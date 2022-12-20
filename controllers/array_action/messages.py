@@ -80,3 +80,5 @@ SNAPSHOT_SOURCE_POOL_MISMATCH_ERROR_MESSAGE = "Snapshot pool : {0} does not matc
 NO_PORT_FOUND_BY_CONNECTIVITY_TYPE_ERROR_MESSAGE = "no port in : {} found by connectivity type : {}"
 
 ALL_THE_PORTS_FOR_HOST_ARE_INVALID = "All the ports for host {} are already assigned or not valid"
+
+IO_GROUP_IS_NOT_VALID = "IO group {} is not valid"

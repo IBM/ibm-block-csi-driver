@@ -58,7 +58,10 @@ def get_status_phase_manifest(phase):
 
 def get_fake_k8s_node_manifest(label):
     node_manifest = _generate_manifest(test_settings.FAKE_NODE_NAME)
-    node_manifest[test_settings.METADATA_FIELD][test_settings.NODE_LABELS_FIELD] = {label: test_settings.TRUE_STRING}
+    node_manifest[test_settings.METADATA_FIELD][test_settings.NODE_LABELS_FIELD] = {
+        label: test_settings.TRUE_STRING,
+        common_settings.IO_GROUP_LABEL_PREFIX + str(0): test_settings.TRUE_STRING,
+        common_settings.IO_GROUP_LABEL_PREFIX + str(2): test_settings.TRUE_STRING}
     return node_manifest
 
 
@@ -120,4 +123,11 @@ def get_metadata_with_manage_node_labels_manifest(label_value):
         test_settings.METADATA_FIELD: {
             test_settings.NODE_LABELS_FIELD: {test_settings.MANAGE_NODE_LABEL: label_value}
         }
+    }
+
+
+def get_host_io_group_manifest():
+    return {
+        test_settings.IO_GROUP_ID_FIELD: test_settings.IO_GROUP_IDS,
+        common_settings.NAME_FIELD: test_settings.IO_GROUP_NAMES
     }

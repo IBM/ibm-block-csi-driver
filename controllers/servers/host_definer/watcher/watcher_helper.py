@@ -13,7 +13,8 @@ import controllers.servers.host_definer.messages as messages
 from controllers.servers.host_definer.kubernetes_manager.manager import KubernetesManager
 from controllers.servers.host_definer import settings
 import controllers.common.settings as common_settings
-from controllers.servers.host_definer.types import DefineHostRequest, DefineHostResponse, HostDefinitionInfo, SecretInfo
+from controllers.servers.host_definer.types import (
+    DefineHostRequest, DefineHostResponse, HostDefinitionInfo, SecretInfo, ManagedNode)
 from controllers.servers.host_definer.storage_manager.host_definer_server import HostDefinerServicer
 
 MANAGED_SECRETS = []
@@ -51,7 +52,7 @@ class Watcher(KubernetesManager):
 
     def _add_name_to_host_definition_info(self, node_name, host_definition_info):
         host_definition_info.node_name = node_name
-        host_definition_info.node_id = NODES[node_name]
+        host_definition_info.node_id = NODES[node_name].node_id
         host_definition_info.name = self._get_host_definition_name(node_name)
         return host_definition_info
 
@@ -62,8 +63,8 @@ class Watcher(KubernetesManager):
             return
         host_definition_info = self._update_host_definition_info(host_definition_info)
         response = self._define_host(host_definition_info)
-        current_host_definition_info_on_cluster = self._create_host_definition_if_not_exist(host_definition_info)
-        self._update_host_definition_from_storage_response(current_host_definition_info_on_cluster.name, response)
+        current_host_definition_info_on_cluster = self._create_host_definition_if_not_exist(
+            host_definition_info, response)
         self._set_status_to_host_definition_after_definition(
             response.error_message, current_host_definition_info_on_cluster)
 
@@ -78,8 +79,8 @@ class Watcher(KubernetesManager):
     def _define_host(self, host_definition_info):
         return self._ensure_definition_state(host_definition_info, self.storage_host_servicer.define_host)
 
-    def _create_host_definition_if_not_exist(self, host_definition_info):
-        host_definition_manifest = self._get_host_definition_manifest(host_definition_info)
+    def _create_host_definition_if_not_exist(self, host_definition_info, response):
+        host_definition_manifest = self._get_host_definition_manifest(host_definition_info, response)
         current_host_definition_info_on_cluster = self._get_matching_host_definition_info(
             host_definition_info.node_name, host_definition_info.secret_name, host_definition_info.secret_namespace)
         if current_host_definition_info_on_cluster:
@@ -91,7 +92,7 @@ class Watcher(KubernetesManager):
             logger.info(messages.CREATING_NEW_HOST_DEFINITION.format(host_definition_info.name))
             return self._create_host_definition(host_definition_manifest)
 
-    def _get_host_definition_manifest(self, host_definition_info):
+    def _get_host_definition_manifest(self, host_definition_info, response):
         return {
             settings.API_VERSION: settings.CSI_IBM_API_VERSION,
             settings.KIND: settings.HOST_DEFINITION_KIND,
@@ -101,46 +102,13 @@ class Watcher(KubernetesManager):
             settings.SPEC: {
                 settings.HOST_DEFINITION_FIELD: {
                     settings.NODE_NAME_FIELD: host_definition_info.node_name,
-                    common_settings.HOST_DEFINITION_NODE_ID_FIELD: NODES[host_definition_info.node_name],
+                    common_settings.HOST_DEFINITION_NODE_ID_FIELD: NODES[host_definition_info.node_name].node_id,
                     settings.SECRET_NAME_FIELD: host_definition_info.secret_name,
-                    settings.SECRET_NAMESPACE_FIELD: host_definition_info.secret_namespace
-                },
-            },
-        }
-
-    def _update_host_definition_from_storage_response(self, host_definition_name, response):
-        self._update_host_definition_connectivity_type(host_definition_name, response.connectivity_type)
-        self._update_host_definition_ports(host_definition_name, response.ports)
-        self._update_host_definition_node_name_on_storage(host_definition_name, response.node_name_on_storage)
-
-    def _update_host_definition_connectivity_type(self, host_definition_name, connectivity_type):
-        logger.info(messages.UPDATE_HOST_DEFINITION_CONNECTIVITY_TYPE.format(host_definition_name, connectivity_type))
-        host_definition_manifest = self._generate_host_definition_manifest(host_definition_name)
-        host_definition_manifest[settings.SPEC][settings.HOST_DEFINITION_FIELD
-                                                ][settings.CONNECTIVITY_TYPE_FIELD] = connectivity_type
-        self._patch_host_definition(host_definition_manifest)
-
-    def _update_host_definition_ports(self, host_definition_name, ports):
-        logger.info(messages.UPDATE_HOST_DEFINITION_PORTS.format(host_definition_name, ports))
-        host_definition_manifest = self._generate_host_definition_manifest(host_definition_name)
-        host_definition_manifest[settings.SPEC][settings.HOST_DEFINITION_FIELD][settings.PORTS_FIELD] = ports
-        self._patch_host_definition(host_definition_manifest)
-
-    def _update_host_definition_node_name_on_storage(self, host_definition_name, node_name_on_storage):
-        logger.info(messages.UPDATE_HOST_DEFINITION_NODE_NAME_ON_STORAGE.format(
-            host_definition_name, node_name_on_storage))
-        host_definition_manifest = self._generate_host_definition_manifest(host_definition_name)
-        host_definition_manifest[settings.SPEC][settings.HOST_DEFINITION_FIELD
-                                                ][settings.NODE_NAME_ON_STORAGE_FIELD] = node_name_on_storage
-        self._patch_host_definition(host_definition_manifest)
-
-    def _generate_host_definition_manifest(self, host_definition_name):
-        return {
-            settings.METADATA: {
-                common_settings.NAME_FIELD: host_definition_name,
-            },
-            settings.SPEC: {
-                settings.HOST_DEFINITION_FIELD: {
+                    settings.SECRET_NAMESPACE_FIELD: host_definition_info.secret_namespace,
+                    settings.CONNECTIVITY_TYPE_FIELD: response.connectivity_type,
+                    settings.PORTS_FIELD: response.ports,
+                    settings.NODE_NAME_ON_STORAGE_FIELD: response.node_name_on_storage,
+                    settings.IO_GROUP_FIELD: response.io_group
                 },
             },
         }
@@ -268,6 +236,7 @@ class Watcher(KubernetesManager):
         if request:
             request.node_id_from_host_definition = host_definition_info.node_id
             request.node_id_from_csi_node = self._get_node_id_by_node(host_definition_info)
+            request.io_group = self._get_io_group_by_node(host_definition_info.node_name)
         return request
 
     def _get_new_request(self, labels):
@@ -331,9 +300,15 @@ class Watcher(KubernetesManager):
 
     def _get_node_id_by_node(self, host_definition_info):
         try:
-            return NODES[host_definition_info.node_name]
+            return NODES[host_definition_info.node_name].node_id
         except Exception:
             return host_definition_info.node_id
+
+    def _get_io_group_by_node(self, node_name):
+        try:
+            return NODES[node_name].io_group
+        except Exception:
+            return ''
 
     def _get_host_definition_name(self, node_name):
         return '{0}-{1}'.format(node_name, self._get_random_string()).replace('_', '.')
@@ -344,13 +319,17 @@ class Watcher(KubernetesManager):
     def _add_node_to_nodes(self, csi_node_info):
         logger.info(messages.NEW_KUBERNETES_NODE.format(csi_node_info.name))
         self._add_manage_node_label_to_node(csi_node_info.name)
-        NODES[csi_node_info.name] = csi_node_info.node_id
+        NODES[csi_node_info.name] = self._generate_managed_node(csi_node_info)
 
     def _add_manage_node_label_to_node(self, node_name):
         if self._is_node_has_manage_node_label(node_name):
             return
         logger.info(messages.ADD_LABEL_TO_NODE.format(settings.MANAGE_NODE_LABEL, node_name))
         self._update_manage_node_label(node_name, settings.TRUE_STRING)
+
+    def _generate_managed_node(self, csi_node_info):
+        node_info = self._get_node_info(csi_node_info.name)
+        return ManagedNode(csi_node_info, node_info.labels)
 
     def _remove_manage_node_label(self, node_name):
         if self._is_managed_by_host_definer_label_should_be_removed(node_name):

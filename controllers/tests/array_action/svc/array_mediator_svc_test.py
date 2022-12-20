@@ -2026,18 +2026,19 @@ class TestArrayMediatorSVC(unittest.TestCase):
             array_settings.NVME_OVER_FC_CONNECTIVITY_TYPE, array_settings.DUMMY_MULTIPLE_IO_GROUP_STRING)
         self.svc.client.svctask.mkhost.assert_called_once_with(name=common_settings.HOST_NAME,
                                                                nqn=array_settings.DUMMY_NVME_NQN1,
-                                                               protocol=svc_settings.MKHOST_NVME_PROTOCOL_VALUE)
+                                                               protocol=svc_settings.MKHOST_NVME_PROTOCOL_VALUE,
+                                                               iogrp=array_settings.DUMMY_MULTIPLE_IO_GROUP_STRING)
 
     def test_create_host_fc_success(self):
         self.svc.create_host(
             common_settings.HOST_NAME,
             Initiators(
-                [],
-                [array_settings.DUMMY_FC_WWN1, array_settings.DUMMY_FC_WWN2],
+                [], [array_settings.DUMMY_FC_WWN1, array_settings.DUMMY_FC_WWN2],
                 [array_settings.DUMMY_NODE1_IQN]),
             array_settings.FC_CONNECTIVITY_TYPE, array_settings.DUMMY_MULTIPLE_IO_GROUP_STRING)
         self.svc.client.svctask.mkhost.assert_called_once_with(name=common_settings.HOST_NAME,
-                                                               fcwwpn=array_settings.DUMMY_FC_WWN1)
+                                                               fcwwpn=array_settings.DUMMY_FC_WWN1,
+                                                               iogrp=array_settings.DUMMY_MULTIPLE_IO_GROUP_STRING)
 
     def test_create_host_fc_when_one_port_is_not_valid_success(self):
         self.svc.client.svctask.mkhost.side_effect = [CLIFailureError('CMMVC5867E'), Mock()]
@@ -2050,7 +2051,8 @@ class TestArrayMediatorSVC(unittest.TestCase):
         self.svc.create_host(common_settings.HOST_NAME, Initiators([], [], [array_settings.DUMMY_NODE1_IQN]),
                              array_settings.ISCSI_CONNECTIVITY_TYPE, array_settings.DUMMY_MULTIPLE_IO_GROUP_STRING)
         self.svc.client.svctask.mkhost.assert_called_once_with(name=common_settings.HOST_NAME,
-                                                               iscsiname=array_settings.DUMMY_NODE1_IQN)
+                                                               iscsiname=array_settings.DUMMY_NODE1_IQN,
+                                                               iogrp=array_settings.DUMMY_MULTIPLE_IO_GROUP_STRING)
 
     def test_create_host_fc_when_two_ports_are_not_valid_failed(self):
         self.svc.client.svctask.mkhost.side_effect = [CLIFailureError('CMMVC5867E'), CLIFailureError('CMMVC5867E')]
@@ -2067,6 +2069,13 @@ class TestArrayMediatorSVC(unittest.TestCase):
                                  svc_settings.MKHOST_NVME_PROTOCOL_VALUE,
                                  array_settings.DUMMY_MULTIPLE_IO_GROUP_STRING)
         self.svc.client.svctask.mkhost.assert_not_called()
+
+    def test_create_host_with_invalid_io_group_failed(self):
+        self.svc.client.svctask.mkhost.side_effect = [CLIFailureError('CMMVC5729E')]
+        with self.assertRaises(array_errors.IoGroupIsInValid):
+            self.svc.create_host(common_settings.HOST_NAME,
+                                 Initiators([], [array_settings.DUMMY_FC_WWN1, array_settings.DUMMY_FC_WWN2], []),
+                                 array_settings.FC_CONNECTIVITY_TYPE, array_settings.DUMMY_MULTIPLE_IO_GROUP_STRING)
 
     def _test_create_host_mkhost_errors(self, client_error, expected_error, connectivity_type=""):
         self._test_mediator_method_client_error(self.svc.create_host,
@@ -2214,3 +2223,94 @@ class TestArrayMediatorSVC(unittest.TestCase):
         self._test_get_host_connectivity_type(svc_settings.HOST_WWPN, array_settings.FC_CONNECTIVITY_TYPE)
         self._test_get_host_connectivity_type(svc_settings.HOST_ISCSI_NAME, array_settings.ISCSI_CONNECTIVITY_TYPE)
         self._test_get_host_connectivity_type('some_connectivity_attribute_name', None)
+
+    def test_add_io_group_to_host_success(self):
+        self.svc.add_io_group_to_host(common_settings.HOST_NAME, array_settings.DUMMY_MULTIPLE_IO_GROUP_STRING)
+        self.svc.client.svctask.addhostiogrp.assert_called_once_with(
+            object_id=common_settings.HOST_NAME, iogrp=array_settings.DUMMY_MULTIPLE_IO_GROUP_STRING)
+
+    def test_add_empty_io_group_to_host_success(self):
+        self.svc.add_io_group_to_host(common_settings.HOST_NAME, '')
+        self.svc.client.svctask.addhostiogrp.assert_not_called()
+
+    def test_add_io_group_to_not_exist_host_falied(self):
+        self.svc.client.svctask.addhostiogrp.side_effect = [CLIFailureError('CMMVC5754E')]
+        with self.assertRaises(array_errors.HostNotFoundError):
+            self.svc.add_io_group_to_host(common_settings.HOST_NAME, array_settings.DUMMY_MULTIPLE_IO_GROUP_STRING)
+
+    def test_add_invlid_io_group_to_host_falied(self):
+        self.svc.client.svctask.addhostiogrp.side_effect = [CLIFailureError('CMMVC5729E')]
+        with self.assertRaises(array_errors.IoGroupIsInValid):
+            self.svc.add_io_group_to_host(common_settings.HOST_NAME, array_settings.DUMMY_MULTIPLE_IO_GROUP_STRING)
+
+    def test_add_io_group_to_host_falied(self):
+        self._test_mediator_method_client_error(
+            self.svc.add_io_group_to_host, (common_settings.HOST_NAME, array_settings.DUMMY_MULTIPLE_IO_GROUP_STRING),
+            self.svc.client.svctask.addhostiogrp, Exception("Failed"),
+            Exception)
+
+    def test_remove_io_group_from_host_success(self):
+        self.svc.remove_io_group_from_host(common_settings.HOST_NAME, array_settings.DUMMY_MULTIPLE_IO_GROUP_STRING)
+        self.svc.client.svctask.rmhostiogrp.assert_called_once_with(object_id=common_settings.HOST_NAME,
+                                                                    iogrp=array_settings.DUMMY_MULTIPLE_IO_GROUP_STRING)
+
+    def test_remove_empty_io_group_from_host_success(self):
+        self.svc.remove_io_group_from_host(common_settings.HOST_NAME, '')
+        self.svc.client.svctask.rmhostiogrp.assert_not_called()
+
+    def test_remove_io_group_from_not_exist_host_falied(self):
+        self.svc.client.svctask.rmhostiogrp.side_effect = [CLIFailureError('CMMVC5754E')]
+        with self.assertRaises(array_errors.HostNotFoundError):
+            self.svc.remove_io_group_from_host(common_settings.HOST_NAME, array_settings.DUMMY_MULTIPLE_IO_GROUP_STRING)
+
+    def test_remove_invlid_io_group_from_host_falied(self):
+        self.svc.client.svctask.rmhostiogrp.side_effect = [CLIFailureError('CMMVC5729E')]
+        with self.assertRaises(array_errors.IoGroupIsInValid):
+            self.svc.remove_io_group_from_host(common_settings.HOST_NAME, array_settings.DUMMY_MULTIPLE_IO_GROUP_STRING)
+
+    def test_remove_io_group_from_host_falied(self):
+        self._test_mediator_method_client_error(
+            self.svc.remove_io_group_from_host,
+            (common_settings.HOST_NAME, array_settings.DUMMY_MULTIPLE_IO_GROUP_STRING),
+            self.svc.client.svctask.rmhostiogrp, Exception("Failed"),
+            Exception)
+
+    def _get_lshostiogrp(self, io_group_ids, io_group_names):
+        return {
+            'id': io_group_ids,
+            'name': io_group_names
+        }
+
+    def _assert_get_host_io_group(self, io_group_ids, io_group_names, result):
+        self.assertEqual(type(result.id), list)
+        self.assertEqual(type(result.name), list)
+        if isinstance(io_group_ids, str):
+            io_group_ids = io_group_ids.split(" ")
+        if isinstance(io_group_names, str):
+            io_group_names = io_group_names.split(" ")
+        self.assertEqual(result, self._get_lshostiogrp(io_group_ids, io_group_names))
+
+    def _test_get_host_io_group_success(self, io_group_ids, io_group_names):
+        self.svc.client.svcinfo.lshostiogrp = Mock()
+        self.svc.client.svcinfo.lshostiogrp.return_value = Mock(
+            as_single_element=Munch(self._get_lshostiogrp(io_group_ids, io_group_names)))
+        result = self.svc.get_host_io_group(common_settings.HOST_NAME)
+        self.svc.client.svcinfo.lshostiogrp.assert_called_once_with(object_id=common_settings.HOST_NAME)
+        self._assert_get_host_io_group(io_group_ids, io_group_names, result)
+
+    def test_get_host_multiple_io_groups_success(self):
+        self._test_get_host_io_group_success(svc_settings.MULTIPLE_IO_GROUP_IDS, svc_settings.MULTIPLE_IO_GROUP_NAMES)
+
+    def test_get_host_single_io_group_success(self):
+        self._test_get_host_io_group_success(svc_settings.SINGLE_IO_GROUP_ID, svc_settings.SINGLE_IO_GROUP_NAME)
+
+    def test_get_io_group_from_not_exist_host_falied(self):
+        self.svc.client.svcinfo.lshostiogrp = Mock()
+        self.svc.client.svcinfo.lshostiogrp.side_effect = [CLIFailureError('CMMVC5754E')]
+        with self.assertRaises(array_errors.HostNotFoundError):
+            self.svc.get_host_io_group(common_settings.HOST_NAME)
+
+    def test_get_host_io_group_falied(self):
+        self._test_mediator_method_client_error(self.svc.get_host_io_group,
+                                                (common_settings.HOST_NAME),
+                                                self.svc.client.svcinfo.lshostiogrp, Exception("Failed"), Exception)

@@ -5,8 +5,9 @@ from mock import patch, Mock
 
 import controllers.tests.controller_server.host_definer.utils.k8s_manifests_utils as manifest_utils
 import controllers.tests.controller_server.host_definer.settings as test_settings
+from controllers.tests.common.test_settings import HOST_NAME
 from controllers.servers.host_definer.kubernetes_manager.manager import KubernetesManager
-from controllers.servers.host_definer.types import DefineHostRequest
+from controllers.servers.host_definer.types import DefineHostRequest, DefineHostResponse
 from controllers.servers.csi.controller_types import ArrayConnectionInfo
 
 
@@ -184,8 +185,14 @@ def get_array_connection_info():
 
 
 def get_define_request(prefix='', connectivity_type='', node_id_from_host_definition=''):
-    return DefineHostRequest(prefix, connectivity_type, node_id_from_host_definition,
-                             test_settings.FAKE_NODE_ID, get_array_connection_info())
+    return DefineHostRequest(
+        prefix, connectivity_type, node_id_from_host_definition, test_settings.FAKE_NODE_ID,
+        get_array_connection_info(),
+        test_settings.FAKE_STRING_IO_GROUP)
+
+
+def get_define_response(connectivity_type, ports):
+    return DefineHostResponse('', connectivity_type, ports, HOST_NAME, get_fake_host_io_group_id())
 
 
 def get_fake_secret_info():
@@ -195,3 +202,20 @@ def get_fake_secret_info():
     secret_info.nodes_with_system_id = {}
     secret_info.managed_storage_classes = 1
     return secret_info
+
+
+def get_fake_host_io_group_id():
+    io_group_ids = get_fake_host_io_group().id
+    return [int(io_group_id) for io_group_id in io_group_ids]
+
+
+def get_fake_host_io_group():
+    return Munch.fromDict(manifest_utils.get_host_io_group_manifest())
+
+
+def get_fake_managed_node():
+    managed_node = Mock(spec_set=['name', 'node_id', 'io_group'])
+    managed_node.name = test_settings.FAKE_NODE_NAME
+    managed_node.node_id = test_settings.FAKE_NODE_ID
+    managed_node.io_group = test_settings.FAKE_STRING_IO_GROUP
+    return managed_node
