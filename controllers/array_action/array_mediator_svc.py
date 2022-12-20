@@ -1379,6 +1379,11 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
             return None
 
         volume_group_id = replication_request.volume_internal_id
+        replication_policy = self._get_replication_policy(volume_group_id)
+        if replication_policy != replication_request.replication_policy:
+            logger.info("found volume group: {} with policy: {}".format(volume_group_id,
+                                                                        replication_policy))
+            return None
         replication_mode = self._get_replication_mode(volume_group_id)
         if not replication_mode:
             return None
@@ -1395,6 +1400,12 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
         location_attr_name = f"location{replication_local_location}_replication_mode"
 
         return getattr(volume_group_replication, location_attr_name, None)
+
+    def _get_replication_policy(self, volume_group_id):
+        volume_group_replication = self._lsvolumegroupreplication(volume_group_id)
+        if not volume_group_replication:
+            return None
+        return volume_group_replication.replication_policy_name
 
     def _is_earreplication_supported(self):
         return hasattr(self.client.svctask, "chvolumereplicationinternals")
