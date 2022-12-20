@@ -770,7 +770,7 @@ def validate_modify_volume_group_request(request):
 
 
 def get_replication_object_type_and_id_info(request):
-    object_type = servers_settings.VOLUME_GROUP_TYPE_NAME
+    object_type = servers_settings.VOLUME_TYPE_NAME
     object_id = request.volume_id
     object_info = None
     if object_info:

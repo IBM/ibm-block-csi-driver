@@ -1471,6 +1471,7 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
         replication_policy = replication_request.replication_policy
         volume_group_id = replication_request.volume_internal_id
 
+        self._change_volume_group_policy(volume_group_id)
         self._change_volume_group_policy(volume_group_id, replication_policy)
 
     def _stop_rcrelationship(self, rcrelationship_id, add_access_to_secondary=False):
