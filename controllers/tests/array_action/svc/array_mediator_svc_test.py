@@ -20,7 +20,7 @@ from controllers.tests.common.test_settings import OBJECT_INTERNAL_ID, \
     OTHER_OBJECT_INTERNAL_ID, REPLICATION_NAME, SYSTEM_ID, COPY_TYPE
 from controllers.common.settings import ARRAY_TYPE_SVC, SPACE_EFFICIENCY_THIN, SPACE_EFFICIENCY_COMPRESSED, \
     SPACE_EFFICIENCY_DEDUPLICATED_COMPRESSED, SPACE_EFFICIENCY_DEDUPLICATED_THIN, SPACE_EFFICIENCY_DEDUPLICATED, \
-    SPACE_EFFICIENCY_THICK, VOLUME_GROUP_NAME_SUFFIX
+    SPACE_EFFICIENCY_THICK, VOLUME_GROUP_NAME_SUFFIX, SCSI_PROTOCOL, NVME_PROTOCOL
 
 EMPTY_BYTES = b""
 
@@ -2316,18 +2316,18 @@ class TestArrayMediatorSVC(unittest.TestCase):
                                                 self.svc.client.svcinfo.lshostiogrp, Exception("Failed"), Exception)
 
     def test_change_host_protocol_to_scsi_success(self):
-        self.svc.change_host_protocol(common_settings.HOST_NAME, svc_settings.SCSI_PROTOCOL)
+        self.svc.change_host_protocol(common_settings.HOST_NAME, SCSI_PROTOCOL)
         self.svc.client.svctask.chhost.assert_called_once_with(object_id=common_settings.HOST_NAME,
-                                                               protocol=svc_settings.SCSI_PROTOCOL)
+                                                               protocol=SCSI_PROTOCOL)
 
     def test_change_host_protocol_to_nvme_success(self):
-        self.svc.change_host_protocol(common_settings.HOST_NAME, svc_settings.NVME_PROTOCOL)
+        self.svc.change_host_protocol(common_settings.HOST_NAME, NVME_PROTOCOL)
         self.svc.client.svctask.chhost.assert_called_once_with(object_id=common_settings.HOST_NAME,
-                                                               protocol=svc_settings.NVME_PROTOCOL)
+                                                               protocol=NVME_PROTOCOL)
 
     def _test_change_host_protocol_chhost_errors(self, client_error, expected_error):
         self._test_mediator_method_client_error(self.svc.change_host_protocol,
-                                                (common_settings.HOST_NAME, svc_settings.SCSI_PROTOCOL),
+                                                (common_settings.HOST_NAME, SCSI_PROTOCOL),
                                                 self.svc.client.svctask.chhost, client_error,
                                                 expected_error)
 

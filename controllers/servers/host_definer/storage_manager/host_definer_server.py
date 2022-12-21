@@ -81,9 +81,7 @@ class HostDefinerServicer:
         connectivity_type_from_user = get_initiators_connectivity_type(initiators, request.connectivity_type_from_user)
         connectivity_type_from_host = array_mediator.get_host_connectivity_type(host)
         if self._is_protocol_switched(connectivity_type_from_user, connectivity_type_from_host):
-            logger.info(messages.HOST_PROTOCOL_SHOULD_BE_CHANGE.format(host))
-            array_mediator.delete_host(host)
-            self._create_host(host, array_mediator, request)
+            self._change_host_protocol(array_mediator, host, connectivity_type_from_host, request)
         elif self._is_port_update_needed_when_same_protocol(request, connectivity_type_from_user,
                                                             connectivity_type_from_host):
             logger.info(messages.HOST_PORTS_SHOULD_BE_CHANGE.format(host, initiators))
@@ -99,15 +97,48 @@ class HostDefinerServicer:
             self._is_switching_from_scsi_to_nvme(connectivity_type_from_user, connectivity_type_from_host)
 
     def _is_switching_from_nvme_to_scsi(self, connectivity_type_from_user, connectivity_type_from_host):
-        return connectivity_type_from_host == array_config.NVME_OVER_FC_CONNECTIVITY_TYPE and \
-            self._is_connectivity_type_scsi(connectivity_type_from_user)
+        return self._is_protocol_nvme(connectivity_type_from_host) and \
+            self._is_protocol_scsi(connectivity_type_from_user)
 
     def _is_switching_from_scsi_to_nvme(self, connectivity_type_from_user, connectivity_type_from_host):
-        return self._is_connectivity_type_scsi(connectivity_type_from_host) and \
-            connectivity_type_from_user == array_config.NVME_OVER_FC_CONNECTIVITY_TYPE
+        return self._is_protocol_scsi(connectivity_type_from_host) and \
+            self._is_protocol_nvme(connectivity_type_from_user)
 
-    def _is_connectivity_type_scsi(self, connectivity_type):
+    def _change_host_protocol(self, array_mediator, host_name, connectivity_type_from_host, request):
+        logger.info(messages.HOST_PROTOCOL_SHOULD_BE_CHANGE.format(host_name))
+        try:
+            self._change_host_protocol_with_chhost(array_mediator, host_name, connectivity_type_from_host, request)
+        except Exception as ex:
+            logger.error(ex)
+            logger.info(messages.COULD_NOT_CHANGE_HOST_PROTOCOL_USING_CHHOST.format(host_name))
+            array_mediator.delete_host(host_name)
+            self._create_host(host_name, array_mediator, request)
+
+    def _change_host_protocol_with_chhost(self, array_mediator, host_name, connectivity_type_from_host, request):
+        self._remove_host_ports(array_mediator, host_name, connectivity_type_from_host)
+        initiators = self._get_initiators_from_node_id(request.node_id_from_csi_node)
+        connectivity_type_from_user = get_initiators_connectivity_type(initiators, request.connectivity_type_from_user)
+        protocol = self._get_host_protocol(connectivity_type_from_user)
+        array_mediator.change_host_protocol(host_name, protocol)
+        array_mediator.add_ports_to_host(host_name, initiators, connectivity_type_from_user)
+
+    def _remove_host_ports(self, array_mediator, host_name, connectivity_type):
+        if connectivity_type:
+            ports_to_remove = array_mediator.get_host_connectivity_ports(host_name, connectivity_type)
+            array_mediator.remove_ports_from_host(host_name, ports_to_remove, connectivity_type)
+
+    def _get_host_protocol(self, connectivity_type):
+        if self._is_protocol_scsi(connectivity_type):
+            return common_settings.SCSI_PROTOCOL
+        if self._is_protocol_nvme(connectivity_type):
+            return common_settings.NVME_PROTOCOL
+        return ''
+
+    def _is_protocol_scsi(self, connectivity_type):
         return connectivity_type in [array_config.FC_CONNECTIVITY_TYPE, array_config.ISCSI_CONNECTIVITY_TYPE]
+
+    def _is_protocol_nvme(self, connectivity_type):
+        return connectivity_type == array_config.NVME_OVER_FC_CONNECTIVITY_TYPE
 
     def _create_host(self, host, array_mediator, request):
         initiators = self._get_initiators_from_node_id(request.node_id_from_csi_node)
@@ -119,11 +150,6 @@ class HostDefinerServicer:
             self, request, connectivity_type_from_user, connectivity_type_from_host):
         return connectivity_type_from_user != connectivity_type_from_host \
             or request.node_id_from_csi_node != request.node_id_from_host_definition
-
-    def _remove_host_ports(self, array_mediator, host_name, connectivity_type):
-        if connectivity_type:
-            ports_to_remove = array_mediator.get_host_connectivity_ports(host_name, connectivity_type)
-            array_mediator.remove_ports_from_host(host_name, ports_to_remove, connectivity_type)
 
     def _update_host_io_group(self, request, host, array_mediator):
         io_group_from_host = array_mediator.get_host_io_group(host)

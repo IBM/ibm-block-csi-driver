@@ -73,3 +73,5 @@ NEW_MANAGED_SECRET = 'New managed secret {} in namespace {}, defining nodes on i
 DEFINE_NODE_ON_ALL_MANAGED_SECRETS = 'Define node {} on all managed secrets'
 DEFINE_NODE_ON_SECRET = 'Defining node {} on secret {} in namespace {}'
 GENERATE_REQUEST_FOR_NODE = 'Generating define request for node {}'
+COULD_NOT_CHANGE_HOST_PROTOCOL_USING_CHHOST = "Could not change host [{}] protocol using chhost command, "\
+    "changing the host protocol by deleting it and creating it again"
