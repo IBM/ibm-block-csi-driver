@@ -108,7 +108,8 @@ class Watcher(KubernetesManager):
                     settings.CONNECTIVITY_TYPE_FIELD: response.connectivity_type,
                     settings.PORTS_FIELD: response.ports,
                     settings.NODE_NAME_ON_STORAGE_FIELD: response.node_name_on_storage,
-                    settings.IO_GROUP_FIELD: response.io_group
+                    settings.IO_GROUP_FIELD: response.io_group,
+                    settings.MANAGEMENT_ADDRESS_FIELD: response.management_address
                 },
             },
         }

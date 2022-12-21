@@ -5,7 +5,7 @@ from mock import patch, Mock
 
 import controllers.tests.controller_server.host_definer.utils.k8s_manifests_utils as manifest_utils
 import controllers.tests.controller_server.host_definer.settings as test_settings
-from controllers.tests.common.test_settings import HOST_NAME
+from controllers.tests.common.test_settings import HOST_NAME, SECRET_MANAGEMENT_ADDRESS_VALUE
 from controllers.servers.host_definer.kubernetes_manager.manager import KubernetesManager
 from controllers.servers.host_definer.types import DefineHostRequest, DefineHostResponse
 from controllers.servers.csi.controller_types import ArrayConnectionInfo
@@ -192,7 +192,9 @@ def get_define_request(prefix='', connectivity_type='', node_id_from_host_defini
 
 
 def get_define_response(connectivity_type, ports):
-    return DefineHostResponse('', connectivity_type, ports, HOST_NAME, get_fake_host_io_group_id())
+    return DefineHostResponse(
+        '', connectivity_type, ports, HOST_NAME, get_fake_host_io_group_id(),
+        SECRET_MANAGEMENT_ADDRESS_VALUE)
 
 
 def get_fake_secret_info():
