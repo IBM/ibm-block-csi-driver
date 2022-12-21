@@ -82,3 +82,8 @@ NO_PORT_FOUND_BY_CONNECTIVITY_TYPE_ERROR_MESSAGE = "no port in : {} found by con
 ALL_THE_PORTS_FOR_HOST_ARE_INVALID = "All the ports for host {} are already assigned or not valid"
 
 IO_GROUP_IS_NOT_VALID = "IO group {} is not valid"
+
+UNSUPPORTED_PARAMETER = "The parameter {} is not a supported parameter"
+
+CANNOT_CHANGE_HOST_PROTOCOL_BECAUSE_OF_MAPPED_PORTS = "The host protocol cannot be changed"\
+    " because the host {} has ports configured."
