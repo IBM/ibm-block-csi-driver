@@ -77,7 +77,7 @@ class VolumeGroupInterface(ABC):
         """
         raise NotImplementedError
 
-    def remove_volume_from_volume_group(self, volume_group_id, volume_id):
+    def remove_volume_from_volume_group(self, volume_id):
         """
         This function should remove a volume from a volume group in the storage system.
 
