@@ -3,10 +3,11 @@ from controllers.array_action.errors import HostNotFoundError, HostAlreadyExists
 from controllers.array_action.storage_agent import detect_array_type, get_agent
 from controllers.common.csi_logger import get_stdout_logger
 from controllers.common.node_info import NodeIdInfo
+import controllers.common.settings as common_settings
 from controllers.servers.host_definer.types import DefineHostResponse
 from controllers.servers.utils import join_object_prefix_with_name, get_initiators_connectivity_type
 import controllers.servers.host_definer.settings as host_definer_settings
-import controllers.common.settings as common_settings
+from controllers.servers.host_definer import messages
 
 logger = get_stdout_logger()
 
@@ -14,13 +15,15 @@ logger = get_stdout_logger()
 class HostDefinerServicer:
     def define_host(self, request):
         array_connection_info = request.array_connection_info
+        array_addresses = array_connection_info.array_addresses
         node_id_info = NodeIdInfo(request.node_id_from_csi_node)
         initiators = node_id_info.initiators
+        node_name = node_id_info.node_name
         connectivity_type_from_user = get_initiators_connectivity_type(initiators, request.connectivity_type_from_user)
-        host_name = join_object_prefix_with_name(prefix=request.prefix, name=node_id_info.node_name)
-        logger.debug("host name : {}".format(host_name))
+        host_name = join_object_prefix_with_name(prefix=request.prefix, name=node_name)
+        logger.info(messages.DEFINE_NODE_ON_ARRAYS.format(node_name, array_addresses))
         try:
-            array_type = detect_array_type(array_connection_info.array_addresses)
+            array_type = detect_array_type(array_addresses)
             with get_agent(array_connection_info, array_type).get_mediator() as array_mediator:
                 try:
                     initiators_from_host_definition = self._get_initiators_from_node_id(
@@ -30,7 +33,7 @@ class HostDefinerServicer:
                     self._update_host_io_group(request, found_host_name, array_mediator)
                     host_name = found_host_name
                 except HostNotFoundError:
-                    logger.debug("host was not found. creating a new host with initiators: {0}".format(initiators))
+                    logger.debug(messages.NODE_WAS_NOT_FOUND_CREATE_NEW_HOST_DEFINITION.format(node_name, initiators))
                     try:
                         self._create_host(host_name, array_mediator, request)
                     except HostAlreadyExists:
@@ -41,24 +44,27 @@ class HostDefinerServicer:
                         host_name = host.name
 
                 return self._generate_response(
-                    array_mediator, host_name, connectivity_type_from_user, array_connection_info.array_addresses[0])
+                    array_mediator, host_name, connectivity_type_from_user, array_addresses[0])
         except Exception as ex:
             logger.exception(ex)
             return DefineHostResponse(error_message=str(ex))
 
     def undefine_host(self, request):
         node_id_info = NodeIdInfo(request.node_id_from_csi_node)
+        array_connection_info = request.array_connection_info
+        array_addresses = array_connection_info.array_addresses
         initiators = node_id_info.initiators
+        node_name = node_id_info.node_name
+        logger.info(messages.UNDEFINE_NODE_FROM_ARRAYS.format(node_name, array_addresses))
         try:
-            array_connection_info = request.array_connection_info
-            array_type = detect_array_type(array_connection_info.array_addresses)
+            array_type = detect_array_type(array_addresses)
             with get_agent(array_connection_info, array_type).get_mediator() as array_mediator:
 
                 try:
                     found_host_name = self._get_host_name(initiators, array_mediator)
                     array_mediator.delete_host(found_host_name)
                 except HostNotFoundError:
-                    logger.debug("host was not found")
+                    logger.debug(messages.NODE_WAS_NOT_FOUND.format(node_name))
 
                 return DefineHostResponse()
         except Exception as ex:
@@ -67,7 +73,7 @@ class HostDefinerServicer:
 
     def _get_host_name(self, initiators, array_mediator):
         found_host_name, _ = array_mediator.get_host_by_host_identifiers(initiators)
-        logger.debug("host found : {}".format(found_host_name))
+        logger.debug(messages.HOST_FOUND.format(found_host_name))
         return found_host_name
 
     def _update_host_ports(self, request, host, array_mediator):
@@ -75,10 +81,12 @@ class HostDefinerServicer:
         connectivity_type_from_user = get_initiators_connectivity_type(initiators, request.connectivity_type_from_user)
         connectivity_type_from_host = array_mediator.get_host_connectivity_type(host)
         if self._is_protocol_switched(connectivity_type_from_user, connectivity_type_from_host):
+            logger.info(messages.HOST_PROTOCOL_SHOULD_BE_CHANGE.format(host))
             array_mediator.delete_host(host)
             self._create_host(host, array_mediator, request)
         elif self._is_port_update_needed_when_same_protocol(request, connectivity_type_from_user,
                                                             connectivity_type_from_host):
+            logger.info(messages.HOST_PORTS_SHOULD_BE_CHANGE.format(host, initiators))
             self._remove_host_ports(array_mediator, host, connectivity_type_from_host)
             array_mediator.add_ports_to_host(host, initiators, connectivity_type_from_user)
 
@@ -157,7 +165,7 @@ class HostDefinerServicer:
 
     def _validate_host(self, host, initiators):
         if host.initiators not in initiators:
-            error_message = "host ({}) found but with different initiators: {}".format(host, host.initiators)
+            error_message = messages.HOST_FOUND_WITH_DIFFERENT_INITIATOR.format(host, host.initiators)
             logger.exception(error_message)
             return DefineHostResponse(error_message=str(error_message))
         return DefineHostResponse()
@@ -169,4 +177,5 @@ class HostDefinerServicer:
         define_host_response.ports = ports
         io_group_ids = array_mediator.get_host_io_group(host_name).id
         define_host_response.io_group = [int(io_group_id) for io_group_id in io_group_ids]
+        logger.info(messages.HOST_CREATED.format(host_name, management_address, ports, define_host_response.io_group))
         return define_host_response

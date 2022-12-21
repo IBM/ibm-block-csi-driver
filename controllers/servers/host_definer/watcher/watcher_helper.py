@@ -28,6 +28,7 @@ class Watcher(KubernetesManager):
         self.storage_host_servicer = HostDefinerServicer()
 
     def _define_host_on_all_storages(self, node_name):
+        logger.info(messages.DEFINE_NODE_ON_ALL_MANAGED_SECRETS.format(node_name))
         for secret_info in MANAGED_SECRETS:
             if secret_info.managed_storage_classes == 0:
                 continue
@@ -77,6 +78,8 @@ class Watcher(KubernetesManager):
         return host_definition_info
 
     def _define_host(self, host_definition_info):
+        logger.info(messages.DEFINE_NODE_ON_SECRET.format(host_definition_info.node_name,
+                    host_definition_info.secret_name, host_definition_info.secret_namespace))
         return self._ensure_definition_state(host_definition_info, self.storage_host_servicer.define_host)
 
     def _create_host_definition_if_not_exist(self, host_definition_info, response):
@@ -124,11 +127,8 @@ class Watcher(KubernetesManager):
             self._set_host_definition_status_to_ready(host_definition_info)
 
     def _delete_definition(self, host_definition_info):
-        node_name = host_definition_info.node_name
         response = DefineHostResponse()
-        logger.info(messages.UNDEFINED_HOST.format(
-            node_name, host_definition_info.secret_name, host_definition_info.secret_namespace))
-        if self._is_node_should_be_managed_on_secret(node_name, host_definition_info.secret_name,
+        if self._is_node_should_be_managed_on_secret(host_definition_info.node_name, host_definition_info.secret_name,
                                                      host_definition_info.secret_namespace):
             response = self._undefine_host(host_definition_info)
         self._handle_k8s_host_definition_after_undefine_action_if_exist(host_definition_info, response)
@@ -167,6 +167,8 @@ class Watcher(KubernetesManager):
         return False
 
     def _undefine_host(self, host_definition_info):
+        logger.info(messages.UNDEFINED_HOST.format(host_definition_info.node_name,
+                    host_definition_info.secret_name, host_definition_info.secret_namespace))
         return self._ensure_definition_state(host_definition_info, self.storage_host_servicer.undefine_host)
 
     def _handle_k8s_host_definition_after_undefine_action_if_exist(self, host_definition_info, response):
@@ -230,7 +232,9 @@ class Watcher(KubernetesManager):
         return define_function(request)
 
     def _get_request_from_host_definition(self, host_definition_info):
-        node_info = self._get_node_info(host_definition_info.node_name)
+        node_name = host_definition_info.node_name
+        logger.info(messages.GENERATE_REQUEST_FOR_NODE.format(node_name))
+        node_info = self._get_node_info(node_name)
         request = self._get_new_request(node_info.labels)
         request = self._add_array_connectivity_info_to_request(
             request, host_definition_info.secret_name, host_definition_info.secret_namespace, node_info.labels)
