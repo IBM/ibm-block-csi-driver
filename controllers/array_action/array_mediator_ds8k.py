@@ -723,3 +723,6 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
 
     def get_host_io_group(self, host_name):
         raise NotImplementedError
+
+    def change_host_protocol(self, host_name, protocol):
+        raise NotImplementedError

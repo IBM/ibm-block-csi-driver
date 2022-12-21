@@ -1923,3 +1923,6 @@ class SVCArrayMediator(ArrayMediatorAbstract):
         io_group.name = split_string(io_group.name)
         logger.info(svc_messages.HOST_IO_GROUP_IDS.format(host_name, io_group.id))
         return io_group
+
+    def change_host_protocol(self, host_name, protocol):
+        raise NotImplementedError
