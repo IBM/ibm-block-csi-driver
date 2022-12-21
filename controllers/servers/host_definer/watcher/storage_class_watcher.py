@@ -72,12 +72,6 @@ class StorageClassWatcher(Watcher):
                 storage_class_info.parameters[prefix + secret_name_suffix.replace(
                     common_settings.NAME_FIELD, common_settings.NAMESPACE_FIELD)])
 
-    def _is_topology_secret(self, secret_data):
-        self._validate_secret(secret_data)
-        if self._get_secret_secret_config(secret_data):
-            return True
-        return False
-
     def _add_secret_info_to_list(self, secret_info, list_with_secrets_info):
         for secret_info_in_list in list_with_secrets_info:
             if secret_info_in_list.name == secret_info.name and \
