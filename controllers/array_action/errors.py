@@ -280,3 +280,17 @@ class IoGroupIsInValid(BaseArrayActionException):
     def __init__(self, io_group):
         super().__init__()
         self.message = messages.IO_GROUP_IS_NOT_VALID.format(io_group)
+
+
+class UnSupportedParameter(BaseArrayActionException):
+
+    def __init__(self, parameter):
+        super().__init__()
+        self.message = messages.UNSUPPORTED_PARAMETER.format(parameter)
+
+
+class CannotChangeHostProtocolBecauseOfMappedPorts(BaseArrayActionException):
+
+    def __init__(self, host_name):
+        super().__init__()
+        self.message = messages.CANNOT_CHANGE_HOST_PROTOCOL_BECAUSE_OF_MAPPED_PORTS.format(host_name)

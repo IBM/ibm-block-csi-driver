@@ -56,12 +56,14 @@ class CsiNodeWatcher(Watcher):
             NODES.pop(node_name, None)
 
     def _is_host_part_of_update(self, worker):
+        logger.info(messages.CHECK_IF_NODE_IS_PART_OF_UPDATE.format(worker))
         daemon_set_name = self._wait_until_all_daemon_set_pods_are_up_to_date()
         if daemon_set_name:
             return self._is_csi_node_pod_running_on_worker(worker, daemon_set_name)
         return False
 
     def _is_csi_node_pod_running_on_worker(self, worker, daemon_set_name):
+        logger.info(messages.CHECK_IF_CSI_NODE_POD_IS_RUNNING.format(worker))
         csi_pods_info = self._get_csi_pods_info()
         for pod_info in csi_pods_info:
             if (pod_info.node_name == worker) and (daemon_set_name in pod_info.name):
@@ -74,6 +76,8 @@ class CsiNodeWatcher(Watcher):
             return None
         status = csi_daemon_set.status
         while status.updated_number_scheduled != status.desired_number_scheduled:
+            logger.info(messages.UPDATED_CSI_NODE_VS_DESIRED.format(
+                status.updated_number_scheduled, status.desired_number_scheduled))
             if status.desired_number_scheduled == 0:
                 return None
             csi_daemon_set = self._get_csi_daemon_set()
@@ -90,7 +94,8 @@ class CsiNodeWatcher(Watcher):
                 csi_node_info.name, secret_name, secret_namespace)
             if host_definition_info:
                 if self._is_node_id_changed(host_definition_info.node_id, csi_node_info.node_id):
-                    logger.info(messages.NODE_ID_WAS_CHANGED.format(csi_node_info.name))
+                    logger.info(messages.NODE_ID_WAS_CHANGED.format(csi_node_info.name,
+                                host_definition_info.node_id, csi_node_info.node_id))
                     NODES[csi_node_info.name] = self._generate_managed_node(csi_node_info)
                     self._create_definition(host_definition_info)
 

@@ -32,6 +32,7 @@ class HostDefinitionWatcher(Watcher):
         return phase.startswith(settings.PENDING_PREFIX)
 
     def _define_host_definition_after_pending_state(self, host_definition_info):
+        logger.info(messages.FOUND_HOST_DEFINITION_IN_PENDING_STATE.format(host_definition_info.name))
         remove_host_thread = Thread(target=self._define_host_using_exponential_backoff,
                                     args=(host_definition_info, ))
         remove_host_thread.start()
