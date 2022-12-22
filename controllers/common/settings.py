@@ -31,5 +31,7 @@ NAMESPACE_FIELD = 'namespace'
 IO_GROUP_DELIMITER = ':'
 IO_GROUP_LABEL_PREFIX = 'hostdefiner.block.csi.ibm.com/io-group-'
 
+EAR_VOLUME_FC_MAP_COUNT = "2"
+
 SCSI_PROTOCOL = 'scsi'
 NVME_PROTOCOL = 'nvme'

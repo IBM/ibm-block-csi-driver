@@ -1757,6 +1757,9 @@ class SVCArrayMediator(ArrayMediatorAbstract):
         if not vdisk_uid:
             return False
         cli_volume = self._get_cli_volume_by_wwn(vdisk_uid, not_exist_err=False)
+        if self._is_earreplication_supported():
+            return cli_volume and cli_volume.replication_mode and cli_volume.fc_map_count != \
+                   common_settings.EAR_VOLUME_FC_MAP_COUNT
         return cli_volume and cli_volume.FC_id
 
     def _raise_invalid_io_group(self, io_group, error_message):
