@@ -10,6 +10,7 @@ from retry import retry
 
 import controllers.array_action.errors as array_errors
 import controllers.array_action.settings as array_settings
+from controllers.array_action import svc_messages
 import controllers.servers.settings as controller_settings
 from controllers.array_action.array_action_types import Volume, Snapshot, Replication, Host
 from controllers.array_action.array_mediator_abstract import ArrayMediatorAbstract
@@ -46,6 +47,8 @@ NOT_REDUCTION_POOL = 'CMMVC9301E'
 NOT_ENOUGH_EXTENTS_IN_POOL_EXPAND = 'CMMVC5860E'
 NOT_ENOUGH_EXTENTS_IN_POOL_CREATE = 'CMMVC8710E'
 NOT_VALID_IO_GROUP = 'CMMVC5729E'
+NOT_SUPPORTED_PARAMETER = 'CMMVC5709E'
+CANNOT_CHANGE_HOST_PROTOCOL_BECAUSE_OF_MAPPED_PORTS = 'CMMVC9331E'
 
 HOST_NQN = 'nqn'
 HOST_WWPN = 'WWPN'
@@ -179,6 +182,13 @@ def build_stop_replication_kwargs(rcrelationship_id, add_access):
     if add_access:
         cli_kwargs.update({'access': True})
     return cli_kwargs
+
+
+def build_change_host_protocol_kwargs(host_name, protocol):
+    return {
+        'object_id': host_name,
+        'protocol': protocol
+    }
 
 
 def _get_cli_volume_space_efficiency_aliases(cli_volume):
@@ -1747,6 +1757,9 @@ class SVCArrayMediator(ArrayMediatorAbstract):
         if not vdisk_uid:
             return False
         cli_volume = self._get_cli_volume_by_wwn(vdisk_uid, not_exist_err=False)
+        if self._is_earreplication_supported():
+            return cli_volume and cli_volume.replication_mode and cli_volume.fc_map_count != \
+                   common_settings.EAR_VOLUME_FC_MAP_COUNT
         return cli_volume and cli_volume.FC_id
 
     def _raise_invalid_io_group(self, io_group, error_message):
@@ -1778,6 +1791,10 @@ class SVCArrayMediator(ArrayMediatorAbstract):
         for port in ports:
             status_code = self._mkhost(host_name, connectivity_type, port, io_group)
             if status_code == 200:
+                if io_group:
+                    logger.info(svc_messages.CREATE_HOST_WITH_IO_GROUP.format(host_name, port, io_group))
+                else:
+                    logger.info(svc_messages.CREATE_HOST_WITHOUT_IO_GROUP.format(host_name, port))
                 return
         raise array_errors.NoPortIsValid(host_name)
 
@@ -1791,6 +1808,7 @@ class SVCArrayMediator(ArrayMediatorAbstract):
             raise ex
 
     def delete_host(self, host_name):
+        logger.info(svc_messages.DELETE_HOST.format(host_name))
         self._rmhost(host_name)
 
     def _raise_error_when_no_ports_added(self, host_name):
@@ -1813,6 +1831,7 @@ class SVCArrayMediator(ArrayMediatorAbstract):
     def add_ports_to_host(self, host_name, initiators, connectivity_type):
         ports = get_connectivity_type_ports(initiators, connectivity_type)
         for port in ports:
+            logger.info(svc_messages.ADD_PORT_TO_HOST.format(port, host_name))
             self._addhostport(host_name, connectivity_type, port)
         self._raise_error_when_no_ports_added(host_name)
 
@@ -1829,27 +1848,34 @@ class SVCArrayMediator(ArrayMediatorAbstract):
 
     def remove_ports_from_host(self, host_name, ports, connectivity_type):
         for port in ports:
+            logger.info(svc_messages.REMOVE_HOST_PORT.format(port, host_name))
             self._rmhostport(host_name, connectivity_type, port)
 
     def get_host_connectivity_ports(self, host_name, connectivity_type):
         cli_host = self._get_cli_host(host_name)
+        ports = None
         if connectivity_type == array_settings.NVME_OVER_FC_CONNECTIVITY_TYPE:
-            return self._get_host_ports(cli_host, HOST_NQN)
+            ports = self._get_host_ports(cli_host, HOST_NQN)
         if connectivity_type == array_settings.FC_CONNECTIVITY_TYPE:
-            return self._get_host_ports(cli_host, HOST_WWPN)
+            ports = self._get_host_ports(cli_host, HOST_WWPN)
         if connectivity_type == array_settings.ISCSI_CONNECTIVITY_TYPE:
-            return self._get_host_ports(cli_host, HOST_ISCSI_NAME)
+            ports = self._get_host_ports(cli_host, HOST_ISCSI_NAME)
+        if ports:
+            logger.info(svc_messages.HOST_PORT_BY_CONNECTIVITY_TYPE.format(host_name, connectivity_type, ports))
+            return ports
         raise array_errors.UnsupportedConnectivityTypeError(connectivity_type)
 
     def get_host_connectivity_type(self, host_name):
+        connectivity_type = None
         cli_host = self._get_cli_host(host_name)
         if hasattr(cli_host, HOST_NQN):
-            return array_settings.NVME_OVER_FC_CONNECTIVITY_TYPE
-        if hasattr(cli_host, HOST_WWPN):
-            return array_settings.FC_CONNECTIVITY_TYPE
-        if hasattr(cli_host, HOST_ISCSI_NAME):
-            return array_settings.ISCSI_CONNECTIVITY_TYPE
-        return None
+            connectivity_type = array_settings.NVME_OVER_FC_CONNECTIVITY_TYPE
+        elif hasattr(cli_host, HOST_WWPN):
+            connectivity_type = array_settings.FC_CONNECTIVITY_TYPE
+        elif hasattr(cli_host, HOST_ISCSI_NAME):
+            connectivity_type = array_settings.ISCSI_CONNECTIVITY_TYPE
+        logger.info(svc_messages.HOST_CONNECTIVITY_TYPE.format(host_name, connectivity_type))
+        return connectivity_type
 
     def _raise_io_group_error(self, host_name, io_group, error_message):
         self._raise_error_when_host_not_exist_or_not_meet_the_rules(host_name, error_message)
@@ -1870,6 +1896,7 @@ class SVCArrayMediator(ArrayMediatorAbstract):
     def add_io_group_to_host(self, host_name, io_group):
         if not io_group:
             return
+        logger.info(svc_messages.ADD_HOST_IO_GROUP.format(io_group, host_name))
         self._addhostiogrp(host_name, io_group)
 
     def _rmhostiogrp(self, host_name, io_group):
@@ -1887,6 +1914,7 @@ class SVCArrayMediator(ArrayMediatorAbstract):
     def remove_io_group_from_host(self, host_name, io_group):
         if not io_group:
             return
+        logger.info(svc_messages.REMOVE_HOST_IO_GROUP.format(io_group, host_name))
         self._rmhostiogrp(host_name, io_group)
 
     def _lshostiogrp(self, host_name):
@@ -1901,7 +1929,38 @@ class SVCArrayMediator(ArrayMediatorAbstract):
             raise ex
 
     def get_host_io_group(self, host_name):
+        logger.info(svc_messages.GET_HOST_IO_GROUP.format(host_name))
         io_group = self._lshostiogrp(host_name)
         io_group.id = split_string(io_group.id)
         io_group.name = split_string(io_group.name)
+        logger.info(svc_messages.HOST_IO_GROUP_IDS.format(host_name, io_group.id))
         return io_group
+
+    def _raise_error_when_host_not_found(self, host_name, error_message):
+        if OBJ_NOT_FOUND in error_message:
+            raise array_errors.HostNotFoundError(host_name)
+
+    def _raise_unsupported_parameter_error(self, error_message, parameter):
+        if NOT_SUPPORTED_PARAMETER in error_message:
+            raise array_errors.UnSupportedParameter(parameter)
+
+    def _raise_error_when_cannot_change_host_protocol_because_of_mapped_ports(self, error_message, host_name):
+        if CANNOT_CHANGE_HOST_PROTOCOL_BECAUSE_OF_MAPPED_PORTS in error_message:
+            raise array_errors.CannotChangeHostProtocolBecauseOfMappedPorts(host_name)
+
+    def _chhost(self, host_name, protocol):
+        cli_kwargs = build_change_host_protocol_kwargs(host_name, protocol)
+        try:
+            self.client.svctask.chhost(**cli_kwargs)
+        except (svc_errors.CommandExecutionError, CLIFailureError) as ex:
+            self._raise_error_when_host_not_found(host_name, ex.my_message)
+            self._raise_unsupported_parameter_error(ex.my_message, 'protocol')
+            self._raise_error_when_cannot_change_host_protocol_because_of_mapped_ports(ex.my_message, host_name)
+            if is_warning_message(ex.my_message):
+                logger.warning("exception encountered during getting io_group, from host {} : {}".format(
+                    host_name, ex.my_message))
+            raise ex
+
+    def change_host_protocol(self, host_name, protocol):
+        self._chhost(host_name, protocol)
+        logger.info(svc_messages.CHANGE_HOST_PROTOCOL.format(host_name, protocol))

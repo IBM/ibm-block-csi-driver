@@ -47,7 +47,10 @@ class StorageClassWatcher(Watcher):
             if self._is_secret(parameter_name):
                 secret_name, secret_namespace = self._get_secret_name_and_namespace(storage_class_info, parameter_name)
                 secret_data = self._get_secret_data(secret_name, secret_namespace)
+                logger.info(messages.SECRET_IS_BEING_USED_BY_STORAGE_CLASS.format(
+                    secret_name, secret_namespace, storage_class_info.name))
                 if self._is_topology_secret(secret_data):
+                    logger.info(messages.SECRET_IS_FROM_TOPOLOGY_TYPE.format(secret_name, secret_namespace))
                     nodes_with_system_id = self._generate_nodes_with_system_id(secret_data)
                     system_ids_topologies = self._generate_secret_system_ids_topologies(secret_data)
                     secret_info = self._generate_secret_info(
@@ -68,12 +71,6 @@ class StorageClassWatcher(Watcher):
         return (storage_class_info.parameters[parameter_name],
                 storage_class_info.parameters[prefix + secret_name_suffix.replace(
                     common_settings.NAME_FIELD, common_settings.NAMESPACE_FIELD)])
-
-    def _is_topology_secret(self, secret_data):
-        self._validate_secret(secret_data)
-        if self._get_secret_secret_config(secret_data):
-            return True
-        return False
 
     def _add_secret_info_to_list(self, secret_info, list_with_secrets_info):
         for secret_info_in_list in list_with_secrets_info:
@@ -103,6 +100,7 @@ class StorageClassWatcher(Watcher):
             MANAGED_SECRETS[index] = secret_info
 
     def _define_nodes_from_secret_info(self, secret_info):
+        logger.info(messages.NEW_MANAGED_SECRET.format(secret_info.name, secret_info.namespace))
         host_definition_info = self._get_host_definition_info_from_secret(secret_info)
         self._define_nodes(host_definition_info)
 
