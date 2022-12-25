@@ -27,7 +27,8 @@ from controllers.tests.common.test_settings import (CLONE_VOLUME_NAME,
                                                     NAME_PREFIX, INTERNAL_SNAPSHOT_ID, SOURCE_VOLUME_ID,
                                                     SECRET_MANAGEMENT_ADDRESS_KEY, SECRET_PASSWORD_KEY,
                                                     SECRET_USERNAME_KEY, SECRET, VOLUME_GROUP_NAME,
-                                                    REQUEST_VOLUME_GROUP_ID, VOLUME_GROUP_UID, REQUEST_VOLUME_ID)
+                                                    REQUEST_VOLUME_GROUP_ID, VOLUME_GROUP_UID, REQUEST_VOLUME_ID,
+                                                    INTERNAL_VOLUME_GROUP_ID)
 from controllers.tests.controller_server.common import mock_get_agent, mock_array_type, mock_mediator, mock_utils_method
 from controllers.tests.utils import ProtoBufMock
 
@@ -1721,7 +1722,7 @@ class TestModifyVolumeGroupMembership(BaseControllerSetUp, CommonControllerTest)
 
         volume_group_response = self.servicer.ModifyVolumeGroupMembership(self.request, self.context)
         self.assertEqual(self.context.code, grpc.StatusCode.OK)
-        self.mediator.add_volume_to_volume_group.assert_called_once_with(VOLUME_GROUP_UID, VOLUME_UID)
+        self.mediator.add_volume_to_volume_group.assert_called_once_with(INTERNAL_VOLUME_GROUP_ID, VOLUME_UID)
         self.mediator.remove_volume_from_volume_group.assert_not_called()
         self.assertEqual(volume_group_response.volume_group.volume_group_id, REQUEST_VOLUME_GROUP_ID)
         self.assertEqual(len(volume_group_response.volume_group.volumes), 1)
