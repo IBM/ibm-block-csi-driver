@@ -605,7 +605,7 @@ class CSIControllerServicer(csi_pb2_grpc.ControllerServicer):
             return csi_pb2.DeleteVolumeGroupResponse()
 
         array_type = volume_group_id_info.array_type
-        volume_group_id = volume_group_id_info.ids.uid
+        volume_group_id = volume_group_id_info.ids.internal_id
         array_connection_info = utils.get_array_connection_info_from_secrets(secrets)
 
         with get_agent(array_connection_info, array_type).get_mediator() as array_mediator:
@@ -626,11 +626,10 @@ class CSIControllerServicer(csi_pb2_grpc.ControllerServicer):
             if volume_id not in volume_ids_in_volume_group:
                 array_mediator.add_volume_to_volume_group(volume_group_id, volume_id)
 
-    def _remove_volumes_missing_from_request(self, array_mediator, volume_ids_in_request, volume_ids_in_volume_group,
-                                             volume_group_id):
+    def _remove_volumes_missing_from_request(self, array_mediator, volume_ids_in_request, volume_ids_in_volume_group):
         for volume_id in volume_ids_in_volume_group:
             if volume_id not in volume_ids_in_request:
-                array_mediator.remove_volume_from_volume_group(volume_group_id, volume_id)
+                array_mediator.remove_volume_from_volume_group(volume_id)
 
     def _get_volume_group(self, array_mediator, volume_group_id):
         try:
@@ -661,7 +660,7 @@ class CSIControllerServicer(csi_pb2_grpc.ControllerServicer):
                                     csi_pb2.ModifyVolumeGroupMembershipResponse)
 
         array_type = volume_group_id_info.array_type
-        volume_group_id = volume_group_id_info.ids.uid
+        volume_group_id = volume_group_id_info.ids.internal_id
         array_connection_info = utils.get_array_connection_info_from_secrets(secrets)
 
         with get_agent(array_connection_info, array_type).get_mediator() as array_mediator:
@@ -674,8 +673,7 @@ class CSIControllerServicer(csi_pb2_grpc.ControllerServicer):
 
             self._add_volumes_missing_from_group(array_mediator, volume_ids_in_request, volume_ids_in_volume_group,
                                                  volume_group_id)
-            self._remove_volumes_missing_from_request(array_mediator, volume_ids_in_request, volume_ids_in_volume_group,
-                                                      volume_group_id)
+            self._remove_volumes_missing_from_request(array_mediator, volume_ids_in_request, volume_ids_in_volume_group)
 
             volume_group = self._get_volume_group(array_mediator, volume_group_id)
 
