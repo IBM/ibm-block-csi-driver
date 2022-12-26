@@ -2090,8 +2090,16 @@ class TestArrayMediatorSVC(unittest.TestCase):
                                  array_settings.FC_CONNECTIVITY_TYPE, array_settings.DUMMY_MULTIPLE_IO_GROUP_STRING)
         self.assertEqual(self.svc.client.svctask.mkhost.call_count, 2)
 
-    def test_create_host_with_connectivity_type_failed(self):
+    def test_create_host_with_empty_ports_failed(self):
         with self.assertRaises(array_errors.NoPortFoundByConnectivityType):
+            self.svc.create_host(common_settings.HOST_NAME,
+                                 Initiators([], [], []),
+                                 "",
+                                 array_settings.DUMMY_MULTIPLE_IO_GROUP_STRING)
+        self.svc.client.svctask.mkhost.assert_not_called()
+
+    def test_create_host_with_connectivity_type_failed(self):
+        with self.assertRaises(array_errors.UnsupportedConnectivityTypeError):
             self.svc.create_host(common_settings.HOST_NAME,
                                  Initiators([], [], [array_settings.DUMMY_NODE1_IQN]),
                                  svc_settings.MKHOST_NVME_PROTOCOL_VALUE,
