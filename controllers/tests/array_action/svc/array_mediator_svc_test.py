@@ -2082,6 +2082,13 @@ class TestArrayMediatorSVC(unittest.TestCase):
                                                                iscsiname=array_settings.DUMMY_NODE1_IQN,
                                                                iogrp=array_settings.DUMMY_MULTIPLE_IO_GROUP_STRING)
 
+    def test_create_host_iscsi_with_empty_io_groupsuccess(self):
+        self.svc.create_host(common_settings.HOST_NAME, Initiators([], [], [array_settings.DUMMY_NODE1_IQN]),
+                             array_settings.ISCSI_CONNECTIVITY_TYPE, "")
+        self.svc.client.svctask.mkhost.assert_called_once_with(name=common_settings.HOST_NAME,
+                                                               iscsiname=array_settings.DUMMY_NODE1_IQN,
+                                                               iogrp=common_settings.DUMMY_FULL_IO_GROUP)
+
     def test_create_host_fc_when_two_ports_are_not_valid_failed(self):
         self.svc.client.svctask.mkhost.side_effect = [CLIFailureError('CMMVC5867E'), CLIFailureError('CMMVC5867E')]
         with self.assertRaises(array_errors.NoPortIsValid):

@@ -129,8 +129,9 @@ def build_create_host_kwargs(host_name, connectivity_type, port, io_group):
     cli_kwargs = _add_port_to_command_kwargs(connectivity_type, port, cli_kwargs)
     if connectivity_type == array_settings.NVME_OVER_FC_CONNECTIVITY_TYPE:
         cli_kwargs['protocol'] = 'nvme'
-    if io_group:
-        cli_kwargs['iogrp'] = io_group
+    if not io_group:
+        io_group = common_settings.FULL_IO_GROUP
+    cli_kwargs['iogrp'] = io_group
     return cli_kwargs
 
 
@@ -1759,7 +1760,7 @@ class SVCArrayMediator(ArrayMediatorAbstract):
         cli_volume = self._get_cli_volume_by_wwn(vdisk_uid, not_exist_err=False)
         if self._is_earreplication_supported():
             return cli_volume and cli_volume.replication_mode and cli_volume.fc_map_count != \
-                   common_settings.EAR_VOLUME_FC_MAP_COUNT
+                common_settings.EAR_VOLUME_FC_MAP_COUNT
         return cli_volume and cli_volume.FC_id
 
     def _raise_invalid_io_group(self, io_group, error_message):
