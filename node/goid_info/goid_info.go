@@ -15,7 +15,7 @@
  */
 
 // We can map goid to a string which will appear in log entry with this goid. In most places it will be volume id.
-// Use "SetAdditionalIDInfo(<info>)" at the begining of API method to specify additional info for current goid.
+// Use "SetAdditionalIDInfo(<info>)" at the beginning of API method to specify additional info for current goid.
 // Directly after use "defer DeleteAdditionalIDInfo()" to remove the info so additionalIDInfoByGoID will not grow endlessly.
 
 package goid_info
