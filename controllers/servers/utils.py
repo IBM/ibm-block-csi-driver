@@ -578,7 +578,8 @@ def validate_addons_request(request, replication_type):
     logger.debug("validating addons request")
 
     logger.debug("validating volume id")
-    if request.volume_id == "" or (replication_type == REPLICATION_TYPE_MIRROR and request.replication_id == ""):
+    if (request.volume_id == "" and not request.replication_source) or\
+            (replication_type == REPLICATION_TYPE_MIRROR and request.replication_id == ""):
         raise ValidationException(messages.VOLUME_ID_SHOULD_NOT_BE_EMPTY_MESSAGE)
 
     if replication_type == REPLICATION_TYPE_EAR:
@@ -619,8 +620,8 @@ def get_addons_replication_type(request):
     return replication_type
 
 
-def generate_addons_replication_request(request, replication_type, object_type):
-    volume_internal_id = _get_volume_internal_id(request, object_type)
+def generate_addons_replication_request(request, replication_type):
+    volume_internal_id = get_replication_object_type_and_id_info(request)
     other_volume_internal_id = _get_other_volume_internal_id(request, replication_type)
 
     other_system_id = request.parameters.get(servers_settings.PARAMETERS_SYSTEM_ID)
@@ -735,18 +736,16 @@ def split_string(string, delimiter=' '):
 
 
 def get_replication_object_type_and_id_info(request):
-    object_type = servers_settings.VOLUME_TYPE_NAME
-    object_id = request.volume_id
-    object_info = None
-    if object_info:
-        logger.info(object_info)
-        if object_info.HasField(servers_settings.VOLUME_TYPE_NAME):
-            object_id = object_info.volume.volume_id
+    replication_source = request.replication_source
+    if replication_source:
+        logger.info(replication_source)
+        if replication_source.HasField(servers_settings.VOLUME_TYPE_NAME):
+            object_id = replication_source.volume.replication_volume_id
             object_type = servers_settings.VOLUME_TYPE_NAME
-        elif object_info.HasField(servers_settings.VOLUME_GROUP_TYPE_NAME):
-            object_id = object_info.volume.volume_group_id
+        elif replication_source.HasField(servers_settings.VOLUME_GROUP_TYPE_NAME):
+            object_id = replication_source.volumegroup.replication_volume_group_id
             object_type = servers_settings.VOLUME_GROUP_TYPE_NAME
         else:
-            return object_type, object_id
+            return servers_settings.VOLUME_TYPE_NAME, request.volume_id
     object_id_info = get_object_id_info(object_id, object_type)
     return object_type, object_id_info

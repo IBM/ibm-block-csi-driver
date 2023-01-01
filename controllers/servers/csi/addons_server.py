@@ -29,7 +29,7 @@ class ReplicationControllerServicer(pb2_grpc.ControllerServicer):
             return build_error_response(error_message, context, grpc.StatusCode.FAILED_PRECONDITION,
                                         pb2.EnableVolumeReplicationResponse)
 
-        replication_request = utils.generate_addons_replication_request(request, replication_type, object_type)
+        replication_request = utils.generate_addons_replication_request(request, replication_type)
 
         connection_info = utils.get_array_connection_info_from_secrets(request.secrets)
         with get_agent(connection_info, object_id_info.array_type).get_mediator() as mediator:
@@ -65,7 +65,7 @@ class ReplicationControllerServicer(pb2_grpc.ControllerServicer):
             return build_error_response(error_message, context, grpc.StatusCode.FAILED_PRECONDITION,
                                         pb2.EnableVolumeReplicationResponse)
 
-        replication_request = utils.generate_addons_replication_request(request, replication_type, object_type)
+        replication_request = utils.generate_addons_replication_request(request, replication_type)
 
         connection_info = utils.get_array_connection_info_from_secrets(request.secrets)
         with get_agent(connection_info, object_id_info.array_type).get_mediator() as mediator:
@@ -108,7 +108,7 @@ class ReplicationControllerServicer(pb2_grpc.ControllerServicer):
             return build_error_response(error_message, context, grpc.StatusCode.FAILED_PRECONDITION,
                                         pb2.EnableVolumeReplicationResponse)
 
-        replication_request = utils.generate_addons_replication_request(request, replication_type, object_type)
+        replication_request = utils.generate_addons_replication_request(request, replication_type)
 
         connection_info = utils.get_array_connection_info_from_secrets(request.secrets)
         with get_agent(connection_info, object_id_info.array_type).get_mediator() as mediator:
@@ -146,7 +146,7 @@ class ReplicationControllerServicer(pb2_grpc.ControllerServicer):
             return build_error_response(error_message, context, grpc.StatusCode.FAILED_PRECONDITION,
                                         pb2.EnableVolumeReplicationResponse)
 
-        replication_request = utils.generate_addons_replication_request(request, replication_type, object_type)
+        replication_request = utils.generate_addons_replication_request(request, replication_type)
 
         connection_info = utils.get_array_connection_info_from_secrets(request.secrets)
         with get_agent(connection_info, object_id_info.array_type).get_mediator() as mediator:
