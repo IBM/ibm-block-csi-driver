@@ -348,13 +348,15 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
                 raise array_errors.InvalidArgumentError(ex.my_message)
             raise ex
 
-    def _lsvolumegroup(self, id_or_name):
+    def _lsvolumegroup(self, id_or_name, not_exist_err=False):
         try:
             return self.client.svcinfo.lsvolumegroup(object_id=id_or_name).as_single_element
         except (svc_errors.CommandExecutionError, CLIFailureError) as ex:
             if (SPECIFIED_OBJ_NOT_EXIST in ex.my_message or
                     NAME_NOT_EXIST_OR_MEET_RULES in ex.my_message):
                 logger.info("volume group {} was not found".format(id_or_name))
+                if not_exist_err:
+                    raise array_errors.ObjectNotFoundError(id_or_name)
                 return None
             if any(msg_id in ex.my_message for msg_id in (NON_ASCII_CHARS, VALUE_TOO_LONG)):
                 raise array_errors.InvalidArgumentError(ex.my_message)
@@ -1817,13 +1819,16 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
         return self._generate_volume_group_response(cli_volume_group)
 
     def delete_volume_group(self, volume_group_id):
+        self._lsvolumegroup(volume_group_id, not_exist_err=True)
         self._rmvolumegroup(volume_group_id)
 
     def add_volume_to_volume_group(self, volume_group_id, volume_id):
-        cli_volume = self._get_cli_volume_by_wwn(volume_id)
+        volume_name = self._get_volume_name_by_wwn(volume_id)
+        cli_volume = self._get_cli_volume(volume_name)
         if cli_volume.volume_group_id and cli_volume.volume_group_id != volume_group_id:
             raise array_errors.VolumeAlreadyInVolumeGroup(volume_id, cli_volume.volume_group_name)
-        self._change_volume_group(volume_id, volume_group_id)
+        self._change_volume_group(cli_volume.id, volume_group_id)
 
-    def remove_volume_from_volume_group(self, volume_group_id, volume_id):
-        self._change_volume_group(volume_id, None)
+    def remove_volume_from_volume_group(self, volume_id):
+        cli_volume = self._get_cli_volume_by_wwn(volume_id, not_exist_err=True)
+        self._change_volume_group(cli_volume.id, None)
