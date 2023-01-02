@@ -9,6 +9,7 @@ from google.protobuf.timestamp_pb2 import Timestamp
 
 import controllers.servers.messages as messages
 import controllers.servers.settings as servers_settings
+import controllers.array_action.settings as array_settings
 import controllers.array_action.errors as array_errors
 from controllers.array_action.array_action_types import ReplicationRequest
 from controllers.array_action.settings import NVME_OVER_FC_CONNECTIVITY_TYPE, FC_CONNECTIVITY_TYPE, \
@@ -710,10 +711,18 @@ def get_initiators_connectivity_type(initiators, connectivity_type):
 
 
 def get_connectivity_type_ports(initiators, connectivity_type):
+    _validate_connectivity_type(connectivity_type)
     ports = initiators.get_by_connectivity_type(connectivity_type)
     if ports:
         return ports
     raise array_errors.NoPortFoundByConnectivityType(initiators, connectivity_type)
+
+
+def _validate_connectivity_type(connectivity_type):
+    if connectivity_type != array_settings.NVME_OVER_FC_CONNECTIVITY_TYPE and \
+            connectivity_type != array_settings.FC_CONNECTIVITY_TYPE and \
+            connectivity_type != array_settings.ISCSI_CONNECTIVITY_TYPE and connectivity_type:
+        raise array_errors.UnsupportedConnectivityTypeError(connectivity_type)
 
 
 def split_string(string, delimiter=' '):
