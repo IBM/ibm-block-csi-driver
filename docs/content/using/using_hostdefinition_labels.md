@@ -16,7 +16,7 @@ This tag defines the connectivity type of the node regardless of connectivity hi
 
 For example, if `connectivityType` is defined as using `fc` but you want to use NVMe on a specific node, you can define `nvmeofc` for this specific node, using this label.
 
-`block.csi.ibm.com/connectivity-type=_connectivityType_
+`block.csi.ibm.com/connectivity-type=<connectivityType>
 
 **Note:** The values for the connectivityType are the same as those for defining the HostDefiner: `nvmeofc`, `fc`, `iscsi`. If an invalid label is used, this label is ignored.
 
