@@ -620,8 +620,7 @@ def get_addons_replication_type(request):
     return replication_type
 
 
-def generate_addons_replication_request(request, replication_type):
-    volume_internal_id = get_replication_object_type_and_id_info(request)
+def generate_addons_replication_request(request, replication_type, volume_internal_id):
     other_volume_internal_id = _get_other_volume_internal_id(request, replication_type)
 
     other_system_id = request.parameters.get(servers_settings.PARAMETERS_SYSTEM_ID)
@@ -633,16 +632,6 @@ def generate_addons_replication_request(request, replication_type):
                               copy_type=copy_type,
                               replication_type=replication_type,
                               replication_policy=replication_policy)
-
-
-def _get_volume_internal_id(request, object_type):
-    if object_type == servers_settings.VOLUME_GROUP_TYPE_NAME:
-        volume_id_info = get_volume_group_id_info(request.volume_id)
-        volume_internal_id = volume_id_info.ids.uid
-    else:
-        volume_id_info = get_volume_id_info(request.volume_id)
-        volume_internal_id = volume_id_info.ids.internal_id
-    return volume_internal_id
 
 
 def _get_other_volume_internal_id(request, replication_type):
