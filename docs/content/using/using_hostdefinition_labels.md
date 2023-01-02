@@ -10,7 +10,7 @@ This label works on a per node basis, where the `allowDelete` parameter definiti
 
 ## Defining a specific host node
 
-In addition to defining `connectivityType` in the HostDefiner, specific host nodes can be defined overriding the `connectivityType` definition. For more information about defining the connectivity type within the HostDefiner, see [Configuring the host definer](../configuration/configuring_hostdefiner.md)).
+In addition to defining `connectivityType` in the HostDefiner, the node's connectivity type can be defined by overriding the `connectivityType` definition within the HostDefiner by using the `connectivity-type` label.
 
 This tag defines the connectivity type of the node regardless of connectivity hierarchy.
 
@@ -18,7 +18,9 @@ For example, if `connectivityType` is defined as using `fc` but you want to use 
 
 `block.csi.ibm.com/connectivity-type=<connectivityType>
 
-**Note:** The values for the connectivityType are the same as those for defining the HostDefiner: `nvmeofc`, `fc`, `iscsi`. If an invalid label is used, this label is ignored.
+**Note:**<br> 
+- The values for the connectivityType are the same as those for defining the HostDefiner: `nvmeofc`, `fc`, `iscsi`. If an invalid label is used, this label is ignored.
+-  For more information about defining the connectivity type within the HostDefiner, see [Configuring the host definer](../configuration/configuring_hostdefiner.md)).
 
 ## Specifying I/O group usage
 
