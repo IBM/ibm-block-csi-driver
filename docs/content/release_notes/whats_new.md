@@ -15,11 +15,11 @@ The IBM® block storage CSI driver 1.11.0 host definition feature now supports t
 
 - **CSI Topology feature**
 
-    For more information, see [Configuring for CSI Topology](../configuration/confiugring_toplogy.md).
+    Dynamic host definition now works together with CSI Topology feature. For more information about CSI Topology, see [Configuring for CSI Topology](../configuration/confiugring_toplogy.md).
 
 - **Dynamically configuring host ports**
 
-     Changes in host port hierarchy are now identified automatically updated. For more information, see [Configuring the host definer](../configuration/configuring_hostdefiner.md).
+     Host ports are now automatically updated and changes in host port hierarchy are now identified and automatically updated. For more information, see [Configuring the host definer](../configuration/configuring_hostdefiner.md).
 
 - **I/O groups**
 
