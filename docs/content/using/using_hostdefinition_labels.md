@@ -30,3 +30,5 @@ To specify which I/O group(s) a node should use, add any of the following labels
 - `hostdefiner.block.csi.ibm.com/io-group-1=true`
 - `hostdefiner.block.csi.ibm.com/io-group-2=true`
 - `hostdefiner.block.csi.ibm.com/io-group-3=true`
+
+For more about the I/O group function, see **Product overview** > **Technical overview** > **I/O group** within your Spectrum Virtualize product documentation on [IBM Documentation](https://www.ibm.com/docs).

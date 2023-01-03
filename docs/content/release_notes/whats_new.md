@@ -21,9 +21,11 @@ The IBM® block storage CSI driver 1.11.0 host definition feature now supports t
 
      Host ports are now automatically updated and changes in host port hierarchy are now identified and automatically updated. For more information, see [Configuring the host definer](../configuration/configuring_hostdefiner.md).
 
-- **I/O groups**
+- **I/O group function**
 
     By default the host definer now creates all definitions across all possible I/O groups. Additionally, an optional label available in order to specify which I/O group(s) should be used on a specific node. For more information, see [Using dynamic host definition](../configuration/configuring_hostdefiner.md).
+
+    For more about the I/O group function, see **Product overview** > **Technical overview** > **I/O group** within your Spectrum Virtualize product documentation on [IBM Documentation](https://www.ibm.com/docs).
 
 - **Overriding node host connectivity**
 
