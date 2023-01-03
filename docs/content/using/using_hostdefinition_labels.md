@@ -24,7 +24,7 @@ For example, if `connectivityType` is defined as using `fc` but you want to use 
 
 ## Specifying I/O group usage
 
-To specify which I/O group a node should use, add one of the following labels to the node:
+To specify which I/O group(s) a node should use, add any of the following labels to the node:
 
 - `hostdefiner.block.csi.ibm.com/io-group-0=true`
 - `hostdefiner.block.csi.ibm.com/io-group-1=true`

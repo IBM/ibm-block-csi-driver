@@ -23,7 +23,7 @@ The IBM® block storage CSI driver 1.11.0 host definition feature now supports t
 
 - **I/O groups**
 
-    By default the host definer now creates all definitions across all possible I/O groups. Additionally, an optional label available in order to specify which I/O group should be used on a specific node. For more information, see [Using dynamic host definition](../configuration/configuring_hostdefiner.md).
+    By default the host definer now creates all definitions across all possible I/O groups. Additionally, an optional label available in order to specify which I/O group(s) should be used on a specific node. For more information, see [Using dynamic host definition](../configuration/configuring_hostdefiner.md).
 
 - **Overriding node host connectivity**
 
