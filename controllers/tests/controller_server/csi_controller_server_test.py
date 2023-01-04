@@ -3,7 +3,7 @@ import json
 import unittest
 
 import grpc
-from csi_general import csi_pb2
+from csi_general import csi_pb2, volumegroup_pb2
 from mock import patch, Mock, MagicMock, call
 
 import controllers.array_action.errors as array_errors
@@ -1570,7 +1570,7 @@ class TestCreateVolumeGroup(BaseControllerSetUp, CommonControllerTest):
 
     @property
     def tested_method_response_class(self):
-        return csi_pb2.CreateVolumeGroupResponse
+        return volumegroup_pb2.CreateVolumeGroupResponse
 
     def setUp(self):
         super().setUp()
@@ -1596,7 +1596,7 @@ class TestCreateVolumeGroup(BaseControllerSetUp, CommonControllerTest):
         response = self.servicer.CreateVolumeGroup(self.request, self.context)
 
         self.mediator.create_volume_group.assert_called_once_with(VOLUME_GROUP_NAME)
-        self.assertEqual(type(response), csi_pb2.CreateVolumeGroupResponse)
+        self.assertEqual(type(response), volumegroup_pb2.CreateVolumeGroupResponse)
         self.assertEqual(self.context.code, grpc.StatusCode.OK)
 
     def test_create_volume_group_with_prefix_success(self):
@@ -1615,7 +1615,7 @@ class TestCreateVolumeGroup(BaseControllerSetUp, CommonControllerTest):
         response = self.servicer.CreateVolumeGroup(self.request, self.context)
 
         self.mediator.create_volume_group.assert_called_once_with(VOLUME_GROUP_NAME)
-        self.assertEqual(type(response), csi_pb2.CreateVolumeGroupResponse)
+        self.assertEqual(type(response), volumegroup_pb2.CreateVolumeGroupResponse)
         self.assertEqual(self.context.code, grpc.StatusCode.ALREADY_EXISTS)
 
     def test_get_volume_success(self):
@@ -1625,7 +1625,7 @@ class TestCreateVolumeGroup(BaseControllerSetUp, CommonControllerTest):
 
         self.mediator.get_volume_group.assert_called_once_with(VOLUME_GROUP_NAME)
         self.mediator.create_volume_group.assert_not_called()
-        self.assertEqual(type(response), csi_pb2.CreateVolumeGroupResponse)
+        self.assertEqual(type(response), volumegroup_pb2.CreateVolumeGroupResponse)
         self.assertEqual(self.context.code, grpc.StatusCode.OK)
 
     def test_group_get_volume_not_empty_fail(self):
@@ -1636,7 +1636,7 @@ class TestCreateVolumeGroup(BaseControllerSetUp, CommonControllerTest):
         response = self.servicer.CreateVolumeGroup(self.request, self.context)
 
         self.mediator.get_volume_group.assert_called_once_with(VOLUME_GROUP_NAME)
-        self.assertEqual(type(response), csi_pb2.CreateVolumeGroupResponse)
+        self.assertEqual(type(response), volumegroup_pb2.CreateVolumeGroupResponse)
         self.assertEqual(self.context.code, grpc.StatusCode.ALREADY_EXISTS)
 
 
@@ -1648,7 +1648,7 @@ class TestDeleteVolumeGroup(BaseControllerSetUp, CommonControllerTest):
 
     @property
     def tested_method_response_class(self):
-        return csi_pb2.DeleteVolumeGroupResponse
+        return volumegroup_pb2.DeleteVolumeGroupResponse
 
     def setUp(self):
         super().setUp()
@@ -1695,7 +1695,7 @@ class TestModifyVolumeGroupMembership(BaseControllerSetUp, CommonControllerTest)
 
     @property
     def tested_method_response_class(self):
-        return csi_pb2.ModifyVolumeGroupMembershipResponse
+        return volumegroup_pb2.ModifyVolumeGroupMembershipResponse
 
     def setUp(self):
         super().setUp()
@@ -1752,7 +1752,7 @@ class TestModifyVolumeGroupMembership(BaseControllerSetUp, CommonControllerTest)
         self.assertEqual(self.context.code, grpc.StatusCode.INVALID_ARGUMENT)
         self.mediator.remove_volume_from_volume_group.assert_not_called()
         self.mediator.add_volume_to_volume_group.assert_not_called()
-        self.assertEqual(type(response), csi_pb2.ModifyVolumeGroupMembershipResponse)
+        self.assertEqual(type(response), volumegroup_pb2.ModifyVolumeGroupMembershipResponse)
 
     def test_modify_volume_group_already_exist_fail(self):
         self.mediator.get_volume_group = Mock(side_effect=array_errors.ObjectNotFoundError(""))
@@ -1761,5 +1761,5 @@ class TestModifyVolumeGroupMembership(BaseControllerSetUp, CommonControllerTest)
 
         self.mediator.remove_volume_from_volume_group.assert_not_called()
         self.mediator.add_volume_to_volume_group.assert_not_called()
-        self.assertEqual(type(response), csi_pb2.ModifyVolumeGroupMembershipResponse)
+        self.assertEqual(type(response), volumegroup_pb2.ModifyVolumeGroupMembershipResponse)
         self.assertEqual(self.context.code, grpc.StatusCode.NOT_FOUND)
