@@ -1,5 +1,5 @@
 import grpc
-from csi_general import csi_pb2
+from csi_general import csi_pb2, volumegroup_pb2
 from csi_general import csi_pb2_grpc
 
 import controllers.array_action.errors as array_errors
@@ -464,8 +464,7 @@ class CSIControllerServicer(csi_pb2_grpc.ControllerServicer):
                           self._get_controller_service_capability("CREATE_DELETE_SNAPSHOT"),
                           self._get_controller_service_capability("PUBLISH_UNPUBLISH_VOLUME"),
                           self._get_controller_service_capability("CLONE_VOLUME"),
-                          self._get_controller_service_capability("EXPAND_VOLUME"),
-                          self._get_controller_service_capability("CREATE_DELETE_VOLUME_GROUP")])
+                          self._get_controller_service_capability("EXPAND_VOLUME")])
 
         logger.info("finished ControllerGetCapabilities")
         return response
@@ -558,7 +557,7 @@ class CSIControllerServicer(csi_pb2_grpc.ControllerServicer):
             object_ids = object_id_info.ids
         return source_type, object_ids
 
-    @csi_method(error_response_type=csi_pb2.CreateVolumeGroupResponse, lock_request_attribute="name")
+    @csi_method(error_response_type=volumegroup_pb2.CreateVolumeGroupResponse, lock_request_attribute="name")
     def CreateVolumeGroup(self, request, context):
         utils.validate_create_volume_group_request(request)
 
@@ -586,14 +585,15 @@ class CSIControllerServicer(csi_pb2_grpc.ControllerServicer):
                     if len(volume_group.volumes) > 0:
                         message = "Volume group {} is not empty".format(volume_group.name)
                         return build_error_response(message, context, grpc.StatusCode.ALREADY_EXISTS,
-                                                    csi_pb2.CreateVolumeGroupResponse)
+                                                    volumegroup_pb2.CreateVolumeGroupResponse)
 
                 response = utils.generate_csi_create_volume_group_response(volume_group)
                 return response
         except array_errors.VolumeGroupAlreadyExists as ex:
-            return handle_exception(ex, context, grpc.StatusCode.ALREADY_EXISTS, csi_pb2.CreateVolumeGroupResponse)
+            return handle_exception(ex, context, grpc.StatusCode.ALREADY_EXISTS,
+                                    volumegroup_pb2.CreateVolumeGroupResponse)
 
-    @csi_method(error_response_type=csi_pb2.DeleteVolumeGroupResponse, lock_request_attribute="volume_group_id")
+    @csi_method(error_response_type=volumegroup_pb2.DeleteVolumeGroupResponse, lock_request_attribute="volume_group_id")
     def DeleteVolumeGroup(self, request, _):
         secrets = request.secrets
         utils.validate_delete_volume_group_request(request)
@@ -602,7 +602,7 @@ class CSIControllerServicer(csi_pb2_grpc.ControllerServicer):
             volume_group_id_info = utils.get_volume_group_id_info(request.volume_group_id)
         except ObjectIdError as ex:
             logger.warning("volume group id is invalid. error : {}".format(ex))
-            return csi_pb2.DeleteVolumeGroupResponse()
+            return volumegroup_pb2.DeleteVolumeGroupResponse()
 
         array_type = volume_group_id_info.array_type
         volume_group_id = volume_group_id_info.ids.internal_id
@@ -618,7 +618,7 @@ class CSIControllerServicer(csi_pb2_grpc.ControllerServicer):
             except array_errors.ObjectNotFoundError as ex:
                 logger.debug("volume group was not found during deletion: {0}".format(ex))
 
-        return csi_pb2.DeleteVolumeGroupResponse()
+        return volumegroup_pb2.DeleteVolumeGroupResponse()
 
     def _add_volumes_missing_from_group(self, array_mediator, volume_ids_in_request, volume_ids_in_volume_group,
                                         volume_group_id):
@@ -647,7 +647,7 @@ class CSIControllerServicer(csi_pb2_grpc.ControllerServicer):
     def _get_volume_ids_from_volume_group(self, volumes):
         return [volume.id for volume in volumes]
 
-    @csi_method(error_response_type=csi_pb2.ModifyVolumeGroupMembershipResponse,
+    @csi_method(error_response_type=volumegroup_pb2.ModifyVolumeGroupMembershipResponse,
                 lock_request_attribute="volume_group_id")
     def ModifyVolumeGroupMembership(self, request, context):
         secrets = request.secrets
@@ -657,7 +657,7 @@ class CSIControllerServicer(csi_pb2_grpc.ControllerServicer):
             volume_group_id_info = utils.get_volume_group_id_info(request.volume_group_id)
         except ObjectIdError as ex:
             return handle_exception(ex, context, grpc.StatusCode.INVALID_ARGUMENT,
-                                    csi_pb2.ModifyVolumeGroupMembershipResponse)
+                                    volumegroup_pb2.ModifyVolumeGroupMembershipResponse)
 
         array_type = volume_group_id_info.array_type
         volume_group_id = volume_group_id_info.ids.internal_id

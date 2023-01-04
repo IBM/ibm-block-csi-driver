@@ -4,7 +4,7 @@ from hashlib import sha256
 from operator import eq
 
 import base58
-from csi_general import csi_pb2
+from csi_general import csi_pb2, volumegroup_pb2
 from google.protobuf.timestamp_pb2 import Timestamp
 
 import controllers.servers.messages as messages
@@ -376,7 +376,7 @@ def validate_expand_volume_request(request):
 def _generate_volumes_response(new_volumes):
     volumes = []
     for volume in new_volumes:
-        volumes.append(_generate_volume_response(volume))
+        volumes.append(_generate_volumegroup_volume_response(volume))
     return volumes
 
 
@@ -396,6 +396,18 @@ def _generate_volume_response(new_volume, system_id=None, source_type=None):
         content_source=content_source)
 
 
+def _generate_volumegroup_volume_response(new_volume, system_id=None):
+    content_source = None
+    if new_volume.source_id:
+        volume_source = volumegroup_pb2.VgVolumeContentSource.VolumeSource(volume_id=new_volume.source_id)
+        content_source = volumegroup_pb2.VgVolumeContentSource(volume=volume_source)
+
+    return volumegroup_pb2.VgVolume(
+        capacity_bytes=new_volume.capacity_bytes,
+        volume_id=get_volume_id(new_volume, system_id),
+        content_source=content_source)
+
+
 def generate_csi_create_volume_response(new_volume, system_id=None, source_type=None):
     logger.debug("creating create volume response for volume : {0}".format(new_volume))
 
@@ -408,7 +420,7 @@ def generate_csi_create_volume_response(new_volume, system_id=None, source_type=
 def generate_csi_create_volume_group_response(volume_group):
     logger.debug("creating create volume group response for volume group : {0}".format(volume_group))
 
-    response = csi_pb2.CreateVolumeGroupResponse(volume_group=csi_pb2.VolumeGroup(
+    response = volumegroup_pb2.CreateVolumeGroupResponse(volume_group=volumegroup_pb2.VolumeGroup(
         volume_group_id=_get_object_id(volume_group, None),
         volumes=[]))
     logger.debug("finished creating volume group response : {0}".format(response))
@@ -419,7 +431,7 @@ def generate_csi_create_volume_group_response(volume_group):
 def generate_csi_modify_volume_group_response(volume_group):
     logger.debug("creating modify volume group response for volume group : {0}".format(volume_group))
 
-    response = csi_pb2.ModifyVolumeGroupMembershipResponse(volume_group=csi_pb2.VolumeGroup(
+    response = volumegroup_pb2.ModifyVolumeGroupMembershipResponse(volume_group=volumegroup_pb2.VolumeGroup(
         volume_group_id=_get_object_id(volume_group, None),
         volumes=_generate_volumes_response(volume_group.volumes)))
     logger.debug("finished creating volume group response : {0}".format(response))
