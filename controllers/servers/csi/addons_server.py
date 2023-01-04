@@ -22,14 +22,16 @@ class ReplicationControllerServicer(pb2_grpc.ControllerServicer):
         utils.validate_addons_request(request, replication_type)
 
         object_type, object_id_info = utils.get_replication_object_type_and_id_info(request)
-        object_id = object_id_info.ids.uid
+        object_id = object_id_info.ids.uid if object_type == servers_settings.VOLUME_TYPE_NAME else \
+            object_id_info.ids.internal_id
+        logger.debug("{0} id : {1}, array type :{2}".format(object_type, object_id, object_id_info.array_type))
 
         error_message = self._validate_replication_object(object_type, replication_type)
         if error_message:
             return build_error_response(error_message, context, grpc.StatusCode.FAILED_PRECONDITION,
                                         pb2.EnableVolumeReplicationResponse)
 
-        replication_request = utils.generate_addons_replication_request(request, replication_type, object_type)
+        replication_request = utils.generate_addons_replication_request(request, replication_type, object_id)
 
         connection_info = utils.get_array_connection_info_from_secrets(request.secrets)
         with get_agent(connection_info, object_id_info.array_type).get_mediator() as mediator:
@@ -59,13 +61,16 @@ class ReplicationControllerServicer(pb2_grpc.ControllerServicer):
         utils.validate_addons_request(request, replication_type)
 
         object_type, object_id_info = utils.get_replication_object_type_and_id_info(request)
+        object_id = object_id_info.ids.uid if object_type == servers_settings.VOLUME_TYPE_NAME else \
+            object_id_info.ids.internal_id
+        logger.debug("{0} id : {1}, array type :{2}".format(object_type, object_id, object_id_info.array_type))
 
         error_message = self._validate_replication_object(object_type, replication_type)
         if error_message:
             return build_error_response(error_message, context, grpc.StatusCode.FAILED_PRECONDITION,
                                         pb2.EnableVolumeReplicationResponse)
 
-        replication_request = utils.generate_addons_replication_request(request, replication_type, object_type)
+        replication_request = utils.generate_addons_replication_request(request, replication_type, object_id)
 
         connection_info = utils.get_array_connection_info_from_secrets(request.secrets)
         with get_agent(connection_info, object_id_info.array_type).get_mediator() as mediator:
@@ -102,13 +107,16 @@ class ReplicationControllerServicer(pb2_grpc.ControllerServicer):
         utils.validate_addons_request(request, replication_type)
 
         object_type, object_id_info = utils.get_replication_object_type_and_id_info(request)
+        object_id = object_id_info.ids.uid if object_type == servers_settings.VOLUME_TYPE_NAME else \
+            object_id_info.ids.internal_id
+        logger.debug("{0} id : {1}, array type :{2}".format(object_type, object_id, object_id_info.array_type))
 
         error_message = self._validate_replication_object(object_type, replication_type)
         if error_message:
             return build_error_response(error_message, context, grpc.StatusCode.FAILED_PRECONDITION,
                                         pb2.EnableVolumeReplicationResponse)
 
-        replication_request = utils.generate_addons_replication_request(request, replication_type, object_type)
+        replication_request = utils.generate_addons_replication_request(request, replication_type, object_id)
 
         connection_info = utils.get_array_connection_info_from_secrets(request.secrets)
         with get_agent(connection_info, object_id_info.array_type).get_mediator() as mediator:
@@ -140,13 +148,16 @@ class ReplicationControllerServicer(pb2_grpc.ControllerServicer):
         utils.validate_addons_request(request, replication_type)
 
         object_type, object_id_info = utils.get_replication_object_type_and_id_info(request)
+        object_id = object_id_info.ids.uid if object_type == servers_settings.VOLUME_TYPE_NAME else \
+            object_id_info.ids.internal_id
+        logger.debug("{0} id : {1}, array type :{2}".format(object_type, object_id, object_id_info.array_type))
 
         error_message = self._validate_replication_object(object_type, replication_type)
         if error_message:
             return build_error_response(error_message, context, grpc.StatusCode.FAILED_PRECONDITION,
                                         pb2.EnableVolumeReplicationResponse)
 
-        replication_request = utils.generate_addons_replication_request(request, replication_type, object_type)
+        replication_request = utils.generate_addons_replication_request(request, replication_type, object_id)
 
         connection_info = utils.get_array_connection_info_from_secrets(request.secrets)
         with get_agent(connection_info, object_id_info.array_type).get_mediator() as mediator:
@@ -167,8 +178,8 @@ class ReplicationControllerServicer(pb2_grpc.ControllerServicer):
         if replication_request.replication_type == array_settings.REPLICATION_TYPE_MIRROR and \
                 replication.copy_type != replication_request.copy_type:
             error_message = "replication already exists " \
-                      "but has copy type of {} and not {}".format(replication.copy_type,
-                                                                  replication_request.copy_type)
+                            "but has copy type of {} and not {}".format(replication.copy_type,
+                                                                        replication_request.copy_type)
             return error_message
         return None
 
