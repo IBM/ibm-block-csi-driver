@@ -170,7 +170,7 @@ class HostDefinerServicer:
 
     def _split_io_group_from_user(self, ig_group_from_user):
         if not ig_group_from_user:
-            return host_definer_settings.FULL_IO_GROUP.split(common_settings.IO_GROUP_DELIMITER)
+            return common_settings.FULL_IO_GROUP.split(common_settings.IO_GROUP_DELIMITER)
         return ig_group_from_user.split(common_settings.IO_GROUP_DELIMITER)
 
     def _get_io_group_to_remove_and_add_lists(self, io_group_from_host, ig_group_from_user):
