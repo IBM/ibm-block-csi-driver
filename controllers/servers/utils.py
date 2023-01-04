@@ -7,10 +7,10 @@ import base58
 from csi_general import csi_pb2, volumegroup_pb2
 from google.protobuf.timestamp_pb2 import Timestamp
 
+import controllers.array_action.errors as array_errors
+import controllers.array_action.settings as array_settings
 import controllers.servers.messages as messages
 import controllers.servers.settings as servers_settings
-import controllers.array_action.settings as array_settings
-import controllers.array_action.errors as array_errors
 from controllers.array_action.array_action_types import ReplicationRequest
 from controllers.array_action.settings import NVME_OVER_FC_CONNECTIVITY_TYPE, FC_CONNECTIVITY_TYPE, \
     ISCSI_CONNECTIVITY_TYPE, REPLICATION_COPY_TYPE_SYNC, REPLICATION_COPY_TYPE_ASYNC, REPLICATION_TYPE_MIRROR, \
@@ -784,18 +784,6 @@ def split_string(string, delimiter=' '):
     return string
 
 
-def get_volume_group_from_request(request_volume_group, parameters_volume_group, array_mediator):
-    storage_class_volume_group = parameters_volume_group
-    if request_volume_group:
-        volume_group_id = get_volume_group_id_info(request_volume_group)
-        volume_group = array_mediator.get_volume_group(volume_group_id.ids.internal_id)
-        volume_group_name = volume_group.name
-        if storage_class_volume_group != "" and volume_group_name != "":
-            raise ValidationException(messages.UNSUPPORTED_STORAGECLASS_VOLUME_GROUP)
-        return volume_group_name
-    return storage_class_volume_group
-
-
 def validate_delete_volume_group_request(request):
     logger.debug("validating delete volume group request")
 
@@ -810,3 +798,24 @@ def validate_modify_volume_group_request(request):
     _validate_minimum_request_fields(request, ["volume_group_id"])
 
     logger.debug("modify volume group validation finished")
+
+
+def get_object_final_name(volume_parameters, name, array_mediator, object_type):
+    prefix = ""
+    if volume_parameters.prefix:
+        prefix = volume_parameters.prefix
+        if len(prefix) > array_mediator.max_object_prefix_length:
+            raise array_errors.InvalidArgumentError(
+                "The {} name prefix '{}' is too long, max allowed length is {}".format(
+                    object_type,
+                    prefix,
+                    array_mediator.max_object_prefix_length
+                )
+            )
+    if not prefix:
+        prefix = array_mediator.default_object_prefix
+    full_name = join_object_prefix_with_name(prefix, name)
+    if len(full_name) > array_mediator.max_object_name_length:
+        hashed_name = hash_string(name)
+        full_name = join_object_prefix_with_name(prefix, hashed_name)
+    return full_name[:array_mediator.max_object_name_length]

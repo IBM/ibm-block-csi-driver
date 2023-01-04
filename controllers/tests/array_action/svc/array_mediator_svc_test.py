@@ -13,18 +13,12 @@ import controllers.tests.common.test_settings as common_settings
 from controllers.array_action.array_action_types import ReplicationRequest
 from controllers.array_action.array_mediator_svc import SVCArrayMediator, build_kwargs_from_parameters, \
     FCMAP_STATUS_DONE, YES
-from controllers.common.node_info import Initiators
-from controllers.array_action.settings import REPLICATION_TYPE_MIRROR, REPLICATION_TYPE_EAR,\
-    RCRELATIONSHIP_STATE_READY, ENDPOINT_TYPE_PRODUCTION
-from controllers.array_action.array_action_types import ReplicationRequest
-from controllers.tests.common.test_settings import OBJECT_INTERNAL_ID, \
-    OTHER_OBJECT_INTERNAL_ID, REPLICATION_NAME, SYSTEM_ID, COPY_TYPE
+from controllers.array_action.settings import ENDPOINT_TYPE_PRODUCTION
 from controllers.array_action.settings import REPLICATION_TYPE_MIRROR, REPLICATION_TYPE_EAR, RCRELATIONSHIP_STATE_READY
 from controllers.common.node_info import Initiators
 from controllers.common.settings import ARRAY_TYPE_SVC, SPACE_EFFICIENCY_THIN, SPACE_EFFICIENCY_COMPRESSED, \
     SPACE_EFFICIENCY_DEDUPLICATED_COMPRESSED, SPACE_EFFICIENCY_DEDUPLICATED_THIN, SPACE_EFFICIENCY_DEDUPLICATED, \
     SPACE_EFFICIENCY_THICK, VOLUME_GROUP_NAME_SUFFIX, EAR_VOLUME_FC_MAP_COUNT, SCSI_PROTOCOL, NVME_PROTOCOL
-    SPACE_EFFICIENCY_THICK, VOLUME_GROUP_NAME_SUFFIX
 from controllers.tests import utils
 from controllers.tests.common.test_settings import OBJECT_INTERNAL_ID, \
     OTHER_OBJECT_INTERNAL_ID, REPLICATION_NAME, SYSTEM_ID, COPY_TYPE
@@ -689,7 +683,7 @@ class TestArrayMediatorSVC(unittest.TestCase):
                       svc_settings.VOLUME_COMPRESSED_COPY_ATTR_KEY: compressed_copy,
                       svc_settings.VOLUME_GROUP_ID_ATTR_KEY: volume_group_id,
                       svc_settings.VOLUME_REPLICATION_MODE_ATTR_KEY: replication_mode,
-                      svc_settings.VOLUME_FC_MAP_COUNT_ATTR_KEY: fc_map_count
+                      svc_settings.VOLUME_FC_MAP_COUNT_ATTR_KEY: fc_map_count,
                       svc_settings.VOLUME_VG_NAME_ATTR_KEY: volume_group_name
                       })
 
@@ -1409,19 +1403,19 @@ class TestArrayMediatorSVC(unittest.TestCase):
         self._prepare_mocks_for_get_host_by_identifiers_no_hosts()
         host_1 = self._get_host_as_munch(array_settings.DUMMY_HOST_ID1, array_settings.DUMMY_HOST_NAME1, nqn_list=[
             array_settings.DUMMY_NVME_NQN1],
-            wwpns_list=[array_settings.DUMMY_FC_WWN1],
-            iscsi_names_list=[array_settings.DUMMY_NODE1_IQN])
+                                         wwpns_list=[array_settings.DUMMY_FC_WWN1],
+                                         iscsi_names_list=[array_settings.DUMMY_NODE1_IQN])
         host_2 = self._get_host_as_munch(array_settings.DUMMY_HOST_ID2, array_settings.DUMMY_HOST_NAME2, nqn_list=[
             array_settings.DUMMY_NVME_NQN2],
-            wwpns_list=[array_settings.DUMMY_FC_WWN2],
-            iscsi_names_list=[array_settings.DUMMY_NODE2_IQN])
+                                         wwpns_list=[array_settings.DUMMY_FC_WWN2],
+                                         iscsi_names_list=[array_settings.DUMMY_NODE2_IQN])
         if custom_host:
             host_3 = custom_host
         else:
             host_3 = self._get_host_as_munch(array_settings.DUMMY_HOST_ID3, array_settings.DUMMY_HOST_NAME3, nqn_list=[
                 array_settings.DUMMY_NVME_NQN3],
-                wwpns_list=[array_settings.DUMMY_FC_WWN3], iscsi_names_list=[
-                array_settings.DUMMY_NODE3_IQN])
+                                             wwpns_list=[array_settings.DUMMY_FC_WWN3], iscsi_names_list=[
+                    array_settings.DUMMY_NODE3_IQN])
         hosts = [host_1, host_2, host_3]
         self.svc.client.svcinfo.lshost = Mock()
         self.svc.client.svcinfo.lshost.return_value = self._get_hosts_list_result(hosts)
@@ -1562,13 +1556,13 @@ class TestArrayMediatorSVC(unittest.TestCase):
     def test_get_host_by_identifiers_slow_return_fc_host(self, svc_response):
         host_1 = self._get_host_as_munch(array_settings.DUMMY_HOST_ID1, array_settings.DUMMY_HOST_NAME1, wwpns_list=[
             array_settings.DUMMY_FC_WWN1],
-            iscsi_names_list=[])
+                                         iscsi_names_list=[])
         host_2 = self._get_host_as_munch(array_settings.DUMMY_HOST_ID2, array_settings.DUMMY_HOST_NAME2, wwpns_list=[
             array_settings.DUMMY_FC_WWN2],
-            iscsi_names_list=[])
+                                         iscsi_names_list=[])
         host_3 = self._get_host_as_munch(array_settings.DUMMY_HOST_ID3, array_settings.DUMMY_HOST_NAME3, wwpns_list=[
             array_settings.DUMMY_FC_WWN3, array_settings.DUMMY_FC_WWN4],
-            iscsi_names_list=[array_settings.DUMMY_NODE3_IQN])
+                                         iscsi_names_list=[array_settings.DUMMY_NODE3_IQN])
         hosts = [host_1, host_2, host_3]
         self._prepare_mocks_for_get_host_by_identifiers_slow(svc_response)
         hostname, connectivity_types = self.svc.get_host_by_host_identifiers(
@@ -1618,13 +1612,13 @@ class TestArrayMediatorSVC(unittest.TestCase):
     def test_get_host_by_identifiers_slow_with_wrong_fc_iscsi_raise_not_found(self, svc_response):
         host_1 = self._get_host_as_munch(array_settings.DUMMY_HOST_ID1, array_settings.DUMMY_HOST_NAME1, wwpns_list=[
             array_settings.DUMMY_FC_WWN1],
-            iscsi_names_list=[])
+                                         iscsi_names_list=[])
         host_2 = self._get_host_as_munch(array_settings.DUMMY_HOST_ID2, array_settings.DUMMY_HOST_NAME2, wwpns_list=[
             array_settings.DUMMY_FC_WWN3],
-            iscsi_names_list=[array_settings.DUMMY_NODE2_IQN])
+                                         iscsi_names_list=[array_settings.DUMMY_NODE2_IQN])
         host_3 = self._get_host_as_munch(array_settings.DUMMY_HOST_ID3, array_settings.DUMMY_HOST_NAME3, wwpns_list=[
             array_settings.DUMMY_FC_WWN3],
-            iscsi_names_list=[array_settings.DUMMY_NODE3_IQN])
+                                         iscsi_names_list=[array_settings.DUMMY_NODE3_IQN])
         hosts = [host_1, host_2, host_3]
         self._prepare_mocks_for_get_host_by_identifiers_slow(svc_response)
         with self.assertRaises(array_errors.HostNotFoundError):
@@ -1778,8 +1772,8 @@ class TestArrayMediatorSVC(unittest.TestCase):
         self._test_mediator_method_client_error(self.svc.map_volume, (
             common_settings.VOLUME_UID, common_settings.HOST_NAME,
             array_settings.DUMMY_CONNECTIVITY_TYPE),
-            self.svc.client.svctask.mkvdiskhostmap, client_error,
-            expected_error)
+                                                self.svc.client.svctask.mkvdiskhostmap, client_error,
+                                                expected_error)
 
     def test_map_volume_mkvdiskhostmap_errors(self):
         self._test_map_volume_mkvdiskhostmap_error(svc_errors.CommandExecutionError("CMMVC5804E"),
@@ -1820,8 +1814,8 @@ class TestArrayMediatorSVC(unittest.TestCase):
     def _test_unmap_volume_rmvdiskhostmap_error(self, client_error, expected_error):
         self._test_mediator_method_client_error(self.svc.unmap_volume, (
             common_settings.VOLUME_UID, common_settings.HOST_NAME),
-            self.svc.client.svctask.rmvdiskhostmap, client_error,
-            expected_error)
+                                                self.svc.client.svctask.rmvdiskhostmap, client_error,
+                                                expected_error)
 
     def test_unmap_volume_rmvdiskhostmap_errors(self):
         self._test_unmap_volume_rmvdiskhostmap_error(svc_errors.CommandExecutionError("CMMVC5753E"),
@@ -1842,9 +1836,9 @@ class TestArrayMediatorSVC(unittest.TestCase):
     def _prepare_mocks_for_get_iscsi_targets(self, portset_id=None):
         host = self._get_host_as_munch(array_settings.DUMMY_HOST_ID1, common_settings.HOST_NAME, wwpns_list=[
             array_settings.DUMMY_FC_WWN1],
-            iscsi_names_list=[array_settings.DUMMY_NODE1_IQN,
-                              array_settings.DUMMY_NODE2_IQN],
-            portset_id=portset_id)
+                                       iscsi_names_list=[array_settings.DUMMY_NODE1_IQN,
+                                                         array_settings.DUMMY_NODE2_IQN],
+                                       portset_id=portset_id)
         self.svc.client.svcinfo.lshost = Mock()
         self.svc.client.svcinfo.lshost.return_value = Mock(as_single_element=host)
 
