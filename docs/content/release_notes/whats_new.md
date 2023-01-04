@@ -23,7 +23,7 @@ The IBM® block storage CSI driver 1.11.0 host definition feature now supports t
 
 - **I/O group function**
 
-    By default the host definer now creates all definitions across all possible I/O groups. Additionally, an optional label available in order to specify which I/O group(s) should be used on a specific node. For more information, see [Using dynamic host definition](../configuration/configuring_hostdefiner.md).
+    By default the host definer now creates all definitions across all possible I/O groups. Additionally, an optional label available in order to specify which I/O group(s) should be used on a specific node. For more information, see [Adding optional labels for dynamic host definition](../using/using_hostdefinition_labels.md).
 
     For more about the I/O group function, see **Product overview** > **Technical overview** > **I/O group** within your Spectrum Virtualize product documentation on [IBM Documentation](https://www.ibm.com/docs).
 
