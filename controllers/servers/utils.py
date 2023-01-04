@@ -9,6 +9,8 @@ from google.protobuf.timestamp_pb2 import Timestamp
 
 import controllers.servers.messages as messages
 import controllers.servers.settings as servers_settings
+import controllers.array_action.settings as array_settings
+import controllers.array_action.errors as array_errors
 from controllers.array_action.array_action_types import ReplicationRequest
 from controllers.array_action.settings import NVME_OVER_FC_CONNECTIVITY_TYPE, FC_CONNECTIVITY_TYPE, \
     ISCSI_CONNECTIVITY_TYPE, REPLICATION_COPY_TYPE_SYNC, REPLICATION_COPY_TYPE_ASYNC, REPLICATION_TYPE_MIRROR, \
@@ -33,7 +35,7 @@ def _parse_raw_json(raw_json):
     return parsed_json
 
 
-def _is_topology_match(system_topologies, node_topologies):
+def is_topology_match(system_topologies, node_topologies):
     for topologies in system_topologies:
         logger.debug(
             "Comparing topologies: system topologies: {},"
@@ -53,10 +55,10 @@ def get_volume_topologies(request):
     return None
 
 
-def _get_system_info_for_topologies(secrets_config, node_topologies):
+def get_system_info_for_topologies(secrets_config, node_topologies):
     for system_id, system_info in secrets_config.items():
         system_topologies = system_info.get(servers_settings.SECRET_SUPPORTED_TOPOLOGIES_PARAMETER)
-        if _is_topology_match(system_topologies, node_topologies):
+        if is_topology_match(system_topologies, node_topologies):
             return system_info, system_id
     raise ValidationException(messages.NO_SYSTEM_MATCH_REQUESTED_TOPOLOGIES.format(node_topologies))
 
@@ -69,8 +71,8 @@ def _get_system_info_from_secrets(secrets, topologies=None, system_id=None):
         if system_id:
             system_info = secrets_config.get(system_id)
         elif topologies:
-            system_info, system_id = _get_system_info_for_topologies(secrets_config=secrets_config,
-                                                                     node_topologies=topologies)
+            system_info, system_id = get_system_info_for_topologies(secrets_config=secrets_config,
+                                                                    node_topologies=topologies)
         else:
             raise ValidationException(messages.INSUFFICIENT_DATA_TO_CHOOSE_A_STORAGE_SYSTEM_MESSAGE)
     return system_info, system_id
@@ -619,6 +621,11 @@ def validate_addons_request(request, replication_type):
         minimum_request_fields.append("replication_id")
     _validate_minimum_request_fields(request, minimum_request_fields)
 
+    if replication_type == REPLICATION_TYPE_EAR:
+        logger.debug("validating obsolete non-EAR parameters")
+        _validate_addons_request_for_replication_id(request)
+        _validate_addons_request_for_system_id(request)
+
     logger.debug("validating copy type")
     if servers_settings.PARAMETERS_COPY_TYPE in request.parameters:
         copy_type = request.parameters.get(servers_settings.PARAMETERS_COPY_TYPE)
@@ -626,6 +633,18 @@ def validate_addons_request(request, replication_type):
             raise ValidationException(messages.INVALID_REPLICATION_COPY_TYPE_MESSAGE.format(copy_type))
 
     logger.debug("addons request validation finished")
+
+
+def _validate_addons_request_for_replication_id(request):
+    if request.replication_id != "":
+        raise ValidationException(messages.INVALID_EAR_PARAMETER_MESSAGE.format(
+            servers_settings.PARAMETERS_REPLICATION_HANDLE))
+
+
+def _validate_addons_request_for_system_id(request):
+    if request.parameters.get(servers_settings.PARAMETERS_SYSTEM_ID):
+        raise ValidationException(messages.INVALID_EAR_PARAMETER_MESSAGE.format(
+            servers_settings.PARAMETERS_SYSTEM_ID))
 
 
 def get_addons_replication_type(request):
@@ -714,6 +733,43 @@ def validate_parameters_match_source_volume(space_efficiency, required_bytes, vo
     if volume_capacity_bytes < required_bytes:
         raise ValidationException(messages.REQUIRED_BYTES_MISMATCH_MESSAGE.format(
             required_bytes, volume_capacity_bytes))
+
+
+def _get_connectivity_type_by_initiators(initiators):
+    if initiators.nvme_nqns:
+        return NVME_OVER_FC_CONNECTIVITY_TYPE
+    if initiators.fc_wwns:
+        return FC_CONNECTIVITY_TYPE
+    if initiators.iscsi_iqns:
+        return ISCSI_CONNECTIVITY_TYPE
+    return None
+
+
+def get_initiators_connectivity_type(initiators, connectivity_type):
+    if not connectivity_type:
+        connectivity_type = _get_connectivity_type_by_initiators(initiators)
+    return connectivity_type
+
+
+def get_connectivity_type_ports(initiators, connectivity_type):
+    _validate_connectivity_type(connectivity_type)
+    ports = initiators.get_by_connectivity_type(connectivity_type)
+    if ports:
+        return ports
+    raise array_errors.NoPortFoundByConnectivityType(initiators, connectivity_type)
+
+
+def _validate_connectivity_type(connectivity_type):
+    if connectivity_type != array_settings.NVME_OVER_FC_CONNECTIVITY_TYPE and \
+            connectivity_type != array_settings.FC_CONNECTIVITY_TYPE and \
+            connectivity_type != array_settings.ISCSI_CONNECTIVITY_TYPE and connectivity_type:
+        raise array_errors.UnsupportedConnectivityTypeError(connectivity_type)
+
+
+def split_string(string, delimiter=' '):
+    if isinstance(string, str):
+        return string.split(delimiter)
+    return string
 
 
 def get_volume_group_from_request(request_volume_group, parameters_volume_group, array_mediator):

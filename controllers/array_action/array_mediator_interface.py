@@ -342,7 +342,7 @@ class ArrayMediator(ABC):
         raise NotImplementedError
 
     @abstractmethod
-    def create_host(self, host_name, initiators, connectivity_type):
+    def create_host(self, host_name, initiators, connectivity_type, io_group):
         """
         This function should create a host in the storage system.
 
@@ -357,6 +357,8 @@ class ArrayMediator(ABC):
 
         Raises:
             HostAlreadyExists
+            NoPortIsValid
+            IoGroupIsInValid
         """
         raise NotImplementedError
 
@@ -373,6 +375,76 @@ class ArrayMediator(ABC):
 
         Raises:
             None
+        """
+        raise NotImplementedError
+
+    @abstractmethod
+    def add_ports_to_host(self, host_name, initiators, connectivity_type):
+        """
+        This function should add ports to host in the storage system.
+
+        Args:
+           host_name         : name of the host to be created in the storage system
+           initiators        : initiators (e.g. fc wwns, iqn) of the host.
+           connectivity_type : the connectivity_type chosen by the user
+
+        Returns:
+            None
+
+        Raises:
+            NoPortIsValid
+        """
+        raise NotImplementedError
+
+    @abstractmethod
+    def remove_ports_from_host(self, host_name, ports, connectivity_type):
+        """
+        This function should remove ports from host in the storage system.
+
+        Args:
+           host_name         : name of the host to be created in the storage system
+           ports             : ports (e.g. fc wwns, iqn) of the host.
+           connectivity_type : the connectivity_type chosen by the user
+
+        Returns:
+            None
+
+        Raises:
+            None
+        """
+        raise NotImplementedError
+
+    @abstractmethod
+    def get_host_connectivity_ports(self, host_name, connectivity_type):
+        """
+        This function should return ports from connectivity type on host in the storage system.
+
+        Args:
+           host_name         : name of the host to be created in the storage system
+           connectivity_type : the connectivity_type chosen by the user
+
+        Returns:
+            list
+
+        Raises:
+            HostNotFoundError
+            UnsupportedConnectivityTypeError
+        """
+        raise NotImplementedError
+
+    @abstractmethod
+    def get_host_connectivity_type(self, host_name):
+        """
+        This function should return the ports' connectivity type from host in the storage system.
+
+        Args:
+           host_name  : name of the host to be created in the storage system
+
+        Returns:
+            string
+
+        Raises:
+            HostNotFoundError
         """
         raise NotImplementedError
 
@@ -487,6 +559,77 @@ class ArrayMediator(ABC):
             ObjectNotFound
             InvalidArgument
             PermissionDenied
+        """
+        raise NotImplementedError
+
+    @abstractmethod
+    def add_io_group_to_host(self, host_name, io_group):
+        """
+        This function should add io_group to host.
+
+        Args:
+           host_name : name of the host in the storage system
+           io_group  : the io_group to add to the host
+
+        Returns:
+            None
+
+        Raises:
+            HostNotFoundError
+            IoGroupIsInValid
+        """
+        raise NotImplementedError
+
+    @abstractmethod
+    def remove_io_group_from_host(self, host_name, io_group):
+        """
+        This function should remove io_group from host.
+
+        Args:
+           host_name : name of the host in the storage system
+           io_group  : the io_group to remove from the host
+
+        Returns:
+            None
+
+        Raises:
+            HostNotFoundError
+            IoGroupIsInValid
+        """
+        raise NotImplementedError
+
+    @abstractmethod
+    def get_host_io_group(self, host_name):
+        """
+        This function should return the io_group from host.
+
+        Args:
+           host_name : name of the host in the storage system
+
+        Returns:
+            List
+
+        Raises:
+            HostNotFoundError
+        """
+        raise NotImplementedError
+
+    @abstractmethod
+    def change_host_protocol(self, host_name, protocol):
+        """
+        This function should change the protocol of a host.
+
+        Args:
+           host_name : name of the host in the storage system
+           protocol  : the new protocol
+
+        Returns:
+            None
+
+        Raises:
+            HostNotFoundError
+            UnSupportedParameter
+            CannotChangeHostProtocolBecauseOfMappedPorts
         """
         raise NotImplementedError
 
