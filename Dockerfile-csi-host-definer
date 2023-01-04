@@ -1,4 +1,4 @@
-FROM registry.access.redhat.com/ubi8/python-38:1-75.1638364053 as builder
+FROM registry.access.redhat.com/ubi8/python-38:1-115.1669838006 as builder
 
 USER root
 RUN if [[ "$(uname -m)" != "x86"* ]]; then yum install -y rust-toolset; fi
@@ -17,7 +17,7 @@ COPY controllers/scripts/csi_general .
 RUN ./csi_pb2.sh
 RUN pip3 install .
 
-FROM registry.access.redhat.com/ubi8/python-38:1-100
+FROM registry.access.redhat.com/ubi8/python-38:1-115.1669838006
 
 ARG VERSION=1.11.0
 ARG BUILD_NUMBER=0
