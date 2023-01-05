@@ -228,7 +228,7 @@ class TestArrayMediatorSVC(unittest.TestCase):
 
         self.svc.create_replication(replication_request)
         self.svc.client.svctask.chvolumegroup.assert_called_with(object_id=OBJECT_INTERNAL_ID,
-                                                                      replicationpolicy=REPLICATION_NAME)
+                                                                 replicationpolicy=REPLICATION_NAME)
 
     def test_create_ear_replication_not_supported(self):
         _, replication_request = self._prepare_mocks_for_ear_replication(is_ear_supported=False)
