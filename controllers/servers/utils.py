@@ -803,5 +803,8 @@ def get_replication_object_type_and_id_info(request):
         elif replication_source.HasField(servers_settings.VOLUME_TYPE_NAME):
             object_id = replication_source.volume.replication_volume_id
             object_type = servers_settings.VOLUME_TYPE_NAME
+        else:
+            logger.error(messages.UNSUPPORTED_REPLICATION_SOURCE_TYPE_MESSAGE)
+            raise ValidationException(messages.UNSUPPORTED_REPLICATION_SOURCE_TYPE_MESSAGE)
     object_id_info = get_object_id_info(object_id, object_type)
     return object_type, object_id_info
