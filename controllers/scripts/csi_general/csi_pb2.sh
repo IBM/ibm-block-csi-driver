@@ -3,14 +3,15 @@ set -x
 
 CSI_VERSION="v1.5.0"
 ADDONS_VERSION="v0.1.1"
+VG_VERSION="v0.9.0"
 PB2_DIR="csi_general"
 
 mkdir -p ./proto/${PB2_DIR}
 cd ./proto/${PB2_DIR}
 
-curl -O https://raw.githubusercontent.com/IBM/csi-volume-group/add/CSI-5164_add_all_spec_with_vg/csi.proto
+curl -O https://raw.githubusercontent.com/container-storage-interface/spec/${CSI_VERSION}/csi.proto
+curl -O https://raw.githubusercontent.com/IBM/csi-volume-group/${VG_VERSION}/volumegroup/volumegroup.proto
 curl -O https://raw.githubusercontent.com/ELENAGER/spec/from_tag_v0.1.1/replication.proto
-
 cd -
 
 python -m grpc_tools.protoc --proto_path=proto \
