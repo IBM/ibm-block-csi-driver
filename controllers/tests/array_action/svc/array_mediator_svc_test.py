@@ -193,13 +193,15 @@ class TestArrayMediatorSVC(unittest.TestCase):
 
     def test_get_ear_replication_success(self):
         _, replication_request = self._prepare_mocks_for_ear_replication()
+        replication_request.replication_policy = None
+        self.svc.client.svcinfo.lsvolumegroupreplication.side_effect = [Mock(as_single_element=None), Mock()]
 
         replication = self.svc.get_replication(replication_request)
 
         self.assertEqual(replication.replication_type, REPLICATION_TYPE_EAR)
         self.assertEqual(replication.volume_group_id, OBJECT_INTERNAL_ID)
 
-        self.svc.client.svcinfo.lsvolumegroupreplication.assert_called_once_with(object_id=OBJECT_INTERNAL_ID)
+        self.svc.client.svcinfo.lsvolumegroupreplication.assert_called_with(object_id=OBJECT_INTERNAL_ID)
 
     def test_get_ear_replication_not_supported(self):
         _, replication_request = self._prepare_mocks_for_ear_replication(is_ear_supported=False)
@@ -225,7 +227,7 @@ class TestArrayMediatorSVC(unittest.TestCase):
         self.svc.client.svcinfo.lsvolumegroupreplication.return_value = Mock(as_single_element=None)
 
         self.svc.create_replication(replication_request)
-        self.svc.client.svctask.chvolumegroup.assert_called_once_with(object_id=OBJECT_INTERNAL_ID,
+        self.svc.client.svctask.chvolumegroup.assert_called_with(object_id=OBJECT_INTERNAL_ID,
                                                                       replicationpolicy=REPLICATION_NAME)
 
     def test_create_ear_replication_not_supported(self):

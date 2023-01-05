@@ -770,16 +770,17 @@ def validate_modify_volume_group_request(request):
 
 
 def get_replication_object_type_and_id_info(request):
+    object_id = request.volume_id
+    object_type = servers_settings.VOLUME_TYPE_NAME
+
     replication_source = request.replication_source
     if replication_source:
         logger.info(replication_source)
-        if replication_source.HasField(servers_settings.VOLUME_TYPE_NAME):
-            object_id = replication_source.volume.replication_volume_id
-            object_type = servers_settings.VOLUME_TYPE_NAME
-        elif replication_source.HasField(servers_settings.VOLUME_GROUP_TYPE_NAME):
+        if replication_source.HasField(servers_settings.VOLUME_GROUP_TYPE_NAME):
             object_id = replication_source.volumegroup.replication_volume_group_id
             object_type = servers_settings.VOLUME_GROUP_TYPE_NAME
-        else:
-            return servers_settings.VOLUME_TYPE_NAME, request.volume_id
+        elif replication_source.HasField(servers_settings.VOLUME_TYPE_NAME):
+            object_id = replication_source.volume.replication_volume_id
+            object_type = servers_settings.VOLUME_TYPE_NAME
     object_id_info = get_object_id_info(object_id, object_type)
     return object_type, object_id_info

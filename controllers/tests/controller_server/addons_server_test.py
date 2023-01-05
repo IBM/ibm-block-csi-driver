@@ -34,6 +34,7 @@ class BaseReplicationSetUp(unittest.TestCase):
                                 "management_address": SECRET_MANAGEMENT_ADDRESS_VALUE}
         self.request.volume_id = "{0}:{1};{1}".format("A9000", OBJECT_INTERNAL_ID)
         self.request.replication_id = "{}:{};{}".format("A9000", OTHER_OBJECT_INTERNAL_ID, VOLUME_UID)
+        self.request.replication_source.volumegroup.replication_volume_group_id = self.request.volume_id
         self.context = utils.FakeContext()
 
     def _prepare_replication_mocks(self, replication_type=None, copy_type=COPY_TYPE, is_primary=False,
