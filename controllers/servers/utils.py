@@ -4,9 +4,10 @@ from hashlib import sha256
 from operator import eq
 
 import base58
-from csi_general import csi_pb2
+from csi_general import csi_pb2, volumegroup_pb2
 from google.protobuf.timestamp_pb2 import Timestamp
 
+import controllers.array_action.errors as array_errors
 import controllers.servers.messages as messages
 import controllers.servers.settings as servers_settings
 from controllers.array_action.array_action_types import ReplicationRequest
@@ -374,7 +375,7 @@ def validate_expand_volume_request(request):
 def _generate_volumes_response(new_volumes):
     volumes = []
     for volume in new_volumes:
-        volumes.append(_generate_volume_response(volume))
+        volumes.append(_generate_volumegroup_volume_response(volume))
     return volumes
 
 
@@ -394,6 +395,18 @@ def _generate_volume_response(new_volume, system_id=None, source_type=None):
         content_source=content_source)
 
 
+def _generate_volumegroup_volume_response(new_volume, system_id=None):
+    content_source = None
+    if new_volume.source_id:
+        volume_source = volumegroup_pb2.VgVolumeContentSource.VolumeSource(volume_id=new_volume.source_id)
+        content_source = volumegroup_pb2.VgVolumeContentSource(volume=volume_source)
+
+    return volumegroup_pb2.VgVolume(
+        capacity_bytes=new_volume.capacity_bytes,
+        volume_id=get_volume_id(new_volume, system_id),
+        content_source=content_source)
+
+
 def generate_csi_create_volume_response(new_volume, system_id=None, source_type=None):
     logger.debug("creating create volume response for volume : {0}".format(new_volume))
 
@@ -406,7 +419,7 @@ def generate_csi_create_volume_response(new_volume, system_id=None, source_type=
 def generate_csi_create_volume_group_response(volume_group):
     logger.debug("creating create volume group response for volume group : {0}".format(volume_group))
 
-    response = csi_pb2.CreateVolumeGroupResponse(volume_group=csi_pb2.VolumeGroup(
+    response = volumegroup_pb2.CreateVolumeGroupResponse(volume_group=volumegroup_pb2.VolumeGroup(
         volume_group_id=_get_object_id(volume_group, None),
         volumes=[]))
     logger.debug("finished creating volume group response : {0}".format(response))
@@ -417,7 +430,7 @@ def generate_csi_create_volume_group_response(volume_group):
 def generate_csi_modify_volume_group_response(volume_group):
     logger.debug("creating modify volume group response for volume group : {0}".format(volume_group))
 
-    response = csi_pb2.ModifyVolumeGroupMembershipResponse(volume_group=csi_pb2.VolumeGroup(
+    response = volumegroup_pb2.ModifyVolumeGroupMembershipResponse(volume_group=volumegroup_pb2.VolumeGroup(
         volume_group_id=_get_object_id(volume_group, None),
         volumes=_generate_volumes_response(volume_group.volumes)))
     logger.debug("finished creating volume group response : {0}".format(response))
@@ -716,18 +729,6 @@ def validate_parameters_match_source_volume(space_efficiency, required_bytes, vo
             required_bytes, volume_capacity_bytes))
 
 
-def get_volume_group_from_request(request_volume_group, parameters_volume_group, array_mediator):
-    storage_class_volume_group = parameters_volume_group
-    if request_volume_group:
-        volume_group_id = get_volume_group_id_info(request_volume_group)
-        volume_group = array_mediator.get_volume_group(volume_group_id.ids.internal_id)
-        volume_group_name = volume_group.name
-        if storage_class_volume_group != "" and volume_group_name != "":
-            raise ValidationException(messages.UNSUPPORTED_STORAGECLASS_VOLUME_GROUP)
-        return volume_group_name
-    return storage_class_volume_group
-
-
 def validate_delete_volume_group_request(request):
     logger.debug("validating delete volume group request")
 
@@ -742,3 +743,24 @@ def validate_modify_volume_group_request(request):
     _validate_minimum_request_fields(request, ["volume_group_id"])
 
     logger.debug("modify volume group validation finished")
+
+
+def get_object_final_name(volume_parameters, name, array_mediator, object_type):
+    prefix = ""
+    if volume_parameters.prefix:
+        prefix = volume_parameters.prefix
+        if len(prefix) > array_mediator.max_object_prefix_length:
+            raise array_errors.InvalidArgumentError(
+                "The {} name prefix '{}' is too long, max allowed length is {}".format(
+                    object_type,
+                    prefix,
+                    array_mediator.max_object_prefix_length
+                )
+            )
+    if not prefix:
+        prefix = array_mediator.default_object_prefix
+    full_name = join_object_prefix_with_name(prefix, name)
+    if len(full_name) > array_mediator.max_object_name_length:
+        hashed_name = hash_string(name)
+        full_name = join_object_prefix_with_name(prefix, hashed_name)
+    return full_name[:array_mediator.max_object_name_length]
