@@ -769,6 +769,7 @@ def validate_modify_volume_group_request(request):
 
     logger.debug("modify volume group validation finished")
 
+
 def get_object_final_name(volume_parameters, name, array_mediator, object_type):
     prefix = ""
     if volume_parameters.prefix:
