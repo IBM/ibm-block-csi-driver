@@ -684,16 +684,6 @@ def generate_addons_replication_request(request, replication_type, volume_intern
                               replication_policy=replication_policy)
 
 
-def _get_volume_internal_id(request, object_type):
-    if object_type == servers_settings.VOLUME_GROUP_TYPE_NAME:
-        volume_id_info = get_volume_group_id_info(request.volume_id)
-        volume_internal_id = volume_id_info.ids.uid
-    else:
-        volume_id_info = get_volume_id_info(request.volume_id)
-        volume_internal_id = volume_id_info.ids.internal_id
-    return volume_internal_id
-
-
 def _get_other_volume_internal_id(request, replication_type):
     if replication_type == REPLICATION_TYPE_MIRROR:
         other_volume_id_info = get_volume_id_info(request.replication_id)
@@ -834,7 +824,7 @@ def get_replication_object_type_and_id_info(request):
     object_type = servers_settings.VOLUME_TYPE_NAME
 
     replication_source = request.replication_source
-    if replication_source:
+    if replication_source and replication_source.ListFields():
         logger.info(replication_source)
         if replication_source.HasField(servers_settings.VOLUME_GROUP_TYPE_NAME):
             object_id = replication_source.volumegroup.replication_volume_group_id
