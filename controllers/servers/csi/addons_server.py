@@ -33,7 +33,7 @@ class ReplicationControllerServicer(pb2_grpc.ControllerServicer):
             replication = mediator.get_replication(replication_request)
             if replication:
                 error_message = self._ensure_replication_idempotency(replication_request, replication, volume)
-                if error_message is not None:
+                if error_message:
                     return build_error_response(error_message, context, grpc.StatusCode.ALREADY_EXISTS,
                                                 pb2.EnableVolumeReplicationResponse)
                 logger.info("idempotent case. replication already exists "
@@ -41,6 +41,10 @@ class ReplicationControllerServicer(pb2_grpc.ControllerServicer):
                                                                    replication_request.other_system_id))
                 return pb2.EnableVolumeReplicationResponse()
 
+            error_message = self._validate_volume(volume)
+            if error_message:
+                return build_error_response(error_message, context, grpc.StatusCode.FAILED_PRECONDITION,
+                                            pb2.EnableVolumeReplicationResponse)
             logger.info("creating replication for volume {} with system: {}"
                         .format(volume.name, replication_request.other_system_id))
             mediator.create_replication(replication_request)
@@ -147,12 +151,20 @@ class ReplicationControllerServicer(pb2_grpc.ControllerServicer):
                                                                   replication_request.copy_type)
             return error_message
         elif replication.replication_type == array_settings.REPLICATION_TYPE_EAR:
-            if replication.volume_group_id != volume.volume_group_id:
-                error_message = "replication already exists, " \
-                      "but volume {} belongs to another group {}".format(volume.name, volume.volume_group_name)
-                return error_message
             if replication.name != replication_request.replication_policy:
                 error_message = "replication already exists, " \
                           "but volume {} uses another replication policy {}".format(volume.name, replication.name)
                 return error_message
+            if replication.volume_group_id != volume.volume_group_id:
+                error_message = "replication already exists, " \
+                      "but volume {} belongs to another group {}".format(volume.name, volume.volume_group_name)
+                return error_message
+        return None
+
+    @staticmethod
+    def _validate_volume(volume):
+        if volume.volume_group_id:
+            error_message = "could not enable replication, " \
+                      "volume {} already belongs to volume group {}".format(volume.name, volume.volume_group_id)
+            return error_message
         return None

@@ -1,3 +1,4 @@
+from controllers.common import settings as common_settings
 SECRET_USERNAME_KEY = "username"
 SECRET_USERNAME_VALUE = "dummy_username"
 SECRET_PASSWORD_KEY = "password"
@@ -14,6 +15,7 @@ STRETCHED_POOL = "pool1:pool2"
 SPACE_EFFICIENCY = "thin"
 VIRT_SNAP_FUNC_TRUE = "true"
 DUMMY_IO_GROUP = "iogrp1"
+DUMMY_FULL_IO_GROUP = common_settings.FULL_IO_GROUP
 DUMMY_VOLUME_GROUP = "volgrp1"
 
 ID_FORMAT = "a9k:{};{}"

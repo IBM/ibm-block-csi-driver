@@ -282,3 +282,31 @@ class VirtSnapshotFunctionNotSupportedMessage(BaseArrayActionException):
     def __init__(self, id_or_name):
         super().__init__()
         self.message = messages.VIRT_SNAPSHOT_FUNCTION_NOT_SUPPORTED_MESSAGE.format(id_or_name)
+
+
+class NoPortIsValid(BaseArrayActionException):
+
+    def __init__(self, host_name):
+        super().__init__()
+        self.message = messages.ALL_THE_PORTS_FOR_HOST_ARE_INVALID.format(host_name)
+
+
+class IoGroupIsInValid(BaseArrayActionException):
+
+    def __init__(self, io_group):
+        super().__init__()
+        self.message = messages.IO_GROUP_IS_NOT_VALID.format(io_group)
+
+
+class UnSupportedParameter(BaseArrayActionException):
+
+    def __init__(self, parameter):
+        super().__init__()
+        self.message = messages.UNSUPPORTED_PARAMETER.format(parameter)
+
+
+class CannotChangeHostProtocolBecauseOfMappedPorts(BaseArrayActionException):
+
+    def __init__(self, host_name):
+        super().__init__()
+        self.message = messages.CANNOT_CHANGE_HOST_PROTOCOL_BECAUSE_OF_MAPPED_PORTS.format(host_name)
