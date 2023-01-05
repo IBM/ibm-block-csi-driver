@@ -18,6 +18,8 @@ DUMMY_IO_GROUP = "iogrp1"
 DUMMY_FULL_IO_GROUP = common_settings.FULL_IO_GROUP
 DUMMY_VOLUME_GROUP = "volgrp1"
 
+ID_FORMAT = "a9k:{};{}"
+
 VOLUME_OBJECT_TYPE = "volume"
 VOLUME_NAME = "volume_name"
 VOLUME_UID = "volume_wwn"
@@ -27,6 +29,7 @@ SOURCE_VOLUME_ID = "source_volume_id"
 TARGET_VOLUME_ID = "target_volume_id"
 TARGET_VOLUME_NAME = "target_volume_name"
 INTERNAL_VOLUME_ID = "internal_volume_id"
+REQUEST_VOLUME_ID = ID_FORMAT.format(INTERNAL_VOLUME_ID, VOLUME_UID)
 
 NAME_PREFIX = "prefix"
 
@@ -46,3 +49,11 @@ REPLICATION_NAME = "replication_name"
 SYSTEM_ID = "system_id"
 COPY_TYPE = "async"
 FCS_DELIMITER = ":"
+
+VOLUME_GROUP_OBJECT_TYPE = "volume group"
+VOLUME_GROUP_NAME = "volume_group_name"
+VOLUME_GROUP_UID = "volume_group_wwn"
+INTERNAL_VOLUME_GROUP_ID = "internal_volume_group_id"
+REQUEST_VOLUME_GROUP_ID = ID_FORMAT.format(INTERNAL_VOLUME_GROUP_ID, VOLUME_GROUP_UID)
+
+HOST_OBJECT_TYPE = "host"

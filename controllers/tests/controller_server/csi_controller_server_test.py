@@ -1473,7 +1473,7 @@ class TestValidateVolumeCapabilities(BaseControllerSetUp, CommonControllerTest):
 
         self.servicer.ValidateVolumeCapabilities(self.request, self.context)
 
-        self._assert_response(grpc.StatusCode.INVALID_ARGUMENT, "volume id")
+        self._assert_response(grpc.StatusCode.INVALID_ARGUMENT, "volume_id")
 
     def test_validate_volume_capabilities_with_wrong_secrets(self):
         self._test_request_with_wrong_secrets()
