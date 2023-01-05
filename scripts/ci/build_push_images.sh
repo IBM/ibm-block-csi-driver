@@ -11,7 +11,7 @@ branch=`echo $GIT_BRANCH| sed 's|/|.|g'`  #not sure if docker accept / in the ve
 specific_tag="${IMAGE_VERSION}_b${BUILD_NUMBER}_${branch}"
 
 # Set latest tag only if its from develop branch or master and prepare tags
-[ "$GIT_BRANCH" = "develop" -o "$GIT_BRANCH" = "origin/develop" -o "$GIT_BRANCH" = "master" ] && tag_latest="true" || tag_latest="false"
+[ "$GIT_BRANCH" = "develop" -o "$GIT_BRANCH" = "origin/develop" -o "$GIT_BRANCH" = "master" ] && is_tag_latest="true" || is_tag_latest="false"
 
 images_file=$1
 [ -n "$images_file" ] && printf "" > $images_file || :
@@ -23,12 +23,12 @@ build_and_push (){
     registry="${DOCKER_REGISTRY}/${repository}"
     tag_specific="${registry}:${specific_tag}"
     tag_latest="${registry}:latest"
-    [ "$tag_latest" = "true" ] && taglatestflag="-t ${tag_latest}"
+    [ "$is_tag_latest" = "true" ] && taglatestflag="-t ${tag_latest}"
 
     echo "Build and push ${driver_type} image"
     docker build -t $tag_specific $taglatestflag -f $dockerfile --build-arg VERSION="${IMAGE_VERSION}" --build-arg BUILD_NUMBER="${BUILD_NUMBER}" .
     docker push $tag_specific
-    [ "$tag_latest" = "true" ] && docker push $tag_latest || :
+    [ "$is_tag_latest" = "true" ] && docker push $tag_latest || :
     [ -n "$images_file" ] && printf "${tag_specific}\n" >> $images_file || :
     echo ""
     echo "Image ready:"
