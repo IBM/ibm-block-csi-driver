@@ -29,6 +29,7 @@ class Volume(ArrayObject):
     pool: str
     space_efficiency_aliases: set = field(default_factory=set)
     volume_group_id: str = None
+    volume_group_name: str = None
 
 
 @dataclass

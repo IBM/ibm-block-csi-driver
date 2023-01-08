@@ -133,16 +133,20 @@ def get_object_parameters(parameters, prefix_param_name, system_id):
 
 
 def get_volume_id(new_volume, system_id):
-    return _get_object_id(new_volume, system_id)
+    return _get_object_id(new_volume, new_volume.id, system_id)
 
 
 def get_snapshot_id(new_snapshot, system_id):
-    return _get_object_id(new_snapshot, system_id)
+    return _get_object_id(new_snapshot, new_snapshot.id, system_id)
 
 
-def _get_object_id(obj, system_id):
+def get_volume_group_id(new_volume_group, system_id):
+    return _get_object_id(new_volume_group, new_volume_group.name, system_id)
+
+
+def _get_object_id(obj, obj_strong_id, system_id):
     object_ids_delimiter = servers_settings.PARAMETERS_OBJECT_IDS_DELIMITER
-    object_ids_value = object_ids_delimiter.join((obj.internal_id, obj.id))
+    object_ids_value = object_ids_delimiter.join((obj.internal_id, obj_strong_id))
     object_id_info_delimiter = servers_settings.PARAMETERS_OBJECT_ID_INFO_DELIMITER
     if system_id:
         return object_id_info_delimiter.join((obj.array_type, system_id, object_ids_value))
@@ -421,7 +425,7 @@ def generate_csi_create_volume_group_response(volume_group):
     logger.debug("creating create volume group response for volume group : {0}".format(volume_group))
 
     response = volumegroup_pb2.CreateVolumeGroupResponse(volume_group=volumegroup_pb2.VolumeGroup(
-        volume_group_id=_get_object_id(volume_group, None),
+        volume_group_id=get_volume_group_id(volume_group, None),
         volumes=[]))
     logger.debug("finished creating volume group response : {0}".format(response))
 
@@ -432,7 +436,7 @@ def generate_csi_modify_volume_group_response(volume_group):
     logger.debug("creating modify volume group response for volume group : {0}".format(volume_group))
 
     response = volumegroup_pb2.ModifyVolumeGroupMembershipResponse(volume_group=volumegroup_pb2.VolumeGroup(
-        volume_group_id=_get_object_id(volume_group, None),
+        volume_group_id=get_volume_group_id(volume_group, None),
         volumes=_generate_volumes_response(volume_group.volumes)))
     logger.debug("finished creating volume group response : {0}".format(response))
 
