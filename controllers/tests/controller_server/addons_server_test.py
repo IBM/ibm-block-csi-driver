@@ -32,8 +32,9 @@ class BaseReplicationSetUp(unittest.TestCase):
         self.request = ProtoBufMock()
         self.request.secrets = {"username": SECRET_USERNAME_VALUE, "password": SECRET_PASSWORD_VALUE,
                                 "management_address": SECRET_MANAGEMENT_ADDRESS_VALUE}
-        self.request.volume_id = "{}:{};{}".format("A9000", OBJECT_INTERNAL_ID, VOLUME_UID)
+        self.request.volume_id = "{0}:{1};{1}".format("A9000", OBJECT_INTERNAL_ID)
         self.request.replication_id = "{}:{};{}".format("A9000", OTHER_OBJECT_INTERNAL_ID, VOLUME_UID)
+        self.request.replication_source.volumegroup.replication_volume_group_id = self.request.volume_id
         self.context = utils.FakeContext()
 
     def _prepare_replication_mocks(self, replication_type=None, copy_type=COPY_TYPE, is_primary=False,
@@ -134,19 +135,6 @@ class TestEnableVolumeReplication(BaseReplicationSetUp, CommonControllerTest):
                                                   copy_type=REPLICATION_COPY_TYPE_SYNC,
                                                   grpc_status=grpc.StatusCode.OK)
 
-    def test_enable_ear_replication_volume_in_group_fails(self):
-        self.mediator.get_object_by_id.return_value = utils.get_mock_mediator_response_volume(
-            volume_group_id=DUMMY_VOLUME_GROUP)
-        replication_request = self._prepare_request_params(replication_type=REPLICATION_TYPE_EAR,
-                                                           replication_id="")
-        self._prepare_replication_mocks()
-
-        self.servicer.EnableVolumeReplication(self.request, self.context)
-
-        self.assertEqual(grpc.StatusCode.FAILED_PRECONDITION, self.context.code)
-        self.mediator.get_replication.assert_called_once_with(replication_request)
-        self.mediator.create_replication.assert_not_called()
-
     def test_enable_replication_already_processing(self):
         self._test_request_already_processing("volume_id", self.request.volume_id)
 
@@ -164,17 +152,6 @@ class TestEnableVolumeReplication(BaseReplicationSetUp, CommonControllerTest):
 
     def test_enable_ear_replication_succeeds(self):
         self._test_enable_replication_succeeds(REPLICATION_TYPE_EAR)
-
-    def test_enable_ear_replication_idempotency_volume_belongs_to_another_group_fails(self):
-        self._test_enable_replication_idempotency(replication_type=REPLICATION_TYPE_EAR,
-                                                  copy_type=REPLICATION_COPY_TYPE_SYNC,
-                                                  grpc_status=grpc.StatusCode.ALREADY_EXISTS)
-
-    def test_enable_ear_replication_idempotency_volume_has_another_policy_fails(self):
-        self._test_enable_replication_idempotency(replication_type=REPLICATION_TYPE_EAR,
-                                                  replication_name="",
-                                                  copy_type=REPLICATION_COPY_TYPE_SYNC,
-                                                  grpc_status=grpc.StatusCode.ALREADY_EXISTS)
 
 
 class TestDisableVolumeReplication(BaseReplicationSetUp, CommonControllerTest):

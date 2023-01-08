@@ -3,8 +3,6 @@ from controllers.common.config import config
 NAME_PREFIX_SEPARATOR = "_"
 ENDPOINTS_SEPARATOR = ", "
 
-VOLUME_GROUP_NAME_SUFFIX = "_vg"
-
 CSI_CONTROLLER_SERVER_WORKERS = 10
 
 # array types

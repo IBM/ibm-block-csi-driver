@@ -568,7 +568,7 @@ def get_object_id_info(full_object_id, object_type):
         internal_id, wwn = splitted_id
     else:
         raise ObjectIdError(object_type, full_object_id)
-    logger.debug("volume id : {0}, array type :{1}".format(object_id, array_type))
+    logger.debug("{0} id : {1}, array type :{2}".format(object_type, object_id, array_type))
     return ObjectIdInfo(array_type=array_type, system_id=system_id, internal_id=internal_id, uid=wwn)
 
 
@@ -628,9 +628,10 @@ def validate_unpublish_volume_request(request):
 
 def validate_addons_request(request, replication_type):
     logger.debug("validating addons request")
-    minimum_request_fields = ["volume_id"]
     if replication_type == REPLICATION_TYPE_MIRROR:
-        minimum_request_fields.append("replication_id")
+        minimum_request_fields = ["volume_id", "replication_id"]
+    elif replication_type == REPLICATION_TYPE_EAR:
+        minimum_request_fields = ["replication_source"]
     _validate_minimum_request_fields(request, minimum_request_fields)
 
     if replication_type == REPLICATION_TYPE_EAR:
@@ -669,10 +670,7 @@ def get_addons_replication_type(request):
     return replication_type
 
 
-def generate_addons_replication_request(request, replication_type):
-    volume_id_info = get_volume_id_info(request.volume_id)
-    volume_internal_id = volume_id_info.ids.internal_id
-
+def generate_addons_replication_request(request, replication_type, volume_internal_id):
     other_volume_internal_id = _get_other_volume_internal_id(request, replication_type)
 
     other_system_id = request.parameters.get(servers_settings.PARAMETERS_SYSTEM_ID)
@@ -819,3 +817,23 @@ def get_object_final_name(volume_parameters, name, array_mediator, object_type):
         hashed_name = hash_string(name)
         full_name = join_object_prefix_with_name(prefix, hashed_name)
     return full_name[:array_mediator.max_object_name_length]
+
+
+def get_replication_object_type_and_id_info(request):
+    object_id = request.volume_id
+    object_type = servers_settings.VOLUME_TYPE_NAME
+
+    replication_source = request.replication_source
+    if replication_source and replication_source.ListFields():
+        logger.info(replication_source)
+        if replication_source.HasField(servers_settings.VOLUME_GROUP_TYPE_NAME):
+            object_id = replication_source.volumegroup.replication_volume_group_id
+            object_type = servers_settings.VOLUME_GROUP_TYPE_NAME
+        elif replication_source.HasField(servers_settings.VOLUME_TYPE_NAME):
+            object_id = replication_source.volume.replication_volume_id
+            object_type = servers_settings.VOLUME_TYPE_NAME
+        else:
+            logger.error(messages.UNSUPPORTED_REPLICATION_SOURCE_TYPE_MESSAGE)
+            raise ValidationException(messages.UNSUPPORTED_REPLICATION_SOURCE_TYPE_MESSAGE)
+    object_id_info = get_object_id_info(object_id, object_type)
+    return object_type, object_id_info

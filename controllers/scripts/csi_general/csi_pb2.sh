@@ -11,8 +11,7 @@ cd ./proto/${PB2_DIR}
 
 curl -O https://raw.githubusercontent.com/container-storage-interface/spec/${CSI_VERSION}/csi.proto
 curl -O https://raw.githubusercontent.com/IBM/csi-volume-group/${VG_VERSION}/volumegroup/volumegroup.proto
-curl -O https://raw.githubusercontent.com/csi-addons/spec/${ADDONS_VERSION}/replication.proto
-
+curl -O https://raw.githubusercontent.com/ELENAGER/spec/from_tag_v0.1.1/replication.proto
 cd -
 
 python -m grpc_tools.protoc --proto_path=proto \
