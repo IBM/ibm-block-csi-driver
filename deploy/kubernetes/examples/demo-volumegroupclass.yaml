@@ -4,5 +4,7 @@ metadata:
   name: demo-volumegroupclass
 driver: block.csi.ibm.com
 parameters:
+  volume_group_name_prefix: demo-prefix
+  
   volumegroup.storage.ibm.io/secret-name: demo-secret
   volumegroup.storage.ibm.io/secret-namespace: default
