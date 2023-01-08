@@ -12,10 +12,14 @@ class ArrayConnectionInfo:
 
 
 @dataclass
-class ObjectIdInfo:
+class CommonIdInfo:
     array_type: str
-    system_id: str
     internal_id: InitVar[str]
+
+
+@dataclass
+class ObjectIdInfo(CommonIdInfo):
+    system_id: str
     uid: InitVar[str]
     ids: ObjectIds = field(init=False)
 
@@ -24,9 +28,7 @@ class ObjectIdInfo:
 
 
 @dataclass
-class VolumeGroupIdInfo:
-    array_type: str
-    internal_id: InitVar[str]
+class VolumeGroupIdInfo(CommonIdInfo):
     name: InitVar[str]
     ids: VolumeGroupIds = field(init=False)
 
