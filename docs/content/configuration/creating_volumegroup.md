@@ -16,14 +16,11 @@ Before creating a volume group, be sure to follow all of the volume group config
     metadata:
       name: demo-volumegroup
     spec:
-      volumeGroupClassName: volumeGroupClass1
+      volumeGroupClassName: demo-volumegroupclass
       source:
-        selector:
-          matchExpressions:
-            - key: volumegroup
-              operator: In
-              values:
-              - demo-volumegroup
+        selector: 
+          matchLabels:
+            demo-volumegroup-key: demo-volumegroup-value
     ```
 
 2.  After the YAML file is created, apply it by using the `kubectl apply -f` command.

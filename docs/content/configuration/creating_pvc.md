@@ -6,7 +6,7 @@ The IBM® block storage CSI driver supports using both file system and raw block
 
 **Important:**
   - If not defined, the default mode is `Filesystem`. Be sure to define the mode as `Block` if this configuration is preferred.
-  - Only use the `volumegroup` label if the PVC is not using a StorageClass with a defined `volume_group`. The PVC `volumegroup` label value is the key defined in the VolumeGroup YAML.
+  - Only use the `volumegroup` label if the PVC is not using a StorageClass with a defined `volume_group`. The PVC `volumegroup` label value is the key defined in the VolumeGroup YAML. For an example of creating a PVC using the VolumeGroup configuration, see [Creating a PVC in a volume group](#creating-a-pvc-in-a-volume-group).
 
 **Note:** The examples below create the PVC with a storage size 1 Gb and using the dynamic volume group feature. This can be changed, per customer needs.
 
@@ -22,6 +22,7 @@ Use the following sections, according to your PVC needs:
 
 - [Creating a PVC for volume with file system](#creating-a-pvc-for-volume-with-file-system)
 - [Creating a PVC for raw block volume](#creating-a-pvc-for-raw-block-volume)
+- [Creating a PVC with `volume_group` defined in StorageClass](#creating-a-pvc-with-volumegroup-defined-in-storageclass)
 - [Creating a PVC from volume snapshot](#creating-a-pvc-from-volume-snapshot)
 - [Creating a volume clone from an existing PVC](#creating-a-volume-clone-from-an-existing-pvc)
 
@@ -58,6 +59,25 @@ Create a PVC YAML file, similar to the following `demo-pvc-raw-block.yaml` file,
         volumegroup: demo-volumegroup
     spec:
       volumeMode: Block
+      accessModes:
+      - ReadWriteOnce
+      resources:
+        requests:
+          storage: 1Gi
+      storageClassName: demo-storageclass
+
+## Creating a PVC with `volume_group` defined in StorageClass
+
+Create a PVC YAML file similar to the following `demo-pvc-in-volume-group.yaml` file, changing the `volumeMode` as needed.
+
+    kind: PersistentVolumeClaim
+    apiVersion: v1
+    metadata:
+      name: demo-pvc-in-volume-group
+      labels:
+        demo-volumegroup-key: demo-volumegroup-value
+    spec:
+      volumeMode: Filesystem
       accessModes:
       - ReadWriteOnce
       resources:

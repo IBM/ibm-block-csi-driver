@@ -15,13 +15,13 @@ In order to enable volume groups for your storage system, create a VolumeGroupCl
 apiVersion: csi.ibm.com/v1
 kind: VolumeGroupClass
 metadata:
-  name: volumeGroupClass1
-spec:
-  parameters:
-    volume_group_name_prefix: demo-prefix    
-    volumegroup.storage.ibm.io/secret-name: demo-secret
-    volumegroup.storage.ibm.io/secret-namespace: default  
-supportVolumeGroupSnapshot: true
+  name: demo-volumegroupclass
+driver: block.csi.ibm.com
+parameters:
+  volume_group_name_prefix: demo-prefix
+
+  volumegroup.storage.ibm.io/secret-name: demo-secret
+  volumegroup.storage.ibm.io/secret-namespace: default
 ```
 
 After the YAML file is created, apply it by using the `kubectl apply -f` command.
