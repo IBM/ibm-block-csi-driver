@@ -1,0 +1,8 @@
+apiVersion: csi.ibm.com/v1
+kind: VolumeGroupClass
+metadata:
+  name: demo-volumegroupclass
+driver: block.csi.ibm.com
+parameters:
+  volumegroup.storage.ibm.io/secret-name: demo-secret
+  volumegroup.storage.ibm.io/secret-namespace: default
