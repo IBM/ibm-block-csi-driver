@@ -29,4 +29,4 @@ After the YAML file is created, apply it by using the `kubectl apply -f` command
 ```
 kubectl apply -f <filename>.yaml
 ```
-The `volumereplicationclass.replication.storage.openshift.io/<volumereplicationclass-name> created` message is emitted.
+The `volumegroupclass.csi.ibm.com/<volumegroupclass-name> created` message is emitted.

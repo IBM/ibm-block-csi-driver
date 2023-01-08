@@ -32,11 +32,11 @@ Before creating a volume group, be sure to follow all of the volume group config
     kubectl apply -f <filename>.yaml
     ```
 
-    The `volumereplication.replication.storage.openshift.io/<volumereplication-name> created` message is emitted.
+    The `volumegroup.csi.ibm.com/<volumegroup-name> created` message is emitted.
 
 3.  Verify that the volume was replicated.
 
-    Run the `kubectl describe volumereplication` command.
+    Run the `kubectl describe volumegroup` command.
 
     See the `status.state` section to see which of the following states the replication is in:
 
