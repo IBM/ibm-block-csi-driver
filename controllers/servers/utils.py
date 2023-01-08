@@ -830,10 +830,10 @@ def get_replication_object_type_and_id_info(request):
     if replication_source and replication_source.ListFields():
         logger.info(replication_source)
         if replication_source.HasField(servers_settings.VOLUME_GROUP_TYPE_NAME):
-            object_id = replication_source.volumegroup.replication_volume_group_id
+            object_id = replication_source.volumegroup.volume_group_id
             object_type = servers_settings.VOLUME_GROUP_TYPE_NAME
         elif replication_source.HasField(servers_settings.VOLUME_TYPE_NAME):
-            object_id = replication_source.volume.replication_volume_id
+            object_id = replication_source.volume.volume_id
             object_type = servers_settings.VOLUME_TYPE_NAME
         else:
             logger.error(messages.UNSUPPORTED_REPLICATION_SOURCE_TYPE_MESSAGE)
