@@ -63,7 +63,7 @@ class VolumeGroupControllerServicer(volumegroup_pb2_grpc.ControllerServicer):
             return volumegroup_pb2.DeleteVolumeGroupResponse()
 
         array_type = volume_group_id_info.array_type
-        volume_group_name = volume_group_id_info.ids.uid
+        volume_group_name = volume_group_id_info.ids.name
         array_connection_info = utils.get_array_connection_info_from_secrets(secrets)
 
         with get_agent(array_connection_info, array_type).get_mediator() as array_mediator:
@@ -118,7 +118,7 @@ class VolumeGroupControllerServicer(volumegroup_pb2_grpc.ControllerServicer):
                                     volumegroup_pb2.ModifyVolumeGroupMembershipResponse)
 
         array_type = volume_group_id_info.array_type
-        volume_group_name = volume_group_id_info.ids.uid
+        volume_group_name = volume_group_id_info.ids.name
         array_connection_info = utils.get_array_connection_info_from_secrets(secrets)
 
         with get_agent(array_connection_info, array_type).get_mediator() as array_mediator:

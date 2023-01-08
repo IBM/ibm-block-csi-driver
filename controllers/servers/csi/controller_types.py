@@ -1,6 +1,6 @@
 from dataclasses import dataclass, field, InitVar
 
-from controllers.array_action.array_action_types import ObjectIds
+from controllers.array_action.array_action_types import ObjectIds, VolumeGroupIds
 
 
 @dataclass
@@ -21,6 +21,17 @@ class ObjectIdInfo:
 
     def __post_init__(self, internal_id, uid):
         self.ids = ObjectIds(internal_id=internal_id, uid=uid)
+
+
+@dataclass
+class VolumeGroupIdInfo:
+    array_type: str
+    internal_id: InitVar[str]
+    name: InitVar[str]
+    ids: VolumeGroupIds = field(init=False)
+
+    def __post_init__(self, internal_id, name):
+        self.ids = VolumeGroupIds(internal_id=internal_id, name=name)
 
 
 @dataclass

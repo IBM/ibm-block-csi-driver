@@ -83,3 +83,12 @@ class ObjectIds:
 
     def __bool__(self):
         return bool(self.internal_id or self.uid)
+
+
+@dataclass
+class VolumeGroupIds:
+    internal_id: str = ''
+    name: str = ''
+
+    def __bool__(self):
+        return bool(self.internal_id or self.name)

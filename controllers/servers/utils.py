@@ -21,7 +21,7 @@ from controllers.common.csi_logger import get_stdout_logger
 from controllers.common.settings import NAME_PREFIX_SEPARATOR
 from controllers.servers.csi.controller_types import (ArrayConnectionInfo,
                                                       ObjectIdInfo,
-                                                      ObjectParameters, VolumeGroupParameters)
+                                                      ObjectParameters, VolumeGroupParameters, VolumeGroupIdInfo)
 from controllers.servers.errors import ObjectIdError, ValidationException, InvalidNodeId
 
 logger = get_stdout_logger()
@@ -558,7 +558,7 @@ def _get_context_from_volume(volume):
 def get_object_id_info(full_object_id, object_type):
     logger.debug("getting {0} info for id : {1}".format(object_type, full_object_id))
     splitted_object_id = full_object_id.split(servers_settings.PARAMETERS_OBJECT_ID_INFO_DELIMITER)
-    system_id, wwn, internal_id = None, None, None
+    system_id, strong_id, internal_id = None, None, None
     if len(splitted_object_id) == 2:
         array_type, object_id = splitted_object_id
     elif len(splitted_object_id) == 3:
@@ -567,13 +567,15 @@ def get_object_id_info(full_object_id, object_type):
         raise ObjectIdError(object_type, full_object_id)
     splitted_id = object_id.split(servers_settings.PARAMETERS_OBJECT_IDS_DELIMITER)
     if len(splitted_id) == 1:
-        wwn = splitted_id[0]
+        strong_id = splitted_id[0]
     elif len(splitted_id) == 2:
-        internal_id, wwn = splitted_id
+        internal_id, strong_id = splitted_id
     else:
         raise ObjectIdError(object_type, full_object_id)
     logger.debug("{0} id : {1}, array type :{2}".format(object_type, object_id, array_type))
-    return ObjectIdInfo(array_type=array_type, system_id=system_id, internal_id=internal_id, uid=wwn)
+    if object_type == servers_settings.VOLUME_GROUP_TYPE_NAME:
+        return VolumeGroupIdInfo(array_type=array_type, internal_id=internal_id, name=strong_id)
+    return ObjectIdInfo(array_type=array_type, system_id=system_id, internal_id=internal_id, uid=strong_id)
 
 
 def choose_connectivity_type(connectivity_types):
