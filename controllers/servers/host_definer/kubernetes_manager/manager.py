@@ -1,3 +1,4 @@
+import ast
 import datetime
 import base64
 
@@ -168,8 +169,8 @@ class KubernetesManager():
 
     def _is_host_definition_matches(self, host_definition_info, node_name, secret_name, secret_namespace):
         return host_definition_info.node_name == node_name and \
-            host_definition_info.secret_name == secret_name and \
-            host_definition_info.secret_namespace == secret_namespace
+               host_definition_info.secret_name == secret_name and \
+               host_definition_info.secret_namespace == secret_namespace
 
     def _create_host_definition(self, host_definition_manifest):
         try:
@@ -208,14 +209,14 @@ class KubernetesManager():
 
     def _generate_k8s_event(self, host_definition_info, message, action, message_type):
         return client.CoreV1Event(
-            metadata=client.V1ObjectMeta(generate_name='{}.'.format(host_definition_info.name),),
+            metadata=client.V1ObjectMeta(generate_name='{}.'.format(host_definition_info.name), ),
             reporting_component=settings.HOST_DEFINER, reporting_instance=settings.HOST_DEFINER, action=action,
-            type=self._get_event_type(message_type), reason=message_type+action, message=str(message),
+            type=self._get_event_type(message_type), reason=message_type + action, message=str(message),
             event_time=datetime.datetime.utcnow().isoformat(timespec='microseconds') + 'Z',
             involved_object=client.V1ObjectReference(
                 api_version=settings.CSI_IBM_API_VERSION, kind=settings.HOST_DEFINITION_KIND,
                 name=host_definition_info.name, resource_version=host_definition_info.resource_version,
-                uid=host_definition_info.uid,))
+                uid=host_definition_info.uid, ))
 
     def _get_event_type(self, message_type):
         if message_type != settings.SUCCESSFUL_MESSAGE_TYPE:
@@ -309,7 +310,7 @@ class KubernetesManager():
         decoded_string_content = self._decode_base64_to_string(content_with_base64)
         encoded_dict = str(decoded_string_content).encode('utf-8')
         base64_dict = base64.b64encode(encoded_dict)
-        my_dict_again = eval(base64.b64decode(base64_dict))
+        my_dict_again = ast.literal_eval(base64.b64decode(base64_dict))
         return my_dict_again
 
     def _decode_base64_to_string(self, content_with_base64):
