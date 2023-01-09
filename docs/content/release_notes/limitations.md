@@ -42,6 +42,11 @@ I/O group configuration is only supported for use with IBM Spectrum Virtualize f
  
  For other limitations with your storage system, see the following section within your Spectrum Virtualize product documentation on [IBM Documentation](https://www.ibm.com/docs/en/): **Configuring** > **Host attachment** > **NVMe over Fibre Channel host attachments** > **FC-NVMe limitations and SAN configuration guidelines**.
 
+## Policy-based replication limitations
+Policy-based replication is only supported for use with IBM Spectrum Virtualize family storage system versions 8.5.2 or higher. To see if your specific product is supported and for more information, see **What's new** > **Getting started with policy-based replication** within your Spectrum Virtualize product documentation on [IBM Documentation](https://www.ibm.com/docs).
+
+For other policy-based replication limitations with your storage system, see the Configuration Limits and Restrictions for your product software version. From the [IBM Support](https://www.ibm.com/mysupport) website, search for `Configuration Limits and Restrictions` and your product name. For example, `Configuration Limits and Restrictions FlashSystem 9500`.
+
 ## Snapshot function limitations
 
 **Important:** Snapshot function support is only Alpha support.

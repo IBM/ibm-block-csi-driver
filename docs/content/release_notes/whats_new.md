@@ -18,6 +18,10 @@ For more information about volume groups and policy-based replication, see the f
 - **Product overview** > **Technical overview** > **Volume groups**
 - **What's new** > **Getting started with policy-based replication**
 
+## New support for policy-based replication
+
+This version adds support for policy-based replication that was introduced in IBM Spectrum Virtualize 8.5.2 release. Policy-based replication provides a simplified configuration and management of asynchronous replication between two system. To see if your specific product is supported and for more information, see **What's new** > **Getting started with policy-based replication** within your Spectrum Virtualize product documentation on [IBM Documentation](https://www.ibm.com/docs).
+
 ## Additional supported orchestration platforms for deployment
 
 This version adds support for orchestration platforms Kubernetes 1.25 and Red Hat® OpenShift® 4.12, suitable for deployment of the CSI (Container Storage Interface) driver.

@@ -120,3 +120,5 @@ Complete these steps to prepare your environment for installing the CSI (Contain
     - Stretched topology planning and configuration ([SAN Volume Controller](https://www.ibm.com/docs/en/sanvolumecontroller) only):
         - **Planning** > **Planning for high availability** > **Planning for a stretched topology system**
         - **Configuring** > **Configuration details** > **Stretched system configuration details**
+
+8. (Optional) If planning on using policy-based replication with your Spectrum Virtualize storage system, verify that the correct replication policy is in place. This can be done either through the Spectrum Virtualize user interface (navigate to **Policies** > **Replication policies**) or through the CLI (`lsreplicationpolicy`). If a replication policy is not in place create one before replicating a volume through the CSI driver.
