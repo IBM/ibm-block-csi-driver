@@ -18,9 +18,13 @@ For more information about volume groups and policy-based replication, see the f
 - **Product overview** > **Technical overview** > **Volume groups**
 - **What's new** > **Getting started with policy-based replication**
 
+**Important:** Volume groups need to be used together with policy-based replication. For more information, see [Using the CSI driver with policy-based replication](../using/using_policy_based_replication.md).
+
 ## New support for policy-based replication
 
 This version adds support for policy-based replication that was introduced in IBM Spectrum Virtualize 8.5.2 release. Policy-based replication provides a simplified configuration and management of asynchronous replication between two system. To see if your specific product is supported and for more information, see **What's new** > **Getting started with policy-based replication** within your Spectrum Virtualize product documentation on [IBM Documentation](https://www.ibm.com/docs).
+
+**Important:** Volume groups is an integral part of policy-based replication and must be used together. For more information, see [Using the CSI driver with policy-based replication](../using/using_policy_based_replication.md).
 
 ## Additional supported orchestration platforms for deployment
 
