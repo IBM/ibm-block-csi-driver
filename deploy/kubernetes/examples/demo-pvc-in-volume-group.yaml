@@ -1,0 +1,14 @@
+kind: PersistentVolumeClaim
+apiVersion: v1
+metadata:
+  name: demo-pvc-in-volume-group
+  labels:
+    demo-volumegroup-key: demo-volumegroup-value
+spec:
+  volumeMode: Filesystem
+  accessModes:
+  - ReadWriteOnce
+  resources:
+    requests:
+      storage: 1Gi
+  storageClassName: demo-storageclass
