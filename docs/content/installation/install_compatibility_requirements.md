@@ -83,12 +83,19 @@ Complete these steps to prepare your environment for installing the CSI (Contain
 
    The instructions and relevant YAML files to enable volume snapshots can be found at: [https://github.com/kubernetes-csi/external-snapshotter#usage](https://github.com/kubernetes-csi/external-snapshotter#usage)
 
-5. (Optional) If planning on using dynamic volume groups, enable support on your orchestration platform cluster and storage system.
+5. (Optional) If planning on using policy-based replication with volume groups, enable support on your orchestration platform cluster and storage system.
     
     1. To enable support on your Kubernetes cluster, install the following replication CRDs once per cluster.
 
         ```
-        PATHING TO BE ADDED
+        curl -O https://raw.githubusercontent.com/IBM/csi-volume-group-operator/v0.9.0/config/crd/bases/csi.ibm.com_volumegroupclasses.yaml
+        kubectl apply -f csi.ibm.com_volumegroupclasses.yaml
+
+        curl -O https://raw.githubusercontent.com/IBM/csi-volume-group-operator/v0.9.0/config/crd/bases/csi.ibm.com_volumegroupcontents.yaml
+        kubectl apply -f csi.ibm.com_volumegroupcontents.yaml
+
+        curl -O https://raw.githubusercontent.com/IBM/csi-volume-group-operator/v0.9.0/config/crd/bases/csi.ibm.com_volumegroups.yaml
+        kubectl apply -f csi.ibm.com_volumegroups.yaml
         ```
     
     2. Enable policy-based replication on volume groups, see the following section within your Spectrum Virtualize product documentation on [IBM Documentation](https://www.ibm.com/docs/en/): **Administering** > **Managing policy-based replication** > **Assigning replication policies to volume groups**.   
