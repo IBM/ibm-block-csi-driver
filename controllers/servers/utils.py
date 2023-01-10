@@ -21,7 +21,7 @@ from controllers.common.csi_logger import get_stdout_logger
 from controllers.common.settings import NAME_PREFIX_SEPARATOR
 from controllers.servers.csi.controller_types import (ArrayConnectionInfo,
                                                       ObjectIdInfo,
-                                                      ObjectParameters, VolumeGroupParameters)
+                                                      ObjectParameters, VolumeGroupParameters, VolumeGroupIdInfo)
 from controllers.servers.errors import ObjectIdError, ValidationException, InvalidNodeId
 
 logger = get_stdout_logger()
@@ -133,16 +133,20 @@ def get_object_parameters(parameters, prefix_param_name, system_id):
 
 
 def get_volume_id(new_volume, system_id):
-    return _get_object_id(new_volume, system_id)
+    return _get_object_id(new_volume, new_volume.id, system_id)
 
 
 def get_snapshot_id(new_snapshot, system_id):
-    return _get_object_id(new_snapshot, system_id)
+    return _get_object_id(new_snapshot, new_snapshot.id, system_id)
 
 
-def _get_object_id(obj, system_id):
+def get_volume_group_id(new_volume_group, system_id):
+    return _get_object_id(new_volume_group, new_volume_group.name, system_id)
+
+
+def _get_object_id(obj, obj_strong_id, system_id):
     object_ids_delimiter = servers_settings.PARAMETERS_OBJECT_IDS_DELIMITER
-    object_ids_value = object_ids_delimiter.join((obj.internal_id, obj.id))
+    object_ids_value = object_ids_delimiter.join((obj.internal_id, obj_strong_id))
     object_id_info_delimiter = servers_settings.PARAMETERS_OBJECT_ID_INFO_DELIMITER
     if system_id:
         return object_id_info_delimiter.join((obj.array_type, system_id, object_ids_value))
@@ -421,7 +425,7 @@ def generate_csi_create_volume_group_response(volume_group):
     logger.debug("creating create volume group response for volume group : {0}".format(volume_group))
 
     response = volumegroup_pb2.CreateVolumeGroupResponse(volume_group=volumegroup_pb2.VolumeGroup(
-        volume_group_id=_get_object_id(volume_group, None),
+        volume_group_id=get_volume_group_id(volume_group, None),
         volumes=[]))
     logger.debug("finished creating volume group response : {0}".format(response))
 
@@ -432,7 +436,7 @@ def generate_csi_modify_volume_group_response(volume_group):
     logger.debug("creating modify volume group response for volume group : {0}".format(volume_group))
 
     response = volumegroup_pb2.ModifyVolumeGroupMembershipResponse(volume_group=volumegroup_pb2.VolumeGroup(
-        volume_group_id=_get_object_id(volume_group, None),
+        volume_group_id=get_volume_group_id(volume_group, None),
         volumes=_generate_volumes_response(volume_group.volumes)))
     logger.debug("finished creating volume group response : {0}".format(response))
 
@@ -554,7 +558,7 @@ def _get_context_from_volume(volume):
 def get_object_id_info(full_object_id, object_type):
     logger.debug("getting {0} info for id : {1}".format(object_type, full_object_id))
     splitted_object_id = full_object_id.split(servers_settings.PARAMETERS_OBJECT_ID_INFO_DELIMITER)
-    system_id, wwn, internal_id = None, None, None
+    system_id, strong_id, internal_id = None, None, None
     if len(splitted_object_id) == 2:
         array_type, object_id = splitted_object_id
     elif len(splitted_object_id) == 3:
@@ -563,13 +567,15 @@ def get_object_id_info(full_object_id, object_type):
         raise ObjectIdError(object_type, full_object_id)
     splitted_id = object_id.split(servers_settings.PARAMETERS_OBJECT_IDS_DELIMITER)
     if len(splitted_id) == 1:
-        wwn = splitted_id[0]
+        strong_id = splitted_id[0]
     elif len(splitted_id) == 2:
-        internal_id, wwn = splitted_id
+        internal_id, strong_id = splitted_id
     else:
         raise ObjectIdError(object_type, full_object_id)
     logger.debug("{0} id : {1}, array type :{2}".format(object_type, object_id, array_type))
-    return ObjectIdInfo(array_type=array_type, system_id=system_id, internal_id=internal_id, uid=wwn)
+    if object_type == servers_settings.VOLUME_GROUP_TYPE_NAME:
+        return VolumeGroupIdInfo(array_type=array_type, internal_id=internal_id, name=strong_id)
+    return ObjectIdInfo(array_type=array_type, system_id=system_id, internal_id=internal_id, uid=strong_id)
 
 
 def choose_connectivity_type(connectivity_types):
