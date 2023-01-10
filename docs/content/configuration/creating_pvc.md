@@ -6,7 +6,7 @@ The IBM® block storage CSI driver supports using both file system and raw block
 
 **Important:**
   - If not defined, the default mode is `Filesystem`. Be sure to define the mode as `Block` if this configuration is preferred.
-  - Only use the `volumegroup` label if the PVC is not using a StorageClass with a defined `volume_group`. The PVC `volumegroup` label value is the key defined in the VolumeGroup YAML. The labels are not pre-defined. Be sure to match the selector in the target volume group (spec.source.selector). For an example of creating a PVC using the VolumeGroup configuration, see [Creating a PVC in a volume group](#creating-a-pvc-in-a-volume-group).
+  - Only use the `volumegroup` label if the PVC is not using a StorageClass with a defined `volume_group`. The PVC `volumegroup` label value is the key defined in the VolumeGroup YAML. The labels are not pre-defined. Be sure to match the selector in the target volume group (`spec.source.selector`). For an example of creating a PVC using the VolumeGroup configuration, see [Creating a PVC in a volume group](#creating-a-pvc-in-a-volume-group).
 
 **Note:** The examples below create the PVC with a storage size 1 Gb and using the dynamic volume group feature. This can be changed, per customer needs.
 
@@ -36,8 +36,6 @@ Create a PVC YAML file, similar to the following `demo-pvc-file-system.yaml` fil
     apiVersion: v1
     metadata:
       name: demo-pvc-file-system
-      labels:
-        volumegroup: demo-volumegroup
     spec:
       volumeMode: Filesystem  # Optional. The default is Filesystem.
       accessModes:
@@ -55,8 +53,6 @@ Create a PVC YAML file, similar to the following `demo-pvc-raw-block.yaml` file,
     apiVersion: v1
     metadata:
       name: demo-pvc-raw-block
-      labels:
-        volumegroup: demo-volumegroup
     spec:
       volumeMode: Block
       accessModes:
@@ -95,8 +91,6 @@ Update the `dataSource` parameters to reflect the existing volume snapshot infor
     apiVersion: v1
     metadata:
       name: demo-pvc-from-snapshot
-      labels:
-        volumegroup: demo-volumegroup
     spec:
       volumeMode: Filesystem
       accessModes:
@@ -122,8 +116,6 @@ Update the `dataSource` parameters to reflect the existing PVC object informatio
     apiVersion: v1
     metadata:
       name: demo-pvc-cloned-pvc
-      labels:
-        volumegroup: demo-volumegroup
     spec:
       volumeMode: Filesystem
       accessModes:
