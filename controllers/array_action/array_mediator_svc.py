@@ -318,7 +318,8 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
             source_id=source_id,
             array_type=self.array_type,
             space_efficiency_aliases=space_efficiency,
-            volume_group_id=cli_volume.volume_group_id
+            volume_group_id=cli_volume.volume_group_id,
+            volume_group_name=cli_volume.volume_group_name
         )
 
     def _generate_snapshot_response_from_cli_volume(self, cli_volume, source_id):
@@ -2020,7 +2021,7 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
     def add_volume_to_volume_group(self, volume_group_id, volume_id):
         volume_name = self._get_volume_name_by_wwn(volume_id)
         cli_volume = self._get_cli_volume(volume_name)
-        if cli_volume.volume_group_id and cli_volume.volume_group_id != volume_group_id:
+        if cli_volume.volume_group_name and cli_volume.volume_group_name != volume_group_id:
             raise array_errors.VolumeAlreadyInVolumeGroup(volume_id, cli_volume.volume_group_name)
         self._change_volume_group(cli_volume.id, volume_group_id)
 
