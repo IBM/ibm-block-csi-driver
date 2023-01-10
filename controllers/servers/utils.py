@@ -628,10 +628,13 @@ def validate_unpublish_volume_request(request):
 
 def validate_addons_request(request, replication_type):
     logger.debug("validating addons request")
+    minimum_request_fields = []
+    replication_source_field = getattr(request, "replication_source")
+    if not replication_source_field:
+        minimum_request_fields.append("volume_id")
+
     if replication_type == REPLICATION_TYPE_MIRROR:
-        minimum_request_fields = ["volume_id", "replication_id"]
-    elif replication_type == REPLICATION_TYPE_EAR:
-        minimum_request_fields = ["replication_source"]
+        minimum_request_fields.append("replication_id")
     _validate_minimum_request_fields(request, minimum_request_fields)
 
     if replication_type == REPLICATION_TYPE_EAR:
