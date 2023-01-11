@@ -25,29 +25,7 @@ Before starting to import an existing volume, find the `volumeHandle` in the exi
 
     For more information about Spectrum Virtualize products, find your product information in [IBM Documentation](https://www.ibm.com/docs/).
   
-- **For FlashSystem A9000 and A9000R:**
 
-  The `volumeHandle` is formatted as `A9000:id;WWN`.
-  
-  - Through command line:
-
-    Find the `id` and `WWN` for the volume, by using the `vol_list -f` command.
-
-    For more information, see **Reference** > **Command-line reference (12.3.2.x)** > **Volume management commands** > **Listing volumes** within your specific product documentation on [IBM Documentation](https://www.ibm.com/docs/).
-
-  - Through the Hyper-Scale Management user interface:
-
-    1. Select **Pools and Volumes Views** > **Volumes** from the side bar.
-
-        The **Volumes** table is displayed.
-
-    2. Select the `Volume`.
-
-        The **Volume Properties** form is displayed.
-
-    3. Use the **ID** and **WWN** values.
-    
-    For more information, see [IBM Hyper-Scale Manager documentation](https://www.ibm.com/docs/en/hyper-scale-manager/).
 
 - **For DS8000 family:**
 

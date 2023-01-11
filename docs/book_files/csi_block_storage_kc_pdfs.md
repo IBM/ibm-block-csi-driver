@@ -18,8 +18,6 @@ For more information about storage systems and orchestration platforms that are 
 - [IBM FlashSystem™ 7300, 7200, and Storwize V7000 documentation](https://www.ibm.com/docs/flashsystem-7x00)
 - [IBM Spectrum Virtualize as Software Only documentation](https://www.ibm.com/docs/spectrumvirtualsoftw)
 - [IBM FlashSystem 9500, 9200, and 9100 documentation](https://www.ibm.com/docs/flashsystem-9x00)
-- [IBM FlashSystem A9000 documentation](https://www.ibm.com/docs/flashsystem-a9000)
-- [IBM FlashSystem A9000R documentation](https://www.ibm.com/docs/flashsystem-a9000r)
 - [IBM DS8880 documentation](https://www.ibm.com/docs/ds8880)
 - [IBM DS8900 documentation](https://www.ibm.com/docs/ds8900)
 - [IBM Spectrum® Access for IBM Cloud® Private Blueprint](https://www-01.ibm.com/common/ssi/cgi-bin/ssialias?htmlfid=TSW03569USEN&)
