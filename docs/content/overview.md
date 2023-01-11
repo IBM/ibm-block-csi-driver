@@ -15,5 +15,5 @@ For details about volume provisioning with Kubernetes, refer to [Persistent volu
 
 **Note:** For the user convenience, this guide might refer to IBM block storage CSI driver as CSI driver.
 
-![This image shows CSI driver integration with IBM block storage.](../book_files/k8s_driver_arch_diagram.png "Integration of IBM block storage systems and CSI driver in a Kubernetes environment")
+![This image shows CSI driver integration with IBM block storage.](../book_files/k8s_driver_arch_diagram_1.11.svg "Integration of IBM block storage systems and CSI driver in a Kubernetes environment")
 
