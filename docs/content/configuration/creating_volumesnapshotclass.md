@@ -22,7 +22,6 @@ When configuring the file, be sure to use the same array secret and array secret
 
    For more information about stretched snapshot limitations and requirements, see [Limitations](../release_notes/limitations.md) and [Compatibility and requirements](../installation/install_compatibility_requirements.md).
 
--   The `pool` parameter is not available on IBM FlashSystem A9000 and A9000R storage systems. For these storage systems, the snapshot must be created on the same pool as the source.
 
 ```
 apiVersion: snapshot.storage.k8s.io/v1

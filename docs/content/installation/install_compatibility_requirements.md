@@ -13,11 +13,8 @@ The CSI driver requires the following ports to be opened on the worker nodes OS 
 
         Port 3260
 
- -   **FlashSystem A9000 and A9000R**
-
-        Port 7778
-
- -   **IBM Spectrum® Virtualize family includes IBM® SAN Volume Controller and IBM FlashSystem® family members that are built with IBM Spectrum® Virtualize (including FlashSystem 5xxx, 7xxx, 9xxx)**
+ 
+ -   **IBM Spectrum® Virtualize family**
 
         Port 22
 

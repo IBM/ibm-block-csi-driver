@@ -8,14 +8,6 @@ When using the CSI driver with DS8000 family storage systems:
 - Connectivity limits on the storage side might be reached with DS8000 family products due to too many open connections. This occurs due to connection closing lag times from the storage side.
 - There is a limit of 11 FlashCopy relationships per volume (including all snapshots and clones).
 
-## Dynamic host definition limitations
-
-Dynamic host definition is only supported for use with IBM Spectrum Virtualize family storage systems.
-
-In addition, the following are not supported when using dynamic host definitions with the IBM block storage CSI driver:
-- I/O groups
-- CSI Topology (see [Configuring for CSI Topology](../configuration/configuring_topology.md))
-
 ## High availability (HA) limitations
 **Note:**
 - HyperSwap topology is only supported for use with IBM Spectrum Virtualize family storage systems.

@@ -13,3 +13,5 @@ The host definer can be installed at any time in the following ways:
 -   With OperatorHub.io (see [Installing the host definer with OperatorHub.io](install_hostdefiner_operatorhub.md)).
 
 The host definer can also be downloaded and installed as part of the operator and driver installation process. For more information, see [Installing the operator and driver](install_operator_driver.md).
+
+After the HostDefiner custom resource, created by the operator, is installed, the HostDefiner pod automatically creates HostDefinition custom resources. The HostDefinition information can be viewed using the `kubectl get hostdefinition` command.

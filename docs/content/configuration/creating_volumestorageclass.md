@@ -18,7 +18,6 @@ Use the `SpaceEfficiency` parameters for each storage system, as defined in the 
 
 |Storage system type|SpaceEfficiency parameter options|
 |-------------------|---------------------------------|
-|IBM FlashSystem® A9000 and A9000R|Always includes deduplication and compression. No need to specify during configuration.|
 |IBM Spectrum® Virtualize family|- `thick` (default value)<br />- `thin`<br />- `compressed`<br />- `dedup_thin` (creates volumes that are deduplicated with thin-provisioning)<br />- `dedup_compressed` (creates deduplicated and compressed volumes)<br /><br /> **Note:** <br />- The `deduplicated` value is deprecated. Use `dedup_compressed`, if possible. When used, `deduplicated` provides the same results as `dedup_compressed`.<br />- If not specified, the default value is `thick`.|
 |IBM® DS8000® family| - `none` (default value) <br />- `thin`<br /><br /> **Note:** If not specified, the default value is `none`.|
 
@@ -40,7 +39,7 @@ Use the `SpaceEfficiency` parameters for each storage system, as defined in the 
 
 - The `csi.storage.k8s.io/fstype` parameter is optional. The values that are allowed are _ext4_ or _xfs_. The default value is _ext4_.
 - The `volume_name_prefix` parameter is optional.
-- The `io_group` and `volume_group` parameters are only available on Spectrum Virtualize storage systems.
+- The `io_group` and `volume_group` parameters are only available on Spectrum Virtualize storage systems.<br>**Note:** If no `io_group` is defined, the volume is created within the storage system's default I/O group(s).
 - The `virt_snap_func` parameter is optional but necessary in Spectrum Virtualize storage systems if using the Snapshot function. To enable the Snapshot function, set the value to _"true"_. The default value is _"false"_. If the value is `"false"` the snapshot will use the FlashCopy function.
 
     **Note:**
