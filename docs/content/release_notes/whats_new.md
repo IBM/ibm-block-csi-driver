@@ -11,3 +11,5 @@ This version adds support for policy-based replication that was introduced in IB
 ## Additional supported orchestration platforms for deployment
 
 This version adds support for orchestration platforms Kubernetes 1.25 and Red Hat® OpenShift® 4.12, suitable for deployment of the CSI (Container Storage Interface) driver.
+
+**Note:** IBM® block storage CSI driver 1.11.0 does not support FlashSystem A9000 or A9000R storage systems.
