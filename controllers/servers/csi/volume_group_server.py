@@ -95,11 +95,13 @@ class VolumeGroupControllerServicer(volumegroup_pb2_grpc.ControllerServicer):
         except array_errors.ObjectNotFoundError:
             raise array_errors.ObjectNotFoundError(volume_group_name)
 
-    def _get_volume_ids_from_request(self, volume_ids):
+    def _get_volume_ids_from_request(self, volume_ids, array_mediator):
         volume_ids_in_request = []
         for volume_id in volume_ids:
             volume_id_info = utils.get_volume_id_info(volume_id)
-            volume_ids_in_request.append(volume_id_info.ids.uid)
+            volume_in_storage = array_mediator.get_object_by_id(volume_id_info.ids.uid,
+                                                                servers_settings.VOLUME_TYPE_NAME)
+            volume_ids_in_request.append(volume_in_storage.id)
         return volume_ids_in_request
 
     def _get_volume_ids_from_volume_group(self, volumes):
@@ -109,7 +111,7 @@ class VolumeGroupControllerServicer(volumegroup_pb2_grpc.ControllerServicer):
                 lock_request_attribute="volume_group_id")
     def ModifyVolumeGroupMembership(self, request, context):
         secrets = request.secrets
-        utils.validate_delete_volume_group_request(request)
+        utils.validate_modify_volume_group_request(request)
 
         try:
             volume_group_id_info = utils.get_volume_group_id_info(request.volume_group_id)
@@ -127,7 +129,7 @@ class VolumeGroupControllerServicer(volumegroup_pb2_grpc.ControllerServicer):
             volume_group = self._get_volume_group(array_mediator, volume_group_name)
 
             volume_ids_in_volume_group = self._get_volume_ids_from_volume_group(volume_group.volumes)
-            volume_ids_in_request = self._get_volume_ids_from_request(request.volume_ids)
+            volume_ids_in_request = self._get_volume_ids_from_request(request.volume_ids, array_mediator)
 
             self._add_volumes_missing_from_group(array_mediator, volume_ids_in_request, volume_ids_in_volume_group,
                                                  volume_group_name)
