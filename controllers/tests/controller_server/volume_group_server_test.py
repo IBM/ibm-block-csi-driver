@@ -3,6 +3,7 @@ import unittest
 import grpc
 from csi_general import volumegroup_pb2
 from mock import MagicMock, Mock
+from munch import Munch
 
 from controllers.array_action import errors as array_errors
 from controllers.servers import settings as servers_settings
@@ -189,6 +190,8 @@ class TestModifyVolumeGroupMembership(BaseVgControllerSetUp, CommonControllerTes
                                              volumes_in_volume_group_after=None):
         if volume_ids_in_request is None:
             volume_ids_in_request = []
+        else:
+            self.mediator.get_object_by_id.return_value = Munch({"id": VOLUME_UID})
         self.request.volume_ids = volume_ids_in_request
         self.mediator.get_volume_group.side_effect = [
             utils.get_mock_mediator_response_volume_group(volumes=volumes_in_volume_group),
