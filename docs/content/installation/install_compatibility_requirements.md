@@ -39,7 +39,7 @@ Complete these steps to prepare your environment for installing the CSI (Contain
    This file can be used for both Fibre Channel and iSCSI configurations. To support iSCSI, uncomment the last two lines in the file.
 
    **Important:**
-   - The `99-ibm-attach.yaml` configuration file overrides any files that exist on your system. Only use this file if the files mentioned are not already created. <br />If one or more were created, edit this YAML file, as necessary.
+   - The `99-ibm-attach.yaml` configuration file overrides any files that exist on your system. Only use this file if the files mentioned are not already created. <br />If one or more have been created, edit this YAML file, as necessary.
    - The `99-ibm-attach.yaml` configuration file contains the default configuration for the CSI driver. It is best practice to update the file according to your storage system and application networking needs.
 
    Apply the YAML file.
@@ -50,7 +50,7 @@ Complete these steps to prepare your environment for installing the CSI (Contain
 
 2. Configure your storage system host attachment, per worker node.
 
-    **Note:** IBM® block storage CSI driver 1.11.0 introduces dynamic host definition. For more information and installation instructions, see [Installing the host definer](install_hostdefiner.md). If this feature is not installed, the nodes are not dynamically defined on the  storage system and they must be defined manually.
+    **Note:** IBM® block storage CSI driver 1.11.0 introduces dynamic host definition. For more information and installation instructions, see [Installing the host definer](install_hostdefiner.md). If this feature is not installed, the nodes are not dynamically defined on the storage system and they must be defined manually.
     
     Be sure to configure your storage system host attachment according to your storage system instructions.
 
@@ -82,7 +82,7 @@ Complete these steps to prepare your environment for installing the CSI (Contain
 
 5. (Optional) If planning on using policy-based replication with volume groups, enable support on your orchestration platform cluster and storage system.
     
-    1. To enable support on your Kubernetes cluster, install the following replication CRDs, once per cluster.
+    1. To enable support on your Kubernetes cluster, install the following replication CRDs once per cluster.
 
         ```
         curl -O https://raw.githubusercontent.com/IBM/csi-volume-group-operator/v0.9.0/config/crd/bases/csi.ibm.com_volumegroupclasses.yaml
@@ -99,7 +99,7 @@ Complete these steps to prepare your environment for installing the CSI (Contain
 
 5. (Optional) If planning on using volume replication (remote copy function), enable support on your orchestration platform cluster and storage system.
     
-    1. To enable support on your Kubernetes cluster, install the following volume group CRDs, once per cluster.
+    1. To enable support on your Kubernetes cluster, install the following volume group CRDs once per cluster.
 
         ```
         curl -O https://raw.githubusercontent.com/csi-addons/volume-replication-operator/v0.3.0/config/crd/bases/replication.storage.openshift.io_volumereplicationclasses.yaml
@@ -125,4 +125,4 @@ Complete these steps to prepare your environment for installing the CSI (Contain
         - **Planning** > **Planning for high availability** > **Planning for a stretched topology system**
         - **Configuring** > **Configuration details** > **Stretched system configuration details**
 
-8. (Optional) If planning on using policy-based replication with your Spectrum Virtualize storage system, verify that the correct replication policy is in place. This can be done either through the Spectrum Virtualize user interface (navigate to **Policies** > **Replication policies**) or through the CLI (`lsreplicationpolicy`). If a replication policy is not in place create one before replicating a volume through the CSI driver.
+8. (Optional) If planning on using policy-based replication with your Spectrum Virtualize storage system, verify that the correct replication policy is in place. This can be done either through the Spectrum Virtualize user interface (go to **Policies** > **Replication policies**) or through the CLI (`lsreplicationpolicy`). If a replication policy is not in place create one before replicating a volume through the CSI driver.
