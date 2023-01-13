@@ -6,7 +6,7 @@ The IBM® block storage CSI driver supports using both file system and raw block
 
 **Important:**
   - If not defined, the default mode is `Filesystem`. Be sure to define the mode as `Block` if this configuration is preferred.
-  - The voluem group labelsare not pre-defined. Be sure to match the selector in the target volume group (`spec.source.selector`). For an example of creating a PVC using the VolumeGroup configuration, see [Creating a PVC in a volume group](#creating-a-pvc-in-a-volume-group).
+  - The volume group labels are not pre-defined. Be sure to match the selector in the target volume group (`spec.source.selector`). For an example of creating a PVC using the VolumeGroup configuration, see [Creating a PVC in a volume group](#creating-a-pvc-in-a-volume-group).
 
 **Note:** The examples below create the PVC with a storage size 1 Gb and using the dynamic volume group feature. This can be changed, per customer needs.
 
@@ -66,7 +66,7 @@ Create a PVC YAML file, similar to the following `demo-pvc-raw-block.yaml` file,
 
 Create a PVC YAML file similar to the following `demo-pvc-in-volume-group.yaml` file, changing the `volumeMode` as needed.
 
-**Note:**  Be sure to match the selector in the target volume group (`spec.source.selector`), using the same volume group key and value as defined in # [Creating a VolumeGroup](creating_volumegroup.md).
+**Note:**  Be sure to match the selector in the target volume group (`spec.source.selector`). Use the same volume group `key` and value in both the PVC and VolumeGroup. For more information, see [Creating a VolumeGroup](creating_volumegroup.md).
 
     kind: PersistentVolumeClaim
     apiVersion: v1

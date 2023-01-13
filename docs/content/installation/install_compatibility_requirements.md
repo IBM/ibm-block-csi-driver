@@ -82,7 +82,7 @@ Complete these steps to prepare your environment for installing the CSI (Contain
 
 5. (Optional) If planning on using policy-based replication with volume groups, enable support on your orchestration platform cluster and storage system.
     
-    1. To enable support on your Kubernetes cluster, install the following replication CRDs once per cluster.
+    1. To enable support on your Kubernetes cluster, install the following replication CRDs, once per cluster.
 
         ```
         curl -O https://raw.githubusercontent.com/IBM/csi-volume-group-operator/v0.9.0/config/crd/bases/csi.ibm.com_volumegroupclasses.yaml
@@ -99,7 +99,7 @@ Complete these steps to prepare your environment for installing the CSI (Contain
 
 5. (Optional) If planning on using volume replication (remote copy function), enable support on your orchestration platform cluster and storage system.
     
-    1. To enable support on your Kubernetes cluster, install the following replication CRDs once per cluster.
+    1. To enable support on your Kubernetes cluster, install the following volume group CRDs, once per cluster.
 
         ```
         curl -O https://raw.githubusercontent.com/csi-addons/volume-replication-operator/v0.3.0/config/crd/bases/replication.storage.openshift.io_volumereplicationclasses.yaml
