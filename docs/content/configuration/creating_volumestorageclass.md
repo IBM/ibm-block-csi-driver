@@ -14,6 +14,8 @@ When configuring the file, be sure to use the same array secret and array secret
 
 Use the `SpaceEfficiency` parameters for each storage system, as defined in the following table. These values are not case-sensitive.
 
+**Important:** When using external provisioning policies for linked pools, do not use the `SpaceEfficiency` parameter.
+
 #### `SpaceEfficiency` parameter definitions per storage system type
 
 |Storage system type|SpaceEfficiency parameter options|
