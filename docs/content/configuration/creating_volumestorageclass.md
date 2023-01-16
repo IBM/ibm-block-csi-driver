@@ -14,7 +14,7 @@ When configuring the file, be sure to use the same array secret and array secret
 
 Use the `SpaceEfficiency` parameters for each storage system, as defined in the following table. These values are not case-sensitive.
 
-**Important:** When using external provisioning policies for linked pools, do not use the `SpaceEfficiency` parameter.
+**Important:** When using external provisioning policies for linked pools, do not use the `SpaceEfficiency` parameter, the capacity savings within the linked pools are defined by the provisioning policy. If the `SpaceEfficiency` parameter is used together with provisioning policies, the volume cannot be created. For more information see **What's new** > **Getting started with policy-based replication** > **Configuring policy-based replication** > **Creating provisioning policy and assigning to pools**.
 
 #### `SpaceEfficiency` parameter definitions per storage system type
 
