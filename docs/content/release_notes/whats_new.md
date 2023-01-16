@@ -36,7 +36,7 @@ The following metrics are currently supported:
 
 For more information about the supported metrics, see `VolumeUsage` within the [Container Storage Interface (CSI) spec documentation for `NodeGetVolumeStats`](https://github.com/container-storage-interface/spec/blob/v1.5.0/spec.md#nodegetvolumestats).
 
-For more information about using metrics in Kubenertes, see [Metrics in Kubernetes](https://kubernetes.io/docs/concepts/cluster-administration/system-metrics/#metrics-in-kubernetes) in the Kubernetes documentation.
+For more information about using metrics in Kubernetes, see [Metrics in Kubernetes](https://kubernetes.io/docs/concepts/cluster-administration/system-metrics/#metrics-in-kubernetes) in the Kubernetes documentation.
 
 ## Additional supported orchestration platforms for deployment
 

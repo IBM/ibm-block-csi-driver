@@ -68,7 +68,7 @@ class ArrayConnectionManager:
 
     def __exit__(self, type, value, traceback):
         logger.debug("closing the connection")
-        with connection_lock_dict[self.endpoint_key]:  # TODO: when moving to python 3 add tiemout!
+        with connection_lock_dict[self.endpoint_key]:  # TODO: when moving to python 3 add timeout!
             if self.connected:
                 self.med_class.disconnect()
                 logger.debug("reducing the connection count")
