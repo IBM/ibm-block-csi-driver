@@ -82,19 +82,24 @@ class VolumeGroupControllerServicer(volumegroup_pb2_grpc.ControllerServicer):
     def _add_volumes_missing_from_group(self, array_mediator, volume_ids_in_request, volume_ids_in_volume_group,
                                         volume_group_id):
         for volume_id in volume_ids_in_request:
-            if volume_id not in volume_ids_in_volume_group \
-                    and convert_scsi_id_to_nguid(volume_id) not in volume_ids_in_volume_group:
+            if not self._is_volume_id_in_volume_group(volume_id, volume_ids_in_volume_group):
                 array_mediator.add_volume_to_volume_group(volume_group_id, volume_id)
+
+    def _is_volume_id_in_volume_group(self, volume_id, volume_ids_in_volume_group):
+        return volume_id in volume_ids_in_volume_group \
+               or convert_scsi_id_to_nguid(volume_id) in volume_ids_in_volume_group
 
     def _remove_volumes_missing_from_request(self, array_mediator, volume_ids_in_request, volume_ids_in_volume_group):
         for volume_id in volume_ids_in_volume_group:
             is_volume_id_in_request = False
             for volume_id_in_request in volume_ids_in_request:
-                if volume_id == volume_id_in_request \
-                        or volume_id_in_request.find(convert_nguid_to_scsi_id(volume_id)) >= 0:
+                if self._is_volume_id_in_request(volume_id, volume_id_in_request):
                     is_volume_id_in_request = True
             if not is_volume_id_in_request:
                 array_mediator.remove_volume_from_volume_group(volume_id)
+
+    def _is_volume_id_in_request(self, volume_id, volume_id_in_request):
+        return volume_id == volume_id_in_request or volume_id_in_request.find(convert_nguid_to_scsi_id(volume_id)) >= 0
 
     def _get_volume_group(self, array_mediator, volume_group_name):
         try:
