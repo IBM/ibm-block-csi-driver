@@ -66,7 +66,7 @@ Create a PVC YAML file, similar to the following `demo-pvc-raw-block.yaml` file,
 
 Create a PVC YAML file similar to the following `demo-pvc-in-volume-group.yaml` file, changing the `volumeMode` as needed.
 
-**Note:**  Be sure to match the selector in the target volume group (`spec.source.selector`). Use the same volume group `key` and value in both the PVC and VolumeGroup. For more information, see [Creating a VolumeGroup](creating_volumegroup.md).
+**Note:**  Be sure to match the selector in the target volume group (`spec.source.selector`). For more information, see [Creating a VolumeGroup](creating_volumegroup.md).
 
     kind: PersistentVolumeClaim
     apiVersion: v1

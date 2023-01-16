@@ -8,7 +8,7 @@ Before creating a volume group, be sure to follow all of the volume group config
 
 1.  Create a Volume Group by using the `demo-volumegroup.yaml`.
 
-    **Note:**  Be sure to match the selector in the target volume group (`spec.source.selector`). Use the same volume group `key` and value in both the VolumeGroup and PVC. For more information, see [Creating a PersistentVolumeClaim (PVC)](creating_pvc.md).
+    **Note:**  Be sure to match the selector in the target volume group (`spec.source.selector`) with the PVC. For more information, see [Creating a PersistentVolumeClaim (PVC)](creating_pvc.md).
 
     ```
     apiVersion: csi.ibm.com/v1
@@ -23,7 +23,7 @@ Before creating a volume group, be sure to follow all of the volume group config
             demo-volumegroup-key: demo-volumegroup-value
     ```
 
-2.  After the YAML file is created, apply it by using the `kubectl apply -f` command.
+2. After the YAML file is created, apply it by using the `kubectl apply -f` command.
 
     ```
     kubectl apply -f <filename>.yaml
@@ -35,11 +35,10 @@ Before creating a volume group, be sure to follow all of the volume group config
 
     Run the `kubectl describe volumegroup <vg_name>` command.
 
-    **Note:** This command to verify which PVCs are in the volume group.
+    This command lists which PVCs are in the volume group, within the `status.pvcList` section.
 
-    See the `status.state` section to see the state of the volume group and volumes within it.
+ **Assigning a PVC to a volume group**
 
-    -   **Primary** Indicates that the source volume is the primary volume.
-    -   **Secondary** Indicates that the source volume is the secondary volume.
-    -   **Unknown** Indicates that the driver does not recognize the replication state.
+To assign a PVC to a specific volume group add a label within the PVC, matching the selector of the volume group.
 
+**Note:** PVCs that belong to a volume group must first be removed from the assigned volume group in order to be deleted.

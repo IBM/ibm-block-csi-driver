@@ -95,7 +95,7 @@ Complete these steps to prepare your environment for installing the CSI (Contain
         kubectl apply -f csi.ibm.com_volumegroups.yaml
         ```
     
-    2. Enable policy-based replication on volume groups, see the following section within your Spectrum Virtualize product documentation on [IBM Documentation](https://www.ibm.com/docs/en/): **Administering** > **Managing policy-based replication** > **Assigning replication policies to volume groups**.   
+    2. Enable policy-based replication on volume groups, see the following section within your Spectrum Virtualize product documentation on [IBM Documentation](https://www.ibm.com/docs/): **Administering** > **Managing policy-based replication** > **Assigning replication policies to volume groups**.   
 
 5. (Optional) If planning on using volume replication (remote copy function), enable support on your orchestration platform cluster and storage system.
     
