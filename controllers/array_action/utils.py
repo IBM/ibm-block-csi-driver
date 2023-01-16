@@ -18,6 +18,16 @@ def convert_scsi_id_to_nguid(volume_id):
     return final_nguid
 
 
+def convert_nguid_to_scsi_id(volume_id):
+    logger.debug("Converting nguid : {} to scsi uuid".format(volume_id))
+    oui = volume_id[WWN_VENDOR_IDENTIFIER_END:WWN_VENDOR_IDENTIFIER_END + WWN_OUI_END - 1]
+    vendor_identifier = volume_id[-(WWN_VENDOR_IDENTIFIER_END - WWN_OUI_END):]
+    vendor_identifier_extension = volume_id[:WWN_VENDOR_IDENTIFIER_END]
+    final_scsi_id = ''.join((oui, vendor_identifier, vendor_identifier_extension))
+    logger.debug("scsi uuid is : {}".format(final_scsi_id))
+    return final_scsi_id
+
+
 class ClassProperty:
 
     def __init__(self, function):
