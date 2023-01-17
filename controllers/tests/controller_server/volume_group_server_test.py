@@ -10,7 +10,7 @@ from controllers.servers import settings as servers_settings
 from controllers.servers.csi.volume_group_server import VolumeGroupControllerServicer
 from controllers.tests import utils
 from controllers.tests.common.test_settings import SECRET, VOLUME_GROUP_NAME, NAME_PREFIX, REQUEST_VOLUME_GROUP_ID, \
-    VOLUME_GROUP_UID, REQUEST_VOLUME_ID, VOLUME_UID
+    VOLUME_GROUP_UID, REQUEST_VOLUME_ID, VOLUME_UID, REQUEST_REAL_VOLUME_ID, REAL_NGUID
 from controllers.tests.controller_server.common import mock_array_type, mock_mediator, mock_get_agent
 from controllers.tests.controller_server.csi_controller_server_test import CommonControllerTest
 from controllers.tests.utils import ProtoBufMock
@@ -187,15 +187,26 @@ class TestModifyVolumeGroupMembership(BaseVgControllerSetUp, CommonControllerTes
         self.assertEqual(self.context.code, grpc.StatusCode.OK)
 
     def _prepare_modify_volume_group_volumes(self, volume_ids_in_request=None, volumes_in_volume_group=None,
-                                             volumes_in_volume_group_after=None):
+                                             volumes_in_volume_group_after=None, nvme=False):
         if volume_ids_in_request is None:
             volume_ids_in_request = []
         else:
-            self.mediator.get_object_by_id.return_value = Munch({"id": VOLUME_UID})
+            volume_id = VOLUME_UID
+            if nvme:
+                volume_id = REAL_NGUID
+            self.mediator.get_object_by_id.return_value = Munch({"id": volume_id})
         self.request.volume_ids = volume_ids_in_request
         self.mediator.get_volume_group.side_effect = [
             utils.get_mock_mediator_response_volume_group(volumes=volumes_in_volume_group),
             utils.get_mock_mediator_response_volume_group(volumes=volumes_in_volume_group_after)]
+
+    def _verify_add_test(self, volume_group_response):
+        self.assertEqual(self.context.code, grpc.StatusCode.OK)
+        self.mediator.get_volume_group.assert_called_with(VOLUME_GROUP_NAME)
+        self.mediator.add_volume_to_volume_group.assert_called_once_with(VOLUME_GROUP_NAME, VOLUME_UID)
+        self.mediator.remove_volume_from_volume_group.assert_not_called()
+        self.assertEqual(volume_group_response.volume_group.volume_group_id, REQUEST_VOLUME_GROUP_ID)
+        self.assertEqual(len(volume_group_response.volume_group.volumes), 1)
 
     def test_modify_volume_group_add_success(self):
         volume_in_volume_group = utils.get_mock_mediator_response_volume()
@@ -203,12 +214,16 @@ class TestModifyVolumeGroupMembership(BaseVgControllerSetUp, CommonControllerTes
                                                   volumes_in_volume_group_after=[volume_in_volume_group])
 
         volume_group_response = self.servicer.ModifyVolumeGroupMembership(self.request, self.context)
-        self.assertEqual(self.context.code, grpc.StatusCode.OK)
-        self.mediator.get_volume_group.assert_called_with(VOLUME_GROUP_NAME)
-        self.mediator.add_volume_to_volume_group.assert_called_once_with(VOLUME_GROUP_NAME, VOLUME_UID)
-        self.mediator.remove_volume_from_volume_group.assert_not_called()
-        self.assertEqual(volume_group_response.volume_group.volume_group_id, REQUEST_VOLUME_GROUP_ID)
-        self.assertEqual(len(volume_group_response.volume_group.volumes), 1)
+        self._verify_add_test(volume_group_response)
+
+    def test_modify_volume_group_add_nvme_already_in_success(self):
+        volume_in_volume_group = utils.get_mock_mediator_response_volume()
+        self._prepare_modify_volume_group_volumes(volume_ids_in_request=[REQUEST_REAL_VOLUME_ID, REQUEST_VOLUME_ID],
+                                                  volumes_in_volume_group=[Munch({"id": REAL_NGUID, "name": "nguid"})],
+                                                  volumes_in_volume_group_after=[volume_in_volume_group], nvme=True)
+
+        volume_group_response = self.servicer.ModifyVolumeGroupMembership(self.request, self.context)
+        self._verify_add_test(volume_group_response)
 
     def test_modify_volume_group_remove_success(self):
         volume_in_volume_group = utils.get_mock_mediator_response_volume()
