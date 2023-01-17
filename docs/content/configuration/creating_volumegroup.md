@@ -31,13 +31,13 @@ Before creating a volume group, be sure to follow all of the volume group config
 
     The `volumegroup.csi.ibm.com/<volumegroup-name> created` message is emitted.
 
-3.  Verify that the volume was replicated.
+3.  Verify that the volume group was created.
 
     Run the `kubectl describe volumegroup <vg_name>` command.
 
     This command lists which PVCs are in the volume group, within the `status.pvcList` section.
 
- **Assigning a PVC to a volume group**
+## Assigning a PVC to a volume group
 
 To assign a PVC to a specific volume group add a label within the PVC, matching the selector of the volume group.
 
