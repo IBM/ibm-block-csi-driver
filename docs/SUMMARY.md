@@ -53,6 +53,8 @@
 		* [Finding the `system_id`](content/configuration/finding_systemid.md)
 		* [Finding the `replication_policy_name`](content/configuration/finding_replication_policy_name.md)
 	* [Creating a VolumeReplication](content/configuration/creating_volumereplication.md)
+	* [Creating a VolumeGroupClass](content/configuration/creating_volumegroupclass.md)
+	* [Creating a VolumeGroup](content/configuration/creating_volumegroup.md)
 	* [Expanding a PersistentVolumeClaim (PVC)](content/configuration/expanding_pvc.md)
 	* [Configuring for CSI Topology](content/configuration/configuring_topology.md)
 		* [Creating a Secret with topology awareness](content/configuration/creating_secret_topology_aware.md)

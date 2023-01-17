@@ -91,6 +91,14 @@ The following limitations apply when expanding volumes with the IBM block storag
 
 Volume group configuration is only supported for use with IBM Spectrum Virtualize family storage systems.
 
+The following limitations apply when using volume groups:
+
+- PersistentVolumeClaims (PVCs) can only be defined inside volume groups in the following ways:
+    - Defined within a StorageClass
+    - Defined within a PVC, using the volume group key
+- PVCs that already belong to a StorageClass with a defined volume group cannot be added to a VolumeGroup object.
+- Volume groups must be empty in order to be deleted.
+
 ## Volume replication limitations
 
 When a role switch is conducted, this is not reflected within the other orchestration platform replication objects.
