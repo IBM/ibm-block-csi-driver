@@ -6,9 +6,9 @@ The IBM® block storage CSI driver supports using both file system and raw block
 
 **Important:**
   - If not defined, the default mode is `Filesystem`. Be sure to define the mode as `Block` if this configuration is preferred.
-  - The volume group labels are not pre-defined. Be sure to match the selector in the target volume group (`spec.source.selector`). For an example of creating a PVC using the VolumeGroup configuration, see [Creating a PVC in a volume group](#creating-a-pvc-in-a-volume-group).
+  - The volume group labels are not pre-defined. Be sure to match the selector in the target volume group (`spec.source.selector`). For an example of creating a PVC using the VolumeGroup configuration, see [Creating a PVC within a volume group with the dynamic volume group feature](#creating-a-pvc-within-a-volume-group-with-the-dynamic-volume-group-feature).
 
-**Note:** The examples below create the PVC with a storage size 1 Gb and using the dynamic volume group feature. This can be changed, per customer needs.
+**Note:** The examples below create the PVC with a storage size 1 Gb. This can be changed, per customer needs.
 
 Use the sections below for creating YAML files for PVCs with file system and raw block volume modes. After each YAML file creation, use the `kubectl apply` command.
 
@@ -22,7 +22,7 @@ Use the following sections, according to your PVC needs:
 
 - [Creating a PVC for volume with file system](#creating-a-pvc-for-volume-with-file-system)
 - [Creating a PVC for raw block volume](#creating-a-pvc-for-raw-block-volume)
-- [Creating a PVC with `volume_group` defined in StorageClass](#creating-a-pvc-with-volumegroup-defined-in-storageclass)
+- [Creating a PVC within a volume group with the dynamic volume group feature](#creating-a-pvc-within-a-volume-group-with-the-dynamic-volume-group-feature)
 - [Creating a PVC from volume snapshot](#creating-a-pvc-from-volume-snapshot)
 - [Creating a volume clone from an existing PVC](#creating-a-volume-clone-from-an-existing-pvc)
 
