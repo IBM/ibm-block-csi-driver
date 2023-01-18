@@ -2,6 +2,19 @@
 
 As opposed to known issues, limitations are functionality restrictions that are part of the predefined system design and capabilities in a particular version.
 
+- [IBM DS8000 usage limitations](#ibm®-ds8000®-usage-limitations)
+- [High availability (HA) limitations](#high-availability-ha-limitations)
+- [I/O group limitations](#io-group-limitations)
+- [NVMe/FC usage limitations](#nvme®fc-usage-limitations)
+- [Policy-based replication limitations](#policy-based-replication-limitations)
+- [Snapshot function limitations](#snapshot-function-limitations)
+- [Volume attach limitations](#volume-attach-limitations)
+- [Volume clone limitations](#volume-clone-limitations)
+- [Volume expansion limitations](#volume-clone-limitations)
+- [Volume group limitations](#volume-group-limitations)
+- [Volume replication limitations](#volume-replication-limitations)
+- [Volume snapshot limitations](#volume-snapshot-limitations)
+
 ## IBM® DS8000® usage limitations
 
 When using the CSI driver with DS8000 family storage systems:
