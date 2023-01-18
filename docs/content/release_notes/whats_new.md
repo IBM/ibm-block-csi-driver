@@ -2,7 +2,7 @@
 
 IBM® block storage CSI driver 1.11.0 introduces the enhancements that are detailed in the following section.
 
-**General availability date:** 15 January 2023
+**General availability date:** 23 January 2023
 
 ## New dynamic volume group support
 
