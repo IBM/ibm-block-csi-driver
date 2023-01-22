@@ -50,7 +50,7 @@ In addition, only valid ports are now defined. For example, if a host has a tota
 
 ## Additional supported orchestration platforms for deployment
 
-This version adds support for orchestration platforms Kubernetes 1.25 and Red Hat® OpenShift® 4.12, suitable for deployment of the CSI (Container Storage Interface) driver.
+This version adds support for orchestration platforms Kubernetes 1.25 and 1.26, and Red Hat® OpenShift® 4.12, suitable for deployment of the CSI (Container Storage Interface) driver.
 
 ## Miscellaneous resolved issues
 
