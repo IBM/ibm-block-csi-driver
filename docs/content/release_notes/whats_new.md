@@ -53,3 +53,7 @@ In addition, only valid ports are now defined. For example, if a host has a tota
 This version adds support for orchestration platforms Kubernetes 1.25 and Red Hat® OpenShift® 4.12, suitable for deployment of the CSI (Container Storage Interface) driver.
 
 **Note:** IBM® block storage CSI driver 1.11.0 does not support FlashSystem A9000 or A9000R storage systems.
+
+## Miscellaneous resolved issues
+
+For information about the resolved issue in version 1.11.0, see [1.11.0 (January 2023)](changelog_1.11.0.md).
