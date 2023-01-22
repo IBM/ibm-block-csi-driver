@@ -49,7 +49,3 @@ For each VolumeGroup Primary and Secondary pair to be deleted:
    1. Delete the Primary VolumeGroup.
    2. Delete the Secondary VolumeGroup.<br>
     **Note:** After the Primary VolumeGroup has been deleted, the Secondary volume group is automatically deleted from the storage system.
-
-
-
-
