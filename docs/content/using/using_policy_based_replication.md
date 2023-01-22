@@ -10,6 +10,17 @@ The CSI driver identifies that policy-based replication is being used based on t
 
 **Important:** `replication_policy` cannot be used together with the `system_id` parameter.
 
-Before replicating a volume with policy-based replication, verify that the proper replication policies are in place on your storage system. For more information, see [Compatibility and requirements](../installation/install_compatibility_requirements.md). For more configuration information, see [Creating a VolumeReplicationClass](../configuration/creating_volumereplicationclass.md) and [Creating a VolumeReplication](../configuration/creating_volumereplication.md).
+Before replicating a volume with policy-based replication, verify that the proper replication policies are in place on your storage system.
+
+- For more information, see [Compatibility and requirements](../installation/install_compatibility_requirements.md)
+- For more configuration information, see [Creating a VolumeReplicationClass](../configuration/creating_volumereplicationclass.md) and [Creating a VolumeReplication](../configuration/creating_volumereplication.md)
+- For information on importing existing volume groups, see [Importing an existing volume group](../configuration/importing_existing_volume_group.md)
 
 **Note:** For full information about this Spectrum Virtualize feature, see **What's new** > **Getting started with policy-based replication** within your Spectrum Virtualize product documentation on [IBM Documentation](https://www.ibm.com/docs).
+
+## Promoting a replicated volume group
+To promote a replicated volume group within the CSI driver, the replication policy must be promoted.
+
+Promote the replication policy, by changing the `spec.replicationState` from `Secondary` to `Primary`. For more information, see [Creating a VolumeReplication](../configuration/creating_volumereplication.md).
+
+
