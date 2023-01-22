@@ -30,5 +30,26 @@ Use the following procedure to promote a replicated volume group:
 <br>**Attention:** Be sure to import any existing volumes before importing the volume group.
 2. Create and apply a new VolumeReplication YAML file for the volume group, with the  `spec.replicationState` parameter being `Primary`. See [Creating a VolumeReplication](../configuration/creating_volumereplication.md).
 
+## Removing a PVC from a volume group with a replication policy
+
+When both Primary and Secondary volume groups are represented on a cluster, their associated PVCs must be removed in this specific order.
+
+**Important:** Be sure to follow these steps in the correct order to prevent a PVC from locking.
+
+For each PVC Primary and Secondary pair to be removed from its volume group:
+   1. Remove the Primary PVC volume group labels.
+   2. Remove the Secondary PVC volume group labels.<br>
+    **Note:** After the Primary PVC volume group labels have been removed, the Secondary PVC associated volume is automatically deleted from the storage system.
+
+## Deleting a VolumeGroup with a replication policy
+
+When both Primary and Secondary volume groups are represented on a cluster, delete them in this specific order.
+
+For each VolumeGroup Primary and Secondary pair to be deleted:
+   1. Delete the Primary VolumeGroup.
+   2. Delete the Secondary VolumeGroup.<br>
+    **Note:** After the Primary VolumeGroup has been deleted, the Secondary volume group is automatically deleted from the storage system.
+
+
 
 
