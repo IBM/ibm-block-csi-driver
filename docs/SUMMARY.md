@@ -63,6 +63,7 @@
 	* [Configuring the host definer](content/configuration/configuring_hostdefiner.md)
 	* [Advanced configuration](content/configuration/advanced_configuration.md)
 		* [Importing an existing volume](content/configuration/importing_existing_volume.md)
+		* [Importing an existing volume group](content/configuration/importing_existing_volume_group.md)
 * [Using](content/using/using.md)
 	* [Using dynamic host connectivity](content/using/using_hostdefinition.md)
 		* [Changing node connectivity](content/using/changing_node_connectivity.md)

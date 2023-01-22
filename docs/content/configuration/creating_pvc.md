@@ -22,7 +22,7 @@ Use the following sections, according to your PVC needs:
 
 - [Creating a PVC for volume with file system](#creating-a-pvc-for-volume-with-file-system)
 - [Creating a PVC for raw block volume](#creating-a-pvc-for-raw-block-volume)
-- [Creating a PVC within a volume group with the dynamic volume group feature](#creating-a-pvc-within-a-volume-group-with-the-dynamic-volume-group-feature)
+- [Creating a PVC within a volume group with the dynamic volume group feature](#creating-a-pvc-within-a-volume-group-with-the-dynamic-volume-group-feature)  
 - [Creating a PVC from volume snapshot](#creating-a-pvc-from-volume-snapshot)
 - [Creating a volume clone from an existing PVC](#creating-a-volume-clone-from-an-existing-pvc)
 
