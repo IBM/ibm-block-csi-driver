@@ -67,8 +67,8 @@ Use this procedure to help build a PV YAML file for your volumes.
     apiVersion: v1
     kind: PersistentVolume
     metadata:
-      # annotations:
-        # pv.kubernetes.io/provisioned-by: block.csi.ibm.com
+      annotations: 
+        pv.kubernetes.io/provisioned-by: block.csi.ibm.com
       name: demo-pv
     spec:
       accessModes:
@@ -76,6 +76,7 @@ Use this procedure to help build a PV YAML file for your volumes.
       capacity:
         storage: 1Gi
       csi:
+        fsType: ext4
         controllerExpandSecretRef:
           name: demo-secret
           namespace: default
@@ -88,17 +89,10 @@ Use this procedure to help build a PV YAML file for your volumes.
         nodeStageSecretRef:
           name: demo-secret
           namespace: default
-        # fsType: ext4
         driver: block.csi.ibm.com
-        # volumeAttributes:
-          # pool_name: demo-pool
-          # storage_type: SVC
-          # volume_name: demo-prefix_demo-pvc-file-system
-          # array_address: demo-management-address
         volumeHandle: SVC:0;600507640082000B08000000000004FF
-      # persistentVolumeReclaimPolicy: Retain
       storageClassName: demo-storageclass
-      # volumeMode: Filesystem
+      persistentVolumeReclaimPolicy: Retain
     ```
 
 3. Create a PersistentVolumeClaim (PVC) YAML file.
