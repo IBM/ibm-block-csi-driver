@@ -90,7 +90,7 @@ Use this procedure to help build a PV YAML file for your volumes.
           name: demo-secret
           namespace: default
         driver: block.csi.ibm.com
-        volumeHandle: SVC:0;600507640082000B08000000000004FF
+        volumeHandle: SVC:id;uid
       storageClassName: demo-storageclass
       persistentVolumeReclaimPolicy: Retain
     ```
