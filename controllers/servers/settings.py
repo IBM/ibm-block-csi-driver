@@ -39,6 +39,7 @@ PARAMETERS_VOLUME_GROUP = "volume_group"
 PARAMETERS_VIRT_SNAP_FUNC = "virt_snap_func"
 PARAMETERS_VOLUME_NAME_PREFIX = "volume_name_prefix"
 PARAMETERS_SNAPSHOT_NAME_PREFIX = "snapshot_name_prefix"
+PARAMETERS_VOLUME_GROUP_NAME_PREFIX = "volume_group_name_prefix"
 PARAMETERS_SYSTEM_ID = "system_id"
 PARAMETERS_COPY_TYPE = "copy_type"
 PARAMETERS_REPLICATION_HANDLE = "replicationHandle"
@@ -55,6 +56,7 @@ REQUEST_ACCESSIBILITY_REQUIREMENTS_FIELD = "accessibility_requirements"
 
 SNAPSHOT_TYPE_NAME = "snapshot"
 VOLUME_TYPE_NAME = "volume"
+VOLUME_GROUP_TYPE_NAME = "volumegroup"
 VOLUME_SOURCE_ID_FIELDS = {SNAPSHOT_TYPE_NAME: 'snapshot_id', VOLUME_TYPE_NAME: 'volume_id'}
 
 MINIMUM_VOLUME_ID_PARTS = 2

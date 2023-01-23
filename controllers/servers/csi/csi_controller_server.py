@@ -448,21 +448,20 @@ class CSIControllerServicer(csi_pb2_grpc.ControllerServicer):
             return handle_exception(ex, context, grpc.StatusCode.INTERNAL,
                                     csi_pb2.ControllerExpandVolumeResponse)
 
+    def _get_controller_service_capability(self, capability_name):
+        types = csi_pb2.ControllerServiceCapability.RPC.Type
+        capability_enum_value = types.Value(capability_name)
+        return csi_pb2.ControllerServiceCapability(
+            rpc=csi_pb2.ControllerServiceCapability.RPC(type=capability_enum_value))
+
     def ControllerGetCapabilities(self, request, context):
         logger.info("ControllerGetCapabilities")
-        types = csi_pb2.ControllerServiceCapability.RPC.Type
-
         response = csi_pb2.ControllerGetCapabilitiesResponse(
-            capabilities=[csi_pb2.ControllerServiceCapability(
-                rpc=csi_pb2.ControllerServiceCapability.RPC(type=types.Value("CREATE_DELETE_VOLUME"))),
-                csi_pb2.ControllerServiceCapability(
-                    rpc=csi_pb2.ControllerServiceCapability.RPC(type=types.Value("CREATE_DELETE_SNAPSHOT"))),
-                csi_pb2.ControllerServiceCapability(
-                    rpc=csi_pb2.ControllerServiceCapability.RPC(type=types.Value("PUBLISH_UNPUBLISH_VOLUME"))),
-                csi_pb2.ControllerServiceCapability(
-                    rpc=csi_pb2.ControllerServiceCapability.RPC(type=types.Value("CLONE_VOLUME"))),
-                csi_pb2.ControllerServiceCapability(
-                    rpc=csi_pb2.ControllerServiceCapability.RPC(type=types.Value("EXPAND_VOLUME")))])
+            capabilities=[self._get_controller_service_capability("CREATE_DELETE_VOLUME"),
+                          self._get_controller_service_capability("CREATE_DELETE_SNAPSHOT"),
+                          self._get_controller_service_capability("PUBLISH_UNPUBLISH_VOLUME"),
+                          self._get_controller_service_capability("CLONE_VOLUME"),
+                          self._get_controller_service_capability("EXPAND_VOLUME")])
 
         logger.info("finished ControllerGetCapabilities")
         return response
@@ -479,33 +478,12 @@ class CSIControllerServicer(csi_pb2_grpc.ControllerServicer):
         return csi_pb2.GetPluginInfoResponse(name=name, vendor_version=version)
 
     def _get_volume_final_name(self, volume_parameters, name, array_mediator):
-        return self._get_object_final_name(volume_parameters, name, array_mediator,
+        return utils.get_object_final_name(volume_parameters, name, array_mediator,
                                            servers_settings.VOLUME_TYPE_NAME)
 
     def _get_snapshot_final_name(self, volume_parameters, name, array_mediator):
-        name = self._get_object_final_name(volume_parameters, name, array_mediator,
+        return utils.get_object_final_name(volume_parameters, name, array_mediator,
                                            servers_settings.SNAPSHOT_TYPE_NAME)
-        return name
-
-    def _get_object_final_name(self, volume_parameters, name, array_mediator, object_type):
-        prefix = ""
-        if volume_parameters.prefix:
-            prefix = volume_parameters.prefix
-            if len(prefix) > array_mediator.max_object_prefix_length:
-                raise array_errors.InvalidArgumentError(
-                    "The {} name prefix '{}' is too long, max allowed length is {}".format(
-                        object_type,
-                        prefix,
-                        array_mediator.max_object_prefix_length
-                    )
-                )
-        if not prefix:
-            prefix = array_mediator.default_object_prefix
-        full_name = utils.join_object_prefix_with_name(prefix, name)
-        if len(full_name) > array_mediator.max_object_name_length:
-            hashed_name = utils.hash_string(name)
-            full_name = utils.join_object_prefix_with_name(prefix, hashed_name)
-        return full_name[:array_mediator.max_object_name_length]
 
     def GetPluginCapabilities(self, _, __):  # pylint: disable=invalid-name
         logger.info("GetPluginCapabilities")

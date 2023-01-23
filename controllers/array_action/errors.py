@@ -1,4 +1,6 @@
 import controllers.array_action.messages as messages
+from controllers.tests.common.test_settings import VOLUME_OBJECT_TYPE, SNAPSHOT_OBJECT_TYPE, HOST_OBJECT_TYPE, \
+    VOLUME_GROUP_OBJECT_TYPE
 
 
 class BaseArrayActionException(Exception):
@@ -77,6 +79,13 @@ class VolumeDeletionError(BaseArrayActionException):
         self.message = messages.VOLUME_DELETION_ERROR_MESSAGE.format(volume_id)
 
 
+class VolumeAlreadyInVolumeGroup(BaseArrayActionException):
+
+    def __init__(self, volume_id, volume_group_name):
+        super().__init__()
+        self.message = messages.VOLUME_ALREADY_IN_VOLUME_GROUP_ERROR_MESSAGE.format(volume_id, volume_group_name)
+
+
 class PoolDoesNotMatchSpaceEfficiency(InvalidArgumentError):
 
     def __init__(self, pool, space_efficiency, error):
@@ -104,7 +113,7 @@ class VolumeAlreadyExists(BaseArrayActionException):
 
     def __init__(self, volume_name, array):
         super().__init__()
-        self.message = messages.VOLUME_ALREADY_EXISTS_MESSAGE.format(volume_name, array)
+        self.message = messages.OBJECT_ALREADY_EXISTS_MESSAGE.format(VOLUME_OBJECT_TYPE, volume_name, array)
 
 
 class PoolDoesNotExist(InvalidArgumentError):
@@ -216,14 +225,21 @@ class SnapshotAlreadyExists(BaseArrayActionException):
 
     def __init__(self, snapshot_id_or_name, array):
         super().__init__()
-        self.message = messages.SNAPSHOT_ALREADY_EXISTS_ERROR_MESSAGE.format(snapshot_id_or_name, array)
+        self.message = messages.OBJECT_ALREADY_EXISTS_MESSAGE.format(SNAPSHOT_OBJECT_TYPE, snapshot_id_or_name, array)
 
 
 class HostAlreadyExists(BaseArrayActionException):
 
     def __init__(self, host_name, array):
         super().__init__()
-        self.message = messages.HOST_ALREADY_EXISTS_ERROR_MESSAGE.format(host_name, array)
+        self.message = messages.OBJECT_ALREADY_EXISTS_MESSAGE.format(HOST_OBJECT_TYPE, host_name, array)
+
+
+class VolumeGroupAlreadyExists(BaseArrayActionException):
+
+    def __init__(self, volume_group_name, array):
+        super().__init__()
+        self.message = messages.OBJECT_ALREADY_EXISTS_MESSAGE.format(VOLUME_GROUP_OBJECT_TYPE, volume_group_name, array)
 
 
 class NoPortFoundByConnectivityType(BaseArrayActionException):
@@ -273,3 +289,24 @@ class NoPortIsValid(BaseArrayActionException):
     def __init__(self, host_name):
         super().__init__()
         self.message = messages.ALL_THE_PORTS_FOR_HOST_ARE_INVALID.format(host_name)
+
+
+class IoGroupIsInValid(BaseArrayActionException):
+
+    def __init__(self, io_group):
+        super().__init__()
+        self.message = messages.IO_GROUP_IS_NOT_VALID.format(io_group)
+
+
+class UnSupportedParameter(BaseArrayActionException):
+
+    def __init__(self, parameter):
+        super().__init__()
+        self.message = messages.UNSUPPORTED_PARAMETER.format(parameter)
+
+
+class CannotChangeHostProtocolBecauseOfMappedPorts(BaseArrayActionException):
+
+    def __init__(self, host_name):
+        super().__init__()
+        self.message = messages.CANNOT_CHANGE_HOST_PROTOCOL_BECAUSE_OF_MAPPED_PORTS.format(host_name)

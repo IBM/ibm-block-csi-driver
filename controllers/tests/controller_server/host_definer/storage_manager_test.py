@@ -10,7 +10,8 @@ from controllers.tests.common.test_settings import HOST_NAME, SECRET
 from controllers.tests.controller_server.common import mock_get_agent, mock_array_type
 import controllers.tests.controller_server.host_definer.settings as settings
 import controllers.tests.array_action.test_settings as array_settings
-from controllers.servers.host_definer.types import DefineHostResponse
+import controllers.tests.controller_server.host_definer.utils.test_utils as test_utils
+import controllers.common.settings as common_settings
 
 HOST_DEFINER_SERVER_PATH = "controllers.servers.host_definer.storage_manager.host_definer_server"
 
@@ -27,14 +28,16 @@ class BaseSetUp(unittest.TestCase):
         self.storage_agent = MagicMock()
         mock_get_agent(self, HOST_DEFINER_SERVER_PATH)
 
-        self.request = Mock(spec_set=['prefix', 'connectivity_type_from_user',
-                            'node_id_from_csi_node', 'node_id_from_host_definition', 'array_connection_info'])
+        self.request = Mock(
+            spec_set=['prefix', 'connectivity_type_from_user', 'node_id_from_csi_node',
+                      'node_id_from_host_definition', 'array_connection_info', 'io_group'])
 
         self.request.prefix = None
         self.request.connectivity_type_from_user = array_settings.ISCSI_CONNECTIVITY_TYPE
         self.request.node_id_from_csi_node = settings.FAKE_NODE_ID
         self.request.node_id_from_host_definition = settings.FAKE_NODE_ID
         self.request.array_connection_info = get_array_connection_info_from_secrets(SECRET)
+        self.request.io_group = array_settings.DUMMY_MULTIPLE_IO_GROUP_STRING
 
 
 class TestDefineHost(BaseSetUp):
@@ -47,14 +50,16 @@ class TestDefineHost(BaseSetUp):
 
     def _test_define_host_success(self, is_host_exist=False):
         self._prepare_define_host(is_host_exist)
+        self.mediator.get_host_io_group.return_value = test_utils.get_fake_host_io_group()
         response = self.servicer.define_host(self.request)
         self.mediator.get_host_by_host_identifiers.assert_called_once_with(Initiators(iscsi_iqns=[settings.IQN]))
         self.assertEqual(response.error_message, '')
 
     def test_define_host_success(self):
         self._test_define_host_success()
-        self.mediator.create_host.assert_called_once_with(HOST_NAME, Initiators(iscsi_iqns=[settings.IQN]),
-                                                          self.request.connectivity_type_from_user)
+        self.mediator.create_host.assert_called_once_with(
+            HOST_NAME, Initiators(iscsi_iqns=[settings.IQN]),
+            self.request.connectivity_type_from_user, self.request.io_group)
 
     def test_define_host_failed(self):
         error_message = 'error'
@@ -64,6 +69,7 @@ class TestDefineHost(BaseSetUp):
 
     def _prepare_define_host_already_exists(self, nqn, iqn):
         self._prepare_define_host()
+        self.mediator.get_host_io_group.return_value = test_utils.get_fake_host_io_group()
         self.mediator.create_host.side_effect = HostAlreadyExists(HOST_NAME, '')
         self.mediator.get_host_by_name.return_value = Host(name=HOST_NAME, nvme_nqns=[nqn], iscsi_iqns=[iqn],
                                                            connectivity_types=[])
@@ -79,37 +85,61 @@ class TestDefineHost(BaseSetUp):
     def _prepare_define_host_update_ports(self, host_connectivity_type, initiators):
         self._prepare_define_host(is_host_exist=True)
         self.mediator.get_host_connectivity_type.return_value = host_connectivity_type
+        self.mediator.get_host_io_group.return_value = test_utils.get_fake_host_io_group()
         response = self.servicer.define_host(self.request)
 
         self.mediator.add_ports_to_host.assert_called_once_with(HOST_NAME, initiators,
                                                                 self.request.connectivity_type_from_user)
         self.assertEqual(response.error_message, '')
 
-    def test_define_host_update_ports_with_different_protocol_success(self):
+    def _assert_io_group(self):
+        self.mediator.get_host_io_group.assert_called_with(HOST_NAME)
+        self.assertEqual(2, self.mediator.get_host_io_group.call_count)
+        self.mediator.remove_io_group_from_host.assert_called_once_with(HOST_NAME, '0')
+        self.mediator.add_io_group_to_host.assert_called_once_with(HOST_NAME, array_settings.DUMMY_IO_GROUP_TO_ADD)
+
+    def test_define_host_update_ports_with_different_protocol_on_storage_without_chhost_success(self):
+        self.mediator.change_host_protocol.side_effect = HostNotFoundError('error')
         self._prepare_define_host_update_ports(array_settings.NVME_OVER_FC_CONNECTIVITY_TYPE,
                                                Initiators(iscsi_iqns=[settings.IQN]))
-        self.mediator.delete_host.assert_called_once_with(HOST_NAME)
-        self.mediator.create_host.assert_called_once_with(HOST_NAME, Initiators(iscsi_iqns=[settings.IQN]),
-                                                          self.request.connectivity_type_from_user)
-        self.mediator.remove_ports_from_host.assert_not_called()
 
-    def test_define_host_update_ports_with_same_protocol_success(self):
+        self.mediator.delete_host.assert_called_once_with(HOST_NAME)
+        self.mediator.create_host.assert_called_once_with(
+            HOST_NAME, Initiators(iscsi_iqns=[settings.IQN]),
+            self.request.connectivity_type_from_user, self.request.io_group)
+        self.mediator.remove_ports_from_host.assert_called_once()
+        self._assert_io_group()
+
+    def _prepare_define_host_update_ports_without_delete_host(self, host_connectivity_type):
         self.mediator.get_host_connectivity_ports.return_value = [settings.IQN]
         self.request.node_id_from_csi_node = '{};;{};'.format(HOST_NAME, settings.WWPN)
         self.request.connectivity_type_from_user = array_settings.FC_CONNECTIVITY_TYPE
-        self._prepare_define_host_update_ports(array_settings.ISCSI_CONNECTIVITY_TYPE,
+        self._prepare_define_host_update_ports(host_connectivity_type,
                                                Initiators(fc_wwns=[settings.WWPN]))
 
-        self.mediator.remove_ports_from_host.assert_called_once_with(HOST_NAME, [settings.IQN],
-                                                                     array_settings.ISCSI_CONNECTIVITY_TYPE)
         self.mediator.create_host.assert_not_called()
         self.mediator.delete_host.assert_not_called()
+        self._assert_io_group()
+
+    def test_define_host_update_ports_with_different_protocol_on_storage_with_chhost_success(self):
+        self._prepare_define_host_update_ports_without_delete_host(array_settings.NVME_OVER_FC_CONNECTIVITY_TYPE)
+
+        self.assertEqual(2, self.mediator.get_host_connectivity_ports.call_count)
+        self.mediator.remove_ports_from_host.assert_called_once_with(HOST_NAME, [settings.IQN],
+                                                                     array_settings.NVME_OVER_FC_CONNECTIVITY_TYPE)
+        self.mediator.change_host_protocol.assert_called_once_with(
+            HOST_NAME, common_settings.SCSI_PROTOCOL)
+
+    def test_define_host_update_ports_with_same_protocol_success(self):
+        self._prepare_define_host_update_ports_without_delete_host(array_settings.ISCSI_CONNECTIVITY_TYPE)
+        self.mediator.remove_ports_from_host.assert_called_once_with(HOST_NAME, [settings.IQN],
+                                                                     array_settings.ISCSI_CONNECTIVITY_TYPE)
 
     def test_define_host_return_values(self):
         self._prepare_define_host()
-        expected_response = DefineHostResponse(connectivity_type=self.request.connectivity_type_from_user,
-                                               node_name_on_storage=HOST_NAME,
-                                               ports=[settings.IQN])
+        self.mediator.get_host_io_group.return_value = test_utils.get_fake_host_io_group()
+        expected_response = test_utils.get_define_response(
+            self.request.connectivity_type_from_user, [settings.IQN])
         self.mediator.get_host_connectivity_ports.return_value = [settings.IQN]
         response = self.servicer.define_host(self.request)
         self.assertEqual(response, expected_response)

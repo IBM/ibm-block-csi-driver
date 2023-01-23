@@ -10,13 +10,15 @@ from retry import retry
 
 import controllers.array_action.errors as array_errors
 import controllers.array_action.settings as array_settings
+from controllers.array_action import svc_messages
 import controllers.servers.settings as controller_settings
-from controllers.array_action.array_action_types import Volume, Snapshot, Replication, Host
+from controllers.array_action.array_action_types import Volume, Snapshot, Replication, Host, VolumeGroup, ThinVolume
 from controllers.array_action.array_mediator_abstract import ArrayMediatorAbstract
 from controllers.array_action.utils import ClassProperty, convert_scsi_id_to_nguid
+from controllers.array_action.volume_group_interface import VolumeGroupInterface
 from controllers.common import settings as common_settings
 from controllers.common.csi_logger import get_stdout_logger
-from controllers.servers.utils import get_connectivity_type_ports
+from controllers.servers.utils import get_connectivity_type_ports, split_string
 
 array_connections_dict = {}
 logger = get_stdout_logger()
@@ -45,6 +47,9 @@ NOT_CHILD_POOL = 'CMMVC9760E'
 NOT_REDUCTION_POOL = 'CMMVC9301E'
 NOT_ENOUGH_EXTENTS_IN_POOL_EXPAND = 'CMMVC5860E'
 NOT_ENOUGH_EXTENTS_IN_POOL_CREATE = 'CMMVC8710E'
+NOT_VALID_IO_GROUP = 'CMMVC5729E'
+NOT_SUPPORTED_PARAMETER = 'CMMVC5709E'
+CANNOT_CHANGE_HOST_PROTOCOL_BECAUSE_OF_MAPPED_PORTS = 'CMMVC9331E'
 
 HOST_NQN = 'nqn'
 HOST_WWPN = 'WWPN'
@@ -120,11 +125,14 @@ def _add_port_to_command_kwargs(connectivity_type, port, cli_kwargs):
     return cli_kwargs
 
 
-def build_create_host_kwargs(host_name, connectivity_type, port):
+def build_create_host_kwargs(host_name, connectivity_type, port, io_group):
     cli_kwargs = {'name': host_name}
     cli_kwargs = _add_port_to_command_kwargs(connectivity_type, port, cli_kwargs)
     if connectivity_type == array_settings.NVME_OVER_FC_CONNECTIVITY_TYPE:
         cli_kwargs['protocol'] = 'nvme'
+    if not io_group:
+        io_group = common_settings.FULL_IO_GROUP
+    cli_kwargs['iogrp'] = io_group
     return cli_kwargs
 
 
@@ -178,6 +186,13 @@ def build_stop_replication_kwargs(rcrelationship_id, add_access):
     return cli_kwargs
 
 
+def build_change_host_protocol_kwargs(host_name, protocol):
+    return {
+        'object_id': host_name,
+        'protocol': protocol
+    }
+
+
 def _get_cli_volume_space_efficiency_aliases(cli_volume):
     space_efficiency_aliases = {common_settings.SPACE_EFFICIENCY_THICK, ''}
     if cli_volume.se_copy == YES:
@@ -194,7 +209,7 @@ def _get_cli_volume_space_efficiency_aliases(cli_volume):
     return space_efficiency_aliases
 
 
-class SVCArrayMediator(ArrayMediatorAbstract):
+class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
     ARRAY_ACTIONS = {}
     BLOCK_SIZE_IN_BYTES = 512
     MAX_LUN_NUMBER = 511
@@ -303,7 +318,8 @@ class SVCArrayMediator(ArrayMediatorAbstract):
             source_id=source_id,
             array_type=self.array_type,
             space_efficiency_aliases=space_efficiency,
-            volume_group_id=cli_volume.volume_group_id
+            volume_group_id=cli_volume.volume_group_id,
+            volume_group_name=cli_volume.volume_group_name
         )
 
     def _generate_snapshot_response_from_cli_volume(self, cli_volume, source_id):
@@ -336,10 +352,22 @@ class SVCArrayMediator(ArrayMediatorAbstract):
         source_id = self._get_wwn_by_volume_name_if_exists(fcmap.source_vdisk_name)
         return self._generate_snapshot_response_from_cli_volume(cli_object, source_id)
 
+    def _lsvdisk_single_element(self, **kwargs):
+        lsvdisk_response = self._lsvdisk(**kwargs)
+        if lsvdisk_response is None:
+            return None
+        return lsvdisk_response.as_single_element
+
+    def _lsvdisk_list(self, **kwargs):
+        lsvdisk_response = self._lsvdisk(**kwargs)
+        if lsvdisk_response is None:
+            return None
+        return lsvdisk_response.as_list
+
     def _lsvdisk(self, **kwargs):
         kwargs['bytes'] = True
         try:
-            return self.client.svcinfo.lsvdisk(**kwargs).as_single_element
+            return self.client.svcinfo.lsvdisk(**kwargs)
         except (svc_errors.CommandExecutionError, CLIFailureError) as ex:
             if (OBJ_NOT_FOUND in ex.my_message or
                     NAME_NOT_EXIST_OR_MEET_RULES in ex.my_message):
@@ -349,13 +377,15 @@ class SVCArrayMediator(ArrayMediatorAbstract):
                 raise array_errors.InvalidArgumentError(ex.my_message)
             raise ex
 
-    def _lsvolumegroup(self, id_or_name):
+    def _lsvolumegroup(self, id_or_name, not_exist_err=False):
         try:
             return self.client.svcinfo.lsvolumegroup(object_id=id_or_name).as_single_element
         except (svc_errors.CommandExecutionError, CLIFailureError) as ex:
             if (SPECIFIED_OBJ_NOT_EXIST in ex.my_message or
                     NAME_NOT_EXIST_OR_MEET_RULES in ex.my_message):
                 logger.info("volume group {} was not found".format(id_or_name))
+                if not_exist_err:
+                    raise array_errors.ObjectNotFoundError(id_or_name)
                 return None
             if any(msg_id in ex.my_message for msg_id in (NON_ASCII_CHARS, VALUE_TOO_LONG)):
                 raise array_errors.InvalidArgumentError(ex.my_message)
@@ -398,7 +428,7 @@ class SVCArrayMediator(ArrayMediatorAbstract):
                 raise ex
 
     def _get_cli_volume(self, volume_name, not_exist_err=True):
-        cli_volume = self._lsvdisk(object_id=volume_name)
+        cli_volume = self._lsvdisk_single_element(object_id=volume_name)
         if not cli_volume and not_exist_err:
             raise array_errors.ObjectNotFoundError(volume_name)
         return cli_volume
@@ -526,7 +556,7 @@ class SVCArrayMediator(ArrayMediatorAbstract):
 
     def _lsvdisk_by_uid(self, vdisk_uid):
         filter_value = 'vdisk_UID=' + vdisk_uid
-        return self._lsvdisk(filtervalue=filter_value)
+        return self._lsvdisk_single_element(filtervalue=filter_value)
 
     def _get_cli_volume_by_wwn(self, volume_id, not_exist_err=False):
         cli_volume = self._lsvdisk_by_uid(volume_id)
@@ -691,6 +721,8 @@ class SVCArrayMediator(ArrayMediatorAbstract):
             if not source_cli_volume:
                 return None
             return self._generate_snapshot_response_from_cli_snapshot(cli_snapshot, source_cli_volume)
+        if object_type == controller_settings.VOLUME_GROUP_TYPE_NAME:
+            return self.get_volume_group(object_id)
         cli_volume = self._get_cli_volume_by_wwn(object_id)
         if not cli_volume:
             return None
@@ -1112,6 +1144,10 @@ class SVCArrayMediator(ArrayMediatorAbstract):
         logger.debug("The chosen available lun is : {0}".format(lun))
         return lun
 
+    def _raise_error_when_host_not_exist_or_not_meet_the_rules(self, host_name, error_message):
+        if NAME_NOT_EXIST_OR_MEET_RULES in error_message:
+            raise array_errors.HostNotFoundError(host_name)
+
     def map_volume(self, volume_id, host_name, connectivity_type):
         logger.debug("mapping volume : {0} to host : "
                      "{1}".format(volume_id, host_name))
@@ -1135,8 +1171,7 @@ class SVCArrayMediator(ArrayMediatorAbstract):
             else:
                 logger.error("Map volume {0} to host {1} failed. Reason "
                              "is: {2}".format(volume_name, host_name, ex))
-                if NAME_NOT_EXIST_OR_MEET_RULES in ex.my_message:
-                    raise array_errors.HostNotFoundError(host_name)
+                self._raise_error_when_host_not_exist_or_not_meet_the_rules(host_name, ex.my_message)
                 if SPECIFIED_OBJ_NOT_EXIST in ex.my_message:
                     raise array_errors.ObjectNotFoundError(volume_name)
                 if LUN_ALREADY_IN_USE in ex.my_message:
@@ -1167,8 +1202,7 @@ class SVCArrayMediator(ArrayMediatorAbstract):
             else:
                 logger.error("unmapping volume {0} from host {1} failed. Reason "
                              "is: {2}".format(volume_name, host_name, ex))
-                if NAME_NOT_EXIST_OR_MEET_RULES in ex.my_message:
-                    raise array_errors.HostNotFoundError(host_name)
+                self._raise_error_when_host_not_exist_or_not_meet_the_rules(host_name, ex.my_message)
                 if OBJ_NOT_FOUND in ex.my_message:
                     raise array_errors.ObjectNotFoundError(volume_name)
                 if VOL_ALREADY_UNMAPPED in ex.my_message:
@@ -1377,12 +1411,10 @@ class SVCArrayMediator(ArrayMediatorAbstract):
             logger.info("EAR replication is not supported on the existing storage")
             return None
 
-        # for phase 1 - find volume by id and get volume group id from result volume
-        cli_volume = self._get_cli_volume(replication_request.volume_internal_id)
-        volume_group_id = cli_volume.volume_group_id
-        if volume_group_id == "":
+        volume_group_id = replication_request.volume_internal_id
+        replication_policy = self._get_replication_policy(volume_group_id)
+        if replication_policy != replication_request.replication_policy:
             return None
-
         replication_mode = self._get_replication_mode(volume_group_id)
         if not replication_mode:
             return None
@@ -1399,6 +1431,12 @@ class SVCArrayMediator(ArrayMediatorAbstract):
         location_attr_name = f"location{replication_local_location}_replication_mode"
 
         return getattr(volume_group_replication, location_attr_name, None)
+
+    def _get_replication_policy(self, volume_group_id):
+        volume_group_replication = self._lsvolumegroupreplication(volume_group_id)
+        if not volume_group_replication:
+            return None
+        return volume_group_replication.replication_policy_name
 
     def _is_earreplication_supported(self):
         return hasattr(self.client.svctask, "chvolumereplicationinternals")
@@ -1462,14 +1500,9 @@ class SVCArrayMediator(ArrayMediatorAbstract):
             return
 
         replication_policy = replication_request.replication_policy
+        volume_group_id = replication_request.volume_internal_id
 
-        volume_internal_id = replication_request.volume_internal_id
-        cli_volume = self._get_cli_volume(volume_internal_id)
-
-        volume_group_name = cli_volume.name + common_settings.VOLUME_GROUP_NAME_SUFFIX
-        volume_group_id = self._create_volume_group(volume_group_name)
-        self._change_volume_group(volume_internal_id, volume_group_name)
-
+        self._change_volume_group_policy(volume_group_id)
         self._change_volume_group_policy(volume_group_id, replication_policy)
 
     def _stop_rcrelationship(self, rcrelationship_id, add_access_to_secondary=False):
@@ -1518,10 +1551,6 @@ class SVCArrayMediator(ArrayMediatorAbstract):
             return
 
         self._change_volume_group_policy(volume_group_id)
-
-        cli_volume_id = self._get_cli_volume_id_from_volume_group("volume_group_id", volume_group_id)
-        self._change_volume_group(cli_volume_id)
-        self._rmvolumegroup(volume_group_id)
 
     def _promote_replication_endpoint(self, endpoint_type, replication_name):
         logger.info("making '{}' primary for remote copy relationship {}".format(endpoint_type, replication_name))
@@ -1684,7 +1713,7 @@ class SVCArrayMediator(ArrayMediatorAbstract):
 
     def _get_cli_volume_id_from_volume_group(self, filter, filter_parameter):
         filter_value = '{}={}'.format(filter, filter_parameter)
-        cli_volume = self._lsvdisk(filtervalue=filter_value)
+        cli_volume = self._lsvdisk_single_element(filtervalue=filter_value)
         return cli_volume.id
 
     def _rollback_create_volume_from_snapshot(self, cli_volume_id, volume_group_name):
@@ -1742,19 +1771,27 @@ class SVCArrayMediator(ArrayMediatorAbstract):
         if not vdisk_uid:
             return False
         cli_volume = self._get_cli_volume_by_wwn(vdisk_uid, not_exist_err=False)
+        if self._is_earreplication_supported():
+            return cli_volume and cli_volume.replication_mode and cli_volume.fc_map_count != \
+                common_settings.EAR_VOLUME_FC_MAP_COUNT
         return cli_volume and cli_volume.FC_id
+
+    def _raise_invalid_io_group(self, io_group, error_message):
+        if NOT_VALID_IO_GROUP in error_message:
+            raise array_errors.IoGroupIsInValid(io_group)
 
     def _is_port_invalid(self, message_from_storage):
         return FC_PORT_IS_NOT_VALID in message_from_storage or \
             ISCSI_PORT_IS_NOT_VALID in message_from_storage or \
             NVME_PORT_IS_ALREADY_ASSIGNED in message_from_storage
 
-    def _mkhost(self, host_name, connectivity_type, port):
-        cli_kwargs = build_create_host_kwargs(host_name, connectivity_type, port)
+    def _mkhost(self, host_name, connectivity_type, port, io_group):
+        cli_kwargs = build_create_host_kwargs(host_name, connectivity_type, port, io_group)
         try:
             self.client.svctask.mkhost(**cli_kwargs)
             return 200
         except (svc_errors.CommandExecutionError, CLIFailureError) as ex:
+            self._raise_invalid_io_group(io_group, ex.my_message)
             if OBJ_ALREADY_EXIST in ex.my_message:
                 raise array_errors.HostAlreadyExists(host_name, self.endpoint)
             if self._is_port_invalid(ex.my_message):
@@ -1763,11 +1800,15 @@ class SVCArrayMediator(ArrayMediatorAbstract):
                 logger.warning("exception encountered during host {} creation : {}".format(host_name, ex.my_message))
             raise ex
 
-    def create_host(self, host_name, initiators, connectivity_type):
+    def create_host(self, host_name, initiators, connectivity_type, io_group):
         ports = get_connectivity_type_ports(initiators, connectivity_type)
         for port in ports:
-            status_code = self._mkhost(host_name, connectivity_type, port)
+            status_code = self._mkhost(host_name, connectivity_type, port, io_group)
             if status_code == 200:
+                if io_group:
+                    logger.info(svc_messages.CREATE_HOST_WITH_IO_GROUP.format(host_name, port, io_group))
+                else:
+                    logger.info(svc_messages.CREATE_HOST_WITHOUT_IO_GROUP.format(host_name, port))
                 return
         raise array_errors.NoPortIsValid(host_name)
 
@@ -1781,6 +1822,7 @@ class SVCArrayMediator(ArrayMediatorAbstract):
             raise ex
 
     def delete_host(self, host_name):
+        logger.info(svc_messages.DELETE_HOST.format(host_name))
         self._rmhost(host_name)
 
     def _raise_error_when_no_ports_added(self, host_name):
@@ -1803,6 +1845,7 @@ class SVCArrayMediator(ArrayMediatorAbstract):
     def add_ports_to_host(self, host_name, initiators, connectivity_type):
         ports = get_connectivity_type_ports(initiators, connectivity_type)
         for port in ports:
+            logger.info(svc_messages.ADD_PORT_TO_HOST.format(port, host_name))
             self._addhostport(host_name, connectivity_type, port)
         self._raise_error_when_no_ports_added(host_name)
 
@@ -1819,24 +1862,169 @@ class SVCArrayMediator(ArrayMediatorAbstract):
 
     def remove_ports_from_host(self, host_name, ports, connectivity_type):
         for port in ports:
+            logger.info(svc_messages.REMOVE_HOST_PORT.format(port, host_name))
             self._rmhostport(host_name, connectivity_type, port)
 
     def get_host_connectivity_ports(self, host_name, connectivity_type):
         cli_host = self._get_cli_host(host_name)
+        ports = None
         if connectivity_type == array_settings.NVME_OVER_FC_CONNECTIVITY_TYPE:
-            return self._get_host_ports(cli_host, HOST_NQN)
+            ports = self._get_host_ports(cli_host, HOST_NQN)
         if connectivity_type == array_settings.FC_CONNECTIVITY_TYPE:
-            return self._get_host_ports(cli_host, HOST_WWPN)
+            ports = self._get_host_ports(cli_host, HOST_WWPN)
         if connectivity_type == array_settings.ISCSI_CONNECTIVITY_TYPE:
-            return self._get_host_ports(cli_host, HOST_ISCSI_NAME)
+            ports = self._get_host_ports(cli_host, HOST_ISCSI_NAME)
+        if ports:
+            logger.info(svc_messages.HOST_PORT_BY_CONNECTIVITY_TYPE.format(host_name, connectivity_type, ports))
+            return ports
         raise array_errors.UnsupportedConnectivityTypeError(connectivity_type)
 
     def get_host_connectivity_type(self, host_name):
+        connectivity_type = None
         cli_host = self._get_cli_host(host_name)
         if hasattr(cli_host, HOST_NQN):
-            return array_settings.NVME_OVER_FC_CONNECTIVITY_TYPE
-        if hasattr(cli_host, HOST_WWPN):
-            return array_settings.FC_CONNECTIVITY_TYPE
-        if hasattr(cli_host, HOST_ISCSI_NAME):
-            return array_settings.ISCSI_CONNECTIVITY_TYPE
-        return None
+            connectivity_type = array_settings.NVME_OVER_FC_CONNECTIVITY_TYPE
+        elif hasattr(cli_host, HOST_WWPN):
+            connectivity_type = array_settings.FC_CONNECTIVITY_TYPE
+        elif hasattr(cli_host, HOST_ISCSI_NAME):
+            connectivity_type = array_settings.ISCSI_CONNECTIVITY_TYPE
+        logger.info(svc_messages.HOST_CONNECTIVITY_TYPE.format(host_name, connectivity_type))
+        return connectivity_type
+
+    def _raise_io_group_error(self, host_name, io_group, error_message):
+        self._raise_error_when_host_not_exist_or_not_meet_the_rules(host_name, error_message)
+        self._raise_invalid_io_group(io_group, error_message)
+
+    def _addhostiogrp(self, host_name, io_group):
+        cli_kwargs = {'iogrp': io_group}
+        try:
+            self.client.svctask.addhostiogrp(object_id=host_name, **cli_kwargs)
+        except (svc_errors.CommandExecutionError, CLIFailureError) as ex:
+            self._raise_io_group_error(host_name, io_group, ex.my_message)
+            if is_warning_message(ex.my_message):
+                logger.warning("exception encountered during adding io_group {}, to host {} : {}".format(
+                    io_group, host_name, ex.my_message))
+            else:
+                raise ex
+
+    def add_io_group_to_host(self, host_name, io_group):
+        if not io_group:
+            return
+        logger.info(svc_messages.ADD_HOST_IO_GROUP.format(io_group, host_name))
+        self._addhostiogrp(host_name, io_group)
+
+    def _rmhostiogrp(self, host_name, io_group):
+        cli_kwargs = {'iogrp': io_group}
+        try:
+            self.client.svctask.rmhostiogrp(object_id=host_name, **cli_kwargs)
+        except (svc_errors.CommandExecutionError, CLIFailureError) as ex:
+            self._raise_io_group_error(host_name, io_group, ex.my_message)
+            if is_warning_message(ex.my_message):
+                logger.warning("exception encountered during removing io_group {}, from host {} : {}".format(
+                    io_group, host_name, ex.my_message))
+            else:
+                raise ex
+
+    def remove_io_group_from_host(self, host_name, io_group):
+        if not io_group:
+            return
+        logger.info(svc_messages.REMOVE_HOST_IO_GROUP.format(io_group, host_name))
+        self._rmhostiogrp(host_name, io_group)
+
+    def _lshostiogrp(self, host_name):
+        try:
+            return self.client.svcinfo.lshostiogrp(object_id=host_name).as_single_element
+        except (svc_errors.CommandExecutionError, CLIFailureError) as ex:
+            self._raise_error_when_host_not_exist_or_not_meet_the_rules(host_name, ex.my_message)
+            if is_warning_message(ex.my_message):
+                logger.warning("exception encountered during getting io_group, from host {} : {}".format(
+                    host_name, ex.my_message))
+                return None
+            raise ex
+
+    def get_host_io_group(self, host_name):
+        logger.info(svc_messages.GET_HOST_IO_GROUP.format(host_name))
+        io_group = self._lshostiogrp(host_name)
+        io_group.id = split_string(io_group.id)
+        io_group.name = split_string(io_group.name)
+        logger.info(svc_messages.HOST_IO_GROUP_IDS.format(host_name, io_group.id))
+        return io_group
+
+    def _raise_error_when_host_not_found(self, host_name, error_message):
+        if OBJ_NOT_FOUND in error_message:
+            raise array_errors.HostNotFoundError(host_name)
+
+    def _raise_unsupported_parameter_error(self, error_message, parameter):
+        if NOT_SUPPORTED_PARAMETER in error_message:
+            raise array_errors.UnSupportedParameter(parameter)
+
+    def _raise_error_when_cannot_change_host_protocol_because_of_mapped_ports(self, error_message, host_name):
+        if CANNOT_CHANGE_HOST_PROTOCOL_BECAUSE_OF_MAPPED_PORTS in error_message:
+            raise array_errors.CannotChangeHostProtocolBecauseOfMappedPorts(host_name)
+
+    def _chhost(self, host_name, protocol):
+        cli_kwargs = build_change_host_protocol_kwargs(host_name, protocol)
+        try:
+            self.client.svctask.chhost(**cli_kwargs)
+        except (svc_errors.CommandExecutionError, CLIFailureError) as ex:
+            self._raise_error_when_host_not_found(host_name, ex.my_message)
+            self._raise_unsupported_parameter_error(ex.my_message, 'protocol')
+            self._raise_error_when_cannot_change_host_protocol_because_of_mapped_ports(ex.my_message, host_name)
+            if is_warning_message(ex.my_message):
+                logger.warning("exception encountered during getting io_group, from host {} : {}".format(
+                    host_name, ex.my_message))
+            raise ex
+
+    def change_host_protocol(self, host_name, protocol):
+        self._chhost(host_name, protocol)
+        logger.info(svc_messages.CHANGE_HOST_PROTOCOL.format(host_name, protocol))
+
+    def _generate_thin_volume_response(self, cli_volume):
+        return ThinVolume(
+            capacity_bytes=int(cli_volume.capacity),
+            id=cli_volume.vdisk_UID,
+            internal_id=cli_volume.id,
+            name=cli_volume.name,
+            array_type=self.array_type
+        )
+
+    def _get_cli_volumes_from_volume_group(self, volume_group_name):
+        filter_value = 'volume_group_name={}'.format(volume_group_name)
+        cli_volumes = self._lsvdisk_list(filtervalue=filter_value)
+        return [self._generate_thin_volume_response(cli_volume) for cli_volume in cli_volumes]
+
+    def _generate_volume_group_response(self, cli_volume_group):
+        volumes = []
+        if int(cli_volume_group.volume_count) > 0:
+            volumes = self._get_cli_volumes_from_volume_group(cli_volume_group.name)
+        return VolumeGroup(name=cli_volume_group.name,
+                           array_type=self.array_type,
+                           id=cli_volume_group.uid if hasattr(cli_volume_group, "uid") else cli_volume_group.id,
+                           internal_id=cli_volume_group.id,
+                           volumes=volumes)
+
+    def create_volume_group(self, name):
+        volume_group_id = self._create_volume_group(name)
+        cli_volume_group = self._lsvolumegroup(volume_group_id)
+        return self._generate_volume_group_response(cli_volume_group)
+
+    def get_volume_group(self, volume_group_id):
+        cli_volume_group = self._lsvolumegroup(volume_group_id)
+        if cli_volume_group is None:
+            raise array_errors.ObjectNotFoundError(volume_group_id)
+        return self._generate_volume_group_response(cli_volume_group)
+
+    def delete_volume_group(self, volume_group_id):
+        self._lsvolumegroup(volume_group_id, not_exist_err=True)
+        self._rmvolumegroup(volume_group_id)
+
+    def add_volume_to_volume_group(self, volume_group_id, volume_id):
+        volume_name = self._get_volume_name_by_wwn(volume_id)
+        cli_volume = self._get_cli_volume(volume_name)
+        if cli_volume.volume_group_name and cli_volume.volume_group_name != volume_group_id:
+            raise array_errors.VolumeAlreadyInVolumeGroup(volume_id, cli_volume.volume_group_name)
+        self._change_volume_group(cli_volume.id, volume_group_id)
+
+    def remove_volume_from_volume_group(self, volume_id):
+        cli_volume = self._get_cli_volume_by_wwn(volume_id, not_exist_err=True)
+        self._change_volume_group(cli_volume.id, None)

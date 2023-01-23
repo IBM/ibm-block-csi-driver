@@ -529,7 +529,7 @@ class XIVArrayMediator(ArrayMediatorAbstract):
     def demote_replication_volume(self, replication):
         raise NotImplementedError
 
-    def create_host(self, host_name, initiators, connectivity_type):
+    def create_host(self, host_name, initiators, connectivity_type, io_group):
         raise NotImplementedError
 
     def delete_host(self, host_name):
@@ -545,4 +545,16 @@ class XIVArrayMediator(ArrayMediatorAbstract):
         raise NotImplementedError
 
     def get_host_connectivity_type(self, host_name):
+        raise NotImplementedError
+
+    def add_io_group_to_host(self, host_name, io_group):
+        raise NotImplementedError
+
+    def remove_io_group_from_host(self, host_name, io_group):
+        raise NotImplementedError
+
+    def get_host_io_group(self, host_name):
+        raise NotImplementedError
+
+    def change_host_protocol(self, host_name, protocol):
         raise NotImplementedError

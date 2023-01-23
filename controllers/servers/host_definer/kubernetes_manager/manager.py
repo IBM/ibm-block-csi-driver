@@ -1,4 +1,6 @@
+import ast
 import datetime
+import base64
 
 from kubernetes import client, config, dynamic
 from kubernetes.client import api_client
@@ -45,6 +47,7 @@ class KubernetesManager():
         for k8s_csi_node in k8s_csi_nodes:
             if self._is_k8s_csi_node_has_driver(k8s_csi_node):
                 csi_nodes_info_with_driver.append(self._generate_csi_node_info(k8s_csi_node))
+        logger.info(messages.CSI_NODES_WITH_IBM_BLOCK_CSI_DRIVER.format(csi_nodes_info_with_driver))
         return csi_nodes_info_with_driver
 
     def _get_k8s_csi_nodes(self):
@@ -64,11 +67,6 @@ class KubernetesManager():
         except ApiException as ex:
             logger.error(messages.FAILED_TO_GET_NODES.format(ex.body))
             return []
-
-    def _generate_node_info(self, k8s_node):
-        node_info = NodeInfo()
-        node_info.name = k8s_node.metadata.name
-        return node_info
 
     def _get_storage_classes_info(self):
         try:
@@ -171,12 +169,13 @@ class KubernetesManager():
 
     def _is_host_definition_matches(self, host_definition_info, node_name, secret_name, secret_namespace):
         return host_definition_info.node_name == node_name and \
-            host_definition_info.secret_name == secret_name and \
-            host_definition_info.secret_namespace == secret_namespace
+               host_definition_info.secret_name == secret_name and \
+               host_definition_info.secret_namespace == secret_namespace
 
     def _create_host_definition(self, host_definition_manifest):
         try:
             k8s_host_definition = self.host_definitions_api.create(body=host_definition_manifest)
+            logger.info(messages.CREATED_HOST_DEFINITION.format(k8s_host_definition.metadata.name))
             self._add_finalizer(k8s_host_definition.metadata.name)
             return self._generate_host_definition_info(k8s_host_definition)
         except ApiException as ex:
@@ -186,8 +185,7 @@ class KubernetesManager():
 
     def _add_finalizer(self, host_definition_name):
         logger.info(messages.ADD_FINALIZER_TO_HOST_DEFINITION.format(host_definition_name))
-        self._update_finalizer(
-            host_definition_name, [settings.CSI_IBM_FINALIZER, ])
+        self._update_finalizer(host_definition_name, [settings.CSI_IBM_FINALIZER, ])
 
     def _set_host_definition_status(self, host_definition_name, host_definition_phase):
         logger.info(messages.SET_HOST_DEFINITION_STATUS.format(host_definition_name, host_definition_phase))
@@ -211,14 +209,14 @@ class KubernetesManager():
 
     def _generate_k8s_event(self, host_definition_info, message, action, message_type):
         return client.CoreV1Event(
-            metadata=client.V1ObjectMeta(generate_name='{}.'.format(host_definition_info.name),),
+            metadata=client.V1ObjectMeta(generate_name='{}.'.format(host_definition_info.name), ),
             reporting_component=settings.HOST_DEFINER, reporting_instance=settings.HOST_DEFINER, action=action,
-            type=self._get_event_type(message_type), reason=message_type+action, message=str(message),
+            type=self._get_event_type(message_type), reason=message_type + action, message=str(message),
             event_time=datetime.datetime.utcnow().isoformat(timespec='microseconds') + 'Z',
             involved_object=client.V1ObjectReference(
                 api_version=settings.CSI_IBM_API_VERSION, kind=settings.HOST_DEFINITION_KIND,
                 name=host_definition_info.name, resource_version=host_definition_info.resource_version,
-                uid=host_definition_info.uid,))
+                uid=host_definition_info.uid, ))
 
     def _get_event_type(self, message_type):
         if message_type != settings.SUCCESSFUL_MESSAGE_TYPE:
@@ -290,22 +288,55 @@ class KubernetesManager():
 
         return body
 
-    def _get_data_from_secret(self, secret_name, secret_namespace):
+    def _get_secret_data(self, secret_name, secret_namespace):
         try:
-            return self.core_api.read_namespaced_secret(name=secret_name, namespace=secret_namespace).data
+            logger.info(messages.READ_SECRET.format(secret_name, secret_namespace))
+            secret_data = self.core_api.read_namespaced_secret(name=secret_name, namespace=secret_namespace).data
+            return self._change_decode_base64_secret_config(secret_data)
         except ApiException as ex:
             if ex.status == 404:
                 logger.error(messages.SECRET_DOES_NOT_EXIST.format(secret_name, secret_namespace))
             else:
                 logger.error(messages.FAILED_TO_GET_SECRET.format(secret_name, secret_namespace, ex.body))
-            return None
+        return {}
+
+    def _change_decode_base64_secret_config(self, secret_data):
+        if settings.SECRET_CONFIG_FIELD in secret_data.keys():
+            secret_data[settings.SECRET_CONFIG_FIELD] = self._decode_base64_to_dict(
+                secret_data[settings.SECRET_CONFIG_FIELD])
+        return secret_data
+
+    def _decode_base64_to_dict(self, content_with_base64):
+        decoded_string_content = self._decode_base64_to_string(content_with_base64)
+        encoded_dict = str(decoded_string_content).encode('utf-8')
+        base64_dict = base64.b64encode(encoded_dict)
+        my_dict_again = ast.literal_eval(base64.b64decode(base64_dict))
+        return my_dict_again
+
+    def _decode_base64_to_string(self, content_with_base64):
+        try:
+            base64_bytes = content_with_base64.encode('ascii')
+            decoded_string_in_bytes = base64.b64decode(base64_bytes)
+            return decoded_string_in_bytes.decode('ascii')
+        except Exception:
+            return content_with_base64
+
+    def _get_node_info(self, node_name):
+        k8s_node = self._read_node(node_name)
+        if k8s_node:
+            return self._generate_node_info(k8s_node)
+        return NodeInfo('', {})
 
     def _read_node(self, node_name):
         try:
+            logger.info(messages.READ_NODE.format(node_name))
             return self.core_api.read_node(name=node_name)
         except ApiException as ex:
             logger.error(messages.FAILED_TO_GET_NODE.format(node_name, ex.body))
             return None
+
+    def _generate_node_info(self, k8s_node):
+        return NodeInfo(k8s_node.metadata.name, k8s_node.metadata.labels)
 
     def _get_csi_daemon_set(self):
         try:

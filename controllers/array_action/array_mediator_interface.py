@@ -342,7 +342,7 @@ class ArrayMediator(ABC):
         raise NotImplementedError
 
     @abstractmethod
-    def create_host(self, host_name, initiators, connectivity_type):
+    def create_host(self, host_name, initiators, connectivity_type, io_group):
         """
         This function should create a host in the storage system.
 
@@ -358,6 +358,7 @@ class ArrayMediator(ABC):
         Raises:
             HostAlreadyExists
             NoPortIsValid
+            IoGroupIsInValid
         """
         raise NotImplementedError
 
@@ -558,6 +559,77 @@ class ArrayMediator(ABC):
             ObjectNotFound
             InvalidArgument
             PermissionDenied
+        """
+        raise NotImplementedError
+
+    @abstractmethod
+    def add_io_group_to_host(self, host_name, io_group):
+        """
+        This function should add io_group to host.
+
+        Args:
+           host_name : name of the host in the storage system
+           io_group  : the io_group to add to the host
+
+        Returns:
+            None
+
+        Raises:
+            HostNotFoundError
+            IoGroupIsInValid
+        """
+        raise NotImplementedError
+
+    @abstractmethod
+    def remove_io_group_from_host(self, host_name, io_group):
+        """
+        This function should remove io_group from host.
+
+        Args:
+           host_name : name of the host in the storage system
+           io_group  : the io_group to remove from the host
+
+        Returns:
+            None
+
+        Raises:
+            HostNotFoundError
+            IoGroupIsInValid
+        """
+        raise NotImplementedError
+
+    @abstractmethod
+    def get_host_io_group(self, host_name):
+        """
+        This function should return the io_group from host.
+
+        Args:
+           host_name : name of the host in the storage system
+
+        Returns:
+            List
+
+        Raises:
+            HostNotFoundError
+        """
+        raise NotImplementedError
+
+    @abstractmethod
+    def change_host_protocol(self, host_name, protocol):
+        """
+        This function should change the protocol of a host.
+
+        Args:
+           host_name : name of the host in the storage system
+           protocol  : the new protocol
+
+        Returns:
+            None
+
+        Raises:
+            HostNotFoundError
+            UnSupportedParameter
+            CannotChangeHostProtocolBecauseOfMappedPorts
         """
         raise NotImplementedError
 
