@@ -1,43 +1,57 @@
-# What's new in 1.10.0
+# What's new in 1.11.0
 
-IBM® block storage CSI driver 1.10.0 introduces the enhancements that are detailed in the following section.
+IBM® block storage CSI driver 1.11.0 introduces the enhancements that are detailed in the following section.
 
-**General availability date:** 26 July 2022
+**General availability date:** 23 January 2023
 
-## Alpha support for the new Snapshot function that was introduced in IBM Spectrum Virtualize 8.5.1 release
+## New dynamic volume group support
 
-This version adds Alpha support for the new Snapshot function that was introduced in IBM Spectrum Virtualize 8.5.1 release. The main use case of snapshot is corruption protection. It protects the user data from deliberate or accidental data corruption from the host's systems. For more information about the Snapshot function, see **Product overview** > **Technical overview** > **Volume groups** > **Snapshot function** within your Spectrum Virtualize product documentation on [IBM Documentation](https://www.ibm.com/docs).
+The new volume group support allows dynamic management of the content of the groups. This feature is used by policy-based replication, introduced IBM Spectrum Virtualize 8.5.2 release.
+As opposed to the volume group feature present within the CSI driver which stays static on the StorageClass, the new volume group feature is dynamic. 
 
-**Important:** Be sure to read all of the limitations before using Snapshot function with the CSI driver.
+With this new volume group support, the PersistentVolumeClaim (PVC) label can be updated at any time to change the PVC from belonging from one volume group to another, once the volume groups are defined on the storage.
 
-**Note:** The IBM® FlashCopy and Snapshot function are both referred to as the more generic volume snapshots and cloning within this documentation set. Not all supported products use the FlashCopy and Snapshot function terminology. Spectrum Virtualize storage systems introduced the new Snapshot function as of Spectrum Virtualize 8.5.1 release. Notes clarifying which function is being referred to within this document are made, as necessary.
+The advantage of using volume groups is that actions, like replication, can be done simultaneously across all volumes in a volume group.
 
-## New dynamic host definition
+For more information about volume groups and policy-based replication, see the following sections within your Spectrum Virtualize product documentation [IBM Documentation](https://www.ibm.com/docs).
 
-IBM® block storage CSI driver 1.10.0 enables users to not need to statically define hosts on the storage in advance, eliminating the need for manual static host definitions. The host definer handles changes in the orchestrator cluster that relate to the host definition and applies them to the relevant storage systems.
+- **Product overview** > **Technical overview** > **Volume groups**
+- **What's new** > **Getting started with policy-based replication**
 
-## Now enables volume group configuration
+## New support for policy-based replication
 
-The CSI driver now enables volume group configuration when creating a new volume for Spectrum Virtualize family systems.
+This version adds support for policy-based replication that was introduced in IBM Spectrum Virtualize 8.5.2 release. Policy-based replication provides a simplified configuration and management of asynchronous replication between two system. To see if your specific product is supported and for more information, see **What's new** > **Getting started with policy-based replication** within your Spectrum Virtualize product documentation on [IBM Documentation](https://www.ibm.com/docs).
 
-For more information about volume groups, see **Product overview** > **Technical overview** > **Volume groups** within your product documentation on [IBM Documentation](https://www.ibm.com/docs).
+**Important:** Policy-based replication must be used together with dynamic volume groups. For more information, see [Using the CSI driver with policy-based replication](../using/using_policy_based_replication.md).
 
-## New metrics support
+## Added dynamic host definition enhancements
 
-IBM® block storage CSI driver 1.10.0 introduces new kubelet mounted volume metrics support for volumes created with the CSI driver.
+The IBM® block storage CSI driver 1.11.0 host definition feature now supports the following:
 
-The following metrics are currently supported:
-- kubelet_volume_stats_available_bytes
-- kubelet_volume_stats_capacity_bytes
-- kubelet_volume_stats_inodes
-- kubelet_volume_stats_inodes_free
-- kubelet_volume_stats_inodes_used
-- kubelet_volume_stats_used_bytes
+- **CSI Topology feature**
 
-For more information about the supported metrics, see `VolumeUsage` within the [Container Storage Interface (CSI) spec documentation for `NodeGetVolumeStats`](https://github.com/container-storage-interface/spec/blob/v1.5.0/spec.md#nodegetvolumestats).
+    Dynamic host definition now works together with CSI Topology feature. For more information about CSI Topology, see [Configuring for CSI Topology](../configuration/confiugring_toplogy.md).
 
-For more information about using metrics in Kubenertes, see [Metrics in Kubernetes](https://kubernetes.io/docs/concepts/cluster-administration/system-metrics/#metrics-in-kubernetes) in the Kubernetes documentation.
+- **Dynamically configuring host ports**
+
+     Host ports are now automatically updated and changes in host port hierarchy are now identified and automatically updated. For more information, see [Configuring the host definer](../configuration/configuring_hostdefiner.md).
+
+- **I/O group function**
+
+    By default the host definer now creates all definitions across all possible I/O groups. Additionally, an optional label available in order to specify which I/O group(s) should be used on a specific node. For more information, see [Adding optional labels for dynamic host definition](../using/using_hostdefinition_labels.md).
+
+    For more about the I/O group function, see **Product overview** > **Technical overview** > **I/O group** within your Spectrum Virtualize product documentation on [IBM Documentation](https://www.ibm.com/docs).
+
+- **Overriding node host connectivity**
+
+    This version introduces a new label tag, allowing connectivity type definition of a specific node, regardless of connectivity hierarchy. For more information, see [Adding optional labels for dynamic host definition](../using/using_hostdefinition_labels.md).
+    
+In addition, only valid ports are now defined. For example, if a host has a total of four Fibre Channel ports and only two of them are zoned to the storage system, only the two zoned ports are created on the host.
 
 ## Additional supported orchestration platforms for deployment
 
-This version adds support for orchestration platforms Kubernetes 1.24 and Red Hat® OpenShift® 4.11, suitable for deployment of the CSI (Container Storage Interface) driver.
+This version adds support for orchestration platforms Kubernetes 1.25 and 1.26, and Red Hat® OpenShift® 4.12, suitable for deployment of the CSI (Container Storage Interface) driver.
+
+## Miscellaneous resolved issues
+
+For information about the resolved issue in version 1.11.0, see [1.11.0 (January 2023)](changelog_1.11.0.md).

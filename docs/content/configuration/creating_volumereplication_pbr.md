@@ -1,16 +1,12 @@
-# Creating a VolumeReplication
+# Creating a VolumeReplication with policy-based replication
 
 Create a VolumeReplication YAML file to replicate a specific PersistentVolumeClaim (PVC).
 
 VolumeReplicationClass needs to be present before a VolumeReplication can be created. For more information, see [Creating a VolumeReplicationClass](creating_volumereplicationclass.md).
 
-**Note:** Remote copy function is referred to as the more generic volume replication within this documentation set. Not all supported products use the remote-copy function terminology.
+**Note:** For information and parameter definitions that are not related to topology awareness, be sure to see the information provided in [Creating a VolumeReplication](creating_volumereplication.md), in addition to the current section.
 
-When replicating a volume, be sure to follow all of the replication configurations, found in [Compatibility and requirements](../installation/install_compatibility_requirements.md) before volume replication.
-
-- When policy-based replication **is not** being used, use the `spec.csi.volumeHandle` of the relevant target PersistentVolume (PV) for the `replicationHandle` value.
-- When policy-based replication **is** being used, **do not** use the `replicationHandle` value. Using the `replicationHandle` while policy-based replication is defined in the VolumeReplicationClass results in the following error message: `got an invalid parameter: replicationHandle`.
-- `spec.dataSource.kind` values are `PersistentVolumeClaim` or `VolumeGroup`. Only one value can be used at a time. Only use the `VolumeGroup` value policy-based replication is being used.
+**Note:** Use the `VolumeGroup` value for `spec.dataSource.kind`.
 
 1.  Replicate a specific PersistentVolumeClaim (PVC) using the `demo-volumereplication.yaml`.
 
@@ -25,9 +21,8 @@ When replicating a volume, be sure to follow all of the replication configuratio
     spec:
       volumeReplicationClass: demo-volumereplicationclass
       replicationState: primary
-      replicationHandle: demo-volumehandle
       dataSource:
-        kind: PersistentVolumeClaim
+        kind: VolumeGroup
         name: demo-pvc-file-system  # Ensure that this is in the same namespace as VolumeReplication.
     ```
 
