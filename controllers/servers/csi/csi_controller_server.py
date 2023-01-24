@@ -3,7 +3,7 @@ from csi_general import csi_pb2
 from csi_general import csi_pb2_grpc
 
 import controllers.array_action.errors as array_errors
-import controllers.servers.config as config
+import controllers.servers.settings as servers_settings
 import controllers.servers.utils as utils
 from controllers.array_action import messages
 from controllers.array_action.array_action_types import ObjectIds
@@ -80,9 +80,9 @@ class CSIControllerServicer(csi_pb2_grpc.ControllerServicer):
                     if not source_object:
                         return handle_exception("source {}: {} not found".format(source_type, source_id), context,
                                                 grpc.StatusCode.NOT_FOUND, csi_pb2.CreateVolumeResponse)
-                    if source_type == config.SNAPSHOT_TYPE_NAME:
+                    if source_type == servers_settings.SNAPSHOT_TYPE_NAME:
                         source_volume = array_mediator.get_object_by_id(source_object.source_id,
-                                                                        config.VOLUME_TYPE_NAME)
+                                                                        servers_settings.VOLUME_TYPE_NAME)
                         if not source_volume:
                             return handle_exception("source volume: {} not found".format(source_object.source_id),
                                                     context, grpc.StatusCode.INVALID_ARGUMENT,
@@ -129,7 +129,7 @@ class CSIControllerServicer(csi_pb2_grpc.ControllerServicer):
                 response = utils.generate_csi_create_volume_response(volume, array_connection_info.system_id,
                                                                      source_type)
                 return response
-        except array_errors.InvalidArgumentError as ex:
+        except (array_errors.InvalidArgumentError, array_errors.ExpectedSnapshotButFoundVolumeError) as ex:
             return handle_exception(ex, context, grpc.StatusCode.INVALID_ARGUMENT, csi_pb2.CreateVolumeResponse)
         except array_errors.VolumeAlreadyExists as ex:
             return handle_exception(ex, context, grpc.StatusCode.ALREADY_EXISTS, csi_pb2.CreateVolumeResponse)
@@ -285,7 +285,8 @@ class CSIControllerServicer(csi_pb2_grpc.ControllerServicer):
 
             with get_agent(array_connection_info, array_type).get_mediator() as array_mediator:
 
-                volume = array_mediator.get_object_by_id(object_id=volume_id, object_type=config.VOLUME_TYPE_NAME)
+                volume = array_mediator.get_object_by_id(object_id=volume_id,
+                                                         object_type=servers_settings.VOLUME_TYPE_NAME)
 
             if not volume:
                 raise array_errors.ObjectNotFoundError(volume_id)
@@ -414,7 +415,7 @@ class CSIControllerServicer(csi_pb2_grpc.ControllerServicer):
                 required_bytes = request.capacity_range.required_bytes
                 max_size = array_mediator.maximal_volume_size_in_bytes
 
-                volume_before_expand = array_mediator.get_object_by_id(volume_id, config.VOLUME_TYPE_NAME)
+                volume_before_expand = array_mediator.get_object_by_id(volume_id, servers_settings.VOLUME_TYPE_NAME)
                 if not volume_before_expand:
                     raise array_errors.ObjectNotFoundError(volume_id)
 
@@ -433,7 +434,7 @@ class CSIControllerServicer(csi_pb2_grpc.ControllerServicer):
                     volume_id=volume_id,
                     required_bytes=required_bytes)
 
-                volume_after_expand = array_mediator.get_object_by_id(volume_id, config.VOLUME_TYPE_NAME)
+                volume_after_expand = array_mediator.get_object_by_id(volume_id, servers_settings.VOLUME_TYPE_NAME)
                 if not volume_after_expand:
                     raise array_errors.ObjectNotFoundError(volume_id)
 
@@ -447,21 +448,20 @@ class CSIControllerServicer(csi_pb2_grpc.ControllerServicer):
             return handle_exception(ex, context, grpc.StatusCode.INTERNAL,
                                     csi_pb2.ControllerExpandVolumeResponse)
 
+    def _get_controller_service_capability(self, capability_name):
+        types = csi_pb2.ControllerServiceCapability.RPC.Type
+        capability_enum_value = types.Value(capability_name)
+        return csi_pb2.ControllerServiceCapability(
+            rpc=csi_pb2.ControllerServiceCapability.RPC(type=capability_enum_value))
+
     def ControllerGetCapabilities(self, request, context):
         logger.info("ControllerGetCapabilities")
-        types = csi_pb2.ControllerServiceCapability.RPC.Type
-
         response = csi_pb2.ControllerGetCapabilitiesResponse(
-            capabilities=[csi_pb2.ControllerServiceCapability(
-                rpc=csi_pb2.ControllerServiceCapability.RPC(type=types.Value("CREATE_DELETE_VOLUME"))),
-                csi_pb2.ControllerServiceCapability(
-                    rpc=csi_pb2.ControllerServiceCapability.RPC(type=types.Value("CREATE_DELETE_SNAPSHOT"))),
-                csi_pb2.ControllerServiceCapability(
-                    rpc=csi_pb2.ControllerServiceCapability.RPC(type=types.Value("PUBLISH_UNPUBLISH_VOLUME"))),
-                csi_pb2.ControllerServiceCapability(
-                    rpc=csi_pb2.ControllerServiceCapability.RPC(type=types.Value("CLONE_VOLUME"))),
-                csi_pb2.ControllerServiceCapability(
-                    rpc=csi_pb2.ControllerServiceCapability.RPC(type=types.Value("EXPAND_VOLUME")))])
+            capabilities=[self._get_controller_service_capability("CREATE_DELETE_VOLUME"),
+                          self._get_controller_service_capability("CREATE_DELETE_SNAPSHOT"),
+                          self._get_controller_service_capability("PUBLISH_UNPUBLISH_VOLUME"),
+                          self._get_controller_service_capability("CLONE_VOLUME"),
+                          self._get_controller_service_capability("EXPAND_VOLUME")])
 
         logger.info("finished ControllerGetCapabilities")
         return response
@@ -478,33 +478,12 @@ class CSIControllerServicer(csi_pb2_grpc.ControllerServicer):
         return csi_pb2.GetPluginInfoResponse(name=name, vendor_version=version)
 
     def _get_volume_final_name(self, volume_parameters, name, array_mediator):
-        return self._get_object_final_name(volume_parameters, name, array_mediator,
-                                           config.VOLUME_TYPE_NAME)
+        return utils.get_object_final_name(volume_parameters, name, array_mediator,
+                                           servers_settings.VOLUME_TYPE_NAME)
 
     def _get_snapshot_final_name(self, volume_parameters, name, array_mediator):
-        name = self._get_object_final_name(volume_parameters, name, array_mediator,
-                                           config.SNAPSHOT_TYPE_NAME)
-        return name
-
-    def _get_object_final_name(self, volume_parameters, name, array_mediator, object_type):
-        prefix = ""
-        if volume_parameters.prefix:
-            prefix = volume_parameters.prefix
-            if len(prefix) > array_mediator.max_object_prefix_length:
-                raise array_errors.InvalidArgumentError(
-                    "The {} name prefix '{}' is too long, max allowed length is {}".format(
-                        object_type,
-                        prefix,
-                        array_mediator.max_object_prefix_length
-                    )
-                )
-        if not prefix:
-            prefix = array_mediator.default_object_prefix
-        full_name = utils.join_object_prefix_with_name(prefix, name)
-        if len(full_name) > array_mediator.max_object_name_length:
-            hashed_name = utils.hash_string(name)
-            full_name = utils.join_object_prefix_with_name(prefix, hashed_name)
-        return full_name[:array_mediator.max_object_name_length]
+        return utils.get_object_final_name(volume_parameters, name, array_mediator,
+                                           servers_settings.SNAPSHOT_TYPE_NAME)
 
     def GetPluginCapabilities(self, _, __):  # pylint: disable=invalid-name
         logger.info("GetPluginCapabilities")
@@ -539,12 +518,12 @@ class CSIControllerServicer(csi_pb2_grpc.ControllerServicer):
         source_type = None
         if source:
             logger.info(source)
-            if source.HasField(config.SNAPSHOT_TYPE_NAME):
+            if source.HasField(servers_settings.SNAPSHOT_TYPE_NAME):
                 source_id = source.snapshot.snapshot_id
-                source_type = config.SNAPSHOT_TYPE_NAME
-            elif source.HasField(config.VOLUME_TYPE_NAME):
+                source_type = servers_settings.SNAPSHOT_TYPE_NAME
+            elif source.HasField(servers_settings.VOLUME_TYPE_NAME):
                 source_id = source.volume.volume_id
-                source_type = config.VOLUME_TYPE_NAME
+                source_type = servers_settings.VOLUME_TYPE_NAME
             else:
                 return source_type, object_ids
             object_id_info = utils.get_object_id_info(source_id, source_type)

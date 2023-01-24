@@ -4,10 +4,10 @@ from pyxcli import errors as xcli_errors
 from pyxcli.client import XCLIClient
 
 import controllers.array_action.errors as array_errors
-import controllers.servers.config as controller_config
+import controllers.servers.settings as servers_settings
 from controllers.array_action.array_action_types import Volume, Snapshot, Host
 from controllers.array_action.array_mediator_abstract import ArrayMediatorAbstract
-from controllers.array_action.config import FC_CONNECTIVITY_TYPE, ISCSI_CONNECTIVITY_TYPE
+from controllers.array_action.settings import FC_CONNECTIVITY_TYPE, ISCSI_CONNECTIVITY_TYPE
 from controllers.array_action.utils import ClassProperty
 from controllers.common import settings
 from controllers.common.csi_logger import get_stdout_logger
@@ -323,7 +323,7 @@ class XIVArrayMediator(ArrayMediatorAbstract):
         cli_object = self._get_cli_object_by_wwn(object_id)
         if not cli_object:
             return None
-        if object_type is controller_config.SNAPSHOT_TYPE_NAME:
+        if object_type is servers_settings.SNAPSHOT_TYPE_NAME:
             if not cli_object.master_name:
                 raise array_errors.ExpectedSnapshotButFoundVolumeError(object_id, self.endpoint)
             return self._generate_snapshot_response(cli_object)
@@ -514,23 +514,47 @@ class XIVArrayMediator(ArrayMediatorAbstract):
         fc_wwns_objects = self.client.cmd.fc_port_list()
         return [port.wwpn for port in fc_wwns_objects if port.port_state == 'Online' and port.role == 'Target']
 
-    def get_replication(self, volume_internal_id, other_volume_internal_id, other_system_id):
+    def get_replication(self, replication_request):
         raise NotImplementedError
 
-    def create_replication(self, volume_internal_id, other_volume_internal_id, other_system_id, copy_type):
+    def create_replication(self, replication_request):
         raise NotImplementedError
 
-    def delete_replication(self, replication_name):
+    def delete_replication(self, replication):
         raise NotImplementedError
 
-    def promote_replication_volume(self, replication_name):
+    def promote_replication_volume(self, replication):
         raise NotImplementedError
 
-    def demote_replication_volume(self, replication_name):
+    def demote_replication_volume(self, replication):
         raise NotImplementedError
 
-    def create_host(self, host_name, initiators, connectivity_type):
+    def create_host(self, host_name, initiators, connectivity_type, io_group):
         raise NotImplementedError
 
     def delete_host(self, host_name):
+        raise NotImplementedError
+
+    def add_ports_to_host(self, host_name, initiators, connectivity_type):
+        raise NotImplementedError
+
+    def remove_ports_from_host(self, host_name, ports, connectivity_type):
+        raise NotImplementedError
+
+    def get_host_connectivity_ports(self, host_name, connectivity_type):
+        raise NotImplementedError
+
+    def get_host_connectivity_type(self, host_name):
+        raise NotImplementedError
+
+    def add_io_group_to_host(self, host_name, io_group):
+        raise NotImplementedError
+
+    def remove_io_group_from_host(self, host_name, io_group):
+        raise NotImplementedError
+
+    def get_host_io_group(self, host_name):
+        raise NotImplementedError
+
+    def change_host_protocol(self, host_name, protocol):
         raise NotImplementedError

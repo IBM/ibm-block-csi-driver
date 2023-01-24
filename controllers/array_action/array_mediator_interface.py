@@ -334,7 +334,7 @@ class ArrayMediator(ABC):
            host_name : name of the host in the storage system
 
         Returns:
-           Host
+            Host
 
         Raises:
             HostNotFoundError
@@ -342,9 +342,9 @@ class ArrayMediator(ABC):
         raise NotImplementedError
 
     @abstractmethod
-    def create_host(self, host_name, initiators, connectivity_type):
+    def create_host(self, host_name, initiators, connectivity_type, io_group):
         """
-        This function will find the host by name.
+        This function should create a host in the storage system.
 
         Args:
            host_name         : name of the host to be created in the storage system
@@ -353,26 +353,98 @@ class ArrayMediator(ABC):
 
 
         Returns:
-           None
+            None
 
         Raises:
             HostAlreadyExists
+            NoPortIsValid
+            IoGroupIsInValid
         """
         raise NotImplementedError
 
     @abstractmethod
     def delete_host(self, host_name):
         """
-        This function will find the host by name.
+        This function should delete a host in the storage system.
 
         Args:
-           host_name : name of the host in the storage system
+            host_name : name of the host in the storage system
 
         Returns:
-           None
+            None
 
         Raises:
             None
+        """
+        raise NotImplementedError
+
+    @abstractmethod
+    def add_ports_to_host(self, host_name, initiators, connectivity_type):
+        """
+        This function should add ports to host in the storage system.
+
+        Args:
+           host_name         : name of the host to be created in the storage system
+           initiators        : initiators (e.g. fc wwns, iqn) of the host.
+           connectivity_type : the connectivity_type chosen by the user
+
+        Returns:
+            None
+
+        Raises:
+            NoPortIsValid
+        """
+        raise NotImplementedError
+
+    @abstractmethod
+    def remove_ports_from_host(self, host_name, ports, connectivity_type):
+        """
+        This function should remove ports from host in the storage system.
+
+        Args:
+           host_name         : name of the host to be created in the storage system
+           ports             : ports (e.g. fc wwns, iqn) of the host.
+           connectivity_type : the connectivity_type chosen by the user
+
+        Returns:
+            None
+
+        Raises:
+            None
+        """
+        raise NotImplementedError
+
+    @abstractmethod
+    def get_host_connectivity_ports(self, host_name, connectivity_type):
+        """
+        This function should return ports from connectivity type on host in the storage system.
+
+        Args:
+           host_name         : name of the host to be created in the storage system
+           connectivity_type : the connectivity_type chosen by the user
+
+        Returns:
+            list
+
+        Raises:
+            HostNotFoundError
+            UnsupportedConnectivityTypeError
+        """
+        raise NotImplementedError
+
+    @abstractmethod
+    def get_host_connectivity_type(self, host_name):
+        """
+        This function should return the ports' connectivity type from host in the storage system.
+
+        Args:
+           host_name  : name of the host to be created in the storage system
+
+        Returns:
+            string
+
+        Raises:
+            HostNotFoundError
         """
         raise NotImplementedError
 
@@ -401,14 +473,12 @@ class ArrayMediator(ABC):
         raise NotImplementedError
 
     @abstractmethod
-    def get_replication(self, volume_internal_id, other_volume_internal_id, other_system_id):
+    def get_replication(self, replication_request):
         """
         This function will return the volume replication relationship info
 
         Args:
-            volume_internal_id : internal id of the volume in the replication relationship
-            other_volume_internal_id : internal id of the other volume in the replication relationship
-            other_system_id : id of the other system of the replication relationship
+            replication_request : class containing all necessary parameters for replication
 
         Returns:
             Replication
@@ -421,15 +491,12 @@ class ArrayMediator(ABC):
         raise NotImplementedError
 
     @abstractmethod
-    def create_replication(self, volume_internal_id, other_volume_internal_id, other_system_id, copy_type):
+    def create_replication(self, replication_request):
         """
         This function will create and activate a volume replication relationship
 
         Args:
-            volume_internal_id : internal id of the volume in the replication relationship
-            other_volume_internal_id : internal id of the other volume in the replication relationship
-            other_system_id : id of the other system of the replication relationship
-            copy_type : sync/async
+            replication_request : class containing all necessary parameters for replication
 
         Returns:
             None
@@ -442,12 +509,12 @@ class ArrayMediator(ABC):
         raise NotImplementedError
 
     @abstractmethod
-    def delete_replication(self, replication_name):
+    def delete_replication(self, replication):
         """
         This function will disable and delete a volume replication relationship
 
         Args:
-            replication_name : name of the replication relationship
+            replication : replication to be deleted
 
         Returns:
             None
@@ -460,12 +527,12 @@ class ArrayMediator(ABC):
         raise NotImplementedError
 
     @abstractmethod
-    def promote_replication_volume(self, replication_name):
+    def promote_replication_volume(self, replication):
         """
         This function will promote the role of the volume in the connected system to be primary
 
         Args:
-            replication_name : name of the replication relationship
+            replication : replication to be promoted
 
         Returns:
             None
@@ -478,12 +545,12 @@ class ArrayMediator(ABC):
         raise NotImplementedError
 
     @abstractmethod
-    def demote_replication_volume(self, replication_name):
+    def demote_replication_volume(self, replication):
         """
         This function will demote the role of the volume in the connected system to be secondary
 
         Args:
-            replication_name : name of the replication relationship
+            replication : replication to be demoted
 
         Returns:
             None
@@ -492,6 +559,77 @@ class ArrayMediator(ABC):
             ObjectNotFound
             InvalidArgument
             PermissionDenied
+        """
+        raise NotImplementedError
+
+    @abstractmethod
+    def add_io_group_to_host(self, host_name, io_group):
+        """
+        This function should add io_group to host.
+
+        Args:
+           host_name : name of the host in the storage system
+           io_group  : the io_group to add to the host
+
+        Returns:
+            None
+
+        Raises:
+            HostNotFoundError
+            IoGroupIsInValid
+        """
+        raise NotImplementedError
+
+    @abstractmethod
+    def remove_io_group_from_host(self, host_name, io_group):
+        """
+        This function should remove io_group from host.
+
+        Args:
+           host_name : name of the host in the storage system
+           io_group  : the io_group to remove from the host
+
+        Returns:
+            None
+
+        Raises:
+            HostNotFoundError
+            IoGroupIsInValid
+        """
+        raise NotImplementedError
+
+    @abstractmethod
+    def get_host_io_group(self, host_name):
+        """
+        This function should return the io_group from host.
+
+        Args:
+           host_name : name of the host in the storage system
+
+        Returns:
+            List
+
+        Raises:
+            HostNotFoundError
+        """
+        raise NotImplementedError
+
+    @abstractmethod
+    def change_host_protocol(self, host_name, protocol):
+        """
+        This function should change the protocol of a host.
+
+        Args:
+           host_name : name of the host in the storage system
+           protocol  : the new protocol
+
+        Returns:
+            None
+
+        Raises:
+            HostNotFoundError
+            UnSupportedParameter
+            CannotChangeHostProtocolBecauseOfMappedPorts
         """
         raise NotImplementedError
 

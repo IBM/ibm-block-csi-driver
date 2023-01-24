@@ -4,7 +4,21 @@ from controllers.common.node_info import Initiators
 
 
 @dataclass
-class Volume:
+class ArrayObject:
+    name: str
+    id: str
+    internal_id: str
+    array_type: str
+
+
+@dataclass
+class ThinVolume(ArrayObject):
+    capacity_bytes: int
+    source_id: str = ""
+
+
+@dataclass
+class Volume(ArrayObject):
     capacity_bytes: int
     id: str
     internal_id: str
@@ -14,6 +28,13 @@ class Volume:
     array_type: str
     pool: str
     space_efficiency_aliases: set = field(default_factory=set)
+    volume_group_id: str = None
+    volume_group_name: str = None
+
+
+@dataclass
+class VolumeGroup(ArrayObject):
+    volumes: list = field(default_factory=list)
 
 
 @dataclass
@@ -22,14 +43,24 @@ class Snapshot(Volume):
     is_ready: bool = False
 
 
+@dataclass
 class Replication:
-    def __init__(self, name, volume_internal_id, other_volume_internal_id, copy_type, is_ready, is_primary=None):
-        self.name = name
-        self.volume_internal_id = volume_internal_id
-        self.other_volume_internal_id = other_volume_internal_id
-        self.copy_type = copy_type
-        self.is_ready = is_ready
-        self.is_primary = is_primary
+    name: str
+    copy_type: str
+    is_ready: bool
+    replication_type: str
+    is_primary: bool
+    volume_group_id: str = None
+
+
+@dataclass
+class ReplicationRequest:
+    volume_internal_id: str
+    other_volume_internal_id: str
+    other_system_id: str
+    copy_type: str
+    replication_type: str
+    replication_policy: str = None
 
 
 @dataclass
@@ -52,3 +83,12 @@ class ObjectIds:
 
     def __bool__(self):
         return bool(self.internal_id or self.uid)
+
+
+@dataclass
+class VolumeGroupIds:
+    internal_id: str = ''
+    name: str = ''
+
+    def __bool__(self):
+        return bool(self.internal_id or self.name)

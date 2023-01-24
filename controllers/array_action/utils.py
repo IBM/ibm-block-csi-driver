@@ -1,6 +1,7 @@
 import encodings
 
-from controllers.array_action.config import WWN_OUI_END, WWN_VENDOR_IDENTIFIER_END
+from controllers.array_action.settings import WWN_OUI_END, WWN_VENDOR_IDENTIFIER_END, VENDOR_IDENTIFIER_LENGTH, \
+    NGUID_OUI_END
 from controllers.common.csi_logger import get_stdout_logger
 
 UTF_8 = encodings.utf_8.getregentry().name
@@ -16,6 +17,16 @@ def convert_scsi_id_to_nguid(volume_id):
     final_nguid = ''.join((vendor_identifier_extension, oui, '0', vendor_identifier))
     logger.debug("Nguid is : {}".format(final_nguid))
     return final_nguid
+
+
+def convert_nguid_to_scsi_id(volume_id):
+    logger.debug("Converting nguid : {} to scsi uuid".format(volume_id))
+    oui = volume_id[WWN_VENDOR_IDENTIFIER_END:NGUID_OUI_END]
+    vendor_identifier = volume_id[-VENDOR_IDENTIFIER_LENGTH:]
+    vendor_identifier_extension = volume_id[:WWN_VENDOR_IDENTIFIER_END]
+    final_scsi_id = ''.join((oui, vendor_identifier, vendor_identifier_extension))
+    logger.debug("scsi uuid is : {}".format(final_scsi_id))
+    return final_scsi_id
 
 
 class ClassProperty:
