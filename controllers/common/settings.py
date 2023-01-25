@@ -3,8 +3,6 @@ from controllers.common.config import config
 NAME_PREFIX_SEPARATOR = "_"
 ENDPOINTS_SEPARATOR = ", "
 
-VOLUME_GROUP_NAME_SUFFIX = "_vg"
-
 CSI_CONTROLLER_SERVER_WORKERS = 10
 
 # array types
@@ -28,3 +26,12 @@ VERSION = 'v1'
 HOST_DEFINITION_NODE_ID_FIELD = 'nodeId'
 NAME_FIELD = 'name'
 NAMESPACE_FIELD = 'namespace'
+IO_GROUP_DELIMITER = ':'
+IO_GROUP_LABEL_PREFIX = 'hostdefiner.block.csi.ibm.com/io-group-'
+
+EAR_VOLUME_FC_MAP_COUNT = "2"
+
+SCSI_PROTOCOL = 'scsi'
+NVME_PROTOCOL = 'nvme'
+
+FULL_IO_GROUP = '0:1:2:3'

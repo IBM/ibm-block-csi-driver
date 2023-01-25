@@ -1,4 +1,5 @@
 from controllers.tests.common.test_settings import HOST_NAME
+import controllers.common.settings as common_settings
 
 SPEC_FIELD = 'spec'
 METADATA_FIELD = 'metadata'
@@ -8,7 +9,6 @@ CSI_NODE_NODE_ID_FIELD = 'nodeID'
 CSI_PROVISIONER_NAME = 'block.csi.ibm.com'
 FAKE_SECRET = 'fake_secret'
 FAKE_SECRET_NAMESPACE = 'fake_secret_namespace'
-FAKE_SECRET_ID = (FAKE_SECRET, FAKE_SECRET_NAMESPACE)
 FAKE_NODE_NAME = 'fake_node_name'
 FAKE_DAEMON_SET_NAME = 'fake_daemon_set_name'
 FAKE_NODE_PODS_NAME = '{}-jdf5g'.format(FAKE_DAEMON_SET_NAME)
@@ -17,7 +17,9 @@ FAKE_SECRET_PASSWORD = 'fake_password'
 FAKE_SECRET_USER_NAME = 'fake_user_name'
 FAKE_STORAGE_CLASS = 'fake_storage_class'
 IQN = 'iqn.1994-05.com.redhat:686358c930fe'
-FAKE_NODE_ID = '{};;;{}'.format(IQN, HOST_NAME)
+WWPN = '34859340583048'
+NQN = 'nqn.2014-08.org.nvmexpress:uuid:b57708c7-5bb6-46a0-b2af-9d824bf539e1'
+FAKE_NODE_ID = '{};;;{}'.format(HOST_NAME, IQN)
 FAKE_CSI_PROVISIONER = 'fake_csi_provisioner'
 TRUE_STRING = 'true'
 NODE_LABELS_FIELD = 'labels'
@@ -61,3 +63,8 @@ STORAGE_CLASS_PROVISIONER_FIELD = 'provisioner'
 STORAGE_CLASS_PARAMETERS_FIELD = 'parameters'
 STORAGE_CLASS_SECRET_FIELD = 'csi.storage.k8s.io/secret-name'
 STORAGE_CLASS_SECRET_NAMESPACE_FIELD = 'csi.storage.k8s.io/secret-namespace'
+FAKE_PREFIX = 'fake-prefix'
+IO_GROUP_ID_FIELD = 'id'
+IO_GROUP_IDS = ['0', '2']
+IO_GROUP_NAMES = ['io_grp0', 'io_grp2']
+FAKE_STRING_IO_GROUP = common_settings.IO_GROUP_DELIMITER.join(IO_GROUP_IDS)

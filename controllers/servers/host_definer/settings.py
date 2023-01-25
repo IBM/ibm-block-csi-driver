@@ -1,4 +1,5 @@
 from controllers.common.settings import HOST_DEFINITION_PLURAL, CSI_IBM_GROUP
+import controllers.array_action.settings as array_config
 
 STORAGE_API_VERSION = 'storage.k8s.io/v1'
 CSI_PARAMETER_PREFIX = "csi.storage.k8s.io/"
@@ -20,9 +21,17 @@ DEFAULT_NAMESPACE = 'default'
 HOST_DEFINER = 'hostDefiner'
 MANAGE_NODE_LABEL = 'hostdefiner.block.csi.ibm.com/manage-node'
 FORBID_DELETION_LABEL = 'hostdefiner.block.csi.ibm.com/do-not-delete-definition'
+CONNECTIVITY_TYPE_LABEL = 'block.csi.ibm.com/connectivity-type'
+SUPPORTED_CONNECTIVITY_TYPES = [array_config.ISCSI_CONNECTIVITY_TYPE,
+                                array_config.FC_CONNECTIVITY_TYPE, array_config.NVME_OVER_FC_CONNECTIVITY_TYPE]
 NODE_NAME_FIELD = 'nodeName'
 SECRET_NAME_FIELD = 'secretName'
 SECRET_NAMESPACE_FIELD = 'secretNamespace'
+CONNECTIVITY_TYPE_FIELD = 'connectivityType'
+PORTS_FIELD = 'ports'
+NODE_NAME_ON_STORAGE_FIELD = 'nodeNameOnStorage'
+IO_GROUP_FIELD = 'ioGroups'
+MANAGEMENT_ADDRESS_FIELD = 'managementAddress'
 API_VERSION = 'apiVersion'
 KIND = 'kind'
 METADATA = 'metadata'
@@ -48,3 +57,6 @@ CSI_IBM_FINALIZER = HOST_DEFINITION_PLURAL + '.' + CSI_IBM_GROUP
 HOST_DEFINITION_PENDING_RETRIES = 5
 HOST_DEFINITION_PENDING_EXPONENTIAL_BACKOFF_IN_SECONDS = 3
 HOST_DEFINITION_PENDING_DELAY_IN_SECONDS = 3
+SECRET_CONFIG_FIELD = 'config'
+TOPOLOGY_PREFIXES = ['topology.block.csi.ibm.com']
+POSSIBLE_NUMBER_OF_IO_GROUP = 4

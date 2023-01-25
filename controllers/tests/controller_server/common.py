@@ -17,6 +17,15 @@ def mock_array_type(contex, server_path):
     contex.addCleanup(detect_array_type_patcher.stop)
 
 
+def mock_utils_method(contex, utils_method_name, return_value=None):
+    utils_method_path = '.'.join(('controllers.servers.utils', utils_method_name))
+    utils_method_patcher = patch(utils_method_path)
+    utils_method = utils_method_patcher.start()
+    if return_value:
+        utils_method.return_value = return_value
+    contex.addCleanup(utils_method_patcher.stop)
+
+
 def mock_mediator():
     mediator = Mock()
     mediator.maximal_volume_size_in_bytes = 10

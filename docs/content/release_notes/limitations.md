@@ -2,19 +2,24 @@
 
 As opposed to known issues, limitations are functionality restrictions that are part of the predefined system design and capabilities in a particular version.
 
+- [IBM DS8000 usage limitations](#ibm®-ds8000®-usage-limitations)
+- [High availability (HA) limitations](#high-availability-ha-limitations)
+- [I/O group limitations](#io-group-limitations)
+- [NVMe/FC usage limitations](#nvme®fc-usage-limitations)
+- [Policy-based replication limitations](#policy-based-replication-limitations)
+- [Snapshot function limitations](#snapshot-function-limitations)
+- [Volume attach limitations](#volume-attach-limitations)
+- [Volume clone limitations](#volume-clone-limitations)
+- [Volume expansion limitations](#volume-clone-limitations)
+- [Volume group limitations](#volume-group-limitations)
+- [Volume replication limitations](#volume-replication-limitations)
+- [Volume snapshot limitations](#volume-snapshot-limitations)
+
 ## IBM® DS8000® usage limitations
 
 When using the CSI driver with DS8000 family storage systems:
 - Connectivity limits on the storage side might be reached with DS8000 family products due to too many open connections. This occurs due to connection closing lag times from the storage side.
 - There is a limit of 11 FlashCopy relationships per volume (including all snapshots and clones).
-
-## Dynamic host definition limitations
-
-Dynamic host definition is only supported for use with IBM Spectrum Virtualize family storage systems.
-
-In addition, the following are not supported when using dynamic host definitions with the IBM block storage CSI driver:
-- I/O groups
-- CSI Topology (see [Configuring for CSI Topology](../configuration/configuring_topology.md))
 
 ## High availability (HA) limitations
 **Note:**
@@ -41,6 +46,11 @@ I/O group configuration is only supported for use with IBM Spectrum Virtualize f
  Red Hat® Enterprise Linux CoreOS (RHCOS) does not support NVMe®/FC.
  
  For other limitations with your storage system, see the following section within your Spectrum Virtualize product documentation on [IBM Documentation](https://www.ibm.com/docs/en/): **Configuring** > **Host attachment** > **NVMe over Fibre Channel host attachments** > **FC-NVMe limitations and SAN configuration guidelines**.
+
+## Policy-based replication limitations
+Policy-based replication is only supported for use with IBM Spectrum Virtualize family storage system versions 8.5.2 or higher. To see if your specific product is supported and for more information, see **What's new** > **Getting started with policy-based replication** within your Spectrum Virtualize product documentation on [IBM Documentation](https://www.ibm.com/docs).
+
+For other policy-based replication limitations with your storage system, see the Configuration Limits and Restrictions for your product software version. From the [IBM Support](https://www.ibm.com/mysupport) website, search for `Configuration Limits and Restrictions` and your product name. For example, `Configuration Limits and Restrictions FlashSystem 9500`.
 
 ## Snapshot function limitations
 
@@ -93,6 +103,14 @@ The following limitations apply when expanding volumes with the IBM block storag
 ## Volume group limitations
 
 Volume group configuration is only supported for use with IBM Spectrum Virtualize family storage systems.
+
+The following limitations apply when using volume groups:
+
+- PersistentVolumeClaims (PVCs) can only be defined inside volume groups in the following ways:
+    - Defined within a StorageClass
+    - Defined within a PVC, using the volume group key
+- PVCs that already belong to a StorageClass with a defined volume group cannot be added to a VolumeGroup object.
+- Volume groups must be empty in order to be deleted.
 
 ## Volume replication limitations
 

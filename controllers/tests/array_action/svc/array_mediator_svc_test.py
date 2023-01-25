@@ -7,20 +7,21 @@ from pysvc import errors as svc_errors
 from pysvc.unified.response import CLIFailureError, SVCResponse
 
 import controllers.array_action.errors as array_errors
-from controllers.tests import utils
 import controllers.tests.array_action.svc.test_settings as svc_settings
 import controllers.tests.array_action.test_settings as array_settings
 import controllers.tests.common.test_settings as common_settings
+from controllers.array_action.array_action_types import ReplicationRequest
 from controllers.array_action.array_mediator_svc import SVCArrayMediator, build_kwargs_from_parameters, \
     FCMAP_STATUS_DONE, YES
+from controllers.array_action.settings import REPLICATION_TYPE_MIRROR, REPLICATION_TYPE_EAR, \
+    RCRELATIONSHIP_STATE_READY, ENDPOINT_TYPE_PRODUCTION
 from controllers.common.node_info import Initiators
-from controllers.array_action.settings import REPLICATION_TYPE_MIRROR, REPLICATION_TYPE_EAR, RCRELATIONSHIP_STATE_READY
-from controllers.array_action.array_action_types import ReplicationRequest
-from controllers.tests.common.test_settings import OBJECT_INTERNAL_ID, \
-    OTHER_OBJECT_INTERNAL_ID, REPLICATION_NAME, SYSTEM_ID, COPY_TYPE
 from controllers.common.settings import ARRAY_TYPE_SVC, SPACE_EFFICIENCY_THIN, SPACE_EFFICIENCY_COMPRESSED, \
     SPACE_EFFICIENCY_DEDUPLICATED_COMPRESSED, SPACE_EFFICIENCY_DEDUPLICATED_THIN, SPACE_EFFICIENCY_DEDUPLICATED, \
-    SPACE_EFFICIENCY_THICK, VOLUME_GROUP_NAME_SUFFIX
+    SPACE_EFFICIENCY_THICK, EAR_VOLUME_FC_MAP_COUNT, SCSI_PROTOCOL, NVME_PROTOCOL
+from controllers.tests import utils
+from controllers.tests.common.test_settings import OBJECT_INTERNAL_ID, \
+    OTHER_OBJECT_INTERNAL_ID, REPLICATION_NAME, SYSTEM_ID, COPY_TYPE
 
 EMPTY_BYTES = b""
 
@@ -158,7 +159,7 @@ class TestArrayMediatorSVC(unittest.TestCase):
         if is_ear_supported:
             self.svc.client.svctask.chvolumereplicationinternals = Mock()
 
-        cli_volume = self._get_cli_volume()
+        cli_volume = self._get_cli_volume(in_volume_group=True)
         self.svc.client.svcinfo.lsvdisk.return_value = self._mock_cli_object(cli_volume)
         return replication, replication_request
 
@@ -193,15 +194,15 @@ class TestArrayMediatorSVC(unittest.TestCase):
 
     def test_get_ear_replication_success(self):
         _, replication_request = self._prepare_mocks_for_ear_replication()
+        replication_request.replication_policy = None
+        self.svc.client.svcinfo.lsvolumegroupreplication.side_effect = [Mock(as_single_element=None), Mock()]
 
         replication = self.svc.get_replication(replication_request)
 
         self.assertEqual(replication.replication_type, REPLICATION_TYPE_EAR)
-        self.assertEqual(replication.volume_group_id, svc_settings.VOLUME_GROUP_ID_ATTR_KEY)
+        self.assertEqual(replication.volume_group_id, OBJECT_INTERNAL_ID)
 
-        self.svc.client.svcinfo.lsvdisk.assert_called_once_with(object_id=OBJECT_INTERNAL_ID, bytes=True)
-        self.svc.client.svcinfo.lsvolumegroupreplication.assert_called_once_with(object_id=svc_settings.
-                                                                                 VOLUME_GROUP_ID_ATTR_KEY)
+        self.svc.client.svcinfo.lsvolumegroupreplication.assert_called_with(object_id=OBJECT_INTERNAL_ID)
 
     def test_get_ear_replication_not_supported(self):
         _, replication_request = self._prepare_mocks_for_ear_replication(is_ear_supported=False)
@@ -219,26 +220,21 @@ class TestArrayMediatorSVC(unittest.TestCase):
 
         replication = self.svc.get_replication(replication_request)
         self.assertEqual(replication, None)
-        self.svc.client.svcinfo.lsvolumegroupreplication.assert_called_once_with(object_id=svc_settings.
-                                                                                 VOLUME_GROUP_ID_ATTR_KEY)
+        self.svc.client.svcinfo.lsvolumegroupreplication.assert_called_once_with(object_id=OBJECT_INTERNAL_ID)
 
     def test_create_ear_replication_success(self):
         _, replication_request = self._prepare_mocks_for_ear_replication()
 
         self.svc.client.svcinfo.lsvolumegroupreplication.return_value = Mock(as_single_element=None)
-        self.svc.client.svctask.mkvolumegroup.return_value = Mock(response=(b"id [1]\n", b""))
 
         self.svc.create_replication(replication_request)
-        self.svc.client.svctask.mkvolumegroup.assert_called_once_with(name=common_settings.
-                                                                      SOURCE_VOLUME_NAME + VOLUME_GROUP_NAME_SUFFIX)
-        self.svc.client.svctask.chvolumegroup.assert_called_once_with(object_id=int(svc_settings.DUMMY_INTERNAL_ID1),
-                                                                      replicationpolicy=REPLICATION_NAME)
+        self.svc.client.svctask.chvolumegroup.assert_called_with(object_id=OBJECT_INTERNAL_ID,
+                                                                 replicationpolicy=REPLICATION_NAME)
 
     def test_create_ear_replication_not_supported(self):
         _, replication_request = self._prepare_mocks_for_ear_replication(is_ear_supported=False)
 
         self.svc.create_replication(replication_request)
-        self.svc.client.svcinfo.mkvolumegroup.assert_not_called()
         self.svc.client.svcinfo.chvolumegroup.assert_not_called()
 
     def test_promote_ear_replication_volume_from_independent(self):
@@ -259,15 +255,12 @@ class TestArrayMediatorSVC(unittest.TestCase):
         self.svc.delete_replication(replication)
         self.svc.client.svctask.chvolumegroup.assert_called_once_with(object_id=OBJECT_INTERNAL_ID,
                                                                       noreplicationpolicy=True)
-        self.svc.client.svctask.rmvolumegroup.assert_called_once_with(object_id=OBJECT_INTERNAL_ID)
 
     def test_delete_ear_replication_not_supported(self):
         replication, _ = self._prepare_mocks_for_ear_replication(is_ear_supported=False)
         self.svc.delete_replication(replication)
 
         self.svc.client.svcinfo.chvolumegroup.assert_not_called()
-        self.svc.client.svctask.chvdisk.assert_not_called()
-        self.svc.client.svctask.rmvolumegroup.assert_not_called()
 
     def test_demote_ear_replication_volume(self):
         replication, _ = self._prepare_mocks_for_ear_replication(is_ear_supported=True)
@@ -652,12 +645,19 @@ class TestArrayMediatorSVC(unittest.TestCase):
                         pool_name=common_settings.DUMMY_POOL1,
                         vdisk_uid=common_settings.VOLUME_UID,
                         fc_id="", capacity=array_settings.DUMMY_CAPACITY_STR,
-                        thick=False):
+                        thick=False,
+                        replication_mode=None,
+                        fc_map_count=EAR_VOLUME_FC_MAP_COUNT,
+                        in_volume_group=False):
 
         deduplicated_copy = svc_settings.NO_VALUE_ALIAS
         compressed_copy = svc_settings.NO_VALUE_ALIAS
         se_copy = svc_settings.NO_VALUE_ALIAS
-        volume_group_id = svc_settings.DUMMY_VOLUME_GROUP_ID
+        volume_group_id = ""
+        volume_group_name = ""
+        if in_volume_group:
+            volume_group_id = svc_settings.DUMMY_VOLUME_GROUP_ID
+            volume_group_name = common_settings.VOLUME_GROUP_NAME
         if with_deduplicated_copy:
             deduplicated_copy = YES
             compressed_copy = YES
@@ -673,7 +673,10 @@ class TestArrayMediatorSVC(unittest.TestCase):
                       svc_settings.VOLUME_SE_COPY_ATTR_KEY: se_copy,
                       svc_settings.VOLUME_DEDUPLICATED_COPY_ATTR_KEY: deduplicated_copy,
                       svc_settings.VOLUME_COMPRESSED_COPY_ATTR_KEY: compressed_copy,
-                      svc_settings.VOLUME_GROUP_ID_ATTR_KEY: volume_group_id
+                      svc_settings.VOLUME_GROUP_ID_ATTR_KEY: volume_group_id,
+                      svc_settings.VOLUME_REPLICATION_MODE_ATTR_KEY: replication_mode,
+                      svc_settings.VOLUME_FC_MAP_COUNT_ATTR_KEY: fc_map_count,
+                      svc_settings.VOLUME_VG_NAME_ATTR_KEY: volume_group_name
                       })
 
     @staticmethod
@@ -858,8 +861,11 @@ class TestArrayMediatorSVC(unittest.TestCase):
 
     def _get_custom_cli_volume(self, support_deduplicated_copy, with_deduplicated_copy,
                                name=common_settings.SOURCE_VOLUME_NAME,
-                               pool_name=common_settings.DUMMY_POOL1):
-        volume = self._get_cli_volume(with_deduplicated_copy, name=name, pool_name=pool_name)
+                               pool_name=common_settings.DUMMY_POOL1,
+                               replication_mode=None,
+                               fc_map_count=EAR_VOLUME_FC_MAP_COUNT):
+        volume = self._get_cli_volume(with_deduplicated_copy, name=name, pool_name=pool_name,
+                                      replication_mode=replication_mode, fc_map_count=fc_map_count)
         if not support_deduplicated_copy:
             del volume.deduplicated_copy
         return volume
@@ -1089,17 +1095,25 @@ class TestArrayMediatorSVC(unittest.TestCase):
         self.svc.client.svcinfo.lsvolumesnapshot.return_value = self._mock_cli_object(
             self._get_cli_snapshot(snapshot_id))
 
-    def _prepare_mocks_for_create_snapshot_addsnapshot(self, snapshot_id=common_settings.INTERNAL_VOLUME_ID):
+    def _prepare_mocks_for_create_snapshot_addsnapshot(self, snapshot_id=common_settings.INTERNAL_VOLUME_ID,
+                                                       is_ear_supported=False,
+                                                       replication_mode=None,
+                                                       fc_map_count=EAR_VOLUME_FC_MAP_COUNT):
         self.svc.client.svctask.addsnapshot = Mock()
-        source_volume_to_copy_from = self._get_custom_cli_volume(False, False, pool_name=common_settings.DUMMY_POOL1)
+        if is_ear_supported:
+            self.svc.client.svctask.chvolumereplicationinternals = Mock()
+        source_volume_to_copy_from = self._get_custom_cli_volume(False, False, pool_name=common_settings.DUMMY_POOL1,
+                                                                 replication_mode=replication_mode,
+                                                                 fc_map_count=fc_map_count)
         volumes_to_return = [source_volume_to_copy_from, source_volume_to_copy_from, source_volume_to_copy_from]
         self.svc.client.svcinfo.lsvdisk.side_effect = self._mock_cli_objects(volumes_to_return)
         self.svc.client.svctask.addsnapshot.return_value = Mock(
             response=(b"Snapshot, id [0], successfully created or triggered\n", b""))
         self._prepare_mocks_for_lsvolumesnapshot(snapshot_id)
 
-    def _test_create_snapshot_addsnapshot_success(self, pool=common_settings.DUMMY_POOL1):
-        self._prepare_mocks_for_create_snapshot_addsnapshot()
+    def _test_create_snapshot_addsnapshot_success(self, pool=common_settings.DUMMY_POOL1,
+                                                  is_ear_supported=False):
+        self._prepare_mocks_for_create_snapshot_addsnapshot(is_ear_supported=is_ear_supported)
         snapshot = self.svc.create_snapshot(common_settings.SOURCE_VOLUME_ID, common_settings.SNAPSHOT_NAME,
                                             space_efficiency=None, pool=pool,
                                             is_virt_snap_func=True)
@@ -1124,6 +1138,18 @@ class TestArrayMediatorSVC(unittest.TestCase):
         self._test_create_snapshot_addsnapshot_success(pool=common_settings.DUMMY_POOL2)
 
     def test_create_snapshot_addsnapshot_not_supported_error(self):
+        with self.assertRaises(array_errors.VirtSnapshotFunctionNotSupportedMessage):
+            self.svc.create_snapshot(common_settings.SOURCE_VOLUME_ID, common_settings.SNAPSHOT_NAME,
+                                     space_efficiency=None, pool=common_settings.DUMMY_POOL1,
+                                     is_virt_snap_func=True)
+
+    def test_create_snapshot_addsnapshot_ear_success(self):
+        self._test_create_snapshot_addsnapshot_success(is_ear_supported=True)
+
+    def test_create_snapshot_addsnapshot_ear_wrong_fc_map_count_error(self):
+        self._prepare_mocks_for_create_snapshot_addsnapshot(is_ear_supported=True,
+                                                            replication_mode=ENDPOINT_TYPE_PRODUCTION,
+                                                            fc_map_count=3)
         with self.assertRaises(array_errors.VirtSnapshotFunctionNotSupportedMessage):
             self.svc.create_snapshot(common_settings.SOURCE_VOLUME_ID, common_settings.SNAPSHOT_NAME,
                                      space_efficiency=None, pool=common_settings.DUMMY_POOL1,
@@ -2017,53 +2043,422 @@ class TestArrayMediatorSVC(unittest.TestCase):
         self._expand_volume_lsvdisk_errors(Exception(array_settings.DUMMY_ERROR_MESSAGE), Exception)
 
     def test_create_host_nvme_success(self):
-        self.svc.create_host(common_settings.HOST_NAME,
-                             Initiators([array_settings.DUMMY_NVME_NQN1],
-                                        [array_settings.DUMMY_FC_WWN1, array_settings.DUMMY_FC_WWN2],
-                                        [array_settings.DUMMY_NODE1_IQN]),
-                             "")
+        self.svc.create_host(
+            common_settings.HOST_NAME,
+            Initiators(
+                [array_settings.DUMMY_NVME_NQN1],
+                [array_settings.DUMMY_FC_WWN1, array_settings.DUMMY_FC_WWN2],
+                [array_settings.DUMMY_NODE1_IQN]),
+            array_settings.NVME_OVER_FC_CONNECTIVITY_TYPE, array_settings.DUMMY_MULTIPLE_IO_GROUP_STRING)
         self.svc.client.svctask.mkhost.assert_called_once_with(name=common_settings.HOST_NAME,
                                                                nqn=array_settings.DUMMY_NVME_NQN1,
-                                                               protocol=svc_settings.MKHOST_NVME_PROTOCOL_VALUE)
+                                                               protocol=svc_settings.MKHOST_NVME_PROTOCOL_VALUE,
+                                                               iogrp=array_settings.DUMMY_MULTIPLE_IO_GROUP_STRING)
 
     def test_create_host_fc_success(self):
-        self.svc.create_host(common_settings.HOST_NAME,
-                             Initiators([], [array_settings.DUMMY_FC_WWN1, array_settings.DUMMY_FC_WWN2], [
-                                 array_settings.DUMMY_NODE1_IQN]), "")
+        self.svc.create_host(
+            common_settings.HOST_NAME,
+            Initiators(
+                [], [array_settings.DUMMY_FC_WWN1, array_settings.DUMMY_FC_WWN2],
+                [array_settings.DUMMY_NODE1_IQN]),
+            array_settings.FC_CONNECTIVITY_TYPE, array_settings.DUMMY_MULTIPLE_IO_GROUP_STRING)
         self.svc.client.svctask.mkhost.assert_called_once_with(name=common_settings.HOST_NAME,
-                                                               fcwwpn=common_settings.FCS_DELIMITER.join(
-                                                                   [array_settings.DUMMY_FC_WWN1,
-                                                                    array_settings.DUMMY_FC_WWN2]))
+                                                               fcwwpn=array_settings.DUMMY_FC_WWN1,
+                                                               iogrp=array_settings.DUMMY_MULTIPLE_IO_GROUP_STRING)
+
+    def test_create_host_fc_when_one_port_is_not_valid_success(self):
+        self.svc.client.svctask.mkhost.side_effect = [CLIFailureError('CMMVC5867E'), Mock()]
+        self.svc.create_host(common_settings.HOST_NAME,
+                             Initiators([], [array_settings.DUMMY_FC_WWN1, array_settings.DUMMY_FC_WWN2], []),
+                             array_settings.FC_CONNECTIVITY_TYPE, array_settings.DUMMY_MULTIPLE_IO_GROUP_STRING)
+        self.assertEqual(self.svc.client.svctask.mkhost.call_count, 2)
 
     def test_create_host_iscsi_success(self):
-        self.svc.create_host(common_settings.HOST_NAME, Initiators([], [], [array_settings.DUMMY_NODE1_IQN]), "")
+        self.svc.create_host(common_settings.HOST_NAME, Initiators([], [], [array_settings.DUMMY_NODE1_IQN]),
+                             array_settings.ISCSI_CONNECTIVITY_TYPE, array_settings.DUMMY_MULTIPLE_IO_GROUP_STRING)
         self.svc.client.svctask.mkhost.assert_called_once_with(name=common_settings.HOST_NAME,
-                                                               iscsiname=array_settings.DUMMY_NODE1_IQN)
+                                                               iscsiname=array_settings.DUMMY_NODE1_IQN,
+                                                               iogrp=array_settings.DUMMY_MULTIPLE_IO_GROUP_STRING)
 
-    def test_create_host_with_connectivity_type_success(self):
-        self.svc.create_host("host_name", Initiators([], [], ['iqn.test.s1']), "iscsi")
-        self.svc.client.svctask.mkhost.assert_called_once_with(name='host_name', iscsiname='iqn.test.s1')
+    def test_create_host_iscsi_with_empty_io_groupsuccess(self):
+        self.svc.create_host(common_settings.HOST_NAME, Initiators([], [], [array_settings.DUMMY_NODE1_IQN]),
+                             array_settings.ISCSI_CONNECTIVITY_TYPE, "")
+        self.svc.client.svctask.mkhost.assert_called_once_with(name=common_settings.HOST_NAME,
+                                                               iscsiname=array_settings.DUMMY_NODE1_IQN,
+                                                               iogrp=common_settings.DUMMY_FULL_IO_GROUP)
+
+    def test_create_host_fc_when_two_ports_are_not_valid_failed(self):
+        self.svc.client.svctask.mkhost.side_effect = [CLIFailureError('CMMVC5867E'), CLIFailureError('CMMVC5867E')]
+        with self.assertRaises(array_errors.NoPortIsValid):
+            self.svc.create_host(common_settings.HOST_NAME,
+                                 Initiators([], [array_settings.DUMMY_FC_WWN1, array_settings.DUMMY_FC_WWN2], []),
+                                 array_settings.FC_CONNECTIVITY_TYPE, array_settings.DUMMY_MULTIPLE_IO_GROUP_STRING)
+        self.assertEqual(self.svc.client.svctask.mkhost.call_count, 2)
+
+    def test_create_host_with_empty_ports_failed(self):
+        with self.assertRaises(array_errors.NoPortFoundByConnectivityType):
+            self.svc.create_host(common_settings.HOST_NAME,
+                                 Initiators([], [], []),
+                                 "",
+                                 array_settings.DUMMY_MULTIPLE_IO_GROUP_STRING)
+        self.svc.client.svctask.mkhost.assert_not_called()
 
     def test_create_host_with_connectivity_type_failed(self):
-        with self.assertRaises(array_errors.NoPortFoundByConnectivityType):
-            self.svc.create_host("host_name", Initiators([], [], ['iqn.test.s1']), "nvmeofc")
+        with self.assertRaises(array_errors.UnsupportedConnectivityTypeError):
+            self.svc.create_host(common_settings.HOST_NAME,
+                                 Initiators([], [], [array_settings.DUMMY_NODE1_IQN]),
+                                 svc_settings.MKHOST_NVME_PROTOCOL_VALUE,
+                                 array_settings.DUMMY_MULTIPLE_IO_GROUP_STRING)
         self.svc.client.svctask.mkhost.assert_not_called()
+
+    def test_create_host_with_invalid_io_group_failed(self):
+        self.svc.client.svctask.mkhost.side_effect = [CLIFailureError('CMMVC5729E')]
+        with self.assertRaises(array_errors.IoGroupIsInValid):
+            self.svc.create_host(common_settings.HOST_NAME,
+                                 Initiators([], [array_settings.DUMMY_FC_WWN1, array_settings.DUMMY_FC_WWN2], []),
+                                 array_settings.FC_CONNECTIVITY_TYPE, array_settings.DUMMY_MULTIPLE_IO_GROUP_STRING)
 
     def _test_create_host_mkhost_errors(self, client_error, expected_error, connectivity_type=""):
         self._test_mediator_method_client_error(self.svc.create_host,
-                                                ("host_name", Initiators([], [], ['iqn.test.s1']), connectivity_type),
+                                                (common_settings.HOST_NAME,
+                                                 Initiators([], [], [array_settings.DUMMY_NODE1_IQN]),
+                                                 connectivity_type, array_settings.DUMMY_MULTIPLE_IO_GROUP_STRING),
                                                 self.svc.client.svctask.mkhost, client_error,
                                                 expected_error)
 
     def test_create_host_errors(self):
-        self._test_create_host_mkhost_errors(CLIFailureError('CMMVC6035E'), array_errors.HostAlreadyExists)
-        self._test_create_host_mkhost_errors(Exception("Failed"), Exception)
+        self._test_create_host_mkhost_errors(CLIFailureError('CMMVC6035E'),
+                                             array_errors.HostAlreadyExists, array_settings.ISCSI_CONNECTIVITY_TYPE)
+        self._test_create_host_mkhost_errors(Exception("Failed"), Exception, array_settings.ISCSI_CONNECTIVITY_TYPE)
 
     def _test_delete_host_rmhost_errors(self, client_error, expected_error):
         self._test_mediator_method_client_error(self.svc.delete_host,
-                                                ("host_name",),
+                                                (common_settings.HOST_NAME,),
                                                 self.svc.client.svctask.rmhost, client_error,
                                                 expected_error)
 
     def test_delete_host_errors(self):
         self._test_delete_host_rmhost_errors(Exception("Failed"), Exception)
+
+    def _prepare_mocks_for_add_ports_to_host(self, port_count):
+        self.svc.client.svcinfo.lshost = Mock()
+        self.svc.client.svcinfo.lshost.return_value = Mock(as_single_element=Munch({
+            svc_settings.PORT_COUNT_FIELD: port_count}))
+
+    def test_add_nvme_ports_to_host_success(self):
+        self._prepare_mocks_for_add_ports_to_host(1)
+        self.svc.add_ports_to_host(common_settings.HOST_NAME,
+                                   Initiators([array_settings.DUMMY_NVME_NQN1],
+                                              [array_settings.DUMMY_FC_WWN1, array_settings.DUMMY_FC_WWN2],
+                                              [array_settings.DUMMY_NODE1_IQN]),
+                                   array_settings.NVME_OVER_FC_CONNECTIVITY_TYPE)
+        self.svc.client.svctask.addhostport.assert_called_once_with(host_name=common_settings.HOST_NAME,
+                                                                    nqn=array_settings.DUMMY_NVME_NQN1)
+
+    def _test_add_fc_ports_to_host_success(self):
+        self._prepare_mocks_for_add_ports_to_host(1)
+        self.svc.add_ports_to_host(common_settings.HOST_NAME,
+                                   Initiators([array_settings.DUMMY_NVME_NQN1],
+                                              [array_settings.DUMMY_FC_WWN1, array_settings.DUMMY_FC_WWN2],
+                                              [array_settings.DUMMY_NODE1_IQN]),
+                                   array_settings.FC_CONNECTIVITY_TYPE)
+        self.assertEqual(self.svc.client.svctask.addhostport.call_count, 2)
+        self.svc.client.svctask.addhostport.assert_called_with(host_name=common_settings.HOST_NAME,
+                                                               fcwwpn=array_settings.DUMMY_FC_WWN2)
+
+    def test_add_fc_ports_to_host_success(self):
+        self._test_add_fc_ports_to_host_success()
+
+    def test_add_fc_ports_to_host_when_one_port_is_not_valid_success(self):
+        self.svc.client.svctask.addhostport.side_effect = [CLIFailureError('CMMVC5867E'), Mock()]
+        self._test_add_fc_ports_to_host_success()
+
+    def test_add_iscsi_ports_to_host_success(self):
+        self._prepare_mocks_for_add_ports_to_host(1)
+        self.svc.add_ports_to_host(common_settings.HOST_NAME,
+                                   Initiators([array_settings.DUMMY_NVME_NQN1],
+                                              [array_settings.DUMMY_FC_WWN1, array_settings.DUMMY_FC_WWN2],
+                                              [array_settings.DUMMY_NODE1_IQN]),
+                                   array_settings.ISCSI_CONNECTIVITY_TYPE)
+        self.svc.client.svctask.addhostport.assert_called_once_with(host_name=common_settings.HOST_NAME,
+                                                                    iscsiname=array_settings.DUMMY_NODE1_IQN)
+
+    def test_add_fc_ports_to_host_when_two_ports_are_not_valid_falied(self):
+        self._prepare_mocks_for_add_ports_to_host(0)
+        self.svc.client.svctask.addhostport.side_effect = [CLIFailureError('CMMVC5867E'), CLIFailureError('CMMVC5867E')]
+        with self.assertRaises(array_errors.NoPortIsValid):
+            self.svc.add_ports_to_host(common_settings.HOST_NAME,
+                                       Initiators([], [array_settings.DUMMY_FC_WWN1, array_settings.DUMMY_FC_WWN2], []),
+                                       array_settings.FC_CONNECTIVITY_TYPE)
+        self.assertEqual(self.svc.client.svctask.addhostport.call_count, 2)
+
+    def test_add_ports_to_host_falied(self):
+        self._test_mediator_method_client_error(self.svc.add_ports_to_host,
+                                                (common_settings.HOST_NAME,
+                                                 Initiators([], [], [array_settings.DUMMY_NODE1_IQN]),
+                                                 array_settings.ISCSI_CONNECTIVITY_TYPE),
+                                                self.svc.client.svctask.addhostport, Exception("Failed"), Exception)
+
+    def test_remove_nvme_ports_from_host_success(self):
+        self.svc.remove_ports_from_host(common_settings.HOST_NAME,
+                                        [array_settings.DUMMY_NVME_NQN1],
+                                        array_settings.NVME_OVER_FC_CONNECTIVITY_TYPE)
+        self.svc.client.svctask.rmhostport.assert_called_once_with(host_name=common_settings.HOST_NAME,
+                                                                   nqn=array_settings.DUMMY_NVME_NQN1)
+
+    def _test_remove_fc_ports_from_host_success(self):
+        self.svc.remove_ports_from_host(common_settings.HOST_NAME,
+                                        [array_settings.DUMMY_FC_WWN1, array_settings.DUMMY_FC_WWN2],
+                                        array_settings.FC_CONNECTIVITY_TYPE)
+        self.assertEqual(self.svc.client.svctask.rmhostport.call_count, 2)
+        self.svc.client.svctask.rmhostport.assert_called_with(host_name=common_settings.HOST_NAME,
+                                                              fcwwpn=array_settings.DUMMY_FC_WWN2)
+
+    def test_remove_fc_ports_from_host_success(self):
+        self._test_remove_fc_ports_from_host_success()
+
+    def test_remove_fc_ports_from_host_when_one_port_is_not_valid_success(self):
+        self.svc.client.svctask.rmhostport.side_effect = [CLIFailureError('CMMVC5867E'), Mock()]
+        self._test_remove_fc_ports_from_host_success()
+
+    def test_remove_iscsi_ports_from_host_success(self):
+        self.svc.remove_ports_from_host(common_settings.HOST_NAME,
+                                        [array_settings.DUMMY_NODE1_IQN],
+                                        array_settings.ISCSI_CONNECTIVITY_TYPE)
+        self.svc.client.svctask.rmhostport.assert_called_once_with(host_name=common_settings.HOST_NAME,
+                                                                   iscsiname=array_settings.DUMMY_NODE1_IQN)
+
+    def test_remove_ports_from_host_falied(self):
+        self._test_mediator_method_client_error(self.svc.remove_ports_from_host,
+                                                (common_settings.HOST_NAME,
+                                                 [array_settings.DUMMY_NODE1_IQN],
+                                                 array_settings.ISCSI_CONNECTIVITY_TYPE),
+                                                self.svc.client.svctask.rmhostport, Exception("Failed"), Exception)
+
+    def _prepare_mocks_for_get_host_with_ports(self, attribute_name):
+        self.svc.client.svcinfo.lshost = Mock()
+        self.svc.client.svcinfo.lshost.return_value = Mock(as_single_element=Munch({
+            attribute_name: ['port1', 'port2']}))
+
+    def _test_get_host_connectivity_port(self, connectivity_attribute_name, connectivity_type):
+        self._prepare_mocks_for_get_host_with_ports(connectivity_attribute_name)
+        result = self.svc.get_host_connectivity_ports(common_settings.HOST_NAME, connectivity_type)
+        self.assertEqual(result, ['port1', 'port2'])
+
+    def test_get_host_connectivity_port_success(self):
+        self._test_get_host_connectivity_port(svc_settings.HOST_NQN, array_settings.NVME_OVER_FC_CONNECTIVITY_TYPE)
+        self._test_get_host_connectivity_port(svc_settings.HOST_WWPN, array_settings.FC_CONNECTIVITY_TYPE)
+        self._test_get_host_connectivity_port(svc_settings.HOST_ISCSI_NAME, array_settings.ISCSI_CONNECTIVITY_TYPE)
+
+    def test_get_host_connectivity_port_falied(self):
+        with self.assertRaises(array_errors.UnsupportedConnectivityTypeError):
+            self.svc.get_host_connectivity_ports(common_settings.HOST_NAME, 'some_connectivity_type')
+
+    def _test_get_host_connectivity_type(self, connectivity_attribute_name, connectivity_type):
+        self._prepare_mocks_for_get_host_with_ports(connectivity_attribute_name)
+        result = self.svc.get_host_connectivity_type(common_settings.HOST_NAME)
+        self.assertEqual(result, connectivity_type)
+
+    def test_get_host_connectivity_type_success(self):
+        self._test_get_host_connectivity_type(svc_settings.HOST_NQN, array_settings.NVME_OVER_FC_CONNECTIVITY_TYPE)
+        self._test_get_host_connectivity_type(svc_settings.HOST_WWPN, array_settings.FC_CONNECTIVITY_TYPE)
+        self._test_get_host_connectivity_type(svc_settings.HOST_ISCSI_NAME, array_settings.ISCSI_CONNECTIVITY_TYPE)
+        self._test_get_host_connectivity_type('some_connectivity_attribute_name', None)
+
+    def test_add_io_group_to_host_success(self):
+        self.svc.add_io_group_to_host(common_settings.HOST_NAME, array_settings.DUMMY_MULTIPLE_IO_GROUP_STRING)
+        self.svc.client.svctask.addhostiogrp.assert_called_once_with(
+            object_id=common_settings.HOST_NAME, iogrp=array_settings.DUMMY_MULTIPLE_IO_GROUP_STRING)
+
+    def test_add_empty_io_group_to_host_success(self):
+        self.svc.add_io_group_to_host(common_settings.HOST_NAME, '')
+        self.svc.client.svctask.addhostiogrp.assert_not_called()
+
+    def test_add_io_group_to_not_exist_host_falied(self):
+        self.svc.client.svctask.addhostiogrp.side_effect = [CLIFailureError('CMMVC5754E')]
+        with self.assertRaises(array_errors.HostNotFoundError):
+            self.svc.add_io_group_to_host(common_settings.HOST_NAME, array_settings.DUMMY_MULTIPLE_IO_GROUP_STRING)
+
+    def test_add_invlid_io_group_to_host_falied(self):
+        self.svc.client.svctask.addhostiogrp.side_effect = [CLIFailureError('CMMVC5729E')]
+        with self.assertRaises(array_errors.IoGroupIsInValid):
+            self.svc.add_io_group_to_host(common_settings.HOST_NAME, array_settings.DUMMY_MULTIPLE_IO_GROUP_STRING)
+
+    def test_add_io_group_to_host_falied(self):
+        self._test_mediator_method_client_error(
+            self.svc.add_io_group_to_host, (common_settings.HOST_NAME, array_settings.DUMMY_MULTIPLE_IO_GROUP_STRING),
+            self.svc.client.svctask.addhostiogrp, Exception("Failed"),
+            Exception)
+
+    def test_remove_io_group_from_host_success(self):
+        self.svc.remove_io_group_from_host(common_settings.HOST_NAME, array_settings.DUMMY_MULTIPLE_IO_GROUP_STRING)
+        self.svc.client.svctask.rmhostiogrp.assert_called_once_with(object_id=common_settings.HOST_NAME,
+                                                                    iogrp=array_settings.DUMMY_MULTIPLE_IO_GROUP_STRING)
+
+    def test_remove_empty_io_group_from_host_success(self):
+        self.svc.remove_io_group_from_host(common_settings.HOST_NAME, '')
+        self.svc.client.svctask.rmhostiogrp.assert_not_called()
+
+    def test_remove_io_group_from_not_exist_host_falied(self):
+        self.svc.client.svctask.rmhostiogrp.side_effect = [CLIFailureError('CMMVC5754E')]
+        with self.assertRaises(array_errors.HostNotFoundError):
+            self.svc.remove_io_group_from_host(common_settings.HOST_NAME, array_settings.DUMMY_MULTIPLE_IO_GROUP_STRING)
+
+    def test_remove_invlid_io_group_from_host_falied(self):
+        self.svc.client.svctask.rmhostiogrp.side_effect = [CLIFailureError('CMMVC5729E')]
+        with self.assertRaises(array_errors.IoGroupIsInValid):
+            self.svc.remove_io_group_from_host(common_settings.HOST_NAME, array_settings.DUMMY_MULTIPLE_IO_GROUP_STRING)
+
+    def test_remove_io_group_from_host_falied(self):
+        self._test_mediator_method_client_error(
+            self.svc.remove_io_group_from_host,
+            (common_settings.HOST_NAME, array_settings.DUMMY_MULTIPLE_IO_GROUP_STRING),
+            self.svc.client.svctask.rmhostiogrp, Exception("Failed"),
+            Exception)
+
+    def _get_lshostiogrp(self, io_group_ids, io_group_names):
+        return {
+            'id': io_group_ids,
+            'name': io_group_names
+        }
+
+    def _assert_get_host_io_group(self, io_group_ids, io_group_names, result):
+        self.assertEqual(type(result.id), list)
+        self.assertEqual(type(result.name), list)
+        if isinstance(io_group_ids, str):
+            io_group_ids = io_group_ids.split(" ")
+        if isinstance(io_group_names, str):
+            io_group_names = io_group_names.split(" ")
+        self.assertEqual(result, self._get_lshostiogrp(io_group_ids, io_group_names))
+
+    def _test_get_host_io_group_success(self, io_group_ids, io_group_names):
+        self.svc.client.svcinfo.lshostiogrp = Mock()
+        self.svc.client.svcinfo.lshostiogrp.return_value = Mock(
+            as_single_element=Munch(self._get_lshostiogrp(io_group_ids, io_group_names)))
+        result = self.svc.get_host_io_group(common_settings.HOST_NAME)
+        self.svc.client.svcinfo.lshostiogrp.assert_called_once_with(object_id=common_settings.HOST_NAME)
+        self._assert_get_host_io_group(io_group_ids, io_group_names, result)
+
+    def test_get_host_multiple_io_groups_success(self):
+        self._test_get_host_io_group_success(svc_settings.MULTIPLE_IO_GROUP_IDS, svc_settings.MULTIPLE_IO_GROUP_NAMES)
+
+    def test_get_host_single_io_group_success(self):
+        self._test_get_host_io_group_success(svc_settings.SINGLE_IO_GROUP_ID, svc_settings.SINGLE_IO_GROUP_NAME)
+
+    def test_get_io_group_from_not_exist_host_falied(self):
+        self.svc.client.svcinfo.lshostiogrp = Mock()
+        self.svc.client.svcinfo.lshostiogrp.side_effect = [CLIFailureError('CMMVC5754E')]
+        with self.assertRaises(array_errors.HostNotFoundError):
+            self.svc.get_host_io_group(common_settings.HOST_NAME)
+
+    def test_get_host_io_group_falied(self):
+        self._test_mediator_method_client_error(self.svc.get_host_io_group,
+                                                (common_settings.HOST_NAME),
+                                                self.svc.client.svcinfo.lshostiogrp, Exception("Failed"), Exception)
+
+    def test_change_host_protocol_to_scsi_success(self):
+        self.svc.change_host_protocol(common_settings.HOST_NAME, SCSI_PROTOCOL)
+        self.svc.client.svctask.chhost.assert_called_once_with(object_id=common_settings.HOST_NAME,
+                                                               protocol=SCSI_PROTOCOL)
+
+    def test_change_host_protocol_to_nvme_success(self):
+        self.svc.change_host_protocol(common_settings.HOST_NAME, NVME_PROTOCOL)
+        self.svc.client.svctask.chhost.assert_called_once_with(object_id=common_settings.HOST_NAME,
+                                                               protocol=NVME_PROTOCOL)
+
+    def _test_change_host_protocol_chhost_errors(self, client_error, expected_error):
+        self._test_mediator_method_client_error(self.svc.change_host_protocol,
+                                                (common_settings.HOST_NAME, SCSI_PROTOCOL),
+                                                self.svc.client.svctask.chhost, client_error,
+                                                expected_error)
+
+    def test_change_host_protocol_errors(self):
+        self._test_change_host_protocol_chhost_errors(CLIFailureError('CMMVC5709E'), array_errors.UnSupportedParameter)
+        self._test_change_host_protocol_chhost_errors(CLIFailureError('CMMVC5753E'), array_errors.HostNotFoundError)
+        self._test_change_host_protocol_chhost_errors(CLIFailureError('CMMVC9331E'),
+                                                      array_errors.CannotChangeHostProtocolBecauseOfMappedPorts)
+        self._test_change_host_protocol_chhost_errors(Exception("Failed"), Exception)
+
+    def _mock_cli_volume_group(self, uid="", volume_count=0):
+        volume_group = {svc_settings.VOLUME_GROUP_VOLUME_COUNT_ATTR_KEY: str(volume_count),
+                        svc_settings.VOLUME_GROUP_NAME_ATTR_KEY: common_settings.VOLUME_GROUP_NAME,
+                        svc_settings.VOLUME_GROUP_ATTR_KEY: common_settings.INTERNAL_VOLUME_GROUP_ID}
+        if uid:
+            volume_group["uid"] = uid
+
+        return Munch(volume_group)
+
+    def _prepare_lsvolumegroup(self, no_return=None, volume_count=0):
+        if no_return:
+            return_value = None
+        else:
+            return_value = self._mock_cli_volume_group(volume_count=volume_count)
+        self.svc.client.svcinfo.lsvolumegroup.return_value = Mock(as_single_element=return_value)
+
+    def test_create_volume_group_success(self):
+        self.svc.client.svctask.mkvolumegroup.return_value = Mock(response=(b"id [1]\n", b""))
+        self._prepare_lsvolumegroup()
+
+        self.svc.create_volume_group(common_settings.VOLUME_GROUP_NAME)
+
+        self.svc.client.svcinfo.lsvolumegroup.assert_called_once_with(object_id=1)
+        self.svc.client.svctask.mkvolumegroup.assert_called_once_with(name=common_settings.VOLUME_GROUP_NAME)
+
+    def test_get_volume_group_success(self):
+        self._prepare_lsvolumegroup()
+        volume_group = self.svc.get_volume_group(common_settings.INTERNAL_VOLUME_GROUP_ID)
+
+        self.svc.client.svcinfo.lsvolumegroup.assert_called_once_with(
+            object_id=common_settings.INTERNAL_VOLUME_GROUP_ID)
+        self.assertEqual(0, len(volume_group.volumes))
+
+    def test_get_volume_group_not_found_failed(self):
+        self._prepare_lsvolumegroup(no_return=True)
+        with self.assertRaises(array_errors.ObjectNotFoundError):
+            self.svc.get_volume_group(common_settings.INTERNAL_VOLUME_GROUP_ID)
+
+    def test_get_volume_group_with_volumes_success(self):
+        self._prepare_lsvolumegroup(volume_count=1)
+        cli_volume = self._get_cli_volume()
+        self.svc.client.svcinfo.lsvdisk.return_value = Mock(as_list=[cli_volume])
+
+        volume_group = self.svc.get_volume_group(common_settings.INTERNAL_VOLUME_GROUP_ID)
+
+        self.svc.client.svcinfo.lsvolumegroup.assert_called_once_with(
+            object_id=common_settings.INTERNAL_VOLUME_GROUP_ID)
+        self.svc.client.svcinfo.lsvdisk.assert_called_once_with(filtervalue='volume_group_name=volume_group_name',
+                                                                bytes=True)
+        self.assertEqual(common_settings.VOLUME_GROUP_NAME, volume_group.name)
+        self.assertEqual(1, len(volume_group.volumes))
+
+    def test_delete_volume_group_success(self):
+        self.svc.delete_volume_group(common_settings.INTERNAL_VOLUME_GROUP_ID)
+
+        self.svc.client.svctask.rmvolumegroup.assert_called_once_with(
+            object_id=common_settings.INTERNAL_VOLUME_GROUP_ID)
+
+    def test_add_volume_to_volume_group_success(self):
+        cli_volume = self._get_cli_volume()
+        self.svc.client.svcinfo.lsvdisk.return_value = Mock(as_single_element=cli_volume)
+
+        self.svc.add_volume_to_volume_group(common_settings.INTERNAL_VOLUME_GROUP_ID, common_settings.VOLUME_UID)
+
+        self.svc.client.svctask.chvdisk.assert_called_once_with(vdisk_id=common_settings.INTERNAL_VOLUME_ID,
+                                                                volumegroup=common_settings.INTERNAL_VOLUME_GROUP_ID)
+
+    def test_add_volume_to_volume_group_already_in_volume_group_failed(self):
+        cli_volume = self._get_cli_volume(in_volume_group=True)
+        self.svc.client.svcinfo.lsvdisk.return_value = Mock(as_single_element=cli_volume)
+
+        with self.assertRaises(array_errors.VolumeAlreadyInVolumeGroup):
+            self.svc.add_volume_to_volume_group(common_settings.INTERNAL_VOLUME_GROUP_ID, common_settings.VOLUME_UID)
+
+        self.svc.client.svctask.chvdisk.assert_not_called()
+
+    def test_remove_volume_from_volume_group_success(self):
+        cli_volume = self._get_cli_volume(in_volume_group=True)
+        self.svc.client.svcinfo.lsvdisk.return_value = Mock(as_single_element=cli_volume)
+        self.svc.remove_volume_from_volume_group(common_settings.VOLUME_UID)
+
+        self.svc.client.svctask.chvdisk.assert_called_once_with(vdisk_id=common_settings.INTERNAL_VOLUME_ID,
+                                                                novolumegroup=True)
