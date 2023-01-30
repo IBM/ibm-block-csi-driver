@@ -3,12 +3,11 @@ import time
 from concurrent import futures
 
 import grpc
-from csi_general import csi_pb2_grpc, replication_pb2_grpc, volumegroup_pb2_grpc
+from csi_general import csi_pb2_grpc, volumegroup_pb2_grpc
 
 from controllers.common.config import config
 from controllers.common.csi_logger import get_stdout_logger
 from controllers.common.settings import CSI_CONTROLLER_SERVER_WORKERS
-from controllers.servers.csi.addons_server import ReplicationControllerServicer
 from controllers.servers.csi.csi_controller_server import CSIControllerServicer
 from controllers.servers.csi.volume_group_server import VolumeGroupControllerServicer
 
@@ -24,7 +23,6 @@ class ControllerServerManager:
     def __init__(self, array_endpoint):
         self.endpoint = array_endpoint
         self.csi_servicer = CSIControllerServicer()
-        self.replication_servicer = ReplicationControllerServicer()
         self.volume_group_servicer = VolumeGroupControllerServicer()
 
     def start_server(self):
@@ -33,7 +31,6 @@ class ControllerServerManager:
 
         csi_pb2_grpc.add_ControllerServicer_to_server(self.csi_servicer, controller_server)
         csi_pb2_grpc.add_IdentityServicer_to_server(self.csi_servicer, controller_server)
-        replication_pb2_grpc.add_ControllerServicer_to_server(self.replication_servicer, controller_server)
         volumegroup_pb2_grpc.add_ControllerServicer_to_server(self.volume_group_servicer, controller_server)
 
         # bind the server to the port defined above
