@@ -16,7 +16,7 @@ from controllers.tests.controller_server.common import mock_get_agent
 from controllers.tests.controller_server.csi_controller_server_test import (CommonControllerTest)
 from controllers.tests.utils import ProtoBufMock
 
-ADDON_SERVER_PATH = "controllers.servers.csi.addons_server"
+ADDON_SERVER_PATH = "controllers.servers.csi.csi_addons_server.replication_controller_servicer"
 
 
 class BaseReplicationSetUp(unittest.TestCase):
