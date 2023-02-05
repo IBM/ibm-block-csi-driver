@@ -13,7 +13,7 @@ from controllers.tests.common.test_settings import VOLUME_NAME, VOLUME_UID, OBJE
     OTHER_OBJECT_INTERNAL_ID, REPLICATION_NAME, SYSTEM_ID, COPY_TYPE, SECRET_USERNAME_VALUE, SECRET_PASSWORD_VALUE, \
     SECRET_MANAGEMENT_ADDRESS_VALUE, DUMMY_VOLUME_GROUP
 from controllers.tests.controller_server.common import mock_get_agent
-from controllers.tests.controller_server.csi_controller_server_test import (CommonControllerTest)
+from controllers.tests.controller_server.controller_server.csi_controller_server_test import (CommonControllerTest)
 from controllers.tests.utils import ProtoBufMock
 
 ADDON_SERVER_PATH = "controllers.servers.csi.csi_addons_server.replication_controller_servicer"

@@ -2,7 +2,7 @@ from argparse import ArgumentParser
 from threading import Thread
 
 from controllers.common.csi_logger import set_log_level
-from controllers.servers.csi.controller_server_manager import ControllerServerManager
+from controllers.servers.csi.controller_server.controller_server_manager import ControllerServerManager
 from controllers.servers.csi.csi_addons_server.csi_addons_server_manager import CSIAddonsServerManager
 
 

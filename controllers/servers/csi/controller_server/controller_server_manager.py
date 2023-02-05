@@ -8,8 +8,8 @@ from csi_general import csi_pb2_grpc, volumegroup_pb2_grpc
 from controllers.common.config import config
 from controllers.common.csi_logger import get_stdout_logger
 from controllers.common.settings import CSI_CONTROLLER_SERVER_WORKERS
-from controllers.servers.csi.csi_controller_server import CSIControllerServicer
-from controllers.servers.csi.volume_group_server import VolumeGroupControllerServicer
+from controllers.servers.csi.controller_server.csi_controller_server import CSIControllerServicer
+from controllers.servers.csi.controller_server.volume_group_server import VolumeGroupControllerServicer
 
 logger = get_stdout_logger()
 
