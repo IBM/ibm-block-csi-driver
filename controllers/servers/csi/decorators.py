@@ -38,8 +38,8 @@ def csi_replication_method(error_response_type):
     return call_csi_method
 
 
-def _set_sync_lock (lock_id, lock_request_attribute, error_response_type,
-                    controller_method, servicer, request, context):
+def _set_sync_lock(lock_id, lock_request_attribute, error_response_type,
+                   controller_method, servicer, request, context):
     set_current_thread_name(lock_id)
     controller_method_name = controller_method.__name__
     logger.info(controller_method_name)
