@@ -8,7 +8,7 @@ from controllers.array_action import errors as array_errors
 from controllers.array_action.storage_agent import get_agent
 from controllers.common.csi_logger import get_stdout_logger
 from controllers.servers import utils
-from controllers.servers.csi.decorators import csi_method, csi_replication_method
+from controllers.servers.csi.decorators import csi_replication_method
 from controllers.servers.csi.exception_handler import build_error_response
 
 logger = get_stdout_logger()
@@ -16,8 +16,7 @@ logger = get_stdout_logger()
 
 class ReplicationControllerServicer(pb2_grpc.ControllerServicer):
 
-    @csi_replication_method(error_response_type=pb2.EnableVolumeReplicationResponse,
-                            lock_replication_request_attribute="replication_source")
+    @csi_replication_method(error_response_type=pb2.EnableVolumeReplicationResponse)
     def EnableVolumeReplication(self, request, context):
         replication_type = utils.get_addons_replication_type(request)
         utils.validate_addons_request(request, replication_type)
@@ -56,8 +55,7 @@ class ReplicationControllerServicer(pb2_grpc.ControllerServicer):
 
         return pb2.EnableVolumeReplicationResponse()
 
-    @csi_replication_method(error_response_type=pb2.DisableVolumeReplicationResponse,
-                            lock_replication_request_attribute="replication_source")
+    @csi_replication_method(error_response_type=pb2.DisableVolumeReplicationResponse)
     def DisableVolumeReplication(self, request, context):
         replication_type = utils.get_addons_replication_type(request)
         utils.validate_addons_request(request, replication_type)
@@ -132,18 +130,15 @@ class ReplicationControllerServicer(pb2_grpc.ControllerServicer):
         logger.info("finished {}".format(method_name))
         return response_type()
 
-    @csi_replication_method(error_response_type=pb2.PromoteVolumeResponse,
-                            lock_replication_request_attribute="replication_source")
+    @csi_replication_method(error_response_type=pb2.PromoteVolumeResponse)
     def PromoteVolume(self, request, context):
         return self._ensure_volume_role(request, context, is_to_promote=True, response_type=pb2.PromoteVolumeResponse)
 
-    @csi_replication_method(error_response_type=pb2.DemoteVolumeResponse,
-                            lock_replication_request_attribute="replication_source")
+    @csi_replication_method(error_response_type=pb2.DemoteVolumeResponse)
     def DemoteVolume(self, request, context):
         return self._ensure_volume_role(request, context, is_to_promote=False, response_type=pb2.DemoteVolumeResponse)
 
-    @csi_replication_method(error_response_type=pb2.ResyncVolumeResponse,
-                            lock_replication_request_attribute="replication_source")
+    @csi_replication_method(error_response_type=pb2.ResyncVolumeResponse)
     def ResyncVolume(self, request, context):
         replication_type = utils.get_addons_replication_type(request)
         utils.validate_addons_request(request, replication_type)
