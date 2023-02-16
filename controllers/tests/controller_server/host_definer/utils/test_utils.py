@@ -7,7 +7,7 @@ from mock import patch, Mock
 import controllers.tests.controller_server.host_definer.utils.k8s_manifests_utils as manifest_utils
 import controllers.tests.controller_server.host_definer.settings as test_settings
 from controllers.tests.common.test_settings import HOST_NAME, SECRET_MANAGEMENT_ADDRESS_VALUE
-from controllers.servers.host_definer.k8s.manager import KubernetesManager
+from controllers.servers.host_definer.k8s.manager import K8SManager
 from controllers.servers.host_definer.types import DefineHostRequest, DefineHostResponse
 from controllers.servers.csi.controller_types import ArrayConnectionInfo
 
@@ -130,7 +130,7 @@ def patch_pending_variables():
 
 def patch_kubernetes_manager_init():
     for function_to_patch in test_settings.KUBERNETES_MANAGER_INIT_FUNCTIONS_TO_PATCH:
-        patch_function(KubernetesManager, function_to_patch)
+        patch_function(K8SManager, function_to_patch)
 
 
 def patch_function(class_type, function):

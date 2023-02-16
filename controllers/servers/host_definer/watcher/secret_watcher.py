@@ -13,7 +13,7 @@ class SecretWatcher(Watcher):
 
     def watch_secret_resources(self):
         while self._loop_forever():
-            stream = self.kubernetes_api.get_secret_stream()
+            stream = self.k8s_api.get_secret_stream()
             for watch_event in stream:
                 watch_event = self._munch(watch_event)
                 secret_info = self._generate_k8s_secret_to_secret_info(watch_event.object)

@@ -1,8 +1,8 @@
 import unittest
 from unittest.mock import MagicMock, Mock
 
-from controllers.servers.host_definer.k8s.manager import KubernetesManager
-from controllers.servers.host_definer.k8s.api import KubernetesApi
+from controllers.servers.host_definer.k8s.manager import K8SManager
+from controllers.servers.host_definer.k8s.api import K8SApi
 import controllers.tests.controller_server.host_definer.utils.test_utils as test_utils
 import controllers.tests.controller_server.host_definer.utils.k8s_manifests_utils as manifest_utils
 import controllers.tests.controller_server.host_definer.settings as test_settings
@@ -11,10 +11,10 @@ import controllers.common.settings as common_settings
 
 class TestKubernetesManager(unittest.TestCase):
     def setUp(self):
-        test_utils.patch_function(KubernetesApi, '_load_cluster_configuration')
-        test_utils.patch_function(KubernetesApi, '_get_dynamic_client')
-        self.k8s_manager = KubernetesManager()
-        self.k8s_manager.kubernetes_api = MagicMock()
+        test_utils.patch_function(K8SApi, '_load_cluster_configuration')
+        test_utils.patch_function(K8SApi, '_get_dynamic_client')
+        self.k8s_manager = K8SManager()
+        self.k8s_manager.k8s_api = MagicMock()
         self.fake_csi_node_info = test_utils.get_fake_csi_node_info()
         self.fake_node_info = test_utils.get_fake_node_info()
         self.fake_storage_class_info = test_utils.get_fake_storage_class_info()
@@ -27,18 +27,18 @@ class TestKubernetesManager(unittest.TestCase):
     def test_get_csi_nodes_info_with_driver_success(self):
         self.k8s_manager.generate_csi_node_info = Mock()
         self._test_get_k8s_resources_info_success(
-            self.k8s_manager.get_csi_nodes_info_with_driver, self.k8s_manager.kubernetes_api.list_csi_node,
+            self.k8s_manager.get_csi_nodes_info_with_driver, self.k8s_manager.k8s_api.list_csi_node,
             self.k8s_manager.generate_csi_node_info, self.fake_csi_node_info,
             self.fake_k8s_csi_nodes_with_ibm_driver)
 
     def test_get_csi_nodes_info_with_driver_empty_list_success(self):
         self.k8s_manager.generate_csi_node_info = Mock()
         self._test_get_k8s_resources_info_empty_list_success(self.k8s_manager.get_csi_nodes_info_with_driver,
-                                                             self.k8s_manager.kubernetes_api.list_csi_node,
+                                                             self.k8s_manager.k8s_api.list_csi_node,
                                                              self.k8s_manager.generate_csi_node_info)
 
     def test_get_csi_nodes_info_with_driver_non_ibm_driver_success(self):
-        self.k8s_manager.kubernetes_api.list_csi_node.return_value = self.fake_k8s_csi_nodes_with_non_ibm_driver
+        self.k8s_manager.k8s_api.list_csi_node.return_value = self.fake_k8s_csi_nodes_with_non_ibm_driver
         self.k8s_manager.generate_csi_node_info = Mock()
         self.k8s_manager.generate_csi_node_info.return_value = self.fake_csi_node_info
         result = self.k8s_manager.get_csi_nodes_info_with_driver()
@@ -48,27 +48,27 @@ class TestKubernetesManager(unittest.TestCase):
     def test_get_nodes_info_success(self):
         self.k8s_manager.generate_node_info = Mock()
         self._test_get_k8s_resources_info_success(
-            self.k8s_manager.get_nodes_info, self.k8s_manager.kubernetes_api.list_node,
+            self.k8s_manager.get_nodes_info, self.k8s_manager.k8s_api.list_node,
             self.k8s_manager.generate_node_info, self.fake_node_info,
             test_utils.get_fake_k8s_nodes_items())
 
     def test_get_nodes_info_empty_list_success(self):
         self.k8s_manager.generate_node_info = Mock()
         self._test_get_k8s_resources_info_empty_list_success(self.k8s_manager.get_nodes_info,
-                                                             self.k8s_manager.kubernetes_api.list_node,
+                                                             self.k8s_manager.k8s_api.list_node,
                                                              self.k8s_manager.generate_node_info)
 
     def test_get_storage_classes_info_success(self):
         self.k8s_manager.generate_storage_class_info = Mock()
         self._test_get_k8s_resources_info_success(
-            self.k8s_manager.get_storage_classes_info, self.k8s_manager.kubernetes_api.list_storage_class,
+            self.k8s_manager.get_storage_classes_info, self.k8s_manager.k8s_api.list_storage_class,
             self.k8s_manager.generate_storage_class_info, self.fake_storage_class_info,
             test_utils.get_fake_k8s_storage_class_items(test_settings.CSI_PROVISIONER_NAME))
 
     def test_get_storage_classes_info_empty_list_success(self):
         self.k8s_manager.generate_storage_class_info = Mock()
         self._test_get_k8s_resources_info_empty_list_success(self.k8s_manager.get_storage_classes_info,
-                                                             self.k8s_manager.kubernetes_api.list_storage_class,
+                                                             self.k8s_manager.k8s_api.list_storage_class,
                                                              self.k8s_manager.generate_storage_class_info)
 
     def _test_get_k8s_resources_info_success(self, function_to_test, k8s_function,
@@ -93,22 +93,22 @@ class TestKubernetesManager(unittest.TestCase):
         self.assertEqual(result.parameters, self.fake_storage_class_info.parameters)
 
     def test_get_csi_node_info_success(self):
-        self.k8s_manager.kubernetes_api.get_csi_node.return_value = test_utils.get_fake_k8s_csi_node()
+        self.k8s_manager.k8s_api.get_csi_node.return_value = test_utils.get_fake_k8s_csi_node()
         self.k8s_manager.generate_csi_node_info = Mock()
         self.k8s_manager.generate_csi_node_info.return_value = self.fake_csi_node_info
         result = self.k8s_manager.get_csi_node_info(test_settings.FAKE_NODE_NAME)
         self.assertEqual(result.name, self.fake_csi_node_info.name)
         self.assertEqual(result.node_id, self.fake_csi_node_info.node_id)
-        self.k8s_manager.kubernetes_api.get_csi_node.assert_called_once_with(test_settings.FAKE_NODE_NAME)
+        self.k8s_manager.k8s_api.get_csi_node.assert_called_once_with(test_settings.FAKE_NODE_NAME)
         self.k8s_manager.generate_csi_node_info.assert_called_once_with(test_utils.get_fake_k8s_csi_node())
 
     def test_get_non_exist_csi_node_info_success(self):
-        self.k8s_manager.kubernetes_api.get_csi_node.return_value = None
+        self.k8s_manager.k8s_api.get_csi_node.return_value = None
         self.k8s_manager.generate_csi_node_info = Mock()
         result = self.k8s_manager.get_csi_node_info(test_settings.FAKE_NODE_NAME)
         self.assertEqual(result.name, "")
         self.assertEqual(result.node_id, "")
-        self.k8s_manager.kubernetes_api.get_csi_node.assert_called_once_with(test_settings.FAKE_NODE_NAME)
+        self.k8s_manager.k8s_api.get_csi_node.assert_called_once_with(test_settings.FAKE_NODE_NAME)
         self.k8s_manager.generate_csi_node_info.assert_not_called()
 
     def test_generate_csi_node_info_with_ibm_driver_success(self):
@@ -142,7 +142,7 @@ class TestKubernetesManager(unittest.TestCase):
 
     def _test_get_matching_host_definition_info_success(
             self, node_name, secret_name, secret_namespace, expected_result=None):
-        self.k8s_manager.kubernetes_api.list_host_definition.return_value = \
+        self.k8s_manager.k8s_api.list_host_definition.return_value = \
             test_utils.get_fake_k8s_host_definitions_items()
         self.k8s_manager.generate_host_definition_info = Mock()
         self.k8s_manager.generate_host_definition_info.return_value = self.fake_host_definition_info
@@ -150,18 +150,18 @@ class TestKubernetesManager(unittest.TestCase):
         self.assertEqual(result, expected_result)
         self.k8s_manager.generate_host_definition_info.assert_called_once_with(
             test_utils.get_fake_k8s_host_definitions_items().items[0])
-        self.k8s_manager.kubernetes_api.list_host_definition.assert_called_once_with()
+        self.k8s_manager.k8s_api.list_host_definition.assert_called_once_with()
 
     def test_get_none_when_host_definition_list_empty_success(self):
-        self.k8s_manager.kubernetes_api.list_host_definition.return_value = test_utils.get_fake_empty_k8s_list()
+        self.k8s_manager.k8s_api.list_host_definition.return_value = test_utils.get_fake_empty_k8s_list()
         self.k8s_manager.generate_host_definition_info = Mock()
         result = self.k8s_manager.get_matching_host_definition_info('', '', '')
         self.assertEqual(result, None)
         self.k8s_manager.generate_host_definition_info.assert_not_called()
-        self.k8s_manager.kubernetes_api.list_host_definition.assert_called_once_with()
+        self.k8s_manager.k8s_api.list_host_definition.assert_called_once_with()
 
     def test_create_host_definition_success(self):
-        self.k8s_manager.kubernetes_api.create_host_definition.return_value = test_utils._get_fake_k8s_host_definitions(
+        self.k8s_manager.k8s_api.create_host_definition.return_value = test_utils._get_fake_k8s_host_definitions(
             test_settings.READY_PHASE)
         self.k8s_manager.generate_host_definition_info = Mock()
         self.k8s_manager.generate_host_definition_info.return_value = self.fake_host_definition_info
@@ -169,20 +169,20 @@ class TestKubernetesManager(unittest.TestCase):
         self.assertEqual(result, self.fake_host_definition_info)
         self.k8s_manager.generate_host_definition_info.assert_called_once_with(
             test_utils._get_fake_k8s_host_definitions(test_settings.READY_PHASE))
-        self.k8s_manager.kubernetes_api.patch_host_definition.assert_called_once_with(
+        self.k8s_manager.k8s_api.patch_host_definition.assert_called_once_with(
             manifest_utils.get_finalizers_manifest([test_settings.CSI_IBM_FINALIZER, ]))
-        self.k8s_manager.kubernetes_api.create_host_definition.assert_called_once_with(
+        self.k8s_manager.k8s_api.create_host_definition.assert_called_once_with(
             manifest_utils.get_fake_k8s_host_definition_manifest())
 
     def test_create_host_definition_failure(self):
-        self.k8s_manager.kubernetes_api.create_host_definition.return_value = None
+        self.k8s_manager.k8s_api.create_host_definition.return_value = None
         self.k8s_manager.generate_host_definition_info = Mock()
         result = self.k8s_manager.create_host_definition(manifest_utils.get_fake_k8s_host_definition_manifest())
         self.assertEqual(result.name, "")
         self.assertEqual(result.node_id, "")
         self.k8s_manager.generate_host_definition_info.assert_not_called()
-        self.k8s_manager.kubernetes_api.patch_host_definition.assert_not_called()
-        self.k8s_manager.kubernetes_api.create_host_definition.assert_called_once_with(
+        self.k8s_manager.k8s_api.patch_host_definition.assert_not_called()
+        self.k8s_manager.k8s_api.create_host_definition.assert_called_once_with(
             manifest_utils.get_fake_k8s_host_definition_manifest())
 
     def test_generate_host_definition_info_success(self):
@@ -200,7 +200,7 @@ class TestKubernetesManager(unittest.TestCase):
 
     def test_set_host_definition_status_success(self):
         self.k8s_manager.set_host_definition_status(test_settings.FAKE_NODE_NAME, test_settings.READY_PHASE)
-        self.k8s_manager.kubernetes_api.patch_cluster_custom_object_status.assert_called_once_with(
+        self.k8s_manager.k8s_api.patch_cluster_custom_object_status.assert_called_once_with(
             common_settings.CSI_IBM_GROUP, common_settings.VERSION, common_settings.HOST_DEFINITION_PLURAL,
             test_settings.FAKE_NODE_NAME, manifest_utils.get_status_phase_manifest(test_settings.READY_PHASE))
 
@@ -225,63 +225,63 @@ class TestKubernetesManager(unittest.TestCase):
 
     def test_delete_host_definition_success(self):
         self._test_delete_host_definition(200)
-        self.k8s_manager.kubernetes_api.delete_host_definition.assert_called_once_with(
+        self.k8s_manager.k8s_api.delete_host_definition.assert_called_once_with(
             test_settings.FAKE_NODE_NAME)
 
     def test_fail_to_delete_host_definition_because_the_finalizers_fails_to_be_deleted(self):
         self._test_delete_host_definition(405)
-        self.k8s_manager.kubernetes_api.delete_host_definition.assert_not_called()
+        self.k8s_manager.k8s_api.delete_host_definition.assert_not_called()
 
     def _test_delete_host_definition(self, finalizers_status_code):
-        self.k8s_manager.kubernetes_api.patch_host_definition.return_value = finalizers_status_code
+        self.k8s_manager.k8s_api.patch_host_definition.return_value = finalizers_status_code
         self.k8s_manager.delete_host_definition(test_settings.FAKE_NODE_NAME)
-        self.k8s_manager.kubernetes_api.patch_host_definition.assert_called_once_with(
+        self.k8s_manager.k8s_api.patch_host_definition.assert_called_once_with(
             manifest_utils.get_finalizers_manifest([]))
 
     def test_update_manage_node_label_success(self):
         excepted_body = manifest_utils.get_metadata_with_manage_node_labels_manifest(test_settings.MANAGE_NODE_LABEL)
         self.k8s_manager.update_manage_node_label(test_settings.FAKE_NODE_NAME, test_settings.MANAGE_NODE_LABEL)
-        self.k8s_manager.kubernetes_api.patch_node.assert_called_once_with(test_settings.FAKE_NODE_NAME, excepted_body)
+        self.k8s_manager.k8s_api.patch_node.assert_called_once_with(test_settings.FAKE_NODE_NAME, excepted_body)
 
     def test_get_secret_data_success(self):
         return_value = 'return value'
-        self.k8s_manager.kubernetes_api.get_secret_data.return_value = return_value
+        self.k8s_manager.k8s_api.get_secret_data.return_value = return_value
         self.k8s_manager.change_decode_base64_secret_config = Mock()
         self.k8s_manager.change_decode_base64_secret_config.return_value = return_value
         result = self.k8s_manager.get_secret_data(test_settings.FAKE_SECRET, test_settings.FAKE_SECRET_NAMESPACE)
         self.assertEqual(result, return_value)
-        self.k8s_manager.kubernetes_api.get_secret_data.assert_called_once_with(
+        self.k8s_manager.k8s_api.get_secret_data.assert_called_once_with(
             test_settings.FAKE_SECRET, test_settings.FAKE_SECRET_NAMESPACE)
         self.k8s_manager.change_decode_base64_secret_config.assert_called_once_with(return_value)
 
     def test_fail_to_get_secret_data(self):
-        self.k8s_manager.kubernetes_api.get_secret_data.return_value = None
+        self.k8s_manager.k8s_api.get_secret_data.return_value = None
         self.k8s_manager.change_decode_base64_secret_config = Mock()
         result = self.k8s_manager.get_secret_data(test_settings.FAKE_SECRET, test_settings.FAKE_SECRET_NAMESPACE)
         self.assertEqual(result, {})
-        self.k8s_manager.kubernetes_api.get_secret_data.assert_called_once_with(
+        self.k8s_manager.k8s_api.get_secret_data.assert_called_once_with(
             test_settings.FAKE_SECRET, test_settings.FAKE_SECRET_NAMESPACE)
         self.k8s_manager.change_decode_base64_secret_config.assert_not_called()
 
     def test_get_node_info_seccess(self):
-        self.k8s_manager.kubernetes_api.read_node.return_value = test_utils.get_fake_k8s_node(
+        self.k8s_manager.k8s_api.read_node.return_value = test_utils.get_fake_k8s_node(
             test_settings.MANAGE_NODE_LABEL)
         self.k8s_manager.generate_node_info = Mock()
         self.k8s_manager.generate_node_info.return_value = self.fake_node_info
         result = self.k8s_manager.get_node_info(test_settings.MANAGE_NODE_LABEL)
         self.assertEqual(result.name, self.fake_node_info.name)
         self.assertEqual(result.labels, self.fake_node_info.labels)
-        self.k8s_manager.kubernetes_api.read_node.assert_called_once_with(test_settings.MANAGE_NODE_LABEL)
+        self.k8s_manager.k8s_api.read_node.assert_called_once_with(test_settings.MANAGE_NODE_LABEL)
         self.k8s_manager.generate_node_info.assert_called_once_with(test_utils.get_fake_k8s_node(
             test_settings.MANAGE_NODE_LABEL))
 
     def test_fail_to_get_node_info(self):
-        self.k8s_manager.kubernetes_api.read_node.return_value = None
+        self.k8s_manager.k8s_api.read_node.return_value = None
         self.k8s_manager.generate_node_info = Mock()
         result = self.k8s_manager.get_node_info(test_settings.MANAGE_NODE_LABEL)
         self.assertEqual(result.name, '')
         self.assertEqual(result.labels, {})
-        self.k8s_manager.kubernetes_api.read_node.assert_called_once_with(test_settings.MANAGE_NODE_LABEL)
+        self.k8s_manager.k8s_api.read_node.assert_called_once_with(test_settings.MANAGE_NODE_LABEL)
         self.k8s_manager.generate_node_info.assert_not_called()
 
     def test_generate_node_info_success(self):
@@ -291,18 +291,18 @@ class TestKubernetesManager(unittest.TestCase):
         self.assertEqual(result.labels, test_utils.get_fake_k8s_node(test_settings.MANAGE_NODE_LABEL).metadata.labels)
 
     def test_get_csi_daemon_set_success(self):
-        self.k8s_manager.kubernetes_api.list_daemon_set_for_all_namespaces.return_value = \
+        self.k8s_manager.k8s_api.list_daemon_set_for_all_namespaces.return_value = \
             test_utils.get_fake_k8s_daemon_set_items(0, 0)
         result = self.k8s_manager.get_csi_daemon_set()
         self.assertEqual(result, test_utils.get_fake_k8s_daemon_set(0, 0))
-        self.k8s_manager.kubernetes_api.list_daemon_set_for_all_namespaces.assert_called_once_with(
+        self.k8s_manager.k8s_api.list_daemon_set_for_all_namespaces.assert_called_once_with(
             test_settings.DRIVER_PRODUCT_LABEL)
 
     def test_get_none_when_fail_to_get_csi_daemon_set(self):
-        self.k8s_manager.kubernetes_api.list_daemon_set_for_all_namespaces.return_value = None
+        self.k8s_manager.k8s_api.list_daemon_set_for_all_namespaces.return_value = None
         result = self.k8s_manager.get_csi_daemon_set()
         self.assertEqual(result, None)
-        self.k8s_manager.kubernetes_api.list_daemon_set_for_all_namespaces.assert_called_once_with(
+        self.k8s_manager.k8s_api.list_daemon_set_for_all_namespaces.assert_called_once_with(
             test_settings.DRIVER_PRODUCT_LABEL)
 
     def test_get_csi_pods_info_success(self):
@@ -312,18 +312,18 @@ class TestKubernetesManager(unittest.TestCase):
         self._test_get_pods_info(2)
 
     def _test_get_pods_info(self, number_of_pods):
-        self.k8s_manager.kubernetes_api.list_pod_for_all_namespaces.return_value = test_utils.get_fake_k8s_pods_items(
+        self.k8s_manager.k8s_api.list_pod_for_all_namespaces.return_value = test_utils.get_fake_k8s_pods_items(
             number_of_pods)
         result = self.k8s_manager.get_csi_pods_info()
         self.assertEqual(result[0].name, test_utils.get_fake_k8s_pods_items().items[0].metadata.name)
         self.assertEqual(result[0].node_name, test_utils.get_fake_k8s_pods_items().items[0].spec.node_name)
         self.assertEqual(len(result), number_of_pods)
-        self.k8s_manager.kubernetes_api.list_pod_for_all_namespaces.assert_called_once_with(
+        self.k8s_manager.k8s_api.list_pod_for_all_namespaces.assert_called_once_with(
             test_settings.DRIVER_PRODUCT_LABEL)
 
     def test_get_none_when_fail_to_get_k8s_pods(self):
-        self.k8s_manager.kubernetes_api.list_pod_for_all_namespaces.return_value = None
+        self.k8s_manager.k8s_api.list_pod_for_all_namespaces.return_value = None
         result = self.k8s_manager.get_csi_pods_info()
         self.assertEqual(result, [])
-        self.k8s_manager.kubernetes_api.list_pod_for_all_namespaces.assert_called_once_with(
+        self.k8s_manager.k8s_api.list_pod_for_all_namespaces.assert_called_once_with(
             test_settings.DRIVER_PRODUCT_LABEL)

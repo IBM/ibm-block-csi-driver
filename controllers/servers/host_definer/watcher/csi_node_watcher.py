@@ -19,7 +19,7 @@ class CsiNodeWatcher(Watcher):
 
     def watch_csi_nodes_resources(self):
         while self._loop_forever():
-            stream = self.kubernetes_api.get_csi_node_stream()
+            stream = self.k8s_api.get_csi_node_stream()
             for watch_event in stream:
                 watch_event = self._munch(watch_event)
                 csi_node_info = self.generate_csi_node_info(watch_event.object)

@@ -32,7 +32,7 @@ class NodeWatcher(Watcher):
 
     def watch_nodes_resources(self):
         while self._loop_forever():
-            stream = self.kubernetes_api.get_node_stream()
+            stream = self.k8s_api.get_node_stream()
             for watch_event in stream:
                 watch_event = self._munch(watch_event)
                 node_name = watch_event.object.metadata.name

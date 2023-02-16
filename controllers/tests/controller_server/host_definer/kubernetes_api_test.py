@@ -3,7 +3,7 @@ from unittest.mock import MagicMock, patch
 from kubernetes.client.rest import ApiException
 from kubernetes.watch import Watch
 
-from controllers.servers.host_definer.k8s.api import KubernetesApi
+from controllers.servers.host_definer.k8s.api import K8SApi
 from controllers.servers.host_definer import utils
 import controllers.tests.controller_server.host_definer.utils.test_utils as test_utils
 import controllers.tests.controller_server.host_definer.utils.k8s_manifests_utils as manifest_utils
@@ -13,9 +13,9 @@ import controllers.common.settings as common_settings
 
 class TestKubernetesApi(unittest.TestCase):
     def setUp(self):
-        test_utils.patch_function(KubernetesApi, '_load_cluster_configuration')
-        test_utils.patch_function(KubernetesApi, '_get_dynamic_client')
-        self.k8s_api = KubernetesApi()
+        test_utils.patch_function(K8SApi, '_load_cluster_configuration')
+        test_utils.patch_function(K8SApi, '_get_dynamic_client')
+        self.k8s_api = K8SApi()
         self.not_found_api_exception = ApiException(http_resp=test_utils.get_error_http_resp(404))
         self.general_api_exception = ApiException(http_resp=test_utils.get_error_http_resp(405))
         self.k8s_api.csi_nodes_api = MagicMock()

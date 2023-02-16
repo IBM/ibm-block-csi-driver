@@ -8,7 +8,7 @@ from controllers.common.csi_logger import get_stdout_logger
 import controllers.servers.host_definer.messages as messages
 from controllers.servers.host_definer import settings
 from controllers.servers.host_definer import utils
-from controllers.servers.host_definer.k8s.api import KubernetesApi
+from controllers.servers.host_definer.k8s.api import K8SApi
 import controllers.common.settings as common_settings
 from controllers.servers.host_definer.types import (
     CsiNodeInfo, PodInfo, NodeInfo, StorageClassInfo, HostDefinitionInfo)
@@ -16,13 +16,13 @@ from controllers.servers.host_definer.types import (
 logger = get_stdout_logger()
 
 
-class KubernetesManager():
+class K8SManager():
     def __init__(self):
-        self.kubernetes_api = KubernetesApi()
+        self.k8s_api = K8SApi()
 
     def get_csi_nodes_info_with_driver(self):
         csi_nodes_info_with_driver = []
-        k8s_csi_nodes = self.kubernetes_api.list_csi_node().items
+        k8s_csi_nodes = self.k8s_api.list_csi_node().items
         for k8s_csi_node in k8s_csi_nodes:
             if self._is_k8s_csi_node_has_driver(k8s_csi_node):
                 csi_nodes_info_with_driver.append(self.generate_csi_node_info(k8s_csi_node))
@@ -38,14 +38,14 @@ class KubernetesManager():
 
     def get_nodes_info(self):
         nodes_info = []
-        for k8s_node in self.kubernetes_api.list_node().items:
+        for k8s_node in self.k8s_api.list_node().items:
             k8s_node = self.generate_node_info(k8s_node)
             nodes_info.append(k8s_node)
         return nodes_info
 
     def get_storage_classes_info(self):
         storage_classes_info = []
-        for k8s_storage_class in self.kubernetes_api.list_storage_class().items:
+        for k8s_storage_class in self.k8s_api.list_storage_class().items:
             storage_class_info = self.generate_storage_class_info(k8s_storage_class)
             storage_classes_info.append(storage_class_info)
         return storage_classes_info
@@ -58,7 +58,7 @@ class KubernetesManager():
         return storage_class_info
 
     def get_csi_node_info(self, node_name):
-        k8s_csi_node = self.kubernetes_api.get_csi_node(node_name)
+        k8s_csi_node = self.k8s_api.get_csi_node(node_name)
         if k8s_csi_node:
             return self.generate_csi_node_info(k8s_csi_node)
         return CsiNodeInfo()
@@ -77,7 +77,7 @@ class KubernetesManager():
         return ''
 
     def get_matching_host_definition_info(self, node_name, secret_name, secret_namespace):
-        k8s_host_definitions = self.kubernetes_api.list_host_definition().items
+        k8s_host_definitions = self.k8s_api.list_host_definition().items
         for k8s_host_definition in k8s_host_definitions:
             host_definition_info = self.generate_host_definition_info(k8s_host_definition)
             if self._is_host_definition_matches(host_definition_info, node_name, secret_name, secret_namespace):
@@ -90,7 +90,7 @@ class KubernetesManager():
             host_definition_info.secret_namespace == secret_namespace
 
     def create_host_definition(self, host_definition_manifest):
-        k8s_host_definition = self.kubernetes_api.create_host_definition(host_definition_manifest)
+        k8s_host_definition = self.k8s_api.create_host_definition(host_definition_manifest)
         if k8s_host_definition:
             logger.info(messages.CREATED_HOST_DEFINITION.format(k8s_host_definition.metadata.name))
             self._add_finalizer(k8s_host_definition.metadata.name)
@@ -132,7 +132,7 @@ class KubernetesManager():
     def set_host_definition_status(self, host_definition_name, host_definition_phase):
         logger.info(messages.SET_HOST_DEFINITION_STATUS.format(host_definition_name, host_definition_phase))
         status = self._get_status_manifest(host_definition_phase)
-        self.kubernetes_api.patch_cluster_custom_object_status(
+        self.k8s_api.patch_cluster_custom_object_status(
             common_settings.CSI_IBM_GROUP, common_settings.VERSION, common_settings.HOST_DEFINITION_PLURAL,
             host_definition_name, status)
 
@@ -163,7 +163,7 @@ class KubernetesManager():
         logger.info(messages.DELETE_HOST_DEFINITION.format(host_definition_name))
         remove_finalizer_status_code = self._remove_finalizer(host_definition_name)
         if remove_finalizer_status_code == 200:
-            self.kubernetes_api.delete_host_definition(host_definition_name)
+            self.k8s_api.delete_host_definition(host_definition_name)
         else:
             logger.error(messages.FAILED_TO_DELETE_HOST_DEFINITION.format(
                 host_definition_name, messages.FAILED_TO_REMOVE_FINALIZER))
@@ -179,11 +179,11 @@ class KubernetesManager():
                 settings.FINALIZERS: finalizers,
             }
         }
-        return self.kubernetes_api.patch_host_definition(finalizer_manifest)
+        return self.k8s_api.patch_host_definition(finalizer_manifest)
 
     def update_manage_node_label(self, node_name, label_value):
         body = self._get_body_for_labels(label_value)
-        self.kubernetes_api.patch_node(node_name, body)
+        self.k8s_api.patch_node(node_name, body)
 
     def _get_body_for_labels(self, label_value):
         body = {
@@ -197,7 +197,7 @@ class KubernetesManager():
 
     def get_secret_data(self, secret_name, secret_namespace):
         logger.info(messages.READ_SECRET.format(secret_name, secret_namespace))
-        secret_data = self.kubernetes_api.get_secret_data(secret_name, secret_namespace)
+        secret_data = self.k8s_api.get_secret_data(secret_name, secret_namespace)
         if secret_data:
             return self.change_decode_base64_secret_config(secret_data)
         return {}
@@ -224,7 +224,7 @@ class KubernetesManager():
             return content_with_base64
 
     def get_node_info(self, node_name):
-        k8s_node = self.kubernetes_api.read_node(node_name)
+        k8s_node = self.k8s_api.read_node(node_name)
         if k8s_node:
             return self.generate_node_info(k8s_node)
         return NodeInfo('', {})
@@ -233,14 +233,14 @@ class KubernetesManager():
         return NodeInfo(k8s_node.metadata.name, k8s_node.metadata.labels)
 
     def get_csi_daemon_set(self):
-        daemon_sets = self.kubernetes_api.list_daemon_set_for_all_namespaces(settings.DRIVER_PRODUCT_LABEL)
+        daemon_sets = self.k8s_api.list_daemon_set_for_all_namespaces(settings.DRIVER_PRODUCT_LABEL)
         if daemon_sets and daemon_sets.items:
             return daemon_sets.items[0]
         return None
 
     def get_csi_pods_info(self):
         pods_info = []
-        k8s_pods = self.kubernetes_api.list_pod_for_all_namespaces(settings.DRIVER_PRODUCT_LABEL)
+        k8s_pods = self.k8s_api.list_pod_for_all_namespaces(settings.DRIVER_PRODUCT_LABEL)
         if not k8s_pods:
             return pods_info
         for k8s_pod in k8s_pods.items:

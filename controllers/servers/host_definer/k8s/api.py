@@ -12,7 +12,7 @@ import controllers.servers.host_definer.messages as messages
 logger = get_stdout_logger()
 
 
-class KubernetesApi():
+class K8SApi():
     def __init__(self):
         self._load_cluster_configuration()
         self.dynamic_client = self._get_dynamic_client()

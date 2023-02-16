@@ -17,11 +17,11 @@ class HostDefinitionWatcher(Watcher):
     def watch_host_definitions_resources(self):
         self._watch_host_definition_with_timeout('')
         while self._loop_forever():
-            resource_version = utils.get_k8s_object_resource_version(self.kubernetes_api.list_host_definition())
+            resource_version = utils.get_k8s_object_resource_version(self.k8s_api.list_host_definition())
             self._watch_host_definition_with_timeout(resource_version)
 
     def _watch_host_definition_with_timeout(self, resource_version, timeout=5):
-        stream = self.kubernetes_api.get_host_definition_stream(resource_version, timeout)
+        stream = self.k8s_api.get_host_definition_stream(resource_version, timeout)
         for watch_event in stream:
             watch_event = self._munch(watch_event)
             host_definition_info = self.generate_host_definition_info(watch_event.object)
@@ -92,7 +92,7 @@ class HostDefinitionWatcher(Watcher):
     def _update_host_definition_from_storage_response(self, host_definition_name, response):
         logger.info(messages.UPDATE_HOST_DEFINITION_FIELDS_FROM_STORAGE.format(host_definition_name, response))
         host_definition_manifest = self._generate_host_definition_manifest(host_definition_name, response)
-        self.kubernetes_api.patch_host_definition(host_definition_manifest)
+        self.k8s_api.patch_host_definition(host_definition_manifest)
 
     def _generate_host_definition_manifest(self, host_definition_name, response):
         return {

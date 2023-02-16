@@ -19,7 +19,7 @@ class StorageClassWatcher(Watcher):
 
     def watch_storage_class_resources(self):
         while self._loop_forever():
-            stream = self.kubernetes_api.get_storage_class_stream()
+            stream = self.k8s_api.get_storage_class_stream()
             for watch_event in stream:
                 watch_event = self._munch(watch_event)
                 storage_class_info = self.generate_storage_class_info(watch_event.object)

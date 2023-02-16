@@ -10,8 +10,8 @@ from controllers.servers.utils import (
     validate_secrets, get_array_connection_info_from_secrets, get_system_info_for_topologies)
 from controllers.servers.errors import ValidationException
 import controllers.servers.host_definer.messages as messages
-from controllers.servers.host_definer.k8s.api import KubernetesApi
-from controllers.servers.host_definer.k8s.manager import KubernetesManager
+from controllers.servers.host_definer.k8s.api import K8SApi
+from controllers.servers.host_definer.k8s.manager import K8SManager
 from controllers.servers.host_definer import settings
 import controllers.common.settings as common_settings
 from controllers.servers.host_definer.types import (
@@ -23,11 +23,11 @@ NODES = {}
 logger = get_stdout_logger()
 
 
-class Watcher(KubernetesManager):
+class Watcher(K8SManager):
     def __init__(self):
         super().__init__()
         self.storage_host_servicer = HostDefinerServicer()
-        self.kubernetes_api = KubernetesApi()
+        self.k8s_api = K8SApi()
 
     def _define_host_on_all_storages(self, node_name):
         logger.info(messages.DEFINE_NODE_ON_ALL_MANAGED_SECRETS.format(node_name))
@@ -91,7 +91,7 @@ class Watcher(KubernetesManager):
         if current_host_definition_info_on_cluster:
             host_definition_manifest[settings.METADATA][
                 common_settings.NAME_FIELD] = current_host_definition_info_on_cluster.name
-            self.kubernetes_api.patch_host_definition(host_definition_manifest)
+            self.k8s_api.patch_host_definition(host_definition_manifest)
             return current_host_definition_info_on_cluster
         else:
             logger.info(messages.CREATING_NEW_HOST_DEFINITION.format(host_definition_info.name))
@@ -204,7 +204,7 @@ class Watcher(KubernetesManager):
     def _create_k8s_event_for_host_definition(self, host_definition_info, message, action, message_type):
         logger.info(messages.CREATE_EVENT_FOR_HOST_DEFINITION.format(message, host_definition_info.name))
         k8s_event = self.generate_k8s_event(host_definition_info, message, action, message_type)
-        self.kubernetes_api.create_event(settings.DEFAULT_NAMESPACE, k8s_event)
+        self.k8s_api.create_event(settings.DEFAULT_NAMESPACE, k8s_event)
 
     def _is_host_can_be_defined(self, node_name):
         return self._is_dynamic_node_labeling_allowed() or self._is_node_has_manage_node_label(node_name)
@@ -364,7 +364,7 @@ class Watcher(KubernetesManager):
 
     def _get_all_node_host_definitions_info(self, node_name):
         node_host_definitions_info = []
-        k8s_host_definitions = self.kubernetes_api.list_host_definition().items
+        k8s_host_definitions = self.k8s_api.list_host_definition().items
         for k8s_host_definition in k8s_host_definitions:
             host_definition_info = self.generate_host_definition_info(k8s_host_definition)
             if host_definition_info.node_name == node_name:
