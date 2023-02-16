@@ -18,7 +18,7 @@ class SecretWatcher(Watcher):
                 watch_event = self._munch(watch_event)
                 secret_info = self._generate_k8s_secret_to_secret_info(watch_event.object)
                 if self._is_secret_managed(secret_info):
-                    secret_data = self.change_decode_base64_secret_config(watch_event.object.data)
+                    secret_data = self.k8s_manager.change_decode_base64_secret_config(watch_event.object.data)
                     if self._is_topology_secret(secret_data):
                         nodes_with_system_id = self._generate_nodes_with_system_id(secret_data)
                         system_ids_topologies = self._generate_secret_system_ids_topologies(secret_data)

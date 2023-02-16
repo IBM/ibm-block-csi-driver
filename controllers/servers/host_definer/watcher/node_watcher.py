@@ -13,10 +13,10 @@ unmanaged_csi_nodes_with_driver = set()
 
 class NodeWatcher(Watcher):
     def add_initial_nodes(self):
-        nodes_info = self.get_nodes_info()
+        nodes_info = self.k8s_manager.get_nodes_info()
         for node_info in nodes_info:
             node_name = node_info.name
-            csi_node_info = self.get_csi_node_info(node_name)
+            csi_node_info = self.k8s_manager.get_csi_node_info(node_name)
             if self._is_csi_node_pod_deleted_while_host_definer_was_down(csi_node_info):
                 logger.info(messages.CSI_NODE_POD_DELETED_WHILE_HOST_DEFINER_WAS_DOWN.format(node_name))
                 self._delete_host_definitions(node_name)
@@ -36,8 +36,8 @@ class NodeWatcher(Watcher):
             for watch_event in stream:
                 watch_event = self._munch(watch_event)
                 node_name = watch_event.object.metadata.name
-                csi_node_info = self.get_csi_node_info(node_name)
-                node_info = self.generate_node_info(watch_event.object)
+                csi_node_info = self.k8s_manager.get_csi_node_info(node_name)
+                node_info = self.k8s_manager.generate_node_info(watch_event.object)
                 self._add_new_unmanaged_nodes_with_ibm_csi_driver(watch_event, csi_node_info)
                 self._define_new_managed_node(watch_event, node_name, csi_node_info)
                 self._handle_node_topologies(node_info, watch_event)

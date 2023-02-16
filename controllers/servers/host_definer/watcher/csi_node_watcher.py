@@ -12,7 +12,7 @@ logger = get_stdout_logger()
 class CsiNodeWatcher(Watcher):
 
     def add_initial_csi_nodes(self):
-        csi_nodes_info = self.get_csi_nodes_info_with_driver()
+        csi_nodes_info = self.k8s_manager.get_csi_nodes_info_with_driver()
         for csi_node_info in csi_nodes_info:
             if self._is_host_can_be_defined(csi_node_info.name):
                 self._add_node_to_nodes(csi_node_info)
@@ -22,7 +22,7 @@ class CsiNodeWatcher(Watcher):
             stream = self.k8s_api.get_csi_node_stream()
             for watch_event in stream:
                 watch_event = self._munch(watch_event)
-                csi_node_info = self.generate_csi_node_info(watch_event.object)
+                csi_node_info = self.k8s_manager.generate_csi_node_info(watch_event.object)
                 if (watch_event.type == settings.DELETED_EVENT) and (csi_node_info.name in NODES):
                     self._handle_deleted_csi_node_pod(csi_node_info)
                 elif watch_event.type == settings.MODIFIED_EVENT:
@@ -63,14 +63,14 @@ class CsiNodeWatcher(Watcher):
 
     def _is_csi_node_pod_running_on_worker(self, worker, daemon_set_name):
         logger.info(messages.CHECK_IF_CSI_NODE_POD_IS_RUNNING.format(worker))
-        csi_pods_info = self.get_csi_pods_info()
+        csi_pods_info = self.k8s_manager.get_csi_pods_info()
         for pod_info in csi_pods_info:
             if (pod_info.node_name == worker) and (daemon_set_name in pod_info.name):
                 return True
         return False
 
     def _wait_until_all_daemon_set_pods_are_up_to_date(self):
-        csi_daemon_set = self.get_csi_daemon_set()
+        csi_daemon_set = self.k8s_manager.get_csi_daemon_set()
         if not csi_daemon_set:
             return None
         status = csi_daemon_set.status
@@ -79,7 +79,7 @@ class CsiNodeWatcher(Watcher):
                 status.updated_number_scheduled, status.desired_number_scheduled))
             if status.desired_number_scheduled == 0:
                 return None
-            csi_daemon_set = self.get_csi_daemon_set()
+            csi_daemon_set = self.k8s_manager.get_csi_daemon_set()
             if not csi_daemon_set:
                 return None
             status = csi_daemon_set.status
@@ -89,7 +89,7 @@ class CsiNodeWatcher(Watcher):
     def _create_definitions_when_csi_node_changed(self, csi_node_info):
         for secret_info in MANAGED_SECRETS:
             secret_name, secret_namespace = secret_info.name, secret_info.namespace
-            host_definition_info = self.get_matching_host_definition_info(
+            host_definition_info = self.k8s_manager.get_matching_host_definition_info(
                 csi_node_info.name, secret_name, secret_namespace)
             if host_definition_info:
                 if self._is_node_id_changed(host_definition_info.node_id, csi_node_info.node_id):

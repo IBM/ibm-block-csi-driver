@@ -24,7 +24,7 @@ class HostDefinitionWatcher(Watcher):
         stream = self.k8s_api.get_host_definition_stream(resource_version, timeout)
         for watch_event in stream:
             watch_event = self._munch(watch_event)
-            host_definition_info = self.generate_host_definition_info(watch_event.object)
+            host_definition_info = self.k8s_manager.generate_host_definition_info(watch_event.object)
             if self._is_host_definition_in_pending_phase(host_definition_info.phase) and \
                     watch_event.type != settings.DELETED_EVENT:
                 self._define_host_definition_after_pending_state(host_definition_info)
@@ -57,7 +57,7 @@ class HostDefinitionWatcher(Watcher):
         self._set_host_definition_phase_to_error(host_definition_info)
 
     def _is_host_definition_not_pending(self, host_definition_info):
-        current_host_definition_info_on_cluster = self.get_matching_host_definition_info(
+        current_host_definition_info_on_cluster = self.k8s_manager.get_matching_host_definition_info(
             host_definition_info.node_name, host_definition_info.secret_name, host_definition_info.secret_namespace)
         return not current_host_definition_info_on_cluster or \
             current_host_definition_info_on_cluster.phase == settings.READY_PHASE
@@ -86,7 +86,7 @@ class HostDefinitionWatcher(Watcher):
             response = self._define_host(host_definition_info)
             self._update_host_definition_from_storage_response(host_definition_info.name, response)
         else:
-            self.delete_host_definition(host_definition_info.name)
+            self.k8s_manager.delete_host_definition(host_definition_info.name)
         return response
 
     def _update_host_definition_from_storage_response(self, host_definition_name, response):
@@ -126,7 +126,7 @@ class HostDefinitionWatcher(Watcher):
         elif phase == settings.PENDING_CREATION_PHASE:
             self._set_host_definition_status_to_ready(host_definition_info)
         elif self._is_pending_for_deletion_need_to_be_handled(phase, host_definition_info.node_name):
-            self.delete_host_definition(host_definition_info.name)
+            self.k8s_manager.delete_host_definition(host_definition_info.name)
             self._remove_manage_node_label(host_definition_info.node_name)
 
     def _is_pending_for_deletion_need_to_be_handled(self, phase, node_name):
@@ -134,4 +134,4 @@ class HostDefinitionWatcher(Watcher):
 
     def _set_host_definition_phase_to_error(self, host_definition_info):
         logger.info(messages.SET_HOST_DEFINITION_PHASE_TO_ERROR.format(host_definition_info.name))
-        self.set_host_definition_status(host_definition_info.name, settings.ERROR_PHASE)
+        self.k8s_manager.set_host_definition_status(host_definition_info.name, settings.ERROR_PHASE)
