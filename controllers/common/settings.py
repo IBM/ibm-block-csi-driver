@@ -28,6 +28,8 @@ NAME_FIELD = 'name'
 NAMESPACE_FIELD = 'namespace'
 IO_GROUP_DELIMITER = ':'
 IO_GROUP_LABEL_PREFIX = 'hostdefiner.block.csi.ibm.com/io-group-'
+RESOURCE_VERSION_FIELD = 'resource_version'
+ITEMS_FIELD = 'items'
 
 EAR_VOLUME_FC_MAP_COUNT = "2"
 

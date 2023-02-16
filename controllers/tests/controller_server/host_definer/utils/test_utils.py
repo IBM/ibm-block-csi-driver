@@ -1,12 +1,13 @@
 from dataclasses import dataclass, field
 import func_timeout
 from munch import Munch
+from kubernetes import client
 from mock import patch, Mock
 
 import controllers.tests.controller_server.host_definer.utils.k8s_manifests_utils as manifest_utils
 import controllers.tests.controller_server.host_definer.settings as test_settings
 from controllers.tests.common.test_settings import HOST_NAME, SECRET_MANAGEMENT_ADDRESS_VALUE
-from controllers.servers.host_definer.kubernetes_manager.manager import KubernetesManager
+from controllers.servers.host_definer.k8s.manager import KubernetesManager
 from controllers.servers.host_definer.types import DefineHostRequest, DefineHostResponse
 from controllers.servers.csi.controller_types import ArrayConnectionInfo
 
@@ -35,7 +36,7 @@ def get_fake_k8s_csi_nodes(csi_provisioner_name, number_of_csi_nodes):
     return K8sResourceItems(k8s_csi_nodes)
 
 
-def get_fake_k8s_csi_node(csi_provisioner_name):
+def get_fake_k8s_csi_node(csi_provisioner_name=""):
     csi_node_manifest = manifest_utils.get_k8s_csi_node_manifest(csi_provisioner_name)
     return Munch.fromDict(csi_node_manifest)
 
@@ -50,24 +51,31 @@ def get_fake_k8s_node(label):
 
 
 def get_fake_k8s_daemon_set_items(updated_pods, desired_updated_pods):
+    return K8sResourceItems([get_fake_k8s_daemon_set(updated_pods, desired_updated_pods)])
+
+
+def get_fake_k8s_daemon_set(updated_pods, desired_updated_pods):
     k8s_daemon_set_manifest = manifest_utils.get_fake_k8s_daemon_set_manifest(updated_pods, desired_updated_pods)
-    return K8sResourceItems([Munch.fromDict(k8s_daemon_set_manifest)])
+    return Munch.fromDict(k8s_daemon_set_manifest)
 
 
 def get_empty_k8s_pods():
     return K8sResourceItems()
 
 
-def get_fake_k8s_pods_items():
-    k8s_pod_manifest = manifest_utils.get_fake_k8s_pod_manifest()
-    return K8sResourceItems([Munch.fromDict(k8s_pod_manifest)])
+def get_fake_k8s_pods_items(number_of_pods=1):
+    k8s_pods = []
+    for pod_index in range(number_of_pods):
+        k8s_pod_manifest = manifest_utils.get_fake_k8s_pod_manifest('-{}'.format(pod_index))
+        k8s_pods.append(Munch.fromDict(k8s_pod_manifest))
+    return K8sResourceItems(k8s_pods)
 
 
 def get_empty_k8s_host_definitions():
     return K8sResourceItems()
 
 
-def get_fake_k8s_host_definitions_items(host_definition_phase):
+def get_fake_k8s_host_definitions_items(host_definition_phase='ready'):
     return K8sResourceItems([_get_fake_k8s_host_definitions(host_definition_phase)])
 
 
@@ -104,6 +112,11 @@ def get_fake_k8s_storage_class_items(provisioner):
     return K8sResourceItems([Munch.fromDict(k8s_storage_classes_manifest)])
 
 
+def get_fake_k8s_storage_class(provisioner):
+    k8s_storage_classes_manifest = manifest_utils.get_fake_k8s_storage_class_manifest(provisioner)
+    return Munch.fromDict(k8s_storage_classes_manifest)
+
+
 def get_fake_secret_storage_event(event_type, provisioner):
     return manifest_utils.generate_watch_event(event_type,
                                                manifest_utils.get_fake_k8s_storage_class_manifest(provisioner))
@@ -117,10 +130,10 @@ def patch_pending_variables():
 
 def patch_kubernetes_manager_init():
     for function_to_patch in test_settings.KUBERNETES_MANAGER_INIT_FUNCTIONS_TO_PATCH:
-        _patch_function(KubernetesManager, function_to_patch)
+        patch_function(KubernetesManager, function_to_patch)
 
 
-def _patch_function(class_type, function):
+def patch_function(class_type, function):
     patcher = patch.object(class_type, function)
     patcher.start()
 
@@ -158,8 +171,8 @@ def run_function_with_timeout(function, max_wait):
         pass
 
 
-def get_error_http_resp():
-    return HttpResp(405, 'some problem', 'some reason')
+def get_error_http_resp(status_code):
+    return HttpResp(status_code, 'some problem', 'some reason')
 
 
 def patch_nodes_global_variable(module_path):
@@ -215,9 +228,63 @@ def get_fake_host_io_group():
     return Munch.fromDict(manifest_utils.get_host_io_group_manifest())
 
 
+def get_fake_empty_k8s_list():
+    much_object = Munch.fromDict(manifest_utils.get_empty_k8s_list_manifest())
+    much_object.items = []
+    return much_object
+
+
 def get_fake_managed_node():
     managed_node = Mock(spec_set=['name', 'node_id', 'io_group'])
     managed_node.name = test_settings.FAKE_NODE_NAME
     managed_node.node_id = test_settings.FAKE_NODE_ID
     managed_node.io_group = test_settings.FAKE_STRING_IO_GROUP
     return managed_node
+
+
+def get_fake_csi_node_info():
+    csi_node_info = Mock(spec_set=['name', 'node_id'])
+    csi_node_info.name = test_settings.FAKE_NODE_NAME
+    csi_node_info.node_id = test_settings.FAKE_NODE_ID
+    return csi_node_info
+
+
+def get_fake_node_info():
+    node_info = Mock(spec_set=['name', 'labels'])
+    node_info.name = test_settings.FAKE_NODE_NAME
+    node_info.labels = test_settings.MANAGE_NODE_LABEL
+    return node_info
+
+
+def get_fake_storage_class_info():
+    storage_class_info = Mock(spec_set=['name', 'provisioner', 'parameters'])
+    storage_class_info.name = test_settings.FAKE_STORAGE_CLASS
+    storage_class_info.provisioner = test_settings.CSI_PROVISIONER_NAME
+    storage_class_info.parameters = test_settings.FAKE_STORAGE_CLASS_PARAMETERS
+    return storage_class_info
+
+
+def get_fake_host_definition_info():
+    host_definition_info = Mock(spec_set=['name', 'resource_version', 'uid', 'phase', 'secret_name',
+                                          'secret_namespace', 'node_name', 'node_id', 'connectivity_type'])
+    host_definition_info.name = test_settings.FAKE_NODE_NAME
+    host_definition_info.resource_version = test_settings.FAKE_RESOURCE_VERSION
+    host_definition_info.uid = test_settings.FAKE_UID
+    host_definition_info.phase = test_settings.READY_PHASE
+    host_definition_info.secret_name = test_settings.FAKE_SECRET
+    host_definition_info.secret_namespace = test_settings.FAKE_SECRET_NAMESPACE
+    host_definition_info.node_name = test_settings.FAKE_NODE_NAME
+    host_definition_info.node_id = test_settings.FAKE_NODE_ID
+    host_definition_info.connectivity_type = test_settings.FAKE_CONNECTIVITY_TYPE
+    return host_definition_info
+
+
+def get_object_reference():
+    return client.V1ObjectReference(
+        api_version=test_settings.CSI_IBM_API_VERSION, kind=test_settings.HOST_DEFINITION_KIND,
+        name=test_settings.FAKE_NODE_NAME, resource_version=test_settings.FAKE_RESOURCE_VERSION,
+        uid=test_settings.FAKE_UID, )
+
+
+def get_event_object_metadata():
+    return client.V1ObjectMeta(generate_name='{}.'.format(test_settings.FAKE_NODE_NAME), )

@@ -7,6 +7,8 @@ STATUS_FIELD = 'status'
 STORAGE_CLASS_DRIVERS_FIELD = 'drivers'
 CSI_NODE_NODE_ID_FIELD = 'nodeID'
 CSI_PROVISIONER_NAME = 'block.csi.ibm.com'
+CSI_IBM_API_VERSION = 'csi.ibm.com/v1'
+HOST_DEFINITION_KIND = 'HostDefinition'
 FAKE_SECRET = 'fake_secret'
 FAKE_SECRET_NAMESPACE = 'fake_secret_namespace'
 FAKE_NODE_NAME = 'fake_node_name'
@@ -16,6 +18,7 @@ FAKE_SECRET_ARRAY = 'management_address'
 FAKE_SECRET_PASSWORD = 'fake_password'
 FAKE_SECRET_USER_NAME = 'fake_user_name'
 FAKE_STORAGE_CLASS = 'fake_storage_class'
+FAKE_CONNECTIVITY_TYPE = 'fake_connectivity_type'
 IQN = 'iqn.1994-05.com.redhat:686358c930fe'
 WWPN = '34859340583048'
 NQN = 'nqn.2014-08.org.nvmexpress:uuid:b57708c7-5bb6-46a0-b2af-9d824bf539e1'
@@ -32,7 +35,6 @@ SECRET_WATCHER_PATH = 'controllers.servers.host_definer.watcher.secret_watcher'
 CSI_NODE_WATCHER_PATH = 'controllers.servers.host_definer.watcher.csi_node_watcher'
 STORAGE_CLASS_WATCHER_PATH = 'controllers.servers.host_definer.watcher.storage_class_watcher'
 SETTINGS_PATH = 'controllers.servers.host_definer.settings'
-METADATA_RESOURCE_VERSION_FIELD = 'resource_version'
 FAKE_RESOURCE_VERSION = '495873498573'
 FAKE_UID = '50345093486093'
 EVENT_TYPE_FIELD = 'type'
@@ -55,7 +57,7 @@ SECRET_DATA_FIELD = 'data'
 FAIL_MESSAGE_FROM_STORAGE = 'fail_from_storage'
 PENDING_CREATION_PHASE = 'PendingCreation'
 PENDING_DELETION_PHASE = 'PendingDeletion'
-SUCCESS_MESSAGE = 'Host defined successfully on the array'
+MESSAGE = 'Host defined successfully on the array'
 HOST_DEFINITION_PENDING_VARS = {'HOST_DEFINITION_PENDING_RETRIES': 3,
                                 'HOST_DEFINITION_PENDING_EXPONENTIAL_BACKOFF_IN_SECONDS': 0.2,
                                 'HOST_DEFINITION_PENDING_DELAY_IN_SECONDS': 0.2}
@@ -68,3 +70,16 @@ IO_GROUP_ID_FIELD = 'id'
 IO_GROUP_IDS = ['0', '2']
 IO_GROUP_NAMES = ['io_grp0', 'io_grp2']
 FAKE_STRING_IO_GROUP = common_settings.IO_GROUP_DELIMITER.join(IO_GROUP_IDS)
+FAKE_STORAGE_CLASS_PARAMETERS = {
+    STORAGE_CLASS_SECRET_FIELD: FAKE_SECRET,
+    STORAGE_CLASS_SECRET_NAMESPACE_FIELD: FAKE_SECRET_NAMESPACE
+}
+CSI_IBM_FINALIZER = common_settings.HOST_DEFINITION_PLURAL + '.' + common_settings.CSI_IBM_GROUP
+FINALIZERS_FIELD = 'finalizers'
+CONNECTIVITY_TYPE_FIELD = 'connectivityType'
+DEFINE_ACTION = 'Define'
+SUCCESSFUL_MESSAGE_TYPE = 'Successful'
+HOST_DEFINER = 'hostDefiner'
+NORMAL_EVENT_TYPE = 'Normal'
+WARNING_EVENT_TYPE = 'Warning'
+DRIVER_PRODUCT_LABEL = 'product=ibm-block-csi-driver'

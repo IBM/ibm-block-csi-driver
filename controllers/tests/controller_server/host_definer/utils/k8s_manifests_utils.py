@@ -26,15 +26,15 @@ def get_fake_k8s_daemon_set_manifest(updated_pods, desired_updated_pods):
     return _generate_manifest(test_settings.FAKE_NODE_PODS_NAME, k8s_daemon_set_status)
 
 
-def get_fake_k8s_pod_manifest():
+def get_fake_k8s_pod_manifest(pod_suffix=''):
     k8s_pod_spec = {
         test_settings.SPEC_FIELD: {
             test_settings.POD_NODE_NAME_FIELD: test_settings.FAKE_NODE_NAME
         }}
-    return _generate_manifest(test_settings.FAKE_NODE_PODS_NAME, k8s_pod_spec)
+    return _generate_manifest(test_settings.FAKE_NODE_PODS_NAME + pod_suffix, k8s_pod_spec)
 
 
-def get_fake_k8s_host_definition_manifest(host_definition_phase):
+def get_fake_k8s_host_definition_manifest(host_definition_phase='ready'):
     status_phase_manifest = get_status_phase_manifest(host_definition_phase)
     k8s_host_definition_body = {
         test_settings.SPEC_FIELD: {
@@ -42,7 +42,8 @@ def get_fake_k8s_host_definition_manifest(host_definition_phase):
                 test_settings.SECRET_NAME_FIELD: test_settings.FAKE_SECRET,
                 test_settings.SECRET_NAMESPACE_FIELD: test_settings.FAKE_SECRET_NAMESPACE,
                 test_settings.HOST_DEFINITION_NODE_NAME_FIELD: test_settings.FAKE_NODE_NAME,
-                common_settings.HOST_DEFINITION_NODE_ID_FIELD: test_settings.FAKE_NODE_ID
+                common_settings.HOST_DEFINITION_NODE_ID_FIELD: test_settings.FAKE_NODE_ID,
+                test_settings.CONNECTIVITY_TYPE_FIELD: test_settings.FAKE_CONNECTIVITY_TYPE
             }
         }}
     return _generate_manifest(test_settings.FAKE_NODE_NAME, status_phase_manifest, k8s_host_definition_body)
@@ -80,10 +81,7 @@ def get_fake_k8s_secret_manifest():
 def get_fake_k8s_storage_class_manifest(provisioner):
     k8s_storage_class_body = {
         test_settings.STORAGE_CLASS_PROVISIONER_FIELD: provisioner,
-        test_settings.STORAGE_CLASS_PARAMETERS_FIELD: {
-            test_settings.STORAGE_CLASS_SECRET_FIELD: test_settings.FAKE_SECRET,
-            test_settings.STORAGE_CLASS_SECRET_NAMESPACE_FIELD: test_settings.FAKE_SECRET_NAMESPACE
-        }}
+        test_settings.STORAGE_CLASS_PARAMETERS_FIELD: test_settings.FAKE_STORAGE_CLASS_PARAMETERS}
     return _generate_manifest(test_settings.FAKE_STORAGE_CLASS, k8s_storage_class_body)
 
 
@@ -102,7 +100,7 @@ def _generate_manifest(object_name, *extra_dicts):
 def _get_metadata_manifest():
     return {
         test_settings.METADATA_FIELD: {
-            test_settings.METADATA_RESOURCE_VERSION_FIELD: test_settings.FAKE_RESOURCE_VERSION,
+            common_settings.RESOURCE_VERSION_FIELD: test_settings.FAKE_RESOURCE_VERSION,
             test_settings.METADATA_UID_FIELD: test_settings.FAKE_UID
         }}
 
@@ -130,4 +128,22 @@ def get_host_io_group_manifest():
     return {
         test_settings.IO_GROUP_ID_FIELD: test_settings.IO_GROUP_IDS,
         common_settings.NAME_FIELD: test_settings.IO_GROUP_NAMES
+    }
+
+
+def get_empty_k8s_list_manifest():
+    return {
+        common_settings.ITEMS_FIELD: [],
+        test_settings.METADATA_FIELD: {
+            common_settings.RESOURCE_VERSION_FIELD
+        }
+    }
+
+
+def get_finalizers_manifest(finalizers):
+    return {
+        test_settings.METADATA_FIELD: {
+            common_settings.NAME_FIELD: test_settings.FAKE_NODE_NAME,
+            test_settings.FINALIZERS_FIELD: finalizers,
+        }
     }

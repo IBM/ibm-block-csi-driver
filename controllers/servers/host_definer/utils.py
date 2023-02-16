@@ -11,3 +11,9 @@ def generate_io_group_from_labels(labels):
                 io_group += common_settings.IO_GROUP_DELIMITER
             io_group += str(io_group_index)
     return io_group
+
+
+def get_k8s_object_resource_version(k8s_object):
+    if k8s_object.metadata.resource_version:
+        return k8s_object.metadata.resource_version
+    return k8s_object.metadata.resourceVersion

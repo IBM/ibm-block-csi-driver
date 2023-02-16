@@ -16,5 +16,5 @@ class BaseSetUp(unittest.TestCase):
         self.k8s_node_with_manage_node_label = test_utils.get_fake_k8s_node(test_settings.MANAGE_NODE_LABEL)
         self.k8s_node_with_fake_label = test_utils.get_fake_k8s_node(test_settings.FAKE_LABEL)
         self.ready_k8s_host_definitions = test_utils.get_fake_k8s_host_definitions_items(test_settings.READY_PHASE)
-        self.http_resp = test_utils.get_error_http_resp()
+        self.http_resp = test_utils.get_error_http_resp(405)
         self.fake_api_exception = ApiException(http_resp=self.http_resp)
