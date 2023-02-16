@@ -1,10 +1,8 @@
 import unittest
-from unittest.mock import MagicMock, Mock, patch
-from kubernetes.client.rest import ApiException
+from unittest.mock import MagicMock, Mock
 
 from controllers.servers.host_definer.k8s.manager import KubernetesManager
 from controllers.servers.host_definer.k8s.api import KubernetesApi
-from controllers.servers.host_definer import utils
 import controllers.tests.controller_server.host_definer.utils.test_utils as test_utils
 import controllers.tests.controller_server.host_definer.utils.k8s_manifests_utils as manifest_utils
 import controllers.tests.controller_server.host_definer.settings as test_settings
@@ -111,7 +109,7 @@ class TestKubernetesManager(unittest.TestCase):
         self.assertEqual(result.name, "")
         self.assertEqual(result.node_id, "")
         self.k8s_manager.kubernetes_api.get_csi_node.assert_called_once_with(test_settings.FAKE_NODE_NAME)
-        self.k8s_manager.generate_csi_node_info.assert_not_called
+        self.k8s_manager.generate_csi_node_info.assert_not_called()
 
     def test_generate_csi_node_info_with_ibm_driver_success(self):
         result = self.k8s_manager.generate_csi_node_info(
@@ -159,7 +157,7 @@ class TestKubernetesManager(unittest.TestCase):
         self.k8s_manager.generate_host_definition_info = Mock()
         result = self.k8s_manager.get_matching_host_definition_info('', '', '')
         self.assertEqual(result, None)
-        self.k8s_manager.generate_host_definition_info.assert_not_called
+        self.k8s_manager.generate_host_definition_info.assert_not_called()
         self.k8s_manager.kubernetes_api.list_host_definition.assert_called_once_with()
 
     def test_create_host_definition_success(self):
@@ -182,8 +180,8 @@ class TestKubernetesManager(unittest.TestCase):
         result = self.k8s_manager.create_host_definition(manifest_utils.get_fake_k8s_host_definition_manifest())
         self.assertEqual(result.name, "")
         self.assertEqual(result.node_id, "")
-        self.k8s_manager.generate_host_definition_info.assert_not_called
-        self.k8s_manager.kubernetes_api.patch_host_definition.assert_not_called
+        self.k8s_manager.generate_host_definition_info.assert_not_called()
+        self.k8s_manager.kubernetes_api.patch_host_definition.assert_not_called()
         self.k8s_manager.kubernetes_api.create_host_definition.assert_called_once_with(
             manifest_utils.get_fake_k8s_host_definition_manifest())
 
@@ -232,7 +230,7 @@ class TestKubernetesManager(unittest.TestCase):
 
     def test_fail_to_delete_host_definition_because_the_finalizers_fails_to_be_deleted(self):
         self._test_delete_host_definition(405)
-        self.k8s_manager.kubernetes_api.delete_host_definition.assert_not_called
+        self.k8s_manager.kubernetes_api.delete_host_definition.assert_not_called()
 
     def _test_delete_host_definition(self, finalizers_status_code):
         self.k8s_manager.kubernetes_api.patch_host_definition.return_value = finalizers_status_code
@@ -263,7 +261,7 @@ class TestKubernetesManager(unittest.TestCase):
         self.assertEqual(result, {})
         self.k8s_manager.kubernetes_api.get_secret_data.assert_called_once_with(
             test_settings.FAKE_SECRET, test_settings.FAKE_SECRET_NAMESPACE)
-        self.k8s_manager.change_decode_base64_secret_config.assert_not_called
+        self.k8s_manager.change_decode_base64_secret_config.assert_not_called()
 
     def test_get_node_info_seccess(self):
         self.k8s_manager.kubernetes_api.read_node.return_value = test_utils.get_fake_k8s_node(
@@ -284,7 +282,7 @@ class TestKubernetesManager(unittest.TestCase):
         self.assertEqual(result.name, '')
         self.assertEqual(result.labels, {})
         self.k8s_manager.kubernetes_api.read_node.assert_called_once_with(test_settings.MANAGE_NODE_LABEL)
-        self.k8s_manager.generate_node_info.assert_not_called
+        self.k8s_manager.generate_node_info.assert_not_called()
 
     def test_generate_node_info_success(self):
         result = self.k8s_manager.generate_node_info(test_utils.get_fake_k8s_node(

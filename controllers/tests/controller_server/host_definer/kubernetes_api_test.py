@@ -66,21 +66,19 @@ class TestKubernetesApi(unittest.TestCase):
 
     def test_patch_cluster_custom_object_status_success(self):
         self.k8s_api.csi_nodes_api.get.return_value = None
-        result = self.k8s_api.patch_cluster_custom_object_status(
+        self.k8s_api.patch_cluster_custom_object_status(
             common_settings.CSI_IBM_GROUP, common_settings.VERSION, common_settings.HOST_DEFINITION_PLURAL,
             test_settings.FAKE_NODE_NAME, test_settings.READY_PHASE)
         self.k8s_api.custom_object_api.patch_cluster_custom_object_status.assert_called_with(
             common_settings.CSI_IBM_GROUP, common_settings.VERSION,
             common_settings.HOST_DEFINITION_PLURAL, test_settings.FAKE_NODE_NAME,
             test_settings.READY_PHASE)
-        self.assertEqual(result, None)
 
     def test_create_event_success(self):
         self.k8s_api.core_api.create_namespaced_event.return_value = None
-        result = self.k8s_api.create_event(test_settings.FAKE_SECRET_NAMESPACE, test_utils.get_fake_empty_k8s_list())
+        self.k8s_api.create_event(test_settings.FAKE_SECRET_NAMESPACE, test_utils.get_fake_empty_k8s_list())
         self.k8s_api.core_api.create_namespaced_event.assert_called_with(
             test_settings.FAKE_SECRET_NAMESPACE, test_utils.get_fake_empty_k8s_list())
-        self.assertEqual(result, None)
 
     def test_delete_host_definition_success(self):
         self.k8s_api.host_definitions_api.delete.return_value = test_utils.get_fake_k8s_host_definitions_items()
@@ -108,9 +106,8 @@ class TestKubernetesApi(unittest.TestCase):
 
     def test_patch_node_success(self):
         self.k8s_api.core_api.patch_node.return_value = None
-        result = self.k8s_api.patch_node(test_settings.FAKE_NODE_NAME, manifest_utils.get_fake_k8s_node_manifest(
+        self.k8s_api.patch_node(test_settings.FAKE_NODE_NAME, manifest_utils.get_fake_k8s_node_manifest(
             test_settings.MANAGE_NODE_LABEL))
-        self.assertEqual(result, None)
         self.k8s_api.core_api.patch_node.assert_called_once_with(
             test_settings.FAKE_NODE_NAME, manifest_utils.get_fake_k8s_node_manifest(
                 test_settings.MANAGE_NODE_LABEL))

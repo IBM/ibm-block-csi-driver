@@ -117,8 +117,8 @@ class TestDefineHost(BaseSetUp):
         self._prepare_define_host_update_ports(host_connectivity_type,
                                                Initiators(fc_wwns=[settings.WWPN]))
 
-        self.mediator.create_host.assert_not_called()
-        self.mediator.delete_host.assert_not_called()
+        self.mediator.create_host.assert_not_called()()
+        self.mediator.delete_host.assert_not_called()()
         self._assert_io_group()
 
     def test_define_host_update_ports_with_different_protocol_on_storage_with_chhost_success(self):
@@ -171,7 +171,7 @@ class TestUndefineHost(BaseSetUp):
 
     def test_undefine_host_idempotency_success(self):
         self._prepare_undefine_host_success(is_found=False)
-        self.mediator.delete_host.assert_not_called()
+        self.mediator.delete_host.assert_not_called()()
 
     def test_verify_host_definition_on_storage_failed(self):
         error_message = 'error'

@@ -38,17 +38,17 @@ class TestWatchSecretResources(SecretWatcherBase):
         self.secret_stream.return_value = iter([test_utils.get_fake_secret_watch_event(
             test_settings.DELETED_EVENT_TYPE)])
         self.secret_watcher.watch_secret_resources()
-        self.secret_watcher.storage_host_servicer.define_host.assert_not_called()
+        self.secret_watcher.storage_host_servicer.define_host.assert_not_called()()
 
     def test_do_not_create_definitions_when_managed_secret_modified_but_no_managed_nodes(self):
         self._prepare_default_mocks_for_secret()
         self.secret_watcher.watch_secret_resources()
-        self.secret_watcher.storage_host_servicer.define_host.assert_not_called()
+        self.secret_watcher.storage_host_servicer.define_host.assert_not_called()()
 
     def test_modified_secret_that_is_not_in_managed_secrets(self):
         self._prepare_default_mocks_for_secret()
         self.secret_watcher.watch_secret_resources()
-        self.secret_watcher.storage_host_servicer.define_host.assert_not_called()
+        self.secret_watcher.storage_host_servicer.define_host.assert_not_called()()
 
     def _prepare_default_mocks_for_secret(self):
         self.secret_stream.return_value = iter([test_utils.get_fake_secret_watch_event(
