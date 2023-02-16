@@ -1,0 +1,2 @@
+MANAGED_SECRETS = []
+NODES = {}
