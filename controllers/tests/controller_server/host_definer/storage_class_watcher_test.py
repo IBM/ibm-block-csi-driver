@@ -37,7 +37,7 @@ class TestAddInitialStorageClasses(StorageClassWatcherBase):
         self.managed_secrets_on_storage_class_watcher.append(test_utils.get_fake_secret_info())
         self.managed_secrets_on_watcher_helper.append(test_utils.get_fake_secret_info())
         self.storage_class_watcher.add_initial_storage_classes()
-        self.storage_class_watcher.storage_host_servicer.define_host.assert_not_called()()
+        self.storage_class_watcher.storage_host_servicer.define_host.assert_not_called()
         self.assertEqual(2, self.managed_secrets_on_storage_class_watcher[0].managed_storage_classes)
 
     def test_add_new_storage_class_without_ibm_csi_provisioner(self):
@@ -45,7 +45,7 @@ class TestAddInitialStorageClasses(StorageClassWatcherBase):
             test_utils.get_fake_k8s_storage_class_items(test_settings.FAKE_CSI_PROVISIONER)
         self.storage_class_watcher.add_initial_storage_classes()
         self.assertEqual(0, len(self.managed_secrets_on_storage_class_watcher))
-        self.storage_class_watcher.storage_host_servicer.define_host.assert_not_called()()
+        self.storage_class_watcher.storage_host_servicer.define_host.assert_not_called()
 
 
 class TestWatchStorageClassResources(StorageClassWatcherBase):
@@ -75,7 +75,7 @@ class TestWatchStorageClassResources(StorageClassWatcherBase):
         self.managed_secrets_on_storage_class_watcher.append(test_utils.get_fake_secret_info())
         self.managed_secrets_on_watcher_helper.append(test_utils.get_fake_secret_info())
         self.storage_class_watcher.watch_storage_class_resources()
-        self.storage_class_watcher.storage_host_servicer.define_host.assert_not_called()()
+        self.storage_class_watcher.storage_host_servicer.define_host.assert_not_called()
         self.assertEqual(2, self.managed_secrets_on_storage_class_watcher[0].managed_storage_classes)
 
     def test_add_new_storage_class_without_ibm_csi_provisioner(self):
@@ -83,7 +83,7 @@ class TestWatchStorageClassResources(StorageClassWatcherBase):
             test_settings.ADDED_EVENT, test_settings.FAKE_CSI_PROVISIONER)])
         self.storage_class_watcher.watch_storage_class_resources()
         self.assertEqual(0, len(self.managed_secrets_on_storage_class_watcher))
-        self.storage_class_watcher.storage_host_servicer.define_host.assert_not_called()()
+        self.storage_class_watcher.storage_host_servicer.define_host.assert_not_called()
 
     def test_deleted_managed_storage_class(self):
         self.storage_class_stream.return_value = iter([test_utils.get_fake_secret_storage_event(
