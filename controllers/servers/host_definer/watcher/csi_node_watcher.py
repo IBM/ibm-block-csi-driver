@@ -2,7 +2,8 @@ import time
 from threading import Thread
 
 from controllers.common.csi_logger import get_stdout_logger
-from controllers.servers.host_definer.watcher.watcher_helper import Watcher, NODES, MANAGED_SECRETS
+from controllers.servers.host_definer.globals import MANAGED_SECRETS, NODES
+from controllers.servers.host_definer.watcher.watcher_helper import Watcher
 import controllers.servers.host_definer.messages as messages
 from controllers.servers.host_definer import settings
 from controllers.servers.host_definer.utils import utils

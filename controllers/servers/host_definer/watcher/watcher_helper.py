@@ -7,6 +7,7 @@ from controllers.servers.settings import SECRET_SUPPORTED_TOPOLOGIES_PARAMETER
 from controllers.servers.utils import get_system_info_for_topologies
 from controllers.servers.errors import ValidationException
 import controllers.servers.host_definer.messages as messages
+from controllers.servers.host_definer.globals import MANAGED_SECRETS, NODES
 from controllers.servers.host_definer.k8s.api import K8SApi
 from controllers.servers.host_definer.k8s.manager import K8SManager
 from controllers.servers.host_definer import settings
@@ -17,8 +18,6 @@ from controllers.servers.host_definer.resource_manager.host_definition import Ho
 from controllers.servers.host_definer.types import DefineHostRequest, DefineHostResponse, SecretInfo, ManagedNode
 from controllers.servers.host_definer.storage_manager.host_definer_server import HostDefinerServicer
 
-MANAGED_SECRETS = []
-NODES = {}
 logger = get_stdout_logger()
 
 
