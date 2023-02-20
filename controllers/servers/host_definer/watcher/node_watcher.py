@@ -2,7 +2,8 @@ from kubernetes import watch
 
 from controllers.common.csi_logger import get_stdout_logger
 from controllers.servers.utils import is_topology_match
-from controllers.servers.host_definer.watcher.watcher_helper import NODES, Watcher, MANAGED_SECRETS
+from controllers.servers.host_definer.globals import MANAGED_SECRETS, NODES
+from controllers.servers.host_definer.watcher.watcher_helper import Watcher
 from controllers.servers.host_definer import settings
 from controllers.servers.host_definer.utils import utils
 from controllers.servers.host_definer import messages
