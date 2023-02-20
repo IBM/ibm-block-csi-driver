@@ -90,7 +90,7 @@ class CsiNodeWatcher(Watcher):
     def _create_definitions_when_csi_node_changed(self, csi_node_info):
         for secret_info in MANAGED_SECRETS:
             secret_name, secret_namespace = secret_info.name, secret_info.namespace
-            host_definition_info = self.k8s_manager.get_matching_host_definition_info(
+            host_definition_info = self.host_definition_manager.get_matching_host_definition_info(
                 csi_node_info.name, secret_name, secret_namespace)
             if host_definition_info:
                 if self._is_node_id_changed(host_definition_info.node_id, csi_node_info.node_id):

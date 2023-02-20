@@ -2,6 +2,8 @@ import os
 import ast
 import base64
 import json
+import random
+import string
 from munch import Munch
 
 from controllers.common.csi_logger import get_stdout_logger
@@ -128,3 +130,7 @@ def decode_base64_to_string(content_with_base64):
         return decoded_string_in_bytes.decode('ascii')
     except Exception:
         return content_with_base64
+
+
+def get_random_string():
+    return ''.join(random.choices(string.ascii_lowercase + string.digits, k=20))

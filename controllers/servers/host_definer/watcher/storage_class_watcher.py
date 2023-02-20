@@ -99,7 +99,7 @@ class StorageClassWatcher(Watcher):
 
     def _define_nodes_from_secret_info(self, secret_info):
         logger.info(messages.NEW_MANAGED_SECRET.format(secret_info.name, secret_info.namespace))
-        host_definition_info = self._get_host_definition_info_from_secret(secret_info)
+        host_definition_info = self.host_definition_manager.get_host_definition_info_from_secret(secret_info)
         self._define_nodes(host_definition_info)
 
     def _handle_deleted_watch_event(self, secrets_info):

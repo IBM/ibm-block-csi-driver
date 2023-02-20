@@ -43,5 +43,5 @@ class SecretWatcher(Watcher):
 
     def _define_host_after_watch_event(self, secret_info):
         logger.info(messages.SECRET_HAS_BEEN_MODIFIED.format(secret_info.name, secret_info.namespace))
-        host_definition_info = self._get_host_definition_info_from_secret(secret_info)
+        host_definition_info = self.host_definition_manager.get_host_definition_info_from_secret(secret_info)
         self._define_nodes(host_definition_info)

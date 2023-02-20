@@ -197,3 +197,8 @@ class TestUtils(unittest.TestCase):
     def test_decode_base64_to_string_handle_getting_decoded_string_success(self):
         result = utils.decode_base64_to_string(test_settings.DECODED_BASE64_STRING)
         self.assertEqual(result, test_settings.DECODED_BASE64_STRING)
+
+    def test_get_random_string_success(self):
+        result = utils.get_random_string()
+        self.assertEqual(type(result), str)
+        self.assertEqual(len(result), 20)
