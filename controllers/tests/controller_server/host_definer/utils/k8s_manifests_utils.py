@@ -37,13 +37,19 @@ def get_fake_k8s_pod_manifest(pod_suffix=''):
 def get_fake_k8s_host_definition_manifest(host_definition_phase='ready'):
     status_phase_manifest = get_status_phase_manifest(host_definition_phase)
     k8s_host_definition_body = {
+        test_settings.API_VERSION_FIELD: test_settings.CSI_IBM_API_VERSION,
+        test_settings.KIND_FIELD: test_settings.HOST_DEFINITION_KIND,
         test_settings.SPEC_FIELD: {
             test_settings.HOST_DEFINITION_FIELD: {
+                test_settings.HOST_DEFINITION_NODE_NAME_FIELD: test_settings.FAKE_NODE_NAME,
                 test_settings.SECRET_NAME_FIELD: test_settings.FAKE_SECRET,
                 test_settings.SECRET_NAMESPACE_FIELD: test_settings.FAKE_SECRET_NAMESPACE,
-                test_settings.HOST_DEFINITION_NODE_NAME_FIELD: test_settings.FAKE_NODE_NAME,
+                test_settings.NODE_NAME_ON_STORAGE_FIELD: test_settings.FAKE_NODE_NAME,
                 common_settings.HOST_DEFINITION_NODE_ID_FIELD: test_settings.FAKE_NODE_ID,
-                test_settings.CONNECTIVITY_TYPE_FIELD: test_settings.FAKE_CONNECTIVITY_TYPE
+                test_settings.CONNECTIVITY_TYPE_FIELD: test_settings.FAKE_CONNECTIVITY_TYPE,
+                test_settings.PORTS_FIELD: test_settings.FAKE_FC_PORTS,
+                test_settings.IO_GROUP_FIELD: test_settings.IO_GROUP_IDS,
+                test_settings.MANAGEMENT_ADDRESS_FIELD: test_settings.FAKE_SECRET_ARRAY
             }
         }}
     return _generate_manifest(test_settings.FAKE_NODE_NAME, status_phase_manifest, k8s_host_definition_body)
@@ -86,7 +92,7 @@ def get_fake_k8s_storage_class_manifest(provisioner):
 
 
 def _generate_manifest(object_name, *extra_dicts):
-    metadata_manifest = _get_metadata_manifest()
+    metadata_manifest = get_metadata_manifest()
     metadata_manifest[test_settings.METADATA_FIELD][common_settings.NAME_FIELD] = object_name
     if len(extra_dicts) > 0:
         merged_dicts = _merge_dicts(metadata_manifest, extra_dicts[0])
@@ -97,7 +103,7 @@ def _generate_manifest(object_name, *extra_dicts):
     return merged_dicts
 
 
-def _get_metadata_manifest():
+def get_metadata_manifest():
     return {
         test_settings.METADATA_FIELD: {
             common_settings.RESOURCE_VERSION_FIELD: test_settings.FAKE_RESOURCE_VERSION,
@@ -145,5 +151,13 @@ def get_finalizers_manifest(finalizers):
         test_settings.METADATA_FIELD: {
             common_settings.NAME_FIELD: test_settings.FAKE_NODE_NAME,
             test_settings.FINALIZERS_FIELD: finalizers,
+        }
+    }
+
+
+def get_general_labels_manifest(labels):
+    return {
+        test_settings.METADATA_FIELD: {
+            test_settings.NODE_LABELS_FIELD: labels
         }
     }

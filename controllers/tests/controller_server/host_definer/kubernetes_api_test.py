@@ -4,9 +4,9 @@ from kubernetes.client.rest import ApiException
 from kubernetes.watch import Watch
 
 from controllers.servers.host_definer.k8s.api import K8SApi
-from controllers.servers.host_definer import utils
+from controllers.servers.host_definer.utils import utils
 import controllers.tests.controller_server.host_definer.utils.test_utils as test_utils
-import controllers.tests.controller_server.host_definer.utils.k8s_manifests_utils as manifest_utils
+import controllers.tests.controller_server.host_definer.utils.k8s_manifests_utils as test_manifest_utils
 import controllers.tests.controller_server.host_definer.settings as test_settings
 import controllers.common.settings as common_settings
 
@@ -54,14 +54,14 @@ class TestKubernetesApi(unittest.TestCase):
 
     def test_create_host_definition_success(self):
         self.k8s_api.host_definitions_api.create.return_value = test_utils.get_fake_empty_k8s_list()
-        result = self.k8s_api.create_host_definition(manifest_utils.get_fake_k8s_host_definition_manifest())
+        result = self.k8s_api.create_host_definition(test_manifest_utils.get_fake_k8s_host_definition_manifest())
         self.assertEqual(result, test_utils.get_fake_empty_k8s_list())
         self.k8s_api.host_definitions_api.create.assert_called_once_with(
-            body=manifest_utils.get_fake_k8s_host_definition_manifest())
+            body=test_manifest_utils.get_fake_k8s_host_definition_manifest())
 
     def test_create_host_definition_failure(self):
         self.k8s_api.host_definitions_api.create.side_effect = self.general_api_exception
-        result = self.k8s_api.create_host_definition(manifest_utils.get_fake_k8s_host_definition_manifest())
+        result = self.k8s_api.create_host_definition(test_manifest_utils.get_fake_k8s_host_definition_manifest())
         self.assertEqual(result, None)
 
     def test_patch_cluster_custom_object_status_success(self):
@@ -93,23 +93,23 @@ class TestKubernetesApi(unittest.TestCase):
 
     def test_patch_host_definition_success(self):
         self.k8s_api.host_definitions_api.patch.return_value = None
-        result = self.k8s_api.patch_host_definition(manifest_utils.get_fake_k8s_host_definition_manifest())
+        result = self.k8s_api.patch_host_definition(test_manifest_utils.get_fake_k8s_host_definition_manifest())
         self.assertEqual(result, 200)
         self.k8s_api.host_definitions_api.patch.assert_called_once_with(
-            name=test_settings.FAKE_NODE_NAME, body=manifest_utils.get_fake_k8s_host_definition_manifest(),
+            name=test_settings.FAKE_NODE_NAME, body=test_manifest_utils.get_fake_k8s_host_definition_manifest(),
             content_type='application/merge-patch+json')
 
     def test_patch_host_definition_failure(self):
         self.k8s_api.host_definitions_api.patch.side_effect = self.not_found_api_exception
-        result = self.k8s_api.patch_host_definition(manifest_utils.get_fake_k8s_host_definition_manifest())
+        result = self.k8s_api.patch_host_definition(test_manifest_utils.get_fake_k8s_host_definition_manifest())
         self.assertEqual(result, 404)
 
     def test_patch_node_success(self):
         self.k8s_api.core_api.patch_node.return_value = None
-        self.k8s_api.patch_node(test_settings.FAKE_NODE_NAME, manifest_utils.get_fake_k8s_node_manifest(
+        self.k8s_api.patch_node(test_settings.FAKE_NODE_NAME, test_manifest_utils.get_fake_k8s_node_manifest(
             test_settings.MANAGE_NODE_LABEL))
         self.k8s_api.core_api.patch_node.assert_called_once_with(
-            test_settings.FAKE_NODE_NAME, manifest_utils.get_fake_k8s_node_manifest(
+            test_settings.FAKE_NODE_NAME, test_manifest_utils.get_fake_k8s_node_manifest(
                 test_settings.MANAGE_NODE_LABEL))
 
     def test_get_secret_data_success(self):

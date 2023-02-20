@@ -1,18 +1,17 @@
 import os
 import random
 import string
-from munch import Munch
-import json
 
 from controllers.common.csi_logger import get_stdout_logger
 from controllers.servers.settings import SECRET_SUPPORTED_TOPOLOGIES_PARAMETER
-from controllers.servers.utils import (
-    validate_secrets, get_array_connection_info_from_secrets, get_system_info_for_topologies)
+from controllers.servers.utils import get_system_info_for_topologies
 from controllers.servers.errors import ValidationException
 import controllers.servers.host_definer.messages as messages
 from controllers.servers.host_definer.k8s.api import K8SApi
 from controllers.servers.host_definer.k8s.manager import K8SManager
 from controllers.servers.host_definer import settings
+from controllers.servers.host_definer.utils import utils
+from controllers.servers.host_definer.utils import manifest_utils
 import controllers.common.settings as common_settings
 from controllers.servers.host_definer.types import (
     DefineHostRequest, DefineHostResponse, HostDefinitionInfo, SecretInfo, ManagedNode)
@@ -86,7 +85,8 @@ class Watcher():
         return self._ensure_definition_state(host_definition_info, self.storage_host_servicer.define_host)
 
     def _create_host_definition_if_not_exist(self, host_definition_info, response):
-        host_definition_manifest = self._get_host_definition_manifest(host_definition_info, response)
+        node_id = NODES[host_definition_info.node_name].node_id
+        host_definition_manifest = manifest_utils.get_host_definition_manifest(host_definition_info, response, node_id)
         current_host_definition_info_on_cluster = self.k8s_manager.get_matching_host_definition_info(
             host_definition_info.node_name, host_definition_info.secret_name, host_definition_info.secret_namespace)
         if current_host_definition_info_on_cluster:
@@ -97,28 +97,6 @@ class Watcher():
         else:
             logger.info(messages.CREATING_NEW_HOST_DEFINITION.format(host_definition_info.name))
             return self.k8s_manager.create_host_definition(host_definition_manifest)
-
-    def _get_host_definition_manifest(self, host_definition_info, response):
-        return {
-            settings.API_VERSION: settings.CSI_IBM_API_VERSION,
-            settings.KIND: settings.HOST_DEFINITION_KIND,
-            settings.METADATA: {
-                common_settings.NAME_FIELD: host_definition_info.name,
-            },
-            settings.SPEC: {
-                settings.HOST_DEFINITION_FIELD: {
-                    settings.NODE_NAME_FIELD: host_definition_info.node_name,
-                    common_settings.HOST_DEFINITION_NODE_ID_FIELD: NODES[host_definition_info.node_name].node_id,
-                    settings.SECRET_NAME_FIELD: host_definition_info.secret_name,
-                    settings.SECRET_NAMESPACE_FIELD: host_definition_info.secret_namespace,
-                    settings.CONNECTIVITY_TYPE_FIELD: response.connectivity_type,
-                    settings.PORTS_FIELD: response.ports,
-                    settings.NODE_NAME_ON_STORAGE_FIELD: response.node_name_on_storage,
-                    settings.IO_GROUP_FIELD: response.io_group,
-                    settings.MANAGEMENT_ADDRESS_FIELD: response.management_address
-                },
-            },
-        }
 
     def _set_status_to_host_definition_after_definition(self, message_from_storage, host_definition_info):
         if message_from_storage and host_definition_info:
@@ -139,7 +117,7 @@ class Watcher():
     def _is_node_should_be_managed_on_secret(self, node_name, secret_name, secret_namespace):
         logger.info(messages.CHECK_NODE_SHOULD_BE_MANAGED_BY_SECRET.format(node_name, secret_name, secret_namespace))
         secret_data = self.k8s_manager.get_secret_data(secret_name, secret_namespace)
-        self._validate_secret(secret_data)
+        utils.validate_secret(secret_data)
         managed_secret_info, _ = self._get_managed_secret_by_name_and_namespace(secret_name, secret_namespace)
         if self._is_node_should_managed_on_secret_info(node_name, managed_secret_info):
             logger.info(messages.NODE_SHOULD_BE_MANAGED_ON_SECRET.format(node_name, secret_name, secret_namespace))
@@ -163,17 +141,10 @@ class Watcher():
         return False
 
     def _is_topology_secret(self, secret_data):
-        self._validate_secret(secret_data)
-        if self._get_secret_secret_config(secret_data):
+        utils.validate_secret(secret_data)
+        if utils.get_secret_config(secret_data):
             return True
         return False
-
-    def _validate_secret(self, secret_data):
-        secret_data = self._convert_secret_config_to_string(secret_data)
-        try:
-            validate_secrets(secret_data)
-        except ValidationException as ex:
-            logger.error(str(ex))
 
     def _undefine_host(self, host_definition_info):
         logger.info(messages.UNDEFINED_HOST.format(host_definition_info.node_name,
@@ -255,18 +226,10 @@ class Watcher():
 
     def _get_new_request(self, labels):
         request = DefineHostRequest()
-        request.prefix = self._get_prefix()
-        request.connectivity_type_from_user = self._get_connectivity_type_from_user(labels)
-        return request
-
-    def _get_prefix(self):
-        return os.getenv(settings.PREFIX_ENV_VAR)
-
-    def _get_connectivity_type_from_user(self, labels):
         connectivity_type_label_on_node = self._get_label_value(labels, settings.CONNECTIVITY_TYPE_LABEL)
-        if connectivity_type_label_on_node in settings.SUPPORTED_CONNECTIVITY_TYPES:
-            return connectivity_type_label_on_node
-        return os.getenv(settings.CONNECTIVITY_ENV_VAR)
+        request.prefix = utils.get_prefix()
+        request.connectivity_type_from_user = utils.get_connectivity_type_from_user(connectivity_type_label_on_node)
+        return request
 
     def _get_label_value(self, labels, label):
         return labels.get(label)
@@ -282,35 +245,8 @@ class Watcher():
         secret_data = self.k8s_manager.get_secret_data(secret_name, secret_namespace)
         if secret_data:
             node_topology_labels = self._get_topology_labels(labels)
-            return self._get_array_connection_info_from_secret_data(secret_data, node_topology_labels)
+            return utils.get_array_connection_info_from_secret_data(secret_data, node_topology_labels)
         return {}
-
-    def _get_array_connection_info_from_secret_data(self, secret_data, labels):
-        try:
-            secret_data = self._convert_secret_config_to_string(secret_data)
-            array_connection_info = get_array_connection_info_from_secrets(secret_data, labels)
-            return self._decode_array_connectivity_info(array_connection_info)
-        except ValidationException as ex:
-            logger.error(str(ex))
-        return None
-
-    def _convert_secret_config_to_string(self, secret_data):
-        if settings.SECRET_CONFIG_FIELD in secret_data.keys():
-            if type(secret_data[settings.SECRET_CONFIG_FIELD]) is dict:
-                secret_data[settings.SECRET_CONFIG_FIELD] = json.dumps(secret_data[settings.SECRET_CONFIG_FIELD])
-        return secret_data
-
-    def _decode_array_connectivity_info(self, array_connection_info):
-        array_connection_info.array_addresses = self._decode_list_base64_to_list_string(
-            array_connection_info.array_addresses)
-        array_connection_info.user = self.k8s_manager.decode_base64_to_string(array_connection_info.user)
-        array_connection_info.password = self.k8s_manager.decode_base64_to_string(array_connection_info.password)
-        return array_connection_info
-
-    def _decode_list_base64_to_list_string(self, list_with_base64):
-        for index, base64_content in enumerate(list_with_base64):
-            list_with_base64[index] = self.k8s_manager.decode_base64_to_string(base64_content)
-        return list_with_base64
 
     def _get_node_id_by_node(self, host_definition_info):
         try:
@@ -372,12 +308,6 @@ class Watcher():
                 node_host_definitions_info.append(host_definition_info)
         return node_host_definitions_info
 
-    def _munch(self, watch_event):
-        return Munch.fromDict(watch_event)
-
-    def _loop_forever(self):
-        return True
-
     def _generate_secret_info(self, secret_name, secret_namespace, nodes_with_system_id={}, system_ids_topologies={}):
         return SecretInfo(secret_name, secret_namespace, nodes_with_system_id, system_ids_topologies)
 
@@ -395,7 +325,7 @@ class Watcher():
 
     def _generate_nodes_with_system_id(self, secret_data):
         nodes_with_system_id = {}
-        secret_config = self._get_secret_secret_config(secret_data)
+        secret_config = utils.get_secret_config(secret_data)
         nodes_info = self.k8s_manager.get_nodes_info()
         for node_info in nodes_info:
             nodes_with_system_id[node_info.name] = self._get_system_id_for_node(node_info, secret_config)
@@ -412,29 +342,13 @@ class Watcher():
     def _get_topology_labels(self, labels):
         topology_labels = {}
         for label in labels:
-            if self._is_topology_label(label):
+            if utils.is_topology_label(label):
                 topology_labels[label] = labels[label]
         return topology_labels
 
-    def _is_topology_label(self, label):
-        for prefix in settings.TOPOLOGY_PREFIXES:
-            if label.startswith(prefix):
-                return True
-        return False
-
     def _generate_secret_system_ids_topologies(self, secret_data):
         system_ids_topologies = {}
-        secret_config = self._get_secret_secret_config(secret_data)
+        secret_config = utils.get_secret_config(secret_data)
         for system_id, system_info in secret_config.items():
             system_ids_topologies[system_id] = (system_info.get(SECRET_SUPPORTED_TOPOLOGIES_PARAMETER))
         return system_ids_topologies
-
-    def _get_secret_secret_config(self, secret_data):
-        secret_data = self._convert_secret_config_to_dict(secret_data)
-        return secret_data.get(settings.SECRET_CONFIG_FIELD, {})
-
-    def _convert_secret_config_to_dict(self, secret_data):
-        if settings.SECRET_CONFIG_FIELD in secret_data.keys():
-            if type(secret_data[settings.SECRET_CONFIG_FIELD]) is str:
-                secret_data[settings.SECRET_CONFIG_FIELD] = json.loads(secret_data[settings.SECRET_CONFIG_FIELD])
-        return secret_data

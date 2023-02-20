@@ -5,6 +5,7 @@ from controllers.common.csi_logger import get_stdout_logger
 from controllers.servers.host_definer.watcher.watcher_helper import Watcher, NODES, MANAGED_SECRETS
 import controllers.servers.host_definer.messages as messages
 from controllers.servers.host_definer import settings
+from controllers.servers.host_definer.utils import utils
 
 logger = get_stdout_logger()
 
@@ -18,10 +19,10 @@ class CsiNodeWatcher(Watcher):
                 self._add_node_to_nodes(csi_node_info)
 
     def watch_csi_nodes_resources(self):
-        while self._loop_forever():
+        while utils.loop_forever():
             stream = self.k8s_api.get_csi_node_stream()
             for watch_event in stream:
-                watch_event = self._munch(watch_event)
+                watch_event = utils.munch(watch_event)
                 csi_node_info = self.k8s_manager.generate_csi_node_info(watch_event.object)
                 if (watch_event.type == settings.DELETED_EVENT) and (csi_node_info.name in NODES):
                     self._handle_deleted_csi_node_pod(csi_node_info)

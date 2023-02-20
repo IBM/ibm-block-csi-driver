@@ -5,7 +5,7 @@ from munch import Munch
 
 from controllers.common.csi_logger import get_stdout_logger
 from controllers.servers.host_definer import settings
-from controllers.servers.host_definer import utils
+from controllers.servers.host_definer.utils import utils
 import controllers.common.settings as common_settings
 import controllers.servers.host_definer.messages as messages
 

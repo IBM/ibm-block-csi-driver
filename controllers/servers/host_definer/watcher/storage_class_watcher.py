@@ -4,6 +4,7 @@ import controllers.servers.host_definer.messages as messages
 from controllers.common.csi_logger import get_stdout_logger
 from controllers.servers.host_definer.watcher.watcher_helper import Watcher, MANAGED_SECRETS
 from controllers.servers.host_definer import settings
+from controllers.servers.host_definer.utils import utils
 import controllers.common.settings as common_settings
 
 logger = get_stdout_logger()
@@ -18,10 +19,10 @@ class StorageClassWatcher(Watcher):
             self._handle_added_watch_event(secrets_info, storage_class_info.name)
 
     def watch_storage_class_resources(self):
-        while self._loop_forever():
+        while utils.loop_forever():
             stream = self.k8s_api.get_storage_class_stream()
             for watch_event in stream:
-                watch_event = self._munch(watch_event)
+                watch_event = utils.munch(watch_event)
                 storage_class_info = self.k8s_manager.generate_storage_class_info(watch_event.object)
                 secrets_info = self._get_secrets_info_from_storage_class_with_driver_provisioner(storage_class_info)
                 if watch_event.type == settings.ADDED_EVENT:

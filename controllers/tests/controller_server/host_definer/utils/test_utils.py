@@ -4,7 +4,7 @@ from munch import Munch
 from kubernetes import client
 from mock import patch, Mock
 
-import controllers.tests.controller_server.host_definer.utils.k8s_manifests_utils as manifest_utils
+import controllers.tests.controller_server.host_definer.utils.k8s_manifests_utils as test_manifest_utils
 import controllers.tests.controller_server.host_definer.settings as test_settings
 from controllers.tests.common.test_settings import HOST_NAME, SECRET_MANAGEMENT_ADDRESS_VALUE
 from controllers.servers.host_definer.k8s.manager import K8SManager
@@ -30,24 +30,24 @@ class HttpResp():
 def get_fake_k8s_csi_nodes(csi_provisioner_name, number_of_csi_nodes):
     k8s_csi_nodes = []
     for csi_node_index in range(number_of_csi_nodes):
-        k8s_csi_node_manifest = manifest_utils.get_k8s_csi_node_manifest(
+        k8s_csi_node_manifest = test_manifest_utils.get_k8s_csi_node_manifest(
             csi_provisioner_name, '-{}'.format(csi_node_index))
         k8s_csi_nodes.append(Munch.fromDict(k8s_csi_node_manifest))
     return K8sResourceItems(k8s_csi_nodes)
 
 
 def get_fake_k8s_csi_node(csi_provisioner_name=""):
-    csi_node_manifest = manifest_utils.get_k8s_csi_node_manifest(csi_provisioner_name)
+    csi_node_manifest = test_manifest_utils.get_k8s_csi_node_manifest(csi_provisioner_name)
     return Munch.fromDict(csi_node_manifest)
 
 
 def get_fake_csi_node_watch_event(event_type):
-    return manifest_utils.generate_watch_event(event_type, manifest_utils.get_k8s_csi_node_manifest(
+    return test_manifest_utils.generate_watch_event(event_type, test_manifest_utils.get_k8s_csi_node_manifest(
         test_settings.CSI_PROVISIONER_NAME))
 
 
 def get_fake_k8s_node(label):
-    return Munch.fromDict(manifest_utils.get_fake_k8s_node_manifest(label))
+    return Munch.fromDict(test_manifest_utils.get_fake_k8s_node_manifest(label))
 
 
 def get_fake_k8s_daemon_set_items(updated_pods, desired_updated_pods):
@@ -55,7 +55,7 @@ def get_fake_k8s_daemon_set_items(updated_pods, desired_updated_pods):
 
 
 def get_fake_k8s_daemon_set(updated_pods, desired_updated_pods):
-    k8s_daemon_set_manifest = manifest_utils.get_fake_k8s_daemon_set_manifest(updated_pods, desired_updated_pods)
+    k8s_daemon_set_manifest = test_manifest_utils.get_fake_k8s_daemon_set_manifest(updated_pods, desired_updated_pods)
     return Munch.fromDict(k8s_daemon_set_manifest)
 
 
@@ -66,7 +66,7 @@ def get_empty_k8s_pods():
 def get_fake_k8s_pods_items(number_of_pods=1):
     k8s_pods = []
     for pod_index in range(number_of_pods):
-        k8s_pod_manifest = manifest_utils.get_fake_k8s_pod_manifest('-{}'.format(pod_index))
+        k8s_pod_manifest = test_manifest_utils.get_fake_k8s_pod_manifest('-{}'.format(pod_index))
         k8s_pods.append(Munch.fromDict(k8s_pod_manifest))
     return K8sResourceItems(k8s_pods)
 
@@ -80,46 +80,46 @@ def get_fake_k8s_host_definitions_items(host_definition_phase='ready'):
 
 
 def _get_fake_k8s_host_definitions(host_definition_phase):
-    return Munch.fromDict(manifest_utils.get_fake_k8s_host_definition_manifest(host_definition_phase))
+    return Munch.fromDict(test_manifest_utils.get_fake_k8s_host_definition_manifest(host_definition_phase))
 
 
 def get_fake_host_definition_watch_event(event_type, host_definition_phase):
-    return manifest_utils.generate_watch_event(
-        event_type, manifest_utils.get_fake_k8s_host_definition_manifest(host_definition_phase))
+    return test_manifest_utils.generate_watch_event(
+        event_type, test_manifest_utils.get_fake_k8s_host_definition_manifest(host_definition_phase))
 
 
 def get_fake_node_watch_event(event_type):
-    return manifest_utils.generate_watch_event(event_type, manifest_utils.get_fake_k8s_node_manifest(
+    return test_manifest_utils.generate_watch_event(event_type, test_manifest_utils.get_fake_k8s_node_manifest(
         test_settings.MANAGE_NODE_LABEL))
 
 
 def get_fake_k8s_nodes_items():
-    k8s_node_manifest = manifest_utils.get_fake_k8s_node_manifest(test_settings.MANAGE_NODE_LABEL)
+    k8s_node_manifest = test_manifest_utils.get_fake_k8s_node_manifest(test_settings.MANAGE_NODE_LABEL)
     return K8sResourceItems([Munch.fromDict(k8s_node_manifest)])
 
 
 def get_fake_secret_watch_event(event_type):
-    return manifest_utils.generate_watch_event(event_type,
-                                               manifest_utils.get_fake_k8s_secret_manifest())
+    return test_manifest_utils.generate_watch_event(event_type,
+                                                    test_manifest_utils.get_fake_k8s_secret_manifest())
 
 
 def get_fake_k8s_secret():
-    return Munch.fromDict(manifest_utils.get_fake_k8s_secret_manifest())
+    return Munch.fromDict(test_manifest_utils.get_fake_k8s_secret_manifest())
 
 
 def get_fake_k8s_storage_class_items(provisioner):
-    k8s_storage_classes_manifest = manifest_utils.get_fake_k8s_storage_class_manifest(provisioner)
+    k8s_storage_classes_manifest = test_manifest_utils.get_fake_k8s_storage_class_manifest(provisioner)
     return K8sResourceItems([Munch.fromDict(k8s_storage_classes_manifest)])
 
 
 def get_fake_k8s_storage_class(provisioner):
-    k8s_storage_classes_manifest = manifest_utils.get_fake_k8s_storage_class_manifest(provisioner)
+    k8s_storage_classes_manifest = test_manifest_utils.get_fake_k8s_storage_class_manifest(provisioner)
     return Munch.fromDict(k8s_storage_classes_manifest)
 
 
 def get_fake_secret_storage_event(event_type, provisioner):
-    return manifest_utils.generate_watch_event(event_type,
-                                               manifest_utils.get_fake_k8s_storage_class_manifest(provisioner))
+    return test_manifest_utils.generate_watch_event(
+        event_type, test_manifest_utils.get_fake_k8s_storage_class_manifest(provisioner))
 
 
 def patch_pending_variables():
@@ -184,11 +184,11 @@ def patch_managed_secrets_global_variable(module_path):
 
 
 def get_pending_creation_status_manifest():
-    return manifest_utils.get_status_phase_manifest(test_settings.PENDING_CREATION_PHASE)
+    return test_manifest_utils.get_status_phase_manifest(test_settings.PENDING_CREATION_PHASE)
 
 
 def get_ready_status_manifest():
-    return manifest_utils.get_status_phase_manifest(test_settings.READY_PHASE)
+    return test_manifest_utils.get_status_phase_manifest(test_settings.READY_PHASE)
 
 
 def get_array_connection_info():
@@ -225,11 +225,11 @@ def get_fake_host_io_group_id():
 
 
 def get_fake_host_io_group():
-    return Munch.fromDict(manifest_utils.get_host_io_group_manifest())
+    return Munch.fromDict(test_manifest_utils.get_host_io_group_manifest())
 
 
 def get_fake_empty_k8s_list():
-    much_object = Munch.fromDict(manifest_utils.get_empty_k8s_list_manifest())
+    much_object = Munch.fromDict(test_manifest_utils.get_empty_k8s_list_manifest())
     much_object.items = []
     return much_object
 
@@ -288,3 +288,35 @@ def get_object_reference():
 
 def get_event_object_metadata():
     return client.V1ObjectMeta(generate_name='{}.'.format(test_settings.FAKE_NODE_NAME), )
+
+
+def get_fake_define_host_response():
+    response = Mock(spec_set=['error_message', 'connectivity_type', 'ports',
+                    'node_name_on_storage', 'io_group', 'management_address'])
+    response.error_message = test_settings.MESSAGE
+    response.connectivity_type = test_settings.FAKE_CONNECTIVITY_TYPE
+    response.ports = test_settings.FAKE_FC_PORTS
+    response.node_name_on_storage = test_settings.FAKE_NODE_NAME
+    response.io_group = test_settings.IO_GROUP_IDS
+    response.management_address = test_settings.FAKE_SECRET_ARRAY
+    return response
+
+
+def get_fake_io_group_labels(number_of_io_groups):
+    labels = {}
+    for index in range(number_of_io_groups):
+        labels[test_settings.IO_GROUP_LABEL_PREFIX + str(index)] = test_settings.TRUE_STRING
+    return labels
+
+
+def get_fake_k8s_metadata():
+    return Munch.fromDict(test_manifest_utils.get_metadata_manifest())
+
+
+def get_fake_array_connectivity_info():
+    array_connectivity_info = Mock(spec_set=['array_addresses', 'user', 'password', 'system_id'])
+    array_connectivity_info.array_addresses = [test_settings.FAKE_SECRET_ARRAY]
+    array_connectivity_info.user = test_settings.FAKE_SECRET_USER_NAME
+    array_connectivity_info.password = test_settings.FAKE_SECRET_PASSWORD
+    array_connectivity_info.system_id = '2'
+    return array_connectivity_info

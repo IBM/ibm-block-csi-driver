@@ -1,13 +1,12 @@
-import ast
 import datetime
-import base64
 
 from kubernetes import client
 
 from controllers.common.csi_logger import get_stdout_logger
 import controllers.servers.host_definer.messages as messages
 from controllers.servers.host_definer import settings
-from controllers.servers.host_definer import utils
+from controllers.servers.host_definer.utils import utils
+from controllers.servers.host_definer.utils import manifest_utils
 from controllers.servers.host_definer.k8s.api import K8SApi
 import controllers.common.settings as common_settings
 from controllers.servers.host_definer.types import (
@@ -131,17 +130,10 @@ class K8SManager():
 
     def set_host_definition_status(self, host_definition_name, host_definition_phase):
         logger.info(messages.SET_HOST_DEFINITION_STATUS.format(host_definition_name, host_definition_phase))
-        status = self._get_status_manifest(host_definition_phase)
+        status = manifest_utils.get_host_definition_status_manifest(host_definition_phase)
         self.k8s_api.patch_cluster_custom_object_status(
             common_settings.CSI_IBM_GROUP, common_settings.VERSION, common_settings.HOST_DEFINITION_PLURAL,
             host_definition_name, status)
-
-    def _get_status_manifest(self, host_definition_phase):
-        return {
-            settings.STATUS: {
-                settings.PHASE: host_definition_phase,
-            }
-        }
 
     def generate_k8s_event(self, host_definition_info, message, action, message_type):
         return client.CoreV1Event(
@@ -173,55 +165,19 @@ class K8SManager():
         return self._update_finalizer(host_definition_name, [])
 
     def _update_finalizer(self, host_definition_name, finalizers):
-        finalizer_manifest = {
-            settings.METADATA: {
-                common_settings.NAME_FIELD: host_definition_name,
-                settings.FINALIZERS: finalizers,
-            }
-        }
+        finalizer_manifest = manifest_utils.get_finalizer_manifest(host_definition_name, finalizers)
         return self.k8s_api.patch_host_definition(finalizer_manifest)
 
     def update_manage_node_label(self, node_name, label_value):
-        body = self._get_body_for_labels(label_value)
+        body = manifest_utils.get_body_manifest_for_labels(label_value)
         self.k8s_api.patch_node(node_name, body)
-
-    def _get_body_for_labels(self, label_value):
-        body = {
-            settings.METADATA: {
-                settings.LABELS: {
-                    settings.MANAGE_NODE_LABEL: label_value}
-            }
-        }
-
-        return body
 
     def get_secret_data(self, secret_name, secret_namespace):
         logger.info(messages.READ_SECRET.format(secret_name, secret_namespace))
         secret_data = self.k8s_api.get_secret_data(secret_name, secret_namespace)
         if secret_data:
-            return self.change_decode_base64_secret_config(secret_data)
+            return utils.change_decode_base64_secret_config(secret_data)
         return {}
-
-    def change_decode_base64_secret_config(self, secret_data):
-        if settings.SECRET_CONFIG_FIELD in secret_data.keys():
-            secret_data[settings.SECRET_CONFIG_FIELD] = self._decode_base64_to_dict(
-                secret_data[settings.SECRET_CONFIG_FIELD])
-        return secret_data
-
-    def _decode_base64_to_dict(self, content_with_base64):
-        decoded_string_content = self.decode_base64_to_string(content_with_base64)
-        encoded_dict = str(decoded_string_content).encode('utf-8')
-        base64_dict = base64.b64encode(encoded_dict)
-        my_dict_again = ast.literal_eval(base64.b64decode(base64_dict))
-        return my_dict_again
-
-    def decode_base64_to_string(self, content_with_base64):
-        try:
-            base64_bytes = content_with_base64.encode('ascii')
-            decoded_string_in_bytes = base64.b64decode(base64_bytes)
-            return decoded_string_in_bytes.decode('ascii')
-        except Exception:
-            return content_with_base64
 
     def get_node_info(self, node_name):
         k8s_node = self.k8s_api.read_node(node_name)

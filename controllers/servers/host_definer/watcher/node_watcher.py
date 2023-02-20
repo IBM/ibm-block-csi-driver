@@ -4,7 +4,7 @@ from controllers.common.csi_logger import get_stdout_logger
 from controllers.servers.utils import is_topology_match
 from controllers.servers.host_definer.watcher.watcher_helper import NODES, Watcher, MANAGED_SECRETS
 from controllers.servers.host_definer import settings
-from controllers.servers.host_definer import utils
+from controllers.servers.host_definer.utils import utils
 from controllers.servers.host_definer import messages
 
 logger = get_stdout_logger()
@@ -31,10 +31,10 @@ class NodeWatcher(Watcher):
             self._is_node_has_host_definitions(csi_node_info.name) and not csi_node_info.node_id
 
     def watch_nodes_resources(self):
-        while self._loop_forever():
+        while utils.loop_forever():
             stream = self.k8s_api.get_node_stream()
             for watch_event in stream:
-                watch_event = self._munch(watch_event)
+                watch_event = utils.munch(watch_event)
                 node_name = watch_event.object.metadata.name
                 csi_node_info = self.k8s_manager.get_csi_node_info(node_name)
                 node_info = self.k8s_manager.generate_node_info(watch_event.object)

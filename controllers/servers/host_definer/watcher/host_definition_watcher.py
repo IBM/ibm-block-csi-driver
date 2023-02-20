@@ -1,7 +1,7 @@
 from threading import Thread
 from time import sleep
 
-from controllers.servers.host_definer import utils
+from controllers.servers.host_definer.utils import utils
 import controllers.servers.host_definer.messages as messages
 from controllers.common.csi_logger import get_stdout_logger
 from controllers.servers.host_definer.watcher.watcher_helper import Watcher
@@ -16,14 +16,14 @@ class HostDefinitionWatcher(Watcher):
 
     def watch_host_definitions_resources(self):
         self._watch_host_definition_with_timeout('')
-        while self._loop_forever():
+        while utils.loop_forever():
             resource_version = utils.get_k8s_object_resource_version(self.k8s_api.list_host_definition())
             self._watch_host_definition_with_timeout(resource_version)
 
     def _watch_host_definition_with_timeout(self, resource_version, timeout=5):
         stream = self.k8s_api.get_host_definition_stream(resource_version, timeout)
         for watch_event in stream:
-            watch_event = self._munch(watch_event)
+            watch_event = utils.munch(watch_event)
             host_definition_info = self.k8s_manager.generate_host_definition_info(watch_event.object)
             if self._is_host_definition_in_pending_phase(host_definition_info.phase) and \
                     watch_event.type != settings.DELETED_EVENT:
