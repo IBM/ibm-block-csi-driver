@@ -202,3 +202,35 @@ class TestUtils(unittest.TestCase):
         result = utils.get_random_string()
         self.assertEqual(type(result), str)
         self.assertEqual(len(result), 20)
+
+    def test_return_true_when_watch_object_is_deleted(self):
+        result = utils.is_watch_object_type_is_delete(test_settings.DELETED_EVENT_TYPE)
+        self.assertTrue(result)
+
+    def test_return_false_when_watch_object_is_not_deleted(self):
+        result = utils.is_watch_object_type_is_delete(test_settings.ADDED_EVENT)
+        self.assertFalse(result)
+
+    def test_return_true_when_host_definer_can_delete_hosts_success(self):
+        self.mock_os.getenv.return_value = test_settings.TRUE_STRING
+        result = utils.is_host_definer_can_delete_hosts()
+        self.assertTrue(result)
+        self.mock_os.getenv.assert_called_once_with(test_settings.ALLOW_DELETE_ENV_VAR)
+
+    def test_return_false_when_host_definer_cannot_delete_hosts_success(self):
+        self.mock_os.getenv.return_value = ''
+        result = utils.is_host_definer_can_delete_hosts()
+        self.assertFalse(result)
+        self.mock_os.getenv.assert_called_once_with(test_settings.ALLOW_DELETE_ENV_VAR)
+
+    def test_return_true_when_dynamic_node_labeling_allowed_success(self):
+        self.mock_os.getenv.return_value = test_settings.TRUE_STRING
+        result = utils.is_dynamic_node_labeling_allowed()
+        self.assertTrue(result)
+        self.mock_os.getenv.assert_called_once_with(test_settings.DYNAMIC_NODE_LABELING_ENV_VAR)
+
+    def test_return_false_when_dynamic_node_labeling_is_not_allowed_success(self):
+        self.mock_os.getenv.return_value = ''
+        result = utils.is_dynamic_node_labeling_allowed()
+        self.assertFalse(result)
+        self.mock_os.getenv.assert_called_once_with(test_settings.DYNAMIC_NODE_LABELING_ENV_VAR)

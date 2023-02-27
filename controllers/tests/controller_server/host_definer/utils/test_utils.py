@@ -279,6 +279,14 @@ def get_fake_host_definition_info():
     return host_definition_info
 
 
+def get_fake_empty_host_definition_info():
+    host_definition_info = Mock(spec_set=['name', 'node_name', 'node_id'])
+    host_definition_info.name = ''
+    host_definition_info.node_name = ''
+    host_definition_info.node_id = ''
+    return host_definition_info
+
+
 def get_object_reference():
     return client.V1ObjectReference(
         api_version=test_settings.CSI_IBM_API_VERSION, kind=test_settings.HOST_DEFINITION_KIND,

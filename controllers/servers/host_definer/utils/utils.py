@@ -134,3 +134,15 @@ def decode_base64_to_string(content_with_base64):
 
 def get_random_string():
     return ''.join(random.choices(string.ascii_lowercase + string.digits, k=20))
+
+
+def is_watch_object_type_is_delete(watch_object_type):
+    return watch_object_type == settings.DELETED_EVENT
+
+
+def is_host_definer_can_delete_hosts():
+    return os.getenv(settings.ALLOW_DELETE_ENV_VAR) == settings.TRUE_STRING
+
+
+def is_dynamic_node_labeling_allowed():
+    return os.getenv(settings.DYNAMIC_NODE_LABELING_ENV_VAR) == settings.TRUE_STRING

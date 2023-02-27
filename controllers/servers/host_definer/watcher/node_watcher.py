@@ -70,7 +70,7 @@ class NodeWatcher(Watcher):
         self._remove_manage_node_label(node_name)
 
     def _is_node_has_new_manage_node_label(self, csi_node_info):
-        return not self._is_dynamic_node_labeling_allowed() and \
+        return not utils.is_dynamic_node_labeling_allowed() and \
             self._is_node_has_manage_node_label(csi_node_info.name) and \
             self._is_node_with_csi_ibm_csi_node_and_is_not_managed(csi_node_info)
 

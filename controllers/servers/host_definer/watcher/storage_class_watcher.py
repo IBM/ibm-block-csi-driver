@@ -29,7 +29,7 @@ class StorageClassWatcher(Watcher):
                 if watch_event.type == settings.ADDED_EVENT:
                     self._handle_added_watch_event(secrets_info, storage_class_info.name)
 
-                if watch_event.type == settings.DELETED_EVENT:
+                if utils.is_watch_object_type_is_delete(watch_event.type):
                     self._handle_deleted_watch_event(secrets_info)
 
     def _get_secrets_info_from_storage_class_with_driver_provisioner(self, storage_class_info):

@@ -50,7 +50,7 @@ class CsiNodeWatcher(Watcher):
         node_name = csi_node_info.name
         if self._is_host_part_of_update(node_name):
             self._create_definitions_when_csi_node_changed(csi_node_info)
-        elif self._is_host_definer_can_delete_hosts() and \
+        elif utils.is_host_definer_can_delete_hosts() and \
                 not self._is_node_has_forbid_deletion_label(node_name):
             self._undefine_hosts(csi_node_info.name)
         else:
@@ -106,7 +106,8 @@ class CsiNodeWatcher(Watcher):
 
     def _undefine_hosts(self, node_name):
         for secret_info in MANAGED_SECRETS:
-            host_definition_info = self._get_host_definition_info_from_secret_and_node_name(node_name, secret_info)
+            host_definition_info = self.host_definition_manager.get_host_definition_info_from_secret_and_node_name(
+                node_name, secret_info)
             self._delete_definition(host_definition_info)
         self._remove_manage_node_label(node_name)
         NODES.pop(node_name, None)
