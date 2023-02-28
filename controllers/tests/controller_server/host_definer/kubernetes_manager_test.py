@@ -153,24 +153,6 @@ class TestKubernetesManager(unittest.TestCase):
         self.mock_get_body_manifest_for_labels.assert_called_once_with(test_settings.MANAGE_NODE_LABEL)
         self.k8s_manager.k8s_api.patch_node.assert_called_once_with(test_settings.FAKE_NODE_NAME, excepted_body)
 
-    def test_get_secret_data_success(self):
-        return_value = 'return value'
-        self.k8s_manager.k8s_api.get_secret_data.return_value = return_value
-        self.mock_decode_base64_secret.return_value = return_value
-        result = self.k8s_manager.get_secret_data(test_settings.FAKE_SECRET, test_settings.FAKE_SECRET_NAMESPACE)
-        self.assertEqual(result, return_value)
-        self.k8s_manager.k8s_api.get_secret_data.assert_called_once_with(
-            test_settings.FAKE_SECRET, test_settings.FAKE_SECRET_NAMESPACE)
-        self.mock_decode_base64_secret.assert_called_once_with(return_value)
-
-    def test_fail_to_get_secret_data(self):
-        self.k8s_manager.k8s_api.get_secret_data.return_value = None
-        result = self.k8s_manager.get_secret_data(test_settings.FAKE_SECRET, test_settings.FAKE_SECRET_NAMESPACE)
-        self.assertEqual(result, {})
-        self.k8s_manager.k8s_api.get_secret_data.assert_called_once_with(
-            test_settings.FAKE_SECRET, test_settings.FAKE_SECRET_NAMESPACE)
-        self.mock_decode_base64_secret.assert_not_called()
-
     def test_get_node_info_seccess(self):
         self.k8s_manager.k8s_api.read_node.return_value = test_utils.get_fake_k8s_node(
             test_settings.MANAGE_NODE_LABEL)

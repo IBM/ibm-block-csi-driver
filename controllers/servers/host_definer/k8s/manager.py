@@ -93,13 +93,6 @@ class K8SManager():
         body = manifest_utils.get_body_manifest_for_labels(label_value)
         self.k8s_api.patch_node(node_name, body)
 
-    def get_secret_data(self, secret_name, secret_namespace):
-        logger.info(messages.READ_SECRET.format(secret_name, secret_namespace))
-        secret_data = self.k8s_api.get_secret_data(secret_name, secret_namespace)
-        if secret_data:
-            return utils.change_decode_base64_secret_config(secret_data)
-        return {}
-
     def get_node_info(self, node_name):
         k8s_node = self.k8s_api.read_node(node_name)
         if k8s_node:

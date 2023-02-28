@@ -18,24 +18,20 @@ class SecretWatcher(Watcher):
             stream = self.k8s_api.get_secret_stream()
             for watch_event in stream:
                 watch_event = utils.munch(watch_event)
-                secret_info = self._generate_k8s_secret_to_secret_info(watch_event.object)
-                if self._is_secret_managed(secret_info):
+                secret_info = self.secret_manager.generate_k8s_secret_to_secret_info(watch_event.object)
+                if self.secret_manager.is_secret_managed(secret_info):
                     secret_data = utils.change_decode_base64_secret_config(watch_event.object.data)
-                    if self._is_topology_secret(secret_data):
+                    if self.secret_manager.is_topology_secret(secret_data):
                         nodes_with_system_id = self._generate_nodes_with_system_id(secret_data)
                         system_ids_topologies = self._generate_secret_system_ids_topologies(secret_data)
-                        secret_info = self._generate_k8s_secret_to_secret_info(
+                        secret_info = self.secret_manager.generate_k8s_secret_to_secret_info(
                             watch_event.object, nodes_with_system_id, system_ids_topologies)
                     else:
-                        secret_info = self._generate_k8s_secret_to_secret_info(watch_event.object)
+                        secret_info = self.secret_manager.generate_k8s_secret_to_secret_info(watch_event.object)
                     self._handle_storage_class_secret(secret_info, watch_event.type)
 
-    def _generate_k8s_secret_to_secret_info(self, k8s_secret, nodes_with_system_id={}, system_ids_topologies={}):
-        return SecretInfo(
-            k8s_secret.metadata.name, k8s_secret.metadata.namespace, nodes_with_system_id, system_ids_topologies)
-
     def _handle_storage_class_secret(self, secret_info, watch_event_type):
-        managed_secret_info, index = self._get_matching_managed_secret_info(secret_info)
+        managed_secret_info, index = self.secret_manager.get_matching_managed_secret_info(secret_info)
         if watch_event_type in (settings.ADDED_EVENT, settings.MODIFIED_EVENT) and \
                 managed_secret_info.managed_storage_classes > 0:
             secret_info.managed_storage_classes = managed_secret_info.managed_storage_classes

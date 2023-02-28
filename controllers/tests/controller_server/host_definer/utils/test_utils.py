@@ -214,8 +214,8 @@ def get_fake_secret_info():
     secret_info = Mock(spec_set=['name', 'namespace', 'nodes_with_system_id', 'managed_storage_classes'])
     secret_info.name = test_settings.FAKE_SECRET
     secret_info.namespace = test_settings.FAKE_SECRET_NAMESPACE
-    secret_info.nodes_with_system_id = {}
-    secret_info.managed_storage_classes = 1
+    secret_info.nodes_with_system_id = {test_settings.FAKE_NODE_NAME: test_settings.FAKE_SYSTEM_ID}
+    secret_info.managed_storage_classes = test_settings.FAKE_SYSTEM_IDS_TOPOLOGIES
     return secret_info
 
 

@@ -71,7 +71,7 @@ class HostDefinitionWatcher(Watcher):
 
     def _define_host_after_pending(self, host_definition_info):
         response = DefineHostResponse()
-        if self._is_node_should_be_managed_on_secret(
+        if self.secret_manager.is_node_should_be_managed_on_secret(
                 host_definition_info.node_name, host_definition_info.secret_name,
                 host_definition_info.secret_namespace):
             response = self._define_host(host_definition_info)
@@ -88,7 +88,7 @@ class HostDefinitionWatcher(Watcher):
 
     def _undefine_host_after_pending(self, host_definition_info):
         response = DefineHostResponse()
-        if self._is_node_should_be_managed_on_secret(
+        if self.secret_manager.is_node_should_be_managed_on_secret(
                 host_definition_info.node_name, host_definition_info.secret_name,
                 host_definition_info.secret_namespace):
             response = self._undefine_host(host_definition_info)

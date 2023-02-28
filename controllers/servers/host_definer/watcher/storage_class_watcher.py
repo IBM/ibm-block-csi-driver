@@ -45,18 +45,18 @@ class StorageClassWatcher(Watcher):
         for parameter_name in storage_class_info.parameters:
             if self._is_secret(parameter_name):
                 secret_name, secret_namespace = self._get_secret_name_and_namespace(storage_class_info, parameter_name)
-                secret_data = self.k8s_manager.get_secret_data(secret_name, secret_namespace)
+                secret_data = self.secret_manager.get_secret_data(secret_name, secret_namespace)
                 logger.info(messages.SECRET_IS_BEING_USED_BY_STORAGE_CLASS.format(
                     secret_name, secret_namespace, storage_class_info.name))
-                if self._is_topology_secret(secret_data):
+                if self.secret_manager.is_topology_secret(secret_data):
                     logger.info(messages.SECRET_IS_FROM_TOPOLOGY_TYPE.format(secret_name, secret_namespace))
                     nodes_with_system_id = self._generate_nodes_with_system_id(secret_data)
                     system_ids_topologies = self._generate_secret_system_ids_topologies(secret_data)
-                    secret_info = self._generate_secret_info(
+                    secret_info = self.secret_manager.generate_secret_info(
                         secret_name, secret_namespace, nodes_with_system_id, system_ids_topologies)
                     secrets_info = self._add_secret_info_to_list(secret_info, secrets_info)
                 else:
-                    secret_info = self._generate_secret_info(secret_name, secret_namespace)
+                    secret_info = self.secret_manager.generate_secret_info(secret_name, secret_namespace)
                     secrets_info = self._add_secret_info_to_list(secret_info, secrets_info)
         return list(filter(None, secrets_info))
 
@@ -86,7 +86,7 @@ class StorageClassWatcher(Watcher):
                 self._define_nodes_when_new_secret(secret_info)
 
     def _define_nodes_when_new_secret(self, secret_info):
-        managed_secret_info, index = self._get_matching_managed_secret_info(secret_info)
+        managed_secret_info, index = self.secret_manager.get_matching_managed_secret_info(secret_info)
         secret_info.managed_storage_classes = 1
         if index == -1:
             MANAGED_SECRETS.append(secret_info)
@@ -105,5 +105,5 @@ class StorageClassWatcher(Watcher):
 
     def _handle_deleted_watch_event(self, secrets_info):
         for secret_info in secrets_info:
-            _, index = self._get_matching_managed_secret_info(secret_info)
+            _, index = self.secret_manager.get_matching_managed_secret_info(secret_info)
             MANAGED_SECRETS[index].managed_storage_classes -= 1

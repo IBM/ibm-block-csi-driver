@@ -1,7 +1,6 @@
 from kubernetes import watch
 
 from controllers.common.csi_logger import get_stdout_logger
-from controllers.servers.utils import is_topology_match
 from controllers.servers.host_definer.globals import MANAGED_SECRETS, NODES
 from controllers.servers.host_definer.watcher.watcher_helper import Watcher
 from controllers.servers.host_definer import settings
@@ -84,33 +83,25 @@ class NodeWatcher(Watcher):
         for index, managed_secret_info in enumerate(MANAGED_SECRETS):
             if not managed_secret_info.system_ids_topologies:
                 continue
-            if self._is_node_should_managed_on_secret_info(node_info.name, managed_secret_info):
+            if self.secret_manager.is_node_should_managed_on_secret_info(node_info.name, managed_secret_info):
                 self._remove_node_if_topology_not_match(node_info, index, managed_secret_info)
-            elif self._is_node_in_system_ids_topologies(managed_secret_info.system_ids_topologies, node_info.labels):
+            elif self.secret_manager.is_node_in_system_ids_topologies(managed_secret_info.system_ids_topologies,
+                                                                      node_info.labels):
                 self._define_host_with_new_topology(node_info, index, managed_secret_info)
 
     def _define_host_with_new_topology(self, node_info, index, managed_secret_info):
         node_name = node_info.name
-        system_id = self._get_system_id_for_node_labels(
+        system_id = self.secret_manager.get_system_id_for_node_labels(
             managed_secret_info.system_ids_topologies, node_info.labels)
         managed_secret_info.nodes_with_system_id[node_name] = system_id
         MANAGED_SECRETS[index] = managed_secret_info
         self._define_host_on_all_storages(node_name)
 
     def _remove_node_if_topology_not_match(self, node_info, index, managed_secret_info):
-        if not self._is_node_in_system_ids_topologies(managed_secret_info.system_ids_topologies, node_info.labels):
+        if not self.secret_manager.is_node_in_system_ids_topologies(managed_secret_info.system_ids_topologies,
+                                                                    node_info.labels):
             managed_secret_info.nodes_with_system_id.pop(node_info.name, None)
             MANAGED_SECRETS[index] = managed_secret_info
-
-    def _is_node_in_system_ids_topologies(self, system_ids_topologies, node_labels):
-        return self._get_system_id_for_node_labels(system_ids_topologies, node_labels) != ''
-
-    def _get_system_id_for_node_labels(self, system_ids_topologies, node_labels):
-        topology_labels = self._get_topology_labels(node_labels)
-        for system_id, system_topologies in system_ids_topologies.items():
-            if is_topology_match(system_topologies, topology_labels):
-                return system_id
-        return ''
 
     def _update_io_group(self, node_info):
         io_group = utils.generate_io_group_from_labels(node_info.labels)

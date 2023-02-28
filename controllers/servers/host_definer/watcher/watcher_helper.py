@@ -9,7 +9,8 @@ from controllers.servers.host_definer.k8s.manager import K8SManager
 from controllers.servers.host_definer import settings
 from controllers.servers.host_definer.utils import utils
 from controllers.servers.host_definer.resource_manager.host_definition import HostDefinitionManager
-from controllers.servers.host_definer.types import DefineHostRequest, DefineHostResponse, SecretInfo, ManagedNode
+from controllers.servers.host_definer.resource_manager.secret import SecretManager
+from controllers.servers.host_definer.types import DefineHostRequest, DefineHostResponse, ManagedNode
 from controllers.servers.host_definer.storage_manager.host_definer_server import HostDefinerServicer
 
 logger = get_stdout_logger()
@@ -22,6 +23,7 @@ class Watcher():
         self.k8s_api = K8SApi()
         self.k8s_manager = K8SManager()
         self.host_definition_manager = HostDefinitionManager()
+        self.secret_manager = SecretManager()
 
     def _define_host_on_all_storages(self, node_name):
         logger.info(messages.DEFINE_NODE_ON_ALL_MANAGED_SECRETS.format(node_name))
@@ -39,7 +41,7 @@ class Watcher():
             self._create_definition(host_definition_info)
 
     def _create_definition(self, host_definition_info):
-        if not self._is_node_should_be_managed_on_secret(
+        if not self.secret_manager.is_node_should_be_managed_on_secret(
                 host_definition_info.node_name, host_definition_info.secret_name,
                 host_definition_info.secret_namespace):
             return
@@ -57,43 +59,12 @@ class Watcher():
 
     def _delete_definition(self, host_definition_info):
         response = DefineHostResponse()
-        if self._is_node_should_be_managed_on_secret(host_definition_info.node_name, host_definition_info.secret_name,
-                                                     host_definition_info.secret_namespace):
+        if self.secret_manager.is_node_should_be_managed_on_secret(
+                host_definition_info.node_name, host_definition_info.secret_name,
+                host_definition_info.secret_namespace):
             response = self._undefine_host(host_definition_info)
         self.host_definition_manager.handle_k8s_host_definition_after_undefine_action_if_exist(host_definition_info,
                                                                                                response)
-
-    def _is_node_should_be_managed_on_secret(self, node_name, secret_name, secret_namespace):
-        logger.info(messages.CHECK_NODE_SHOULD_BE_MANAGED_BY_SECRET.format(node_name, secret_name, secret_namespace))
-        secret_data = self.k8s_manager.get_secret_data(secret_name, secret_namespace)
-        utils.validate_secret(secret_data)
-        managed_secret_info, _ = self._get_managed_secret_by_name_and_namespace(secret_name, secret_namespace)
-        if self._is_node_should_managed_on_secret_info(node_name, managed_secret_info):
-            logger.info(messages.NODE_SHOULD_BE_MANAGED_ON_SECRET.format(node_name, secret_name, secret_namespace))
-            return True
-        logger.info(messages.NODE_SHOULD_NOT_BE_MANAGED_ON_SECRET.format(node_name, secret_name, secret_namespace))
-        return False
-
-    def _get_managed_secret_by_name_and_namespace(self, secret_name, secret_namespace):
-        secret_info = self._generate_secret_info(secret_name, secret_namespace)
-        managed_secret_info, index = self._get_matching_managed_secret_info(secret_info)
-        return managed_secret_info, index
-
-    def _is_node_should_managed_on_secret_info(self, node_name, secret_info):
-        if secret_info:
-            nodes_with_system_id = secret_info.nodes_with_system_id
-            if nodes_with_system_id and nodes_with_system_id.get(node_name):
-                return True
-            if nodes_with_system_id:
-                return False
-            return True
-        return False
-
-    def _is_topology_secret(self, secret_data):
-        utils.validate_secret(secret_data)
-        if utils.get_secret_config(secret_data):
-            return True
-        return False
 
     def _undefine_host(self, host_definition_info):
         logger.info(messages.UNDEFINED_HOST.format(host_definition_info.node_name,
@@ -158,9 +129,9 @@ class Watcher():
         return None
 
     def _get_array_connection_info_from_secret(self, secret_name, secret_namespace, labels):
-        secret_data = self.k8s_manager.get_secret_data(secret_name, secret_namespace)
+        secret_data = self.secret_manager.get_secret_data(secret_name, secret_namespace)
         if secret_data:
-            node_topology_labels = self._get_topology_labels(labels)
+            node_topology_labels = self.secret_manager.get_topology_labels(labels)
             return utils.get_array_connection_info_from_secret_data(secret_data, node_topology_labels)
         return {}
 
@@ -218,21 +189,6 @@ class Watcher():
                 node_host_definitions_info.append(host_definition_info)
         return node_host_definitions_info
 
-    def _generate_secret_info(self, secret_name, secret_namespace, nodes_with_system_id={}, system_ids_topologies={}):
-        return SecretInfo(secret_name, secret_namespace, nodes_with_system_id, system_ids_topologies)
-
-    def _is_secret_managed(self, secret_info):
-        _, index = self._get_matching_managed_secret_info(secret_info)
-        if index != -1:
-            return True
-        return False
-
-    def _get_matching_managed_secret_info(self, secret_info):
-        for index, managed_secret_info in enumerate(MANAGED_SECRETS):
-            if managed_secret_info.name == secret_info.name and managed_secret_info.namespace == secret_info.namespace:
-                return managed_secret_info, index
-        return secret_info, -1
-
     def _generate_nodes_with_system_id(self, secret_data):
         nodes_with_system_id = {}
         secret_config = utils.get_secret_config(secret_data)
@@ -242,19 +198,12 @@ class Watcher():
         return nodes_with_system_id
 
     def _get_system_id_for_node(self, node_info, secret_config):
-        node_topology_labels = self._get_topology_labels(node_info.labels)
+        node_topology_labels = self.secret_manager.get_topology_labels(node_info.labels)
         try:
             _, system_id = get_system_info_for_topologies(secret_config, node_topology_labels)
         except ValidationException:
             return ''
         return system_id
-
-    def _get_topology_labels(self, labels):
-        topology_labels = {}
-        for label in labels:
-            if utils.is_topology_label(label):
-                topology_labels[label] = labels[label]
-        return topology_labels
 
     def _generate_secret_system_ids_topologies(self, secret_data):
         system_ids_topologies = {}
