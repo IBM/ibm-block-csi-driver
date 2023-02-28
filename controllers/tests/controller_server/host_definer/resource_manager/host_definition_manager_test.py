@@ -178,7 +178,7 @@ class TestHostDefinitionManager(unittest.TestCase):
         host_definition_info = deepcopy(self.fake_host_definition_info)
         host_definition_info.connectivity_type = 'some_connectivity'
         host_definition_info.node_id = 'some_node_id'
-        self._prepare_get_matching_host_definition_info_function_As_mock(matching_host_definition_info)
+        self._prepare_get_matching_host_definition_info_function_as_mock(matching_host_definition_info)
         result = self.host_definition_manager.update_host_definition_info(host_definition_info)
         self._assert_get_matching_host_definition_called_once_with()
         return result
@@ -202,7 +202,7 @@ class TestHostDefinitionManager(unittest.TestCase):
         host_definition_manifest = deepcopy(test_manifest_utils.get_fake_k8s_host_definition_manifest())
         host_definition_manifest[test_settings.METADATA_FIELD][common_settings.NAME_FIELD] = new_host_definition_name
         self.mock_get_host_definition_manifest.return_value = host_definition_manifest
-        self._prepare_get_matching_host_definition_info_function_As_mock(matching_host_definition)
+        self._prepare_get_matching_host_definition_info_function_as_mock(matching_host_definition)
         self.host_definition_manager.create_host_definition = Mock()
         self.host_definition_manager.create_host_definition.return_value = created_host_definition
         result = self.host_definition_manager.create_host_definition_if_not_exist(
@@ -290,7 +290,7 @@ class TestHostDefinitionManager(unittest.TestCase):
         self.host_definition_manager.set_host_definition_status = Mock()
         self.host_definition_manager.create_k8s_event_for_host_definition = Mock()
         self.host_definition_manager.delete_host_definition = Mock()
-        self._prepare_get_matching_host_definition_info_function_As_mock(matching_host_definition)
+        self._prepare_get_matching_host_definition_info_function_as_mock(matching_host_definition)
         self.host_definition_manager.handle_k8s_host_definition_after_undefine_action_if_exist(
             self.fake_host_definition_info, define_response)
         self._assert_get_matching_host_definition_called_once_with()
@@ -324,12 +324,12 @@ class TestHostDefinitionManager(unittest.TestCase):
         self.assertFalse(result)
 
     def _test_is_host_definition_not_pending(self, matching_host_definition):
-        self._prepare_get_matching_host_definition_info_function_As_mock(matching_host_definition)
+        self._prepare_get_matching_host_definition_info_function_as_mock(matching_host_definition)
         result = self.host_definition_manager.is_host_definition_not_pending(self.fake_host_definition_info)
         self._assert_get_matching_host_definition_called_once_with()
         return result
 
-    def _prepare_get_matching_host_definition_info_function_As_mock(self, matching_host_definition):
+    def _prepare_get_matching_host_definition_info_function_as_mock(self, matching_host_definition):
         self.host_definition_manager.get_matching_host_definition_info = Mock()
         self.host_definition_manager.get_matching_host_definition_info.return_value = matching_host_definition
 
