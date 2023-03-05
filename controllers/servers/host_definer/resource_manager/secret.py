@@ -8,7 +8,6 @@ from controllers.servers.host_definer.utils import utils
 from controllers.servers.host_definer.types import SecretInfo
 import controllers.servers.host_definer.messages as messages
 from controllers.servers.host_definer.k8s.api import K8SApi
-from controllers.servers.host_definer.resource_manager.host_definition import HostDefinitionManager
 
 logger = get_stdout_logger()
 
@@ -16,7 +15,6 @@ logger = get_stdout_logger()
 class SecretManager:
     def __init__(self):
         self.k8s_api = K8SApi()
-        self.host_definition_manager = HostDefinitionManager()
 
     def is_node_should_be_managed_on_secret(self, node_name, secret_name, secret_namespace):
         logger.info(messages.CHECK_NODE_SHOULD_BE_MANAGED_BY_SECRET.format(node_name, secret_name, secret_namespace))
