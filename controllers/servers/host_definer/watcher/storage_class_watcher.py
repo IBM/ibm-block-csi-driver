@@ -1,5 +1,3 @@
-from kubernetes import watch
-
 import controllers.servers.host_definer.messages as messages
 from controllers.common.csi_logger import get_stdout_logger
 from controllers.servers.host_definer.globals import MANAGED_SECRETS
@@ -43,41 +41,22 @@ class StorageClassWatcher(Watcher):
     def _get_secrets_info_from_storage_class(self, storage_class_info):
         secrets_info = []
         for parameter_name in storage_class_info.parameters:
-            if self._is_secret(parameter_name):
-                secret_name, secret_namespace = self._get_secret_name_and_namespace(storage_class_info, parameter_name)
+            if self.secret_manager.is_secret(parameter_name):
+                secret_name, secret_namespace = self.secret_manager.get_secret_name_and_namespace(
+                    storage_class_info, parameter_name)
                 secret_data = self.secret_manager.get_secret_data(secret_name, secret_namespace)
                 logger.info(messages.SECRET_IS_BEING_USED_BY_STORAGE_CLASS.format(
                     secret_name, secret_namespace, storage_class_info.name))
                 if self.secret_manager.is_topology_secret(secret_data):
                     logger.info(messages.SECRET_IS_FROM_TOPOLOGY_TYPE.format(secret_name, secret_namespace))
                     nodes_with_system_id = self._generate_nodes_with_system_id(secret_data)
-                    system_ids_topologies = self._generate_secret_system_ids_topologies(secret_data)
+                    system_ids_topologies = self.secret_manager.generate_secret_system_ids_topologies(secret_data)
                     secret_info = self.secret_manager.generate_secret_info(
                         secret_name, secret_namespace, nodes_with_system_id, system_ids_topologies)
-                    secrets_info = self._add_secret_info_to_list(secret_info, secrets_info)
                 else:
                     secret_info = self.secret_manager.generate_secret_info(secret_name, secret_namespace)
-                    secrets_info = self._add_secret_info_to_list(secret_info, secrets_info)
+                secrets_info = self.secret_manager.add_unique_secret_info_to_list(secret_info, secrets_info)
         return list(filter(None, secrets_info))
-
-    def _is_secret(self, parameter_name):
-        return parameter_name.endswith(settings.SECRET_NAME_SUFFIX) and \
-            parameter_name.startswith(settings.CSI_PARAMETER_PREFIX)
-
-    def _get_secret_name_and_namespace(self, storage_class_info, parameter_name):
-        secret_name_suffix = settings.SECRET_NAME_SUFFIX
-        prefix = parameter_name.split(secret_name_suffix)[0]
-        return (storage_class_info.parameters[parameter_name],
-                storage_class_info.parameters[prefix + secret_name_suffix.replace(
-                    common_settings.NAME_FIELD, common_settings.NAMESPACE_FIELD)])
-
-    def _add_secret_info_to_list(self, secret_info, list_with_secrets_info):
-        for secret_info_in_list in list_with_secrets_info:
-            if secret_info_in_list.name == secret_info.name and \
-                    secret_info_in_list.namespace == secret_info.namespace:
-                return list_with_secrets_info
-        list_with_secrets_info.append(secret_info)
-        return list_with_secrets_info
 
     def _handle_added_watch_event(self, secrets_info, storage_class_name):
         logger.info(messages.NEW_STORAGE_CLASS.format(storage_class_name))

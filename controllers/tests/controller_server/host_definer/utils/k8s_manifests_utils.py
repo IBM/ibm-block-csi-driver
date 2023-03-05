@@ -174,3 +174,12 @@ def get_general_labels_manifest(labels):
             test_settings.NODE_LABELS_FIELD: labels
         }
     }
+
+
+def get_fake_secret_config_with_system_info_manifest():
+    return {
+        'system_id_with_supported_topologies' + '1': {
+            test_settings.SECRET_SUPPORTED_TOPOLOGIES_PARAMETER: [test_settings.FAKE_TOPOLOGY_LABEL]
+        },
+        'system_id_with_no_supported_topologies' + '2': [test_settings.FAKE_TOPOLOGY_LABEL]
+    }

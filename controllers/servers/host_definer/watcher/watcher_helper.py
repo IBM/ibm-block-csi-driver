@@ -1,5 +1,4 @@
 from controllers.common.csi_logger import get_stdout_logger
-from controllers.servers.settings import SECRET_SUPPORTED_TOPOLOGIES_PARAMETER
 from controllers.servers.utils import get_system_info_for_topologies
 from controllers.servers.errors import ValidationException
 import controllers.servers.host_definer.messages as messages
@@ -122,18 +121,11 @@ class Watcher():
         return labels.get(label)
 
     def _add_array_connectivity_info_to_request(self, request, secret_name, secret_namespace, labels):
-        request.array_connection_info = self._get_array_connection_info_from_secret(
+        request.array_connection_info = self.secret_manager.get_array_connection_info(
             secret_name, secret_namespace, labels)
         if request.array_connection_info:
             return request
         return None
-
-    def _get_array_connection_info_from_secret(self, secret_name, secret_namespace, labels):
-        secret_data = self.secret_manager.get_secret_data(secret_name, secret_namespace)
-        if secret_data:
-            node_topology_labels = self.secret_manager.get_topology_labels(labels)
-            return utils.get_array_connection_info_from_secret_data(secret_data, node_topology_labels)
-        return {}
 
     def _get_node_id_by_node(self, host_definition_info):
         try:
@@ -204,10 +196,3 @@ class Watcher():
         except ValidationException:
             return ''
         return system_id
-
-    def _generate_secret_system_ids_topologies(self, secret_data):
-        system_ids_topologies = {}
-        secret_config = utils.get_secret_config(secret_data)
-        for system_id, system_info in secret_config.items():
-            system_ids_topologies[system_id] = (system_info.get(SECRET_SUPPORTED_TOPOLOGIES_PARAMETER))
-        return system_ids_topologies

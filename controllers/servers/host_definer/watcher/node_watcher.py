@@ -1,5 +1,3 @@
-from kubernetes import watch
-
 from controllers.common.csi_logger import get_stdout_logger
 from controllers.servers.host_definer.globals import MANAGED_SECRETS, NODES
 from controllers.servers.host_definer.watcher.watcher_helper import Watcher

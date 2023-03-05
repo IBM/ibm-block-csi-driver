@@ -17,51 +17,6 @@ class HostDefinitionManager:
         self.k8s_api = K8SApi()
         self.k8s_manager = K8SManager()
 
-    def _is_host_definition_matches(self, host_definition_info, node_name, secret_name, secret_namespace):
-        return host_definition_info.node_name == node_name and \
-            host_definition_info.secret_name == secret_name and \
-            host_definition_info.secret_namespace == secret_namespace
-
-    def _add_finalizer(self, host_definition_name):
-        logger.info(messages.ADD_FINALIZER_TO_HOST_DEFINITION.format(host_definition_name))
-        self._update_finalizer(host_definition_name, [settings.CSI_IBM_FINALIZER, ])
-
-    def generate_host_definition_info(self, k8s_host_definition):
-        host_definition_info = HostDefinitionInfo()
-        host_definition_info.name = k8s_host_definition.metadata.name
-        host_definition_info.resource_version = utils.get_k8s_object_resource_version(k8s_host_definition)
-        host_definition_info.uid = k8s_host_definition.metadata.uid
-        host_definition_info.phase = self._get_host_definition_phase(k8s_host_definition)
-        host_definition_info.secret_name = self._get_attr_from_host_definition(
-            k8s_host_definition, settings.SECRET_NAME_FIELD)
-        host_definition_info.secret_namespace = self._get_attr_from_host_definition(
-            k8s_host_definition, settings.SECRET_NAMESPACE_FIELD)
-        host_definition_info.node_name = self._get_attr_from_host_definition(
-            k8s_host_definition, settings.NODE_NAME_FIELD)
-        host_definition_info.node_id = self._get_attr_from_host_definition(
-            k8s_host_definition, common_settings.HOST_DEFINITION_NODE_ID_FIELD)
-        host_definition_info.connectivity_type = self._get_attr_from_host_definition(
-            k8s_host_definition, settings.CONNECTIVITY_TYPE_FIELD)
-        return host_definition_info
-
-    def _get_host_definition_phase(self, k8s_host_definition):
-        if k8s_host_definition.status:
-            return k8s_host_definition.status.phase
-        return ''
-
-    def _get_attr_from_host_definition(self, k8s_host_definition, attribute):
-        if hasattr(k8s_host_definition.spec.hostDefinition, attribute):
-            return getattr(k8s_host_definition.spec.hostDefinition, attribute)
-        return ''
-
-    def _remove_finalizer(self, host_definition_name):
-        logger.info(messages.REMOVE_FINALIZER_TO_HOST_DEFINITION.format(host_definition_name))
-        return self._update_finalizer(host_definition_name, [])
-
-    def _update_finalizer(self, host_definition_name, finalizers):
-        finalizer_manifest = manifest_utils.get_finalizer_manifest(host_definition_name, finalizers)
-        return self.k8s_api.patch_host_definition(finalizer_manifest)
-
     def get_host_definition_info_from_secret_and_node_name(self, node_name, secret_info):
         host_definition_info = self.get_host_definition_info_from_secret(secret_info)
         host_definition_info = self.add_name_to_host_definition_info(node_name, host_definition_info)
@@ -112,6 +67,10 @@ class HostDefinitionManager:
             return self.generate_host_definition_info(k8s_host_definition)
         return HostDefinitionInfo()
 
+    def _add_finalizer(self, host_definition_name):
+        logger.info(messages.ADD_FINALIZER_TO_HOST_DEFINITION.format(host_definition_name))
+        self._update_finalizer(host_definition_name, [settings.CSI_IBM_FINALIZER, ])
+
     def set_status_to_host_definition_after_definition(self, message_from_storage, host_definition_info):
         if message_from_storage and host_definition_info:
             self.set_host_definition_status(host_definition_info.name,
@@ -157,6 +116,14 @@ class HostDefinitionManager:
             logger.error(messages.FAILED_TO_DELETE_HOST_DEFINITION.format(
                 host_definition_name, messages.FAILED_TO_REMOVE_FINALIZER))
 
+    def _remove_finalizer(self, host_definition_name):
+        logger.info(messages.REMOVE_FINALIZER_TO_HOST_DEFINITION.format(host_definition_name))
+        return self._update_finalizer(host_definition_name, [])
+
+    def _update_finalizer(self, host_definition_name, finalizers):
+        finalizer_manifest = manifest_utils.get_finalizer_manifest(host_definition_name, finalizers)
+        return self.k8s_api.patch_host_definition(finalizer_manifest)
+
     def is_host_definition_in_pending_phase(self, phase):
         return phase.startswith(settings.PENDING_PREFIX)
 
@@ -184,3 +151,36 @@ class HostDefinitionManager:
             if self._is_host_definition_matches(host_definition_info, node_name, secret_name, secret_namespace):
                 return host_definition_info
         return None
+
+    def generate_host_definition_info(self, k8s_host_definition):
+        host_definition_info = HostDefinitionInfo()
+        host_definition_info.name = k8s_host_definition.metadata.name
+        host_definition_info.resource_version = utils.get_k8s_object_resource_version(k8s_host_definition)
+        host_definition_info.uid = k8s_host_definition.metadata.uid
+        host_definition_info.phase = self._get_host_definition_phase(k8s_host_definition)
+        host_definition_info.secret_name = self._get_attr_from_host_definition(
+            k8s_host_definition, settings.SECRET_NAME_FIELD)
+        host_definition_info.secret_namespace = self._get_attr_from_host_definition(
+            k8s_host_definition, settings.SECRET_NAMESPACE_FIELD)
+        host_definition_info.node_name = self._get_attr_from_host_definition(
+            k8s_host_definition, settings.NODE_NAME_FIELD)
+        host_definition_info.node_id = self._get_attr_from_host_definition(
+            k8s_host_definition, common_settings.HOST_DEFINITION_NODE_ID_FIELD)
+        host_definition_info.connectivity_type = self._get_attr_from_host_definition(
+            k8s_host_definition, settings.CONNECTIVITY_TYPE_FIELD)
+        return host_definition_info
+
+    def _get_host_definition_phase(self, k8s_host_definition):
+        if k8s_host_definition.status:
+            return k8s_host_definition.status.phase
+        return ''
+
+    def _get_attr_from_host_definition(self, k8s_host_definition, attribute):
+        if hasattr(k8s_host_definition.spec.hostDefinition, attribute):
+            return getattr(k8s_host_definition.spec.hostDefinition, attribute)
+        return ''
+
+    def _is_host_definition_matches(self, host_definition_info, node_name, secret_name, secret_namespace):
+        return host_definition_info.node_name == node_name and \
+            host_definition_info.secret_name == secret_name and \
+            host_definition_info.secret_namespace == secret_namespace

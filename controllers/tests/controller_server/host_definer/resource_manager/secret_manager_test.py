@@ -7,6 +7,7 @@ from controllers.servers.host_definer.k8s.api import K8SApi
 from controllers.servers.host_definer.types import SecretInfo
 from controllers.servers.host_definer.utils import utils
 import controllers.tests.controller_server.host_definer.utils.test_utils as test_utils
+import controllers.tests.controller_server.host_definer.utils.k8s_manifests_utils as test_manifest_utils
 import controllers.tests.controller_server.host_definer.settings as test_settings
 
 
@@ -20,10 +21,14 @@ class TestSecretManager(unittest.TestCase):
         self.fake_secret_info = test_utils.get_fake_secret_info()
         self.fake_secret_data = test_utils.get_fake_k8s_secret().data
         self.fake_k8s_secret = test_utils.get_fake_k8s_secret()
+        self.secret_config_with_system_info = test_manifest_utils.get_fake_secret_config_with_system_info_manifest()
         self.mock_decode_secret_config = patch.object(utils, 'change_decode_base64_secret_config').start()
         self.mock_validate_secret = patch.object(utils, 'validate_secret').start()
         self.mock_is_topology_label = patch.object(utils, 'is_topology_label').start()
         self.mock_utils_get_secret_config = patch.object(utils, 'get_secret_config').start()
+        self.mock_is_deleted_watch_object_type = patch.object(utils, 'is_watch_object_type_is_delete').start()
+        self.mock_utils_get_array_connectivity_info = patch.object(
+            utils, 'get_array_connection_info_from_secret_data').start()
         self.expected_decode_secret_config = 'decoded secret config'
         self.managed_secrets = patch('{}.MANAGED_SECRETS'.format(test_settings.SECRET_MANAGER_PATH),
                                      [self.fake_secret_info]).start()
@@ -58,8 +63,7 @@ class TestSecretManager(unittest.TestCase):
         self.assertFalse(result)
 
     def _prepare_is_node_should_be_managed_on_secret(self):
-        self.secret_manager.get_secret_data = Mock()
-        self.secret_manager.get_secret_data.return_value = self.fake_secret_data
+        self._prepare_get_secret_data(self.fake_secret_data)
         self.secret_manager.generate_secret_info = Mock()
         self.secret_manager.generate_secret_info.return_value = self.fake_secret_info
         self._prepare_get_matching_managed_secret_info(0)
@@ -116,25 +120,6 @@ class TestSecretManager(unittest.TestCase):
     def test_node_should_not_be_managed_on_empty_secret_info(self):
         result = self.secret_manager.is_node_should_managed_on_secret_info(test_settings.FAKE_NODE_NAME, None)
         self.assertFalse(result)
-
-    def test_return_true_when_secret_is_managed(self):
-        result = self._test_is_secret_managed(0)
-        self.assertTrue(result)
-
-    def test_return_false_when_secret_is_not_managed(self):
-        result = self._test_is_secret_managed(-1)
-        self.assertFalse(result)
-
-    def _prepare_get_matching_managed_secret_info(self, managed_secret_index):
-        self.secret_manager.get_matching_managed_secret_info = Mock()
-        self.secret_manager.get_matching_managed_secret_info.return_value = (
-            self.fake_secret_info, managed_secret_index)
-
-    def _test_is_secret_managed(self, managed_secret_index):
-        self._prepare_get_matching_managed_secret_info(managed_secret_index)
-        result = self.secret_manager.is_secret_managed(self.fake_secret_info)
-        self.secret_manager.get_matching_managed_secret_info.assert_called_once_with(self.fake_secret_info)
-        return result
 
     def test_get_matching_managed_secret_info_success(self):
         result = self.secret_manager.get_matching_managed_secret_info(self.fake_secret_info)
@@ -195,8 +180,7 @@ class TestSecretManager(unittest.TestCase):
         self.mock_is_topology_match.assert_not_called()
 
     def _test_get_system_id_for_node_labels(self, is_topology_match, system_ids_topologies):
-        self.secret_manager.get_topology_labels = Mock()
-        self.secret_manager.get_topology_labels.return_value = test_settings.FAKE_TOPOLOGY_LABELS
+        self._prepare_get_topology_labels()
         self.mock_is_topology_match.side_effect = is_topology_match
         result = self.secret_manager.get_system_id_for_node_labels(system_ids_topologies,
                                                                    test_settings.FAKE_TOPOLOGY_LABELS)
@@ -256,3 +240,101 @@ class TestSecretManager(unittest.TestCase):
         result = self.secret_manager.get_topology_labels(labels_to_check)
         self.assertEqual(self.mock_is_topology_label.call_count, expected_is_topology_call_count)
         self.assertEqual(result, expected_result)
+
+    def test_generate_secret_system_ids_topologies_success(self):
+        expected_result = {
+            'system_id_with_supported_topologies' + '1': [test_settings.FAKE_TOPOLOGY_LABEL],
+            'system_id_with_no_supported_topologies' + '2': None
+        }
+        self._test_generate_secret_system_ids_topologies(self.secret_config_with_system_info, expected_result)
+
+    def test_generate_empty_secret_system_ids_topologies(self):
+        self._test_generate_secret_system_ids_topologies({}, {})
+
+    def _test_generate_secret_system_ids_topologies(self, secret_config, expected_result):
+        self.mock_utils_get_secret_config.return_value = secret_config
+        result = self.secret_manager.generate_secret_system_ids_topologies(self.fake_secret_data)
+        self.assertEqual(result, expected_result)
+        self.mock_utils_get_secret_config.assert_called_once_with(self.fake_secret_data)
+
+    def test_return_true_when_parameter_is_secret_success(self):
+        self._test_is_secret_success(test_settings.STORAGE_CLASS_SECRET_FIELD, True)
+
+    def test_return_false_when_parameter_has_bad_suffix_is_secret_success(self):
+        self._test_is_secret_success('csi.storage.k8s.io/bad_suffix', False)
+
+    def test_return_false_when_parameter_has_bad_prefix_is_secret_success(self):
+        self._test_is_secret_success('bad_prefix/secret-name', False)
+
+    def _test_is_secret_success(self, parameter, expected_result):
+        result = self.secret_manager.is_secret(parameter)
+        self.assertEqual(result, expected_result)
+
+    def test_get_secret_name_and_namespace_from_storage_class_success(self):
+        result = self.secret_manager.get_secret_name_and_namespace(
+            test_utils.get_fake_storage_class_info(), test_settings.STORAGE_CLASS_SECRET_FIELD)
+        self.assertEqual(result, (test_settings.FAKE_SECRET, test_settings.FAKE_SECRET_NAMESPACE))
+
+    def test_add_unique_secret_info_to_list_success(self):
+        self._test_add_unique_secret_info_to_list([])
+
+    def test_do_not_change_list_when_secret_is_already_there_success(self):
+        self._test_add_unique_secret_info_to_list([self.fake_secret_info])
+
+    def _test_add_unique_secret_info_to_list(self, secrets_info_list):
+        result = self.secret_manager.add_unique_secret_info_to_list(self.fake_secret_info, secrets_info_list)
+        self.assertEqual(result, [self.fake_secret_info])
+
+    def test_secret_can_be_changed_when_secret_is_managed_and_the_watch_event_type_is_not_deleted(self):
+        self.mock_is_deleted_watch_object_type.return_value = False
+        self._test_is_secret_can_be_changed(0, True)
+        self.mock_is_deleted_watch_object_type.assert_called_once_with('event_type')
+
+    def test_secret_cannot_be_changed_when_secret_is_not_managed(self):
+        self._test_is_secret_can_be_changed(-1, False)
+        self.mock_is_deleted_watch_object_type.assert_not_called()
+
+    def test_secret_cannot_be_changed_when_watch_event_type_is_deleted(self):
+        self.mock_is_deleted_watch_object_type.return_value = True
+        self._test_is_secret_can_be_changed(0, False)
+        self.mock_is_deleted_watch_object_type.assert_called_once_with('event_type')
+
+    def _test_is_secret_can_be_changed(self, managed_secret_index, expected_result):
+        self._prepare_get_matching_managed_secret_info(managed_secret_index)
+        result = self.secret_manager.is_secret_can_be_changed(self.fake_secret_info, 'event_type')
+        self.secret_manager.get_matching_managed_secret_info.assert_called_once_with(self.fake_secret_info)
+        self.assertEqual(result, expected_result)
+
+    def _prepare_get_matching_managed_secret_info(self, managed_secret_index):
+        self.secret_manager.get_matching_managed_secret_info = Mock()
+        self.secret_manager.get_matching_managed_secret_info.return_value = (
+            self.fake_secret_info, managed_secret_index)
+
+    def test_get_array_connectivity_info_success(self):
+        self.mock_utils_get_array_connectivity_info.return_value = 'fake_array_connectivity_info'
+        self._test_get_array_connectivity_info(self.fake_secret_data, 'fake_array_connectivity_info')
+        self.secret_manager.get_topology_labels.assert_called_once_with(test_settings.FAKE_TOPOLOGY_LABELS)
+        self.mock_utils_get_array_connectivity_info.assert_called_once_with(
+            self.fake_secret_data, test_settings.FAKE_TOPOLOGY_LABELS)
+
+    def test_get_empty_array_connectivity_info_when_secret_data_is_empty_success(self):
+        self._test_get_array_connectivity_info(None, {})
+        self.secret_manager.get_topology_labels.assert_not_called()
+        self.mock_utils_get_array_connectivity_info.assert_not_called()
+
+    def _test_get_array_connectivity_info(self, secret_data, expected_result):
+        self._prepare_get_secret_data(secret_data)
+        self._prepare_get_topology_labels()
+        result = self.secret_manager.get_array_connection_info(
+            test_settings.FAKE_SECRET, test_settings.FAKE_SECRET_NAMESPACE, test_settings.FAKE_TOPOLOGY_LABELS)
+        self.assertEqual(result, expected_result)
+        self.secret_manager.get_secret_data.assert_called_once_with(
+            test_settings.FAKE_SECRET, test_settings.FAKE_SECRET_NAMESPACE)
+
+    def _prepare_get_secret_data(self, secret_data):
+        self.secret_manager.get_secret_data = Mock()
+        self.secret_manager.get_secret_data.return_value = secret_data
+
+    def _prepare_get_topology_labels(self):
+        self.secret_manager.get_topology_labels = Mock()
+        self.secret_manager.get_topology_labels.return_value = test_settings.FAKE_TOPOLOGY_LABELS
