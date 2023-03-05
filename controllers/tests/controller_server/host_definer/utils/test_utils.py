@@ -252,7 +252,7 @@ def get_fake_csi_node_info():
 def get_fake_node_info():
     node_info = Mock(spec_set=['name', 'labels'])
     node_info.name = test_settings.FAKE_NODE_NAME
-    node_info.labels = test_settings.MANAGE_NODE_LABEL
+    node_info.labels = {test_settings.MANAGE_NODE_LABEL: test_settings.TRUE_STRING}
     return node_info
 
 

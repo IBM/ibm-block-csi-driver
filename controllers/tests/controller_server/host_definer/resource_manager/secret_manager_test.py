@@ -17,7 +17,6 @@ class TestSecretManager(unittest.TestCase):
         test_utils.patch_function(K8SApi, '_get_dynamic_client')
         self.secret_manager = SecretManager()
         self.secret_manager.k8s_api = MagicMock()
-        self.secret_manager.host_definition_manager = MagicMock()
         self.fake_secret_info = test_utils.get_fake_secret_info()
         self.fake_secret_data = test_utils.get_fake_k8s_secret().data
         self.fake_k8s_secret = test_utils.get_fake_k8s_secret()

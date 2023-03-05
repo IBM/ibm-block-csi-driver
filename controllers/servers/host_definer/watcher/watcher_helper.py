@@ -9,8 +9,9 @@ from controllers.servers.host_definer import settings
 from controllers.servers.host_definer.utils import utils
 from controllers.servers.host_definer.resource_manager.host_definition import HostDefinitionManager
 from controllers.servers.host_definer.resource_manager.secret import SecretManager
-from controllers.servers.host_definer.types import DefineHostRequest, DefineHostResponse, ManagedNode
+from controllers.servers.host_definer.types import DefineHostResponse, ManagedNode
 from controllers.servers.host_definer.storage_manager.host_definer_server import HostDefinerServicer
+from controllers.servers.host_definer.definition_manager.request import RequestManager
 
 logger = get_stdout_logger()
 
@@ -23,6 +24,7 @@ class Watcher():
         self.k8s_manager = K8SManager()
         self.host_definition_manager = HostDefinitionManager()
         self.secret_manager = SecretManager()
+        self.request_manager = RequestManager()
 
     def _define_host_on_all_storages(self, node_name):
         logger.info(messages.DEFINE_NODE_ON_ALL_MANAGED_SECRETS.format(node_name))
@@ -86,58 +88,16 @@ class Watcher():
 
     def _is_host_has_label_in_true(self, node_name, label):
         node_info = self.k8s_manager.get_node_info(node_name)
-        return self._get_label_value(node_info.labels, label) == settings.TRUE_STRING
+        return node_info.labels.get(label) == settings.TRUE_STRING
 
     def _ensure_definition_state(self, host_definition_info, define_function):
-        request = self._get_request_from_host_definition(host_definition_info)
+        request = self.request_manager.generate_request(host_definition_info)
         if not request:
             response = DefineHostResponse()
             response.error_message = messages.FAILED_TO_GET_SECRET_EVENT.format(
                 host_definition_info.secret_name, host_definition_info.secret_namespace)
             return response
         return define_function(request)
-
-    def _get_request_from_host_definition(self, host_definition_info):
-        node_name = host_definition_info.node_name
-        logger.info(messages.GENERATE_REQUEST_FOR_NODE.format(node_name))
-        node_info = self.k8s_manager.get_node_info(node_name)
-        request = self._get_new_request(node_info.labels)
-        request = self._add_array_connectivity_info_to_request(
-            request, host_definition_info.secret_name, host_definition_info.secret_namespace, node_info.labels)
-        if request:
-            request.node_id_from_host_definition = host_definition_info.node_id
-            request.node_id_from_csi_node = self._get_node_id_by_node(host_definition_info)
-            request.io_group = self._get_io_group_by_node(host_definition_info.node_name)
-        return request
-
-    def _get_new_request(self, labels):
-        request = DefineHostRequest()
-        connectivity_type_label_on_node = self._get_label_value(labels, settings.CONNECTIVITY_TYPE_LABEL)
-        request.prefix = utils.get_prefix()
-        request.connectivity_type_from_user = utils.get_connectivity_type_from_user(connectivity_type_label_on_node)
-        return request
-
-    def _get_label_value(self, labels, label):
-        return labels.get(label)
-
-    def _add_array_connectivity_info_to_request(self, request, secret_name, secret_namespace, labels):
-        request.array_connection_info = self.secret_manager.get_array_connection_info(
-            secret_name, secret_namespace, labels)
-        if request.array_connection_info:
-            return request
-        return None
-
-    def _get_node_id_by_node(self, host_definition_info):
-        try:
-            return NODES[host_definition_info.node_name].node_id
-        except Exception:
-            return host_definition_info.node_id
-
-    def _get_io_group_by_node(self, node_name):
-        try:
-            return NODES[node_name].io_group
-        except Exception:
-            return ''
 
     def _add_node_to_nodes(self, csi_node_info):
         logger.info(messages.NEW_KUBERNETES_NODE.format(csi_node_info.name))
