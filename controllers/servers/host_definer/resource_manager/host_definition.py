@@ -85,14 +85,14 @@ class HostDefinitionManager:
         self.create_k8s_event_for_host_definition(
             host_definition, settings.SUCCESS_MESSAGE, settings.DEFINE_ACTION, settings.SUCCESSFUL_MESSAGE_TYPE)
 
-    def handle_k8s_host_definition_after_undefine_action_if_exist(self, host_definition_info, response):
+    def handle_k8s_host_definition_after_undefine_action(self, host_definition_info, response):
         current_host_definition_info_on_cluster = self.get_matching_host_definition_info(
             host_definition_info.node_name, host_definition_info.secret_name, host_definition_info.secret_namespace)
         if current_host_definition_info_on_cluster:
-            self._handle_k8s_host_definition_after_undefine_action(
+            self._handle_existing_k8s_host_definition_after_undefine_action(
                 response.error_message, current_host_definition_info_on_cluster)
 
-    def _handle_k8s_host_definition_after_undefine_action(self, message_from_storage, host_definition_info):
+    def _handle_existing_k8s_host_definition_after_undefine_action(self, message_from_storage, host_definition_info):
         if message_from_storage and host_definition_info:
             self.set_host_definition_status(host_definition_info.name,
                                             settings.PENDING_DELETION_PHASE)
@@ -152,6 +152,20 @@ class HostDefinitionManager:
                 return host_definition_info
         return None
 
+    def _is_host_definition_matches(self, host_definition_info, node_name, secret_name, secret_namespace):
+        return host_definition_info.node_name == node_name and \
+            host_definition_info.secret_name == secret_name and \
+            host_definition_info.secret_namespace == secret_namespace
+
+    def get_all_host_definitions_info_of_the_node(self, node_name):
+        node_host_definitions_info = []
+        k8s_host_definitions = self.k8s_api.list_host_definition().items
+        for k8s_host_definition in k8s_host_definitions:
+            host_definition_info = self.generate_host_definition_info(k8s_host_definition)
+            if host_definition_info.node_name == node_name:
+                node_host_definitions_info.append(host_definition_info)
+        return node_host_definitions_info
+
     def generate_host_definition_info(self, k8s_host_definition):
         host_definition_info = HostDefinitionInfo()
         host_definition_info.name = k8s_host_definition.metadata.name
@@ -179,8 +193,3 @@ class HostDefinitionManager:
         if hasattr(k8s_host_definition.spec.hostDefinition, attribute):
             return getattr(k8s_host_definition.spec.hostDefinition, attribute)
         return ''
-
-    def _is_host_definition_matches(self, host_definition_info, node_name, secret_name, secret_namespace):
-        return host_definition_info.node_name == node_name and \
-            host_definition_info.secret_name == secret_name and \
-            host_definition_info.secret_namespace == secret_namespace

@@ -2,7 +2,6 @@ from threading import Thread
 from time import sleep
 
 from controllers.servers.host_definer.utils import utils
-from controllers.servers.host_definer.utils import manifest_utils
 import controllers.servers.host_definer.messages as messages
 from controllers.common.csi_logger import get_stdout_logger
 from controllers.servers.host_definer.watcher.watcher_helper import Watcher
@@ -58,9 +57,9 @@ class HostDefinitionWatcher(Watcher):
         phase = host_definition_info.phase
         action = self._get_action(phase)
         if phase == settings.PENDING_CREATION_PHASE:
-            response = self._define_host_after_pending(host_definition_info)
+            response = self.definition_manager.define_host_after_pending(host_definition_info)
         elif self._is_pending_for_deletion_need_to_be_handled(phase, host_definition_info.node_name):
-            response = self._undefine_host_after_pending(host_definition_info)
+            response = self.definition_manager.undefine_host_after_pending(host_definition_info)
         self._handle_message_from_storage(
             host_definition_info, response.error_message, action)
 
@@ -68,31 +67,6 @@ class HostDefinitionWatcher(Watcher):
         if phase == settings.PENDING_CREATION_PHASE:
             return settings.DEFINE_ACTION
         return settings.UNDEFINE_ACTION
-
-    def _define_host_after_pending(self, host_definition_info):
-        response = DefineHostResponse()
-        if self.secret_manager.is_node_should_be_managed_on_secret(
-                host_definition_info.node_name, host_definition_info.secret_name,
-                host_definition_info.secret_namespace):
-            response = self._define_host(host_definition_info)
-            self._update_host_definition_from_storage_response(host_definition_info.name, response)
-        else:
-            self.host_definition_manager.delete_host_definition(host_definition_info.name)
-        return response
-
-    def _update_host_definition_from_storage_response(self, host_definition_name, response):
-        logger.info(messages.UPDATE_HOST_DEFINITION_FIELDS_FROM_STORAGE.format(host_definition_name, response))
-        host_definition_manifest = manifest_utils.generate_host_definition_response_fields_manifest(
-            host_definition_name, response)
-        self.k8s_api.patch_host_definition(host_definition_manifest)
-
-    def _undefine_host_after_pending(self, host_definition_info):
-        response = DefineHostResponse()
-        if self.secret_manager.is_node_should_be_managed_on_secret(
-                host_definition_info.node_name, host_definition_info.secret_name,
-                host_definition_info.secret_namespace):
-            response = self._undefine_host(host_definition_info)
-        return response
 
     def _handle_message_from_storage(self, host_definition_info, error_message, action):
         phase = host_definition_info.phase
@@ -106,4 +80,4 @@ class HostDefinitionWatcher(Watcher):
             self._remove_manage_node_label(host_definition_info.node_name)
 
     def _is_pending_for_deletion_need_to_be_handled(self, phase, node_name):
-        return phase == settings.PENDING_DELETION_PHASE and self._is_host_can_be_undefined(node_name)
+        return phase == settings.PENDING_DELETION_PHASE and self._is_node_can_be_undefined(node_name)

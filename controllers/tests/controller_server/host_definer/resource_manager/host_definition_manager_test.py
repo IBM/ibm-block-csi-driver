@@ -56,8 +56,7 @@ class TestHostDefinitionManager(unittest.TestCase):
             self, node_name, secret_name, secret_namespace, expected_result=None):
         self.host_definition_manager.k8s_api.list_host_definition.return_value = \
             test_utils.get_fake_k8s_host_definitions_items()
-        self.host_definition_manager.generate_host_definition_info = Mock()
-        self.host_definition_manager.generate_host_definition_info.return_value = self.fake_host_definition_info
+        self._mock_generate_host_definition_info()
         result = self.host_definition_manager.get_matching_host_definition_info(
             node_name, secret_name, secret_namespace)
         self.assertEqual(result, expected_result)
@@ -67,7 +66,7 @@ class TestHostDefinitionManager(unittest.TestCase):
 
     def test_get_none_when_host_definition_list_empty_success(self):
         self.host_definition_manager.k8s_api.list_host_definition.return_value = test_utils.get_fake_empty_k8s_list()
-        self.host_definition_manager.generate_host_definition_info = Mock()
+        self._mock_generate_host_definition_info()
         result = self.host_definition_manager.get_matching_host_definition_info('', '', '')
         self.assertEqual(result, None)
         self.host_definition_manager.generate_host_definition_info.assert_not_called()
@@ -78,8 +77,7 @@ class TestHostDefinitionManager(unittest.TestCase):
         self.host_definition_manager.k8s_api.create_host_definition.return_value = \
             test_utils._get_fake_k8s_host_definitions(test_settings.READY_PHASE)
         self.mock_get_finalizer_manifest.return_value = finalizers_manifest
-        self.host_definition_manager.generate_host_definition_info = Mock()
-        self.host_definition_manager.generate_host_definition_info.return_value = self.fake_host_definition_info
+        self._mock_generate_host_definition_info()
         result = self.host_definition_manager.create_host_definition(
             test_manifest_utils.get_fake_k8s_host_definition_manifest())
         self.assertEqual(result, self.fake_host_definition_info)
@@ -93,7 +91,7 @@ class TestHostDefinitionManager(unittest.TestCase):
 
     def test_create_host_definition_failure(self):
         self.host_definition_manager.k8s_api.create_host_definition.return_value = None
-        self.host_definition_manager.generate_host_definition_info = Mock()
+        self._mock_generate_host_definition_info()
         result = self.host_definition_manager.create_host_definition(
             test_manifest_utils.get_fake_k8s_host_definition_manifest())
         self.assertEqual(result.name, "")
@@ -291,7 +289,7 @@ class TestHostDefinitionManager(unittest.TestCase):
         self.host_definition_manager.create_k8s_event_for_host_definition = Mock()
         self.host_definition_manager.delete_host_definition = Mock()
         self._prepare_get_matching_host_definition_info_function_as_mock(matching_host_definition)
-        self.host_definition_manager.handle_k8s_host_definition_after_undefine_action_if_exist(
+        self.host_definition_manager.handle_k8s_host_definition_after_undefine_action(
             self.fake_host_definition_info, define_response)
         self._assert_get_matching_host_definition_called_once_with()
 
@@ -337,3 +335,17 @@ class TestHostDefinitionManager(unittest.TestCase):
         self.host_definition_manager.get_matching_host_definition_info.assert_called_once_with(
             self.fake_host_definition_info.name, self.fake_host_definition_info.secret_name,
             self.fake_host_definition_info.secret_namespace)
+
+    def test_get_all_host_definitions_info_of_the_node(self):
+        self.host_definition_manager.k8s_api.list_host_definition.return_value = \
+            test_utils.get_fake_k8s_host_definitions_items()
+        self._mock_generate_host_definition_info()
+        result = self.host_definition_manager.get_all_host_definitions_info_of_the_node(test_settings.FAKE_NODE_NAME)
+        self.assertEqual(result, [self.fake_host_definition_info])
+        self.host_definition_manager.k8s_api.list_host_definition.assert_called_once_with()
+        self.host_definition_manager.generate_host_definition_info.assert_called_once_with(
+            test_utils.get_fake_k8s_host_definitions_items().items[0])
+
+    def _mock_generate_host_definition_info(self):
+        self.host_definition_manager.generate_host_definition_info = Mock()
+        self.host_definition_manager.generate_host_definition_info.return_value = self.fake_host_definition_info

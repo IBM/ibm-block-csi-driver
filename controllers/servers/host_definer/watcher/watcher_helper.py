@@ -2,16 +2,15 @@ from controllers.common.csi_logger import get_stdout_logger
 from controllers.servers.utils import get_system_info_for_topologies
 from controllers.servers.errors import ValidationException
 import controllers.servers.host_definer.messages as messages
-from controllers.servers.host_definer.globals import MANAGED_SECRETS, NODES
+from controllers.servers.host_definer.globals import NODES
 from controllers.servers.host_definer.k8s.api import K8SApi
 from controllers.servers.host_definer.k8s.manager import K8SManager
 from controllers.servers.host_definer import settings
 from controllers.servers.host_definer.utils import utils
 from controllers.servers.host_definer.resource_manager.host_definition import HostDefinitionManager
 from controllers.servers.host_definer.resource_manager.secret import SecretManager
-from controllers.servers.host_definer.types import DefineHostResponse, ManagedNode
-from controllers.servers.host_definer.storage_manager.host_definer_server import HostDefinerServicer
-from controllers.servers.host_definer.definition_manager.request import RequestManager
+from controllers.servers.host_definer.types import ManagedNode
+from controllers.servers.host_definer.definition_manager.definition import DefinitionManager
 
 logger = get_stdout_logger()
 
@@ -19,85 +18,29 @@ logger = get_stdout_logger()
 class Watcher():
     def __init__(self):
         super().__init__()
-        self.storage_host_servicer = HostDefinerServicer()
         self.k8s_api = K8SApi()
         self.k8s_manager = K8SManager()
         self.host_definition_manager = HostDefinitionManager()
         self.secret_manager = SecretManager()
-        self.request_manager = RequestManager()
+        self.definition_manager = DefinitionManager()
 
-    def _define_host_on_all_storages(self, node_name):
-        logger.info(messages.DEFINE_NODE_ON_ALL_MANAGED_SECRETS.format(node_name))
-        for secret_info in MANAGED_SECRETS:
-            if secret_info.managed_storage_classes == 0:
-                continue
-            host_definition_info = self.host_definition_manager.get_host_definition_info_from_secret_and_node_name(
-                node_name, secret_info)
-            self._create_definition(host_definition_info)
-
-    def _define_nodes(self, host_definition_info):
-        for node_name, _ in NODES.items():
-            host_definition_info = self.host_definition_manager.add_name_to_host_definition_info(
-                node_name, host_definition_info)
-            self._create_definition(host_definition_info)
-
-    def _create_definition(self, host_definition_info):
-        if not self.secret_manager.is_node_should_be_managed_on_secret(
-                host_definition_info.node_name, host_definition_info.secret_name,
-                host_definition_info.secret_namespace):
-            return
-        host_definition_info = self.host_definition_manager.update_host_definition_info(host_definition_info)
-        response = self._define_host(host_definition_info)
-        current_host_definition_info_on_cluster = self.host_definition_manager.create_host_definition_if_not_exist(
-            host_definition_info, response)
-        self.host_definition_manager.set_status_to_host_definition_after_definition(
-            response.error_message, current_host_definition_info_on_cluster)
-
-    def _define_host(self, host_definition_info):
-        logger.info(messages.DEFINE_NODE_ON_SECRET.format(host_definition_info.node_name,
-                    host_definition_info.secret_name, host_definition_info.secret_namespace))
-        return self._ensure_definition_state(host_definition_info, self.storage_host_servicer.define_host)
-
-    def _delete_definition(self, host_definition_info):
-        response = DefineHostResponse()
-        if self.secret_manager.is_node_should_be_managed_on_secret(
-                host_definition_info.node_name, host_definition_info.secret_name,
-                host_definition_info.secret_namespace):
-            response = self._undefine_host(host_definition_info)
-        self.host_definition_manager.handle_k8s_host_definition_after_undefine_action_if_exist(host_definition_info,
-                                                                                               response)
-
-    def _undefine_host(self, host_definition_info):
-        logger.info(messages.UNDEFINED_HOST.format(host_definition_info.node_name,
-                    host_definition_info.secret_name, host_definition_info.secret_namespace))
-        return self._ensure_definition_state(host_definition_info, self.storage_host_servicer.undefine_host)
-
-    def _is_host_can_be_defined(self, node_name):
+    def _is_node_can_be_defined(self, node_name):
         return utils.is_dynamic_node_labeling_allowed() or self._is_node_has_manage_node_label(node_name)
 
-    def _is_host_can_be_undefined(self, node_name):
+    def _is_node_can_be_undefined(self, node_name):
         return utils.is_host_definer_can_delete_hosts() and \
             self._is_node_has_manage_node_label(node_name) and \
             not self._is_node_has_forbid_deletion_label(node_name)
 
     def _is_node_has_manage_node_label(self, node_name):
-        return self._is_host_has_label_in_true(node_name, settings.MANAGE_NODE_LABEL)
+        return self._is_node_has_label_in_true(node_name, settings.MANAGE_NODE_LABEL)
 
     def _is_node_has_forbid_deletion_label(self, node_name):
-        return self._is_host_has_label_in_true(node_name, settings.FORBID_DELETION_LABEL)
+        return self._is_node_has_label_in_true(node_name, settings.FORBID_DELETION_LABEL)
 
-    def _is_host_has_label_in_true(self, node_name, label):
+    def _is_node_has_label_in_true(self, node_name, label):
         node_info = self.k8s_manager.get_node_info(node_name)
         return node_info.labels.get(label) == settings.TRUE_STRING
-
-    def _ensure_definition_state(self, host_definition_info, define_function):
-        request = self.request_manager.generate_request(host_definition_info)
-        if not request:
-            response = DefineHostResponse()
-            response.error_message = messages.FAILED_TO_GET_SECRET_EVENT.format(
-                host_definition_info.secret_name, host_definition_info.secret_namespace)
-            return response
-        return define_function(request)
 
     def _add_node_to_nodes(self, csi_node_info):
         logger.info(messages.NEW_KUBERNETES_NODE.format(csi_node_info.name))
@@ -129,17 +72,8 @@ class Watcher():
         return csi_node_info.node_id != ''
 
     def _is_node_has_host_definitions(self, node_name):
-        host_definitions_info = self._get_all_node_host_definitions_info(node_name)
+        host_definitions_info = self.host_definition_manager.get_all_host_definitions_info_of_the_node(node_name)
         return host_definitions_info != []
-
-    def _get_all_node_host_definitions_info(self, node_name):
-        node_host_definitions_info = []
-        k8s_host_definitions = self.k8s_api.list_host_definition().items
-        for k8s_host_definition in k8s_host_definitions:
-            host_definition_info = self.host_definition_manager.generate_host_definition_info(k8s_host_definition)
-            if host_definition_info.node_name == node_name:
-                node_host_definitions_info.append(host_definition_info)
-        return node_host_definitions_info
 
     def _generate_nodes_with_system_id(self, secret_data):
         nodes_with_system_id = {}

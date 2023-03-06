@@ -16,7 +16,7 @@ class CsiNodeWatcher(Watcher):
     def add_initial_csi_nodes(self):
         csi_nodes_info = self.k8s_manager.get_csi_nodes_info_with_driver()
         for csi_node_info in csi_nodes_info:
-            if self._is_host_can_be_defined(csi_node_info.name):
+            if self._is_node_can_be_defined(csi_node_info.name):
                 self._add_node_to_nodes(csi_node_info)
 
     def watch_csi_nodes_resources(self):
@@ -33,12 +33,12 @@ class CsiNodeWatcher(Watcher):
     def _handle_modified_csi_node(self, csi_node_info):
         if self._is_new_csi_node(csi_node_info):
             self._add_node_to_nodes(csi_node_info)
-            self._define_host_on_all_storages(csi_node_info.name)
+            self.definition_manager.define_node_on_all_storages(csi_node_info.name)
         elif csi_node_info.name in NODES:
             self._handle_deleted_csi_node_pod(csi_node_info)
 
     def _is_new_csi_node(self, csi_node_info):
-        return csi_node_info.node_id and self._is_host_can_be_defined(csi_node_info.name) and \
+        return csi_node_info.node_id and self._is_node_can_be_defined(csi_node_info.name) and \
             csi_node_info.name not in NODES
 
     def _handle_deleted_csi_node_pod(self, csi_node_info):
@@ -52,7 +52,7 @@ class CsiNodeWatcher(Watcher):
             self._create_definitions_when_csi_node_changed(csi_node_info)
         elif utils.is_host_definer_can_delete_hosts() and \
                 not self._is_node_has_forbid_deletion_label(node_name):
-            self._undefine_hosts(csi_node_info.name)
+            self._undefine_all_the_definitions_of_a_node(csi_node_info.name)
         else:
             NODES.pop(node_name, None)
 
@@ -98,16 +98,13 @@ class CsiNodeWatcher(Watcher):
                     logger.info(messages.NODE_ID_WAS_CHANGED.format(csi_node_info.name,
                                 host_definition_info.node_id, csi_node_info.node_id))
                     NODES[csi_node_info.name] = self._generate_managed_node(csi_node_info)
-                    self._create_definition(host_definition_info)
+                    self.definition_manager.create_definition(host_definition_info)
 
     def _is_node_id_changed(self, host_definition_node_id, csi_node_node_id):
         return host_definition_node_id != csi_node_node_id \
             and host_definition_node_id and csi_node_node_id
 
-    def _undefine_hosts(self, node_name):
-        for secret_info in MANAGED_SECRETS:
-            host_definition_info = self.host_definition_manager.get_host_definition_info_from_secret_and_node_name(
-                node_name, secret_info)
-            self._delete_definition(host_definition_info)
+    def _undefine_all_the_definitions_of_a_node(self, node_name):
+        self.definition_manager.undefine_node_definitions(node_name)
         self._remove_manage_node_label(node_name)
         NODES.pop(node_name, None)

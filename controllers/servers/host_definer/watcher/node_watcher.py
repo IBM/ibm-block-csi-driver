@@ -48,22 +48,22 @@ class NodeWatcher(Watcher):
             unmanaged_csi_nodes_with_driver.add(csi_node_info.name)
 
     def _is_unmanaged_csi_node_has_driver(self, csi_node_info):
-        return csi_node_info.node_id and not self._is_host_can_be_defined(csi_node_info.name)
+        return csi_node_info.node_id and not self._is_node_can_be_defined(csi_node_info.name)
 
     def _define_new_managed_node(self, watch_event, node_name, csi_node_info):
         if watch_event.type == settings.MODIFIED_EVENT and \
                 self._is_node_has_new_manage_node_label(csi_node_info):
             logger.info(messages.DETECTED_NEW_MANAGED_CSI_NODE.format(node_name))
             self._add_node_to_nodes(csi_node_info)
-            self._define_host_on_all_storages(node_name)
+            self.definition_manager.define_node_on_all_storages(node_name)
             unmanaged_csi_nodes_with_driver.remove(csi_node_info.name)
 
     def _delete_host_definitions(self, node_name):
-        if not self._is_host_can_be_undefined(node_name):
+        if not self._is_node_can_be_undefined(node_name):
             return
-        host_definitions_info = self._get_all_node_host_definitions_info(node_name)
+        host_definitions_info = self.host_definition_manager.get_all_host_definitions_info_of_the_node(node_name)
         for host_definition_info in host_definitions_info:
-            self._delete_definition(host_definition_info)
+            self.definition_manager.delete_definition(host_definition_info)
         self._remove_manage_node_label(node_name)
 
     def _is_node_has_new_manage_node_label(self, csi_node_info):
@@ -93,7 +93,7 @@ class NodeWatcher(Watcher):
             managed_secret_info.system_ids_topologies, node_info.labels)
         managed_secret_info.nodes_with_system_id[node_name] = system_id
         MANAGED_SECRETS[index] = managed_secret_info
-        self._define_host_on_all_storages(node_name)
+        self.definition_manager.define_node_on_all_storages(node_name)
 
     def _remove_node_if_topology_not_match(self, node_info, index, managed_secret_info):
         if not self.secret_manager.is_node_in_system_ids_topologies(managed_secret_info.system_ids_topologies,
@@ -107,4 +107,4 @@ class NodeWatcher(Watcher):
         if node_name in NODES and io_group != NODES[node_name].io_group:
             logger.info(messages.IO_GROUP_CHANGED.format(node_name, io_group, NODES[node_name].io_group))
             NODES[node_name].io_group = io_group
-            self._define_host_on_all_storages(node_name)
+            self.definition_manager.define_node_on_all_storages(node_name)

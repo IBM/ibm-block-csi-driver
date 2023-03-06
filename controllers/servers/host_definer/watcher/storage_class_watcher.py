@@ -4,7 +4,6 @@ from controllers.servers.host_definer.globals import MANAGED_SECRETS
 from controllers.servers.host_definer.watcher.watcher_helper import Watcher
 from controllers.servers.host_definer import settings
 from controllers.servers.host_definer.utils import utils
-import controllers.common.settings as common_settings
 
 logger = get_stdout_logger()
 
@@ -62,25 +61,7 @@ class StorageClassWatcher(Watcher):
         logger.info(messages.NEW_STORAGE_CLASS.format(storage_class_name))
         for secret_info in secrets_info:
             if secret_info:
-                self._define_nodes_when_new_secret(secret_info)
-
-    def _define_nodes_when_new_secret(self, secret_info):
-        managed_secret_info, index = self.secret_manager.get_matching_managed_secret_info(secret_info)
-        secret_info.managed_storage_classes = 1
-        if index == -1:
-            MANAGED_SECRETS.append(secret_info)
-            self._define_nodes_from_secret_info(secret_info)
-        elif managed_secret_info.managed_storage_classes == 0:
-            MANAGED_SECRETS[index] = secret_info
-            self._define_nodes_from_secret_info(secret_info)
-        else:
-            secret_info.managed_storage_classes = managed_secret_info.managed_storage_classes + 1
-            MANAGED_SECRETS[index] = secret_info
-
-    def _define_nodes_from_secret_info(self, secret_info):
-        logger.info(messages.NEW_MANAGED_SECRET.format(secret_info.name, secret_info.namespace))
-        host_definition_info = self.host_definition_manager.get_host_definition_info_from_secret(secret_info)
-        self._define_nodes(host_definition_info)
+                self.definition_manager.define_nodes_when_new_secret(secret_info)
 
     def _handle_deleted_watch_event(self, secrets_info):
         for secret_info in secrets_info:

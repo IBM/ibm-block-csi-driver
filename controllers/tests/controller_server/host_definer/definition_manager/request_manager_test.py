@@ -9,7 +9,7 @@ import controllers.tests.controller_server.host_definer.settings as test_setting
 from controllers.servers.host_definer.definition_manager.request import RequestManager
 
 
-class TestSecretManager(unittest.TestCase):
+class TestRequestManager(unittest.TestCase):
     def setUp(self):
         test_utils.patch_function(K8SApi, '_load_cluster_configuration')
         test_utils.patch_function(K8SApi, '_get_dynamic_client')
@@ -17,7 +17,7 @@ class TestSecretManager(unittest.TestCase):
         self.request_manager.secret_manager = MagicMock()
         self.request_manager.k8s_manager = MagicMock()
         self.mock_global_managed_nodes = test_utils.patch_nodes_global_variable(
-            test_settings.HOST_DEFINITION_MANAGER_PATH)
+            test_settings.REQUEST_MANAGER_PATH)
         self.mock_get_prefix = patch.object(utils, 'get_prefix').start()
         self.mock_get_user_connectivity_type = patch.object(utils, 'get_connectivity_type_from_user').start()
         self.fake_host_definition_info = test_utils.get_fake_host_definition_info()

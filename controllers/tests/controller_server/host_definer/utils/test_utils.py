@@ -210,12 +210,12 @@ def get_define_response(connectivity_type, ports):
         SECRET_MANAGEMENT_ADDRESS_VALUE)
 
 
-def get_fake_secret_info():
+def get_fake_secret_info(managed_storage_classes=0):
     secret_info = Mock(spec_set=['name', 'namespace', 'nodes_with_system_id', 'managed_storage_classes'])
     secret_info.name = test_settings.FAKE_SECRET
     secret_info.namespace = test_settings.FAKE_SECRET_NAMESPACE
     secret_info.nodes_with_system_id = {test_settings.FAKE_NODE_NAME: test_settings.FAKE_SYSTEM_ID}
-    secret_info.managed_storage_classes = test_settings.FAKE_SYSTEM_IDS_TOPOLOGIES
+    secret_info.managed_storage_classes = managed_storage_classes
     return secret_info
 
 
