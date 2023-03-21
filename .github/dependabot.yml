@@ -12,6 +12,8 @@ updates:
     rebase-strategy: "disabled"
     reviewers:
       - "csi-reviewers"
+    labels:
+      - go
   - package-ecosystem: "pip"
     directory: "/"
     schedule:
@@ -19,6 +21,8 @@ updates:
     rebase-strategy: "disabled"
     reviewers:
       - "csi-reviewers"
+    labels:
+      - python
   - package-ecosystem: "github-actions"
     directory: "/"
     schedule:
@@ -26,3 +30,5 @@ updates:
     rebase-strategy: "disabled"
     reviewers:
       - "csi-reviewers"
+    labels:
+      - testing
