@@ -1,0 +1,11 @@
+apiVersion: replication.storage.openshift.io/v1alpha1
+kind: VolumeReplication
+metadata:
+  name: demo-volumereplication
+  namespace: default
+spec:
+  volumeReplicationClass: demo-volumereplicationclass
+  replicationState: primary # Required. Values primary/secondary.
+  dataSource:
+    kind: VolumeGroup
+    name: demo-volumegroup  # Ensure that this is in the same namespace as VolumeReplication.
