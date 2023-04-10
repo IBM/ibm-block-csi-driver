@@ -3,19 +3,16 @@ module github.com/ibm/ibm-block-csi-driver
 go 1.13
 
 require (
-	github.com/container-storage-interface/spec v1.5.0
+	github.com/container-storage-interface/spec v1.8.0
 	github.com/golang/mock v1.3.1
-	github.com/gophercloud/gophercloud v0.1.0 // indirect
 	github.com/kubernetes-csi/csi-lib-utils v0.9.1
 	github.com/sirupsen/logrus v1.6.0
-	golang.org/x/sync v0.0.0-20190911185100-cd5d95a43a6e
-	golang.org/x/sys v0.0.0-20200622214017-ed371f2e16b4
+	golang.org/x/sync v0.0.0-20220722155255-886fb9371eb4
+	golang.org/x/sys v0.5.0
 	google.golang.org/grpc v1.29.0
 	gopkg.in/yaml.v2 v2.2.8
 	k8s.io/apimachinery v0.19.0
 	k8s.io/client-go v0.19.0
-	k8s.io/klog v1.0.0 // indirect
 	k8s.io/mount-utils v0.20.13
 	k8s.io/utils v0.0.0-20201110183641-67b214c5f920
-	sigs.k8s.io/structured-merge-diff/v3 v3.0.0 // indirect
 )
