@@ -54,6 +54,8 @@ class TestArrayMediatorSVC(unittest.TestCase):
         self.svc.client.svcinfo.lsfcmap.return_value = Mock(as_list=self.fcmaps)
         del self.svc.client.svctask.addsnapshot
         del self.svc.client.svctask.chvolumereplicationinternals
+        self.svc.client.send_raw_command = Mock()
+        self.svc.client.send_raw_command.return_value = EMPTY_BYTES, EMPTY_BYTES
 
     def _mock_node(self, node_id=svc_settings.DUMMY_INTERNAL_ID1, name=array_settings.DUMMY_NODE1_NAME,
                    iqn=array_settings.DUMMY_NODE1_IQN, status=svc_settings.ONLINE_STATUS):
@@ -2388,11 +2390,14 @@ class TestArrayMediatorSVC(unittest.TestCase):
 
         return Munch(volume_group)
 
-    def _prepare_lsvolumegroup(self, no_return=None, volume_count=0):
+    def _prepare_lsvolumegroup(self, no_return=None, volume_count=0, ouid=False):
         if no_return:
             return_value = None
         else:
             return_value = self._mock_cli_volume_group(volume_count=volume_count)
+        if ouid:
+            response = str.encode('id 14\nvolume_count 0\nouid {}\n'.format(svc_settings.VOLUME_GROUP_OUID))
+            self.svc.client.send_raw_command.return_value = response, EMPTY_BYTES
         self.svc.client.svcinfo.lsvolumegroup.return_value = Mock(as_single_element=return_value)
 
     def test_create_volume_group_success(self):
@@ -2403,6 +2408,14 @@ class TestArrayMediatorSVC(unittest.TestCase):
 
         self.svc.client.svcinfo.lsvolumegroup.assert_called_once_with(object_id=1)
         self.svc.client.svctask.mkvolumegroup.assert_called_once_with(name=common_settings.VOLUME_GROUP_NAME)
+
+    def test_create_volume_group_with_ouid_success(self):
+        self.svc.client.svctask.mkvolumegroup.return_value = Mock(response=(b"id [1]\n", b""))
+        self._prepare_lsvolumegroup(ouid=True)
+
+        res = self.svc.create_volume_group(common_settings.VOLUME_GROUP_NAME)
+
+        self.assertEqual(svc_settings.VOLUME_GROUP_OUID, res.internal_id)
 
     def test_get_volume_group_success(self):
         self._prepare_lsvolumegroup()

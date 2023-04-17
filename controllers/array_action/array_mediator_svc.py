@@ -1993,6 +1993,12 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
         cli_volumes = self._lsvdisk_list(filtervalue=filter_value)
         return [self._generate_thin_volume_response(cli_volume) for cli_volume in cli_volumes]
 
+    def _get_id_for_volume_group(self, cli_volume_group):
+        raw_command = "lsvolumegroup -gui {}".format(cli_volume_group.name)
+        raw_response = self.client.send_raw_command(raw_command)
+        gui_volume_group = SVCResponse(raw_response, {'delim': ' '}).as_single_element
+        return gui_volume_group.ouid if hasattr(gui_volume_group, "ouid") else cli_volume_group.id
+
     def _generate_volume_group_response(self, cli_volume_group):
         volumes = []
         if int(cli_volume_group.volume_count) > 0:
@@ -2000,7 +2006,7 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
         return VolumeGroup(name=cli_volume_group.name,
                            array_type=self.array_type,
                            id=cli_volume_group.uid if hasattr(cli_volume_group, "uid") else cli_volume_group.id,
-                           internal_id=cli_volume_group.id,
+                           internal_id=self._get_id_for_volume_group(cli_volume_group),
                            volumes=volumes)
 
     def create_volume_group(self, name):
