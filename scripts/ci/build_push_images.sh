@@ -7,8 +7,8 @@ for envi in $MANDATORY_ENVS; do
 done
 
 # Prepare specific tag for the image
-branch=`echo $GIT_BRANCH| sed 's|/|.|g'`  #not sure if docker accept / in the version
-specific_tag="${IMAGE_VERSION}_b${BUILD_NUMBER}_${branch}"
+tags=`scripts/ci/get_image_tags_from_branch.sh ${GIT_BRANCH} ${IMAGE_VERSION} ${BUILD_NUMBER} ${GIT_COMMIT}`
+specific_tag=`echo $tags | awk '{print$1}'`
 
 # Set latest tag only if its from develop branch or master and prepare tags
 [ "$GIT_BRANCH" = "develop" -o "$GIT_BRANCH" = "origin/develop" -o "$GIT_BRANCH" = "master" ] && is_tag_latest="true" || is_tag_latest="false"
