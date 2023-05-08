@@ -1,6 +1,6 @@
-# What's new in 1.11.0
+# What's new in 1.11.1
 
-IBM® block storage CSI driver 1.11.0 introduces the enhancements that are detailed in the following section.
+IBM® block storage CSI driver 1.11.1 introduces the enhancements that are detailed in the following section.
 
 **General availability date:** 23 January 2023
 
@@ -26,7 +26,7 @@ This version adds support for policy-based replication that was introduced in IB
 
 ## Added dynamic host definition enhancements
 
-The IBM® block storage CSI driver 1.11.0 host definition feature now supports the following:
+The IBM® block storage CSI driver 1.11.1 host definition feature now supports the following:
 
 - **CSI Topology feature**
 
@@ -54,4 +54,4 @@ This version adds support for orchestration platforms Kubernetes 1.25 and 1.26, 
 
 ## Miscellaneous resolved issues
 
-For information about the resolved issue in version 1.11.0, see [1.11.0 (January 2023)](changelog_1.11.0.md).
+For information about the resolved issue in version 1.11.1, see [1.11.0 (January 2023)](changelog_1.11.0.md).

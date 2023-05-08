@@ -14,7 +14,7 @@ Use the following steps to install the operator and driver, with [GitHub](https:
     1. Download the manifest from GitHub.
 
         ```
-        curl https://raw.githubusercontent.com/IBM/ibm-block-csi-operator/v1.11.0/deploy/installer/generated/ibm-block-csi-operator.yaml > ibm-block-csi-operator.yaml
+        curl https://raw.githubusercontent.com/IBM/ibm-block-csi-operator/v1.11.1/deploy/installer/generated/ibm-block-csi-operator.yaml > ibm-block-csi-operator.yaml
         ```
 
     2.  (Optional) Update the image fields in the `ibm-block-csi-operator.yaml`.
