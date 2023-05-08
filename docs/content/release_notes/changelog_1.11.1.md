@@ -1,12 +1,5 @@
 # 1.11.1 (May 2023)
 
 IBM® block storage CSI driver 1.11.1 added new support and enhancements.
-- Added dynamic host definition enhancements
-- New Spectrum Virtualize family system support for policy-based replication and dynamic volume groups
 - Additional orchestration platform support for Red Hat OpenShift 4.13 and Kubernetes 1.27
 
-Version 1.11.1 also resolved the following issue:
-
-|Ticket ID|Severity|Description|
-|---------|--------|-----------|
-|**CSI-4554**|Low|During HostDefinition creation no success event is emitted when the status is in a _Ready_ state.|
