@@ -1,4 +1,4 @@
-# 1.11.0 (January 2023)
+# 1.11.1 (May 2023)
 
 IBM® block storage CSI driver 1.11.0 added new support and enhancements.
 - Added dynamic host definition enhancements

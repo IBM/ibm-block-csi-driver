@@ -2,7 +2,7 @@
 
 IBM® block storage CSI driver 1.11.1 introduces the enhancements that are detailed in the following section.
 
-**General availability date:** 23 January 2023
+**General availability date:** 8 May 2023
 
 ## New dynamic volume group support
 
@@ -54,4 +54,4 @@ This version adds support for orchestration platforms Kubernetes 1.25 and 1.26, 
 
 ## Miscellaneous resolved issues
 
-For information about the resolved issue in version 1.11.1, see [1.11.0 (January 2023)](changelog_1.11.0.md).
+For information about the resolved issue in version 1.11.1, see [1.11.0 (May 2023)](changelog_1.11.1.md).

@@ -2,7 +2,7 @@
 
 This topic lists the dates and nature of updates to the published information of IBM® block storage CSI driver 1.11.1.
 
-|Date|Nature of updates to the published information|
-|----|----------------------------------------------|
-|23 January 2023|The version information was added to IBM Documentation.<br>For more information about this version, see the [What's new in 1.11.](../content/release_notes/whats_new.md) section in the release notes.|
+| Date       | Nature of updates to the published information                                                                                                                                                          |
+|------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| 8 May 2023 | The version information was added to IBM Documentation.<br>For more information about this version, see the [What's new in 1.11.1](../content/release_notes/whats_new.md) section in the release notes. |
 
