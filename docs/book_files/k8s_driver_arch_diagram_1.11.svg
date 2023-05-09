@@ -15,7 +15,7 @@
    version="1.1"
    id="svg8"
    inkscape:version="1.0.2-2 (e86c870879, 2021-01-15)"
-   sodipodi:docname="k8s_driver_arch_diagram_1.11.svg">
+   sodipodi:docname="k8s_cluster_1.11.svg">
   <defs
      id="defs2">
     <marker
@@ -280,9 +280,9 @@
      inkscape:pageshadow="2"
      inkscape:zoom="1.1"
      inkscape:cx="395.85737"
-     inkscape:cy="374.13464"
+     inkscape:cy="410.49828"
      inkscape:document-units="mm"
-     inkscape:current-layer="g3737"
+     inkscape:current-layer="layer1"
      showgrid="false"
      units="in"
      inkscape:window-width="1920"
@@ -312,7 +312,7 @@
         <dc:format>image/svg+xml</dc:format>
         <dc:type
            rdf:resource="http://purl.org/dc/dcmitype/StillImage" />
-        <dc:title />
+        <dc:title></dc:title>
       </cc:Work>
     </rdf:RDF>
   </metadata>
@@ -344,8 +344,7 @@
              height="75.85714"
              width="390.64285"
              id="rect3728" /></flowRegion><flowPara
-           id="flowPara3730"
-           style="-inkscape-font-specification:'IBM Plex Sans, Normal';font-family:'IBM Plex Sans';font-weight:normal;font-style:normal;font-stretch:normal;font-variant:normal;font-size:40.0000005px;font-variant-ligatures:normal;font-variant-caps:normal;font-variant-numeric:normal;font-variant-east-asian:normal;">Kubernetes Cluster</flowPara></flowRoot>
+           id="flowPara3730">Kubernetes Cluster</flowPara></flowRoot>
     </g>
     <rect
        id="rect3739"
