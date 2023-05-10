@@ -10,7 +10,7 @@
         * [Supported orchestration platforms](content/release_notes/supported_orchestration.md)
     * [Change log](content/release_notes/change_log.md)
         * [1.11.1 (May 2023)](content/release_notes/changelog_1.11.1.md)
-        * [1.11.0 (January 2022)](content/release_notes/changelog_1.11.0.md)
+        * [1.11.0 (January 2023)](content/release_notes/changelog_1.11.0.md)
         * [1.10.0 (July 2022)](content/release_notes/changelog_1.10.0.md)
         * [1.9.0 (March 2022)](content/release_notes/changelog_1.9.0.md)
         * [1.8.0 (December 2021)](content/release_notes/changelog_1.8.0.md)
