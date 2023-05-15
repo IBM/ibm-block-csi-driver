@@ -5,7 +5,6 @@ import controllers.common.settings as common_settings
 from controllers.servers.host_definer.globals import MANAGED_SECRETS
 from controllers.servers.host_definer import settings
 from controllers.servers.host_definer.utils import utils
-from controllers.servers.host_definer.types import SecretInfo
 import controllers.servers.host_definer.messages as messages
 from controllers.servers.host_definer.k8s.api import K8SApi
 from controllers.servers.host_definer.resource_manager.resource_info import ResourceInfoManager

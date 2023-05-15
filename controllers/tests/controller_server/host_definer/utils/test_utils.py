@@ -173,9 +173,8 @@ def get_array_connection_info():
 
 def get_define_request(prefix='', connectivity_type='', node_id_from_host_definition=''):
     return DefineHostRequest(
-        prefix, connectivity_type, node_id_from_host_definition, test_settings.FAKE_NODE_ID,
-        get_array_connection_info(),
-        test_settings.FAKE_STRING_IO_GROUP)
+        prefix, connectivity_type, get_array_connection_info(),
+        node_id_from_host_definition, test_settings.FAKE_NODE_ID, test_settings.FAKE_STRING_IO_GROUP)
 
 
 def get_define_response(connectivity_type, ports):

@@ -19,31 +19,27 @@ class RequestManager:
         node_name = host_definition_info.node_name
         logger.info(messages.GENERATE_REQUEST_FOR_NODE.format(node_name))
         node_info = self.resource_info_manager.get_node_info(node_name)
-        request = self._get_new_request(node_info.labels)
-        request = self._add_array_connectivity_info_to_request(
-            request, host_definition_info.secret_name, host_definition_info.secret_namespace, node_info.labels)
+        request = self._get_new_request(host_definition_info.secret_name,
+                                        host_definition_info.secret_namespace, node_info.labels)
         if request:
             request.node_id_from_host_definition = host_definition_info.node_id
             request.node_id_from_csi_node = self._get_node_id_by_node(host_definition_info)
             request.io_group = self._get_io_group_by_node(host_definition_info.node_name)
         return request
 
-    def _get_new_request(self, labels):
-        request = DefineHostRequest()
+    def _get_new_request(self, secret_name, secret_namespace, labels):
         connectivity_type_label_on_node = self._get_label_value(labels, settings.CONNECTIVITY_TYPE_LABEL)
-        request.prefix = utils.get_prefix()
-        request.connectivity_type_from_user = utils.get_connectivity_type_from_user(connectivity_type_label_on_node)
-        return request
+        prefix = utils.get_prefix()
+        connectivity_type_from_user = utils.get_connectivity_type_from_user(connectivity_type_label_on_node)
+        array_connection_info = self.secret_manager.get_array_connection_info(secret_name, secret_namespace, labels)
+
+        if array_connection_info:
+            return DefineHostRequest(prefix=prefix, connectivity_type_from_user=connectivity_type_from_user,
+                                     array_connection_info=array_connection_info)
+        return None
 
     def _get_label_value(self, labels, label):
         return labels.get(label)
-
-    def _add_array_connectivity_info_to_request(self, request, secret_name, secret_namespace, labels):
-        request.array_connection_info = self.secret_manager.get_array_connection_info(
-            secret_name, secret_namespace, labels)
-        if request.array_connection_info:
-            return request
-        return None
 
     def _get_node_id_by_node(self, host_definition_info):
         try:
