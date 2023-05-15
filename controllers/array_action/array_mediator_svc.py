@@ -1831,11 +1831,16 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
             self.delete_host(host_name)
             raise array_errors.NoPortIsValid(host_name)
 
+    def _raise_error_when_host_not_found(self, host_name, error_message):
+        if OBJ_NOT_FOUND in error_message:
+            raise array_errors.HostNotFoundError(host_name)
+
     def _addhostport(self, host_name, connectivity_type, port):
         cli_kwargs = build_host_port_command_kwargs(host_name, connectivity_type, port)
         try:
             self.client.svctask.addhostport(**cli_kwargs)
         except (svc_errors.CommandExecutionError, CLIFailureError) as ex:
+            self._raise_error_when_host_not_found(host_name, ex.my_message)
             if not self._is_port_invalid(ex.my_message):
                 if is_warning_message(ex.my_message):
                     logger.warning("exception encountered during adding port {} to host {} : {}".format(
@@ -1854,6 +1859,7 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
         try:
             self.client.svctask.rmhostport(**cli_kwargs)
         except (svc_errors.CommandExecutionError, CLIFailureError) as ex:
+            self._raise_error_when_host_not_found(host_name, ex.my_message)
             if not self._is_port_invalid(ex.my_message):
                 if is_warning_message(ex.my_message):
                     logger.warning("exception encountered during removing port {} from host {} : {}".format(
@@ -1949,10 +1955,6 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
         io_group.name = split_string(io_group.name)
         logger.info(svc_messages.HOST_IO_GROUP_IDS.format(host_name, io_group.id))
         return io_group
-
-    def _raise_error_when_host_not_found(self, host_name, error_message):
-        if OBJ_NOT_FOUND in error_message:
-            raise array_errors.HostNotFoundError(host_name)
 
     def _raise_unsupported_parameter_error(self, error_message, parameter):
         if NOT_SUPPORTED_PARAMETER in error_message:
