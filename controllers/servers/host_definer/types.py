@@ -67,9 +67,9 @@ class NodeInfo:
 
 @dataclass
 class StorageClassInfo:
-    name: str = ''
-    provisioner: str = ''
-    parameters: dict = field(default_factory=dict)
+    name: str
+    provisioner: str
+    parameters: dict
 
 
 class ManagedNode:

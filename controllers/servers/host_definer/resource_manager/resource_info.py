@@ -47,11 +47,9 @@ class ResourceInfoManager:
         return storage_classes_info
 
     def generate_storage_class_info(self, k8s_storage_class):
-        storage_class_info = StorageClassInfo()
-        storage_class_info.name = k8s_storage_class.metadata.name
-        storage_class_info.provisioner = k8s_storage_class.provisioner
-        storage_class_info.parameters = k8s_storage_class.parameters
-        return storage_class_info
+        return StorageClassInfo(
+            name=k8s_storage_class.metadata.name, provisioner=k8s_storage_class.provisioner,
+            parameters=k8s_storage_class.parameters)
 
     def get_csi_pods_info(self):
         pods_info = []
