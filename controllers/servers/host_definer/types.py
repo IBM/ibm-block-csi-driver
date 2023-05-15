@@ -8,9 +8,9 @@ class DefineHostRequest:
     prefix: str
     connectivity_type_from_user: str
     array_connection_info: ArrayConnectionInfo
-    node_id_from_host_definition: str = ''
-    node_id_from_csi_node: str = ''
-    io_group: str = ''
+    node_id_from_host_definition: str
+    node_id_from_csi_node: str
+    io_group: str
 
 
 @dataclass

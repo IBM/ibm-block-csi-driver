@@ -34,8 +34,10 @@ class RequestManager:
         array_connection_info = self.secret_manager.get_array_connection_info(secret_name, secret_namespace, labels)
 
         if array_connection_info:
-            return DefineHostRequest(prefix=prefix, connectivity_type_from_user=connectivity_type_from_user,
-                                     array_connection_info=array_connection_info)
+            return DefineHostRequest(
+                prefix=prefix, connectivity_type_from_user=connectivity_type_from_user,
+                array_connection_info=array_connection_info, node_id_from_host_definition='', node_id_from_csi_node='',
+                io_group='')
         return None
 
     def _get_label_value(self, labels, label):
