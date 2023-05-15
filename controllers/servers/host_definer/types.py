@@ -55,8 +55,8 @@ class CsiNodeInfo:
 
 @dataclass
 class PodInfo:
-    name: str = ''
-    node_name: str = ''
+    name: str
+    node_name: str
 
 
 @dataclass

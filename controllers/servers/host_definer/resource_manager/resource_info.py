@@ -64,10 +64,7 @@ class ResourceInfoManager:
         return pods_info
 
     def _generate_pod_info(self, k8s_pod):
-        pod_info = PodInfo()
-        pod_info.name = k8s_pod.metadata.name
-        pod_info.node_name = k8s_pod.spec.node_name
-        return pod_info
+        return PodInfo(name=k8s_pod.metadata.name, node_name=k8s_pod.spec.node_name)
 
     def generate_host_definition_info(self, k8s_host_definition):
         host_definition_info = HostDefinitionInfo()
