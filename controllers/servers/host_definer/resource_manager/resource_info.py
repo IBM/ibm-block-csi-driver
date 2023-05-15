@@ -27,13 +27,10 @@ class ResourceInfoManager:
         k8s_csi_node = self.k8s_api.get_csi_node(node_name)
         if k8s_csi_node:
             return self.generate_csi_node_info(k8s_csi_node)
-        return CsiNodeInfo()
+        return CsiNodeInfo('', '')
 
     def generate_csi_node_info(self, k8s_csi_node):
-        csi_node_info = CsiNodeInfo()
-        csi_node_info.name = k8s_csi_node.metadata.name
-        csi_node_info.node_id = self._get_node_id_from_k8s_csi_node(k8s_csi_node)
-        return csi_node_info
+        return CsiNodeInfo(name=k8s_csi_node.metadata.name, node_id=self._get_node_id_from_k8s_csi_node(k8s_csi_node))
 
     def _get_node_id_from_k8s_csi_node(self, k8s_csi_node):
         if k8s_csi_node.spec.drivers:

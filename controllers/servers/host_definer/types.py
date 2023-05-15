@@ -49,8 +49,8 @@ class HostDefinitionInfo:
 
 @dataclass
 class CsiNodeInfo:
-    name: str = ''
-    node_id: str = ''
+    name: str
+    node_id: str
 
 
 @dataclass
