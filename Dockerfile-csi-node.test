@@ -13,7 +13,7 @@
 # limitations under the License.
 
 # Build stage
-FROM golang:1.13 as builder
+FROM golang:1.19 as builder
 
 WORKDIR /go/src/github.com/ibm/ibm-block-csi-driver
 ENV GO111MODULE=on
@@ -24,6 +24,9 @@ COPY go.sum .
 RUN go mod download
 RUN go get github.com/tebeka/go2xunit   # when GO111MODULE=on the module will not become executable, so get it here to run it as binary.
 RUN go get github.com/golang/mock/gomock
+RUN go get github.com/golang/mock/mockgen
+RUN go install github.com/tebeka/go2xunit
+RUN go install github.com/golang/mock/gomock
 RUN go install github.com/golang/mock/mockgen
 
 COPY . .
