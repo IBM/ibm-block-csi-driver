@@ -6,6 +6,7 @@ from controllers.servers.host_definer.resource_manager.secret import SecretManag
 import controllers.tests.controller_server.host_definer.utils.test_utils as test_utils
 import controllers.tests.controller_server.host_definer.utils.k8s_manifests_utils as test_manifest_utils
 import controllers.tests.controller_server.host_definer.settings as test_settings
+import controllers.common.settings as common_settings
 
 
 class TestSecretManager(BaseResourceManager):
@@ -120,7 +121,7 @@ class TestSecretManager(BaseResourceManager):
         self.assertFalse(result)
 
     def _test_is_node_in_system_ids_topologies(self, system_id):
-        node_labels = [test_settings.MANAGE_NODE_LABEL]
+        node_labels = [common_settings.MANAGE_NODE_LABEL]
         self.secret_manager.get_system_id_for_node_labels = Mock()
         self.secret_manager.get_system_id_for_node_labels.return_value = system_id
         result = self.secret_manager.is_node_labels_in_system_ids_topologies(self.fake_secret_info, node_labels)
@@ -179,7 +180,7 @@ class TestSecretManager(BaseResourceManager):
 
     @patch('{}.utils'.format(test_settings.SECRET_MANAGER_PATH))
     def test_get_only_first_label_when_it_is_a_topology(self, manifest_utils):
-        expected_result = {test_settings.FAKE_TOPOLOGY_LABEL + '1': test_settings.TRUE_STRING}
+        expected_result = {test_settings.FAKE_TOPOLOGY_LABEL + '1': common_settings.TRUE_STRING}
         self._test_get_topology_labels([True, False], test_settings.FAKE_TOPOLOGY_LABELS,
                                        expected_result, 2, manifest_utils)
 

@@ -1,6 +1,7 @@
 from copy import deepcopy
 from unittest.mock import patch, MagicMock
 
+import controllers.common.settings as common_settings
 import controllers.tests.controller_server.host_definer.utils.test_utils as test_utils
 import controllers.tests.controller_server.host_definer.settings as test_settings
 from controllers.tests.controller_server.host_definer.watchers.watcher_base import WatcherBaseSetUp
@@ -19,14 +20,14 @@ class TestWatchHostDefinitionsResources(WatcherBaseSetUp):
         test_utils.patch_pending_variables()
         self.fake_define_response = test_utils.get_fake_define_host_response()
         self.fake_define_response.error_message = ''
-        self.fake_action = test_settings.DEFINE_ACTION
+        self.fake_action = common_settings.DEFINE_ACTION
         self.fake_host_definition_info = test_utils.get_fake_host_definition_info()
         self.fake_pending_deletion_host_definition_info = deepcopy(self.fake_host_definition_info)
-        self.fake_pending_deletion_host_definition_info.phase = test_settings.PENDING_DELETION_PHASE
+        self.fake_pending_deletion_host_definition_info.phase = common_settings.PENDING_DELETION_PHASE
         self.fake_pending_creation_host_definition_info = deepcopy(self.fake_host_definition_info)
-        self.fake_pending_creation_host_definition_info.phase = test_settings.PENDING_CREATION_PHASE
+        self.fake_pending_creation_host_definition_info.phase = common_settings.PENDING_CREATION_PHASE
         self.host_definition_deleted_watch_manifest = test_utils.get_fake_host_definition_watch_event(
-            test_settings.DELETED_EVENT_TYPE)
+            common_settings.DELETED_EVENT_TYPE)
         self.host_definition_deleted_watch_munch = test_utils.convert_manifest_to_munch(
             self.host_definition_deleted_watch_manifest)
 
@@ -114,7 +115,7 @@ class TestWatchHostDefinitionsResources(WatcherBaseSetUp):
 
     def _prepare_handle_pending_host_definition(self, mock_utils, host_definition_info, is_node_can_be_undefined):
         mock_utils.get_action.return_value = self.fake_action
-        if host_definition_info.phase == test_settings.PENDING_CREATION_PHASE:
+        if host_definition_info.phase == common_settings.PENDING_CREATION_PHASE:
             self.watcher.definition_manager.define_host_after_pending.return_value = self.fake_define_response
         else:
             self.watcher.node_manager.is_node_can_be_undefined.return_value = is_node_can_be_undefined
@@ -153,7 +154,7 @@ class TestWatchHostDefinitionsResources(WatcherBaseSetUp):
     def _assert_called_handle_pending_host_definition(
             self, mock_utils, host_definition_info, is_node_can_be_undefined, is_error_message):
         mock_utils.get_action.assert_called_once_with(host_definition_info.phase)
-        if host_definition_info.phase == test_settings.PENDING_CREATION_PHASE:
+        if host_definition_info.phase == common_settings.PENDING_CREATION_PHASE:
             self.watcher.definition_manager.define_host_after_pending.assert_called_once_with(host_definition_info)
             self.watcher.node_manager.is_node_can_be_undefined.assert_not_called()
             self.watcher.definition_manager.undefine_host_after_pending.assert_not_called()
@@ -178,8 +179,8 @@ class TestWatchHostDefinitionsResources(WatcherBaseSetUp):
         if is_error_message:
             self.watcher.host_definition_manager.create_k8s_event_for_host_definition.assert_called_once_with(
                 host_definition_info, self.fake_define_response.error_message, self.fake_action,
-                test_settings.FAILED_MESSAGE_TYPE)
-        elif host_definition_info.phase == test_settings.PENDING_CREATION_PHASE:
+                common_settings.FAILED_MESSAGE_TYPE)
+        elif host_definition_info.phase == common_settings.PENDING_CREATION_PHASE:
             self.watcher.host_definition_manager.set_host_definition_status_to_ready.assert_called_once_with(
                 host_definition_info)
         elif is_node_can_be_undefined:

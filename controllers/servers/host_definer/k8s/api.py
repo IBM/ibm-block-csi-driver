@@ -34,8 +34,8 @@ class K8SApi():
                                                  kind=settings.CSINODE_KIND)
 
     def _get_host_definitions_api(self):
-        return self.dynamic_client.resources.get(api_version=settings.CSI_IBM_API_VERSION,
-                                                 kind=settings.HOST_DEFINITION_KIND)
+        return self.dynamic_client.resources.get(api_version=common_settings.CSI_IBM_API_VERSION,
+                                                 kind=common_settings.HOST_DEFINITION_KIND)
 
     def get_csi_node(self, node_name):
         try:
@@ -60,7 +60,7 @@ class K8SApi():
         except ApiException as ex:
             if ex != 404:
                 logger.error(messages.FAILED_TO_CREATE_HOST_DEFINITION.format(
-                    host_definition_manifest[settings.METADATA][common_settings.NAME_FIELD], ex.body))
+                    host_definition_manifest[common_settings.METADATA_FIELD][common_settings.NAME_FIELD], ex.body))
             return None
 
     def patch_cluster_custom_object_status(self, group, version, plural, name, status):
@@ -88,7 +88,7 @@ class K8SApi():
             return None
 
     def patch_host_definition(self, host_definition_manifest):
-        host_definition_name = host_definition_manifest[settings.METADATA][common_settings.NAME_FIELD]
+        host_definition_name = host_definition_manifest[common_settings.METADATA_FIELD][common_settings.NAME_FIELD]
         logger.info(messages.PATCHING_HOST_DEFINITION.format(host_definition_name))
         try:
             self.host_definitions_api.patch(body=host_definition_manifest, name=host_definition_name,
@@ -106,7 +106,7 @@ class K8SApi():
             self.core_api.patch_node(node_name, body)
         except ApiException as ex:
             logger.error(messages.FAILED_TO_UPDATE_NODE_LABEL.format(
-                node_name, settings.MANAGE_NODE_LABEL, ex.body))
+                node_name, common_settings.MANAGE_NODE_LABEL, ex.body))
 
     def get_secret_data(self, secret_name, secret_namespace):
         try:
@@ -184,7 +184,7 @@ class K8SApi():
     def _get_empty_k8s_list(self):
         much_object = Munch.fromDict({
             common_settings.ITEMS_FIELD: [],
-            settings.METADATA: {
+            common_settings.METADATA_FIELD: {
                 common_settings.RESOURCE_VERSION_FIELD
             }
         })

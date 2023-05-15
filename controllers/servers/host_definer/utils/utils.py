@@ -21,7 +21,7 @@ def generate_io_group_from_labels(labels):
     io_group = ''
     for io_group_index in range(host_definer_settings.POSSIBLE_NUMBER_OF_IO_GROUP):
         label_content = labels.get(common_settings.IO_GROUP_LABEL_PREFIX + str(io_group_index))
-        if label_content == host_definer_settings.TRUE_STRING:
+        if label_content == common_settings.TRUE_STRING:
             if io_group:
                 io_group += common_settings.IO_GROUP_DELIMITER
             io_group += str(io_group_index)
@@ -35,9 +35,9 @@ def get_k8s_object_resource_version(k8s_object):
 
 
 def change_decode_base64_secret_config(secret_data):
-    if settings.SECRET_CONFIG_FIELD in secret_data.keys():
-        secret_data[settings.SECRET_CONFIG_FIELD] = _decode_base64_to_dict(
-            secret_data[settings.SECRET_CONFIG_FIELD])
+    if common_settings.SECRET_CONFIG_FIELD in secret_data.keys():
+        secret_data[common_settings.SECRET_CONFIG_FIELD] = _decode_base64_to_dict(
+            secret_data[common_settings.SECRET_CONFIG_FIELD])
     return secret_data
 
 
@@ -49,13 +49,14 @@ def _decode_base64_to_dict(content_with_base64):
 
 def get_secret_config(secret_data):
     secret_data = _convert_secret_config_to_dict(secret_data)
-    return secret_data.get(settings.SECRET_CONFIG_FIELD, {})
+    return secret_data.get(common_settings.SECRET_CONFIG_FIELD, {})
 
 
 def _convert_secret_config_to_dict(secret_data):
-    if settings.SECRET_CONFIG_FIELD in secret_data.keys():
-        if type(secret_data[settings.SECRET_CONFIG_FIELD]) is str:
-            secret_data[settings.SECRET_CONFIG_FIELD] = json.loads(secret_data[settings.SECRET_CONFIG_FIELD])
+    if common_settings.SECRET_CONFIG_FIELD in secret_data.keys():
+        if type(secret_data[common_settings.SECRET_CONFIG_FIELD]) is str:
+            secret_data[common_settings.SECRET_CONFIG_FIELD] = json.loads(
+                secret_data[common_settings.SECRET_CONFIG_FIELD])
     return secret_data
 
 
@@ -76,13 +77,13 @@ def validate_secret(secret_data):
 
 
 def get_prefix():
-    return os.getenv(settings.PREFIX_ENV_VAR)
+    return os.getenv(common_settings.PREFIX_ENV_VAR)
 
 
 def get_connectivity_type_from_user(connectivity_type_label_on_node):
     if connectivity_type_label_on_node in settings.SUPPORTED_CONNECTIVITY_TYPES:
         return connectivity_type_label_on_node
-    return os.getenv(settings.CONNECTIVITY_ENV_VAR)
+    return os.getenv(common_settings.CONNECTIVITY_ENV_VAR)
 
 
 def is_topology_label(label):
@@ -103,9 +104,10 @@ def get_array_connection_info_from_secret_data(secret_data, labels):
 
 
 def _convert_secret_config_to_string(secret_data):
-    if settings.SECRET_CONFIG_FIELD in secret_data.keys():
-        if type(secret_data[settings.SECRET_CONFIG_FIELD]) is dict:
-            secret_data[settings.SECRET_CONFIG_FIELD] = json.dumps(secret_data[settings.SECRET_CONFIG_FIELD])
+    if common_settings.SECRET_CONFIG_FIELD in secret_data.keys():
+        if type(secret_data[common_settings.SECRET_CONFIG_FIELD]) is dict:
+            secret_data[common_settings.SECRET_CONFIG_FIELD] = json.dumps(
+                secret_data[common_settings.SECRET_CONFIG_FIELD])
     return secret_data
 
 
@@ -137,18 +139,18 @@ def get_random_string():
 
 
 def is_watch_object_type_is_delete(watch_object_type):
-    return watch_object_type == settings.DELETED_EVENT
+    return watch_object_type == common_settings.DELETED_EVENT_TYPE
 
 
 def is_host_definer_can_delete_hosts():
-    return os.getenv(settings.ALLOW_DELETE_ENV_VAR) == settings.TRUE_STRING
+    return os.getenv(common_settings.ALLOW_DELETE_ENV_VAR) == common_settings.TRUE_STRING
 
 
 def is_dynamic_node_labeling_allowed():
-    return os.getenv(settings.DYNAMIC_NODE_LABELING_ENV_VAR) == settings.TRUE_STRING
+    return os.getenv(common_settings.DYNAMIC_NODE_LABELING_ENV_VAR) == common_settings.TRUE_STRING
 
 
 def get_action(phase):
-    if phase == settings.PENDING_CREATION_PHASE:
-        return settings.DEFINE_ACTION
-    return settings.UNDEFINE_ACTION
+    if phase == common_settings.PENDING_CREATION_PHASE:
+        return common_settings.DEFINE_ACTION
+    return common_settings.UNDEFINE_ACTION

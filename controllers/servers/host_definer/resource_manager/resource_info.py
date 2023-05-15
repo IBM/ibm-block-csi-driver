@@ -38,7 +38,7 @@ class ResourceInfoManager:
     def _get_node_id_from_k8s_csi_node(self, k8s_csi_node):
         if k8s_csi_node.spec.drivers:
             for driver in k8s_csi_node.spec.drivers:
-                if driver.name == settings.CSI_PROVISIONER_NAME:
+                if driver.name == common_settings.CSI_PROVISIONER_NAME:
                     return driver.nodeID
         return ''
 
@@ -58,7 +58,7 @@ class ResourceInfoManager:
 
     def get_csi_pods_info(self):
         pods_info = []
-        k8s_pods = self.k8s_api.list_pod_for_all_namespaces(settings.DRIVER_PRODUCT_LABEL)
+        k8s_pods = self.k8s_api.list_pod_for_all_namespaces(common_settings.DRIVER_PRODUCT_LABEL)
         if not k8s_pods:
             return pods_info
         for k8s_pod in k8s_pods.items:
@@ -79,15 +79,15 @@ class ResourceInfoManager:
         host_definition_info.uid = k8s_host_definition.metadata.uid
         host_definition_info.phase = self._get_host_definition_phase(k8s_host_definition)
         host_definition_info.secret_name = self._get_attr_from_host_definition(
-            k8s_host_definition, settings.SECRET_NAME_FIELD)
+            k8s_host_definition, common_settings.SECRET_NAME_FIELD)
         host_definition_info.secret_namespace = self._get_attr_from_host_definition(
-            k8s_host_definition, settings.SECRET_NAMESPACE_FIELD)
+            k8s_host_definition, common_settings.SECRET_NAMESPACE_FIELD)
         host_definition_info.node_name = self._get_attr_from_host_definition(
-            k8s_host_definition, settings.NODE_NAME_FIELD)
+            k8s_host_definition, common_settings.HOST_DEFINITION_NODE_NAME_FIELD)
         host_definition_info.node_id = self._get_attr_from_host_definition(
             k8s_host_definition, common_settings.HOST_DEFINITION_NODE_ID_FIELD)
         host_definition_info.connectivity_type = self._get_attr_from_host_definition(
-            k8s_host_definition, settings.CONNECTIVITY_TYPE_FIELD)
+            k8s_host_definition, common_settings.CONNECTIVITY_TYPE_FIELD)
         return host_definition_info
 
     def _get_host_definition_phase(self, k8s_host_definition):
