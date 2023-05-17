@@ -1,3 +1,4 @@
+import controllers.common.settings as common_settings
 from controllers.common.csi_logger import get_stdout_logger
 from controllers.servers.host_definer.globals import NODES
 from controllers.servers.host_definer import settings
@@ -28,7 +29,7 @@ class RequestManager:
         return request
 
     def _get_new_request(self, secret_name, secret_namespace, labels):
-        connectivity_type_label_on_node = self._get_label_value(labels, settings.CONNECTIVITY_TYPE_LABEL)
+        connectivity_type_label_on_node = self._get_label_value(labels, common_settings.CONNECTIVITY_TYPE_LABEL)
         prefix = utils.get_prefix()
         connectivity_type_from_user = utils.get_connectivity_type_from_user(connectivity_type_label_on_node)
         array_connection_info = self.secret_manager.get_array_connection_info(secret_name, secret_namespace, labels)

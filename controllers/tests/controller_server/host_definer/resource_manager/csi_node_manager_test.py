@@ -5,6 +5,7 @@ from controllers.tests.controller_server.host_definer.resource_manager.base_reso
 from controllers.servers.host_definer.resource_manager.csi_node import CSINodeManager
 import controllers.tests.controller_server.host_definer.utils.test_utils as test_utils
 import controllers.tests.controller_server.host_definer.settings as test_settings
+import controllers.common.settings as common_settings
 
 
 class TestCSINodeManager(BaseResourceManager):
@@ -17,7 +18,7 @@ class TestCSINodeManager(BaseResourceManager):
         self.fake_csi_node_info = test_utils.get_fake_csi_node_info()
         self.fake_pod_info = test_utils.get_fake_pod_info()
         self.fake_k8s_csi_nodes_with_ibm_driver = test_utils.get_fake_k8s_csi_nodes(
-            test_settings.CSI_PROVISIONER_NAME, 1)
+            common_settings.CSI_PROVISIONER_NAME, 1)
         self.fake_k8s_csi_nodes_with_non_ibm_driver = test_utils.get_fake_k8s_csi_nodes(
             test_settings.FAKE_CSI_PROVISIONER, 1)
 
