@@ -8,6 +8,7 @@ from controllers.tests.controller_server.host_definer.resource_manager.base_reso
 import controllers.tests.controller_server.host_definer.utils.test_utils as test_utils
 import controllers.tests.controller_server.host_definer.utils.k8s_manifests_utils as test_manifest_utils
 import controllers.tests.controller_server.host_definer.settings as test_settings
+import controllers.common.settings as common_settings
 
 
 class TestNodeManager(BaseResourceManager):
@@ -30,7 +31,7 @@ class TestNodeManager(BaseResourceManager):
         self.global_managed_secrets = test_utils.patch_managed_secrets_global_variable(
             test_settings.NODE_MANAGER_PATH)
         self.manage_node_labels_manifest = test_manifest_utils.get_metadata_with_manage_node_labels_manifest(
-            test_settings.MANAGE_NODE_LABEL)
+            common_settings.MANAGE_NODE_LABEL)
         self.mock_get_system_info_for_topologies = patch('{}.get_system_info_for_topologies'.format(
             test_settings.NODE_MANAGER_PATH)).start()
 
@@ -120,12 +121,12 @@ class TestNodeManager(BaseResourceManager):
 
     def test_node_do_not_has_manage_node_label(self):
         node_info = deepcopy(self.fake_node_info)
-        node_info.labels.pop(test_settings.MANAGE_NODE_LABEL)
+        node_info.labels.pop(common_settings.MANAGE_NODE_LABEL)
         self._test_is_node_has_label(node_info, False, self.node_manager.is_node_has_manage_node_label)
 
     def test_node_has_forbid_deletion_label(self):
         node_info = deepcopy(self.fake_node_info)
-        node_info.labels[test_settings.FORBID_DELETION_LABEL] = test_settings.TRUE_STRING
+        node_info.labels[common_settings.FORBID_DELETION_LABEL] = common_settings.TRUE_STRING
         self._test_is_node_has_label(node_info, True, self.node_manager.is_node_has_forbid_deletion_label)
 
     def test_node_do_not_has_forbid_deletion_label(self):
@@ -146,7 +147,7 @@ class TestNodeManager(BaseResourceManager):
         self.node_manager.add_node_to_nodes(self.fake_csi_node_info)
         self._assert_add_node_to_nodes(excepted_managed_node)
         self._assert_update_manage_node_label_called(
-            mock_manifest_utils, self.manage_node_labels_manifest, test_settings.TRUE_STRING)
+            mock_manifest_utils, self.manage_node_labels_manifest, common_settings.TRUE_STRING)
 
     @patch('{}.manifest_utils'.format(test_settings.NODE_MANAGER_PATH))
     def test_add_node_to_nodes_when_node_has_manage_node_label_success(self, mock_manifest_utils):
@@ -370,12 +371,12 @@ class TestNodeManager(BaseResourceManager):
 
     def test_do_not_handle_node_topologies_when_node_is_not_managed(self):
         self.global_managed_nodes = {}
-        self.node_manager.handle_node_topologies(self.fake_node_info, test_settings.MODIFIED_EVENT_TYPE)
+        self.node_manager.handle_node_topologies(self.fake_node_info, common_settings.MODIFIED_EVENT_TYPE)
         self._assert_do_not_handle_node_topologies()
 
     def test_do_not_handle_node_topologies_when_watch_event_is_not_modified_type(self):
         self.global_managed_nodes[test_settings.FAKE_NODE_NAME] = self.fake_managed_node
-        self.node_manager.handle_node_topologies(self.fake_node_info, test_settings.ADDED_EVENT)
+        self.node_manager.handle_node_topologies(self.fake_node_info, common_settings.ADDED_EVENT_TYPE)
         self._assert_do_not_handle_node_topologies()
 
     def _assert_do_not_handle_node_topologies(self):
@@ -387,7 +388,7 @@ class TestNodeManager(BaseResourceManager):
     def test_do_not_handle_node_topologies_when_node_is_not_in_secret_topologies(self):
         self._prepare_handle_node_topologies(self.fake_secret_info, False, False)
         global_managed_secrets = deepcopy(self.global_managed_secrets)
-        self.node_manager.handle_node_topologies(self.fake_node_info, test_settings.MODIFIED_EVENT_TYPE)
+        self.node_manager.handle_node_topologies(self.fake_node_info, common_settings.MODIFIED_EVENT_TYPE)
         self.assertEqual(global_managed_secrets[0].nodes_with_system_id,
                          self.global_managed_secrets[0].nodes_with_system_id)
         self.node_manager.secret_manager.is_node_should_managed_on_secret_info.assert_called_once_with(
@@ -400,7 +401,7 @@ class TestNodeManager(BaseResourceManager):
     def test_remove_node_from_secret_topology_fields_if_topology_not_match_anymore(self):
         fake_secret_info = deepcopy(self.fake_secret_info)
         self._prepare_handle_node_topologies(fake_secret_info, True, False)
-        self.node_manager.handle_node_topologies(self.fake_node_info, test_settings.MODIFIED_EVENT_TYPE)
+        self.node_manager.handle_node_topologies(self.fake_node_info, common_settings.MODIFIED_EVENT_TYPE)
         self._assert_global_secrets_changed_as_wanted({})
         self._assert_called_remove_node_if_topology_not_match(fake_secret_info)
 
@@ -416,7 +417,7 @@ class TestNodeManager(BaseResourceManager):
         fake_secret_info = deepcopy(self.fake_secret_info)
         fake_secret_info.nodes_with_system_id = {}
         self._prepare_handle_node_topologies(fake_secret_info, False, True)
-        self.node_manager.handle_node_topologies(self.fake_node_info, test_settings.MODIFIED_EVENT_TYPE)
+        self.node_manager.handle_node_topologies(self.fake_node_info, common_settings.MODIFIED_EVENT_TYPE)
         self._assert_called_define_host_with_new_topology(fake_secret_info)
         self._assert_global_secrets_changed_as_wanted(self.fake_secret_info.nodes_with_system_id)
 

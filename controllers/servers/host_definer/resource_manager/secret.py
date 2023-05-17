@@ -5,7 +5,6 @@ import controllers.common.settings as common_settings
 from controllers.servers.host_definer.globals import MANAGED_SECRETS
 from controllers.servers.host_definer import settings
 from controllers.servers.host_definer.utils import utils
-from controllers.servers.host_definer.types import SecretInfo
 import controllers.servers.host_definer.messages as messages
 from controllers.servers.host_definer.k8s.api import K8SApi
 from controllers.servers.host_definer.resource_manager.resource_info import ResourceInfoManager
@@ -71,11 +70,11 @@ class SecretManager:
         return system_ids_topologies
 
     def is_secret(self, parameter_name):
-        return parameter_name.endswith(settings.SECRET_NAME_SUFFIX) and \
-            parameter_name.startswith(settings.CSI_PARAMETER_PREFIX)
+        return parameter_name.endswith(common_settings.SECRET_NAME_SUFFIX) and \
+            parameter_name.startswith(common_settings.CSI_PARAMETER_PREFIX)
 
     def get_secret_name_and_namespace(self, storage_class_info, parameter_name):
-        secret_name_suffix = settings.SECRET_NAME_SUFFIX
+        secret_name_suffix = common_settings.SECRET_NAME_SUFFIX
         prefix = parameter_name.split(secret_name_suffix)[0]
         return (storage_class_info.parameters[parameter_name],
                 storage_class_info.parameters[prefix + secret_name_suffix.replace(

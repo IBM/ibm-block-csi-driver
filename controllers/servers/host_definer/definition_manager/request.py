@@ -1,3 +1,4 @@
+import controllers.common.settings as common_settings
 from controllers.common.csi_logger import get_stdout_logger
 from controllers.servers.host_definer.globals import NODES
 from controllers.servers.host_definer import settings
@@ -30,7 +31,7 @@ class RequestManager:
 
     def _get_new_request(self, labels):
         request = DefineHostRequest()
-        connectivity_type_label_on_node = self._get_label_value(labels, settings.CONNECTIVITY_TYPE_LABEL)
+        connectivity_type_label_on_node = self._get_label_value(labels, common_settings.CONNECTIVITY_TYPE_LABEL)
         request.prefix = utils.get_prefix()
         request.connectivity_type_from_user = utils.get_connectivity_type_from_user(connectivity_type_label_on_node)
         return request
