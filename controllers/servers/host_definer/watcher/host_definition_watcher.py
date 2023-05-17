@@ -1,6 +1,7 @@
 from threading import Thread
 from time import sleep
 
+import controllers.common.settings as common_settings
 from controllers.servers.host_definer.utils import utils
 import controllers.servers.host_definer.messages as messages
 from controllers.common.csi_logger import get_stdout_logger
@@ -56,7 +57,7 @@ class HostDefinitionWatcher(Watcher):
         response = DefineHostResponse()
         phase = host_definition_info.phase
         action = utils.get_action(phase)
-        if phase == settings.PENDING_CREATION_PHASE:
+        if phase == common_settings.PENDING_CREATION_PHASE:
             response = self.definition_manager.define_host_after_pending(host_definition_info)
         elif self._is_pending_for_deletion_need_to_be_handled(phase, host_definition_info.node_name):
             response = self.definition_manager.undefine_host_after_pending(host_definition_info)
@@ -66,13 +67,15 @@ class HostDefinitionWatcher(Watcher):
     def _handle_message_from_storage(self, host_definition_info, error_message, action):
         phase = host_definition_info.phase
         if error_message:
-            self.host_definition_manager.create_k8s_event_for_host_definition(host_definition_info, str(error_message),
-                                                                              action, settings.FAILED_MESSAGE_TYPE)
-        elif phase == settings.PENDING_CREATION_PHASE:
+            self.host_definition_manager.create_k8s_event_for_host_definition(
+                host_definition_info, str(error_message),
+                action, common_settings.FAILED_MESSAGE_TYPE)
+        elif phase == common_settings.PENDING_CREATION_PHASE:
             self.host_definition_manager.set_host_definition_status_to_ready(host_definition_info)
         elif self._is_pending_for_deletion_need_to_be_handled(phase, host_definition_info.node_name):
             self.host_definition_manager.delete_host_definition(host_definition_info.name)
             self.node_manager.remove_manage_node_label(host_definition_info.node_name)
 
     def _is_pending_for_deletion_need_to_be_handled(self, phase, node_name):
-        return phase == settings.PENDING_DELETION_PHASE and self.node_manager.is_node_can_be_undefined(node_name)
+        return phase == common_settings.PENDING_DELETION_PHASE and \
+            self.node_manager.is_node_can_be_undefined(node_name)

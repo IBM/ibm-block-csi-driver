@@ -1,14 +1,9 @@
+from controllers.common.settings import TOPOLOGY_IBM_BLOCK_PREFIX, CSI_PARAMETER_PREFIX, SECRET_NAME_SUFFIX
 from controllers.tests.common.test_settings import HOST_NAME
 import controllers.common.settings as common_settings
 
-SPEC_FIELD = 'spec'
-METADATA_FIELD = 'metadata'
-STATUS_FIELD = 'status'
 STORAGE_CLASS_DRIVERS_FIELD = 'drivers'
 CSI_NODE_NODE_ID_FIELD = 'nodeID'
-CSI_PROVISIONER_NAME = 'block.csi.ibm.com'
-CSI_IBM_API_VERSION = 'csi.ibm.com/v1'
-HOST_DEFINITION_KIND = 'HostDefinition'
 FAKE_SECRET = 'fake_secret'
 FAKE_SECRET_NAMESPACE = 'fake_secret_namespace'
 FAKE_NODE_NAME = 'fake_node_name'
@@ -25,23 +20,22 @@ WWPN = '34859340583048'
 NQN = 'nqn.2014-08.org.nvmexpress:uuid:b57708c7-5bb6-46a0-b2af-9d824bf539e1'
 FAKE_NODE_ID = '{};;;{}'.format(HOST_NAME, IQN)
 FAKE_CSI_PROVISIONER = 'fake_csi_provisioner'
-TRUE_STRING = 'true'
-NODE_LABELS_FIELD = 'labels'
 FAKE_LABEL = 'FAKE_LABEL'
-MANAGE_NODE_LABEL = 'hostdefiner.block.csi.ibm.com/manage-node'
-FORBID_DELETION_LABEL = 'hostdefiner.block.csi.ibm.com/do-not-delete-definition'
-FAKE_TOPOLOGY_LABEL = 'topology.block.csi.ibm.com/topology'
-NODES_WATCHER_PATH = 'controllers.servers.host_definer.watcher.node_watcher'
-SECRET_WATCHER_PATH = 'controllers.servers.host_definer.watcher.secret_watcher'
-CSI_NODE_WATCHER_PATH = 'controllers.servers.host_definer.watcher.csi_node_watcher'
-STORAGE_CLASS_WATCHER_PATH = 'controllers.servers.host_definer.watcher.storage_class_watcher'
-HOST_DEFINITION_WATCHER_PATH = 'controllers.servers.host_definer.watcher.host_definition_watcher'
+FAKE_TOPOLOGY_LABEL = '{}/topology'.format(TOPOLOGY_IBM_BLOCK_PREFIX)
+HOST_DEFINER_PATH = 'controllers.servers.host_definer'
+HOST_DEFINER_WATCHER_PATH = '{}.watcher'.format(HOST_DEFINER_PATH)
+HOST_DEFINER_RESOURCE_MANAGER_PATH = '{}.resource_manager'.format(HOST_DEFINER_PATH)
+NODES_WATCHER_PATH = '{}.node_watcher'.format(HOST_DEFINER_WATCHER_PATH)
+SECRET_WATCHER_PATH = '{}.secret_watcher'.format(HOST_DEFINER_WATCHER_PATH)
+CSI_NODE_WATCHER_PATH = '{}.csi_node_watcher'.format(HOST_DEFINER_WATCHER_PATH)
+STORAGE_CLASS_WATCHER_PATH = '{}.storage_class_watcher'.format(HOST_DEFINER_WATCHER_PATH)
+HOST_DEFINITION_WATCHER_PATH = '{}.host_definition_watcher'.format(HOST_DEFINER_WATCHER_PATH)
 UTILS_PATH = 'controllers.servers.host_definer.utils.utils'
-HOST_DEFINITION_MANAGER_PATH = 'controllers.servers.host_definer.resource_manager.host_definition'
 SETTINGS_PATH = 'controllers.servers.host_definer.settings'
-SECRET_MANAGER_PATH = 'controllers.servers.host_definer.resource_manager.secret'
-NODE_MANAGER_PATH = 'controllers.servers.host_definer.resource_manager.node'
-RESOURCE_INFO_MANAGER_PATH = 'controllers.servers.host_definer.resource_manager.resource_info'
+HOST_DEFINITION_MANAGER_PATH = '{}.host_definition'.format(HOST_DEFINER_RESOURCE_MANAGER_PATH)
+SECRET_MANAGER_PATH = '{}.secret'.format(HOST_DEFINER_RESOURCE_MANAGER_PATH)
+NODE_MANAGER_PATH = '{}.node'.format(HOST_DEFINER_RESOURCE_MANAGER_PATH)
+RESOURCE_INFO_MANAGER_PATH = '{}.resource_info'.format(HOST_DEFINER_RESOURCE_MANAGER_PATH)
 TYPES_PATH = 'controllers.servers.host_definer.types'
 REQUEST_MANAGER_PATH = 'controllers.servers.host_definer.definition_manager.request'
 DEFINITION_MANAGER_PATH = 'controllers.servers.host_definer.definition_manager.definition'
@@ -54,30 +48,17 @@ KUBERNETES_MANAGER_INIT_FUNCTIONS_TO_PATCH = ['_load_cluster_configuration', '_g
 UPDATED_PODS = 'updated_number_scheduled'
 POD_NODE_NAME_FIELD = 'node_name'
 DESIRED_UPDATED_PODS = 'desired_number_scheduled'
-DELETED_EVENT_TYPE = 'DELETED'
-MODIFIED_EVENT_TYPE = 'MODIFIED'
-ADDED_EVENT = 'ADDED'
 METADATA_UID_FIELD = 'uid'
-STATUS_PHASE_FIELD = 'phase'
-READY_PHASE = 'Ready'
-ERROR_PHASE = 'Error'
-HOST_DEFINITION_FIELD = 'hostDefinition'
-SECRET_NAME_FIELD = 'secretName'
-SECRET_NAMESPACE_FIELD = 'secretNamespace'
-HOST_DEFINITION_NODE_NAME_FIELD = 'nodeName'
-NODE_NAME_ON_STORAGE_FIELD = 'nodeNameOnStorage'
 SECRET_DATA_FIELD = 'data'
 FAIL_MESSAGE_FROM_STORAGE = 'fail_from_storage'
-PENDING_CREATION_PHASE = 'PendingCreation'
-PENDING_DELETION_PHASE = 'PendingDeletion'
 MESSAGE = 'Host defined successfully on the array'
 HOST_DEFINITION_PENDING_VARS = {'HOST_DEFINITION_PENDING_RETRIES': 3,
                                 'HOST_DEFINITION_PENDING_EXPONENTIAL_BACKOFF_IN_SECONDS': 0.2,
                                 'HOST_DEFINITION_PENDING_DELAY_IN_SECONDS': 0.2}
 STORAGE_CLASS_PROVISIONER_FIELD = 'provisioner'
 STORAGE_CLASS_PARAMETERS_FIELD = 'parameters'
-STORAGE_CLASS_SECRET_FIELD = 'csi.storage.k8s.io/secret-name'
-STORAGE_CLASS_SECRET_NAMESPACE_FIELD = 'csi.storage.k8s.io/secret-namespace'
+STORAGE_CLASS_SECRET_FIELD = '{}{}'.format(CSI_PARAMETER_PREFIX, SECRET_NAME_SUFFIX)
+STORAGE_CLASS_SECRET_NAMESPACE_FIELD = '{}secret-namespace'.format(CSI_PARAMETER_PREFIX)
 FAKE_PREFIX = 'fake-prefix'
 IO_GROUP_ID_FIELD = 'id'
 IO_GROUP_IDS = ['0', '2']
@@ -87,23 +68,8 @@ FAKE_STORAGE_CLASS_PARAMETERS = {
     STORAGE_CLASS_SECRET_FIELD: FAKE_SECRET,
     STORAGE_CLASS_SECRET_NAMESPACE_FIELD: FAKE_SECRET_NAMESPACE
 }
-CSI_IBM_FINALIZER = common_settings.HOST_DEFINITION_PLURAL + '.' + common_settings.CSI_IBM_GROUP
-FINALIZERS_FIELD = 'finalizers'
 CONNECTIVITY_TYPE_FIELD = 'connectivityType'
-DEFINE_ACTION = 'Define'
-UNDEFINE_ACTION = 'Undefine'
-SUCCESSFUL_MESSAGE_TYPE = 'Successful'
-FAILED_MESSAGE_TYPE = 'Failed'
-HOST_DEFINER = 'hostDefiner'
-NORMAL_EVENT_TYPE = 'Normal'
-WARNING_EVENT_TYPE = 'Warning'
-DRIVER_PRODUCT_LABEL = 'product=ibm-block-csi-driver'
 FAKE_FC_PORTS = ['532453845345', '532453845345']
-PORTS_FIELD = 'ports'
-IO_GROUP_FIELD = 'ioGroups'
-MANAGEMENT_ADDRESS_FIELD = 'managementAddress'
-API_VERSION_FIELD = 'apiVersion'
-KIND_FIELD = 'kind'
 IO_GROUP_LABEL_PREFIX = 'hostdefiner.block.csi.ibm.com/io-group-'
 FAKE_SINGLE_IO_GROUP_STRING = '0'
 FAKE_MULTIPLE_IO_GROUP_STRING = '0:1'
@@ -112,14 +78,8 @@ DECODED_BASE64_STRING = "{'fake_key': 'fake_value'}"
 FAKE_ENCODED_CONFIG = {"config": BASE64_STRING}
 FAKE_DECODED_CONFIG_STRING = {"config": DECODED_BASE64_STRING}
 FAKE_DECODED_CONFIG = {"config": {'fake_key': 'fake_value'}}
-CONFIG_FIELD = 'config'
-PREFIX_ENV_VAR = 'PREFIX'
-CONNECTIVITY_ENV_VAR = 'CONNECTIVITY_TYPE'
 ISCSI_CONNECTIVITY_TYPE = 'iscsi'
-DEFAULT_NAMESPACE = 'default'
-ALLOW_DELETE_ENV_VAR = 'ALLOW_DELETE'
-DYNAMIC_NODE_LABELING_ENV_VAR = 'DYNAMIC_NODE_LABELING'
-FAKE_TOPOLOGY_LABELS = {FAKE_TOPOLOGY_LABEL + '1': TRUE_STRING, FAKE_TOPOLOGY_LABEL + '2': TRUE_STRING}
+FAKE_TOPOLOGY_LABELS = {FAKE_TOPOLOGY_LABEL + '1': common_settings.TRUE_STRING,
+                        FAKE_TOPOLOGY_LABEL + '2': common_settings.TRUE_STRING}
 FAKE_SYSTEM_IDS_TOPOLOGIES = {FAKE_SYSTEM_ID: FAKE_TOPOLOGY_LABELS}
 SECRET_SUPPORTED_TOPOLOGIES_PARAMETER = "supported_topologies"
-CONNECTIVITY_TYPE_LABEL = '{}/connectivity-type'.format(CSI_PROVISIONER_NAME)

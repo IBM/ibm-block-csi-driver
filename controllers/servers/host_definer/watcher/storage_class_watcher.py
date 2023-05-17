@@ -1,8 +1,8 @@
+import controllers.common.settings as common_settings
 import controllers.servers.host_definer.messages as messages
 from controllers.common.csi_logger import get_stdout_logger
 from controllers.servers.host_definer.globals import MANAGED_SECRETS
 from controllers.servers.host_definer.watcher.watcher_helper import Watcher
-from controllers.servers.host_definer import settings
 from controllers.servers.host_definer.utils import utils
 
 logger = get_stdout_logger()
@@ -23,7 +23,7 @@ class StorageClassWatcher(Watcher):
                 watch_event = utils.munch(watch_event)
                 storage_class_info = self.resource_info_manager.generate_storage_class_info(watch_event.object)
                 secrets_info = self._get_secrets_info_from_storage_class_with_driver_provisioner(storage_class_info)
-                if watch_event.type == settings.ADDED_EVENT:
+                if watch_event.type == common_settings.ADDED_EVENT_TYPE:
                     self._handle_added_watch_event(secrets_info, storage_class_info.name)
                 elif utils.is_watch_object_type_is_delete(watch_event.type):
                     self._handle_deleted_watch_event(secrets_info)

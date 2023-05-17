@@ -1,6 +1,7 @@
 from copy import deepcopy
 from unittest.mock import patch, MagicMock
 
+import controllers.common.settings as common_settings
 from controllers.servers.host_definer.watcher.secret_watcher import SecretWatcher
 import controllers.tests.controller_server.host_definer.utils.test_utils as test_utils
 import controllers.tests.controller_server.host_definer.settings as test_settings
@@ -23,7 +24,8 @@ class TestWatchSecretResources(WatcherBaseSetUp):
         self.fake_host_definition_info = test_utils.get_fake_host_definition_info()
         self.global_managed_secrets = test_utils.patch_managed_secrets_global_variable(
             test_settings.SECRET_WATCHER_PATH)
-        self.secret_modified_watch_manifest = test_utils.get_fake_secret_watch_event(test_settings.MODIFIED_EVENT_TYPE)
+        self.secret_modified_watch_manifest = test_utils.get_fake_secret_watch_event(
+            common_settings.MODIFIED_EVENT_TYPE)
         self.secret_modified_watch_munch = test_utils.convert_manifest_to_munch(self.secret_modified_watch_manifest)
         self.fake_nodes_with_system_id = {self.fake_node_info.name: test_settings.FAKE_SYSTEM_ID}
 

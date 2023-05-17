@@ -42,34 +42,34 @@ class TestUtils(unittest.TestCase):
     def test_get_secret_config_encoded_in_base64_success(self, mock_decode_base64_to_string):
         secret_data = deepcopy(test_settings.FAKE_ENCODED_CONFIG)
         mock_decode_base64_to_string.return_value = test_settings.FAKE_DECODED_CONFIG_STRING[
-            test_settings.CONFIG_FIELD]
+            common_settings.SECRET_CONFIG_FIELD]
         result = utils.change_decode_base64_secret_config(secret_data)
         self.assertEqual(result, test_settings.FAKE_DECODED_CONFIG)
         mock_decode_base64_to_string.assert_called_once_with(
-            test_settings.FAKE_ENCODED_CONFIG[test_settings.CONFIG_FIELD])
+            test_settings.FAKE_ENCODED_CONFIG[common_settings.SECRET_CONFIG_FIELD])
 
     @patch('{}.decode_base64_to_string'.format(test_settings.UTILS_PATH))
     def test_get_decoded_secret_not_encoded_success(self, mock_decode_base64_to_string):
         secret_data = deepcopy(test_settings.FAKE_DECODED_CONFIG_STRING)
         mock_decode_base64_to_string.return_value = test_settings.FAKE_DECODED_CONFIG_STRING[
-            test_settings.CONFIG_FIELD]
+            common_settings.SECRET_CONFIG_FIELD]
         result = utils.change_decode_base64_secret_config(secret_data)
         self.assertEqual(result, test_settings.FAKE_DECODED_CONFIG)
         mock_decode_base64_to_string.assert_called_once_with(
-            test_settings.FAKE_DECODED_CONFIG_STRING[test_settings.CONFIG_FIELD])
+            test_settings.FAKE_DECODED_CONFIG_STRING[common_settings.SECRET_CONFIG_FIELD])
 
     def test_get_secret_config_success(self):
         secret_data = deepcopy(test_settings.FAKE_DECODED_CONFIG_STRING)
-        self.mock_json.loads.return_value = test_settings.FAKE_DECODED_CONFIG[test_settings.CONFIG_FIELD]
+        self.mock_json.loads.return_value = test_settings.FAKE_DECODED_CONFIG[common_settings.SECRET_CONFIG_FIELD]
         result = utils.get_secret_config(secret_data)
-        self.assertEqual(result, test_settings.FAKE_DECODED_CONFIG[test_settings.CONFIG_FIELD])
+        self.assertEqual(result, test_settings.FAKE_DECODED_CONFIG[common_settings.SECRET_CONFIG_FIELD])
         self.mock_json.loads.assert_called_once_with(
-            test_settings.FAKE_DECODED_CONFIG_STRING[test_settings.CONFIG_FIELD])
+            test_settings.FAKE_DECODED_CONFIG_STRING[common_settings.SECRET_CONFIG_FIELD])
 
     def test_do_not_call_json_load_when_getting_dict_secret_config_success(self):
         secret_data = deepcopy(test_settings.FAKE_DECODED_CONFIG)
         result = utils.get_secret_config(secret_data)
-        self.assertEqual(result, test_settings.FAKE_DECODED_CONFIG[test_settings.CONFIG_FIELD])
+        self.assertEqual(result, test_settings.FAKE_DECODED_CONFIG[common_settings.SECRET_CONFIG_FIELD])
         self.mock_json.loads.assert_not_called()
 
     def test_get_secret_config_from_secret_data_with_no_config_field_success(self):
@@ -88,10 +88,12 @@ class TestUtils(unittest.TestCase):
 
     def test_validate_secret_success(self):
         secret_data = deepcopy(test_settings.FAKE_DECODED_CONFIG)
-        self.mock_json.dumps.return_value = test_settings.FAKE_DECODED_CONFIG_STRING[test_settings.CONFIG_FIELD]
+        self.mock_json.dumps.return_value = test_settings.FAKE_DECODED_CONFIG_STRING[
+            common_settings.SECRET_CONFIG_FIELD]
         utils.validate_secret(secret_data)
         self.mock_validate_secrets.assert_called_once_with(test_settings.FAKE_DECODED_CONFIG_STRING)
-        self.mock_json.dumps.assert_called_once_with(test_settings.FAKE_DECODED_CONFIG[test_settings.CONFIG_FIELD])
+        self.mock_json.dumps.assert_called_once_with(
+            test_settings.FAKE_DECODED_CONFIG[common_settings.SECRET_CONFIG_FIELD])
 
     def test_do_not_call_json_dumps_when_getting_string_secret_config_on_validate_secret_success(self):
         secret_data = deepcopy(test_settings.FAKE_DECODED_CONFIG_STRING)
@@ -113,10 +115,10 @@ class TestUtils(unittest.TestCase):
         self.mock_json.dumps.assert_not_called()
 
     def test_get_prefix_success(self):
-        self.mock_os.getenv.return_value = test_settings.TRUE_STRING
+        self.mock_os.getenv.return_value = common_settings.TRUE_STRING
         result = utils.get_prefix()
-        self.assertEqual(result, test_settings.TRUE_STRING)
-        self.mock_os.getenv.assert_called_once_with(test_settings.PREFIX_ENV_VAR)
+        self.assertEqual(result, common_settings.TRUE_STRING)
+        self.mock_os.getenv.assert_called_once_with(common_settings.PREFIX_ENV_VAR)
 
     def test_get_connectivity_type_when_it_set_in_the_labels_success(self):
         result = utils.get_connectivity_type_from_user(test_settings.ISCSI_CONNECTIVITY_TYPE)
@@ -127,7 +129,7 @@ class TestUtils(unittest.TestCase):
         self.mock_os.getenv.return_value = test_settings.ISCSI_CONNECTIVITY_TYPE
         result = utils.get_connectivity_type_from_user('')
         self.assertEqual(result, test_settings.ISCSI_CONNECTIVITY_TYPE)
-        self.mock_os.getenv.assert_called_once_with(test_settings.CONNECTIVITY_ENV_VAR)
+        self.mock_os.getenv.assert_called_once_with(common_settings.CONNECTIVITY_ENV_VAR)
 
     def test_is_topology_label_true_success(self):
         result = utils.is_topology_label(test_settings.FAKE_TOPOLOGY_LABEL)
@@ -141,14 +143,16 @@ class TestUtils(unittest.TestCase):
     def test_get_array_connectivity_info_from_secret_config_success(self, mock_decode):
         connectivity_info = 'connectivity_info'
         secret_data = deepcopy(test_settings.FAKE_DECODED_CONFIG)
-        self.mock_json.dumps.return_value = test_settings.FAKE_DECODED_CONFIG_STRING[test_settings.CONFIG_FIELD]
+        self.mock_json.dumps.return_value = test_settings.FAKE_DECODED_CONFIG_STRING[
+            common_settings.SECRET_CONFIG_FIELD]
         self.mock_get_array_connectivity_info.return_value = connectivity_info
         mock_decode.return_value = connectivity_info
         result = utils.get_array_connection_info_from_secret_data(secret_data, [])
         self.assertEqual(result, connectivity_info)
         self.mock_get_array_connectivity_info.assert_called_once_with(secret_data, [])
         mock_decode.assert_called_once_with(connectivity_info)
-        self.mock_json.dumps.assert_called_once_with(test_settings.FAKE_DECODED_CONFIG[test_settings.CONFIG_FIELD])
+        self.mock_json.dumps.assert_called_once_with(
+            test_settings.FAKE_DECODED_CONFIG[common_settings.SECRET_CONFIG_FIELD])
 
     @patch('{}.decode_array_connectivity_info'.format(test_settings.UTILS_PATH))
     def test_do_not_call_json_dumps_when_getting_string_secret_config_on_get_array_info_success(self, mock_decode):
@@ -204,41 +208,41 @@ class TestUtils(unittest.TestCase):
         self.assertEqual(len(result), 20)
 
     def test_return_true_when_watch_object_is_deleted(self):
-        result = utils.is_watch_object_type_is_delete(test_settings.DELETED_EVENT_TYPE)
+        result = utils.is_watch_object_type_is_delete(common_settings.DELETED_EVENT_TYPE)
         self.assertTrue(result)
 
     def test_return_false_when_watch_object_is_not_deleted(self):
-        result = utils.is_watch_object_type_is_delete(test_settings.ADDED_EVENT)
+        result = utils.is_watch_object_type_is_delete(common_settings.ADDED_EVENT_TYPE)
         self.assertFalse(result)
 
     def test_return_true_when_host_definer_can_delete_hosts_success(self):
-        self.mock_os.getenv.return_value = test_settings.TRUE_STRING
+        self.mock_os.getenv.return_value = common_settings.TRUE_STRING
         result = utils.is_host_definer_can_delete_hosts()
         self.assertTrue(result)
-        self.mock_os.getenv.assert_called_once_with(test_settings.ALLOW_DELETE_ENV_VAR)
+        self.mock_os.getenv.assert_called_once_with(common_settings.ALLOW_DELETE_ENV_VAR)
 
     def test_return_false_when_host_definer_cannot_delete_hosts_success(self):
         self.mock_os.getenv.return_value = ''
         result = utils.is_host_definer_can_delete_hosts()
         self.assertFalse(result)
-        self.mock_os.getenv.assert_called_once_with(test_settings.ALLOW_DELETE_ENV_VAR)
+        self.mock_os.getenv.assert_called_once_with(common_settings.ALLOW_DELETE_ENV_VAR)
 
     def test_return_true_when_dynamic_node_labeling_allowed_success(self):
-        self.mock_os.getenv.return_value = test_settings.TRUE_STRING
+        self.mock_os.getenv.return_value = common_settings.TRUE_STRING
         result = utils.is_dynamic_node_labeling_allowed()
         self.assertTrue(result)
-        self.mock_os.getenv.assert_called_once_with(test_settings.DYNAMIC_NODE_LABELING_ENV_VAR)
+        self.mock_os.getenv.assert_called_once_with(common_settings.DYNAMIC_NODE_LABELING_ENV_VAR)
 
     def test_return_false_when_dynamic_node_labeling_is_not_allowed_success(self):
         self.mock_os.getenv.return_value = ''
         result = utils.is_dynamic_node_labeling_allowed()
         self.assertFalse(result)
-        self.mock_os.getenv.assert_called_once_with(test_settings.DYNAMIC_NODE_LABELING_ENV_VAR)
+        self.mock_os.getenv.assert_called_once_with(common_settings.DYNAMIC_NODE_LABELING_ENV_VAR)
 
     def test_get_define_action_when_phase_is_pending_creation(self):
-        result = utils.get_action(test_settings.PENDING_CREATION_PHASE)
-        self.assertEqual(result, test_settings.DEFINE_ACTION)
+        result = utils.get_action(common_settings.PENDING_CREATION_PHASE)
+        self.assertEqual(result, common_settings.DEFINE_ACTION)
 
     def test_get_undefine_action_when_phase_is_not_pending_creation(self):
-        result = utils.get_action(test_settings.PENDING_DELETION_PHASE)
-        self.assertEqual(result, test_settings.UNDEFINE_ACTION)
+        result = utils.get_action(common_settings.PENDING_DELETION_PHASE)
+        self.assertEqual(result, common_settings.UNDEFINE_ACTION)

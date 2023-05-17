@@ -1,4 +1,5 @@
 from controllers.common.csi_logger import get_stdout_logger
+import controllers.common.settings as common_settings
 from controllers.servers.host_definer.watcher.watcher_helper import Watcher
 from controllers.servers.host_definer import settings
 from controllers.servers.host_definer.utils import utils
@@ -51,7 +52,7 @@ class NodeWatcher(Watcher):
                 self.node_manager.update_node_io_group(node_info)
 
     def _add_new_unmanaged_nodes_with_ibm_csi_driver(self, watch_event, csi_node_info):
-        if watch_event.type in settings.MODIFIED_EVENT and \
+        if watch_event.type in common_settings.MODIFIED_EVENT_TYPE and \
                 self._is_unmanaged_csi_node_has_driver(csi_node_info):
             logger.info(messages.DETECTED_UNMANAGED_CSI_NODE_WITH_IBM_BLOCK_CSI_DRIVER.format(csi_node_info.name))
             unmanaged_csi_nodes_with_driver.add(csi_node_info.name)
@@ -60,7 +61,7 @@ class NodeWatcher(Watcher):
         return csi_node_info.node_id and not self.node_manager.is_node_can_be_defined(csi_node_info.name)
 
     def _define_new_managed_node(self, watch_event, node_name, csi_node_info):
-        if watch_event.type == settings.MODIFIED_EVENT and \
+        if watch_event.type == common_settings.MODIFIED_EVENT_TYPE and \
                 self.node_manager.is_node_has_new_manage_node_label(csi_node_info, unmanaged_csi_nodes_with_driver):
             logger.info(messages.DETECTED_NEW_MANAGED_CSI_NODE.format(node_name))
             self.node_manager.add_node_to_nodes(csi_node_info)

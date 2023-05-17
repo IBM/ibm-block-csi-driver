@@ -53,7 +53,7 @@ class HostDefinitionManager:
         current_host_definition_info_on_cluster = self.get_matching_host_definition_info(
             host_definition_info.node_name, host_definition_info.secret_name, host_definition_info.secret_namespace)
         if current_host_definition_info_on_cluster:
-            host_definition_manifest[settings.METADATA][
+            host_definition_manifest[common_settings.METADATA_FIELD][
                 common_settings.NAME_FIELD] = current_host_definition_info_on_cluster.name
             self.k8s_api.patch_host_definition(host_definition_manifest)
             return current_host_definition_info_on_cluster
@@ -71,21 +71,23 @@ class HostDefinitionManager:
 
     def _add_finalizer(self, host_definition_name):
         logger.info(messages.ADD_FINALIZER_TO_HOST_DEFINITION.format(host_definition_name))
-        self._update_finalizer(host_definition_name, [settings.CSI_IBM_FINALIZER, ])
+        self._update_finalizer(host_definition_name, [common_settings.CSI_IBM_FINALIZER, ])
 
     def set_status_to_host_definition_after_definition(self, message_from_storage, host_definition_info):
         if message_from_storage and host_definition_info:
             self.set_host_definition_status(host_definition_info.name,
-                                            settings.PENDING_CREATION_PHASE)
+                                            common_settings.PENDING_CREATION_PHASE)
             self.create_k8s_event_for_host_definition(
-                host_definition_info, message_from_storage, settings.DEFINE_ACTION, settings.FAILED_MESSAGE_TYPE)
+                host_definition_info, message_from_storage, common_settings.DEFINE_ACTION,
+                common_settings.FAILED_MESSAGE_TYPE)
         elif host_definition_info:
             self.set_host_definition_status_to_ready(host_definition_info)
 
     def set_host_definition_status_to_ready(self, host_definition):
-        self.set_host_definition_status(host_definition.name, settings.READY_PHASE)
+        self.set_host_definition_status(host_definition.name, common_settings.READY_PHASE)
         self.create_k8s_event_for_host_definition(
-            host_definition, settings.SUCCESS_MESSAGE, settings.DEFINE_ACTION, settings.SUCCESSFUL_MESSAGE_TYPE)
+            host_definition, settings.SUCCESS_MESSAGE, common_settings.DEFINE_ACTION,
+            common_settings.SUCCESSFUL_MESSAGE_TYPE)
 
     def handle_k8s_host_definition_after_undefine_action(self, host_definition_info, response):
         current_host_definition_info_on_cluster = self.get_matching_host_definition_info(
@@ -97,17 +99,17 @@ class HostDefinitionManager:
     def _handle_existing_k8s_host_definition_after_undefine_action(self, message_from_storage, host_definition_info):
         if message_from_storage and host_definition_info:
             self.set_host_definition_status(host_definition_info.name,
-                                            settings.PENDING_DELETION_PHASE)
+                                            common_settings.PENDING_DELETION_PHASE)
             self.create_k8s_event_for_host_definition(
                 host_definition_info, message_from_storage,
-                settings.UNDEFINE_ACTION, settings.FAILED_MESSAGE_TYPE)
+                common_settings.UNDEFINE_ACTION, common_settings.FAILED_MESSAGE_TYPE)
         elif host_definition_info:
             self.delete_host_definition(host_definition_info.name)
 
     def create_k8s_event_for_host_definition(self, host_definition_info, message, action, message_type):
         logger.info(messages.CREATE_EVENT_FOR_HOST_DEFINITION.format(message, host_definition_info.name))
         k8s_event = self.event_manager.generate_k8s_event(host_definition_info, message, action, message_type)
-        self.k8s_api.create_event(settings.DEFAULT_NAMESPACE, k8s_event)
+        self.k8s_api.create_event(common_settings.DEFAULT_NAMESPACE, k8s_event)
 
     def delete_host_definition(self, host_definition_name):
         logger.info(messages.DELETE_HOST_DEFINITION.format(host_definition_name))
@@ -131,7 +133,7 @@ class HostDefinitionManager:
 
     def set_host_definition_phase_to_error(self, host_definition_info):
         logger.info(messages.SET_HOST_DEFINITION_PHASE_TO_ERROR.format(host_definition_info.name))
-        self.set_host_definition_status(host_definition_info.name, settings.ERROR_PHASE)
+        self.set_host_definition_status(host_definition_info.name, common_settings.ERROR_PHASE)
 
     def set_host_definition_status(self, host_definition_name, host_definition_phase):
         logger.info(messages.SET_HOST_DEFINITION_STATUS.format(host_definition_name, host_definition_phase))
@@ -144,7 +146,7 @@ class HostDefinitionManager:
         current_host_definition_info_on_cluster = self.get_matching_host_definition_info(
             host_definition_info.node_name, host_definition_info.secret_name, host_definition_info.secret_namespace)
         return not current_host_definition_info_on_cluster or \
-            current_host_definition_info_on_cluster.phase == settings.READY_PHASE
+            current_host_definition_info_on_cluster.phase == common_settings.READY_PHASE
 
     def get_matching_host_definition_info(self, node_name, secret_name, secret_namespace):
         k8s_host_definitions = self.k8s_api.list_host_definition().items

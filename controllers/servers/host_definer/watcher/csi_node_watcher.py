@@ -1,5 +1,6 @@
 from threading import Thread
 
+import controllers.common.settings as common_settings
 from controllers.common.csi_logger import get_stdout_logger
 from controllers.servers.host_definer.globals import MANAGED_SECRETS, NODES
 from controllers.servers.host_definer.watcher.watcher_helper import Watcher
@@ -24,9 +25,9 @@ class CsiNodeWatcher(Watcher):
             for watch_event in stream:
                 watch_event = utils.munch(watch_event)
                 csi_node_info = self.resource_info_manager.generate_csi_node_info(watch_event.object)
-                if (watch_event.type == settings.DELETED_EVENT) and (csi_node_info.name in NODES):
+                if (watch_event.type == common_settings.DELETED_EVENT_TYPE) and (csi_node_info.name in NODES):
                     self._handle_deleted_csi_node_pod(csi_node_info)
-                elif watch_event.type == settings.MODIFIED_EVENT:
+                elif watch_event.type == common_settings.MODIFIED_EVENT_TYPE:
                     self._handle_modified_csi_node(csi_node_info)
 
     def _handle_modified_csi_node(self, csi_node_info):

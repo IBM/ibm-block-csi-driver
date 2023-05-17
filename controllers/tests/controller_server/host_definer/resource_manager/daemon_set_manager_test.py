@@ -1,8 +1,8 @@
 from unittest.mock import MagicMock
 
+import controllers.common.settings as common_settings
 from controllers.servers.host_definer.resource_manager.daemon_set import DaemonSetManager
 import controllers.tests.controller_server.host_definer.utils.test_utils as test_utils
-import controllers.tests.controller_server.host_definer.settings as test_settings
 from controllers.tests.controller_server.host_definer.resource_manager.base_resource_manager import BaseResourceManager
 
 
@@ -27,7 +27,7 @@ class TestEventManagerTest(BaseResourceManager):
         result = self.daemon_set_manager.wait_until_all_daemon_set_pods_are_up_to_date()
         self.assertEqual(result, expected_result)
         self.daemon_set_manager.k8s_api.list_daemon_set_for_all_namespaces.assert_called_once_with(
-            test_settings.DRIVER_PRODUCT_LABEL)
+            common_settings.DRIVER_PRODUCT_LABEL)
 
     def test_get_not_updated_daemon_and_wait_until_it_will_be_updated(self):
         daemon_set_name = self.fake_updated_daemon_set.metadata.name

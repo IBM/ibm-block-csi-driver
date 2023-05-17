@@ -1,7 +1,7 @@
 from controllers.common.csi_logger import get_stdout_logger
 from controllers.servers.utils import get_system_info_for_topologies
 from controllers.servers.errors import ValidationException
-from controllers.servers.host_definer import settings
+import controllers.common.settings as common_settings
 from controllers.servers.host_definer.globals import NODES, MANAGED_SECRETS
 from controllers.servers.host_definer.types import ManagedNode
 import controllers.servers.host_definer.messages as messages
@@ -33,7 +33,7 @@ class NodeManager:
             not self.is_node_has_forbid_deletion_label(node_name)
 
     def is_node_has_forbid_deletion_label(self, node_name):
-        return self._is_node_has_label_in_true(node_name, settings.FORBID_DELETION_LABEL)
+        return self._is_node_has_label_in_true(node_name, common_settings.FORBID_DELETION_LABEL)
 
     def add_node_to_nodes(self, csi_node_info):
         logger.info(messages.NEW_KUBERNETES_NODE.format(csi_node_info.name))
@@ -43,8 +43,8 @@ class NodeManager:
     def _add_manage_node_label_to_node(self, node_name):
         if self.is_node_has_manage_node_label(node_name):
             return
-        logger.info(messages.ADD_LABEL_TO_NODE.format(settings.MANAGE_NODE_LABEL, node_name))
-        self._update_manage_node_label(node_name, settings.TRUE_STRING)
+        logger.info(messages.ADD_LABEL_TO_NODE.format(common_settings.MANAGE_NODE_LABEL, node_name))
+        self._update_manage_node_label(node_name, common_settings.TRUE_STRING)
 
     def generate_managed_node(self, csi_node_info):
         node_info = self.resource_info_manager.get_node_info(csi_node_info.name)
@@ -52,7 +52,7 @@ class NodeManager:
 
     def remove_manage_node_label(self, node_name):
         if self._is_node_should_be_removed(node_name):
-            logger.info(messages.REMOVE_LABEL_FROM_NODE.format(settings.MANAGE_NODE_LABEL, node_name))
+            logger.info(messages.REMOVE_LABEL_FROM_NODE.format(common_settings.MANAGE_NODE_LABEL, node_name))
             self._update_manage_node_label(node_name, None)
 
     def _is_node_should_be_removed(self, node_name):
@@ -101,11 +101,11 @@ class NodeManager:
             self._is_node_is_unmanaged_and_with_csi_node(csi_node_info, unmanaged_csi_nodes_with_driver)
 
     def is_node_has_manage_node_label(self, node_name):
-        return self._is_node_has_label_in_true(node_name, settings.MANAGE_NODE_LABEL)
+        return self._is_node_has_label_in_true(node_name, common_settings.MANAGE_NODE_LABEL)
 
     def _is_node_has_label_in_true(self, node_name, label):
         node_info = self.resource_info_manager.get_node_info(node_name)
-        return node_info.labels.get(label) == settings.TRUE_STRING
+        return node_info.labels.get(label) == common_settings.TRUE_STRING
 
     def _is_node_is_unmanaged_and_with_csi_node(self, csi_node_info, unmanaged_csi_nodes_with_driver):
         if csi_node_info.name not in NODES and csi_node_info.node_id and \
@@ -114,7 +114,7 @@ class NodeManager:
         return False
 
     def handle_node_topologies(self, node_info, watch_event_type):
-        if node_info.name not in NODES or watch_event_type != settings.MODIFIED_EVENT:
+        if node_info.name not in NODES or watch_event_type != common_settings.MODIFIED_EVENT_TYPE:
             return
         for index, managed_secret_info in enumerate(MANAGED_SECRETS):
             if not managed_secret_info.system_ids_topologies:

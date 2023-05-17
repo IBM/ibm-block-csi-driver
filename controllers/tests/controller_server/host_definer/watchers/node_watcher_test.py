@@ -1,6 +1,7 @@
 from copy import deepcopy
 from unittest.mock import patch, MagicMock
 
+import controllers.common.settings as common_settings
 import controllers.tests.controller_server.host_definer.utils.test_utils as test_utils
 import controllers.tests.controller_server.host_definer.settings as test_settings
 from controllers.tests.controller_server.host_definer.watchers.watcher_base import WatcherBaseSetUp
@@ -125,9 +126,9 @@ class TestAddInitialNodes(NodeWatcherBase):
 class TestWatchNodesResources(NodeWatcherBase):
     def setUp(self):
         super().setUp()
-        self.node_modified_watch_manifest = test_utils.get_fake_node_watch_event(test_settings.MODIFIED_EVENT_TYPE)
+        self.node_modified_watch_manifest = test_utils.get_fake_node_watch_event(common_settings.MODIFIED_EVENT_TYPE)
         self.node_modified_watch_munch = test_utils.convert_manifest_to_munch(self.node_modified_watch_manifest)
-        self.node_added_watch_manifest = test_utils.get_fake_node_watch_event(test_settings.ADDED_EVENT)
+        self.node_added_watch_manifest = test_utils.get_fake_node_watch_event(common_settings.ADDED_EVENT_TYPE)
         self.node_added_watch_munch = test_utils.convert_manifest_to_munch(self.node_added_watch_manifest)
 
     @patch('{}.utils'.format(test_settings.NODES_WATCHER_PATH))
