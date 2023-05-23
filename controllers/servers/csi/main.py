@@ -1,19 +1,19 @@
 import os
 from argparse import ArgumentParser
+from concurrent import futures
 from threading import Thread
-from concurrent import futures
-import grpc
-from concurrent import futures
 
-from csi_general import csi_pb2_grpc, volumegroup_pb2_grpc, identity_pb2_grpc, replication_pb2_grpc
+import grpc
+from csi_general import csi_pb2_grpc, volumegroup_pb2_grpc, identity_pb2_grpc, replication_pb2_grpc, fence_pb2_grpc
 
 from controllers.common.csi_logger import set_log_level
 from controllers.common.settings import CSI_CONTROLLER_SERVER_WORKERS
-from controllers.servers.csi.server_manager import ServerManager
 from controllers.servers.csi.controller_server.csi_controller_server import CSIControllerServicer
 from controllers.servers.csi.controller_server.volume_group_server import VolumeGroupControllerServicer
-from controllers.servers.csi.csi_addons_server.replication_controller_servicer import ReplicationControllerServicer
+from controllers.servers.csi.csi_addons_server.fence import FenceControllerServicer
 from controllers.servers.csi.csi_addons_server.identity_controller_servicer import IdentityControllerServicer
+from controllers.servers.csi.csi_addons_server.replication_controller_servicer import ReplicationControllerServicer
+from controllers.servers.csi.server_manager import ServerManager
 
 
 def main():
@@ -56,8 +56,10 @@ def _add_csi_controller_servicers(controller_server):
 def _add_csi_addons_servicers(csi_addons_server):
     replication_servicer = ReplicationControllerServicer()
     identity_servicer = IdentityControllerServicer()
+    fence_servicer = FenceControllerServicer()
     replication_pb2_grpc.add_ControllerServicer_to_server(replication_servicer, csi_addons_server)
     identity_pb2_grpc.add_IdentityServicer_to_server(identity_servicer, csi_addons_server)
+    fence_pb2_grpc.add_FenceControllerServicer_to_server(fence_servicer, csi_addons_server)
     return csi_addons_server
 
 
@@ -66,7 +68,7 @@ def _start_servers(csi_controller_server_manager, csi_addons_server_manager):
         csi_controller_server_manager.start_server,
         csi_addons_server_manager.start_server)
     for server_function in servers:
-        thread = Thread(target=server_function,)
+        thread = Thread(target=server_function, )
         thread.start()
 
 

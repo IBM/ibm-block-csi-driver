@@ -10,6 +10,11 @@ class FenceControllerServicer(fence_pb2_grpc.FenceControllerServicer):
     def FenceClusterNetwork(self, request, context):
         logger.debug("FenceClusterNetwork parameters : {}".format(request.parameters))
         logger.debug("FenceClusterNetwork cidrs : {}".format(request.cidrs))
+        """
+        1. get ogA's pools
+        2. move pools to ogB
+        3. remove all mapping from ogA
+        """
 
     @csi_method(error_response_type=fence_pb2.UnfenceClusterNetworkResponse, lock_request_attribute="cidrs")
     def UnfenceClusterNetwork(self, request, context):
