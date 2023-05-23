@@ -7,16 +7,15 @@ from mock import Mock, MagicMock
 from controllers.servers.settings import PARAMETERS_SYSTEM_ID, PARAMETERS_COPY_TYPE, PARAMETERS_REPLICATION_POLICY
 from controllers.array_action.settings import REPLICATION_TYPE_MIRROR, REPLICATION_TYPE_EAR, REPLICATION_COPY_TYPE_SYNC
 from controllers.array_action.array_action_types import ReplicationRequest
-from controllers.servers.csi.addons_server import ReplicationControllerServicer
+from controllers.servers.csi.csi_addons_server.replication_controller_servicer import ReplicationControllerServicer
 from controllers.tests import utils
 from controllers.tests.common.test_settings import VOLUME_NAME, VOLUME_UID, OBJECT_INTERNAL_ID, \
-    OTHER_OBJECT_INTERNAL_ID, REPLICATION_NAME, SYSTEM_ID, COPY_TYPE, SECRET_USERNAME_VALUE, SECRET_PASSWORD_VALUE, \
-    SECRET_MANAGEMENT_ADDRESS_VALUE, DUMMY_VOLUME_GROUP
+    OTHER_OBJECT_INTERNAL_ID, REPLICATION_NAME, SYSTEM_ID, COPY_TYPE, SECRET, DUMMY_VOLUME_GROUP
 from controllers.tests.controller_server.common import mock_get_agent
-from controllers.tests.controller_server.csi_controller_server_test import (CommonControllerTest)
+from controllers.tests.controller_server.controller_server.csi_controller_server_test import (CommonControllerTest)
 from controllers.tests.utils import ProtoBufMock
 
-ADDON_SERVER_PATH = "controllers.servers.csi.addons_server"
+REPLICATION_SERVICER_PATH = "controllers.servers.csi.csi_addons_server.replication_controller_servicer"
 
 
 class BaseReplicationSetUp(unittest.TestCase):
@@ -27,11 +26,10 @@ class BaseReplicationSetUp(unittest.TestCase):
         self.mediator.client = Mock()
 
         self.storage_agent = MagicMock()
-        mock_get_agent(self, ADDON_SERVER_PATH)
+        mock_get_agent(self, REPLICATION_SERVICER_PATH)
 
         self.request = ProtoBufMock()
-        self.request.secrets = {"username": SECRET_USERNAME_VALUE, "password": SECRET_PASSWORD_VALUE,
-                                "management_address": SECRET_MANAGEMENT_ADDRESS_VALUE}
+        self.request.secrets = SECRET
         self.request.volume_id = "{0}:{1};{1}".format("A9000", OBJECT_INTERNAL_ID)
         self.request.replication_id = "{}:{};{}".format("A9000", OTHER_OBJECT_INTERNAL_ID, VOLUME_UID)
         self.request.replication_source.volumegroup.volume_group_id = self.request.volume_id

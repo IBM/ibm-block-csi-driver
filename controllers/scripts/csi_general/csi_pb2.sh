@@ -13,6 +13,7 @@ curl -O https://raw.githubusercontent.com/container-storage-interface/spec/${CSI
 curl -O https://raw.githubusercontent.com/IBM/csi-volume-group/${VG_VERSION}/volumegroup/volumegroup.proto
 curl -O https://raw.githubusercontent.com/csi-addons/spec/v0.2.0/replication/replication.proto
 curl -O https://raw.githubusercontent.com/csi-addons/spec/v0.2.0/fence/fence.proto
+curl -O https://raw.githubusercontent.com/csi-addons/spec/main/identity/identity.proto
 sed -i 's|github.com/container-storage-interface/spec/lib/go/csi/csi.proto|csi_general/csi.proto|g' replication.proto
 sed -i 's|github.com/container-storage-interface/spec/lib/go/csi/csi.proto|csi_general/csi.proto|g' fence.proto
 cd -

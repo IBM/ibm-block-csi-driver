@@ -7,15 +7,15 @@ from munch import Munch
 
 from controllers.array_action import errors as array_errors
 from controllers.servers import settings as servers_settings
-from controllers.servers.csi.volume_group_server import VolumeGroupControllerServicer
+from controllers.servers.csi.controller_server.volume_group_server import VolumeGroupControllerServicer
 from controllers.tests import utils
 from controllers.tests.common.test_settings import SECRET, VOLUME_GROUP_NAME, NAME_PREFIX, REQUEST_VOLUME_GROUP_ID, \
     VOLUME_GROUP_UID, REQUEST_VOLUME_ID, VOLUME_UID, REQUEST_REAL_VOLUME_ID, REAL_NGUID
 from controllers.tests.controller_server.common import mock_array_type, mock_mediator, mock_get_agent
-from controllers.tests.controller_server.csi_controller_server_test import CommonControllerTest
+from controllers.tests.controller_server.controller_server.csi_controller_server_test import CommonControllerTest
 from controllers.tests.utils import ProtoBufMock
 
-VG_CONTROLLER_SERVER_PATH = "controllers.servers.csi.volume_group_server"
+VG_CONTROLLER_SERVER_PATH = "controllers.servers.csi.controller_server.volume_group_server"
 
 
 class BaseVgControllerSetUp(unittest.TestCase):
