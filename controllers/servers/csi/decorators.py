@@ -50,3 +50,14 @@ def _set_sync_lock(lock_id, lock_request_attribute, error_response_type,
         return handle_exception(ex, context, grpc.StatusCode.ABORTED, error_response_type)
     logger.info("finished {}".format(controller_method_name))
     return response
+
+
+def register_csi_plugin(registration_map):
+    @decorator
+    def call_csi_plugin_registration(mediator_method, mediator_class, *args):
+        plugin_fields = registration_map.get(mediator_method.__name__, {})
+        if plugin_fields:
+            mediator_class.register_plugin(plugin_fields['unique_key'], plugin_fields['metadata'])
+        return mediator_method(mediator_class, *args)
+
+    return call_csi_plugin_registration
