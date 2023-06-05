@@ -1,11 +1,14 @@
 import unittest
 from unittest.mock import MagicMock
+from time import sleep
+from datetime import datetime, timedelta
 
 from mock import patch, Mock, call, PropertyMock
 from munch import Munch
 from pysvc import errors as svc_errors
 from pysvc.unified.response import CLIFailureError, SVCResponse
 
+from controllers.common.config import config
 import controllers.array_action.errors as array_errors
 import controllers.tests.array_action.svc.test_settings as svc_settings
 import controllers.tests.array_action.test_settings as array_settings
@@ -2478,3 +2481,37 @@ class TestArrayMediatorSVC(unittest.TestCase):
 
         self.svc.client.svctask.chvdisk.assert_called_once_with(vdisk_id=common_settings.INTERNAL_VOLUME_ID,
                                                                 novolumegroup=True)
+
+    @patch('controllers.array_action.array_mediator_svc.SVC_REGISTRATION_CACHE')
+    def test_register_plugin_when_there_is_no_registered_storage_success(self, mock_cache):
+        self._test_register_plugin_success(mock_cache, {}, True)
+
+    @patch('controllers.array_action.array_mediator_svc.SVC_REGISTRATION_CACHE')
+    def test_register_plugin_when_unique_key_is_registered_more_than_two_hours_ago_success(self, mock_cache):
+        current_time = datetime.now()
+        three_hours_ago = current_time - timedelta(hours=3)
+        self._test_register_plugin_success(mock_cache, {'test_key': three_hours_ago}, True)
+
+    @patch('controllers.array_action.array_mediator_svc.SVC_REGISTRATION_CACHE')
+    def test_do_not_register_plugin_when_unique_key_is_registered_less_than_two_hours_ago_success(self, mock_cache):
+        current_time = datetime.now()
+        one_hours_ago = current_time - timedelta(hours=1)
+        self._test_register_plugin_success(mock_cache, {'test_key': one_hours_ago}, False)
+
+    @patch('controllers.array_action.array_mediator_svc.SVC_REGISTRATION_CACHE')
+    def test_assert_no_exception_when_register_fail_success(self, mock_cache):
+        self.svc.client.svctask.registerplugin.side_effect = [Exception]
+        self._test_register_plugin_success(mock_cache, {}, True)
+
+    def _test_register_plugin_success(self, mock_cache, mock_cache_return_value, should_register):
+        mock_cache.get.return_value = mock_cache_return_value
+        self.svc.register_plugin('test_key', 'some_metadata')
+        sleep(0.1)
+
+        if should_register:
+            self.svc.client.svctask.registerplugin.assert_called_once_with(name='block.csi.ibm.com',
+                                                                           uniquekey='test_key',
+                                                                           version=config.identity.version,
+                                                                           metadata='some_metadata')
+        else:
+            self.svc.client.svctask.registerplugin.not_called()
