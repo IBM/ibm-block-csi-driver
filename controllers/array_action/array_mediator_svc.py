@@ -24,7 +24,7 @@ from controllers.array_action.utils import ClassProperty, convert_scsi_id_to_ngu
 from controllers.array_action.volume_group_interface import VolumeGroupInterface
 from controllers.common import settings as common_settings
 from controllers.common.csi_logger import get_stdout_logger
-from controllers.servers.utils import get_connectivity_type_ports, split_string
+from controllers.servers.utils import get_connectivity_type_ports, split_string, is_call_home_enabled
 
 array_connections_dict = {}
 logger = get_stdout_logger()
@@ -2066,7 +2066,7 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
         self._change_volume_group(cli_volume.id, None)
 
     def register_plugin(self, unique_key,  metadata):
-        if self._is_plugin_needs_to_be_registered(unique_key):
+        if is_call_home_enabled() and self._is_plugin_needs_to_be_registered(unique_key):
             thread = Thread(target=self._register_plugin, args=(unique_key, metadata,))
             thread.start()
 

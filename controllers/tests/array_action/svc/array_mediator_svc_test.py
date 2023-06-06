@@ -2482,29 +2482,54 @@ class TestArrayMediatorSVC(unittest.TestCase):
         self.svc.client.svctask.chvdisk.assert_called_once_with(vdisk_id=common_settings.INTERNAL_VOLUME_ID,
                                                                 novolumegroup=True)
 
+    @patch('{}.is_call_home_enabled'.format('controllers.array_action.array_mediator_svc'))
     @patch('controllers.array_action.array_mediator_svc.SVC_REGISTRATION_CACHE')
-    def test_register_plugin_when_there_is_no_registered_storage_success(self, mock_cache):
-        self._test_register_plugin_success(mock_cache, {}, True)
+    def test_register_plugin_when_there_is_no_registered_storage_success(self, mock_cache, is_enabled_mock):
+        mock_cache.get.return_value = {}
+        is_enabled_mock.return_value = True
 
+        self._test_register_plugin_success(True)
+
+    @patch('{}.is_call_home_enabled'.format('controllers.array_action.array_mediator_svc'))
     @patch('controllers.array_action.array_mediator_svc.SVC_REGISTRATION_CACHE')
-    def test_register_plugin_when_unique_key_is_registered_more_than_two_hours_ago_success(self, mock_cache):
+    def test_register_plugin_when_unique_key_is_registered_more_than_two_hours_ago_success(
+            self, mock_cache, is_enabled_mock):
         current_time = datetime.now()
         three_hours_ago = current_time - timedelta(hours=3)
-        self._test_register_plugin_success(mock_cache, {'test_key': three_hours_ago}, True)
+        mock_cache.get.return_value = {'test_key': three_hours_ago}
+        is_enabled_mock.return_value = True
 
+        self._test_register_plugin_success(True)
+
+    @patch('{}.is_call_home_enabled'.format('controllers.array_action.array_mediator_svc'))
     @patch('controllers.array_action.array_mediator_svc.SVC_REGISTRATION_CACHE')
-    def test_do_not_register_plugin_when_unique_key_is_registered_less_than_two_hours_ago_success(self, mock_cache):
+    def test_do_not_register_plugin_when_unique_key_is_registered_less_than_two_hours_ago_success(
+            self, mock_cache, is_enabled_mock):
         current_time = datetime.now()
         one_hours_ago = current_time - timedelta(hours=1)
-        self._test_register_plugin_success(mock_cache, {'test_key': one_hours_ago}, False)
+        mock_cache.get.return_value = {'test_key': one_hours_ago}
+        is_enabled_mock.return_value = True
 
+        self._test_register_plugin_success(False)
+
+    @patch('{}.is_call_home_enabled'.format('controllers.array_action.array_mediator_svc'))
     @patch('controllers.array_action.array_mediator_svc.SVC_REGISTRATION_CACHE')
-    def test_assert_no_exception_when_register_fail_success(self, mock_cache):
+    def test_assert_no_exception_when_register_fail_success(self, mock_cache, is_enabled_mock):
         self.svc.client.svctask.registerplugin.side_effect = [Exception]
-        self._test_register_plugin_success(mock_cache, {}, True)
+        mock_cache.get.return_value = {}
+        is_enabled_mock.return_value = True
 
-    def _test_register_plugin_success(self, mock_cache, mock_cache_return_value, should_register):
-        mock_cache.get.return_value = mock_cache_return_value
+        self._test_register_plugin_success(True)
+
+    @patch('{}.is_call_home_enabled'.format('controllers.array_action.array_mediator_svc'))
+    @patch('controllers.array_action.array_mediator_svc.SVC_REGISTRATION_CACHE')
+    def test_do_not_register_plugin_when_call_home_is_not_enabled_success(self, mock_cache, is_enabled_mock):
+        is_enabled_mock.return_value = False
+
+        self._test_register_plugin_success(False)
+        self.assertEqual(mock_cache.get.call_count, 0)
+
+    def _test_register_plugin_success(self, should_register):
         self.svc.register_plugin('test_key', 'some_metadata')
         sleep(0.1)
 
