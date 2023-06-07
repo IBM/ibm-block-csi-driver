@@ -546,4 +546,4 @@ class TestUtils(unittest.TestCase):
         mock_getenv.return_value = get_env_return_value
         result = utils.is_call_home_enabled()
         self.assertEqual(result, expected_result)
-        mock_getenv.assert_called_once_with(controller_config.ENABLE_CALL_HOME_ENV_VAR)
+        mock_getenv.assert_called_once_with(controller_config.ENABLE_CALL_HOME_ENV_VAR, 'true')
