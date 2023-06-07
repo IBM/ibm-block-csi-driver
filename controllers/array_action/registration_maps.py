@@ -16,7 +16,7 @@ snapshot_plugin_type = _generate_plugin_type('snapshot')
 host_definition_plugin_type = _generate_plugin_type('host_definition')
 
 
-SVC_REGISTRATION_MAP = {
+REGISTRATION_MAP = {
     'create_volume': basic_plugin_type,
     'delete_volume': basic_plugin_type,
     'map_volume': basic_plugin_type,
