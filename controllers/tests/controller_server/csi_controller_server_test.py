@@ -452,10 +452,6 @@ class TestCreateVolume(BaseControllerSetUp, CommonControllerTest):
     def test_create_volume_with_topologies_succeeds(self):
         self._test_create_volume_with_topologies_succeeds()
 
-    def test_create_volume_with_topologies_when_register_plugin_is_not_implemented_succeeds(self):
-        self.mediator.register_plugin.side_effect = [NotImplementedError]
-        self._test_create_volume_with_topologies_succeeds()
-
     def _test_create_volume_with_topologies_succeeds(self):
         self.request.secrets = utils.get_fake_secret_config(system_id="u2", supported_topologies=[
             {"topology.block.csi.ibm.com/test": "topology_value"}])

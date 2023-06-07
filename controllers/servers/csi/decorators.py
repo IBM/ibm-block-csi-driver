@@ -4,7 +4,9 @@ from decorator import decorator
 from controllers.common.csi_logger import get_stdout_logger
 from controllers.common.utils import set_current_thread_name
 from controllers.servers.errors import ObjectAlreadyProcessingError
-from controllers.servers.settings import VOLUME_TYPE_NAME, VOLUME_GROUP_TYPE_NAME, LOCK_REPLICATION_REQUEST_ATTR
+from controllers.servers.settings import (VOLUME_TYPE_NAME, VOLUME_GROUP_TYPE_NAME,
+                                          LOCK_REPLICATION_REQUEST_ATTR, UNIQUE_KEY_KEY)
+from controllers.array_action.settings import METADATA_KEY
 from controllers.servers.csi.exception_handler import handle_exception, handle_common_exceptions
 from controllers.servers.csi.sync_lock import SyncLock
 
@@ -57,7 +59,7 @@ def register_csi_plugin(registration_map):
     def call_csi_plugin_registration(mediator_method, mediator_class, *args):
         plugin_fields = registration_map.get(mediator_method.__name__, {})
         if plugin_fields:
-            mediator_class.register_plugin(plugin_fields['unique_key'], plugin_fields['metadata'])
+            mediator_class.register_plugin(plugin_fields[UNIQUE_KEY_KEY], plugin_fields[METADATA_KEY])
         return mediator_method(mediator_class, *args)
 
     return call_csi_plugin_registration

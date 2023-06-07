@@ -100,10 +100,7 @@ class CSIControllerServicer(csi_pb2_grpc.ControllerServicer):
 
                     array_mediator.validate_supported_space_efficiency(space_efficiency)
                     if topologies:
-                        try:
-                            array_mediator.register_plugin('topology', '')
-                        except NotImplementedError:
-                            pass
+                        array_mediator.register_plugin('topology', '')
                     volume = array_mediator.create_volume(volume_final_name, required_bytes, space_efficiency, pool,
                                                           volume_parameters.io_group, volume_parameters.volume_group,
                                                           source_ids, source_type, is_virt_snap_func)

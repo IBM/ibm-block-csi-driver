@@ -560,4 +560,4 @@ class XIVArrayMediator(ArrayMediatorAbstract):
         raise NotImplementedError
 
     def register_plugin(self, unique_key,  metadata):
-        raise NotImplementedError
+        return None
