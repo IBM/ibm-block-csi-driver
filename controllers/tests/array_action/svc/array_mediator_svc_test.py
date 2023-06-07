@@ -1,6 +1,5 @@
 import unittest
 from unittest.mock import MagicMock
-from time import sleep
 from datetime import datetime, timedelta
 
 from mock import patch, Mock, call, PropertyMock
@@ -2531,7 +2530,6 @@ class TestArrayMediatorSVC(unittest.TestCase):
 
     def _test_register_plugin_success(self, should_register):
         self.svc.register_plugin('test_key', 'some_metadata')
-        sleep(0.1)
 
         if should_register:
             self.svc.client.svctask.registerplugin.assert_called_once_with(name='block.csi.ibm.com',

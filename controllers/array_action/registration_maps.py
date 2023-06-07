@@ -1,4 +1,5 @@
-from controllers.array_action.settings import UNIQUE_KEY_KEY, METADATA_KEY
+from controllers.array_action.settings import METADATA_KEY
+from controllers.servers.settings import UNIQUE_KEY_KEY
 
 
 def _generate_plugin_type(unique_key, metadata=''):

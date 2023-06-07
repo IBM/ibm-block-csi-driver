@@ -2,7 +2,6 @@ from collections import defaultdict
 from io import StringIO
 from random import choice
 from datetime import datetime, timedelta
-from threading import Thread
 
 from packaging.version import Version
 from pysvc import errors as svc_errors
@@ -2066,31 +2065,30 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
         self._change_volume_group(cli_volume.id, None)
 
     def register_plugin(self, unique_key,  metadata):
-        if is_call_home_enabled() and self._is_plugin_needs_to_be_registered(unique_key):
-            thread = Thread(target=self._register_plugin, args=(unique_key, metadata,))
-            thread.start()
-
-    def _is_plugin_needs_to_be_registered(self, unique_key):
-        current_time = datetime.now()
-        endpoint_cache = SVC_REGISTRATION_CACHE.get(self.endpoint, '')
-        if not endpoint_cache:
-            return True
-        last_registration_time = endpoint_cache.get(unique_key, '')
-        if last_registration_time:
-            time_difference = current_time - last_registration_time
-            return time_difference >= timedelta(hours=2)
-        return True
-
-    def _register_plugin(self, unique_key, metadata):
-        if self._is_registerplugin_supported():
-            self._update_registration_cache(unique_key)
-            self._registerplugin(unique_key, metadata)
+        if is_call_home_enabled() and self._is_registerplugin_supported() and \
+                self._is_plugin_needs_to_be_registered(unique_key):
+            self._register_plugin(unique_key, metadata)
 
     def _is_registerplugin_supported(self):
         return hasattr(self.client.svctask, "registerplugin")
 
+    def _is_plugin_needs_to_be_registered(self, unique_key):
+        current_time = datetime.now()
+        endpoint_cache = SVC_REGISTRATION_CACHE.get(self.endpoint)
+        if not endpoint_cache:
+            return True
+        last_registration_time = endpoint_cache.get(unique_key)
+        if last_registration_time:
+            time_difference = current_time - last_registration_time
+            return time_difference >= timedelta(hours=array_settings.MINIMUM_HOURS_BETWEEN_REGISTRATIONS)
+        return True
+
+    def _register_plugin(self, unique_key, metadata):
+        self._update_registration_cache(unique_key)
+        self._registerplugin(unique_key, metadata)
+
     def _update_registration_cache(self, unique_key):
-        endpoint_cache = SVC_REGISTRATION_CACHE.get(self.endpoint, '')
+        endpoint_cache = SVC_REGISTRATION_CACHE.get(self.endpoint)
         if not endpoint_cache:
             SVC_REGISTRATION_CACHE[self.endpoint] = {}
         SVC_REGISTRATION_CACHE[self.endpoint][unique_key] = datetime.now()
