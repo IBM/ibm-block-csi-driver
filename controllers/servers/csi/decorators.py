@@ -7,6 +7,7 @@ from controllers.servers.errors import ObjectAlreadyProcessingError
 from controllers.servers.settings import (VOLUME_TYPE_NAME, VOLUME_GROUP_TYPE_NAME,
                                           LOCK_REPLICATION_REQUEST_ATTR, UNIQUE_KEY_KEY)
 from controllers.array_action.settings import METADATA_KEY
+from controllers.array_action.registration_maps import REGISTRATION_MAP
 from controllers.servers.csi.exception_handler import handle_exception, handle_common_exceptions
 from controllers.servers.csi.sync_lock import SyncLock
 
@@ -54,10 +55,10 @@ def _set_sync_lock(lock_id, lock_request_attribute, error_response_type,
     return response
 
 
-def register_csi_plugin(registration_map):
+def register_csi_plugin():
     @decorator
     def call_csi_plugin_registration(mediator_method, mediator_class, *args):
-        plugin_fields = registration_map.get(mediator_method.__name__, {})
+        plugin_fields = REGISTRATION_MAP.get(mediator_method.__name__, {})
         if plugin_fields:
             mediator_class.register_plugin(plugin_fields[UNIQUE_KEY_KEY], plugin_fields[METADATA_KEY])
         return mediator_method(mediator_class, *args)
