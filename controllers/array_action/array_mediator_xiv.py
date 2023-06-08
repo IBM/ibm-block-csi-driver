@@ -558,3 +558,6 @@ class XIVArrayMediator(ArrayMediatorAbstract):
 
     def change_host_protocol(self, host_name, protocol):
         raise NotImplementedError
+
+    def register_plugin(self, unique_key,  metadata):
+        return None
