@@ -10,7 +10,7 @@ from controllers.common.csi_logger import set_log_level
 from controllers.common.settings import CSI_CONTROLLER_SERVER_WORKERS
 from controllers.servers.csi.controller_server.csi_controller_server import CSIControllerServicer
 from controllers.servers.csi.controller_server.volume_group_server import VolumeGroupControllerServicer
-from controllers.servers.csi.csi_addons_server.fence import FenceControllerServicer
+from controllers.servers.csi.csi_addons_server.fence_controller_servicer import FenceControllerServicer
 from controllers.servers.csi.csi_addons_server.identity_controller_servicer import IdentityControllerServicer
 from controllers.servers.csi.csi_addons_server.replication_controller_servicer import ReplicationControllerServicer
 from controllers.servers.csi.server_manager import ServerManager
