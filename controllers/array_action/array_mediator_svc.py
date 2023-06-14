@@ -10,8 +10,8 @@ from retry import retry
 
 import controllers.array_action.errors as array_errors
 import controllers.array_action.settings as array_settings
-from controllers.array_action import svc_messages
 import controllers.servers.settings as controller_settings
+from controllers.array_action import svc_messages
 from controllers.array_action.array_action_types import Volume, Snapshot, Replication, Host, VolumeGroup, ThinVolume
 from controllers.array_action.array_mediator_abstract import ArrayMediatorAbstract
 from controllers.array_action.fence_interface import FenceInterface
@@ -2034,6 +2034,7 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface, FenceInterfa
         self._change_volume_group(cli_volume.id, None)
 
     def _get_ownership_group_pools(self, ownership_group):
+        logger.info(svc_messages.GET_OWNERSHIP_GROUP_POOLS.format(ownership_group))
         filter_value = 'owner_name={}'.format(ownership_group)
         cli_pools = self._lsmdiskgrp(filtervalue=filter_value).as_list
         return cli_pools
@@ -2041,24 +2042,17 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface, FenceInterfa
     def is_fenced(self, fence_ownership_group):
         ownership_group_pools = self._get_ownership_group_pools(fence_ownership_group)
         if len(ownership_group_pools) == 0:
+            logger.info(svc_messages.NO_POOLS_FOUND_IN_OWNERSHIP_GROUP.format(fence_ownership_group))
             return True
 
+        logger.info(svc_messages.POOLS_FOUND_IN_OWNERSHIP_GROUP.format(fence_ownership_group, ownership_group_pools))
         return False
 
     def _chmdiskgrp(self, pool_id, **cli_kwargs):
         self.client.svctask.chmdiskgrp(object_id=pool_id, **cli_kwargs)
 
-    def fence(self, fence_ownership_group, unfence_ownership_group):
-        ownership_group_pools = self._get_ownership_group_pools(fence_ownership_group)
-        if len(ownership_group_pools) == 0:
-            return
-
-        self._remove_all_mappings_from_ownership_group(fence_ownership_group)
-
-        for pool in ownership_group_pools:
-            self._chmdiskgrp(pool.id, ownershipgroup=unfence_ownership_group)
-
     def _remove_all_mappings_from_ownership_group(self, ownership_group):
+        logger.info(svc_messages.REMOVING_ALL_MAPPINGS_FROM_OWNERSHIP_GROUP.format(ownership_group))
         filter_value = 'owner_name={}'.format(ownership_group)
 
         hosts = self.client.svcinfo.lshost(filtervalue=filter_value).as_list
@@ -2069,6 +2063,23 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface, FenceInterfa
 
         mappings = self.client.svcinfo.lshostvdiskmap().as_list
 
-        for mapping in mappings:
-            if mapping.name in host_names and mapping.vdisk_name in volume_names:
-                self.client.svctask.rmvdiskhostmap(vdisk_name=mapping.vdisk_name, host=mapping.name)
+        relevant_mappings = [mapping for mapping in mappings if
+                             mapping.name in host_names and mapping.vdisk_name in volume_names]
+        logger.info(svc_messages.REMOVING_MAPPINGS.format(relevant_mappings))
+        for mapping in relevant_mappings:
+            self.client.svctask.rmvdiskhostmap(vdisk_name=mapping.vdisk_name, host=mapping.name)
+
+    def _change_pools_ownership_group(self, ownership_group, pools):
+        logger.info(svc_messages.CHANGE_POOLS_OWNERSHIP_GROUP.format(ownership_group))
+        for pool in pools:
+            self._chmdiskgrp(pool.id, ownershipgroup=ownership_group)
+
+    def fence(self, fence_ownership_group, unfence_ownership_group):
+        ownership_group_pools = self._get_ownership_group_pools(fence_ownership_group)
+        if len(ownership_group_pools) == 0:
+            logger.info(svc_messages.NO_POOLS_FOUND_IN_OWNERSHIP_GROUP.format(fence_ownership_group))
+            return
+
+        self._remove_all_mappings_from_ownership_group(fence_ownership_group)
+
+        self._change_pools_ownership_group(unfence_ownership_group, ownership_group_pools)

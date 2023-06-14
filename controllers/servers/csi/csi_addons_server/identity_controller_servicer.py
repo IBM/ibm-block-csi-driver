@@ -29,7 +29,7 @@ class IdentityControllerServicer(pb2_grpc.IdentityServicer):
         response = pb2.GetCapabilitiesResponse(
             capabilities=[self._get_replication_capability(),
                           self._get_controller_capability(),
-                          self._get_NetworkFence_capability()])
+                          self._get_network_fence_capability()])
 
         logger.info("finished GetCapabilities")
         return response
@@ -46,7 +46,7 @@ class IdentityControllerServicer(pb2_grpc.IdentityServicer):
         return pb2.Capability(
             service=pb2.Capability.Service(type=capability_enum_value))
 
-    def _get_NetworkFence_capability(self):
+    def _get_network_fence_capability(self):
         types = pb2.Capability.NetworkFence.Type
         capability_enum_value = types.Value("NETWORK_FENCE")
         return pb2.Capability(

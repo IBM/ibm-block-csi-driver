@@ -1,4 +1,5 @@
 from controllers.common import settings as common_settings
+
 SECRET_USERNAME_KEY = "username"
 SECRET_USERNAME_VALUE = "dummy_username"
 SECRET_PASSWORD_KEY = "password"

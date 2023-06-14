@@ -13,6 +13,7 @@ def _is_already_handled(mediator, fence_ownership_group):
 
 
 def _fence_cluster_network(mediator, fence_ownership_group, unfence_ownership_group):
+    logger.info("fencing {}".format(fence_ownership_group))
     mediator.fence(fence_ownership_group, unfence_ownership_group)
 
 
@@ -25,6 +26,7 @@ def handle_fencing(request):
     with get_agent(connection_info, array_type).get_mediator() as mediator:
         # idempotence - check if the fence_ownership_group is already fenced (no pools in the og)
         if _is_already_handled(mediator, fence_ownership_group):
+            logger.info("{} is fenced".format(fence_ownership_group))
             return fence_pb2.FenceClusterNetworkResponse()
         _fence_cluster_network(mediator, fence_ownership_group, unfence_ownership_group)
         return fence_pb2.FenceClusterNetworkResponse()
@@ -33,14 +35,10 @@ def handle_fencing(request):
 class FenceControllerServicer(fence_pb2_grpc.FenceControllerServicer):
     @csi_fence_method(error_response_type=fence_pb2.FenceClusterNetworkResponse)
     def FenceClusterNetwork(self, request, context):
-        logger.debug("FenceClusterNetwork parameters : {}".format(request.parameters))
-        logger.debug("FenceClusterNetwork cidrs : {}".format(request.cidrs))
         return handle_fencing(request)
 
     @csi_fence_method(error_response_type=fence_pb2.UnfenceClusterNetworkResponse)
     def UnfenceClusterNetwork(self, request, context):
-        logger.debug("UnfenceClusterNetwork parameters : {}".format(request.parameters))
-        logger.debug("UnfenceClusterNetwork cidrs : {}".format(request.cidrs))
         return handle_fencing(request)
 
     @csi_fence_method(error_response_type=fence_pb2.ListClusterFenceResponse)
