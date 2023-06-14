@@ -15,13 +15,19 @@ def csi_method(error_response_type, lock_request_attribute=''):
     @decorator
     def call_csi_method(controller_method, servicer, request, context):
         lock_id = getattr(request, lock_request_attribute, None)
-        if isinstance(lock_id, dict):
-            lock_id = lock_id.get('fenceToken', '')
         return _set_sync_lock(lock_id, lock_request_attribute, error_response_type,
                               controller_method, servicer, request, context)
 
     return call_csi_method
 
+def csi_fence_method(error_response_type):
+    @decorator
+    def call_csi_method(controller_method, servicer, request, context):
+        lock_id = request.parameters.get('fenceToken', '')
+        return _set_sync_lock(lock_id, 'fenceToken', error_response_type,
+                              controller_method, servicer, request, context)
+
+    return call_csi_method
 
 def csi_replication_method(error_response_type):
     @decorator

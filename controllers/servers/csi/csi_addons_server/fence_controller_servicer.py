@@ -3,7 +3,7 @@ from csi_general import fence_pb2_grpc, fence_pb2
 from controllers.array_action.storage_agent import get_agent, detect_array_type
 from controllers.common.csi_logger import get_stdout_logger
 from controllers.servers import utils
-from controllers.servers.csi.decorators import csi_method
+from controllers.servers.csi.decorators import csi_fence_method
 
 logger = get_stdout_logger()
 
@@ -31,14 +31,18 @@ def handle_fencing(request):
 
 
 class FenceControllerServicer(fence_pb2_grpc.FenceControllerServicer):
-    @csi_method(error_response_type=fence_pb2.FenceClusterNetworkResponse, lock_request_attribute="parameters")
+    @csi_fence_method(error_response_type=fence_pb2.FenceClusterNetworkResponse)
     def FenceClusterNetwork(self, request, context):
         logger.debug("FenceClusterNetwork parameters : {}".format(request.parameters))
         logger.debug("FenceClusterNetwork cidrs : {}".format(request.cidrs))
         return handle_fencing(request)
 
-    @csi_method(error_response_type=fence_pb2.UnfenceClusterNetworkResponse, lock_request_attribute="parameters")
+    @csi_fence_method(error_response_type=fence_pb2.UnfenceClusterNetworkResponse)
     def UnfenceClusterNetwork(self, request, context):
         logger.debug("UnfenceClusterNetwork parameters : {}".format(request.parameters))
         logger.debug("UnfenceClusterNetwork cidrs : {}".format(request.cidrs))
         return handle_fencing(request)
+
+    @csi_fence_method(error_response_type=fence_pb2.ListClusterFenceResponse)
+    def ListClusterFence(self, request, context):
+        raise NotImplementedError()

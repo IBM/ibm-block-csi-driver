@@ -14,6 +14,7 @@ from controllers.array_action import svc_messages
 import controllers.servers.settings as controller_settings
 from controllers.array_action.array_action_types import Volume, Snapshot, Replication, Host, VolumeGroup, ThinVolume
 from controllers.array_action.array_mediator_abstract import ArrayMediatorAbstract
+from controllers.array_action.fence_interface import FenceInterface
 from controllers.array_action.utils import ClassProperty, convert_scsi_id_to_nguid
 from controllers.array_action.volume_group_interface import VolumeGroupInterface
 from controllers.common import settings as common_settings
@@ -99,7 +100,7 @@ def _get_space_efficiency_kwargs(space_efficiency):
 
 def _is_space_efficiency_matches_source(parameter_space_efficiency, array_space_efficiency):
     return (not parameter_space_efficiency and array_space_efficiency == common_settings.SPACE_EFFICIENCY_THICK) or \
-           (parameter_space_efficiency and parameter_space_efficiency == array_space_efficiency)
+        (parameter_space_efficiency and parameter_space_efficiency == array_space_efficiency)
 
 
 def build_create_volume_in_volume_group_kwargs(pool, io_group, source_id):
@@ -209,7 +210,7 @@ def _get_cli_volume_space_efficiency_aliases(cli_volume):
     return space_efficiency_aliases
 
 
-class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
+class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface, FenceInterface):
     ARRAY_ACTIONS = {}
     BLOCK_SIZE_IN_BYTES = 512
     MAX_LUN_NUMBER = 511
@@ -871,9 +872,12 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
             self._rollback_create_snapshot(target_volume_name)
             raise ex
 
+    def _lsmdiskgrp(self, **kwargs):
+        return self.client.svcinfo.lsmdiskgrp(**kwargs)
+
     def _get_pool_site(self, pool):
         filter_value = 'name={}'.format(pool)
-        cli_pool = self.client.svcinfo.lsmdiskgrp(filtervalue=filter_value).as_single_element
+        cli_pool = self._lsmdiskgrp(filtervalue=filter_value).as_single_element
         if cli_pool:
             return cli_pool.site_name
         raise array_errors.PoolDoesNotExist(pool, self.endpoint)
@@ -2028,3 +2032,43 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
     def remove_volume_from_volume_group(self, volume_id):
         cli_volume = self._get_cli_volume_by_wwn(volume_id, not_exist_err=True)
         self._change_volume_group(cli_volume.id, None)
+
+    def _get_ownership_group_pools(self, ownership_group):
+        filter_value = 'owner_name={}'.format(ownership_group)
+        cli_pools = self._lsmdiskgrp(filtervalue=filter_value).as_list
+        return cli_pools
+
+    def is_fenced(self, fence_ownership_group):
+        ownership_group_pools = self._get_ownership_group_pools(fence_ownership_group)
+        if len(ownership_group_pools) == 0:
+            return True
+
+        return False
+
+    def _chmdiskgrp(self, pool_id, **cli_kwargs):
+        self.client.svctask.chmdiskgrp(object_id=pool_id, **cli_kwargs)
+
+    def fence(self, fence_ownership_group, unfence_ownership_group):
+        ownership_group_pools = self._get_ownership_group_pools(fence_ownership_group)
+        if len(ownership_group_pools) == 0:
+            return
+
+        self._remove_all_mappings_from_ownership_group(fence_ownership_group)
+
+        for pool in ownership_group_pools:
+            self._chmdiskgrp(pool.id, ownershipgroup=unfence_ownership_group)
+
+    def _remove_all_mappings_from_ownership_group(self, ownership_group):
+        filter_value = 'owner_name={}'.format(ownership_group)
+
+        hosts = self.client.svcinfo.lshost(filtervalue=filter_value).as_list
+        host_names = [host.name for host in hosts]
+
+        volumes = self._lsvdisk_list(filtervalue=filter_value)
+        volume_names = [volume.name for volume in volumes]
+
+        mappings = self.client.svcinfo.lshostvdiskmap().as_list
+
+        for mapping in mappings:
+            if mapping.name in host_names and mapping.vdisk_name in volume_names:
+                self.client.svctask.rmvdiskhostmap(vdisk_name=mapping.vdisk_name, host=mapping.name)
