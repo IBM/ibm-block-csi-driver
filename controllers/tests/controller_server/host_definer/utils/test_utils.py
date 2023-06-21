@@ -9,6 +9,7 @@ from controllers.servers.csi.controller_types import ArrayConnectionInfo
 from controllers.servers.host_definer.k8s.api import K8SApi
 from controllers.tests.common.test_settings import HOST_NAME, SECRET_MANAGEMENT_ADDRESS_VALUE
 import controllers.tests.controller_server.host_definer.settings as test_settings
+import controllers.common.settings as common_settings
 import controllers.tests.controller_server.host_definer.utils.k8s_manifests_utils as test_manifest_utils
 
 
@@ -43,7 +44,7 @@ def get_fake_k8s_csi_node(csi_provisioner_name=""):
 
 def get_fake_csi_node_watch_event(event_type):
     return test_manifest_utils.generate_watch_event(event_type, test_manifest_utils.get_k8s_csi_node_manifest(
-        test_settings.CSI_PROVISIONER_NAME))
+        common_settings.CSI_PROVISIONER_NAME))
 
 
 def get_fake_k8s_node(label):
@@ -90,11 +91,11 @@ def get_fake_host_definition_watch_event(event_type):
 
 def get_fake_node_watch_event(event_type):
     return test_manifest_utils.generate_watch_event(event_type, test_manifest_utils.get_fake_k8s_node_manifest(
-        test_settings.MANAGE_NODE_LABEL))
+        common_settings.MANAGE_NODE_LABEL))
 
 
 def get_fake_k8s_nodes_items():
-    k8s_node_manifest = test_manifest_utils.get_fake_k8s_node_manifest(test_settings.MANAGE_NODE_LABEL)
+    k8s_node_manifest = test_manifest_utils.get_fake_k8s_node_manifest(common_settings.MANAGE_NODE_LABEL)
     return K8sResourceItems([Munch.fromDict(k8s_node_manifest)])
 
 
@@ -158,11 +159,11 @@ def patch_managed_secrets_global_variable(module_path):
 
 
 def get_pending_creation_status_manifest():
-    return test_manifest_utils.get_status_phase_manifest(test_settings.PENDING_CREATION_PHASE)
+    return test_manifest_utils.get_status_phase_manifest(common_settings.PENDING_CREATION_PHASE)
 
 
 def get_ready_status_manifest():
-    return test_manifest_utils.get_status_phase_manifest(test_settings.READY_PHASE)
+    return test_manifest_utils.get_status_phase_manifest(common_settings.READY_PHASE)
 
 
 def get_array_connection_info():
@@ -228,14 +229,14 @@ def get_fake_csi_node_info():
 def get_fake_node_info():
     node_info = Mock(spec_set=['name', 'labels'])
     node_info.name = test_settings.FAKE_NODE_NAME
-    node_info.labels = {test_settings.MANAGE_NODE_LABEL: test_settings.TRUE_STRING}
+    node_info.labels = {common_settings.MANAGE_NODE_LABEL: common_settings.TRUE_STRING}
     return node_info
 
 
 def get_fake_storage_class_info():
     storage_class_info = Mock(spec_set=['name', 'provisioner', 'parameters'])
     storage_class_info.name = test_settings.FAKE_STORAGE_CLASS
-    storage_class_info.provisioner = test_settings.CSI_PROVISIONER_NAME
+    storage_class_info.provisioner = common_settings.CSI_PROVISIONER_NAME
     storage_class_info.parameters = test_settings.FAKE_STORAGE_CLASS_PARAMETERS
     return storage_class_info
 
@@ -246,7 +247,7 @@ def get_fake_host_definition_info():
     host_definition_info.name = test_settings.FAKE_NODE_NAME
     host_definition_info.resource_version = test_settings.FAKE_RESOURCE_VERSION
     host_definition_info.uid = test_settings.FAKE_UID
-    host_definition_info.phase = test_settings.READY_PHASE
+    host_definition_info.phase = common_settings.READY_PHASE
     host_definition_info.secret_name = test_settings.FAKE_SECRET
     host_definition_info.secret_namespace = test_settings.FAKE_SECRET_NAMESPACE
     host_definition_info.node_name = test_settings.FAKE_NODE_NAME
@@ -265,7 +266,7 @@ def get_fake_empty_host_definition_info():
 
 def get_object_reference():
     return client.V1ObjectReference(
-        api_version=test_settings.CSI_IBM_API_VERSION, kind=test_settings.HOST_DEFINITION_KIND,
+        api_version=common_settings.CSI_IBM_API_VERSION, kind=common_settings.HOST_DEFINITION_KIND,
         name=test_settings.FAKE_NODE_NAME, resource_version=test_settings.FAKE_RESOURCE_VERSION,
         uid=test_settings.FAKE_UID, )
 
@@ -289,7 +290,7 @@ def get_fake_define_host_response():
 def get_fake_io_group_labels(number_of_io_groups):
     labels = {}
     for index in range(number_of_io_groups):
-        labels[test_settings.IO_GROUP_LABEL_PREFIX + str(index)] = test_settings.TRUE_STRING
+        labels[test_settings.IO_GROUP_LABEL_PREFIX + str(index)] = common_settings.TRUE_STRING
     return labels
 
 

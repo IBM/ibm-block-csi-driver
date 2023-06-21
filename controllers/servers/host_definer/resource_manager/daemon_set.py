@@ -1,5 +1,6 @@
 import time
 
+import controllers.common.settings as common_settings
 from controllers.common.csi_logger import get_stdout_logger
 import controllers.servers.host_definer.messages as messages
 from controllers.servers.host_definer import settings
@@ -30,7 +31,7 @@ class DaemonSetManager():
         return csi_daemon_set.metadata.name
 
     def _get_csi_daemon_set(self):
-        daemon_sets = self.k8s_api.list_daemon_set_for_all_namespaces(settings.DRIVER_PRODUCT_LABEL)
+        daemon_sets = self.k8s_api.list_daemon_set_for_all_namespaces(common_settings.DRIVER_PRODUCT_LABEL)
         if daemon_sets and daemon_sets.items:
             return daemon_sets.items[0]
         return None

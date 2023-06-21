@@ -65,11 +65,11 @@ class TestKubernetesApi(unittest.TestCase):
         self.k8s_api.csi_nodes_api.get.return_value = None
         self.k8s_api.patch_cluster_custom_object_status(
             common_settings.CSI_IBM_GROUP, common_settings.VERSION, common_settings.HOST_DEFINITION_PLURAL,
-            test_settings.FAKE_NODE_NAME, test_settings.READY_PHASE)
+            test_settings.FAKE_NODE_NAME, common_settings.READY_PHASE)
         self.k8s_api.custom_object_api.patch_cluster_custom_object_status.assert_called_with(
             common_settings.CSI_IBM_GROUP, common_settings.VERSION,
             common_settings.HOST_DEFINITION_PLURAL, test_settings.FAKE_NODE_NAME,
-            test_settings.READY_PHASE)
+            common_settings.READY_PHASE)
 
     def test_create_event_success(self):
         self.k8s_api.core_api.create_namespaced_event.return_value = None
@@ -104,10 +104,10 @@ class TestKubernetesApi(unittest.TestCase):
     def test_patch_node_success(self):
         self.k8s_api.core_api.patch_node.return_value = None
         self.k8s_api.patch_node(test_settings.FAKE_NODE_NAME, test_manifest_utils.get_fake_k8s_node_manifest(
-            test_settings.MANAGE_NODE_LABEL))
+            common_settings.MANAGE_NODE_LABEL))
         self.k8s_api.core_api.patch_node.assert_called_once_with(
             test_settings.FAKE_NODE_NAME, test_manifest_utils.get_fake_k8s_node_manifest(
-                test_settings.MANAGE_NODE_LABEL))
+                common_settings.MANAGE_NODE_LABEL))
 
     def test_get_secret_data_success(self):
         self.k8s_api.core_api.read_namespaced_secret.return_value = test_utils.get_fake_k8s_secret()
@@ -122,9 +122,9 @@ class TestKubernetesApi(unittest.TestCase):
         self.assertEqual(result, {})
 
     def test_read_node_success(self):
-        self.k8s_api.core_api.read_node.return_value = test_utils.get_fake_k8s_node(test_settings.MANAGE_NODE_LABEL)
+        self.k8s_api.core_api.read_node.return_value = test_utils.get_fake_k8s_node(common_settings.MANAGE_NODE_LABEL)
         result = self.k8s_api.read_node(test_settings.FAKE_NODE_NAME)
-        self.assertEqual(result, test_utils.get_fake_k8s_node(test_settings.MANAGE_NODE_LABEL))
+        self.assertEqual(result, test_utils.get_fake_k8s_node(common_settings.MANAGE_NODE_LABEL))
         self.k8s_api.core_api.read_node.assert_called_once_with(name=test_settings.FAKE_NODE_NAME)
 
     def test_read_node_failure(self):
@@ -135,10 +135,10 @@ class TestKubernetesApi(unittest.TestCase):
     def test_list_daemon_set_for_all_namespaces_success(self):
         self.k8s_api.apps_api.list_daemon_set_for_all_namespaces.return_value = \
             test_utils.get_fake_k8s_daemon_set_items(0, 0)
-        result = self.k8s_api.list_daemon_set_for_all_namespaces(test_settings.MANAGE_NODE_LABEL)
+        result = self.k8s_api.list_daemon_set_for_all_namespaces(common_settings.MANAGE_NODE_LABEL)
         self.assertEqual(result, test_utils.get_fake_k8s_daemon_set_items(0, 0))
         self.k8s_api.apps_api.list_daemon_set_for_all_namespaces.assert_called_once_with(
-            label_selector=test_settings.MANAGE_NODE_LABEL)
+            label_selector=common_settings.MANAGE_NODE_LABEL)
 
     def test_list_daemon_set_for_all_namespaces_failure(self):
         self.k8s_api.apps_api.list_daemon_set_for_all_namespaces.side_effect = self.general_api_exception
@@ -148,10 +148,10 @@ class TestKubernetesApi(unittest.TestCase):
     def test_list_pod_for_all_namespaces_success(self):
         self.k8s_api.core_api.list_pod_for_all_namespaces.return_value = \
             test_utils.get_fake_k8s_daemon_set_items(0, 0)
-        result = self.k8s_api.list_pod_for_all_namespaces(test_settings.MANAGE_NODE_LABEL)
+        result = self.k8s_api.list_pod_for_all_namespaces(common_settings.MANAGE_NODE_LABEL)
         self.assertEqual(result, test_utils.get_fake_k8s_daemon_set_items(0, 0))
         self.k8s_api.core_api.list_pod_for_all_namespaces.assert_called_once_with(
-            label_selector=test_settings.MANAGE_NODE_LABEL)
+            label_selector=common_settings.MANAGE_NODE_LABEL)
 
     def test_list_pod_for_all_namespaces_failure(self):
         self.k8s_api.core_api.list_pod_for_all_namespaces.side_effect = self.general_api_exception
@@ -198,9 +198,9 @@ class TestKubernetesApi(unittest.TestCase):
 
     def test_list_storage_class_success(self):
         self.k8s_api.storage_api.list_storage_class.return_value = \
-            test_utils.get_fake_k8s_storage_class_items(test_settings.CSI_PROVISIONER_NAME)
+            test_utils.get_fake_k8s_storage_class_items(common_settings.CSI_PROVISIONER_NAME)
         result = self.k8s_api.list_storage_class()
-        self.assertEqual(result, test_utils.get_fake_k8s_storage_class_items(test_settings.CSI_PROVISIONER_NAME))
+        self.assertEqual(result, test_utils.get_fake_k8s_storage_class_items(common_settings.CSI_PROVISIONER_NAME))
 
     def test_list_storage_class_failure(self):
         self._test_list_k8s_resource_failure(self.k8s_api.list_storage_class,
@@ -216,9 +216,9 @@ class TestKubernetesApi(unittest.TestCase):
 
     def test_list_csi_node_success(self):
         self.k8s_api.csi_nodes_api.get.return_value = test_utils.get_fake_k8s_csi_node(
-            test_settings.CSI_PROVISIONER_NAME)
+            common_settings.CSI_PROVISIONER_NAME)
         result = self.k8s_api.list_csi_node()
-        self.assertEqual(result, test_utils.get_fake_k8s_csi_node(test_settings.CSI_PROVISIONER_NAME))
+        self.assertEqual(result, test_utils.get_fake_k8s_csi_node(common_settings.CSI_PROVISIONER_NAME))
 
     def test_list_csi_node_failure(self):
         self._test_list_k8s_resource_failure(self.k8s_api.list_csi_node, self.k8s_api.csi_nodes_api.get)

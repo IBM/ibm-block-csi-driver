@@ -1,6 +1,7 @@
 from copy import deepcopy
 from unittest.mock import MagicMock, patch
 
+import controllers.common.settings as common_settings
 import controllers.tests.controller_server.host_definer.utils.test_utils as test_utils
 import controllers.tests.controller_server.host_definer.settings as test_settings
 from controllers.tests.controller_server.host_definer.watchers.watcher_base import WatcherBaseSetUp
@@ -158,11 +159,11 @@ class TestWatchStorageClassResources(StorageClassWatcherBase):
         self.secret_info_with_storage_classes = test_utils.get_fake_secret_info(2)
         self.copy_secret_info_with_storage_classes = deepcopy(self.secret_info_with_storage_classes)
         self.storage_class_added_watch_manifest = test_utils.get_fake_storage_class_watch_event(
-            test_settings.ADDED_EVENT)
+            common_settings.ADDED_EVENT_TYPE)
         self.storage_class_added_watch_munch = test_utils.convert_manifest_to_munch(
             self.storage_class_added_watch_manifest)
         self.storage_class_deleted_watch_manifest = test_utils.get_fake_storage_class_watch_event(
-            test_settings.DELETED_EVENT_TYPE)
+            common_settings.DELETED_EVENT_TYPE)
         self.storage_class_deleted_watch_munch = test_utils.convert_manifest_to_munch(
             self.storage_class_deleted_watch_manifest)
         self.global_managed_secrets = patch('{}.MANAGED_SECRETS'.format(test_settings.STORAGE_CLASS_WATCHER_PATH),

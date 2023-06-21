@@ -1,5 +1,5 @@
 from controllers.common.csi_logger import get_stdout_logger
-from controllers.servers.host_definer import settings
+import controllers.common.settings as common_settings
 import controllers.servers.host_definer.messages as messages
 from controllers.servers.host_definer.k8s.api import K8SApi
 from controllers.servers.host_definer.resource_manager.resource_info import ResourceInfoManager
@@ -26,7 +26,7 @@ class CSINodeManager:
     def _is_k8s_csi_node_has_driver(self, k8s_csi_node):
         if k8s_csi_node.spec.drivers:
             for driver in k8s_csi_node.spec.drivers:
-                if driver.name == settings.CSI_PROVISIONER_NAME:
+                if driver.name == common_settings.CSI_PROVISIONER_NAME:
                     return True
         return False
 

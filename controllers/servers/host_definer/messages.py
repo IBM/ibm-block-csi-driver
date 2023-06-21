@@ -1,4 +1,4 @@
-from controllers.servers.host_definer import settings
+import controllers.common.settings as common_settings
 
 SECRET_DOES_NOT_EXIST = 'Secret {} in namespace {} does not exist'
 FAILED_TO_GET_SECRET = 'Failed to get Secret {} in namespace {}, go this error: {}'
@@ -37,7 +37,7 @@ HOST_DEFINITION_IS_NOT_PENDING = "Stopping verifying host definition {}, using e
 DELETE_HOST_DEFINITION = 'Deleting host definition {}'
 ADD_FINALIZER_TO_HOST_DEFINITION = 'Adding finalizer to host definition {}'
 REMOVE_FINALIZER_TO_HOST_DEFINITION = 'Removing finalizer from host definition {}'
-FAILED_TO_REMOVE_FINALIZER = 'Failed to remove {} finalizer from node'.format(settings.CSI_IBM_FINALIZER)
+FAILED_TO_REMOVE_FINALIZER = 'Failed to remove {} finalizer from node'.format(common_settings.CSI_IBM_FINALIZER)
 NODE_ID_WAS_CHANGED = "NodeId was changed for {} node, updating his ports in his definitions,"\
     "old NodeId [{}], new NodeId [{}]"
 UPDATE_HOST_DEFINITION_FIELDS_FROM_STORAGE = 'Update host definition {} host from storage fields with {}'

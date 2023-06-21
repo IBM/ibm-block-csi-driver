@@ -1,6 +1,7 @@
 from unittest.mock import MagicMock, patch
 from copy import deepcopy
 
+import controllers.common.settings as common_settings
 import controllers.tests.controller_server.host_definer.utils.test_utils as test_utils
 import controllers.tests.controller_server.host_definer.settings as test_settings
 from controllers.tests.controller_server.host_definer.watchers.watcher_base import WatcherBaseSetUp
@@ -53,10 +54,11 @@ class TestWatchCsiNodesResources(CsiNodeWatcherBase):
         self.managed_node_with_different_node_id.node_id = 'different_node_id'
         self.fake_secret_info = test_utils.get_fake_secret_info()
         self.fake_host_definition_info = test_utils.get_fake_host_definition_info()
-        self.csi_node_modified_watch_manifest = test_utils.get_fake_node_watch_event(test_settings.MODIFIED_EVENT_TYPE)
+        self.csi_node_modified_watch_manifest = test_utils.get_fake_node_watch_event(
+            common_settings.MODIFIED_EVENT_TYPE)
         self.csi_node_modified_watch_munch = test_utils.convert_manifest_to_munch(
             self.csi_node_modified_watch_manifest)
-        self.csi_node_deleted_watch_manifest = test_utils.get_fake_node_watch_event(test_settings.DELETED_EVENT_TYPE)
+        self.csi_node_deleted_watch_manifest = test_utils.get_fake_node_watch_event(common_settings.DELETED_EVENT_TYPE)
         self.csi_node_deleted_watch_munch = test_utils.convert_manifest_to_munch(self.csi_node_deleted_watch_manifest)
         self.global_managed_nodes = test_utils.patch_nodes_global_variable(
             test_settings.CSI_NODE_WATCHER_PATH)

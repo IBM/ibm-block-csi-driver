@@ -1,3 +1,4 @@
+from os import getenv
 import json
 import re
 from hashlib import sha256
@@ -846,3 +847,7 @@ def get_replication_object_type_and_id_info(request):
             raise ValidationException(messages.UNSUPPORTED_REPLICATION_SOURCE_TYPE_MESSAGE)
     object_id_info = get_object_id_info(object_id, object_type)
     return object_type, object_id_info
+
+
+def is_call_home_enabled():
+    return getenv(servers_settings.ENABLE_CALL_HOME_ENV_VAR, 'true') == 'true'

@@ -2,6 +2,7 @@ import unittest
 from copy import deepcopy
 from unittest.mock import MagicMock, patch
 
+import controllers.common.settings as common_settings
 from controllers.servers.host_definer.k8s.api import K8SApi
 import controllers.tests.controller_server.host_definer.utils.test_utils as test_utils
 import controllers.tests.controller_server.host_definer.settings as test_settings
@@ -19,7 +20,7 @@ class TestRequestManager(unittest.TestCase):
             test_settings.REQUEST_MANAGER_PATH)
         self.fake_host_definition_info = test_utils.get_fake_host_definition_info()
         self.fake_node_info = test_utils.get_fake_node_info()
-        self.fake_node_info.labels[test_settings.CONNECTIVITY_TYPE_LABEL] = test_settings.ISCSI_CONNECTIVITY_TYPE
+        self.fake_node_info.labels[common_settings.CONNECTIVITY_TYPE_LABEL] = test_settings.ISCSI_CONNECTIVITY_TYPE
         self.array_connection_info = test_utils.get_array_connection_info()
         self.define_request = test_utils.get_define_request(
             test_settings.FAKE_PREFIX, test_settings.ISCSI_CONNECTIVITY_TYPE, test_settings.FAKE_NODE_ID)
