@@ -99,6 +99,8 @@ class CSIControllerServicer(csi_pb2_grpc.ControllerServicer):
                         "volume was not found. creating a new volume with parameters: {0}".format(request.parameters))
 
                     array_mediator.validate_supported_space_efficiency(space_efficiency)
+                    if topologies:
+                        array_mediator.register_plugin('topology', '')
                     volume = array_mediator.create_volume(volume_final_name, required_bytes, space_efficiency, pool,
                                                           volume_parameters.io_group, volume_parameters.volume_group,
                                                           source_ids, source_type, is_virt_snap_func)

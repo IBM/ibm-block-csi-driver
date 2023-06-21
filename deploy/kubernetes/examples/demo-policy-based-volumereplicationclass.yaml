@@ -1,0 +1,11 @@
+apiVersion: replication.storage.openshift.io/v1alpha1
+kind: VolumeReplicationClass
+metadata:
+  name: demo-volumereplicationclass
+spec:
+  provisioner: block.csi.ibm.com
+  parameters:
+    replication_policy: demo-replication-policy-name # Ensure that this is a name of existing replication policy
+
+    replication.storage.openshift.io/replication-secret-name: demo-secret
+    replication.storage.openshift.io/replication-secret-namespace: default

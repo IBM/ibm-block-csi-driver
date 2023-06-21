@@ -1,11 +1,13 @@
 import unittest
 from unittest.mock import MagicMock
+from datetime import datetime, timedelta
 
 from mock import patch, Mock, call, PropertyMock
 from munch import Munch
 from pysvc import errors as svc_errors
 from pysvc.unified.response import CLIFailureError, SVCResponse
 
+from controllers.common.config import config
 import controllers.array_action.errors as array_errors
 import controllers.tests.array_action.svc.test_settings as svc_settings
 import controllers.tests.array_action.test_settings as array_settings
@@ -1395,19 +1397,19 @@ class TestArrayMediatorSVC(unittest.TestCase):
         self._prepare_mocks_for_get_host_by_identifiers_no_hosts()
         host_1 = self._get_host_as_munch(array_settings.DUMMY_HOST_ID1, array_settings.DUMMY_HOST_NAME1, nqn_list=[
             array_settings.DUMMY_NVME_NQN1],
-                                         wwpns_list=[array_settings.DUMMY_FC_WWN1],
-                                         iscsi_names_list=[array_settings.DUMMY_NODE1_IQN])
+            wwpns_list=[array_settings.DUMMY_FC_WWN1],
+            iscsi_names_list=[array_settings.DUMMY_NODE1_IQN])
         host_2 = self._get_host_as_munch(array_settings.DUMMY_HOST_ID2, array_settings.DUMMY_HOST_NAME2, nqn_list=[
             array_settings.DUMMY_NVME_NQN2],
-                                         wwpns_list=[array_settings.DUMMY_FC_WWN2],
-                                         iscsi_names_list=[array_settings.DUMMY_NODE2_IQN])
+            wwpns_list=[array_settings.DUMMY_FC_WWN2],
+            iscsi_names_list=[array_settings.DUMMY_NODE2_IQN])
         if custom_host:
             host_3 = custom_host
         else:
             host_3 = self._get_host_as_munch(array_settings.DUMMY_HOST_ID3, array_settings.DUMMY_HOST_NAME3, nqn_list=[
                 array_settings.DUMMY_NVME_NQN3],
-                                             wwpns_list=[array_settings.DUMMY_FC_WWN3], iscsi_names_list=[
-                    array_settings.DUMMY_NODE3_IQN])
+                wwpns_list=[array_settings.DUMMY_FC_WWN3], iscsi_names_list=[
+                array_settings.DUMMY_NODE3_IQN])
         hosts = [host_1, host_2, host_3]
         self.svc.client.svcinfo.lshost = Mock()
         self.svc.client.svcinfo.lshost.return_value = self._get_hosts_list_result(hosts)
@@ -1548,13 +1550,13 @@ class TestArrayMediatorSVC(unittest.TestCase):
     def test_get_host_by_identifiers_slow_return_fc_host(self, svc_response):
         host_1 = self._get_host_as_munch(array_settings.DUMMY_HOST_ID1, array_settings.DUMMY_HOST_NAME1, wwpns_list=[
             array_settings.DUMMY_FC_WWN1],
-                                         iscsi_names_list=[])
+            iscsi_names_list=[])
         host_2 = self._get_host_as_munch(array_settings.DUMMY_HOST_ID2, array_settings.DUMMY_HOST_NAME2, wwpns_list=[
             array_settings.DUMMY_FC_WWN2],
-                                         iscsi_names_list=[])
+            iscsi_names_list=[])
         host_3 = self._get_host_as_munch(array_settings.DUMMY_HOST_ID3, array_settings.DUMMY_HOST_NAME3, wwpns_list=[
             array_settings.DUMMY_FC_WWN3, array_settings.DUMMY_FC_WWN4],
-                                         iscsi_names_list=[array_settings.DUMMY_NODE3_IQN])
+            iscsi_names_list=[array_settings.DUMMY_NODE3_IQN])
         hosts = [host_1, host_2, host_3]
         self._prepare_mocks_for_get_host_by_identifiers_slow(svc_response)
         hostname, connectivity_types = self.svc.get_host_by_host_identifiers(
@@ -1604,13 +1606,13 @@ class TestArrayMediatorSVC(unittest.TestCase):
     def test_get_host_by_identifiers_slow_with_wrong_fc_iscsi_raise_not_found(self, svc_response):
         host_1 = self._get_host_as_munch(array_settings.DUMMY_HOST_ID1, array_settings.DUMMY_HOST_NAME1, wwpns_list=[
             array_settings.DUMMY_FC_WWN1],
-                                         iscsi_names_list=[])
+            iscsi_names_list=[])
         host_2 = self._get_host_as_munch(array_settings.DUMMY_HOST_ID2, array_settings.DUMMY_HOST_NAME2, wwpns_list=[
             array_settings.DUMMY_FC_WWN3],
-                                         iscsi_names_list=[array_settings.DUMMY_NODE2_IQN])
+            iscsi_names_list=[array_settings.DUMMY_NODE2_IQN])
         host_3 = self._get_host_as_munch(array_settings.DUMMY_HOST_ID3, array_settings.DUMMY_HOST_NAME3, wwpns_list=[
             array_settings.DUMMY_FC_WWN3],
-                                         iscsi_names_list=[array_settings.DUMMY_NODE3_IQN])
+            iscsi_names_list=[array_settings.DUMMY_NODE3_IQN])
         hosts = [host_1, host_2, host_3]
         self._prepare_mocks_for_get_host_by_identifiers_slow(svc_response)
         with self.assertRaises(array_errors.HostNotFoundError):
@@ -1764,8 +1766,8 @@ class TestArrayMediatorSVC(unittest.TestCase):
         self._test_mediator_method_client_error(self.svc.map_volume, (
             common_settings.VOLUME_UID, common_settings.HOST_NAME,
             array_settings.DUMMY_CONNECTIVITY_TYPE),
-                                                self.svc.client.svctask.mkvdiskhostmap, client_error,
-                                                expected_error)
+            self.svc.client.svctask.mkvdiskhostmap, client_error,
+            expected_error)
 
     def test_map_volume_mkvdiskhostmap_errors(self):
         self._test_map_volume_mkvdiskhostmap_error(svc_errors.CommandExecutionError("CMMVC5804E"),
@@ -1806,8 +1808,8 @@ class TestArrayMediatorSVC(unittest.TestCase):
     def _test_unmap_volume_rmvdiskhostmap_error(self, client_error, expected_error):
         self._test_mediator_method_client_error(self.svc.unmap_volume, (
             common_settings.VOLUME_UID, common_settings.HOST_NAME),
-                                                self.svc.client.svctask.rmvdiskhostmap, client_error,
-                                                expected_error)
+            self.svc.client.svctask.rmvdiskhostmap, client_error,
+            expected_error)
 
     def test_unmap_volume_rmvdiskhostmap_errors(self):
         self._test_unmap_volume_rmvdiskhostmap_error(svc_errors.CommandExecutionError("CMMVC5753E"),
@@ -1828,9 +1830,9 @@ class TestArrayMediatorSVC(unittest.TestCase):
     def _prepare_mocks_for_get_iscsi_targets(self, portset_id=None):
         host = self._get_host_as_munch(array_settings.DUMMY_HOST_ID1, common_settings.HOST_NAME, wwpns_list=[
             array_settings.DUMMY_FC_WWN1],
-                                       iscsi_names_list=[array_settings.DUMMY_NODE1_IQN,
-                                                         array_settings.DUMMY_NODE2_IQN],
-                                       portset_id=portset_id)
+            iscsi_names_list=[array_settings.DUMMY_NODE1_IQN,
+                              array_settings.DUMMY_NODE2_IQN],
+            portset_id=portset_id)
         self.svc.client.svcinfo.lshost = Mock()
         self.svc.client.svcinfo.lshost.return_value = Mock(as_single_element=host)
 
@@ -2199,6 +2201,14 @@ class TestArrayMediatorSVC(unittest.TestCase):
                                                  array_settings.ISCSI_CONNECTIVITY_TYPE),
                                                 self.svc.client.svctask.addhostport, Exception("Failed"), Exception)
 
+    def test_add_ports_to_not_exist_host_falied(self):
+        self.svc.client.svctask.addhostport.side_effect = [CLIFailureError('CMMVC5753E')]
+        with self.assertRaises(array_errors.HostNotFoundError):
+            self.svc.add_ports_to_host(common_settings.HOST_NAME,
+                                       Initiators([], [array_settings.DUMMY_FC_WWN1, array_settings.DUMMY_FC_WWN2], []),
+                                       array_settings.FC_CONNECTIVITY_TYPE)
+        self.assertEqual(self.svc.client.svctask.addhostport.call_count, 1)
+
     def test_remove_nvme_ports_from_host_success(self):
         self.svc.remove_ports_from_host(common_settings.HOST_NAME,
                                         [array_settings.DUMMY_NVME_NQN1],
@@ -2234,6 +2244,14 @@ class TestArrayMediatorSVC(unittest.TestCase):
                                                  [array_settings.DUMMY_NODE1_IQN],
                                                  array_settings.ISCSI_CONNECTIVITY_TYPE),
                                                 self.svc.client.svctask.rmhostport, Exception("Failed"), Exception)
+
+    def test_remove_ports_from_not_exist_host_falied(self):
+        self.svc.client.svctask.rmhostport.side_effect = [CLIFailureError('CMMVC5753E')]
+        with self.assertRaises(array_errors.HostNotFoundError):
+            self.svc.remove_ports_from_host(common_settings.HOST_NAME,
+                                            [array_settings.DUMMY_FC_WWN1, array_settings.DUMMY_FC_WWN2],
+                                            array_settings.ISCSI_CONNECTIVITY_TYPE)
+        self.assertEqual(self.svc.client.svctask.rmhostport.call_count, 1)
 
     def _prepare_mocks_for_get_host_with_ports(self, attribute_name):
         self.svc.client.svcinfo.lshost = Mock()
@@ -2462,3 +2480,61 @@ class TestArrayMediatorSVC(unittest.TestCase):
 
         self.svc.client.svctask.chvdisk.assert_called_once_with(vdisk_id=common_settings.INTERNAL_VOLUME_ID,
                                                                 novolumegroup=True)
+
+    @patch('{}.is_call_home_enabled'.format('controllers.array_action.array_mediator_svc'))
+    @patch('controllers.array_action.array_mediator_svc.SVC_REGISTRATION_CACHE')
+    def test_register_plugin_when_there_is_no_registered_storage_success(self, mock_cache, is_enabled_mock):
+        mock_cache.get.return_value = {}
+        is_enabled_mock.return_value = True
+
+        self._test_register_plugin_success(True)
+
+    @patch('{}.is_call_home_enabled'.format('controllers.array_action.array_mediator_svc'))
+    @patch('controllers.array_action.array_mediator_svc.SVC_REGISTRATION_CACHE')
+    def test_register_plugin_when_unique_key_is_registered_more_than_two_hours_ago_success(
+            self, mock_cache, is_enabled_mock):
+        current_time = datetime.now()
+        three_hours_ago = current_time - timedelta(hours=3)
+        mock_cache.get.return_value = {'test_key': three_hours_ago}
+        is_enabled_mock.return_value = True
+
+        self._test_register_plugin_success(True)
+
+    @patch('{}.is_call_home_enabled'.format('controllers.array_action.array_mediator_svc'))
+    @patch('controllers.array_action.array_mediator_svc.SVC_REGISTRATION_CACHE')
+    def test_do_not_register_plugin_when_unique_key_is_registered_less_than_two_hours_ago_success(
+            self, mock_cache, is_enabled_mock):
+        current_time = datetime.now()
+        one_hours_ago = current_time - timedelta(hours=1)
+        mock_cache.get.return_value = {'test_key': one_hours_ago}
+        is_enabled_mock.return_value = True
+
+        self._test_register_plugin_success(False)
+
+    @patch('{}.is_call_home_enabled'.format('controllers.array_action.array_mediator_svc'))
+    @patch('controllers.array_action.array_mediator_svc.SVC_REGISTRATION_CACHE')
+    def test_assert_no_exception_when_register_fail_success(self, mock_cache, is_enabled_mock):
+        self.svc.client.svctask.registerplugin.side_effect = [Exception]
+        mock_cache.get.return_value = {}
+        is_enabled_mock.return_value = True
+
+        self._test_register_plugin_success(True)
+
+    @patch('{}.is_call_home_enabled'.format('controllers.array_action.array_mediator_svc'))
+    @patch('controllers.array_action.array_mediator_svc.SVC_REGISTRATION_CACHE')
+    def test_do_not_register_plugin_when_call_home_is_not_enabled_success(self, mock_cache, is_enabled_mock):
+        is_enabled_mock.return_value = False
+
+        self._test_register_plugin_success(False)
+        self.assertEqual(mock_cache.get.call_count, 0)
+
+    def _test_register_plugin_success(self, should_register):
+        self.svc.register_plugin('test_key', 'some_metadata')
+
+        if should_register:
+            self.svc.client.svctask.registerplugin.assert_called_once_with(name='block.csi.ibm.com',
+                                                                           uniquekey='test_key',
+                                                                           version=config.identity.version,
+                                                                           metadata='some_metadata')
+        else:
+            self.svc.client.svctask.registerplugin.not_called()

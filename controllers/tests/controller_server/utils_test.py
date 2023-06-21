@@ -534,3 +534,16 @@ class TestUtils(unittest.TestCase):
         self._test_validate_parameters_match_volume(volume_field="name", volume_value="prefix_vol",
                                                     parameter_field=controller_config.PARAMETERS_VOLUME_NAME_PREFIX,
                                                     parameter_value="prefix")
+
+    def test_is_call_home_enabled_true(self):
+        self._test_is_call_home_enabled('true', True)
+
+    def test_is_call_home_enabled_false(self):
+        self._test_is_call_home_enabled('false', False)
+
+    def _test_is_call_home_enabled(self, get_env_return_value, expected_result):
+        mock_getenv = patch('{}.getenv'.format('controllers.servers.utils')).start()
+        mock_getenv.return_value = get_env_return_value
+        result = utils.is_call_home_enabled()
+        self.assertEqual(result, expected_result)
+        mock_getenv.assert_called_once_with(controller_config.ENABLE_CALL_HOME_ENV_VAR, 'true')
