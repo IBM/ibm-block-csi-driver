@@ -10,8 +10,8 @@ from csi_general import csi_pb2_grpc, volumegroup_pb2_grpc, identity_pb2_grpc, r
 from controllers.common.csi_logger import set_log_level
 from controllers.common.settings import CSI_CONTROLLER_SERVER_WORKERS
 from controllers.servers.csi.server_manager import ServerManager
-from controllers.servers.csi.csi_controller_server import CSIControllerServicer
-from controllers.servers.csi.volume_group_server import VolumeGroupControllerServicer
+from controllers.servers.csi.controller_server.csi_controller_server import CSIControllerServicer
+from controllers.servers.csi.controller_server.volume_group_server import VolumeGroupControllerServicer
 from controllers.servers.csi.csi_addons_server.replication_controller_servicer import ReplicationControllerServicer
 
 

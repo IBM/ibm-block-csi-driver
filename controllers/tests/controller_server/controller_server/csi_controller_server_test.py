@@ -11,7 +11,7 @@ import controllers.servers.errors as controller_errors
 import controllers.servers.settings as servers_settings
 from controllers.array_action.array_action_types import ObjectIds
 from controllers.array_action.array_mediator_xiv import XIVArrayMediator
-from controllers.servers.csi.csi_controller_server import CSIControllerServicer
+from controllers.servers.csi.controller_server.csi_controller_server import CSIControllerServicer
 from controllers.servers.csi.sync_lock import SyncLock
 from controllers.tests import utils
 from controllers.tests.common.test_settings import (CLONE_VOLUME_NAME,
@@ -30,7 +30,7 @@ from controllers.tests.common.test_settings import (CLONE_VOLUME_NAME,
 from controllers.tests.controller_server.common import mock_get_agent, mock_array_type, mock_mediator
 from controllers.tests.utils import ProtoBufMock
 
-CONTROLLER_SERVER_PATH = "controllers.servers.csi.csi_controller_server"
+CONTROLLER_SERVER_PATH = "controllers.servers.csi.controller_server.csi_controller_server"
 
 
 class BaseControllerSetUp(unittest.TestCase):
@@ -916,7 +916,7 @@ class TestDeleteVolume(BaseControllerSetUp, CommonControllerTest):
 
         self.assertEqual(self.context.code, grpc.StatusCode.OK)
 
-    @patch("controllers.servers.csi.csi_controller_server.get_agent")
+    @patch("controllers.servers.csi.controller_server.csi_controller_server.get_agent")
     def test_delete_volume_with_array_connection_exception(self, storage_agent):
         storage_agent.side_effect = [Exception("a_enter error")]
 

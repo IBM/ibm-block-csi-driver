@@ -14,11 +14,11 @@ from controllers.common.node_info import NodeIdInfo
 from controllers.common.settings import SPACE_EFFICIENCY_DEDUPLICATED_COMPRESSED, SPACE_EFFICIENCY_NONE, \
     SPACE_EFFICIENCY_DEDUPLICATED, SPACE_EFFICIENCY_THIN
 from controllers.servers import settings as controller_config
-from controllers.servers.csi.csi_controller_server import CSIControllerServicer
+from controllers.servers.csi.controller_server.csi_controller_server import CSIControllerServicer
 from controllers.servers.errors import ObjectIdError, ValidationException, InvalidNodeId
 from controllers.tests import utils as test_utils
 from controllers.tests.common.test_settings import DUMMY_POOL1, SECRET_USERNAME_VALUE, SECRET_PASSWORD_VALUE, ARRAY
-from controllers.tests.controller_server.csi_controller_server_test import ProtoBufMock
+from controllers.tests.controller_server.controller_server.csi_controller_server_test import ProtoBufMock
 from controllers.tests.utils import get_fake_secret_config
 
 
