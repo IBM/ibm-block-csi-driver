@@ -1,6 +1,7 @@
 from collections import defaultdict
 from io import StringIO
 from random import choice
+from datetime import datetime, timedelta
 
 from packaging.version import Version
 from pysvc import errors as svc_errors
@@ -8,17 +9,21 @@ from pysvc.unified.client import connect
 from pysvc.unified.response import CLIFailureError, SVCResponse
 from retry import retry
 
+from controllers.common.config import config
 import controllers.array_action.errors as array_errors
 import controllers.array_action.settings as array_settings
+from controllers.array_action.registration_cache import SVC_REGISTRATION_CACHE
 from controllers.array_action import svc_messages
 import controllers.servers.settings as controller_settings
+from controllers.servers.csi.decorators import register_csi_plugin
 from controllers.array_action.array_action_types import Volume, Snapshot, Replication, Host, VolumeGroup, ThinVolume
 from controllers.array_action.array_mediator_abstract import ArrayMediatorAbstract
 from controllers.array_action.utils import ClassProperty, convert_scsi_id_to_nguid
 from controllers.array_action.volume_group_interface import VolumeGroupInterface
 from controllers.common import settings as common_settings
 from controllers.common.csi_logger import get_stdout_logger
-from controllers.servers.utils import get_connectivity_type_ports, split_string
+from controllers.servers.utils import get_connectivity_type_ports, split_string, is_call_home_enabled
+from controllers.servers.settings import UNIQUE_KEY_KEY
 
 array_connections_dict = {}
 logger = get_stdout_logger()
@@ -191,6 +196,16 @@ def build_change_host_protocol_kwargs(host_name, protocol):
         'object_id': host_name,
         'protocol': protocol
     }
+
+
+def build_register_plugin_kwargs(unique_key, metadata):
+    cli_kwargs = {
+        UNIQUE_KEY_KEY: unique_key,
+        array_settings.VERSION_KEY: config.identity.version
+    }
+    if metadata:
+        cli_kwargs[array_settings.METADATA_KEY] = metadata
+    return cli_kwargs
 
 
 def _get_cli_volume_space_efficiency_aliases(cli_volume):
@@ -666,6 +681,7 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
     def _is_vdisk_support_addsnapshot(self, vdisk_uid):
         return self._is_addsnapshot_supported() and not self._is_vdisk_has_fcmaps(vdisk_uid)
 
+    @register_csi_plugin()
     def create_volume(self, name, size_in_bytes, space_efficiency, pool, io_group, volume_group, source_ids,
                       source_type, is_virt_snap_func):
         if is_virt_snap_func and source_ids:
@@ -692,6 +708,7 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
                     raise array_errors.ObjectNotFoundError(volume_id_or_name)
                 raise ex
 
+    @register_csi_plugin()
     def delete_volume(self, volume_id):
         logger.info("Deleting volume with id : {0}".format(volume_id))
         self._delete_volume(volume_id)
@@ -904,6 +921,7 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
                 return other_cli_volume
         raise RuntimeError('could not find a volume for {} in site {}'.format(volume_name, pool_site_name))
 
+    @register_csi_plugin()
     def create_snapshot(self, volume_id, snapshot_name, space_efficiency, pool, is_virt_snap_func):
         logger.info("creating snapshot '{0}' from volume '{1}'".format(snapshot_name, volume_id))
         source_volume_name = self._get_volume_name_by_wwn(volume_id)
@@ -933,6 +951,7 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
                 raise array_errors.ObjectNotFoundError(internal_snapshot_id)
             raise ex
 
+    @register_csi_plugin()
     def delete_snapshot(self, snapshot_id, internal_snapshot_id):
         logger.info("Deleting snapshot with id : {0}".format(snapshot_id))
         if self._is_addsnapshot_supported() and not snapshot_id:
@@ -1148,6 +1167,7 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
         if NAME_NOT_EXIST_OR_MEET_RULES in error_message:
             raise array_errors.HostNotFoundError(host_name)
 
+    @register_csi_plugin()
     def map_volume(self, volume_id, host_name, connectivity_type):
         logger.debug("mapping volume : {0} to host : "
                      "{1}".format(volume_id, host_name))
@@ -1181,6 +1201,7 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
 
         return str(lun)
 
+    @register_csi_plugin()
     def unmap_volume(self, volume_id, host_name):
         logger.debug("unmapping volume : {0} from host : "
                      "{1}".format(volume_id, host_name))
@@ -1481,6 +1502,7 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
             else:
                 logger.warning("failed to start rcrelationship '{}': {}".format(rcrelationship_id, ex))
 
+    @register_csi_plugin()
     def create_replication(self, replication_request):
         if replication_request.replication_type == array_settings.REPLICATION_TYPE_MIRROR:
             self._create_replication(replication_request)
@@ -1531,6 +1553,7 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
             else:
                 logger.warning("failed to delete rcrelationship '{0}': {1}".format(rcrelationship_id, ex))
 
+    @register_csi_plugin()
     def delete_replication(self, replication):
         if replication.replication_type == array_settings.REPLICATION_TYPE_MIRROR:
             self._delete_replication(replication.name)
@@ -1581,6 +1604,7 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
             self._start_rcrelationship(rcrelationship.id, primary_endpoint_type=other_endpoint_type, force=True)
         self._promote_replication_endpoint(endpoint_type, rcrelationship.name)
 
+    @register_csi_plugin()
     def promote_replication_volume(self, replication):
         if replication.replication_type == array_settings.REPLICATION_TYPE_MIRROR:
             self._promote_replication_volume(replication.name)
@@ -1612,6 +1636,7 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
         else:
             logger.info("Can't be promoted because the local volume group is not an independent copy")
 
+    @register_csi_plugin()
     def demote_replication_volume(self, replication):
         if replication.replication_type == array_settings.REPLICATION_TYPE_MIRROR:
             self._demote_replication_volume(replication.name)
@@ -1800,6 +1825,7 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
                 logger.warning("exception encountered during host {} creation : {}".format(host_name, ex.my_message))
             raise ex
 
+    @register_csi_plugin()
     def create_host(self, host_name, initiators, connectivity_type, io_group):
         ports = get_connectivity_type_ports(initiators, connectivity_type)
         for port in ports:
@@ -1821,6 +1847,7 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
                 return
             raise ex
 
+    @register_csi_plugin()
     def delete_host(self, host_name):
         logger.info(svc_messages.DELETE_HOST.format(host_name))
         self._rmhost(host_name)
@@ -1831,17 +1858,23 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
             self.delete_host(host_name)
             raise array_errors.NoPortIsValid(host_name)
 
+    def _raise_error_when_host_not_found(self, host_name, error_message):
+        if OBJ_NOT_FOUND in error_message:
+            raise array_errors.HostNotFoundError(host_name)
+
     def _addhostport(self, host_name, connectivity_type, port):
         cli_kwargs = build_host_port_command_kwargs(host_name, connectivity_type, port)
         try:
             self.client.svctask.addhostport(**cli_kwargs)
         except (svc_errors.CommandExecutionError, CLIFailureError) as ex:
+            self._raise_error_when_host_not_found(host_name, ex.my_message)
             if not self._is_port_invalid(ex.my_message):
                 if is_warning_message(ex.my_message):
                     logger.warning("exception encountered during adding port {} to host {} : {}".format(
                         port, host_name, ex.my_message))
                 raise ex
 
+    @register_csi_plugin()
     def add_ports_to_host(self, host_name, initiators, connectivity_type):
         ports = get_connectivity_type_ports(initiators, connectivity_type)
         for port in ports:
@@ -1854,12 +1887,14 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
         try:
             self.client.svctask.rmhostport(**cli_kwargs)
         except (svc_errors.CommandExecutionError, CLIFailureError) as ex:
+            self._raise_error_when_host_not_found(host_name, ex.my_message)
             if not self._is_port_invalid(ex.my_message):
                 if is_warning_message(ex.my_message):
                     logger.warning("exception encountered during removing port {} from host {} : {}".format(
                         port, host_name, ex.my_message))
                 raise ex
 
+    @register_csi_plugin()
     def remove_ports_from_host(self, host_name, ports, connectivity_type):
         for port in ports:
             logger.info(svc_messages.REMOVE_HOST_PORT.format(port, host_name))
@@ -1950,10 +1985,6 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
         logger.info(svc_messages.HOST_IO_GROUP_IDS.format(host_name, io_group.id))
         return io_group
 
-    def _raise_error_when_host_not_found(self, host_name, error_message):
-        if OBJ_NOT_FOUND in error_message:
-            raise array_errors.HostNotFoundError(host_name)
-
     def _raise_unsupported_parameter_error(self, error_message, parameter):
         if NOT_SUPPORTED_PARAMETER in error_message:
             raise array_errors.UnSupportedParameter(parameter)
@@ -2003,6 +2034,7 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
                            internal_id=cli_volume_group.id,
                            volumes=volumes)
 
+    @register_csi_plugin()
     def create_volume_group(self, name):
         volume_group_id = self._create_volume_group(name)
         cli_volume_group = self._lsvolumegroup(volume_group_id)
@@ -2014,10 +2046,12 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
             raise array_errors.ObjectNotFoundError(volume_group_id)
         return self._generate_volume_group_response(cli_volume_group)
 
+    @register_csi_plugin()
     def delete_volume_group(self, volume_group_id):
         self._lsvolumegroup(volume_group_id, not_exist_err=True)
         self._rmvolumegroup(volume_group_id)
 
+    @register_csi_plugin()
     def add_volume_to_volume_group(self, volume_group_id, volume_id):
         volume_name = self._get_volume_name_by_wwn(volume_id)
         cli_volume = self._get_cli_volume(volume_name)
@@ -2025,6 +2059,47 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
             raise array_errors.VolumeAlreadyInVolumeGroup(volume_id, cli_volume.volume_group_name)
         self._change_volume_group(cli_volume.id, volume_group_id)
 
+    @register_csi_plugin()
     def remove_volume_from_volume_group(self, volume_id):
         cli_volume = self._get_cli_volume_by_wwn(volume_id, not_exist_err=True)
         self._change_volume_group(cli_volume.id, None)
+
+    def register_plugin(self, unique_key,  metadata):
+        if is_call_home_enabled() and self._is_registerplugin_supported() and \
+                self._is_plugin_needs_to_be_registered(unique_key):
+            self._register_plugin(unique_key, metadata)
+
+    def _is_registerplugin_supported(self):
+        return hasattr(self.client.svctask, "registerplugin")
+
+    def _is_plugin_needs_to_be_registered(self, unique_key):
+        current_time = datetime.now()
+        endpoint_cache = SVC_REGISTRATION_CACHE.get(self.endpoint)
+        if not endpoint_cache:
+            return True
+        last_registration_time = endpoint_cache.get(unique_key)
+        if last_registration_time:
+            time_difference = current_time - last_registration_time
+            return time_difference >= timedelta(hours=array_settings.MINIMUM_HOURS_BETWEEN_REGISTRATIONS)
+        return True
+
+    def _register_plugin(self, unique_key, metadata):
+        self._update_registration_cache(unique_key)
+        self._registerplugin(unique_key, metadata)
+
+    def _update_registration_cache(self, unique_key):
+        endpoint_cache = SVC_REGISTRATION_CACHE.get(self.endpoint)
+        if not endpoint_cache:
+            SVC_REGISTRATION_CACHE[self.endpoint] = {}
+        SVC_REGISTRATION_CACHE[self.endpoint][unique_key] = datetime.now()
+
+    def _registerplugin(self, unique_key, metadata):
+        logger.info("Registering {} plugin, using {} unique key with [{}] metadata".format(
+            array_settings.REGISTRATION_PLUGIN, unique_key, metadata))
+        cli_kwargs = build_register_plugin_kwargs(unique_key, metadata)
+        try:
+            self.client.svctask.registerplugin(name='{}'.format(array_settings.REGISTRATION_PLUGIN), **cli_kwargs)
+        except Exception as ex:
+            logger.error("exception encountered during"
+                         "registering {} plugin using {} unique key with [{}] metadata: {}".format(
+                             array_settings.REGISTRATION_PLUGIN, unique_key, metadata, ex))
