@@ -23,6 +23,7 @@ def csi_method(error_response_type, lock_request_attribute=''):
 
     return call_csi_method
 
+
 def csi_fence_method(error_response_type):
     @decorator
     def call_csi_method(controller_method, servicer, request, context):
@@ -31,6 +32,7 @@ def csi_fence_method(error_response_type):
                               controller_method, servicer, request, context)
 
     return call_csi_method
+
 
 def csi_replication_method(error_response_type):
     @decorator

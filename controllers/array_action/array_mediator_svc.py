@@ -1,7 +1,7 @@
 from collections import defaultdict
+from datetime import datetime, timedelta
 from io import StringIO
 from random import choice
-from datetime import datetime, timedelta
 
 from packaging.version import Version
 from pysvc import errors as svc_errors
@@ -9,22 +9,22 @@ from pysvc.unified.client import connect
 from pysvc.unified.response import CLIFailureError, SVCResponse
 from retry import retry
 
-from controllers.common.config import config
 import controllers.array_action.errors as array_errors
 import controllers.array_action.settings as array_settings
-from controllers.array_action.registration_cache import SVC_REGISTRATION_CACHE
 import controllers.servers.settings as controller_settings
 from controllers.array_action import svc_messages
-from controllers.servers.csi.decorators import register_csi_plugin
 from controllers.array_action.array_action_types import Volume, Snapshot, Replication, Host, VolumeGroup, ThinVolume
 from controllers.array_action.array_mediator_abstract import ArrayMediatorAbstract
 from controllers.array_action.fence_interface import FenceInterface
+from controllers.array_action.registration_cache import SVC_REGISTRATION_CACHE
 from controllers.array_action.utils import ClassProperty, convert_scsi_id_to_nguid
 from controllers.array_action.volume_group_interface import VolumeGroupInterface
 from controllers.common import settings as common_settings
+from controllers.common.config import config
 from controllers.common.csi_logger import get_stdout_logger
-from controllers.servers.utils import get_connectivity_type_ports, split_string, is_call_home_enabled
+from controllers.servers.csi.decorators import register_csi_plugin
 from controllers.servers.settings import UNIQUE_KEY_KEY
+from controllers.servers.utils import get_connectivity_type_ports, split_string, is_call_home_enabled
 
 array_connections_dict = {}
 logger = get_stdout_logger()
