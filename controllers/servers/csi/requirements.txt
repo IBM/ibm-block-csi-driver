@@ -3,7 +3,7 @@ grpcio-tools==1.41.1
 protobuf==3.18.3
 pyyaml==6
 munch==2.3.2
-retry==0.9.2
+retry2==0.9.5
 packaging==20.1
 base58==2.0.0
 

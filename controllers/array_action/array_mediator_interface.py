@@ -633,6 +633,23 @@ class ArrayMediator(ABC):
         """
         raise NotImplementedError
 
+    @abstractmethod
+    def register_plugin(self, unique_key,  metadata):
+        """
+        This function should register CSI plugin with unique_key and metadata accordingly to the feature it used.
+
+        Args:
+           unique_key : a unique key that will represent a feature
+           metadata  : a metadata that will add some information
+
+        Returns:
+            None
+
+        Raises:
+            None
+        """
+        raise NotImplementedError
+
     @property
     @abstractmethod
     def identifier(self):

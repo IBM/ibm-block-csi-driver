@@ -136,7 +136,7 @@ class TestEnableVolumeReplication(BaseReplicationSetUp, CommonControllerTest):
                                                   grpc_status=grpc.StatusCode.OK)
 
     def test_enable_replication_already_processing(self):
-        self._test_request_already_processing("volume_id", self.request.volume_id)
+        self._test_request_already_processing("replication_source", self.request.volume_id)
 
     def test_enable_replication_with_wrong_secrets(self):
         self._test_request_with_wrong_secrets()
@@ -192,7 +192,7 @@ class TestDisableVolumeReplication(BaseReplicationSetUp, CommonControllerTest):
         self._test_disable_replication_idempotency_succeeds(REPLICATION_TYPE_MIRROR)
 
     def test_disable_replication_already_processing(self):
-        self._test_request_already_processing("volume_id", self.request.volume_id)
+        self._test_request_already_processing("replication_source", self.request.volume_id)
 
     def test_disable_replication_with_wrong_secrets(self):
         self._test_request_with_wrong_secrets()
@@ -246,7 +246,7 @@ class TestPromoteVolume(BaseReplicationSetUp, CommonControllerTest):
         self._test_promote_replication_fails(REPLICATION_TYPE_MIRROR)
 
     def test_promote_replication_already_processing(self):
-        self._test_request_already_processing("volume_id", self.request.volume_id)
+        self._test_request_already_processing("replication_source", self.request.volume_id)
 
     def test_promote_replication_with_wrong_secrets(self):
         self._test_request_with_wrong_secrets()
@@ -304,7 +304,7 @@ class TestDemoteVolume(BaseReplicationSetUp, CommonControllerTest):
         self.mediator.demote_replication_volume.assert_not_called()
 
     def test_demote_replication_already_processing(self):
-        self._test_request_already_processing("volume_id", self.request.volume_id)
+        self._test_request_already_processing("replication_source", self.request.volume_id)
 
     def test_demote_replication_with_wrong_secrets(self):
         self._test_request_with_wrong_secrets()
