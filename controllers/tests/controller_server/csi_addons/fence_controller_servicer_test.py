@@ -40,6 +40,18 @@ class TestFenceControllerServicer(unittest.TestCase):
         self.assertEqual(grpc.StatusCode.INTERNAL, self.context.code)
         self.mediator.fence.assert_called_once_with("fenceToken", "unfenceToken")
 
+    def test_fence_invalid_parameters(self):
+        self.request.parameters = {}
+        self.servicer.FenceClusterNetwork(self.request, self.context)
+        self.assertEqual(grpc.StatusCode.INVALID_ARGUMENT, self.context.code)
+        self.mediator.fence.assert_not_called()
+
+    def test_fence_invalid_secret(self):
+        self.request.secrets = {}
+        self.servicer.FenceClusterNetwork(self.request, self.context)
+        self.assertEqual(grpc.StatusCode.INVALID_ARGUMENT, self.context.code)
+        self.mediator.fence.assert_not_called()
+
     def test_fence_already_fenced(self):
         self.mediator.is_fenced.return_value = True
         self.servicer.FenceClusterNetwork(self.request, self.context)

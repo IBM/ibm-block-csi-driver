@@ -18,6 +18,7 @@ def _fence_cluster_network(mediator, fence_ownership_group, unfence_ownership_gr
 
 
 def handle_fencing(request):
+    utils.validate_fencing_request(request)
     fence_ownership_group = request.parameters["fenceToken"]
     unfence_ownership_group = request.parameters["unfenceToken"]
 
