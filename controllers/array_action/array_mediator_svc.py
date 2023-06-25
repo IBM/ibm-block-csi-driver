@@ -1,7 +1,7 @@
 from collections import defaultdict
+from datetime import datetime, timedelta
 from io import StringIO
 from random import choice
-from datetime import datetime, timedelta
 
 from packaging.version import Version
 from pysvc import errors as svc_errors
@@ -9,21 +9,22 @@ from pysvc.unified.client import connect
 from pysvc.unified.response import CLIFailureError, SVCResponse
 from retry import retry
 
-from controllers.common.config import config
 import controllers.array_action.errors as array_errors
 import controllers.array_action.settings as array_settings
-from controllers.array_action.registration_cache import SVC_REGISTRATION_CACHE
-from controllers.array_action import svc_messages
 import controllers.servers.settings as controller_settings
-from controllers.servers.csi.decorators import register_csi_plugin
+from controllers.array_action import svc_messages
 from controllers.array_action.array_action_types import Volume, Snapshot, Replication, Host, VolumeGroup, ThinVolume
 from controllers.array_action.array_mediator_abstract import ArrayMediatorAbstract
+from controllers.array_action.fence_interface import FenceInterface
+from controllers.array_action.registration_cache import SVC_REGISTRATION_CACHE
 from controllers.array_action.utils import ClassProperty, convert_scsi_id_to_nguid
 from controllers.array_action.volume_group_interface import VolumeGroupInterface
 from controllers.common import settings as common_settings
+from controllers.common.config import config
 from controllers.common.csi_logger import get_stdout_logger
-from controllers.servers.utils import get_connectivity_type_ports, split_string, is_call_home_enabled
+from controllers.servers.csi.decorators import register_csi_plugin
 from controllers.servers.settings import UNIQUE_KEY_KEY
+from controllers.servers.utils import get_connectivity_type_ports, split_string, is_call_home_enabled
 
 array_connections_dict = {}
 logger = get_stdout_logger()
@@ -104,7 +105,7 @@ def _get_space_efficiency_kwargs(space_efficiency):
 
 def _is_space_efficiency_matches_source(parameter_space_efficiency, array_space_efficiency):
     return (not parameter_space_efficiency and array_space_efficiency == common_settings.SPACE_EFFICIENCY_THICK) or \
-           (parameter_space_efficiency and parameter_space_efficiency == array_space_efficiency)
+        (parameter_space_efficiency and parameter_space_efficiency == array_space_efficiency)
 
 
 def build_create_volume_in_volume_group_kwargs(pool, io_group, source_id):
@@ -224,7 +225,7 @@ def _get_cli_volume_space_efficiency_aliases(cli_volume):
     return space_efficiency_aliases
 
 
-class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
+class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface, FenceInterface):
     ARRAY_ACTIONS = {}
     BLOCK_SIZE_IN_BYTES = 512
     MAX_LUN_NUMBER = 511
@@ -888,9 +889,12 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
             self._rollback_create_snapshot(target_volume_name)
             raise ex
 
+    def _lsmdiskgrp(self, **kwargs):
+        return self.client.svcinfo.lsmdiskgrp(**kwargs)
+
     def _get_pool_site(self, pool):
         filter_value = 'name={}'.format(pool)
-        cli_pool = self.client.svcinfo.lsmdiskgrp(filtervalue=filter_value).as_single_element
+        cli_pool = self._lsmdiskgrp(filtervalue=filter_value).as_single_element
         if cli_pool:
             return cli_pool.site_name
         raise array_errors.PoolDoesNotExist(pool, self.endpoint)
@@ -2064,7 +2068,58 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
         cli_volume = self._get_cli_volume_by_wwn(volume_id, not_exist_err=True)
         self._change_volume_group(cli_volume.id, None)
 
-    def register_plugin(self, unique_key,  metadata):
+    def _get_ownership_group_pools(self, ownership_group):
+        logger.info(svc_messages.GET_OWNERSHIP_GROUP_POOLS.format(ownership_group))
+        filter_value = 'owner_name={}'.format(ownership_group)
+        cli_pools = self._lsmdiskgrp(filtervalue=filter_value).as_list
+        return cli_pools
+
+    def is_fenced(self, fence_ownership_group):
+        ownership_group_pools = self._get_ownership_group_pools(fence_ownership_group)
+        if len(ownership_group_pools) == 0:
+            logger.info(svc_messages.NO_POOLS_FOUND_IN_OWNERSHIP_GROUP.format(fence_ownership_group))
+            return True
+
+        logger.info(svc_messages.POOLS_FOUND_IN_OWNERSHIP_GROUP.format(fence_ownership_group, ownership_group_pools))
+        return False
+
+    def _chmdiskgrp(self, pool_id, **cli_kwargs):
+        self.client.svctask.chmdiskgrp(object_id=pool_id, **cli_kwargs)
+
+    def _remove_all_mappings_from_ownership_group(self, ownership_group):
+        logger.info(svc_messages.REMOVING_ALL_MAPPINGS_FROM_OWNERSHIP_GROUP.format(ownership_group))
+        filter_value = 'owner_name={}'.format(ownership_group)
+
+        hosts = self.client.svcinfo.lshost(filtervalue=filter_value).as_list
+        host_names = [host.name for host in hosts]
+
+        volumes = self._lsvdisk_list(filtervalue=filter_value)
+        volume_names = [volume.name for volume in volumes]
+
+        mappings = self.client.svcinfo.lshostvdiskmap().as_list
+
+        relevant_mappings = [mapping for mapping in mappings if
+                             mapping.name in host_names and mapping.vdisk_name in volume_names]
+        logger.info(svc_messages.REMOVING_MAPPINGS.format(relevant_mappings))
+        for mapping in relevant_mappings:
+            self.client.svctask.rmvdiskhostmap(vdisk_name=mapping.vdisk_name, host=mapping.name)
+
+    def _change_pools_ownership_group(self, ownership_group, pools):
+        logger.info(svc_messages.CHANGE_POOLS_OWNERSHIP_GROUP.format(ownership_group))
+        for pool in pools:
+            self._chmdiskgrp(pool.id, ownershipgroup=ownership_group)
+
+    def fence(self, fence_ownership_group, unfence_ownership_group):
+        ownership_group_pools = self._get_ownership_group_pools(fence_ownership_group)
+        if len(ownership_group_pools) == 0:
+            logger.info(svc_messages.NO_POOLS_FOUND_IN_OWNERSHIP_GROUP.format(fence_ownership_group))
+            return
+
+        self._remove_all_mappings_from_ownership_group(fence_ownership_group)
+
+        self._change_pools_ownership_group(unfence_ownership_group, ownership_group_pools)
+
+    def register_plugin(self, unique_key, metadata):
         if is_call_home_enabled() and self._is_registerplugin_supported() and \
                 self._is_plugin_needs_to_be_registered(unique_key):
             self._register_plugin(unique_key, metadata)
@@ -2102,4 +2157,4 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
         except Exception as ex:
             logger.error("exception encountered during"
                          "registering {} plugin using {} unique key with [{}] metadata: {}".format(
-                             array_settings.REGISTRATION_PLUGIN, unique_key, metadata, ex))
+                array_settings.REGISTRATION_PLUGIN, unique_key, metadata, ex))

@@ -1,4 +1,5 @@
 from controllers.common import settings as common_settings
+
 SECRET_USERNAME_KEY = "username"
 SECRET_USERNAME_VALUE = "dummy_username"
 SECRET_PASSWORD_KEY = "password"
@@ -60,3 +61,9 @@ INTERNAL_VOLUME_GROUP_ID = "internal_volume_group_id"
 REQUEST_VOLUME_GROUP_ID = ID_FORMAT.format(INTERNAL_VOLUME_GROUP_ID, VOLUME_GROUP_NAME)
 
 HOST_OBJECT_TYPE = "host"
+
+POOL_NAME = "pool_name"
+POOL_ID = "pool_id"
+
+FENCE_OWNERSHIP_GROUP = "fence_ownership_group"
+UNFENCE_OWNERSHIP_GROUP = "unfence_ownership_group"

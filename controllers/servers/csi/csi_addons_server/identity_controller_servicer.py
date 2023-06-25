@@ -28,7 +28,8 @@ class IdentityControllerServicer(pb2_grpc.IdentityServicer):
         logger.info("GetCapabilities")
         response = pb2.GetCapabilitiesResponse(
             capabilities=[self._get_replication_capability(),
-                          self._get_controller_capability()])
+                          self._get_controller_capability(),
+                          self._get_network_fence_capability()])
 
         logger.info("finished GetCapabilities")
         return response
@@ -44,6 +45,12 @@ class IdentityControllerServicer(pb2_grpc.IdentityServicer):
         capability_enum_value = types.Value("CONTROLLER_SERVICE")
         return pb2.Capability(
             service=pb2.Capability.Service(type=capability_enum_value))
+
+    def _get_network_fence_capability(self):
+        types = pb2.Capability.NetworkFence.Type
+        capability_enum_value = types.Value("NETWORK_FENCE")
+        return pb2.Capability(
+            network_fence=pb2.Capability.NetworkFence(type=capability_enum_value))
 
     def Probe(self, request, context):
         context.set_code(grpc.StatusCode.OK)

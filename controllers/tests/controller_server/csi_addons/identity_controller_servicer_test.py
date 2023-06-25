@@ -51,7 +51,7 @@ class TestIdentityControllerServicer(unittest.TestCase):
 
     def test_get_capabilities_succeeds(self):
         response = self.servicer.GetCapabilities(self.request, self.context)
-        supported_capabilities = 2
+        supported_capabilities = 3
         self.assertIn('VolumeReplication', dir(response.capabilities[0]))
         self.assertIn('Service', dir(response.capabilities[1]))
         self.assertEqual(len(response.capabilities), supported_capabilities)

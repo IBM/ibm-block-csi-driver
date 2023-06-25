@@ -1,8 +1,8 @@
-from os import getenv
 import json
 import re
 from hashlib import sha256
 from operator import eq
+from os import getenv
 
 import base58
 from csi_general import csi_pb2, volumegroup_pb2
@@ -278,7 +278,7 @@ def _validate_object_id(object_id, object_type=servers_settings.VOLUME_TYPE_NAME
         raise ValidationException(messages.WRONG_FORMAT_MESSAGE.format("volume id"))
 
 
-def _validate_request_required_field(field_value, field_name):
+def _validate_required_field(field_value, field_name):
     logger.debug("validating request {}".format(field_name))
     if not field_value:
         raise ValidationException(messages.PARAMETER_SHOULD_NOT_BE_EMPTY_MESSAGE.format(field_name))
@@ -286,7 +286,7 @@ def _validate_request_required_field(field_value, field_name):
 
 def _validate_minimum_request_fields(request, required_field_names):
     for required_field_name in required_field_names:
-        _validate_request_required_field(getattr(request, required_field_name), required_field_name)
+        _validate_required_field(getattr(request, required_field_name), required_field_name)
     validate_secrets(request.secrets)
 
 
@@ -851,3 +851,17 @@ def get_replication_object_type_and_id_info(request):
 
 def is_call_home_enabled():
     return getenv(servers_settings.ENABLE_CALL_HOME_ENV_VAR, 'true') == 'true'
+
+
+def _validate_parameters_fields(parameters, required_parameters_names):
+    for required_field_name in required_parameters_names:
+        _validate_required_field(parameters.get(required_field_name), required_field_name)
+
+
+def validate_fencing_request(request):
+    logger.debug("validating fencing request")
+
+    _validate_parameters_fields(request.parameters, ["fenceToken", "unfenceToken"])
+    validate_secrets(request.secrets)
+
+    logger.debug("fencing validation finished")
