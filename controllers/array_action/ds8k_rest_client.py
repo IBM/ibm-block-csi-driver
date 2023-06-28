@@ -176,12 +176,13 @@ class RESTClient:
             new_pool=new_pool_id
         )
 
-    def create_host(self, host_name, wwpn, host_type='VMWare'):
+    def create_host(self, host_name, wwpns, host_type='VMWare'):
         hosts = self._client.create_host(
             host_name=host_name,
             hosttype=host_type
         )
-        self.attach_port_to_host(host_name=hosts[0].id, wwpn=wwpn)
+        for wwpn in wwpns:
+            self.attach_port_to_host(host_name=hosts[0].id, wwpn=wwpn)
         return hosts[0].id
 
     def delete_host(self, host_name):

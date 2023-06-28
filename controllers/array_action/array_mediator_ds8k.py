@@ -15,6 +15,7 @@ from controllers.array_action.ds8k_rest_client import RESTClient, scsilun_to_int
 from controllers.array_action.ds8k_volume_cache import VolumeCache
 from controllers.array_action.utils import ClassProperty
 from controllers.common.csi_logger import get_stdout_logger
+from controllers.servers.utils import get_connectivity_type_ports
 
 LOGIN_PORT_WWPN = attr_names.IOPORT_WWPN
 LOGIN_PORT_STATE = attr_names.IOPORT_STATUS
@@ -698,22 +699,29 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
         raise NotImplementedError
 
     def create_host(self, host_name, initiators, connectivity_type, io_group):
-        raise NotImplementedError
+        ports = get_connectivity_type_ports(initiators, connectivity_type)
+        # TODO host_type - should be a parameter
+        self.client.create_host(host_name, ports, host_type='VMWare')
 
     def delete_host(self, host_name):
-        raise NotImplementedError
+        self.client.delete_host(host_name)
 
     def add_ports_to_host(self, host_name, initiators, connectivity_type):
-        raise NotImplementedError
+        ports = get_connectivity_type_ports(initiators, connectivity_type)
+        api_host = self.client.get_host(host_name)
+        for port in ports:
+            self.client.attach_port_to_host(host_name=api_host.id, wwpn=port)
 
     def remove_ports_from_host(self, host_name, ports, connectivity_type):
-        raise NotImplementedError
+        for port in ports:
+            self.client.detach_port_from_host(wwpn=port)
 
     def get_host_connectivity_ports(self, host_name, connectivity_type):
-        raise NotImplementedError
+        api_host = self.client.get_host(host_name)
+        return self._get_fc_wwns_from_api_host(api_host)
 
     def get_host_connectivity_type(self, host_name):
-        raise NotImplementedError
+        return array_settings.FC_CONNECTIVITY_TYPE
 
     def add_io_group_to_host(self, host_name, io_group):
         raise NotImplementedError
@@ -727,5 +735,5 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
     def change_host_protocol(self, host_name, protocol):
         raise NotImplementedError
 
-    def register_plugin(self, unique_key,  metadata):
+    def register_plugin(self, unique_key, metadata):
         return None
