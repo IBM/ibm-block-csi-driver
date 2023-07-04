@@ -161,7 +161,7 @@ class XIVArrayMediator(ArrayMediatorAbstract):
             logger.exception(ex)
             raise array_errors.InvalidArgumentError(ex.status)
 
-    def get_volume(self, name, pool, is_virt_snap_func):
+    def get_volume(self, name, pool, is_virt_snap_func, source_type):
         logger.debug("Get volume : {}".format(name))
         cli_volume = self._get_cli_object_by_name(name)
 

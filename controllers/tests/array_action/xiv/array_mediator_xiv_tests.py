@@ -27,14 +27,14 @@ class TestArrayMediatorXIV(unittest.TestCase):
         error_msg = array_settings.DUMMY_ERROR_MESSAGE
         self.mediator.client.cmd.vol_list.side_effect = [Exception(array_settings.DUMMY_ERROR_MESSAGE)]
         with self.assertRaises(Exception) as ex:
-            self.mediator.get_volume(common_settings.VOLUME_NAME, None, False)
+            self.mediator.get_volume(common_settings.VOLUME_NAME, None, False, None)
 
         self.assertIn(error_msg, str(ex.exception))
 
     def test_get_volume_return_correct_value(self):
         xcli_volume = utils.get_mock_xiv_volume(10, common_settings.VOLUME_NAME, common_settings.VOLUME_UID)
         self.mediator.client.cmd.vol_list.return_value = Mock(as_single_element=xcli_volume)
-        volume = self.mediator.get_volume(common_settings.VOLUME_NAME, None, False)
+        volume = self.mediator.get_volume(common_settings.VOLUME_NAME, None, False, None)
 
         self.assertEqual(xcli_volume.capacity * array_settings.DUMMY_SMALL_CAPACITY_INT, volume.capacity_bytes)
         self.assertEqual(xcli_volume.capacity * array_settings.DUMMY_SMALL_CAPACITY_INT, volume.capacity_bytes)
@@ -42,12 +42,12 @@ class TestArrayMediatorXIV(unittest.TestCase):
     def test_get_volume_raise_illegal_object_name(self):
         self.mediator.client.cmd.vol_list.side_effect = [xcli_errors.IllegalNameForObjectError("", "", "")]
         with self.assertRaises(array_errors.InvalidArgumentError):
-            self.mediator.get_volume(common_settings.VOLUME_NAME, None, False)
+            self.mediator.get_volume(common_settings.VOLUME_NAME, None, False, None)
 
     def test_get_volume_returns_nothing(self):
         self.mediator.client.cmd.vol_list.return_value = Mock(as_single_element=None)
         with self.assertRaises(array_errors.ObjectNotFoundError):
-            self.mediator.get_volume(common_settings.VOLUME_NAME, None, False)
+            self.mediator.get_volume(common_settings.VOLUME_NAME, None, False, None)
 
     @patch("controllers.array_action.array_mediator_xiv.XCLIClient")
     def test_connect_errors(self, client):

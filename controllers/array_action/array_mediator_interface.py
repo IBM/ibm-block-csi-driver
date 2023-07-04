@@ -99,7 +99,7 @@ class ArrayMediator(ABC):
         raise NotImplementedError
 
     @abstractmethod
-    def get_volume(self, name, pool, is_virt_snap_func):
+    def get_volume(self, name, pool, is_virt_snap_func, source_type):
         """
         This function return volume info about the volume.
 
@@ -107,6 +107,7 @@ class ArrayMediator(ABC):
             name              : name of the volume on storage system.
             pool              : pool of the volume to find the volume more efficiently.
             is_virt_snap_func : indicate if svc's snapshot function feature is enabled
+            source_type       : volume or snapshot
 
 
         Returns:

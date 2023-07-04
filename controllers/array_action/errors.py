@@ -58,6 +58,13 @@ class ObjectNotFoundError(BaseArrayActionException):
         self.message = messages.OBJECT_NOT_FOUND_ERROR_MESSAGE.format(name)
 
 
+class ObjectAlreadyExistError(BaseArrayActionException):
+
+    def __init__(self, name, field_name, actual_value, expected_value):
+        super().__init__()
+        self.message = messages.VOLUME_NOT_MATCH_REQUEST.format(name, field_name, actual_value, expected_value)
+
+
 class VolumeNameBelongsToSnapshotError(BaseArrayActionException):
 
     def __init__(self, volume, array):

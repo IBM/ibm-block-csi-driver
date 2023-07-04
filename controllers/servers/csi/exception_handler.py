@@ -16,7 +16,8 @@ status_codes_by_exception = {
     array_errors.HostNotFoundError: grpc.StatusCode.NOT_FOUND,
     array_errors.PermissionDeniedError: grpc.StatusCode.PERMISSION_DENIED,
     array_errors.ObjectIsStillInUseError: grpc.StatusCode.FAILED_PRECONDITION,
-    array_errors.CredentialsError: grpc.StatusCode.UNAUTHENTICATED
+    array_errors.CredentialsError: grpc.StatusCode.UNAUTHENTICATED,
+    array_errors.ObjectAlreadyExistError: grpc.StatusCode.ALREADY_EXISTS,
 }
 
 
