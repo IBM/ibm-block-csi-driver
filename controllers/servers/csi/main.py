@@ -9,7 +9,7 @@ from csi_general import csi_pb2_grpc, volumegroup_pb2_grpc, identity_pb2_grpc, r
 from controllers.common.csi_logger import set_log_level
 from controllers.common.settings import CSI_CONTROLLER_SERVER_WORKERS
 from controllers.servers.csi.controller_server.csi_controller_server import CSIControllerServicer
-from controllers.servers.csi.controller_server.volume_group_server import VolumeGroupControllerServicer
+from controllers.servers.csi.common_servers.volume_group_server import VolumeGroupControllerServicer
 from controllers.servers.csi.csi_addons_server.fence_controller_servicer import FenceControllerServicer
 from controllers.servers.csi.csi_addons_server.identity_controller_servicer import IdentityControllerServicer
 from controllers.servers.csi.csi_addons_server.replication_controller_servicer import ReplicationControllerServicer
@@ -57,9 +57,11 @@ def _add_csi_addons_servicers(csi_addons_server):
     replication_servicer = ReplicationControllerServicer()
     identity_servicer = IdentityControllerServicer()
     fence_servicer = FenceControllerServicer()
+    volume_group_servicer = VolumeGroupControllerServicer()
     replication_pb2_grpc.add_ControllerServicer_to_server(replication_servicer, csi_addons_server)
     identity_pb2_grpc.add_IdentityServicer_to_server(identity_servicer, csi_addons_server)
     fence_pb2_grpc.add_FenceControllerServicer_to_server(fence_servicer, csi_addons_server)
+    volumegroup_pb2_grpc.add_ControllerServicer_to_server(volume_group_servicer, csi_addons_server)
     return csi_addons_server
 
 
