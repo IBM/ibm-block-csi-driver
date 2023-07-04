@@ -29,7 +29,10 @@ class IdentityControllerServicer(pb2_grpc.IdentityServicer):
         response = pb2.GetCapabilitiesResponse(
             capabilities=[self._get_replication_capability(),
                           self._get_controller_capability(),
-                          self._get_network_fence_capability()])
+                          self._get_network_fence_capability(),
+                          self._get_volume_group_capability(),
+                          self._get_vg_limit_volume_to_one_vg_capability(),
+                          self._get_vg_disable_deleting_volumes_when_vg_deleted_capability()])
 
         logger.info("finished GetCapabilities")
         return response
@@ -51,6 +54,24 @@ class IdentityControllerServicer(pb2_grpc.IdentityServicer):
         capability_enum_value = types.Value("NETWORK_FENCE")
         return pb2.Capability(
             network_fence=pb2.Capability.NetworkFence(type=capability_enum_value))
+
+    def _get_volume_group_capability(self):
+        types = pb2.Capability.VolumeGroup.Type
+        capability_enum_value = types.Value("VOLUME_GROUP")
+        return pb2.Capability(
+            volume_group=pb2.Capability.VolumeGroup(type=capability_enum_value))
+
+    def _get_vg_limit_volume_to_one_vg_capability(self):
+        types = pb2.Capability.VolumeGroup.Type
+        capability_enum_value = types.Value("LIMIT_VOLUME_TO_ONE_VG")
+        return pb2.Capability(
+            volume_group=pb2.Capability.VolumeGroup(type=capability_enum_value))
+
+    def _get_vg_disable_deleting_volumes_when_vg_deleted_capability(self):
+        types = pb2.Capability.VolumeGroup.Type
+        capability_enum_value = types.Value("DO_NOT_ALLOW_VG_TO_DELETE_VOLUMES")
+        return pb2.Capability(
+            volume_group=pb2.Capability.VolumeGroup(type=capability_enum_value))
 
     def Probe(self, request, context):
         context.set_code(grpc.StatusCode.OK)
