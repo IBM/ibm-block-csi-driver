@@ -55,6 +55,7 @@ NOT_ENOUGH_EXTENTS_IN_POOL_CREATE = 'CMMVC8710E'
 NOT_VALID_IO_GROUP = 'CMMVC5729E'
 NOT_SUPPORTED_PARAMETER = 'CMMVC5709E'
 CANNOT_CHANGE_HOST_PROTOCOL_BECAUSE_OF_MAPPED_PORTS = 'CMMVC9331E'
+STR_AS_NUMERIC_FIELD = 'CMMVC5716E'
 
 HOST_NQN = 'nqn'
 HOST_WWPN = 'WWPN'
@@ -742,7 +743,7 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
 
     def get_object_by_id(self, object_id, object_type, is_virt_snap_func=False):
         if is_virt_snap_func and object_type == controller_settings.SNAPSHOT_TYPE_NAME:
-            cli_snapshot = self._get_cli_snapshot_by_id(object_id)
+            cli_snapshot = self._get_cli_snapshot(object_id)
             if not cli_snapshot:
                 return None
             source_cli_volume = self._get_cli_volume(cli_snapshot.volume_name)
@@ -1720,6 +1721,15 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
             else:
                 raise ex
         return None
+
+    def _get_cli_snapshot(self, snapshot_id_or_name):
+        try:
+            return self._get_cli_snapshot_by_id(snapshot_id_or_name)
+        except (svc_errors.CommandExecutionError, CLIFailureError) as ex:
+            if STR_AS_NUMERIC_FIELD in ex.my_message:
+                return self._get_cli_snapshot_by_name(snapshot_id_or_name)
+            else:
+                raise ex
 
     def _get_cli_snapshot_by_id(self, snapshot_id):
         return self._lsvolumesnapshot(object_id=snapshot_id)
