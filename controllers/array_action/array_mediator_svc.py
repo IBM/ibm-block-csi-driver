@@ -1728,8 +1728,7 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
         except (svc_errors.CommandExecutionError, CLIFailureError) as ex:
             if STR_AS_NUMERIC_FIELD in ex.my_message:
                 return self._get_cli_snapshot_by_name(snapshot_id_or_name)
-            else:
-                raise ex
+            raise ex
 
     def _get_cli_snapshot_by_id(self, snapshot_id):
         return self._lsvolumesnapshot(object_id=snapshot_id)
