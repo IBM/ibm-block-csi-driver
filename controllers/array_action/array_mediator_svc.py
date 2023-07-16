@@ -965,13 +965,10 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
 
     def _handle_delete_snapshot(self, snapshot_name, internal_snapshot_id):
         if self._is_addsnapshot_supported():
-            if snapshot_name:
-                cli_snapshot = self._get_cli_snapshot_by_name(snapshot_name)
-                if cli_snapshot and cli_snapshot.snapshot_name == snapshot_name:
-                    self._rmsnapshot(cli_snapshot.snapshot_id)
-                    return True
-            else:
-                self._rmsnapshot(internal_snapshot_id)
+            snapshot_id = snapshot_name if snapshot_name else internal_snapshot_id
+            cli_snapshot = self._get_cli_snapshot(snapshot_id)
+            if cli_snapshot:
+                self._rmsnapshot(cli_snapshot.snapshot_id)
                 return True
         return False
 
