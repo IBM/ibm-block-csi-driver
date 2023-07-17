@@ -1,7 +1,7 @@
 from collections import defaultdict
+from datetime import datetime, timedelta
 from io import StringIO
 from random import choice
-from datetime import datetime, timedelta
 
 from packaging.version import Version
 from pysvc import errors as svc_errors
@@ -9,21 +9,21 @@ from pysvc.unified.client import connect
 from pysvc.unified.response import CLIFailureError, SVCResponse
 from retry import retry
 
-from controllers.common.config import config
 import controllers.array_action.errors as array_errors
 import controllers.array_action.settings as array_settings
-from controllers.array_action.registration_cache import SVC_REGISTRATION_CACHE
-from controllers.array_action import svc_messages
 import controllers.servers.settings as controller_settings
-from controllers.servers.csi.decorators import register_csi_plugin
+from controllers.array_action import svc_messages
 from controllers.array_action.array_action_types import Volume, Snapshot, Replication, Host, VolumeGroup, ThinVolume
 from controllers.array_action.array_mediator_abstract import ArrayMediatorAbstract
+from controllers.array_action.registration_cache import SVC_REGISTRATION_CACHE
 from controllers.array_action.utils import ClassProperty, convert_scsi_id_to_nguid
 from controllers.array_action.volume_group_interface import VolumeGroupInterface
 from controllers.common import settings as common_settings
+from controllers.common.config import config
 from controllers.common.csi_logger import get_stdout_logger
-from controllers.servers.utils import get_connectivity_type_ports, split_string, is_call_home_enabled
+from controllers.servers.csi.decorators import register_csi_plugin
 from controllers.servers.settings import UNIQUE_KEY_KEY
+from controllers.servers.utils import get_connectivity_type_ports, split_string, is_call_home_enabled
 
 array_connections_dict = {}
 logger = get_stdout_logger()
@@ -55,6 +55,7 @@ NOT_ENOUGH_EXTENTS_IN_POOL_CREATE = 'CMMVC8710E'
 NOT_VALID_IO_GROUP = 'CMMVC5729E'
 NOT_SUPPORTED_PARAMETER = 'CMMVC5709E'
 CANNOT_CHANGE_HOST_PROTOCOL_BECAUSE_OF_MAPPED_PORTS = 'CMMVC9331E'
+STR_AS_NUMERIC_FIELD = 'CMMVC5716E'
 
 HOST_NQN = 'nqn'
 HOST_WWPN = 'WWPN'
@@ -317,10 +318,11 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
     def is_active(self):
         return self.client.transport.transport.get_transport().is_active()
 
-    def _generate_volume_response(self, cli_volume, is_virt_snap_func=False):
+    def _generate_volume_response(self, cli_volume, is_virt_snap_func=False, source_type=None):
         pool = self._get_volume_pool(cli_volume)
-        source_id = None
-        if not is_virt_snap_func:
+        if is_virt_snap_func:
+            source_id = self._get_source_id_flashcopy2(cli_volume, source_type)
+        else:
             source_id = self._get_source_volume_wwn_if_exists(cli_volume)
         space_efficiency = _get_cli_volume_space_efficiency_aliases(cli_volume)
         return Volume(
@@ -356,6 +358,16 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
             is_ready=True,
             array_type=self.array_type
         )
+
+    def _get_source_id_flashcopy2(self, cli_volume, source_type):
+        if source_type == controller_settings.SNAPSHOT_TYPE_NAME:
+            if hasattr(cli_volume, "source_snapshot"):
+                cli_snapshot = self._get_cli_snapshot_by_name(cli_volume.source_snapshot)
+                return cli_snapshot.snapshot_name
+        elif hasattr(cli_volume, "source_volume_name"):
+            cli_volume = self._get_cli_volume(cli_volume.source_volume_name)
+            return cli_volume.vdisk_UID
+        return None
 
     def _generate_snapshot_response_with_verification(self, cli_object):
         if not cli_object.FC_id:
@@ -483,9 +495,9 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
         pools = self._get_volume_pools(cli_volume)
         return ':'.join(pools)
 
-    def get_volume(self, name, pool, is_virt_snap_func):
+    def get_volume(self, name, pool, is_virt_snap_func, source_type):
         cli_volume = self._get_cli_volume(name)
-        return self._generate_volume_response(cli_volume, is_virt_snap_func)
+        return self._generate_volume_response(cli_volume, is_virt_snap_func, source_type)
 
     def _get_object_fcmaps(self, object_name):
         all_fcmaps = []
@@ -692,7 +704,7 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
         else:
             self._create_cli_volume(name, size_in_bytes, space_efficiency, pool, io_group, volume_group)
         cli_volume = self._get_cli_volume(name)
-        return self._generate_volume_response(cli_volume, is_virt_snap_func)
+        return self._generate_volume_response(cli_volume, is_virt_snap_func, source_type)
 
     def _rmvolume(self, volume_id_or_name, not_exist_err=True):
         logger.info("deleting volume with name : {0}".format(volume_id_or_name))
@@ -721,7 +733,7 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
                 cli_snapshot = self._get_cli_snapshot_by_name(snapshot_name)
                 if not cli_snapshot:
                     return None
-                source_cli_volume = self._get_cli_volume_by_wwn(volume_id)
+                source_cli_volume = self._get_cli_volume(cli_snapshot.volume_name)
                 return self._generate_snapshot_response_from_cli_snapshot(cli_snapshot, source_cli_volume)
             raise array_errors.VirtSnapshotFunctionNotSupportedMessage(volume_id)
         target_cli_volume = self._get_cli_volume_if_exists(snapshot_name)
@@ -731,7 +743,7 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
 
     def get_object_by_id(self, object_id, object_type, is_virt_snap_func=False):
         if is_virt_snap_func and object_type == controller_settings.SNAPSHOT_TYPE_NAME:
-            cli_snapshot = self._get_cli_snapshot_by_id(object_id)
+            cli_snapshot = self._get_cli_snapshot(object_id)
             if not cli_snapshot:
                 return None
             source_cli_volume = self._get_cli_volume(cli_snapshot.volume_name)
@@ -746,7 +758,7 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
         if object_type is controller_settings.SNAPSHOT_TYPE_NAME:
             return self._generate_snapshot_response_with_verification(cli_volume)
         cli_volume = self._get_cli_volume(cli_volume.name)
-        return self._generate_volume_response(cli_volume)
+        return self._generate_volume_response(cli_volume, is_virt_snap_func, object_type)
 
     def _create_similar_volume(self, source_cli_volume, target_volume_name, space_efficiency, pool):
         logger.info("creating target cli volume '{0}' from source volume '{1}'".format(target_volume_name,
@@ -951,12 +963,20 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
                 raise array_errors.ObjectNotFoundError(internal_snapshot_id)
             raise ex
 
+    def _handle_delete_snapshot(self, snapshot_name, internal_snapshot_id):
+        if self._is_addsnapshot_supported():
+            snapshot_id = snapshot_name if snapshot_name else internal_snapshot_id
+            cli_snapshot = self._get_cli_snapshot(snapshot_id)
+            if cli_snapshot:
+                self._rmsnapshot(cli_snapshot.snapshot_id)
+                return True
+        return False
+
     @register_csi_plugin()
     def delete_snapshot(self, snapshot_id, internal_snapshot_id):
         logger.info("Deleting snapshot with id : {0}".format(snapshot_id))
-        if self._is_addsnapshot_supported() and not snapshot_id:
-            self._rmsnapshot(internal_snapshot_id)
-        else:
+        is_handled = self._handle_delete_snapshot(snapshot_id, internal_snapshot_id)
+        if not is_handled:
             self._delete_volume(snapshot_id, is_snapshot=True)
         logger.info("Finished snapshot deletion. id : {0}".format(snapshot_id))
 
@@ -1699,6 +1719,14 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
                 raise ex
         return None
 
+    def _get_cli_snapshot(self, snapshot_id_or_name):
+        try:
+            return self._get_cli_snapshot_by_id(snapshot_id_or_name)
+        except (svc_errors.CommandExecutionError, CLIFailureError) as ex:
+            if STR_AS_NUMERIC_FIELD in ex.my_message:
+                return self._get_cli_snapshot_by_name(snapshot_id_or_name)
+            raise ex
+
     def _get_cli_snapshot_by_id(self, snapshot_id):
         return self._lsvolumesnapshot(object_id=snapshot_id)
 
@@ -2064,7 +2092,7 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
         cli_volume = self._get_cli_volume_by_wwn(volume_id, not_exist_err=True)
         self._change_volume_group(cli_volume.id, None)
 
-    def register_plugin(self, unique_key,  metadata):
+    def register_plugin(self, unique_key, metadata):
         if is_call_home_enabled() and self._is_registerplugin_supported() and \
                 self._is_plugin_needs_to_be_registered(unique_key):
             self._register_plugin(unique_key, metadata)

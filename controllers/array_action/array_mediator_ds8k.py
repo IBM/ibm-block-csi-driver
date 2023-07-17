@@ -363,7 +363,7 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
             api_volume = self._get_api_volume_by_name(volume_name=name, pool_id=pool_id)
         return api_volume
 
-    def get_volume(self, name, pool, is_virt_snap_func):
+    def get_volume(self, name, pool, is_virt_snap_func, source_type):
         logger.debug("getting volume {} in pool {}".format(name, pool))
         api_volume = self._get_api_volume_with_cache(name, pool)
         if api_volume:

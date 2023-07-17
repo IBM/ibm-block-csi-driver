@@ -1,8 +1,8 @@
-from os import getenv
 import json
 import re
 from hashlib import sha256
 from operator import eq
+from os import getenv
 
 import base58
 from csi_general import csi_pb2, volumegroup_pb2
@@ -138,7 +138,8 @@ def get_volume_id(new_volume, system_id):
 
 
 def get_snapshot_id(new_snapshot, system_id):
-    return _get_object_id(new_snapshot, new_snapshot.id, system_id)
+    snapshot_strong_id = new_snapshot.id if new_snapshot.id else new_snapshot.name
+    return _get_object_id(new_snapshot, snapshot_strong_id, system_id)
 
 
 def get_volume_group_id(new_volume_group, system_id):
@@ -745,6 +746,14 @@ def join_object_prefix_with_name(prefix, name):
     if prefix:
         return settings.NAME_PREFIX_SEPARATOR.join((prefix, name))
     return name
+
+
+def validate_volume_idempotency(volume, required_bytes, source_id):
+    volume_capacity_bytes = volume.capacity_bytes
+    if not source_id and volume_capacity_bytes < required_bytes:
+        raise array_errors.ObjectAlreadyExistError(volume.name, "size", volume_capacity_bytes, required_bytes)
+    if source_id and source_id != volume.source_id:
+        raise array_errors.ObjectAlreadyExistError(volume.name, "source id", volume.source_id, source_id)
 
 
 def validate_parameters_match_source_volume(space_efficiency, required_bytes, volume):
