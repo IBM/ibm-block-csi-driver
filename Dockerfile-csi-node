@@ -1,4 +1,4 @@
-# Copyright IBM Corporation 2019.
+# Copyright IBM Corporation 2023.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -30,7 +30,7 @@ RUN make ibm-block-csi-driver
 FROM registry.access.redhat.com/ubi8/ubi-minimal:8.7-1049
 MAINTAINER IBM Storage
 
-ARG VERSION=1.11.0
+ARG VERSION=1.11.2
 ARG BUILD_NUMBER=0
 
 LABEL name="IBM block storage CSI driver node" \
