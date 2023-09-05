@@ -1,6 +1,6 @@
 # Known issues
 
-This section details the known issues in IBM® block storage CSI driver 1.11.1, along with possible solutions or workarounds (if available).
+This section details the known issues in IBM® block storage CSI driver 1.11.2, along with possible solutions or workarounds (if available).
 
 The following severity levels apply to known issues:
 
@@ -12,8 +12,8 @@ The following severity levels apply to known issues:
 
 **Important:**
 
--   **The issues listed below apply to IBM block storage CSI driver 1.11.1**. As long as a newer version has not yet been released, a newer release notes edition for IBM block storage CSI driver 1.11.1 might be issued to provide a more updated list of known issues and workarounds.
--   When a newer version is released for general availability, the release notes of this version will no longer be updated. Accordingly, check the release notes of the newer version to learn whether any newly discovered issues affect IBM block storage CSI driver 1.11.1 or whether the newer version resolves any of the issues listed below.
+-   **The issues listed below apply to IBM block storage CSI driver 1.11.2**. As long as a newer version has not yet been released, a newer release notes edition for IBM block storage CSI driver 1.11.2 might be issued to provide a more updated list of known issues and workarounds.
+-   When a newer version is released for general availability, the release notes of this version will no longer be updated. Accordingly, check the release notes of the newer version to learn whether any newly discovered issues affect IBM block storage CSI driver 1.11.2 or whether the newer version resolves any of the issues listed below.
 
 |Ticket ID|Severity|Description|
 |---------|--------|-----------|
