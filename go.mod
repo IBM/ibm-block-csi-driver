@@ -1,10 +1,12 @@
 module github.com/ibm/ibm-block-csi-driver
 
-go 1.19
+go 1.13
 
 require (
+<<<<<<< HEAD
 	github.com/container-storage-interface/spec v1.8.0
 	github.com/golang/mock v1.6.0
+	github.com/gophercloud/gophercloud v0.1.0 // indirect
 	github.com/kubernetes-csi/csi-lib-utils v0.15.0
 	github.com/sirupsen/logrus v1.9.0
 	golang.org/x/sync v0.1.0
@@ -13,8 +15,10 @@ require (
 	gopkg.in/yaml.v2 v2.4.0
 	k8s.io/apimachinery v0.28.0
 	k8s.io/client-go v0.28.0
+	k8s.io/klog v1.0.0 // indirect
 	k8s.io/mount-utils v0.27.1
 	k8s.io/utils v0.0.0-20230406110748-d93618cff8a2
+	sigs.k8s.io/structured-merge-diff/v3 v3.0.0 // indirect
 )
 
 require (
