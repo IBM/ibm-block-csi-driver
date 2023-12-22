@@ -5,12 +5,12 @@ from controllers.servers.host_definer.utils import utils
 
 @dataclass
 class DefineHostRequest:
-    prefix: str = ''
-    connectivity_type_from_user: str = ''
-    node_id_from_host_definition: str = ''
-    node_id_from_csi_node: str = ''
-    array_connection_info: ArrayConnectionInfo = ArrayConnectionInfo(array_addresses='', user='', password='')
-    io_group: str = ''
+    prefix: str
+    connectivity_type_from_user: str
+    array_connection_info: ArrayConnectionInfo
+    node_id_from_host_definition: str
+    node_id_from_csi_node: str
+    io_group: str
 
 
 @dataclass
@@ -49,14 +49,14 @@ class HostDefinitionInfo:
 
 @dataclass
 class CsiNodeInfo:
-    name: str = ''
-    node_id: str = ''
+    name: str
+    node_id: str
 
 
 @dataclass
 class PodInfo:
-    name: str = ''
-    node_name: str = ''
+    name: str
+    node_name: str
 
 
 @dataclass
@@ -67,9 +67,9 @@ class NodeInfo:
 
 @dataclass
 class StorageClassInfo:
-    name: str = ''
-    provisioner: str = ''
-    parameters: dict = field(default_factory=dict)
+    name: str
+    provisioner: str
+    parameters: dict
 
 
 class ManagedNode:

@@ -27,13 +27,10 @@ class ResourceInfoManager:
         k8s_csi_node = self.k8s_api.get_csi_node(node_name)
         if k8s_csi_node:
             return self.generate_csi_node_info(k8s_csi_node)
-        return CsiNodeInfo()
+        return CsiNodeInfo('', '')
 
     def generate_csi_node_info(self, k8s_csi_node):
-        csi_node_info = CsiNodeInfo()
-        csi_node_info.name = k8s_csi_node.metadata.name
-        csi_node_info.node_id = self._get_node_id_from_k8s_csi_node(k8s_csi_node)
-        return csi_node_info
+        return CsiNodeInfo(name=k8s_csi_node.metadata.name, node_id=self._get_node_id_from_k8s_csi_node(k8s_csi_node))
 
     def _get_node_id_from_k8s_csi_node(self, k8s_csi_node):
         if k8s_csi_node.spec.drivers:
@@ -50,11 +47,9 @@ class ResourceInfoManager:
         return storage_classes_info
 
     def generate_storage_class_info(self, k8s_storage_class):
-        storage_class_info = StorageClassInfo()
-        storage_class_info.name = k8s_storage_class.metadata.name
-        storage_class_info.provisioner = k8s_storage_class.provisioner
-        storage_class_info.parameters = k8s_storage_class.parameters
-        return storage_class_info
+        return StorageClassInfo(
+            name=k8s_storage_class.metadata.name, provisioner=k8s_storage_class.provisioner,
+            parameters=k8s_storage_class.parameters)
 
     def get_csi_pods_info(self):
         pods_info = []
@@ -67,10 +62,7 @@ class ResourceInfoManager:
         return pods_info
 
     def _generate_pod_info(self, k8s_pod):
-        pod_info = PodInfo()
-        pod_info.name = k8s_pod.metadata.name
-        pod_info.node_name = k8s_pod.spec.node_name
-        return pod_info
+        return PodInfo(name=k8s_pod.metadata.name, node_name=k8s_pod.spec.node_name)
 
     def generate_host_definition_info(self, k8s_host_definition):
         host_definition_info = HostDefinitionInfo()
