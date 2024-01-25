@@ -13,7 +13,7 @@ The following table details orchestration platforms suitable for deployment of t
 |Red Hat OpenShift| 4.12    |x86, IBM Z, IBM Power Systems<sup>1</sup>|
 |Red Hat OpenShift| 4.13    |x86, IBM Z, IBM Power Systems<sup>1</sup>|
 
-<sup>1</sup> IBM Power Systems architecture is only supported on Spectrum Virtualize and DS8000 family storage systems.</br>
+<sup>1</sup> IBM Power Systems architecture is only supported on Spectrum Virtualize and DS8000 family storage systems.<br>
 <sup>2</sup> [MicroK8s](https://microk8s.io/) is not supported for use with IBM® block storage CSI driver.
 
 **Note:** 
