@@ -4,5 +4,5 @@ This topic lists the dates and nature of updates to the published information of
 
 | Date            | Nature of updates to the published information                                                                                                                                                          |
 |-----------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| 31 December 2023| The version information was added to IBM Documentation.<br>For more information about this version, see the [What's new in 1.11.2](../content/release_notes/whats_new.md) section in the release notes. |
+| 31 March 2024   | The version information was added to IBM Documentation.<br>For more information about this version, see the [What's new in 1.11.2](../content/release_notes/whats_new.md) section in the release notes. |
 
