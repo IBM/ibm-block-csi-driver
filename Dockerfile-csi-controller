@@ -26,6 +26,7 @@ RUN pip3 install -r ./requirements.txt
 
 USER root
 COPY controllers/scripts/csi_general .
+RUN chmod +x csi_pb2.sh
 RUN ./csi_pb2.sh
 RUN pip3 install .
 
@@ -53,9 +54,12 @@ COPY ./controllers/ /driver/controllers/
 COPY ./LICENSE /licenses/
 COPY ./NOTICES /licenses/
 
+USER root
+RUN chmod +x /driver/controllers/scripts/entrypoint.sh
+USER default
+
 WORKDIR /driver
 ENV PYTHONPATH=/driver
 
 # Note: UBI runs with app-user by default.
-
 ENTRYPOINT ["/driver/controllers/scripts/entrypoint.sh"]
