@@ -75,7 +75,7 @@ RUN    ln -s /chroot/chroot-host-wrapper.sh /chroot/blkid \
 
 ENV PATH="/chroot:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
 USER root
-RUN yum update -y
+RUN microdnf update -y
 
 USER default
 ENTRYPOINT ["/root/entrypoint.sh"]
