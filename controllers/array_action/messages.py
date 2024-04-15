@@ -83,5 +83,7 @@ IO_GROUP_IS_NOT_VALID = "IO group {} is not valid"
 
 UNSUPPORTED_PARAMETER = "The parameter {} is not a supported parameter"
 
-CANNOT_CHANGE_HOST_PROTOCOL_BECAUSE_OF_MAPPED_PORTS = "The host protocol cannot be changed"\
-    " because the host {} has ports configured."
+CANNOT_CHANGE_HOST_PROTOCOL_BECAUSE_OF_MAPPED_PORTS = "The host protocol cannot be changed" \
+                                                      " because the host {} has ports configured."
+
+VOLUME_NOT_MATCH_REQUEST = "Volume: {0} was already created with different {1}. volume {1}: {2}, requested {1}: {3}"

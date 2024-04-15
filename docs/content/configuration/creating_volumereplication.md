@@ -11,6 +11,7 @@ When replicating a volume, be sure to follow all of the replication configuratio
 - When policy-based replication **is not** being used, use the `spec.csi.volumeHandle` of the relevant target PersistentVolume (PV) for the `replicationHandle` value.
 - When policy-based replication **is** being used, **do not** use the `replicationHandle` value. Using the `replicationHandle` while policy-based replication is defined in the VolumeReplicationClass results in the following error message: `got an invalid parameter: replicationHandle`.
 - `spec.dataSource.kind` values are `PersistentVolumeClaim` or `VolumeGroup`. Only one value can be used at a time. Only use the `VolumeGroup` value policy-based replication is being used.
+- `spec.dataSource.name` value must be the VolumeGroup name, when policy-based replication is being used.
 
 1.  Replicate a specific PersistentVolumeClaim (PVC) using the `demo-volumereplication.yaml`.
 
@@ -49,4 +50,4 @@ When replicating a volume, be sure to follow all of the replication configuratio
     -   **Secondary** Indicates that the source volume is the secondary volume.
     -   **Unknown** Indicates that the driver does not recognize the replication state.
 
-    **Note:** For information about changing the replication state, see the [Usage](https://github.com/csi-addons/volume-replication-operator/tree/v0.2.0#usage) section of the Volume Replication Operator for csi-addons.
+    **Note:** For information about changing the replication state, see the [Usage](https://github.com/csiblock/volume-replication-operator/tree/v0.1.0#usage) section of the Volume Replication Operator for csi-addons.
