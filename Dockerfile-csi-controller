@@ -1,4 +1,4 @@
-# Copyright IBM Corporation 2019.
+# Copyright IBM Corporation 2024.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -26,6 +26,7 @@ RUN pip3 install -r ./requirements.txt
 
 USER root
 COPY controllers/scripts/csi_general .
+RUN chmod +x csi_pb2.sh
 RUN ./csi_pb2.sh
 RUN pip3 install .
 
@@ -53,9 +54,16 @@ COPY ./controllers/ /driver/controllers/
 COPY ./LICENSE /licenses/
 COPY ./NOTICES /licenses/
 
+USER root
+RUN chmod +x /driver/controllers/scripts/entrypoint.sh
+USER default
+
 WORKDIR /driver
 ENV PYTHONPATH=/driver
 
-# Note: UBI runs with app-user by default.
+USER root
+RUN yum update -y
 
+USER default
+# Note: UBI runs with app-user by default.
 ENTRYPOINT ["/driver/controllers/scripts/entrypoint.sh"]
