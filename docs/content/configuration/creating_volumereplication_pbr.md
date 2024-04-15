@@ -23,7 +23,7 @@ VolumeReplicationClass needs to be present before a VolumeReplication can be cre
       replicationState: primary
       dataSource:
         kind: VolumeGroup
-        name: demo-pvc-file-system  # Ensure that this is in the same namespace as VolumeReplication.
+        name: demo-volumegroup  # Ensure that this is in the same namespace as VolumeGroup.
     ```
 
 2.  After the YAML file is created, apply it by using the `kubectl apply -f` command.
@@ -44,4 +44,4 @@ VolumeReplicationClass needs to be present before a VolumeReplication can be cre
     -   **Secondary** Indicates that the source volume is the secondary volume.
     -   **Unknown** Indicates that the driver does not recognize the replication state.
 
-    **Note:** For information about changing the replication state, see the [Usage](https://github.com/csi-addons/volume-replication-operator/tree/v0.2.0#usage) section of the Volume Replication Operator for csi-addons.
+    **Note:** For information about changing the replication state, see the [Usage](https://github.com/csiblock/volume-replication-operator/tree/v0.1.0#usage) section of the Volume Replication Operator for csi-addons.

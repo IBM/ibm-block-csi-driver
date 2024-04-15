@@ -20,6 +20,7 @@ SPACE_EFFICIENCY_DEDUPLICATED_COMPRESSED = "dedup_compressed"
 SPACE_EFFICIENCY_THICK = "thick"
 SPACE_EFFICIENCY_NONE = "none"
 
+# hostDefiner
 HOST_DEFINITION_PLURAL = 'hostdefinitions'
 CSI_IBM_GROUP = 'csi.ibm.com'
 VERSION = 'v1'
@@ -28,6 +29,60 @@ NAME_FIELD = 'name'
 NAMESPACE_FIELD = 'namespace'
 IO_GROUP_DELIMITER = ':'
 IO_GROUP_LABEL_PREFIX = 'hostdefiner.block.csi.ibm.com/io-group-'
+RESOURCE_VERSION_FIELD = 'resource_version'
+ITEMS_FIELD = 'items'
+CSI_PROVISIONER_NAME = 'block.csi.ibm.com'
+CSI_IBM_API_VERSION = 'csi.ibm.com/v1'
+HOST_DEFINITION_KIND = 'HostDefinition'
+MANAGE_NODE_LABEL = 'hostdefiner.block.csi.ibm.com/manage-node'
+FORBID_DELETION_LABEL = 'hostdefiner.block.csi.ibm.com/do-not-delete-definition'
+TRUE_STRING = 'true'
+PREFIX_ENV_VAR = 'PREFIX'
+CONNECTIVITY_ENV_VAR = 'CONNECTIVITY_TYPE'
+DYNAMIC_NODE_LABELING_ENV_VAR = 'DYNAMIC_NODE_LABELING'
+ALLOW_DELETE_ENV_VAR = 'ALLOW_DELETE'
+DEFINE_ACTION = 'Define'
+UNDEFINE_ACTION = 'Undefine'
+FAILED_MESSAGE_TYPE = 'Failed'
+NORMAL_EVENT_TYPE = 'Normal'
+WARNING_EVENT_TYPE = 'Warning'
+CSI_IBM_FINALIZER = HOST_DEFINITION_PLURAL + '.' + CSI_IBM_GROUP
+TOPOLOGY_IBM_BLOCK_PREFIX = 'topology.block.csi.ibm.com'
+ADDED_EVENT_TYPE = 'ADDED'
+MODIFIED_EVENT_TYPE = 'MODIFIED'
+DELETED_EVENT_TYPE = 'DELETED'
+PENDING_CREATION_PHASE = 'PendingCreation'
+PENDING_DELETION_PHASE = 'PendingDeletion'
+DRIVER_PRODUCT_LABEL = 'product=ibm-block-csi-driver'
+CONNECTIVITY_TYPE_LABEL = '{}/connectivity-type'.format(CSI_PROVISIONER_NAME)
+SUCCESSFUL_MESSAGE_TYPE = 'Successful'
+HOST_DEFINER = 'hostDefiner'
+STORAGE_API_GROUP = 'storage.k8s.io'
+CSI_PARAMETER_PREFIX = "csi.{}/".format(STORAGE_API_GROUP)
+SECRET_NAME_SUFFIX = 'secret-name'
+READY_PHASE = 'Ready'
+ERROR_PHASE = 'Error'
+DEFAULT_NAMESPACE = 'default'
+
+# hostDefiner fields
+API_VERSION_FIELD = 'apiVersion'
+KIND_FIELD = 'kind'
+SPEC_FIELD = 'spec'
+METADATA_FIELD = 'metadata'
+STATUS_FIELD = 'status'
+HOST_DEFINITION_NODE_NAME_FIELD = 'nodeName'
+SECRET_NAME_FIELD = 'secretName'
+SECRET_NAMESPACE_FIELD = 'secretNamespace'
+CONNECTIVITY_TYPE_FIELD = 'connectivityType'
+PORTS_FIELD = 'ports'
+NODE_NAME_ON_STORAGE_FIELD = 'nodeNameOnStorage'
+IO_GROUP_FIELD = 'ioGroups'
+MANAGEMENT_ADDRESS_FIELD = 'managementAddress'
+STATUS_PHASE_FIELD = 'phase'
+LABELS_FIELD = 'labels'
+FINALIZERS_FIELD = 'finalizers'
+SECRET_CONFIG_FIELD = 'config'
+HOST_DEFINITION_FIELD = 'hostDefinition'
 
 EAR_VOLUME_FC_MAP_COUNT = "2"
 
