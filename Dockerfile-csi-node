@@ -1,4 +1,4 @@
-# Copyright IBM Corporation 2019.
+# Copyright IBM Corporation 2024.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -27,7 +27,7 @@ COPY . .
 RUN make ibm-block-csi-driver
 
 # Final stage
-FROM registry.access.redhat.com/ubi8/ubi-minimal:8.7-1107
+FROM registry.access.redhat.com/ubi9-minimal:9.3-1612
 MAINTAINER IBM Storage
 
 ARG VERSION=1.12.0
@@ -74,5 +74,8 @@ RUN    ln -s /chroot/chroot-host-wrapper.sh /chroot/blkid \
     && ln -s /chroot/chroot-host-wrapper.sh /chroot/xfs_growfs
 
 ENV PATH="/chroot:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+USER root
+RUN microdnf update -y
 
+USER default
 ENTRYPOINT ["/root/entrypoint.sh"]

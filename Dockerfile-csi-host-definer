@@ -14,6 +14,7 @@ RUN pip3 install -r ./csi_requirements.txt -r ./host_definer_requirements.txt
 
 USER root
 COPY controllers/scripts/csi_general .
+RUN chmod +x csi_pb2.sh
 RUN ./csi_pb2.sh
 RUN pip3 install .
 
@@ -43,4 +44,8 @@ COPY ./NOTICES /licenses/
 WORKDIR /driver/controllers/servers/host_definer/
 ENV PYTHONPATH=/driver
 
+USER root
+RUN yum update -y
+
+USER default
 CMD ["python3", "/driver/controllers/servers/host_definer/main.py"]
