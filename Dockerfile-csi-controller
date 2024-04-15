@@ -61,5 +61,9 @@ USER default
 WORKDIR /driver
 ENV PYTHONPATH=/driver
 
+USER root
+RUN yum update -y
+
+USER default
 # Note: UBI runs with app-user by default.
 ENTRYPOINT ["/driver/controllers/scripts/entrypoint.sh"]
