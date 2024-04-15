@@ -116,7 +116,7 @@ class TestArrayMediatorDS8K(unittest.TestCase):
 
     def test_get_volume_with_no_pool(self):
         with self.assertRaises(array_errors.PoolParameterIsMissing):
-            self.array.get_volume(common_settings.VOLUME_NAME, None, False)
+            self.array.get_volume(common_settings.VOLUME_NAME, None, False, None)
 
     def _test_get_volume(self, with_cache=False):
         if with_cache:
@@ -126,7 +126,7 @@ class TestArrayMediatorDS8K(unittest.TestCase):
             self.array.volume_cache.get.return_value = None
             self.client_mock.get_volumes_by_pool.return_value = [self.volume_response]
         volume = self.array.get_volume(self.volume_response.name, pool=self.volume_response.pool,
-                                       is_virt_snap_func=False)
+                                       is_virt_snap_func=False, source_type=None)
 
         self.assertEqual(self.volume_response.name, volume.name)
         self.array.volume_cache.add_or_delete.assert_called_once_with(self.volume_response.name,
@@ -146,7 +146,7 @@ class TestArrayMediatorDS8K(unittest.TestCase):
             self.volume_response,
         ]
         volume = self.array.get_volume(self.volume_response.name, pool=self.volume_response.pool,
-                                       is_virt_snap_func=False)
+                                       is_virt_snap_func=False, source_type=None)
         self.assertEqual(self.volume_response.name, volume.name)
         self.client_mock.get_volumes_by_pool.assert_called_once_with(self.volume_response.pool)
 
@@ -156,7 +156,7 @@ class TestArrayMediatorDS8K(unittest.TestCase):
         ]
         with self.assertRaises(array_errors.ObjectNotFoundError):
             self.array.get_volume(ds8k_settings.VOLUME_FAKE_NAME, pool=self.volume_response.pool,
-                                  is_virt_snap_func=False)
+                                  is_virt_snap_func=False, source_type=None)
 
     def test_create_volume_with_default_space_efficiency_success(self):
         self._test_create_volume_success(space_efficiency=SPACE_EFFICIENCY_NONE)

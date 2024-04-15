@@ -1,0 +1,10 @@
+apiVersion: csi.ibm.com/v1
+kind: VolumeGroup
+metadata:
+  name: demo-volumegroup
+spec:
+  volumeGroupClassName: demo-volumegroupclass
+  source:
+    selector: 
+      matchLabels:
+        demo-volumegroup-key: demo-volumegroup-value

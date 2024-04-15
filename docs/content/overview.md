@@ -9,11 +9,11 @@ By leveraging CSI (Container Storage Interface) drivers for IBM storage systems,
 IBM storage orchestration for containers includes the following driver types for storage provisioning:
 
 - The IBM block storage CSI driver, for block storage (documented here).
-- The IBM Spectrum® Scale CSI driver, for file storage. For specific Spectrum Scale and Spectrum Scale CSI driver product information, see [IBM Spectrum Scale documentation](https://www.ibm.com/docs/en/spectrum-scale/).
+- The IBM Storage® Scale CSI driver, for file storage. For specific Storage Scale and Storage Scale CSI driver product information, see [IBM Storage Scale documentation](https://www.ibm.com/docs/en/storage-scale/).
 
 For details about volume provisioning with Kubernetes, refer to [Persistent volumes on Kubernetes](https://kubernetes.io/docs/concepts/storage/volumes/).
 
 **Note:** For the user convenience, this guide might refer to IBM block storage CSI driver as CSI driver.
 
-![This image shows CSI driver integration with IBM block storage.](../book_files/k8s_driver_arch_diagram.png "Integration of IBM block storage systems and CSI driver in a Kubernetes environment")
+![This image shows CSI driver integration with IBM block storage.](../book_files/k8s_driver_arch_diagram_1.11.svg "Integration of IBM block storage systems and CSI driver in a Kubernetes environment")
 

@@ -3,11 +3,12 @@ import json
 import grpc
 from mock import Mock, MagicMock
 
-from controllers.servers.csi.controller_types import ArrayConnectionInfo
 from controllers.array_action.array_action_types import Replication
+from controllers.servers.csi.controller_types import ArrayConnectionInfo
 from controllers.tests.common.test_settings import SECRET_USERNAME_VALUE as test_user, \
     SECRET_PASSWORD_VALUE as test_password, ARRAY as test_array, VOLUME_NAME, VOLUME_UID, DUMMY_POOL1, \
-    INTERNAL_VOLUME_ID, COPY_TYPE, \
+    VOLUME_GROUP_NAME, VOLUME_GROUP_UID, \
+    INTERNAL_VOLUME_GROUP_ID, INTERNAL_VOLUME_ID, COPY_TYPE, \
     SNAPSHOT_NAME, SNAPSHOT_VOLUME_NAME, SNAPSHOT_VOLUME_UID
 
 
@@ -30,6 +31,25 @@ def get_mock_mediator_response_volume(size=10, name=VOLUME_NAME, volume_id=VOLUM
     volume.space_efficiency_aliases = space_efficiency if isinstance(space_efficiency, set) else {space_efficiency}
     volume.volume_group_id = volume_group_id
     return volume
+
+
+def _get_mock_mediator_response_volumes(volumes):
+    response_volumes = []
+    for volume in volumes:
+        response_volumes.append(get_mock_mediator_response_volume(name=volume.name, volume_id=volume.id))
+    return response_volumes
+
+
+def get_mock_mediator_response_volume_group(name=VOLUME_GROUP_NAME, volume_id=VOLUME_GROUP_UID, volumes=None):
+    if not volumes:
+        volumes = []
+    volume_group = Mock()
+    volume_group.id = volume_id
+    volume_group.internal_id = INTERNAL_VOLUME_GROUP_ID
+    volume_group.name = name
+    volume_group.array_type = "a9k"
+    volume_group.volumes = _get_mock_mediator_response_volumes(volumes)
+    return volume_group
 
 
 def get_mock_mediator_response_snapshot(capacity=10, name=SNAPSHOT_NAME, snapshot_id=SNAPSHOT_VOLUME_UID,

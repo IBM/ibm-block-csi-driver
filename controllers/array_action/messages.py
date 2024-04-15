@@ -9,6 +9,8 @@ OBJECT_NOT_FOUND_ERROR_MESSAGE = "Object was not found : {0} "
 VOLUME_NAME_BELONGS_TO_SNAPSHOT_ERROR_MESSAGE = "Volume not found. Snapshot with the same id exists. \
                                                          Name : {0} , array : {1}"
 
+VOLUME_ALREADY_IN_VOLUME_GROUP_ERROR_MESSAGE = "Volume {0} is already in a volume group {1}"
+
 POOL_DOES_NOT_MATCH_SPACE_EFFICIENCY_MESSAGE = "Pool : {0} does not match the following space efficiency : {1} . " \
                                                "error : {2}"
 
@@ -19,7 +21,7 @@ SPACE_EFFICIENCY_MISMATCH_MESSAGE = "space efficiency : {0}" \
 
 VIRT_SNAPSHOT_FUNCTION_NOT_SUPPORTED_MESSAGE = "Snapshot function is enabled but not supported with object : {0} "
 
-VOLUME_ALREADY_EXISTS_MESSAGE = "Volume already exists : {0} , array : {1}"
+OBJECT_ALREADY_EXISTS_MESSAGE = "{0} already exists : {1} , array : {2}"
 
 POOL_DOES_NOT_EXIST_MESSAGE = "Pool does not exist: {0} , array : {1}"
 
@@ -58,10 +60,6 @@ UNSUPPORTED_CONNECTIVITY_TYPE_ERROR_MESSAGE = "Unsupported connectivity type: {0
 
 SNAPSHOT_NOT_FOUND_ERROR_MESSAGE = "Snapshot was not found : {0} "
 
-SNAPSHOT_ALREADY_EXISTS_ERROR_MESSAGE = "Snapshot already exists : {0} , array : {1}"
-
-HOST_ALREADY_EXISTS_ERROR_MESSAGE = "Host already exists : {0} , array : {1}"
-
 EXPECTED_SNAPSHOT_BUT_FOUND_VOLUME_ERROR_MESSAGE = "Could not find info about the source of: {0}, array: {1}"
 
 SNAPSHOT_WRONG_VOLUME_ERROR_MESSAGE = "Snapshot {0} exists but it is of Volume {1} and not {2}"
@@ -85,5 +83,7 @@ IO_GROUP_IS_NOT_VALID = "IO group {} is not valid"
 
 UNSUPPORTED_PARAMETER = "The parameter {} is not a supported parameter"
 
-CANNOT_CHANGE_HOST_PROTOCOL_BECAUSE_OF_MAPPED_PORTS = "The host protocol cannot be changed"\
-    " because the host {} has ports configured."
+CANNOT_CHANGE_HOST_PROTOCOL_BECAUSE_OF_MAPPED_PORTS = "The host protocol cannot be changed" \
+                                                      " because the host {} has ports configured."
+
+VOLUME_NOT_MATCH_REQUEST = "Volume: {0} was already created with different {1}. volume {1}: {2}, requested {1}: {3}"

@@ -25,29 +25,7 @@ Before starting to import an existing volume, find the `volumeHandle` in the exi
 
     For more information about Spectrum Virtualize products, find your product information in [IBM Documentation](https://www.ibm.com/docs/).
   
-- **For FlashSystem A9000 and A9000R:**
 
-  The `volumeHandle` is formatted as `A9000:id;WWN`.
-  
-  - Through command line:
-
-    Find the `id` and `WWN` for the volume, by using the `vol_list -f` command.
-
-    For more information, see **Reference** > **Command-line reference (12.3.2.x)** > **Volume management commands** > **Listing volumes** within your specific product documentation on [IBM Documentation](https://www.ibm.com/docs/).
-
-  - Through the Hyper-Scale Management user interface:
-
-    1. Select **Pools and Volumes Views** > **Volumes** from the side bar.
-
-        The **Volumes** table is displayed.
-
-    2. Select the `Volume`.
-
-        The **Volume Properties** form is displayed.
-
-    3. Use the **ID** and **WWN** values.
-    
-    For more information, see [IBM Hyper-Scale Manager documentation](https://www.ibm.com/docs/en/hyper-scale-manager/).
 
 - **For DS8000 family:**
 
@@ -89,8 +67,8 @@ Use this procedure to help build a PV YAML file for your volumes.
     apiVersion: v1
     kind: PersistentVolume
     metadata:
-      # annotations:
-        # pv.kubernetes.io/provisioned-by: block.csi.ibm.com
+      annotations: 
+        pv.kubernetes.io/provisioned-by: block.csi.ibm.com
       name: demo-pv
     spec:
       accessModes:
@@ -98,6 +76,7 @@ Use this procedure to help build a PV YAML file for your volumes.
       capacity:
         storage: 1Gi
       csi:
+        fsType: ext4
         controllerExpandSecretRef:
           name: demo-secret
           namespace: default
@@ -110,17 +89,10 @@ Use this procedure to help build a PV YAML file for your volumes.
         nodeStageSecretRef:
           name: demo-secret
           namespace: default
-        # fsType: ext4
         driver: block.csi.ibm.com
-        # volumeAttributes:
-          # pool_name: demo-pool
-          # storage_type: SVC
-          # volume_name: demo-prefix_demo-pvc-file-system
-          # array_address: demo-management-address
-        volumeHandle: SVC:0;600507640082000B08000000000004FF
-      # persistentVolumeReclaimPolicy: Retain
+        volumeHandle: SVC:id;uid
       storageClassName: demo-storageclass
-      # volumeMode: Filesystem
+      persistentVolumeReclaimPolicy: Retain
     ```
 
 3. Create a PersistentVolumeClaim (PVC) YAML file.

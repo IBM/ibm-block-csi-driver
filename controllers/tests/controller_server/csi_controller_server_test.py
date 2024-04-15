@@ -161,28 +161,37 @@ class TestCreateSnapshot(BaseControllerSetUp, CommonControllerTest):
     def test_create_snapshot_with_empty_name(self):
         self._test_create_object_with_empty_name()
 
-    def _prepare_create_snapshot_mocks(self, ):
+    def _prepare_create_snapshot_mocks(self, virt_snap_func=False):
         self.mediator.get_snapshot = Mock()
         self.mediator.get_snapshot.return_value = None
         self.mediator.create_snapshot = Mock()
-        self.mediator.create_snapshot.return_value = utils.get_mock_mediator_response_snapshot(10, SNAPSHOT_NAME,
-                                                                                               SNAPSHOT_VOLUME_UID,
-                                                                                               SNAPSHOT_VOLUME_NAME,
-                                                                                               "xiv")
+        if virt_snap_func:
+            snapshot_returned = utils.get_mock_mediator_response_snapshot(snapshot_id=None)
+        else:
+            snapshot_returned = utils.get_mock_mediator_response_snapshot()
+        self.mediator.create_snapshot.return_value = snapshot_returned
 
     def _test_create_snapshot_succeeds(self, expected_space_efficiency=None, expected_pool=None,
-                                       system_id=None):
-        self._prepare_create_snapshot_mocks()
+                                       system_id=None, virt_snap_func=False):
+        self._prepare_create_snapshot_mocks(virt_snap_func)
 
         response_snapshot = self.servicer.CreateSnapshot(self.request, self.context)
 
         self.assertEqual(grpc.StatusCode.OK, self.context.code)
-        self.mediator.get_snapshot.assert_called_once_with(SNAPSHOT_VOLUME_UID, SNAPSHOT_NAME, expected_pool, False)
+        self.mediator.get_snapshot.assert_called_once_with(SNAPSHOT_VOLUME_UID, SNAPSHOT_NAME, expected_pool,
+                                                           virt_snap_func)
         self.mediator.create_snapshot.assert_called_once_with(SNAPSHOT_VOLUME_UID, SNAPSHOT_NAME,
-                                                              expected_space_efficiency, expected_pool, False)
+                                                              expected_space_efficiency, expected_pool, virt_snap_func)
         system_id_part = ':{}'.format(system_id) if system_id else ''
-        snapshot_id = 'xiv{}:0;{}'.format(system_id_part, SNAPSHOT_VOLUME_UID)
+        if virt_snap_func:
+            snapshot_id = 'xiv{}:0;{}'.format(system_id_part, SNAPSHOT_NAME)
+        else:
+            snapshot_id = 'xiv{}:0;{}'.format(system_id_part, SNAPSHOT_VOLUME_UID)
         self.assertEqual(snapshot_id, response_snapshot.snapshot.snapshot_id)
+
+    def test_create_snapshot_virt_snap_func_enabled_succeeds(self):
+        self.request.parameters[servers_settings.PARAMETERS_VIRT_SNAP_FUNC] = VIRT_SNAP_FUNC_TRUE
+        self._test_create_snapshot_succeeds(virt_snap_func=True)
 
     def test_create_snapshot_succeeds(self, ):
         self._test_create_snapshot_succeeds()
@@ -434,7 +443,7 @@ class TestCreateVolume(BaseControllerSetUp, CommonControllerTest):
 
         response_volume = self.servicer.CreateVolume(self.request, self.context)
         self.assertEqual(self.context.code, grpc.StatusCode.OK)
-        self.mediator.get_volume.assert_called_once_with(VOLUME_NAME, expected_pool, False)
+        self.mediator.get_volume.assert_called_once_with(VOLUME_NAME, expected_pool, False, None)
         self.mediator.create_volume.assert_called_once_with(VOLUME_NAME, 10, None, expected_pool, DUMMY_IO_GROUP,
                                                             DUMMY_VOLUME_GROUP,
                                                             ObjectIds(internal_id='', uid=''), None, False)
@@ -447,8 +456,12 @@ class TestCreateVolume(BaseControllerSetUp, CommonControllerTest):
 
     def test_create_volume_succeeds(self):
         self._test_create_volume_succeeds('xiv:{};{}'.format(INTERNAL_VOLUME_ID, VOLUME_UID))
+        self.mediator.register_plugin.not_called()
 
     def test_create_volume_with_topologies_succeeds(self):
+        self._test_create_volume_with_topologies_succeeds()
+
+    def _test_create_volume_with_topologies_succeeds(self):
         self.request.secrets = utils.get_fake_secret_config(system_id="u2", supported_topologies=[
             {"topology.block.csi.ibm.com/test": "topology_value"}])
         self.request.accessibility_requirements.preferred = [
@@ -460,6 +473,7 @@ class TestCreateVolume(BaseControllerSetUp, CommonControllerTest):
             {"u1": self.request.parameters, "u2": second_system_parameters})}
         self._test_create_volume_succeeds('xiv:u2:{};{}'.format(INTERNAL_VOLUME_ID, VOLUME_UID),
                                           expected_pool=DUMMY_POOL2)
+        self.mediator.register_plugin.assert_called_once_with('topology', '')
 
     def test_create_volume_with_space_efficiency_succeeds(self):
         self._prepare_create_volume_mocks()
@@ -469,7 +483,7 @@ class TestCreateVolume(BaseControllerSetUp, CommonControllerTest):
         self.servicer.CreateVolume(self.request, self.context)
 
         self.assertEqual(self.context.code, grpc.StatusCode.OK)
-        self.mediator.get_volume.assert_called_once_with(VOLUME_NAME, DUMMY_POOL1, False)
+        self.mediator.get_volume.assert_called_once_with(VOLUME_NAME, DUMMY_POOL1, False, None)
         self.mediator.create_volume.assert_called_once_with(VOLUME_NAME, 10, "not_none", DUMMY_POOL1, DUMMY_IO_GROUP,
                                                             DUMMY_VOLUME_GROUP,
                                                             ObjectIds(internal_id='', uid=''), None, False)
@@ -482,7 +496,7 @@ class TestCreateVolume(BaseControllerSetUp, CommonControllerTest):
 
         response_volume = self.servicer.CreateVolume(self.request, self.context)
         self.assertEqual(self.context.code, grpc.StatusCode.OK)
-        self.mediator.get_volume.assert_called_once_with(VOLUME_NAME, DUMMY_POOL1, False)
+        self.mediator.get_volume.assert_called_once_with(VOLUME_NAME, DUMMY_POOL1, False, None)
         self.mediator.create_volume.assert_not_called()
         self.assertEqual(response_volume.volume.content_source.volume.volume_id, '')
         self.assertEqual(response_volume.volume.content_source.snapshot.snapshot_id, '')
@@ -535,7 +549,7 @@ class TestCreateVolume(BaseControllerSetUp, CommonControllerTest):
         self.servicer.CreateVolume(self.request, self.context)
         self.assertEqual(self.context.code, grpc.StatusCode.INTERNAL)
         self.assertIn("error", self.context.details)
-        self.mediator.get_volume.assert_called_once_with(VOLUME_NAME, DUMMY_POOL1, False)
+        self.mediator.get_volume.assert_called_once_with(VOLUME_NAME, DUMMY_POOL1, False, None)
 
     def test_create_volume_with_get_volume_illegal_object_name_exception(self):
         self.mediator.get_volume.side_effect = [array_errors.InvalidArgumentError("volume")]
@@ -545,7 +559,7 @@ class TestCreateVolume(BaseControllerSetUp, CommonControllerTest):
 
         self.assertEqual(self.context.code, grpc.StatusCode.INVALID_ARGUMENT)
         self.assertIn(msg, self.context.details)
-        self.mediator.get_volume.assert_called_once_with(VOLUME_NAME, DUMMY_POOL1, False)
+        self.mediator.get_volume.assert_called_once_with(VOLUME_NAME, DUMMY_POOL1, False, None)
 
     def test_create_volume_with_prefix_too_long_exception(self):
         self.request.parameters.update({"volume_name_prefix": "a" * 128})
@@ -570,7 +584,7 @@ class TestCreateVolume(BaseControllerSetUp, CommonControllerTest):
 
         self.assertEqual(self.context.code, return_code)
         self.assertIn(msg, self.context.details)
-        self.mediator.get_volume.assert_called_once_with(VOLUME_NAME, DUMMY_POOL1, False)
+        self.mediator.get_volume.assert_called_once_with(VOLUME_NAME, DUMMY_POOL1, False, None)
         self.mediator.create_volume.assert_called_once_with(VOLUME_NAME, self.capacity_bytes, None, DUMMY_POOL1,
                                                             DUMMY_IO_GROUP,
                                                             DUMMY_VOLUME_GROUP, ObjectIds(internal_id='', uid=''),
@@ -733,7 +747,7 @@ class TestCreateVolume(BaseControllerSetUp, CommonControllerTest):
         self._enable_virt_snap_func()
         self.mediator.get_object_by_id.return_value = utils.get_mock_mediator_response_volume()
         self._prepare_idempotent_test_with_other_source()
-        self.assertEqual(self.context.code, grpc.StatusCode.OK)
+        self.assertEqual(self.context.code, grpc.StatusCode.ALREADY_EXISTS)
 
     def test_create_volume_virt_snap_func_enabled_no_source(self):
         self._enable_virt_snap_func()
@@ -1473,7 +1487,7 @@ class TestValidateVolumeCapabilities(BaseControllerSetUp, CommonControllerTest):
 
         self.servicer.ValidateVolumeCapabilities(self.request, self.context)
 
-        self._assert_response(grpc.StatusCode.INVALID_ARGUMENT, "volume id")
+        self._assert_response(grpc.StatusCode.INVALID_ARGUMENT, "volume_id")
 
     def test_validate_volume_capabilities_with_wrong_secrets(self):
         self._test_request_with_wrong_secrets()

@@ -5,7 +5,7 @@ This file details additional third party software license agreements
 and third party notices and information that are required
 to be reproduced for the following programs:
 
-IBM Block Storage CSI Driver version 1.10.0
+IBM Block Storage CSI Driver version 1.11.0
 
 
 
@@ -1414,7 +1414,7 @@ End of GNU GPL Version 3.0 License
 
 ===========================================================================
 END OF TERMS AND CONDITIONS FOR SEPARATELY LICENSED CODE for IBM Block
-Storage CSI Driver version 1.10.0
+Storage CSI Driver version 1.11.0
 ===========================================================================
 
 
@@ -1426,7 +1426,7 @@ Storage CSI Driver version 1.10.0
 
 GNU GPL and / or LGPL Source Code for:
 
-IBM Block Storage CSI Driver 1.10.0
+IBM Block Storage CSI Driver 1.11.0
 
 ===========================================================================
 
@@ -1445,7 +1445,7 @@ GNU General Public License 2.0.
     Red Hat Universal Base Image 8 Python 3.8
 
 Source code to any of the above-listed packages distributed with IBM Block
-Storage CSI Driver 1.10.0 is available at the website below, when a URL is
+Storage CSI Driver 1.11.0 is available at the website below, when a URL is
 provided, or by sending a request to the following address or email:
 
     IBM Corporation
@@ -1473,7 +1473,7 @@ GNU General Public License 3.0.
     Red Hat Universal Base Image 8 Python 3.8
 
 Source code to any of the above-listed packages distributed with IBM Block
-Storage CSI Driver 1.10.0 is available at the website below, when a URL is
+Storage CSI Driver 1.11.0 is available at the website below, when a URL is
 provided, or by sending a request to the following address or email:
 
     IBM Corporation
@@ -2394,6 +2394,6 @@ END OF yaml-2.2.8 NOTICES AND INFORMATION
 
 ===========================================================================
 END OF NOTICES AND INFORMATION FOR IBM Block Storage CSI
-Driver 1.10.0
+Driver 1.11.0
 ===========================================================================
 

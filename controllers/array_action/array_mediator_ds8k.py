@@ -363,7 +363,7 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
             api_volume = self._get_api_volume_by_name(volume_name=name, pool_id=pool_id)
         return api_volume
 
-    def get_volume(self, name, pool, is_virt_snap_func):
+    def get_volume(self, name, pool, is_virt_snap_func, source_type):
         logger.debug("getting volume {} in pool {}".format(name, pool))
         api_volume = self._get_api_volume_with_cache(name, pool)
         if api_volume:
@@ -726,3 +726,6 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
 
     def change_host_protocol(self, host_name, protocol):
         raise NotImplementedError
+
+    def register_plugin(self, unique_key,  metadata):
+        return None
