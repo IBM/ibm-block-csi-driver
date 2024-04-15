@@ -2,7 +2,7 @@
 
 IBM® block storage CSI driver 1.11.2 introduces the enhancements that are detailed in the following section.
 
-**General availability date:** 31 December 2023
+**General availability date:** 1 May 2024
 
 ## Supported orchestration platforms for deployment
 
@@ -10,4 +10,4 @@ This version adds support for orchestration platforms Kubernetes 1.28 and Red Ha
 
 ## Miscellaneous resolved issues
 
-For information about the resolved issue in version 1.11.2, see [1.11.2 (December 2023)](changelog_1.11.2.md).
+For information about the resolved issues in version 1.11.2, see [1.11.2 (May 2024)](changelog_1.11.2.md).

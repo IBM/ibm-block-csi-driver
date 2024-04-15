@@ -33,7 +33,7 @@ Complete these steps to prepare your environment for installing the CSI (Contain
    Download and save the following YAML file:
 
    ```
-   curl https://raw.githubusercontent.com/IBM/ibm-block-csi-operator/master/deploy/99-ibm-attach.yaml > 99-ibm-attach.yaml
+   curl https://raw.githubusercontent.com/IBM/ibm-block-csi-operator/v1.11.2/deploy/99-ibm-attach.yaml > 99-ibm-attach.yaml
    ```
 
    This file can be used for both Fibre Channel and iSCSI configurations. To support iSCSI, uncomment the last two lines in the file.
@@ -50,7 +50,7 @@ Complete these steps to prepare your environment for installing the CSI (Contain
 
 2. Configure your storage system host attachment, per worker node.
 
-    **Note:** IBM® block storage CSI driver 1.11.0 introduces dynamic host definition. For more information and installation instructions, see [Installing the host definer](install_hostdefiner.md). If this feature is not installed, the nodes are not dynamically defined on the storage system and they must be defined manually.
+    **Note:** IBM® block storage CSI driver 1.11.0 introduced dynamic host definition. For more information and installation instructions, see [Installing the host definer](install_hostdefiner.md). If this feature is not installed, the nodes are not dynamically defined on the storage system and they must be defined manually.
     
     Be sure to configure your storage system host attachment according to your storage system instructions.
 
@@ -85,13 +85,13 @@ Complete these steps to prepare your environment for installing the CSI (Contain
     1. To enable support on your Kubernetes cluster, install the following replication CRDs once per cluster.
 
         ```
-        curl -O https://raw.githubusercontent.com/IBM/csi-volume-group-operator/v0.9.0/config/crd/bases/csi.ibm.com_volumegroupclasses.yaml
+        curl -O https://raw.githubusercontent.com/IBM/csi-volume-group-operator/v0.9.1/config/crd/bases/csi.ibm.com_volumegroupclasses.yaml
         kubectl apply -f csi.ibm.com_volumegroupclasses.yaml
 
-        curl -O https://raw.githubusercontent.com/IBM/csi-volume-group-operator/v0.9.0/config/crd/bases/csi.ibm.com_volumegroupcontents.yaml
+        curl -O https://raw.githubusercontent.com/IBM/csi-volume-group-operator/v0.9.1/config/crd/bases/csi.ibm.com_volumegroupcontents.yaml
         kubectl apply -f csi.ibm.com_volumegroupcontents.yaml
 
-        curl -O https://raw.githubusercontent.com/IBM/csi-volume-group-operator/v0.9.0/config/crd/bases/csi.ibm.com_volumegroups.yaml
+        curl -O https://raw.githubusercontent.com/IBM/csi-volume-group-operator/v0.9.1/config/crd/bases/csi.ibm.com_volumegroups.yaml
         kubectl apply -f csi.ibm.com_volumegroups.yaml
         ```
     
@@ -102,10 +102,10 @@ Complete these steps to prepare your environment for installing the CSI (Contain
     1. To enable support on your Kubernetes cluster, install the following volume group CRDs once per cluster.
 
         ```
-        curl -O https://raw.githubusercontent.com/csi-addons/volume-replication-operator/v0.3.0/config/crd/bases/replication.storage.openshift.io_volumereplicationclasses.yaml
+        curl -O https://raw.githubusercontent.com/csiblock/volume-replication-operator/v0.1.0/config/crd/bases/replication.storage.openshift.io_volumereplicationclasses.yaml
         kubectl apply -f ./replication.storage.openshift.io_volumereplicationclasses.yaml
         
-        curl -O https://raw.githubusercontent.com/csi-addons/volume-replication-operator/v0.3.0/config/crd/bases/replication.storage.openshift.io_volumereplications.yaml
+        curl -O https://raw.githubusercontent.com/csiblock/volume-replication-operator/v0.1.0/config/crd/bases/replication.storage.openshift.io_volumereplications.yaml
         kubectl apply -f ./replication.storage.openshift.io_volumereplications.yaml
         ```
     
