@@ -45,8 +45,8 @@ WORKDIR /driver/controllers/servers/host_definer/
 ENV PYTHONPATH=/driver
 
 USER root
-RUN yum update -y
-RUN pip3 install --ignore-installed --default-timeout=100 --upgrade pip==23.3
+RUN yum update -y --security
+RUN pip3 install --ignore-installed --default-timeout=100 --upgrade pip==23.3 setuptools==65.5.1
 
 USER default
 CMD ["python3", "/driver/controllers/servers/host_definer/main.py"]
