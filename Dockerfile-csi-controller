@@ -17,7 +17,6 @@ USER root
 RUN if [[ "$(uname -m)" != "x86"* ]]; then yum install -y rust-toolset; fi
 USER default
 ENV PIP_DISABLE_PIP_VERSION_CHECK=1
-RUN yum update -y
 RUN pip3 install --upgrade pip==24.0 setuptools==69.5.1
 WORKDIR /tmp
 COPY controllers/servers/csi/requirements.txt .
@@ -26,6 +25,7 @@ ENV GRPC_PYTHON_BUILD_SYSTEM_OPENSSL=True
 RUN pip3 install -r ./requirements.txt
 
 USER root
+RUN yum update -y
 COPY controllers/scripts/csi_general .
 RUN chmod +x csi_pb2.sh
 RUN ./csi_pb2.sh
