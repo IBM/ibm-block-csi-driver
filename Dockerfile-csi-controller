@@ -14,6 +14,7 @@
 
 FROM registry.access.redhat.com/ubi8/python-38:1-115.1669838006 as builder
 USER root
+RUN yum update -y
 RUN if [[ "$(uname -m)" != "x86"* ]]; then yum install -y rust-toolset; fi
 USER default
 ENV PIP_DISABLE_PIP_VERSION_CHECK=1
@@ -25,7 +26,6 @@ ENV GRPC_PYTHON_BUILD_SYSTEM_OPENSSL=True
 RUN pip3 install -r ./requirements.txt
 
 USER root
-RUN yum update -y
 COPY controllers/scripts/csi_general .
 RUN chmod +x csi_pb2.sh
 RUN ./csi_pb2.sh

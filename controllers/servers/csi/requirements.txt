@@ -6,7 +6,6 @@ munch==2.3.2
 retry2==0.9.5
 packaging==20.1
 base58==2.0.0
-setuptools==65.5.1
 
 # A9000 python client
 pyxcli==1.2.1
