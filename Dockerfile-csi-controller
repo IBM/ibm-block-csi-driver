@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-FROM registry.access.redhat.com/ubi8/python-38:1-131
+FROM registry.access.redhat.com/ubi8/python-38:1-131 as builder
 USER root
 RUN pip3 uninstall setuptools pip
 RUN yum update -y
