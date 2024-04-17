@@ -1,7 +1,7 @@
 FROM registry.access.redhat.com/ubi8/python-38:1-131 as builder
 
 USER root
-RUN pip3 uninstall setuptools pip
+RUN pip3 uninstall -y setuptools pip
 RUN yum update -y
 RUN if [[ "$(uname -m)" != "x86"* ]]; then yum install -y rust-toolset; fi
 USER default
@@ -48,7 +48,7 @@ WORKDIR /driver/controllers/servers/host_definer/
 ENV PYTHONPATH=/driver
 
 USER root
-RUN pip3 uninstall setuptools pip
+RUN pip3 uninstall -y setuptools pip
 RUN yum update -y
 RUN python38 -m ensurepip --upgrade
 RUN pip3 install --upgrade pip==24.0 setuptools==69.5.1
