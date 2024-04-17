@@ -1,10 +1,12 @@
-FROM registry.access.redhat.com/ubi8/python-38:1-115.1669838006 as builder
+FROM registry.access.redhat.com/ubi8/python-38:1-131 as builder
 
 USER root
+RUN pip3 uninstall setuptools pip
 RUN yum update -y
 RUN if [[ "$(uname -m)" != "x86"* ]]; then yum install -y rust-toolset; fi
 USER default
 ENV PIP_DISABLE_PIP_VERSION_CHECK=1
+RUN python38 -m ensurepip --upgrade
 RUN pip3 install --upgrade pip==24.0 setuptools==69.5.1
 WORKDIR /tmp
 COPY controllers/servers/csi/requirements.txt ./csi_requirements.txt
@@ -19,7 +21,7 @@ RUN chmod +x csi_pb2.sh
 RUN ./csi_pb2.sh
 RUN pip3 install .
 
-FROM registry.access.redhat.com/ubi8/python-38:1-115.1669838006
+FROM registry.access.redhat.com/ubi8/python-38:1-131
 
 ARG VERSION=1.11.2
 ARG BUILD_NUMBER=0
@@ -46,7 +48,9 @@ WORKDIR /driver/controllers/servers/host_definer/
 ENV PYTHONPATH=/driver
 
 USER root
+RUN pip3 uninstall setuptools pip
 RUN yum update -y
+RUN python38 -m ensurepip --upgrade
 RUN pip3 install --upgrade pip==24.0 setuptools==69.5.1
 
 USER default
