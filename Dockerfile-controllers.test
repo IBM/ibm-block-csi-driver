@@ -21,7 +21,7 @@ USER root
 RUN if [[ "$(uname -m)" != "x86"* ]]; then yum install -y rust-toolset; fi
 USER default
 ENV PIP_DISABLE_PIP_VERSION_CHECK=1
-RUN pip3 install --ignore-installed --default-timeout=100 --upgrade pip==21.2.4
+RUN pip3 install --ignore-installed --default-timeout=100 --upgrade pip==23.3
 WORKDIR /tmp
 COPY controllers/servers/csi/requirements.txt ./csi_requirements.txt
 COPY controllers/servers/host_definer/requirements.txt ./host_definer_requirements.txt
