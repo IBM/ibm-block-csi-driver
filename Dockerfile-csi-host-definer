@@ -46,6 +46,7 @@ ENV PYTHONPATH=/driver
 
 USER root
 RUN yum update -y
+RUN pip3 install --ignore-installed --default-timeout=100 --upgrade pip==23.3
 
 USER default
 CMD ["python3", "/driver/controllers/servers/host_definer/main.py"]

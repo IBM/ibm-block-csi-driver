@@ -63,6 +63,7 @@ ENV PYTHONPATH=/driver
 
 USER root
 RUN yum update -y
+RUN pip3 install --ignore-installed --default-timeout=100 --upgrade pip==23.3
 
 USER default
 # Note: UBI runs with app-user by default.
