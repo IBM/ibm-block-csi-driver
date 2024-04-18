@@ -7,7 +7,7 @@ import controllers.tests.controller_server.host_definer.utils.k8s_manifests_util
 import controllers.tests.controller_server.host_definer.settings as test_settings
 from controllers.tests.common.test_settings import HOST_NAME, SECRET_MANAGEMENT_ADDRESS_VALUE
 from controllers.servers.host_definer.kubernetes_manager.manager import KubernetesManager
-from controllers.servers.host_definer.types import DefineHostRequest, DefineHostResponse
+from controllers.servers.host_definer.hd_types import DefineHostRequest, DefineHostResponse
 from controllers.servers.csi.controller_types import ArrayConnectionInfo
 
 

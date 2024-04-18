@@ -10,7 +10,7 @@ from controllers.common.csi_logger import get_stdout_logger
 import controllers.servers.host_definer.messages as messages
 from controllers.servers.host_definer import settings
 import controllers.common.settings as common_settings
-from controllers.servers.host_definer.types import (
+from controllers.servers.host_definer.hd_types import (
     CsiNodeInfo, PodInfo, NodeInfo, StorageClassInfo, HostDefinitionInfo)
 
 logger = get_stdout_logger()

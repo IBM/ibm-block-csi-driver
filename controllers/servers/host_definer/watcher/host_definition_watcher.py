@@ -4,7 +4,7 @@ from time import sleep
 import controllers.servers.host_definer.messages as messages
 from controllers.common.csi_logger import get_stdout_logger
 from controllers.servers.host_definer.watcher.watcher_helper import Watcher
-from controllers.servers.host_definer.types import DefineHostResponse
+from controllers.servers.host_definer.hd_types import DefineHostResponse
 from controllers.servers.host_definer import settings
 import controllers.common.settings as common_settings
 
