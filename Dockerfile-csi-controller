@@ -66,15 +66,14 @@ USER default
 
 WORKDIR /driver
 ENV PYTHONPATH=/driver
-
-USER default
 RUN pip3 uninstall -y setuptools pip
+
 USER root
 RUN pip3 uninstall -y setuptools pip
 RUN yum update -y
 
 USER default
 RUN python3 -m ensurepip --upgrade
-RUN pip3 install --upgrade pip==24.0 setuptools==69.5.1
+RUN pip3 install --user --upgrade pip==24.0 setuptools==69.5.1
 # Note: UBI runs with app-user by default.
 ENTRYPOINT ["/driver/controllers/scripts/entrypoint.sh"]
