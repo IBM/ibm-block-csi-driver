@@ -19,7 +19,7 @@ RUN yum update -y
 RUN if [[ "$(uname -m)" != "x86"* ]]; then yum install -y rust-toolset; fi
 USER default
 ENV PIP_DISABLE_PIP_VERSION_CHECK=1
-RUN python38 -m ensurepip --upgrade
+RUN python3 -m ensurepip --upgrade
 RUN pip3 install --upgrade pip==24.0 setuptools==69.5.1
 WORKDIR /tmp
 COPY controllers/servers/csi/requirements.txt .
@@ -67,7 +67,7 @@ ENV PYTHONPATH=/driver
 USER root
 RUN pip3 uninstall -y setuptools pip
 RUN yum update -y
-RUN python38 -m ensurepip --upgrade
+RUN python3 -m ensurepip --upgrade
 RUN pip3 install --upgrade pip==24.0 setuptools==69.5.1
 
 USER default
