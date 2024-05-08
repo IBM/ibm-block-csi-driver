@@ -74,8 +74,4 @@ RUN    ln -s /chroot/chroot-host-wrapper.sh /chroot/blkid \
     && ln -s /chroot/chroot-host-wrapper.sh /chroot/xfs_growfs
 
 ENV PATH="/chroot:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
-#USER root
-#RUN microdnf update -y
-
-#USER default
 ENTRYPOINT ["/root/entrypoint.sh"]
