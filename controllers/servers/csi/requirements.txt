@@ -1,5 +1,5 @@
-grpcio==1.62.1
-grpcio-tools==1.62.1
+grpcio==1.63.0
+grpcio-tools==1.51.1
 protobuf==4.25.3
 pyyaml==6.0.1
 munch==2.3.2
