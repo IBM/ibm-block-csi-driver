@@ -10,8 +10,8 @@ The following table lists operating systems required for deployment of the IBM®
 | Ubuntu 20.04.x LTS<sup>2</sup>                    |x86|
 
 <sup>1</sup>IBM Power Systems architecture is only supported on Spectrum Virtualize and DS8000 family storage systems.<br/>
-<sup>2</sup>Ubuntu is supported with Kubernetes orchestration platforms only.
-<sup>3</sup>Red Hat® Enterprise Linux® (RHEL) 9.x is supported with Kubernetes orchestration platforms only.
+<sup>2</sup>Ubuntu is supported with Kubernetes orchestration platforms only.<br/>
+<sup>3</sup>Red Hat® Enterprise Linux® (RHEL) 9.x is supported with Kubernetes orchestration platforms only.<br/>
 
 **Note:** 
 - Virtualized worker nodes (for example, VMware vSphere) are supported with iSCSI and Fibre Channel (FC) adapters, when the FC adapter is used in passthrough mode.

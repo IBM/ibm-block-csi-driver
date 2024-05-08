@@ -6,7 +6,7 @@ IBM® block storage CSI driver 1.11.2 introduces the enhancements that are detai
 
 ## Supported orchestration platforms for deployment
 
-This version adds support for orchestration platforms Kubernetes 1.28 and Red Hat® OpenShift® 4.14, suitable for deployment of the CSI (Container Storage Interface) driver.
+This version adds support for orchestration platforms Kubernetes 1.28 and 1.29, and Red Hat® OpenShift® 4.14 and 4.15, suitable for deployment of the CSI (Container Storage Interface) driver.
 
 ## Miscellaneous resolved issues
 
