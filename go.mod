@@ -7,13 +7,13 @@ require (
 	github.com/golang/mock v1.6.0
 	github.com/kubernetes-csi/csi-lib-utils v0.18.0
 	github.com/sirupsen/logrus v1.9.3
-	golang.org/x/sync v0.6.0
+	golang.org/x/sync v0.7.0
 	golang.org/x/sys v0.20.0
 	google.golang.org/grpc v1.63.2
 	gopkg.in/yaml.v2 v2.4.0
 	k8s.io/apimachinery v0.30.0
 	k8s.io/client-go v0.30.0
-	k8s.io/mount-utils v0.27.1
+	k8s.io/mount-utils v0.30.0
 	k8s.io/utils v0.0.0-20230726121419-3b25d923346b
 )
 
