@@ -12,7 +12,7 @@ The following table details orchestration platforms suitable for deployment of t
 |Red Hat OpenShift| 4.14    |x86, IBM Z, IBM Power Systems<sup>1</sup>|
 |Red Hat OpenShift| 4.15    |x86, IBM Z, IBM Power Systems<sup>1</sup>|
 
-<sup>1</sup>IBM Power Systems architecture is only supported on Spectrum Virtualize and DS8000 family storage systems.
+<sup>1</sup>IBM Power Systems architecture is only supported on Spectrum Virtualize family storage systems.
 
 **Note:** 
 - As of this document's publication date, IBM Cloud® Satellite only supports RHEL 8 on x86 architecture for Red Hat OpenShift. For the latest support information, see [Satellite host system requirements](https://cloud.ibm.com/docs/satellite?topic=satellite-host-reqs).
