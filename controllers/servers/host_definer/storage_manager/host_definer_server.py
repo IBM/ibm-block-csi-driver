@@ -4,7 +4,7 @@ from controllers.array_action.storage_agent import detect_array_type, get_agent
 from controllers.common.csi_logger import get_stdout_logger
 from controllers.common.node_info import NodeIdInfo
 import controllers.common.settings as common_settings
-from controllers.servers.host_definer.types import DefineHostResponse
+from controllers.servers.host_definer.hd_types import DefineHostResponse
 from controllers.servers.utils import join_object_prefix_with_name, get_initiators_connectivity_type
 import controllers.servers.host_definer.settings as host_definer_settings
 from controllers.servers.host_definer import messages

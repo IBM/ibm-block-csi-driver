@@ -1,6 +1,6 @@
 # Table of Contents
 
-* [Welcome](book_files/csi_block_storage_kc_welcome.md)
+* [Overview](content/overview.md)
 * [What's new](book_files/csi_block_storage_kc_whatsnew.md)
 * [Release notes](book_files/csi_block_storage_kc_rn.md)
     * [What's new in 1.11.2](content/release_notes/whats_new.md)
@@ -26,7 +26,6 @@
         * [1.0.0 (November 2019)](content/release_notes/changelog_1.0.0.md)
     * [Limitations](content/release_notes/limitations.md)
     * [Known issues](content/release_notes/known_issues.md)
-* [Overview](content/overview.md)
 * [Installing](content/installation/installation.md)
     * [Compatibility and requirements](content/installation/install_compatibility_requirements.md)
     * [Installing the operator and driver](content/installation/install_operator_driver.md)
