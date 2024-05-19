@@ -1,6 +1,6 @@
 # What's new in 1.11.3
 
-IBM® block storage CSI driver 1.11.3 is a minor release that fixes CSI installations via Openshift web console for v4.14
+IBM® block storage CSI driver 1.11.3 is a minor release that fixes CSI installations via Red Hat® OpenShift® web console for OpenShift v4.13</br>
 It is complementary to release 1.11.2 which introduces the enhancements that are detailed in the following section.
 
 **General availability date:** 19 May 2024
