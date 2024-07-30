@@ -50,6 +50,7 @@ NOT_ENOUGH_EXTENTS_IN_POOL_CREATE = 'CMMVC8710E'
 NOT_VALID_IO_GROUP = 'CMMVC5729E'
 NOT_SUPPORTED_PARAMETER = 'CMMVC5709E'
 CANNOT_CHANGE_HOST_PROTOCOL_BECAUSE_OF_MAPPED_PORTS = 'CMMVC9331E'
+COMMAND_NOT_SUPPORTED = 'CMMVC7205E'
 
 HOST_NQN = 'nqn'
 HOST_WWPN = 'WWPN'
@@ -985,6 +986,9 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
         try:
             return self.client.svcinfo.lsnvmefabric(remotenqn=host_nqn).as_list
         except(svc_errors.CommandExecutionError, CLIFailureError) as ex:
+            if COMMAND_NOT_SUPPORTED in ex.my_message:
+                logger.warning("Failed to get nvme fabrics - command not supported")
+                return None
             logger.error("Failed to get nvme fabrics. Reason "
                          "is: {0}".format(ex))
             raise ex
@@ -993,10 +997,12 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
         return hasattr(self.client.svcinfo, "lsnvmefabric")
 
     def _get_host_names_by_nqn(self, nqn):
-        if self._is_lsnvmefabric_supported():
-            nvme_fabrics = self._lsnvmefabric(nqn)
-            return set(nvme_fabric.object_name for nvme_fabric in nvme_fabrics)
-        return None
+        if not self._is_lsnvmefabric_supported():
+            return None
+        nvme_fabrics = self._lsnvmefabric(nqn)
+        if nvme_fabrics is None:
+            return None
+        return set(nvme_fabric.object_name for nvme_fabric in nvme_fabrics)
 
     def _lshostiplogin(self, iqn):
         try:
