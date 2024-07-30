@@ -1391,6 +1391,11 @@ class TestArrayMediatorSVC(unittest.TestCase):
         self._prepare_mocks_for_get_host_by_identifiers(nvme_host_names=[], fc_host_names=[], iscsi_host_name="")
         self.svc.client.svcinfo.lshost = Mock(return_value=[])
 
+    def _prepare_mocks_for_get_host_by_identifiers_no_hosts_lsnvmefabric_not_supported(self):
+        self._prepare_mocks_for_get_host_by_identifiers(nvme_host_names=[array_settings.DUMMY_HOST_NAME2], fc_host_names=[], iscsi_host_name="")
+        self.svc.client.svcinfo.lsnvmefabric.side_effect = [CLIFailureError("CMMVC7205E") * 4]
+        self.svc.client.svcinfo.lshost = Mock(return_value=[])
+
     def _prepare_mocks_for_get_host_by_identifiers_slow(self, svc_response, custom_host=None):
         self._prepare_mocks_for_get_host_by_identifiers_no_hosts()
         host_1 = self._get_host_as_munch(array_settings.DUMMY_HOST_ID1, array_settings.DUMMY_HOST_NAME1, nqn_list=[
@@ -1450,6 +1455,12 @@ class TestArrayMediatorSVC(unittest.TestCase):
 
     def test_get_host_by_identifier_return_host_not_found_when_no_hosts_exist(self):
         self._prepare_mocks_for_get_host_by_identifiers_no_hosts()
+        with self.assertRaises(array_errors.HostNotFoundError):
+            self.svc.get_host_by_host_identifiers(Initiators([array_settings.DUMMY_NVME_NQN4], [
+                array_settings.DUMMY_FC_WWN4], [array_settings.DUMMY_NODE4_IQN]))
+
+    def test_get_host_by_identifier_return_host_not_found_when_no_hosts_exist_lsnvmefabric_not_supported(self):
+        self._prepare_mocks_for_get_host_by_identifiers_no_hosts_lsnvmefabric_not_supported()
         with self.assertRaises(array_errors.HostNotFoundError):
             self.svc.get_host_by_host_identifiers(Initiators([array_settings.DUMMY_NVME_NQN4], [
                 array_settings.DUMMY_FC_WWN4], [array_settings.DUMMY_NODE4_IQN]))
