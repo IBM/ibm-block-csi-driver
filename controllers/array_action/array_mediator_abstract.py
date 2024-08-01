@@ -24,26 +24,7 @@ class ArrayMediatorAbstract(ArrayMediator, ABC):
 
     @retry(NoConnectionAvailableException, tries=11, delay=1)
     def map_volume_by_initiators(self, vol_id, initiators):
-        mappings = self.get_volume_mappings(vol_id)
-        if len(mappings) >= 1:
-            logger.debug(
-                "{0} mappings have been found for volume. the mappings are: {1}".format(len(mappings), mappings))
-            if len(mappings) == 1:
-                mapping_host_name = list(mappings)[0]
-                host = self.get_host_by_name(mapping_host_name)
-                if host.initiators in initiators:
-                    logger.debug("idempotent case - volume is already mapped to host.")
-                    lun = mappings[mapping_host_name]
-                    logger.debug(
-                        "hostname : {}, connectivity_types  : {}".format(host.name, host.connectivity_types))
-                    connectivity_type = utils.choose_connectivity_type(host.connectivity_types)
-                    array_initiators = self._get_array_initiators(host.name, connectivity_type)
-                    return lun, connectivity_type, array_initiators
-                logger.error("volume is already mapped to a host but doesn't match initiators."
-                             " host initiators: {} request initiators: {}.".format(host.initiators, initiators))
-            raise array_errors.VolumeAlreadyMappedToDifferentHostsError(mappings)
-
-        logger.debug("no mappings were found for volume. mapping volume : {0}".format(vol_id))
+        logger.debug("mapping volume : {0}".format(vol_id))
 
         host_name, connectivity_types = self.get_host_by_host_identifiers(initiators)
 
