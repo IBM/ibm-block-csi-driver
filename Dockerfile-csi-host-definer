@@ -1,4 +1,4 @@
-FROM registry.access.redhat.com/ubi8/python-38:1-131 as builder
+FROM registry.access.redhat.com/ubi8/python-38:1-131 AS builder
 
 USER root
 RUN yum update -y
