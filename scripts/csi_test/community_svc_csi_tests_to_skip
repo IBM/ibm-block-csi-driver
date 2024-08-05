@@ -1,4 +1,0 @@
-should create volume from an existing source snapshot
-should create volume from an existing source volume
-should succeed when requesting to create a snapshot with already existing name and same source volume ID
-should fail when requesting to create a snapshot with already existing name and different source volume ID
