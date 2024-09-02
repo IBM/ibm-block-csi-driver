@@ -141,6 +141,9 @@ def build_host_port_command_kwargs(host_name, connectivity_type, port):
     cli_kwargs = {'host_name': host_name}
     return _add_port_to_command_kwargs(connectivity_type, port, cli_kwargs)
 
+def build_port_set_command_kwargs(port_set, port_id)
+    cli_kwargs = {'portset': port_set, 'fcioportid': port_id}
+    return cli_kwargs
 
 def build_kwargs_from_parameters(space_efficiency, pool_name, io_group,
                                  volume_group, volume_name, volume_size):
@@ -1847,6 +1850,15 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
                     logger.warning("exception encountered during adding port {} to host {} : {}".format(
                         port, host_name, ex.my_message))
                 raise ex
+       port_set = os.getenv(settings.PORT_SET_ENV_VAR)
+       if if connectivity_type != array_settings.FC_CONNECTIVITY_TYPE or port_set == 0:
+           return
+       cli_kwargs = build_port_set_command_kwargs(port_set, port)
+        try:
+            self.client.svctask.addfcportsetmember(**cli_kwargs)
+        except (svc_errors.CommandExecutionError, CLIFailureError) as ex:
+            logger.warning("exception encountered during configure port set {} of port {} to host {} : {}".format(
+                port_set, port, host_name, ex.my_message))
 
     def add_ports_to_host(self, host_name, initiators, connectivity_type):
         ports = get_connectivity_type_ports(initiators, connectivity_type)
