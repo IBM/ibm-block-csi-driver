@@ -754,8 +754,8 @@ def validate_parameters_match_source_volume(space_efficiency, required_bytes, vo
             required_bytes, volume_capacity_bytes))
 
 
-def _get_connectivity_type_by_initiators(initiators):
-    if initiators.nvme_nqns:
+def _get_connectivity_type_by_initiators(initiators, disallow_nvme):
+    if initiators.nvme_nqns and not disallow_nvme:
         return NVME_OVER_FC_CONNECTIVITY_TYPE
     if initiators.fc_wwns:
         return FC_CONNECTIVITY_TYPE
@@ -764,9 +764,11 @@ def _get_connectivity_type_by_initiators(initiators):
     return None
 
 
-def get_initiators_connectivity_type(initiators, connectivity_type):
+def get_initiators_connectivity_type(initiators, connectivity_type, disallow_nvme=False):
+    if (disallow_nvme && connectivity_type == array_settings.NVME_OVER_FC_CONNECTIVITY_TYPE):
+        connectivity_type == None
     if not connectivity_type:
-        connectivity_type = _get_connectivity_type_by_initiators(initiators)
+        connectivity_type = _get_connectivity_type_by_initiators(initiators, disallow_nvme)
     return connectivity_type
 
 

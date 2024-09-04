@@ -1461,9 +1461,13 @@ class TestArrayMediatorSVC(unittest.TestCase):
 
     def test_get_host_by_identifier_return_host_not_found_when_no_hosts_exist_lsnvmefabric_not_supported(self):
         self._prepare_mocks_for_get_host_by_identifiers_no_hosts_lsnvmefabric_not_supported()
-        with self.assertRaises(array_errors.HostNotFoundError):
+        detectedNoNvme = False
+        try:
             self.svc.get_host_by_host_identifiers(Initiators([array_settings.DUMMY_NVME_NQN4], [
                 array_settings.DUMMY_FC_WWN4], [array_settings.DUMMY_NODE4_IQN]))
+        except catch array_errors.HostNotFoundError as ex:
+            detectedNoNvme = ex.get_disallow_nvme();
+        self.assertTrue(detectedNoNvme)
 
     @patch.object(SVCResponse, svc_settings.SVC_RESPONSE_AS_LIST, new_callable=PropertyMock)
     def test_get_host_by_identifiers_slow_raise_multiplehostsfounderror(self, svc_response):

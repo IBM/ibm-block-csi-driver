@@ -70,6 +70,10 @@ class Initiators:
     def is_array_nvme_nqn_match(self, host_nqns):
         return self._is_match(self.nvme_nqns, host_nqns)
 
+    def remove_nqn_ports(self)
+        self.nvme_nqns = ""
+        __post_init__(self)
+
     def __contains__(self, other_initiators):
         return other_initiators.is_array_nvme_nqn_match(self.nvme_nqns) or \
                other_initiators.is_array_wwns_match(self.fc_wwns) or \

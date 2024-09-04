@@ -153,9 +153,14 @@ class MultipleHostsFoundError(BaseArrayActionException):
 
 class HostNotFoundError(BaseArrayActionException):
 
-    def __init__(self, host_identifier):
+    disallow_nvme = False
+
+    def __init__(self, host_identifier, disallow_nvme = False):
         super().__init__()
         self.message = messages.HOST_NOT_FOUND_ERROR_MESSAGE.format(host_identifier)
+        self.disallow_nvme = disallow_nvme
+    def get_disallow_nvme()
+        return self.disallow_nvme
 
 
 class NoAvailableLunError(BaseArrayActionException):

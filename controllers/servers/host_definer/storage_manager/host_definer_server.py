@@ -22,6 +22,7 @@ class HostDefinerServicer:
         connectivity_type_from_user = get_initiators_connectivity_type(initiators, request.connectivity_type_from_user)
         host_name = join_object_prefix_with_name(prefix=request.prefix, name=node_name)
         logger.info(messages.DEFINE_NODE_ON_ARRAYS.format(node_name, array_addresses))
+        disallow_nvme = False
         try:
             array_type = detect_array_type(array_addresses)
             with get_agent(array_connection_info, array_type).get_mediator() as array_mediator:
@@ -35,7 +36,7 @@ class HostDefinerServicer:
                 except HostNotFoundError:
                     logger.debug(messages.NODE_WAS_NOT_FOUND_CREATE_NEW_HOST_DEFINITION.format(node_name, initiators))
                     try:
-                        self._create_host(host_name, array_mediator, request)
+                        self._create_host(host_name, array_mediator, request, HostNotFoundError.get_disallow_nvme())
                     except HostAlreadyExists:
                         host = array_mediator.get_host_by_name(host_name)
                         define_host_response = self._validate_host(host, initiators)
@@ -140,10 +141,15 @@ class HostDefinerServicer:
     def _is_protocol_nvme(self, connectivity_type):
         return connectivity_type == array_config.NVME_OVER_FC_CONNECTIVITY_TYPE
 
-    def _create_host(self, host, array_mediator, request):
+    def _create_host(self, host, array_mediator, request, disallow_nvme=False):
         initiators = self._get_initiators_from_node_id(request.node_id_from_csi_node)
-        connectivity_type = get_initiators_connectivity_type(initiators, request.connectivity_type_from_user)
+        connectivity_type = get_initiators_connectivity_type(initiators, request.connectivity_type_from_user, disallow_nvme)
+        if connectivity_type is None:
+            logger.warn("No host created - only NQN ports exist but not supported by storage")
+            return
         array_mediator.create_host(host, initiators, connectivity_type, request.io_group)
+        if (disallow_nvme):
+            initiators.remove_nqn_ports();
         array_mediator.add_ports_to_host(host, initiators, connectivity_type)
 
     def _is_port_update_needed_when_same_protocol(

@@ -946,7 +946,7 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
         ports = host.get(attribute_name, [])
         return ports if isinstance(ports, list) else [ports]
 
-    def _get_host_by_host_identifiers_slow(self, initiators):
+    def _get_host_by_host_identifiers_slow(self, initiators, disallow_nvme=False):
         logger.debug("Scanning all hosts for initiators : {0}".format(initiators))
         detailed_hosts_list = self._get_detailed_hosts_list()
         nvme_host, fc_host, iscsi_host = None, None, None
@@ -972,7 +972,7 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
                              "{1}".format(initiators.iscsi_iqns, iscsi_host))
         if not connectivity_types:
             logger.debug("could not find host by using initiators: {0} ".format(initiators))
-            raise array_errors.HostNotFoundError(initiators)
+            raise array_errors.HostNotFoundError(initiators, disallow_nvme)
         host_name = self._get_host_name_if_equal(nvme_host, fc_host, iscsi_host)
         if not host_name:
             raise array_errors.MultipleHostsFoundError(initiators, fc_host)
@@ -984,11 +984,11 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
 
     def _lsnvmefabric(self, host_nqn):
         try:
-            return self.client.svcinfo.lsnvmefabric(remotenqn=host_nqn).as_list
+            return self.client.svcinfo.lsnvmefabric(remotenqn=host_nqn).as_list, False
         except(svc_errors.CommandExecutionError, CLIFailureError) as ex:
             if COMMAND_NOT_SUPPORTED in ex.my_message:
                 logger.warning("Failed to get nvme fabrics - command not supported")
-                return None
+                return None, True
             logger.error("Failed to get nvme fabrics. Reason "
                          "is: {0}".format(ex))
             raise ex
@@ -998,11 +998,11 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
 
     def _get_host_names_by_nqn(self, nqn):
         if not self._is_lsnvmefabric_supported():
-            return None
-        nvme_fabrics = self._lsnvmefabric(nqn)
+            return None, True
+        nvme_fabrics, disallow_nvme = self._lsnvmefabric(nqn)
         if nvme_fabrics is None:
-            return None
-        return set(nvme_fabric.object_name for nvme_fabric in nvme_fabrics)
+            return None, disallow_nvme
+        return set(nvme_fabric.object_name for nvme_fabric in nvme_fabrics), False
 
     def _lshostiplogin(self, iqn):
         try:
@@ -1027,9 +1027,10 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
     def _get_host_names_and_connectivity_types(self, initiators):
         host_names = set()
         connectivity_types = set()
+        disallow_nvme = False
         for connectivity_type, initiator in initiators:
             if connectivity_type == array_settings.NVME_OVER_FC_CONNECTIVITY_TYPE:
-                nvme_host_names = self._get_host_names_by_nqn(initiator)
+                nvme_host_names, disallow_nvme = self._get_host_names_by_nqn(initiator)
                 if nvme_host_names:
                     host_names.update(nvme_host_names)
                     connectivity_types.add(array_settings.NVME_OVER_FC_CONNECTIVITY_TYPE)
@@ -1043,17 +1044,17 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
                 if iscsi_host_name:
                     host_names.add(iscsi_host_name)
                     connectivity_types.add(array_settings.ISCSI_CONNECTIVITY_TYPE)
-        return host_names, connectivity_types
+        return host_names, connectivity_types, disallow_nvme
 
     def get_host_by_host_identifiers(self, initiators):
         logger.debug("Getting host name for initiators : {0}".format(initiators))
-        host_names, connectivity_types = self._get_host_names_and_connectivity_types(initiators)
+        host_names, connectivity_types, disallow_nvme = self._get_host_names_and_connectivity_types(initiators)
         host_names = set(filter(None, host_names))
         if len(host_names) > 1:
             raise array_errors.MultipleHostsFoundError(initiators, host_names)
         if len(host_names) == 1:
             return host_names.pop(), connectivity_types
-        return self._get_host_by_host_identifiers_slow(initiators)
+        return self._get_host_by_host_identifiers_slow(initiators, disallow_nvme)
 
     def _get_detailed_hosts_list(self):
         logger.debug("Getting detailed hosts list on array {0}".format(self.endpoint))
