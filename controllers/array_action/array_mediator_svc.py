@@ -8,6 +8,8 @@ from pysvc.unified.client import connect
 from pysvc.unified.response import CLIFailureError, SVCResponse
 from retry import retry
 
+import os
+from controllers.servers.host_definer import settings
 import controllers.array_action.errors as array_errors
 import controllers.array_action.settings as array_settings
 from controllers.array_action import svc_messages
@@ -30,6 +32,8 @@ NON_ASCII_CHARS = 'CMMVC6017E'
 INVALID_NAME = 'CMMVC6527E'
 TOO_MANY_CHARS = 'CMMVC5738E'
 VALUE_TOO_LONG = 'CMMVC5703E'
+OBJECT_NOT_OF_TYPE_OF_HOST = 'CMMVC9699E'
+ENTITY_DOES_NOT_EXIST = 'CMMVC5868E'
 INVALID_FILTER_VALUE = 'CMMVC5741E'
 SPECIFIED_OBJ_NOT_EXIST = 'CMMVC5804E'
 LUN_ALREADY_IN_USE = 'CMMVC5879E'
@@ -1801,6 +1805,9 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
             if OBJ_ALREADY_EXIST in ex.my_message:
                 raise array_errors.HostAlreadyExists(host_name, self.endpoint)
             if self._is_port_invalid(ex.my_message):
+                return 400
+            if any(msg_id in ex.my_message for msg_id in (OBJECT_NOT_OF_TYPE_OF_HOST, VALUE_TOO_LONG, ENTITY_DOES_NOT_EXIST)):
+                logger.warning("exception encountered during host {} creation : {}, might be related to bad portset".format(host_name, ex.my_message))
                 return 400
             if is_warning_message(ex.my_message):
                 logger.warning("exception encountered during host {} creation : {}".format(host_name, ex.my_message))
