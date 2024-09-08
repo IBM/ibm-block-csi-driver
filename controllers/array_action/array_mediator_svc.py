@@ -138,6 +138,10 @@ def build_create_host_kwargs(host_name, connectivity_type, port, io_group):
     if not io_group:
         io_group = common_settings.FULL_IO_GROUP
     cli_kwargs['iogrp'] = io_group
+    port_set = os.getenv(settings.PORT_SET_ENV_VAR)
+    if port_set is not None:
+        logger.info("host {} is created with port set {}".format(host_name, port_set))
+        cli_kwargs['portset'] = port_set
     return cli_kwargs
 
 
