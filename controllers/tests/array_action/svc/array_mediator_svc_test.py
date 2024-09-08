@@ -2054,6 +2054,7 @@ class TestArrayMediatorSVC(unittest.TestCase):
         self._expand_volume_lsvdisk_errors(Exception(array_settings.DUMMY_ERROR_MESSAGE), Exception)
 
     def test_create_host_nvme_success(self):
+        self.os.getenv.return_value = None
         self.svc.create_host(
             common_settings.HOST_NAME,
             Initiators(
@@ -2064,7 +2065,23 @@ class TestArrayMediatorSVC(unittest.TestCase):
         self.svc.client.svctask.mkhost.assert_called_once_with(name=common_settings.HOST_NAME,
                                                                nqn=array_settings.DUMMY_NVME_NQN1,
                                                                protocol=svc_settings.MKHOST_NVME_PROTOCOL_VALUE,
-                                                               iogrp=array_settings.DUMMY_MULTIPLE_IO_GROUP_STRING)
+                                                               iogrp=array_settings.DUMMY_MULTIPLE_IO_GROUP_STRING,
+                                                               portset=None)
+
+    def test_create_host_nvme_success_force_portset(self):
+        self.os.getenv.return_value = '2'
+        self.svc.create_host(
+            common_settings.HOST_NAME,
+            Initiators(
+                [array_settings.DUMMY_NVME_NQN1],
+                [array_settings.DUMMY_FC_WWN1, array_settings.DUMMY_FC_WWN2],
+                [array_settings.DUMMY_NODE1_IQN]),
+            array_settings.NVME_OVER_FC_CONNECTIVITY_TYPE, array_settings.DUMMY_MULTIPLE_IO_GROUP_STRING)
+        self.svc.client.svctask.mkhost.assert_called_once_with(name=common_settings.HOST_NAME,
+                                                               nqn=array_settings.DUMMY_NVME_NQN1,
+                                                               protocol=svc_settings.MKHOST_NVME_PROTOCOL_VALUE,
+                                                               iogrp=array_settings.DUMMY_MULTIPLE_IO_GROUP_STRING,
+                                                               portset='2')
 
     def test_create_host_fc_success(self):
         self.svc.create_host(
