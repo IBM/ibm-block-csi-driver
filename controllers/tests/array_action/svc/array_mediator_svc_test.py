@@ -2054,6 +2054,7 @@ class TestArrayMediatorSVC(unittest.TestCase):
         self._expand_volume_lsvdisk_errors(Exception(array_settings.DUMMY_ERROR_MESSAGE), Exception)
 
     def test_create_host_nvme_success(self):
+        self.os.getenv.return_value = None
         self.svc.create_host(
             common_settings.HOST_NAME,
             Initiators(
@@ -2064,7 +2065,23 @@ class TestArrayMediatorSVC(unittest.TestCase):
         self.svc.client.svctask.mkhost.assert_called_once_with(name=common_settings.HOST_NAME,
                                                                nqn=array_settings.DUMMY_NVME_NQN1,
                                                                protocol=svc_settings.MKHOST_NVME_PROTOCOL_VALUE,
-                                                               iogrp=array_settings.DUMMY_MULTIPLE_IO_GROUP_STRING)
+                                                               iogrp=array_settings.DUMMY_MULTIPLE_IO_GROUP_STRING,
+                                                               portset=None)
+
+    def test_create_host_nvme_success_force_portset(self):
+        self.os.getenv.return_value = '2'
+        self.svc.create_host(
+            common_settings.HOST_NAME,
+            Initiators(
+                [array_settings.DUMMY_NVME_NQN1],
+                [array_settings.DUMMY_FC_WWN1, array_settings.DUMMY_FC_WWN2],
+                [array_settings.DUMMY_NODE1_IQN]),
+            array_settings.NVME_OVER_FC_CONNECTIVITY_TYPE, array_settings.DUMMY_MULTIPLE_IO_GROUP_STRING)
+        self.svc.client.svctask.mkhost.assert_called_once_with(name=common_settings.HOST_NAME,
+                                                               nqn=array_settings.DUMMY_NVME_NQN1,
+                                                               protocol=svc_settings.MKHOST_NVME_PROTOCOL_VALUE,
+                                                               iogrp=array_settings.DUMMY_MULTIPLE_IO_GROUP_STRING,
+                                                               portset='2')
 
     def test_create_host_fc_success(self):
         self.svc.create_host(
@@ -2077,12 +2094,24 @@ class TestArrayMediatorSVC(unittest.TestCase):
                                                                fcwwpn=array_settings.DUMMY_FC_WWN1,
                                                                iogrp=array_settings.DUMMY_MULTIPLE_IO_GROUP_STRING)
 
-    def test_create_host_fc_when_one_port_is_not_valid_success(self):
-        self.svc.client.svctask.mkhost.side_effect = [CLIFailureError('CMMVC5867E'), Mock()]
+    def _test_create_host_one_port_failure(errorCode)
+        self.svc.client.svctask.mkhost.side_effect = [CLIFailureError(errorCode), Mock()]
         self.svc.create_host(common_settings.HOST_NAME,
                              Initiators([], [array_settings.DUMMY_FC_WWN1, array_settings.DUMMY_FC_WWN2], []),
                              array_settings.FC_CONNECTIVITY_TYPE, array_settings.DUMMY_MULTIPLE_IO_GROUP_STRING)
         self.assertEqual(self.svc.client.svctask.mkhost.call_count, 2)
+
+    def test_create_host_fc_when_one_port_is_not_valid_success(self):
+        test_create_host_one_port_failure('CMMVC5867E')
+
+    def test_create_host_fc_when_one_portset_invalid_type(self):
+        test_create_host_one_port_failure('CMMVC9699E')
+
+    def test_create_host_fc_when_one_portset_value_too_long(self):
+        test_create_host_one_port_failure('CMMVC5703E')
+
+    def test_create_host_fc_when_one_portset_not_found(self):
+        test_create_host_one_port_failure('CMMVC5868E')
 
     def test_create_host_iscsi_success(self):
         self.svc.create_host(common_settings.HOST_NAME, Initiators([], [], [array_settings.DUMMY_NODE1_IQN]),
