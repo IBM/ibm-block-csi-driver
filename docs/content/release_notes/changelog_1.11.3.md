@@ -5,3 +5,4 @@ Version 1.11.3 resolved the following issue:
 |Ticket ID|Severity|Description|
 |---------|--------|-----------|
 |**CSI-5716**|High|Cannot install CSI 1.11.2 on OCP 4.13|
+|**CSI-5706**|Low|Support Ubuntu 22.04 OS|
