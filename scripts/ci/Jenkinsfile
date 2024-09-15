@@ -31,7 +31,7 @@ pipeline {
                 sh 'make test-xunit-in-container'
             }
         }
-        stage ('CSI-deployment: k8s yamls validation') {
+        stage ('k8s yamls validation') {
             steps {
                 sh './scripts/run_yamlcheck.sh'
             }
