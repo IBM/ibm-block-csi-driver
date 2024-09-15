@@ -9,6 +9,10 @@ It is complementary to release 1.11.2 which introduces the enhancements that are
 
 This version completes release 1.11.2 which adds support for orchestration platforms Kubernetes 1.28 and 1.29, and Red Hat® OpenShift® 4.14 and 4.15, suitable for deployment of the CSI (Container Storage Interface) driver.
 
+## Supported operating systems
+
+This version now supports the Ubuntu 22.04.x LTS operating system (on Kubernetes cluster nodes only).
+
 ## Miscellaneous resolved issues
 
 For information about the resolved issues in version 1.11.3, see [1.11.3 (May 2024)](changelog_1.11.3.md).
