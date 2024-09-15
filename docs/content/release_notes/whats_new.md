@@ -1,13 +1,12 @@
-# What's new in 1.11.3
+# What's new in 1.11.4
 
-IBM® block storage CSI driver 1.11.3 is a minor release that fixes CSI installations via Red Hat® OpenShift® web console for OpenShift v4.13</br>
-It is complementary to release 1.11.2 which introduces the enhancements that are detailed in the following section.
+IBM® block storage CSI driver 1.11.4 is a minor release that adds support for Red Hat® OpenShift® v4.16 and v4.17.</br>
 
-**General availability date:** 19 May 2024
+**General availability date:** September 2024
 
 ## Supported orchestration platforms for deployment
 
-This version completes release 1.11.2 which adds support for orchestration platforms Kubernetes 1.28 and 1.29, and Red Hat® OpenShift® 4.14 and 4.15, suitable for deployment of the CSI (Container Storage Interface) driver.
+This version extends support to orchestration platform Red Hat® OpenShift® 4.16 and 4.17, suitable for deployment of the CSI (Container Storage Interface) driver.
 
 ## Supported operating systems
 
@@ -15,4 +14,4 @@ This version now supports the Ubuntu 22.04.x LTS operating system (on Kubernetes
 
 ## Miscellaneous resolved issues
 
-For information about the resolved issues in version 1.11.3, see [1.11.3 (May 2024)](changelog_1.11.3.md).
+For information about the resolved issues in version 1.11.4, see [1.11.4 (Sep 2024)](changelog_1.11.4.md).

@@ -6,7 +6,7 @@ The following table lists operating systems required for deployment of the IBM®
 |---------------------------------------------------|------------|
 | Red Hat® Enterprise Linux® (RHEL) 8.x             |x86|
 | Red Hat® Enterprise Linux® (RHEL) 9.x             |x86<sup>3</sup>|
-| Red Hat Enterprise Linux CoreOS (RHCOS) 4.12-4.15 |x86, IBM Z, IBM Power Systems™<sup>1</sup>|
+| Red Hat Enterprise Linux CoreOS (RHCOS) 4.13-4.17 |x86, IBM Z, IBM Power Systems™<sup>1</sup>|
 | Ubuntu 20.04.x LTS<sup>2</sup>                    |x86|
 | Ubuntu 22.04.x LTS<sup>2</sup>                    |x86|
 
