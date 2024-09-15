@@ -34,4 +34,5 @@ Apply the storage class.
   kubectl apply -f <filename>.yaml
   ```
 
-The `storageclass.storage.k8s.io/<storageclass-name> created` message is emitted.
+  The `storageclass.storage.k8s.io/<storageclass-name> created` message is emitted.
+
