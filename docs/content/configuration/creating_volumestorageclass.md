@@ -71,8 +71,6 @@ Use the `SpaceEfficiency` parameters for each storage system, as defined in the 
 
 Apply the storage class.
 
-  ```
-  kubectl apply -f <filename>.yaml
-  ```
+      kubectl apply -f <filename>.yaml
 
 The `storageclass.storage.k8s.io/<storageclass-name> created` message is emitted.
