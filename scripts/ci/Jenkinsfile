@@ -40,7 +40,6 @@ pipeline {
             steps {
                 script {
                     registryUrl = "${DOCKER_REGISTRY}"
-                    #sh 'docker login -u $USERNAME -p $PASSWORD ${DOCKER_REGISTRY}'
                     sh 'docker login ${DOCKER_REGISTRY}'
                     sh './scripts/ci/build_push_images.sh build/reports/images_url'
                     sh 'docker logout ${DOCKER_REGISTRY}'
