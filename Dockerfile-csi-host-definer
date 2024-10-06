@@ -1,4 +1,4 @@
-FROM registry.access.redhat.com/ubi8/python-38:1-131 as builder
+FROM registry.access.redhat.com/ubi8/python-39:1-200 as builder
 
 USER root
 RUN yum update -y
@@ -18,7 +18,7 @@ RUN chmod +x csi_pb2.sh
 RUN ./csi_pb2.sh
 RUN pip3 install .
 
-FROM registry.access.redhat.com/ubi8/python-38:1-131
+FROM registry.access.redhat.com/ubi8/python-39:1-200
 
 ARG VERSION=1.11.4
 ARG BUILD_NUMBER=0
