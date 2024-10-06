@@ -10,7 +10,7 @@ This version extends support to orchestration platform Red Hat® OpenShift® 4.1
 
 ## Supported operating systems
 
-This version now supports the Ubuntu 22.04.x LTS operating system (on Kubernetes cluster nodes only).
+This version now supports the Ubuntu 22.04.x and 24.04.x LTS operating systems (on Kubernetes cluster nodes only).
 
 ## Miscellaneous resolved issues
 
