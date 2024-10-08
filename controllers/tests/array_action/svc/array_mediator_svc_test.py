@@ -3,8 +3,8 @@ from unittest.mock import MagicMock
 
 from mock import patch, Mock, call, PropertyMock
 from munch import Munch
-from pysvc2 import errors as svc_errors
-from pysvc2.unified.response import CLIFailureError, SVCResponse
+from pysvc import errors as svc_errors
+from pysvc.unified.response import CLIFailureError, SVCResponse
 
 import controllers.array_action.errors as array_errors
 import controllers.tests.array_action.svc.test_settings as svc_settings

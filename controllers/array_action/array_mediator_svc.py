@@ -3,9 +3,9 @@ from io import StringIO
 from random import choice
 
 from packaging.version import Version
-from pysvc2 import errors as svc_errors
-from pysvc2.unified.client import connect
-from pysvc2.unified.response import CLIFailureError, SVCResponse
+from pysvc import errors as svc_errors
+from pysvc.unified.client import connect
+from pysvc.unified.response import CLIFailureError, SVCResponse
 from retry import retry
 
 import controllers.array_action.errors as array_errors
