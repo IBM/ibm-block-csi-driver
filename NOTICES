@@ -1528,7 +1528,7 @@ k8s.io/structured-merge-diff-3.0.0
 k8s.io/utils commit 67b214c
 kubernetes-client/python-23.6.0
 pyds8k version 1.4.0
-pysvc version 1.1.1
+pysvc2 version 1.0.0
 pyxcli version 1.2.1
 controller-util-0.3.0
 kubernetes/apimachinery-0.19.0
