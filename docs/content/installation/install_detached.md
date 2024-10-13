@@ -108,9 +108,7 @@ The IBM Block CSI Driver itself uses the following container images:
 
 All the images above must be copied to your private registry using ```skopeo```.<br>
 
----
 **Note**: Make sure to run the ```skopeo``` command from a node that uses the same CPU architecture as the node where you intend to deploy the operator.
----
 
 ## Create CatalogSource and Patch Operator (CSV)
 
@@ -120,9 +118,7 @@ Once all the images have been copied to your private registry, the IBM Block CSI
 2. Deploy the IBM Block CSI Driver Operator via the Red Hat OpenShift Console
 3. Patch the IBM Block CSI Driver CSV, setting all image paths and tags to match your private registry images
 
----
 **Note**: To edit the CSV, go to the Red Hat OpenShift console or use the ```oc edit``` command. Use ```skopeo inspect``` to identify the digest of each image.
----
 
 ## Install the Driver
 
