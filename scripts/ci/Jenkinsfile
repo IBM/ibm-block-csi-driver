@@ -5,7 +5,7 @@ pipeline {
         string(name: 'EMAIL_TO', defaultValue: "")
     }
     environment {
-        registryCredentialsID = 'csi_w3_user'
+        registryCredentialsID = 'quayio_username_pass'
     }
     options {
         ansiColor('xterm')
