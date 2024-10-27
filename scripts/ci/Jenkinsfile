@@ -5,7 +5,7 @@ pipeline {
         string(name: 'EMAIL_TO', defaultValue: "")
     }
     environment {
-        registryCredentialsID = 'csi_w3_user'
+        registryCredentialsID = 'quayio_username_pass'
     }
     options {
         ansiColor('xterm')
@@ -41,8 +41,7 @@ pipeline {
                 script {
                     registryUrl = "${DOCKER_REGISTRY}"
                     withCredentials([usernamePassword(credentialsId: registryCredentialsID, usernameVariable: 'USERNAME', passwordVariable: 'PASSWORD')]) {
-                        sh 'echo username and password: $USERNAME; echo $PASSWORD'
-			sh 'docker login -u $USERNAME -p $PASSWORD ${DOCKER_REGISTRY}'
+                        sh 'docker login -u $USERNAME -p $PASSWORD ${DOCKER_REGISTRY}'
                         sh './scripts/ci/build_push_images.sh build/reports/images_url'
                         sh 'docker logout ${DOCKER_REGISTRY}'
                     }
