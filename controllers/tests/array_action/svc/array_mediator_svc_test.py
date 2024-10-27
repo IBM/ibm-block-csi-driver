@@ -2094,7 +2094,7 @@ class TestArrayMediatorSVC(unittest.TestCase):
                                                                fcwwpn=array_settings.DUMMY_FC_WWN1,
                                                                iogrp=array_settings.DUMMY_MULTIPLE_IO_GROUP_STRING)
 
-    def _test_create_host_one_port_failure(errorCode):
+    def _test_create_host_one_port_failure(self, errorCode):
         self.svc.client.svctask.mkhost.side_effect = [CLIFailureError(errorCode), Mock()]
         self.svc.create_host(common_settings.HOST_NAME,
                              Initiators([], [array_settings.DUMMY_FC_WWN1, array_settings.DUMMY_FC_WWN2], []),
