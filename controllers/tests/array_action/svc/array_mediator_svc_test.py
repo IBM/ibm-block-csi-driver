@@ -1,6 +1,5 @@
 import unittest
 from unittest.mock import MagicMock
-import os
 
 from mock import patch, Mock, call, PropertyMock
 from munch import Munch
@@ -2068,7 +2067,7 @@ class TestArrayMediatorSVC(unittest.TestCase):
                                                                iogrp=array_settings.DUMMY_MULTIPLE_IO_GROUP_STRING)
 
     def test_create_host_nvme_success_force_portset(self):
-        with patch('os.getenv', return_value='2') as mocked_getenv:
+        with patch('os.getenv', return_value='2'):
             self.svc.create_host(
                 common_settings.HOST_NAME,
                 Initiators(
