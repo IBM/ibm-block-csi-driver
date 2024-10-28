@@ -1,5 +1,6 @@
 import unittest
 from unittest.mock import MagicMock
+import os
 
 from mock import patch, Mock, call, PropertyMock
 from munch import Munch
@@ -1393,7 +1394,7 @@ class TestArrayMediatorSVC(unittest.TestCase):
 
     def _prepare_mocks_for_get_host_by_identifiers_no_hosts_lsnvmefabric_not_supported(self):
         self._prepare_mocks_for_get_host_by_identifiers(nvme_host_names=[array_settings.DUMMY_HOST_NAME2], fc_host_names=[], iscsi_host_name="")
-        self.svc.client.svcinfo.lsnvmefabric.side_effect = [CLIFailureError("CMMVC7205E") * 4]
+        self.svc.client.svcinfo.lsnvmefabric.side_effect = [CLIFailureError("CMMVC7205E")] * 4
         self.svc.client.svcinfo.lshost = Mock(return_value=[])
 
     def _prepare_mocks_for_get_host_by_identifiers_slow(self, svc_response, custom_host=None):
@@ -2054,7 +2055,6 @@ class TestArrayMediatorSVC(unittest.TestCase):
         self._expand_volume_lsvdisk_errors(Exception(array_settings.DUMMY_ERROR_MESSAGE), Exception)
 
     def test_create_host_nvme_success(self):
-        self.os.getenv.return_value = None
         self.svc.create_host(
             common_settings.HOST_NAME,
             Initiators(
@@ -2065,23 +2065,22 @@ class TestArrayMediatorSVC(unittest.TestCase):
         self.svc.client.svctask.mkhost.assert_called_once_with(name=common_settings.HOST_NAME,
                                                                nqn=array_settings.DUMMY_NVME_NQN1,
                                                                protocol=svc_settings.MKHOST_NVME_PROTOCOL_VALUE,
-                                                               iogrp=array_settings.DUMMY_MULTIPLE_IO_GROUP_STRING,
-                                                               portset=None)
+                                                               iogrp=array_settings.DUMMY_MULTIPLE_IO_GROUP_STRING)
 
     def test_create_host_nvme_success_force_portset(self):
-        self.os.getenv.return_value = '2'
-        self.svc.create_host(
-            common_settings.HOST_NAME,
-            Initiators(
-                [array_settings.DUMMY_NVME_NQN1],
-                [array_settings.DUMMY_FC_WWN1, array_settings.DUMMY_FC_WWN2],
-                [array_settings.DUMMY_NODE1_IQN]),
-            array_settings.NVME_OVER_FC_CONNECTIVITY_TYPE, array_settings.DUMMY_MULTIPLE_IO_GROUP_STRING)
-        self.svc.client.svctask.mkhost.assert_called_once_with(name=common_settings.HOST_NAME,
-                                                               nqn=array_settings.DUMMY_NVME_NQN1,
-                                                               protocol=svc_settings.MKHOST_NVME_PROTOCOL_VALUE,
-                                                               iogrp=array_settings.DUMMY_MULTIPLE_IO_GROUP_STRING,
-                                                               portset='2')
+        with patch('os.getenv', return_value='2') as mocked_getenv:
+            self.svc.create_host(
+                common_settings.HOST_NAME,
+                Initiators(
+                    [array_settings.DUMMY_NVME_NQN1],
+                    [array_settings.DUMMY_FC_WWN1, array_settings.DUMMY_FC_WWN2],
+                    [array_settings.DUMMY_NODE1_IQN]),
+                array_settings.NVME_OVER_FC_CONNECTIVITY_TYPE, array_settings.DUMMY_MULTIPLE_IO_GROUP_STRING)
+            self.svc.client.svctask.mkhost.assert_called_once_with(name=common_settings.HOST_NAME,
+                                                                   nqn=array_settings.DUMMY_NVME_NQN1,
+                                                                   protocol=svc_settings.MKHOST_NVME_PROTOCOL_VALUE,
+                                                                   iogrp=array_settings.DUMMY_MULTIPLE_IO_GROUP_STRING,
+                                                                   portset='2')
 
     def test_create_host_fc_success(self):
         self.svc.create_host(
