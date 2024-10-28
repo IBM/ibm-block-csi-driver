@@ -2101,16 +2101,16 @@ class TestArrayMediatorSVC(unittest.TestCase):
         self.assertEqual(self.svc.client.svctask.mkhost.call_count, 2)
 
     def test_create_host_fc_when_one_port_is_not_valid_success(self):
-        test_create_host_one_port_failure('CMMVC5867E')
+        self._test_create_host_one_port_failure('CMMVC5867E')
 
     def test_create_host_fc_when_one_portset_invalid_type(self):
-        test_create_host_one_port_failure('CMMVC9699E')
+        self._test_create_host_one_port_failure('CMMVC9699E')
 
     def test_create_host_fc_when_one_portset_value_too_long(self):
-        test_create_host_one_port_failure('CMMVC5703E')
+        self._test_create_host_one_port_failure('CMMVC5703E')
 
     def test_create_host_fc_when_one_portset_not_found(self):
-        test_create_host_one_port_failure('CMMVC5868E')
+        self._test_create_host_one_port_failure('CMMVC5868E')
 
     def test_create_host_iscsi_success(self):
         self.svc.create_host(common_settings.HOST_NAME, Initiators([], [], [array_settings.DUMMY_NODE1_IQN]),
