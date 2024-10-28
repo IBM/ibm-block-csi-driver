@@ -2,13 +2,13 @@ from collections import defaultdict
 from io import StringIO
 from random import choice
 
+import os
 from packaging.version import Version
 from pysvc import errors as svc_errors
 from pysvc.unified.client import connect
 from pysvc.unified.response import CLIFailureError, SVCResponse
 from retry import retry
 
-import os
 from controllers.servers.host_definer import settings
 import controllers.array_action.errors as array_errors
 import controllers.array_action.settings as array_settings
@@ -1810,8 +1810,10 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
                 raise array_errors.HostAlreadyExists(host_name, self.endpoint)
             if self._is_port_invalid(ex.my_message):
                 return 400
-            if any(msg_id in ex.my_message for msg_id in (OBJECT_NOT_OF_TYPE_OF_HOST, VALUE_TOO_LONG, ENTITY_DOES_NOT_EXIST)):
-                logger.warning("exception encountered during host {} creation : {}, might be related to bad portset".format(host_name, ex.my_message))
+            if any(msg_id in ex.my_message for msg_id in (OBJECT_NOT_OF_TYPE_OF_HOST, VALUE_TOO_LONG,
+                                                          ENTITY_DOES_NOT_EXIST)):
+                logger.warning("exception encountered during host {} creation : {}, might be related to bad \
+                               portset".format(host_name, ex.my_message))
                 return 400
             if is_warning_message(ex.my_message):
                 logger.warning("exception encountered during host {} creation : {}".format(host_name, ex.my_message))

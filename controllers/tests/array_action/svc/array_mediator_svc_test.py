@@ -1392,7 +1392,8 @@ class TestArrayMediatorSVC(unittest.TestCase):
         self.svc.client.svcinfo.lshost = Mock(return_value=[])
 
     def _prepare_mocks_for_get_host_by_identifiers_no_hosts_lsnvmefabric_not_supported(self):
-        self._prepare_mocks_for_get_host_by_identifiers(nvme_host_names=[array_settings.DUMMY_HOST_NAME2], fc_host_names=[], iscsi_host_name="")
+        self._prepare_mocks_for_get_host_by_identifiers(nvme_host_names=[array_settings.DUMMY_HOST_NAME2],
+                                                        fc_host_names=[], iscsi_host_name="")
         self.svc.client.svcinfo.lsnvmefabric.side_effect = [CLIFailureError("CMMVC7205E")] * 4
         self.svc.client.svcinfo.lshost = Mock(return_value=[])
 
