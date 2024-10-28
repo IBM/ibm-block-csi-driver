@@ -13,7 +13,7 @@ require (
 	gopkg.in/yaml.v2 v2.4.0
 	k8s.io/apimachinery v0.31.0
 	k8s.io/client-go v0.31.0
-	k8s.io/mount-utils v0.31.0
+	k8s.io/mount-utils v0.31.2
 	k8s.io/utils v0.0.0-20240711033017-18e509b52bc8
 )
 
