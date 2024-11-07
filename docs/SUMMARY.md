@@ -61,6 +61,7 @@
     * [Creating a VolumeGroupClass](content/configuration/creating_volumegroupclass.md)
     * [Creating a VolumeGroup](content/configuration/creating_volumegroup.md)
     * [Expanding a PersistentVolumeClaim (PVC)](content/configuration/expanding_pvc.md)
+    * [Configuring an OpenShift VM](content/configuration/configuring_vm.md)
     * [Configuring for CSI Topology](content/configuration/configuring_topology.md)
         * [Creating a Secret with topology awareness](content/configuration/creating_secret_topology_aware.md)
         * [Creating a StorageClass with topology awareness](content/configuration/creating_storageclass_topology_aware.md)

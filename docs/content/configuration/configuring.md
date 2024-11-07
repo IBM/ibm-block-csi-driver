@@ -6,6 +6,7 @@ Once the driver is installed and running (see [Installing the operator and drive
 
 Multiple YAML files per type can be created (with different configurations), according to your storage needs.
 
+- [Make sure multipath is enabled](enable_multipath.md)
 - [Creating a Secret](creating_secret.md)
 - [Creating a StorageClass](creating_volumestorageclass.md)
 - [Creating a PersistentVolumeClaim (PVC)](creating_pvc.md)
@@ -18,3 +19,4 @@ Multiple YAML files per type can be created (with different configurations), acc
 - [Configuring for CSI Topology](configuring_topology.md)
 - [Configuring the host definer](configuring_hostdefiner.md)
 - [Advanced configuration](advanced_configuration.md)
+- [Configuring an OpenShift VM](configuring_vm.md)
