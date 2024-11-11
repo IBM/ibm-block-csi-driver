@@ -4,7 +4,7 @@ import controllers.tests.controller_server.host_definer.utils.test_utils as test
 import controllers.tests.controller_server.host_definer.settings as test_settings
 import controllers.common.settings as common_settings
 from controllers.tests.controller_server.host_definer.common import BaseSetUp
-from controllers.servers.host_definer.types import DefineHostResponse
+from controllers.servers.host_definer.hd_types import DefineHostResponse
 from controllers.servers.host_definer.watcher.host_definition_watcher import HostDefinitionWatcher
 
 

@@ -5,7 +5,7 @@ import controllers.tests.controller_server.host_definer.utils.k8s_manifests_util
 import controllers.tests.controller_server.host_definer.settings as test_settings
 import controllers.common.settings as common_settings
 from controllers.tests.controller_server.host_definer.common import BaseSetUp
-from controllers.servers.host_definer.types import DefineHostResponse
+from controllers.servers.host_definer.hd_types import DefineHostResponse
 from controllers.servers.host_definer.watcher.csi_node_watcher import CsiNodeWatcher
 
 

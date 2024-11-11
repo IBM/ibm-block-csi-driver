@@ -1,4 +1,4 @@
-# Copyright IBM Corporation 2019.
+# Copyright IBM Corporation 2024.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,12 +12,14 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-FROM registry.access.redhat.com/ubi8/python-38:1-115.1669838006 as builder
+FROM registry.access.redhat.com/ubi8/python-38:1-131 as builder
+
 USER root
 RUN if [[ "$(uname -m)" != "x86"* ]]; then yum install -y rust-toolset; fi
+RUN yum update -y
+
 USER default
 ENV PIP_DISABLE_PIP_VERSION_CHECK=1
-RUN pip3 install --ignore-installed --default-timeout=100 --upgrade pip==21.2.4
 WORKDIR /tmp
 COPY controllers/servers/csi/requirements.txt .
 # avoid default boringssl lib, since it does not support z systems
@@ -26,14 +28,14 @@ RUN pip3 install -r ./requirements.txt
 
 USER root
 COPY controllers/scripts/csi_general .
+RUN chmod +x csi_pb2.sh
 RUN ./csi_pb2.sh
 RUN pip3 install .
 
-
-FROM registry.access.redhat.com/ubi8/python-38:1-115.1669838006
+FROM registry.access.redhat.com/ubi8/python-38:1-131
 MAINTAINER IBM Storage
 
-ARG VERSION=1.11.0
+ARG VERSION=1.11.2
 ARG BUILD_NUMBER=0
 
 ###Required Labels
@@ -53,9 +55,16 @@ COPY ./controllers/ /driver/controllers/
 COPY ./LICENSE /licenses/
 COPY ./NOTICES /licenses/
 
+USER root
+RUN chmod +x /driver/controllers/scripts/entrypoint.sh
+USER default
+
 WORKDIR /driver
 ENV PYTHONPATH=/driver
 
-# Note: UBI runs with app-user by default.
+USER root
+RUN yum update -y
 
+USER default
+# Note: UBI runs with app-user by default.
 ENTRYPOINT ["/driver/controllers/scripts/entrypoint.sh"]
