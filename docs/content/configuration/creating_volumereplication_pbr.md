@@ -23,7 +23,7 @@ VolumeReplicationClass needs to be present before a VolumeReplication can be cre
       replicationState: primary
       dataSource:
         kind: VolumeGroup
-        name: demo-pvc-file-system  # Ensure that this is in the same namespace as VolumeReplication.
+        name: demo-volumegroup  # Ensure that this is in the same namespace as VolumeGroup.
     ```
 
 2.  After the YAML file is created, apply it by using the `kubectl apply -f` command.
