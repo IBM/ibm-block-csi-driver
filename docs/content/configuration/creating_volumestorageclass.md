@@ -44,7 +44,7 @@ Use the `SpaceEfficiency` parameters for each storage system, as defined in the 
 - The `io_group` and `volume_group` parameters are only available on Spectrum Virtualize storage systems.
 <br><br>**Attention:** Volume groups can only be managed by **either** the associated VolumeGroup **or** the associated StorageClass (with the `volume_group` parameter). If a volume group is already associated with a VolumeGroup, then each volume of this StorageClass can be automatically deleted.
 <br><br>**Note:** If no `io_group` is defined, the volume is created within the storage system's default I/O group(s).
-- The `virt_snap_func` parameter is optional but necessary in Spectrum Virtualize storage systems if using the Snapshot function. To enable the Snapshot function, set the value to _"true"_. The default value is _"false"_. If the value is `"false"` the snapshot will use the FlashCopy function.
+- The `virt_snap_func` parameter is optional but necessary in Spectrum Virtualize storage systems if using the Snapshot function. To enable the Snapshot function, set the value to _"true"_. The default value is _"false"_. If the value is _"false"_ the snapshot will use the FlashCopy function.
 
     **Note:**
     For IBM DS8000 family, the maximum prefix length is five characters. The maximum prefix length for other systems is 20 characters. <br /><br />For storage systems that use Spectrum Virtualize, the `CSI` prefix is added as default if not specified by the user.
@@ -71,8 +71,6 @@ Use the `SpaceEfficiency` parameters for each storage system, as defined in the 
 
 Apply the storage class.
 
-  ```
-  kubectl apply -f <filename>.yaml
-  ```
+      kubectl apply -f <filename>.yaml
 
 The `storageclass.storage.k8s.io/<storageclass-name> created` message is emitted.
