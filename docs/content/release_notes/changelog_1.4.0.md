@@ -10,7 +10,7 @@ IBM® block storage CSI driver 1.4.0 provided a range of enhancements and resolv
 |Ticket ID|Severity|Description|
 |---------|--------|-----------|
 |**CSI-2156**|Service|**Fixed:** IBM block storage driver node registration may encounter an error when the `node_id` exceeds 128 bytes.|
-|**CSI-1842**|Service|**Fixed:** When creating a new volume on a DS8000® family storage system, if an error occurs during PersistentVolumeClaim (PVC) attachment, the attachment retry may fail.|
+|**CSI-1842**|Service|**Fixed:** When creating a new volume on a IBM DS8000® family storage system, if an error occurs during PersistentVolumeClaim (PVC) attachment, the attachment retry may fail.|
 |**CSI-645**|Low|**Fixed:** In some cases, during high-scale operations, such as pod creation with many PersistentVolumeClaims (PVCs), the "ibm-block-csi-controller-0" controller pod restarts.|
 
 

@@ -11,7 +11,7 @@ The following table lists operating systems required for deployment of the IBM®
 | Ubuntu 22.04.x LTS<sup>2</sup>                    |x86|
 | Ubuntu 24.04.x LTS<sup>2</sup>                    |x86|
 
-<sup>1</sup>IBM Power Systems architecture is only supported on Spectrum Virtualize and DS8000 family storage systems.<br/>
+<sup>1</sup>IBM Power Systems architecture is only supported with IBM Storage Virtualize family storage systems.<br/>
 <sup>2</sup>Ubuntu is supported with Kubernetes orchestration platforms only.<br/>
 <sup>3</sup>Red Hat® Enterprise Linux® (RHEL) 9.x is supported with Kubernetes orchestration platforms only.<br/>
 

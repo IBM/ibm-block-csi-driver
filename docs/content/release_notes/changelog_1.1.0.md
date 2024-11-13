@@ -2,7 +2,7 @@
 
 IBM® block storage CSI driver 1.1.0 provided a range of enhancements:
 
--   Added support for DS8000® family storage systems
+-   Added support for IBM DS8000® family storage systems
 -   RHCOS support
 -   Now supports Kubernetes 1.16 and Red Hat® OpenShift® 4.3
 -   IBM Z® architecture support

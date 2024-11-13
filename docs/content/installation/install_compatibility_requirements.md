@@ -14,11 +14,11 @@ The CSI driver requires the following ports to be opened on the worker nodes OS 
         Port 3260
 
  
- -   **IBM Spectrum® Virtualize family**
+ -   **IBM Storage® Virtualize family**
 
         Port 22
 
- -   **DS8000® family systems**
+ -   **IBM DS8000® family systems**
 
       Port 8452
 
@@ -57,7 +57,7 @@ Complete these steps to prepare your environment for installing the CSI (Contain
     The CSI driver supports the following connectivity for each worker node: Fibre Channel (WWPN), NVMe®/FC (NQN), and iSCSI (IQN).
         
     **Note:** 
-    - The CSI driver supports NVMe®/FC only on IBM Spectrum Virtualize family products.
+    - The CSI driver supports NVMe®/FC only on IBM Storage Virtualize family products.
     - For Fibre Channel connectivity be sure that storage system is using one of the fully supported HBAs compatible with your host connection, as listed in the [IBM® System Storage® Interoperation Center (SSIC)](https://www-03.ibm.com/systems/support/storage/ssic/interoperability.wss).
     - The CSI driver supports IBM DS8000 family storage systems only with Fibre Channel connectivity.
        
@@ -95,7 +95,7 @@ Complete these steps to prepare your environment for installing the CSI (Contain
         kubectl apply -f csi.ibm.com_volumegroups.yaml
         ```
     
-    2. Enable policy-based replication on volume groups, see the following section within your Spectrum Virtualize product documentation on [IBM Documentation](https://www.ibm.com/docs/): **Administering** > **Managing policy-based replication** > **Assigning replication policies to volume groups**.   
+    2. Enable policy-based replication on volume groups, see the following section within your IBM Storage Virtualize product documentation on [IBM Documentation](https://www.ibm.com/docs/): **Administering** > **Managing policy-based replication** > **Assigning replication policies to volume groups**.   
 
 5. (Optional) If planning on using volume replication (remote copy function), enable support on your orchestration platform cluster and storage system.
     
@@ -109,7 +109,7 @@ Complete these steps to prepare your environment for installing the CSI (Contain
         kubectl apply -f ./replication.storage.openshift.io_volumereplications.yaml
         ```
     
-    2. To enable support on your storage system, see the following section within your Spectrum Virtualize product documentation on [IBM Documentation](https://www.ibm.com/docs/en/): **Administering** > **Managing Copy Services** > **Managing remote-copy partnerships**.
+    2. To enable support on your storage system, see the following section within your IBM Storage Virtualize product documentation on [IBM Documentation](https://www.ibm.com/docs/en/): **Administering** > **Managing Copy Services** > **Managing remote-copy partnerships**.
 
 6. (Optional) To use CSI Topology, at least one node in the cluster must have the label-prefix of `topology.block.csi.ibm.com` to introduce topology awareness.
       
@@ -117,7 +117,7 @@ Complete these steps to prepare your environment for installing the CSI (Contain
 
       For more information, see [Configuring for CSI Topology](../configuration/configuring_topology.md).
 
-7. (Optional) If planning on using a high availability (HA) feature (either HyperSwap or stretched topology) on your storage system, see the appropriate sections within your Spectrum Virtualize product documentation on [IBM Documentation](https://www.ibm.com/docs/en/):
+7. (Optional) If planning on using a high availability (HA) feature (either HyperSwap or stretched topology) on your storage system, see the appropriate sections within your IBM Storage Virtualize product documentation on [IBM Documentation](https://www.ibm.com/docs/en/):
     - HyperSwap topology planning and configuration
         - **Planning** > **Planning for high availability** > **Planning for a HyperSwap topology system**
         - **Configuring** > **Configuration details** > **HyperSwap system configuration details**
@@ -125,4 +125,4 @@ Complete these steps to prepare your environment for installing the CSI (Contain
         - **Planning** > **Planning for high availability** > **Planning for a stretched topology system**
         - **Configuring** > **Configuration details** > **Stretched system configuration details**
 
-8. (Optional) If planning on using policy-based replication with your Spectrum Virtualize storage system, verify that the correct replication policy is in place. This can be done either through the Spectrum Virtualize user interface (go to **Policies** > **Replication policies**) or through the CLI (`lsreplicationpolicy`). If a replication policy is not in place create one before replicating a volume through the CSI driver.
+8. (Optional) If planning on using policy-based replication with your IBM Storage Virtualize storage system, verify that the correct replication policy is in place. This can be done either through the IBM Storage Virtualize user interface (go to **Policies** > **Replication policies**) or through the CLI (`lsreplicationpolicy`). If a replication policy is not in place create one before replicating a volume through the CSI driver.

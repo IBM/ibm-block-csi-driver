@@ -10,4 +10,4 @@ IBM® block storage CSI driver 1.3.0 provided a range of enhancements:
 |Ticket ID|Severity|Description|
 |---------|--------|-----------|
 |**CSI-1672**|Moderate|**Fixed:** In rare cases, if the volume devices have an unexpected `udev` path on the node host, the CSI driver may not be able to find the device mapper in order to mount the volume.|
-|**CSI-1658**|Moderate|**Fixed:** In some cases, when mounting a volume through the CSI driver on a Spectrum Virtualize family system, the same LUN ID may be defined on different I/O groups on the same storage system. This causes the volume mount to fail.|
+|**CSI-1658**|Moderate|**Fixed:** In some cases, when mounting a volume through the CSI driver on an IBM Storage Virtualize family system, the same LUN ID may be defined on different I/O groups on the same storage system. This causes the volume mount to fail.|
