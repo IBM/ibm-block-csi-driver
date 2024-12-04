@@ -1,3 +1,4 @@
+from time import sleep
 from kubernetes.client.rest import ApiException
 
 import controllers.tests.controller_server.host_definer.utils.test_utils as test_utils
@@ -99,6 +100,7 @@ class TestWatchCsiNodesResources(CsiNodeWatcherBase):
         self.csi_node_watcher.core_api.read_namespaced_secret.return_value = test_utils.get_fake_k8s_secret()
         test_utils.run_function_with_timeout(self.csi_node_watcher.watch_csi_nodes_resources, 0.5)
         self.assertEqual(1, len(self.nodes_on_csi_node_watcher))
+        sleep(2)
         self.csi_node_watcher.storage_host_servicer.define_host.assert_called()
 
     def _prepare_mocks_for_updated_csi_node(self):

@@ -341,6 +341,7 @@ class KubernetesManager():
     def _get_csi_daemon_set(self):
         try:
             daemon_sets = self.apps_api.list_daemon_set_for_all_namespaces(label_selector=settings.DRIVER_PRODUCT_LABEL)
+            # kubectl describe daemonsets.apps ibm-block-csi-node
             if daemon_sets.items:
                 return daemon_sets.items[0]
             return None

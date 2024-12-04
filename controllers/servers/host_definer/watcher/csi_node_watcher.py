@@ -75,7 +75,20 @@ class CsiNodeWatcher(Watcher):
         if not csi_daemon_set:
             return None
         status = csi_daemon_set.status
-        while status.updated_number_scheduled != status.desired_number_scheduled:
+        """
+        status looks like this:
+        status:
+        currentNumberScheduled: 1
+        desiredNumberScheduled: 1
+        numberAvailable: 1
+        numberMisscheduled: 0
+        numberReady: 1
+        observedGeneration: 5
+        updatedNumberScheduled: 1
+        """
+        enough_time = True if status.updated_number_scheduled != status.desired_number_scheduled else False
+        seconds_passed = 0
+        while status.updated_number_scheduled != status.desired_number_scheduled or not enough_time:
             logger.info(messages.UPDATED_CSI_NODE_VS_DESIRED.format(
                 status.updated_number_scheduled, status.desired_number_scheduled))
             if status.desired_number_scheduled == 0:
@@ -85,7 +98,11 @@ class CsiNodeWatcher(Watcher):
                 return None
             status = csi_daemon_set.status
             time.sleep(0.5)
-        return csi_daemon_set.metadata.name
+            seconds_passed += 0.5
+            enough_time = True if (enough_time or
+                                   status.updated_number_scheduled != status.desired_number_scheduled or
+                                   seconds_passed >= 2) else False
+        return csi_daemon_set.metadata.name  # will return ibm-block-csi-node
 
     def _create_definitions_when_csi_node_changed(self, csi_node_info):
         for secret_info in MANAGED_SECRETS:
