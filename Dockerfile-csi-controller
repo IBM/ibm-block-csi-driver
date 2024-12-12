@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-FROM registry.access.redhat.com/ubi8/python-39:1-206 AS builder
+FROM registry.access.redhat.com/ubi8/python-39:1-206.1732638092 AS builder
 
 USER root
 RUN if [[ "$(uname -m)" != "x86"* ]]; then yum install -y rust-toolset; fi
@@ -32,7 +32,7 @@ RUN chmod +x csi_pb2.sh
 RUN ./csi_pb2.sh
 RUN pip3 install .
 
-FROM registry.access.redhat.com/ubi8/python-39:1-206
+FROM registry.access.redhat.com/ubi8/python-39:1-206.1732638092
 MAINTAINER IBM Storage
 
 ARG VERSION=1.12.0
