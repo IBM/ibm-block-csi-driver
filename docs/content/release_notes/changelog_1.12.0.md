@@ -15,5 +15,7 @@ IBM® block storage CSI driver version 1.12.0 resolved the following issues:
 |---------|--------|-----------|
 |**CSI-5727**|Medium|HostDefiner fails to match hosts with NQN identifiers when FlashSystem lsnvmefabric is disabled|
 
-** Note: ** As of this document's publication date, IBM DS8000® family is not supported for this release.
-** Note: ** As of this document's publication date, IBM Power® and zLinux® architectures are not supported for this release.
+**Note:**
+
+- As of this document's publication date, IBM DS8000® family is not supported for this release.
+- As of this document's publication date, IBM Power® and zLinux® architectures are not supported for this release.

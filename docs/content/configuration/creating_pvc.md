@@ -5,6 +5,7 @@ Create a PersistentVolumeClaim (PVC) YAML file for a persistent volume (PV).
 The IBM® block storage CSI driver supports using both file system and raw block volume modes.
 
 **Important:**
+<br>
   - If not defined, the default mode is `Filesystem`. Be sure to define the mode as `Block` if this configuration is preferred.
   - In all the examples - `accessModes` with value `ReadWriteOnce` is used, but `ReadWriteMany` can be used (instead or in addition) to allow multiple pod containers to access the mount - see details below
   - Changing `accessModes` of existing PVCs should follow the procedure detailed below
@@ -136,7 +137,7 @@ Update the `dataSource` parameters to reflect the existing PVC object informatio
 
 ## Creating a PVC with ReadWriteMany access mode
 
-`accessModes` can be either `ReadWriteOnce`, `ReadWriteMany`, or both can be specified. The choice affects the constraint of multiple container access and mount permissions.
+`accessModes` can be either `ReadWriteOnce`, `ReadWriteMany`, or both can be specified. The choice affects the constraint of multiple container access and mount permissions.<br>
 For more information about the `accessModes` field, refer to the Kubernetes documentation page https://kubernetes.io/docs/concepts/storage/persistent-volumes/
 
 To use `ReadWriteMany` - replace `ReadWriteOnce` in the examples above with:
