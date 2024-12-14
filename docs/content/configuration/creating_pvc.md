@@ -7,8 +7,8 @@ The IBM® block storage CSI driver supports using both file system and raw block
 **Important:**
 <br>
   - If not defined, the default mode is `Filesystem`. Be sure to define the mode as `Block` if this configuration is preferred.
-  - In all the examples - `accessModes` with value `ReadWriteOnce` is used, but `ReadWriteMany` can be used (instead or in addition) to allow multiple pod containers to access the mount - see details below
-  - Changing `accessModes` of existing PVCs should follow the procedure detailed below
+  - In all the examples, `accessModes` with value `ReadWriteOnce` is used, but `ReadWriteMany` can be used (instead or in addition) to allow multiple pod containers to access the mount (see [details](#creating-a-pvc-with-readwritemany-access-mode) below)
+  - Changing `accessModes` of existing PVCs should follow the [procedure](#updating-access-modes) below
   - The volume group labels are not pre-defined. Be sure to match the selector in the target volume group (`spec.source.selector`). For an example of creating a PVC using the VolumeGroup configuration, see [Creating a PVC within a volume group with the dynamic volume group feature](#creating-a-pvc-within-a-volume-group-with-the-dynamic-volume-group-feature).
 
 **Note:** The examples below create the PVC with a storage size 1 Gb. This can be changed, per customer needs.
