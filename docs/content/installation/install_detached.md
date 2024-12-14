@@ -13,9 +13,7 @@ The first step is to download the correct version of the oc-mirror tool for the 
 Identify the packages available in the Red Hat Community Operator catalog index using the following command. Examples below are shown for a Red Hat OpenShift 4.17 installation.<br>
 
 ```
-$ oc-mirror list operators \
-  --catalog=registry.redhat.io/redhat/community-operator-index:v4.17 \
-  > community-operators.lst
+$ oc-mirror list operators --catalog=registry.redhat.io/redhat/community-operator-index:v4.17 > community-operators.lst
 ```
 
 Verify the IBM Block CSI Driver is listed in the catalog.
@@ -81,9 +79,7 @@ mirror:
 Initiate the catalog index creation.
 
 ```
-$ oc-mirror --config ./ibm-block.yaml \
-  docker://{your_private_registry_url} \
-  --ignore-history [--dest-skip-tls]
+$ oc-mirror --config ./ibm-block.yaml docker://{your_private_registry_url} --ignore-history [--dest-skip-tls]
 ```
 The command above should generate the following files in your current working directory:
 
@@ -96,7 +92,7 @@ The IBM Block CSI Driver itself uses the following container images:
 * ```k8s.gcr.io/sig-storage/csi-node-driver-registrar:v2.9.0```
 * ```k8s.gcr.io/sig-storage/csi-provisioner:v3.6.0```
 * ```k8s.gcr.io/sig-storage/csi-attacher:v4.4.0```
-* ```k8s.gcr.io/sig-storage/csi-snapshotter:v6.3. ```
+* ```k8s.gcr.io/sig-storage/csi-snapshotter:v6.3.0```
 * ```k8s.gcr.io/sig-storage/csi-resizer:v1.9.0```
 * ```k8s.gcr.io/sig-storage/livenessprobe:v2.12.0```
 * ```quay.io/ibmcsiblock/csi-block-volumereplication-operator:v0.9.0```
