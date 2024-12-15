@@ -47,6 +47,9 @@ var (
 		{
 			Mode: csi.VolumeCapability_AccessMode_SINGLE_NODE_WRITER,
 		},
+		{
+			Mode: csi.VolumeCapability_AccessMode_MULTI_NODE_MULTI_WRITER,
+		},
 	}
 
 	defaultFSType     = "ext4"

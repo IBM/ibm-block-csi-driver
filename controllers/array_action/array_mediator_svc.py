@@ -2,12 +2,14 @@ from collections import defaultdict
 from io import StringIO
 from random import choice
 
+import os
 from packaging.version import Version
 from pysvc import errors as svc_errors
 from pysvc.unified.client import connect
 from pysvc.unified.response import CLIFailureError, SVCResponse
 from retry import retry
 
+from controllers.servers.host_definer import settings
 import controllers.array_action.errors as array_errors
 import controllers.array_action.settings as array_settings
 from controllers.array_action import svc_messages
@@ -30,6 +32,8 @@ NON_ASCII_CHARS = 'CMMVC6017E'
 INVALID_NAME = 'CMMVC6527E'
 TOO_MANY_CHARS = 'CMMVC5738E'
 VALUE_TOO_LONG = 'CMMVC5703E'
+OBJECT_NOT_OF_TYPE_OF_HOST = 'CMMVC9699E'
+ENTITY_DOES_NOT_EXIST = 'CMMVC5868E'
 INVALID_FILTER_VALUE = 'CMMVC5741E'
 SPECIFIED_OBJ_NOT_EXIST = 'CMMVC5804E'
 LUN_ALREADY_IN_USE = 'CMMVC5879E'
@@ -50,6 +54,7 @@ NOT_ENOUGH_EXTENTS_IN_POOL_CREATE = 'CMMVC8710E'
 NOT_VALID_IO_GROUP = 'CMMVC5729E'
 NOT_SUPPORTED_PARAMETER = 'CMMVC5709E'
 CANNOT_CHANGE_HOST_PROTOCOL_BECAUSE_OF_MAPPED_PORTS = 'CMMVC9331E'
+COMMAND_NOT_SUPPORTED = 'CMMVC7205E'
 
 HOST_NQN = 'nqn'
 HOST_WWPN = 'WWPN'
@@ -133,6 +138,10 @@ def build_create_host_kwargs(host_name, connectivity_type, port, io_group):
     if not io_group:
         io_group = common_settings.FULL_IO_GROUP
     cli_kwargs['iogrp'] = io_group
+    port_set = os.getenv(settings.PORT_SET_ENV_VAR)
+    if port_set is not None and port_set:
+        logger.info("host {} is created with port set {}".format(host_name, port_set))
+        cli_kwargs['portset'] = port_set
     return cli_kwargs
 
 
@@ -985,6 +994,9 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
         try:
             return self.client.svcinfo.lsnvmefabric(remotenqn=host_nqn).as_list
         except(svc_errors.CommandExecutionError, CLIFailureError) as ex:
+            if COMMAND_NOT_SUPPORTED in ex.my_message:
+                logger.warning("Failed to get nvme fabrics - command not supported")
+                return None
             logger.error("Failed to get nvme fabrics. Reason "
                          "is: {0}".format(ex))
             raise ex
@@ -993,10 +1005,12 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
         return hasattr(self.client.svcinfo, "lsnvmefabric")
 
     def _get_host_names_by_nqn(self, nqn):
-        if self._is_lsnvmefabric_supported():
-            nvme_fabrics = self._lsnvmefabric(nqn)
-            return set(nvme_fabric.object_name for nvme_fabric in nvme_fabrics)
-        return None
+        if not self._is_lsnvmefabric_supported():
+            return None
+        nvme_fabrics = self._lsnvmefabric(nqn)
+        if nvme_fabrics is None:
+            return None
+        return set(nvme_fabric.object_name for nvme_fabric in nvme_fabrics)
 
     def _lshostiplogin(self, iqn):
         try:
@@ -1795,6 +1809,11 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
             if OBJ_ALREADY_EXIST in ex.my_message:
                 raise array_errors.HostAlreadyExists(host_name, self.endpoint)
             if self._is_port_invalid(ex.my_message):
+                return 400
+            if any(msg_id in ex.my_message for msg_id in (OBJECT_NOT_OF_TYPE_OF_HOST, VALUE_TOO_LONG,
+                                                          ENTITY_DOES_NOT_EXIST)):
+                logger.warning("exception encountered during host {} creation : {}, might be related to bad \
+                               portset".format(host_name, ex.my_message))
                 return 400
             if is_warning_message(ex.my_message):
                 logger.warning("exception encountered during host {} creation : {}".format(host_name, ex.my_message))

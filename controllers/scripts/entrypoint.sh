@@ -1,2 +1,2 @@
 #!/bin/bash
-exec python3.8 /driver/controllers/servers/csi/main.py $@
+exec python3.9 /driver/controllers/servers/csi/main.py $@

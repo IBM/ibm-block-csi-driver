@@ -17,13 +17,13 @@ As opposed to known issues, limitations are functionality restrictions that are 
 
 ## IBM® DS8000® usage limitations
 
-When using the CSI driver with DS8000 family storage systems:
-- Connectivity limits on the storage side might be reached with DS8000 family products due to too many open connections. This occurs due to connection closing lag times from the storage side.
+When using the CSI driver with IBM DS8000 family storage systems:
+- Connectivity limits on the storage side might be reached with IBM DS8000 family products due to too many open connections. This occurs due to connection closing lag times from the storage side.
 - There is a limit of 11 FlashCopy relationships per volume (including all snapshots and clones).
 
 ## High availability (HA) limitations
 **Note:**
-- HyperSwap topology is only supported for use with IBM Spectrum Virtualize family storage systems.
+- HyperSwap topology is only supported for use with IBM Storage Virtualize family storage systems.
 - Stretched topology is only supported by SAN Volume Controller storage systems.
 
 ### HyperSwap volume limitations
@@ -39,24 +39,24 @@ The following IBM block storage CSI driver features are not supported on volumes
 
 ## I/O group limitations
 
-I/O group configuration is only supported for use with IBM Spectrum Virtualize family storage systems.
+I/O group configuration is only supported for use with IBM Storage Virtualize family storage systems.
 
 ## NVMe®/FC usage limitations
 
  Red Hat® Enterprise Linux CoreOS (RHCOS) does not support NVMe®/FC.
  
- For other limitations with your storage system, see the following section within your Spectrum Virtualize product documentation on [IBM Documentation](https://www.ibm.com/docs/en/): **Configuring** > **Host attachment** > **NVMe over Fibre Channel host attachments** > **FC-NVMe limitations and SAN configuration guidelines**.
+ For other limitations with your storage system, see the following section within your IBM Storage Virtualize product documentation on [IBM Documentation](https://www.ibm.com/docs/en/): **Configuring** > **Host attachment** > **NVMe over Fibre Channel host attachments** > **FC-NVMe limitations and SAN configuration guidelines**.
 
 ## Policy-based replication limitations
-Policy-based replication is only supported for use with IBM Spectrum Virtualize family storage system versions 8.5.2 or higher. To see if your specific product is supported and for more information, see **What's new** > **Getting started with policy-based replication** within your Spectrum Virtualize product documentation on [IBM Documentation](https://www.ibm.com/docs).
+Policy-based replication is only supported for use with IBM Storage Virtualize family storage system versions 8.5.2 or higher. To see if your specific product is supported and for more information, see **What's new** > **Getting started with policy-based replication** within your IBM Storage Virtualize product documentation on [IBM Documentation](https://www.ibm.com/docs).
 
-For other policy-based replication limitations with your storage system, see the Configuration Limits and Restrictions for your product software version. From the [IBM Support](https://www.ibm.com/mysupport) website, search for `Configuration Limits and Restrictions` and your product name. For example, `Configuration Limits and Restrictions FlashSystem 9500`.
+For other policy-based replication limitations with your storage system, see the Configuration Limits and Restrictions for your product software version. From the [IBM Support](https://www.ibm.com/mysupport) website, search for `Configuration Limits and Restrictions` and your product name. For example, `Configuration Limits and Restrictions IBM Storage FlashSystem 9500`.
 
 ## Snapshot function limitations
 
 **Important:** Snapshot function support is only Alpha support.
 
-- Snapshot function is only supported for use with IBM Spectrum Virtualize family storage system versions 8.5.1 or higher. For more information, see **Product overview** > **Technical overview** > **Volume groups** > **Snapshot function** within your Spectrum Virtualize product documentation on [IBM Documentation](https://www.ibm.com/docs).
+- Snapshot function is only supported for use with IBM Storage Virtualize family storage system versions 8.5.1 or higher. For more information, see **Product overview** > **Technical overview** > **Volume groups** > **Snapshot function** within your IBM Storage Virtualize product documentation on [IBM Documentation](https://www.ibm.com/docs).
 - In very rare cases, due to a race condition, a different snapshot than intended may be mistakenly deleted during a snapshot deletion. This occurs as no snapshot unique ID (UID) is present on the storage side.
 - Both source and target PVCs (in a source PVC to snapshot to target PVC scenario) must have the same space efficiency set within their storage classes. If the space efficiency is set differently, the target PVC creation fails.
 - A PVC target must have the same volume size as the source volume.
@@ -94,7 +94,7 @@ The following limitations apply when using volume clones with the IBM block stor
 
 The following limitations apply when expanding volumes with the IBM block storage CSI driver:
 
--   When using the CSI driver with IBM Spectrum Virtualize family and IBM DS8000 family products, during size expansion of a PersistentVolumeClaim (PVC), the size remains until all snapshots of the specific PVC are deleted.
+-   When using the CSI driver with IBM Storage Virtualize family and IBM DS8000 family products, during size expansion of a PersistentVolumeClaim (PVC), the size remains until all snapshots of the specific PVC are deleted.
 
      **Note:** This limitation is not relevant when using Snapshot function. For more information, see [Snapshot function limitations](#snapshot-function-limitations).
 -   When expanding a PVC while not in use by a pod, the volume size immediately increases on the storage side. However, PVC size only increases after a pod uses the PVC.
@@ -102,7 +102,7 @@ The following limitations apply when expanding volumes with the IBM block storag
 
 ## Volume group limitations
 
-Volume group configuration is only supported for use with IBM Spectrum Virtualize family storage systems.
+Volume group configuration is only supported for use with IBM Storage Virtualize family storage systems.
 
 The following limitations apply when using volume groups:
 
@@ -129,5 +129,5 @@ When a role switch is conducted, this is not reflected within the other orchestr
 The following limitations apply when using volume snapshots with the IBM block storage CSI driver:
 
 **Note:** This limitation is not relevant when using Snapshot function. For more information, see [Snapshot function limitations](#snapshot-function-limitations).
--   When using the CSI driver with IBM Spectrum® Virtualize family products, a snapshot can only be used to provision a new volume of equal size.
-- When using the CSI driver with DS8000 family storage systems, a snapshot is limited to creating 11 volumes.
+- When using the CSI driver with IBM Storage® Virtualize family products, a snapshot can only be used to provision a new volume of equal size.
+- When using the CSI driver with IBM DS8000® family storage systems, a snapshot is limited to creating 11 volumes.

@@ -4,7 +4,7 @@ Use this information to import volumes that were created externally from the IBM
 
 Before starting to import an existing volume, find the `volumeHandle` in the existing volume in order to include the information in the persistent volume (PV) YAML file. To find the `volumeHandle`, use one of the following procedures:
 
-- **For Spectrum Virtualize family**
+- **For IBM Storage Virtualize family**
 
   The `volumeHandle` is formatted as `SVC:id;vdisk_UID`.
 
@@ -23,11 +23,11 @@ Before starting to import an existing volume, find the `volumeHandle` in the exi
 
       The Properties window is displayed. Use the **Volume ID** and **Volume UID** values.
 
-    For more information about Spectrum Virtualize products, find your product information in [IBM Documentation](https://www.ibm.com/docs/).
+    For more information about IBM Storage Virtualize products, find your product information in [IBM Documentation](https://www.ibm.com/docs/).
   
 
 
-- **For DS8000 family:**
+- **For IBM DS8000 family:**
 
   The `volumeHandle` is formatted as `DS8K:id;GUID`.
   The `id` is the last four digits of the `GUID`.
@@ -38,7 +38,7 @@ Before starting to import an existing volume, find the `volumeHandle` in the exi
 
      For more information, see **Reference** > **Command-line interface** > **CLI commands** > **Storage configuration commands** > **Fixed block logical volume specific commands** > **lsfbvol** within your specific product documentation on [IBM Documentation](https://www.ibm.com/docs/).
 
-  - Through the DS8000 Storage Management GUI:
+  - Through the IBM DS8000 Storage Management GUI:
 
     1. Select **Volumes** from the side bar.
 
@@ -48,12 +48,12 @@ Before starting to import an existing volume, find the `volumeHandle` in the exi
 
         The Properties window is displayed. Use the **GUID** value.
 
-    For more information about DS8000 family products, find your product information in [IBM Documentation](https://www.ibm.com/docs/).
+    For more information about IBM DS8000 family products, find your product information in [IBM Documentation](https://www.ibm.com/docs/).
   
 
 Use this procedure to help build a PV YAML file for your volumes.
 
-**Note:** These steps are set up for importing volumes from a Spectrum Virtualize family system. Change parameters, as needed.
+**Note:** These steps are set up for importing volumes from an IBM Storage Virtualize family system. Change parameters, as needed.
 
 1. Create a persistent volume (PV) YAML file.
 

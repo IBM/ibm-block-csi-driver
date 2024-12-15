@@ -2,7 +2,7 @@
 
 IBM® block storage CSI driver 1.11.0 added new support and enhancements.
 - Added dynamic host definition enhancements
-- New Spectrum Virtualize family system support for policy-based replication and dynamic volume groups
+- New IBM Storage Virtualize family system support for policy-based replication and dynamic volume groups
 - Additional orchestration platform support for Red Hat OpenShift 4.12 and Kubernetes 1.25 and 1.26
 
 Version 1.11.0 also resolved the following issue:

@@ -16,7 +16,7 @@ If policy-based replication is not in use, use the `system_id` of the storage sy
 
 Use one of the following examples, depending on the replication type that is being used.
 
-**Example 1: VolumeReplicationClass _not_ using Spectrum Virtualize policy-based replication**
+**Example 1: VolumeReplicationClass _not_ using IBM Storage Virtualize policy-based replication**
 
 ```
 apiVersion: replication.storage.openshift.io/v1alpha1
@@ -32,7 +32,7 @@ spec:
     replication.storage.openshift.io/replication-secret-name: demo-secret
     replication.storage.openshift.io/replication-secret-namespace: default
 ```
-**Example 2: VolumeReplicationClass using Spectrum Virtualize policy-based replication**
+**Example 2: VolumeReplicationClass using IBM Storage Virtualize policy-based replication**
 
 ```
 apiVersion: replication.storage.openshift.io/v1alpha1
@@ -49,7 +49,6 @@ spec:
 
 After the YAML file is created, apply it by using the `kubectl apply -f` command.
 
-```
-kubectl apply -f <filename>.yaml
-```
+    kubectl apply -f <filename>.yaml
+
 The `volumereplicationclass.replication.storage.openshift.io/<volumereplicationclass-name> created` message is emitted.
