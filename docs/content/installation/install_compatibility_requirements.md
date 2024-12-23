@@ -33,7 +33,7 @@ Complete these steps to prepare your environment for installing the CSI (Contain
    Download and save the following YAML file:
 
    ```
-   curl https://raw.githubusercontent.com/IBM/ibm-block-csi-operator/v1.12.0/deploy/99-ibm-attach.yaml > 99-ibm-attach.yaml
+   curl https://raw.githubusercontent.com/IBM/ibm-block-csi-operator/v1.12.1/deploy/99-ibm-attach.yaml > 99-ibm-attach.yaml
    ```
 
    This file can be used for both Fibre Channel and iSCSI configurations. To support iSCSI, uncomment the last two lines in the file.
