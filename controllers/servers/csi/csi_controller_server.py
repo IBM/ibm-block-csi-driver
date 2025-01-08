@@ -268,6 +268,8 @@ class CSIControllerServicer(csi_pb2_grpc.ControllerServicer):
             logger.debug("Idempotent case. volume is already unmapped.")
         except array_errors.ObjectNotFoundError:
             logger.debug("Idempotent case. volume is already deleted.")
+        except array_errors.VolumeNotMappedToHostError:
+            logger.debug("Idempotent case. volume is not mapped to host.")
         return csi_pb2.ControllerUnpublishVolumeResponse()
 
     @csi_method(error_response_type=csi_pb2.ValidateVolumeCapabilitiesResponse, lock_request_attribute="volume_id")

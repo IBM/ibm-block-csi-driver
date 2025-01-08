@@ -185,6 +185,11 @@ class VolumeAlreadyUnmappedError(BaseArrayActionException):
         super().__init__()
         self.message = messages.VOLUME_ALREADY_UNMAPPED_MESSAGE.format(volume_id_or_name)
 
+class VolumeNotMappedToHostError(BaseArrayActionException):
+
+    def __init__(self, volume_id_or_name, host):
+        super().__init__()
+        self.message = messages.VOLUME_NOT_MAPPED_TO_HOST_MESSAGE.format(volume_id_or_name, host)
 
 class UnmappingError(BaseArrayActionException):
 
