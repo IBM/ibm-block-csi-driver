@@ -36,9 +36,10 @@ The various `by_management_id` parameters are chosen within the following hierar
 
 Apply the storage class.
 
-  ```
-  kubectl apply -f <filename>.yaml
-  ```
+```
+kubectl apply -f <filename>.yaml
+```
+
 The `storageclass.storage.k8s.io/<storageclass-name> created` message is emitted.
 
 

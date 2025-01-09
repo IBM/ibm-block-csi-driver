@@ -35,7 +35,7 @@ RUN pip3 install .
 FROM registry.access.redhat.com/ubi8/python-39:1-206.1732638092
 MAINTAINER IBM Storage
 
-ARG VERSION=1.12.0
+ARG VERSION=1.12.1
 ARG BUILD_NUMBER=0
 
 ###Required Labels

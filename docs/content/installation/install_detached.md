@@ -122,11 +122,11 @@ Once the private registry is set up, the CatalogSource is configured and the IBM
 
 1. Download the driver installation yaml
 ```
-curl https://raw.githubusercontent.com/IBM/ibm-block-csi-operator/v1.12.0/config/samples/csi.ibm.com_v1_ibmblockcsi_cr.yaml > csi.ibm.com_v1_ibmblockcsi_cr.yaml
+curl https://raw.githubusercontent.com/IBM/ibm-block-csi-operator/v1.12.1/config/samples/csi.ibm.com_v1_ibmblockcsi_cr.yaml > csi.ibm.com_v1_ibmblockcsi_cr.yaml
 ```
 2. Update the driver installation yaml, setting all image paths and tags to match your private registry images
 3. Optionally, download the HostDefiner driver installation yaml and update it, setting all iamge paths and tags to match your private registry images
 ```
- curl https://raw.githubusercontent.com/IBM/ibm-block-csi-operator/v1.12.0/config/samples/csi_v1_hostdefiner_cr.yaml > csi_v1_hostdefiner_cr.yaml
+ curl https://raw.githubusercontent.com/IBM/ibm-block-csi-operator/v1.12.1/config/samples/csi_v1_hostdefiner_cr.yaml > csi_v1_hostdefiner_cr.yaml
  ```
 
