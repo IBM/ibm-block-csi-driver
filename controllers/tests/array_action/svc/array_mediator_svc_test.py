@@ -1828,6 +1828,8 @@ class TestArrayMediatorSVC(unittest.TestCase):
                                                      array_errors.HostNotFoundError)
         self._test_unmap_volume_rmvdiskhostmap_error(svc_errors.CommandExecutionError("CMMVC5842E"),
                                                      array_errors.VolumeAlreadyUnmappedError)
+        self._test_unmap_volume_rmvdiskhostmap_error(svc_errors.CommandExecutionError("CMMVC5804E"),
+                                                     array_errors.VolumeNotMappedToHostError)
         self._test_unmap_volume_rmvdiskhostmap_error(svc_errors.CommandExecutionError(
             array_settings.DUMMY_ERROR_MESSAGE),
             array_errors.UnmappingError)

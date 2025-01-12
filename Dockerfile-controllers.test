@@ -30,6 +30,7 @@ RUN pip3 install -r ./csi_requirements.txt -r ./host_definer_requirements.txt
 
 USER root
 COPY controllers/scripts/csi_general .
+RUN chmod +x csi_pb2.sh
 RUN ./csi_pb2.sh
 RUN pip3 install .
 
