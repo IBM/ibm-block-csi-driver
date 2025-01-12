@@ -1220,8 +1220,10 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
                 if OBJ_NOT_FOUND in ex.my_message:
                     raise array_errors.ObjectNotFoundError(volume_name)
                 if VOL_ALREADY_UNMAPPED in ex.my_message:
-                    raise array_errors.VolumeAlreadyUnmappedError(
-                        volume_name)
+                    raise array_errors.VolumeAlreadyUnmappedError(volume_name)
+                if SPECIFIED_OBJ_NOT_EXIST in ex.my_message:
+                    # host isn't in the volume's mappings
+                    raise array_errors.VolumeNotMappedToHostError(volume_name, host_name)
                 raise array_errors.UnmappingError(volume_name,
                                                   host_name, ex)
 
