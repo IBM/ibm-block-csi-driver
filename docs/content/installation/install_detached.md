@@ -89,12 +89,12 @@ The command above should generate the following files in your current working di
 These two files can be used in the next section.<br>
 The IBM Block CSI Driver itself uses the following container images:
 
-* ```k8s.gcr.io/sig-storage/csi-node-driver-registrar:v2.9.0```
-* ```k8s.gcr.io/sig-storage/csi-provisioner:v3.6.0```
-* ```k8s.gcr.io/sig-storage/csi-attacher:v4.4.0```
-* ```k8s.gcr.io/sig-storage/csi-snapshotter:v6.3.0```
-* ```k8s.gcr.io/sig-storage/csi-resizer:v1.9.0```
-* ```k8s.gcr.io/sig-storage/livenessprobe:v2.12.0```
+* ```registry.k8s.io/sig-storage/csi-node-driver-registrar:v2.9.0```
+* ```registry.k8s.io/sig-storage/csi-provisioner:v3.6.0```
+* ```registry.k8s.io/sig-storage/csi-attacher:v4.4.0```
+* ```registry.k8s.io/sig-storage/csi-snapshotter:v6.3.0```
+* ```registry.k8s.io/sig-storage/csi-resizer:v1.9.0```
+* ```registry.k8s.io/sig-storage/livenessprobe:v2.12.0```
 * ```quay.io/ibmcsiblock/csi-block-volumereplication-operator:v0.9.0```
 * ```quay.io/ibmcsiblock/csi-volume-group-operator:v0.9.1```
 * ```quay.io/ibmcsiblock/ibm-block-csi-host-definer-amd64:1.12.0```
