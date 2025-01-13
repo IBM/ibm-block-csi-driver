@@ -212,6 +212,9 @@ class TestUnmapVolumeByInitiators(BaseMediatorAbstractSetUp):
     def test_unmap_volume_by_initiators_unmap_volume_volume_already_unmapped_error(self):
         self._test_unpublish_volume_unmap_volume_with_error(array_errors.VolumeAlreadyUnmappedError(''))
 
+    def test_unmap_volume_by_initiators_unmap_volume_volume_not_mapped_to_host_error(self):
+        self._test_unpublish_volume_unmap_volume_with_error(array_errors.VolumeNotMappedToHostError('volume', 'host'))
+
     def test_unmap_volume_by_initiators_unmap_volume_permission_denied_error(self):
         self._test_unpublish_volume_unmap_volume_with_error(array_errors.PermissionDeniedError(''))
 
