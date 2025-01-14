@@ -1,7 +1,7 @@
 # 1.12.1 (January 2025)
 
 IBM® Block Storage CSI driver 1.12.1 added new support and enhancements.
-- Extended support to RedHat OpenShift® 4.18 and 4.19
+- Extended support to RedHat OpenShift® 4.18
 - Extended support to Kubernetes 1.32
 
 **Note:**

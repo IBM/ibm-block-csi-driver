@@ -4,15 +4,16 @@ The following table lists operating systems required for deployment of the IBM®
 
 | Operating system                                     |Architecture|
 |------------------------------------------------------|------------|
-| Red Hat® Enterprise Linux® (RHEL) 8.x                |x86<sup>2</sup>|
+| Red Hat® Enterprise Linux® (RHEL) 8.x                |x86<sup>2, 3</sup>|
 | Red Hat® Enterprise Linux® (RHEL) 9.x                |x86<sup>2</sup>|
-| Red Hat® Enterprise Linux CoreOS® (RHCOS) 4.14-4.19  |x86|
+| Red Hat® Enterprise Linux CoreOS® (RHCOS) 4.14-4.18  |x86|
 | Ubuntu 20.04.x LTS                                   |x86<sup>1</sup>|
 | Ubuntu 22.04.x LTS                                   |x86<sup>1</sup>|
 | Ubuntu 24.04.x LTS                                   |x86<sup>1</sup>|
 
 <sup>1</sup>Ubuntu is supported with Kubernetes orchestration platforms only.<br/>
 <sup>2</sup>Red Hat® Enterprise Linux® (RHEL) 8.x and 9.x are supported with Kubernetes orchestration platforms only.<br/>
+<sup>3</sup>Kubernetes 1.32 is not supported on Red Hat® Enterprise Linux® (RHEL) 8.x.<br/>
 
 **Note:** 
 - Virtualized worker nodes (for example, VMware vSphere) are supported with iSCSI and Fibre Channel (FC) adapters, when the FC adapter is used in passthrough mode.
