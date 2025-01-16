@@ -20,6 +20,7 @@ As opposed to known issues, limitations are functionality restrictions that are 
 When using the CSI driver with IBM DS8000 family storage systems:
 - Connectivity limits on the storage side might be reached with IBM DS8000 family products due to too many open connections. This occurs due to connection closing lag times from the storage side.
 - There is a limit of 11 FlashCopy relationships per volume (including all snapshots and clones).
+- HostDefiner is not supported.
 
 ## High availability (HA) limitations
 **Note:**

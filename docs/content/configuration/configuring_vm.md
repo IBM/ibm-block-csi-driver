@@ -10,3 +10,5 @@ When creating a Virtual Machine on RedHat OpenShift® - configure the storage pr
 6. In the "Edit disk" window uncheck "Apply optimized StorageProfile settings" and in "Access Mode" select "Shared access (RWX)". Then Click Save
 
 **Note:** In future releases of RedHat OpenShift, "Shared Access (RWX)" will be the default storage profile for Virtual Machines using the IBM Block Storage CSI driver.
+
+**Note:** Virtual Machine support on RedHat OpenShift is limited to specific cluster configurations and requirements. Please review the latest RedHat OpenShift Virtualization installation guide.
