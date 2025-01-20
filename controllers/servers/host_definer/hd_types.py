@@ -9,7 +9,7 @@ class DefineHostRequest:
     connectivity_type_from_user: str = ''
     node_id_from_host_definition: str = ''
     node_id_from_csi_node: str = ''
-    array_connection_info: ArrayConnectionInfo = ArrayConnectionInfo(array_addresses='', user='', password='')
+    array_connection_info: ArrayConnectionInfo = ArrayConnectionInfo(array_addresses='', user='', password='',partition_name='')
     io_group: str = ''
 
 
