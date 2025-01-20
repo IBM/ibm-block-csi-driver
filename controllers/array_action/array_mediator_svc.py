@@ -142,6 +142,8 @@ def build_create_host_kwargs(host_name, connectivity_type, port, io_group):
     if port_set is not None and port_set:
         logger.info("host {} is created with port set {}".format(host_name, port_set))
         cli_kwargs['portset'] = port_set
+    if self._partition_name is not None:
+        cli_kwargs['partition_name'] = self._partition_name
     return cli_kwargs
 
 
@@ -593,6 +595,10 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
     def _create_cli_volume(self, name, size_in_bytes, space_efficiency, pool, io_group, volume_group=None):
         logger.info("creating volume with name : {}. size : {} . in pool : {} with parameters : {}".format(
             name, size_in_bytes, pool, space_efficiency))
+        if self._partition_name is not None and volume_group is None:
+            logger.info("get corresponding volume group for partition {}".format(self._partition_name))
+            volume_group = self._get_volume_group_from_partition_name(self._partition_name)
+            logger.info("volume group is {}".format(volume_group))
         try:
             size = self._convert_size_bytes(size_in_bytes)
             cli_kwargs = build_kwargs_from_parameters(space_efficiency, pool, io_group,
@@ -2006,6 +2012,19 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
             name=cli_volume.name,
             array_type=self.array_type
         )
+
+    def _get_volume_group_from_partition_name(self, partition_name):
+        filter_value = 'partition_name={}'.format(partition_name)
+        try:
+            vol_groups = self.client.svcinfo.lsvolumegroup(filtervalue=filter_value).as_single_element
+            if vol_groups is None or vol_groups.name is None:
+                raise array_errors.ObjectNotFoundError(partition_name)
+            return vol_groups.name
+        except (svc_errors.CommandExecutionError, CLIFailureError) as ex:
+            if any(msg_id in ex.my_message for msg_id in (NON_ASCII_CHARS, VALUE_TOO_LONG)):
+                raise array_errors.InvalidArgumentError(ex.my_message)
+            raise ex
+
 
     def _get_cli_volumes_from_volume_group(self, volume_group_name):
         filter_value = 'volume_group_name={}'.format(volume_group_name)
