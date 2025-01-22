@@ -98,7 +98,7 @@ Complete these steps to prepare your environment for installing the CSI (Contain
     
     2. Enable policy-based replication on volume groups, see the following section within your IBM Storage Virtualize product documentation on [IBM Documentation](https://www.ibm.com/docs/): **Administering** > **Managing policy-based replication** > **Assigning replication policies to volume groups**.   
 
-5. (Optional) If planning on using volume replication (remote copy function), enable support on your orchestration platform cluster and storage system.
+6. (Optional) If planning on using volume replication (remote copy function), enable support on your orchestration platform cluster and storage system.
     
     1. To enable support on your Kubernetes cluster, install the following volume group CRDs once per cluster.
 
@@ -112,13 +112,13 @@ Complete these steps to prepare your environment for installing the CSI (Contain
     
     2. To enable support on your storage system, see the following section within your IBM Storage Virtualize product documentation on [IBM Documentation](https://www.ibm.com/docs/en/): **Administering** > **Managing Copy Services** > **Managing remote-copy partnerships**.
 
-6. (Optional) To use CSI Topology, at least one node in the cluster must have the label-prefix of `topology.block.csi.ibm.com` to introduce topology awareness.
+7. (Optional) To use CSI Topology, at least one node in the cluster must have the label-prefix of `topology.block.csi.ibm.com` to introduce topology awareness.
       
       **Important:** This label-prefix must be found on the nodes in the cluster **before** installing the IBM® block storage CSI driver. If the nodes do not have the proper label-prefix before installation, CSI Topology cannot be used with the CSI driver.
 
       For more information, see [Configuring for CSI Topology](../configuration/configuring_topology.md).
 
-7. (Optional) If planning on using a high availability (HA) feature (either HyperSwap or stretched topology) on your storage system, see the appropriate sections within your IBM Storage Virtualize product documentation on [IBM Documentation](https://www.ibm.com/docs/en/):
+8. (Optional) If planning on using a high availability (HA) feature (either HyperSwap or stretched topology) on your storage system, see the appropriate sections within your IBM Storage Virtualize product documentation on [IBM Documentation](https://www.ibm.com/docs/en/):
     - HyperSwap topology planning and configuration
         - **Planning** > **Planning for high availability** > **Planning for a HyperSwap topology system**
         - **Configuring** > **Configuration details** > **HyperSwap system configuration details**
@@ -126,4 +126,4 @@ Complete these steps to prepare your environment for installing the CSI (Contain
         - **Planning** > **Planning for high availability** > **Planning for a stretched topology system**
         - **Configuring** > **Configuration details** > **Stretched system configuration details**
 
-8. (Optional) If planning on using policy-based replication with your IBM Storage Virtualize storage system, verify that the correct replication policy is in place. This can be done either through the IBM Storage Virtualize user interface (go to **Policies** > **Replication policies**) or through the CLI (`lsreplicationpolicy`). If a replication policy is not in place create one before replicating a volume through the CSI driver.
+9. (Optional) If planning on using policy-based replication with your IBM Storage Virtualize storage system, verify that the correct replication policy is in place. This can be done either through the IBM Storage Virtualize user interface (go to **Policies** > **Replication policies**) or through the CLI (`lsreplicationpolicy`). If a replication policy is not in place create one before replicating a volume through the CSI driver.
