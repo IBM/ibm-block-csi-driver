@@ -30,7 +30,7 @@ Use the `SpaceEfficiency` parameters for each storage system, as defined in the 
   `pool: demo-pool1:demo-pool2`
   
    **Important:** The two pools must be from different sites.<br>
-   **Important:** vdisk protection must be disabled globally or for a specific child pools to be used
+   **Important:** vdisk protection must be disabled globally or for the specific child pools to be used
    
   For more information about high availability limitations, see [Limitations](../release_notes/limitations.md).
   
