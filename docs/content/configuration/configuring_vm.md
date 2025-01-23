@@ -1,6 +1,8 @@
 # Configuring a Virtual Machine on RedHat OpenShift
 
-When creating a Virtual Machine on RedHat OpenShift® - configure the storage profile to "Shared Access (RWX)". This is required to support Virtual Machine live migration.
+**Important:** Prior to configuring Virtual Machines on RedHat Openshift® with the IBM® Block Storage CSI driver, vdisk protection must be disabled globally or for the specific child pools to be used on the connected IBM FlashSystem.
+
+When creating a Virtual Machine on RedHat OpenShift - configure the storage profile to "Shared Access (RWX)". This is required to support Virtual Machine live migration.
 
 1. Set the StorageClass configured to use the IBM Block Storage CSI driver as the default StorageClass, so that boot devices of VMs are created on the desired FlashSystem storage
 2. In the main VM creation window click the "Customize VirtualMachine" button
