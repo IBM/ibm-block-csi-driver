@@ -55,8 +55,6 @@ For other policy-based replication limitations with your storage system, see the
 
 ## Snapshot function limitations
 
-**Important:** Snapshot function support is only Alpha support.
-
 - Snapshot function is only supported for use with IBM Storage Virtualize family storage system versions 8.5.1 or higher. For more information, see **Product overview** > **Technical overview** > **Volume groups** > **Snapshot function** within your IBM Storage Virtualize product documentation on [IBM Documentation](https://www.ibm.com/docs).
 - In very rare cases, due to a race condition, a different snapshot than intended may be mistakenly deleted during a snapshot deletion. This occurs as no snapshot unique ID (UID) is present on the storage side.
 - Both source and target PVCs (in a source PVC to snapshot to target PVC scenario) must have the same space efficiency set within their storage classes. If the space efficiency is set differently, the target PVC creation fails.
