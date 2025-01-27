@@ -1,8 +1,11 @@
+
+{{site.data.keyword.attribute-definition-list}}
+
 # Creating a VolumeReplicationClass
 
 Create a VolumeReplicationClass YAML file to enable volume replication.
 
-**Note:** Remote copy function is referred to as the more generic volume replication within this documentation set. Not all supported products use the remote-copy function terminology.
+Remote copy function is referred to as the more generic volume replication within this documentation set. Not all supported products use the remote-copy function terminology.{: note}
 
 In order to enable volume replication for your storage system, create a VolumeReplicationClass YAML file, similar to the following `demo-volumereplicationclass.yaml`.
 
@@ -12,7 +15,7 @@ If using policy-based replication, use the `replication_policy` parameter, with 
 
 If policy-based replication is not in use, use the `system_id` of the storage system containing the `replicationHandle` volumes. For information on obtaining your storage system `system_id`, see [Finding a `system_id`](finding_systemid.md).
 
-**Important:** Be sure to only use one of the following parameters: `replication_policy` **or** `system_id`. Using both parameters within the VolumeReplicationClass, results in the following error message: `got an invalid parameter: system_id`.
+Be sure to only use one of the following parameters: `replication_policy` **or** `system_id`. Using both parameters within the VolumeReplicationClass, results in the following error message: `got an invalid parameter: system_id`.{: attention}
 
 Use one of the following examples, depending on the replication type that is being used.
 

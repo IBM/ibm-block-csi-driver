@@ -1,3 +1,6 @@
+
+{{site.data.keyword.attribute-definition-list}}
+
 # Creating a VolumeGroup
 
 Create a VolumeGroup YAML file to specify a volume group key, for creating PersistentVolumeClaim (PVC) groups.
@@ -8,7 +11,7 @@ Before creating a volume group, be sure to follow all of the volume group config
 
 1.  Create a Volume Group by using the `demo-volumegroup.yaml`.
 
-    **Note:**  Be sure to match the selector in the target volume group (`spec.source.selector`) with the PVC. For more information, see [Creating a PersistentVolumeClaim (PVC)](creating_pvc.md).
+Be sure to match the selector in the target volume group (`spec.source.selector`) with the PVC. For more information, see [Creating a PersistentVolumeClaim (PVC)](creating_pvc.md).{: attention}
 
     ```
     apiVersion: csi.ibm.com/v1
@@ -41,4 +44,5 @@ Before creating a volume group, be sure to follow all of the volume group config
 
 To assign a PVC to a specific volume group add a label within the PVC, matching the selector of the volume group.
 
-**Note:** PVCs that belong to a volume group must first be removed from the assigned volume group in order to be deleted.
+PVCs that belong to a volume group must first be removed from the assigned volume group in order to be deleted.{: restriction}
+

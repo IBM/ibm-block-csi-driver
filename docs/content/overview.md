@@ -1,3 +1,6 @@
+
+{{site.data.keyword.attribute-definition-list}}
+
 # Overview
 
 IBM® block storage CSI driver is leveraged by Kubernetes persistent volumes (PVs) to dynamically provision for block storage used with stateful containers.
@@ -13,7 +16,7 @@ IBM storage orchestration for containers includes the following driver types for
 
 For details about volume provisioning with Kubernetes, refer to [Persistent volumes on Kubernetes](https://kubernetes.io/docs/concepts/storage/volumes/).
 
-**Note:** For the user convenience, this guide might refer to IBM block storage CSI driver as CSI driver.
+For user convenience, this guide might refer to IBM block storage CSI driver as CSI driver. {: note}
 
 ![This image shows CSI driver integration with IBM block storage.](../book_files/k8s_driver_arch_diagram_1.11.svg "Integration of IBM block storage systems and CSI driver in a Kubernetes environment")
 

@@ -1,12 +1,13 @@
+
+{{site.data.keyword.attribute-definition-list}}
+
 # Creating a StorageClass with volume groups
 
 Use the following procedure to create and apply the storage classes when using policy-based replication and volume groups.
 
-**Note:** For information and parameter definitions that are not related to topology awareness, be sure to see the information provided in [Creating a StorageClass](creating_volumestorageclass.md), in addition to the current section.
+For information and parameter definitions that are not related to topology awareness, be sure to see the information provided in [Creating a StorageClass](creating_volumestorageclass.md), in addition to the current section.{: note}
 
-**Note:** This procedure is applicable for both Kubernetes and Red Hat® OpenShift®. For Red Hat OpenShift, replace `kubectl` with `oc` in all relevant commands.
-
-**Attention:** Volume groups can only be managed by **either** the associated VolumeGroup **or** the associated StorageClass (with the `volume_group` parameter). If a volume group is already associated with a VolumeGroup, then each volume of this StorageClass can be automatically deleted.
+Volume groups can only be managed by **either** the associated VolumeGroup **or** the associated StorageClass (with the `volume_group` parameter). If a volume group is already associated with a VolumeGroup, then each volume of this StorageClass can be automatically deleted.{: restriction}
 
   
       kind: StorageClass
@@ -33,5 +34,7 @@ Apply the storage class.
   ```
   kubectl apply -f <filename>.yaml
   ```
+
+This procedure is applicable for both Kubernetes and Red Hat® OpenShift®. For Red Hat OpenShift, replace `kubectl` with `oc` in all relevant commands.{: tip}
 
 The `storageclass.storage.k8s.io/<storageclass-name> created` message is emitted.

@@ -1,8 +1,11 @@
+
+{{site.data.keyword.attribute-definition-list}}
+
 # Creating a StorageClass with topology awareness
 
 When using the CSI Topology feature, different parameters must be taken into account when creating a storage class YAML file with specific `by_management_id` requirements. Use this information to help define a StorageClass that is topology aware.
 
-**Note:** For information and parameter definitions that are not related to topology awareness, be sure to see the information provided in [Creating a StorageClass](creating_volumestorageclass.md), in addition to the current section.
+For information and parameter definitions that are not related to topology awareness, be sure to see the information provided in [Creating a StorageClass](creating_volumestorageclass.md), in addition to the current section.{: note}
 
 The StorageClass file must be defined to contain topology information, based off of the labels that were already defined on the nodes in the cluster (see [Compatibility and requirements](../installation/install_compatibility_requirements.md)). This determines the storage pools that are then served as candidates for PersistentVolumeClaim (PVC) requests made, as well as the subset of nodes that can make use of the volumes provisioned by the CSI driver.
 

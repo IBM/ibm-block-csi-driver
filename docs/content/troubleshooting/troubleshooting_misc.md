@@ -1,8 +1,11 @@
+
+{{site.data.keyword.attribute-definition-list}}
+
 # Miscellaneous troubleshooting
 
 Use this information to help pinpoint potential causes for stateful pod failure.
 
-**Note:** These procedures are applicable for both Kubernetes and Red Hat&reg; OpenShift&reg;. For Red Hat OpenShift, replace `kubectl` with `oc` in all relevant commands.
+These procedures are applicable for both Kubernetes and Red Hat® OpenShift®. For Red Hat OpenShift, replace `kubectl` with `oc` in all relevant commands.{: tip}
 
 ## General troubleshooting
 Use the following command for general troubleshooting:
@@ -12,7 +15,8 @@ kubectl get -n <namespace>  csidriver,sa,clusterrole,clusterrolebinding,stateful
 ```
 
 ## Error during pod creation
-**Note:** This troubleshooting procedure is relevant for volumes using file system volume mode only (not for volumes using raw block volume mode).
+
+This troubleshooting procedure is relevant for volumes using file system volume mode only (not for volumes using raw block volume mode).{: attention}
 
 If the following error occurs during stateful application pod creation (the pod status is _ContainerCreating_):
 
@@ -43,7 +47,8 @@ If the following error occurs during stateful application pod creation (the pod 
     The multipath devices should be running properly and the pod should come up immediately.
 
 ## Error during PVC expansion
-**Note:** This troubleshooting procedure is a workaround for issue **CSI-5769** (see [Known issues](../release_notes/known_issues.md))
+
+This troubleshooting procedure is a workaround for issue **CSI-5769** (see [Known issues](../release_notes/known_issues.md)){: note}
 
 If the PVC expansion fails with the following event
 

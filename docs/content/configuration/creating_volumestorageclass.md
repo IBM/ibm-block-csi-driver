@@ -1,12 +1,13 @@
+
+{{site.data.keyword.attribute-definition-list}}
+
 # Creating a StorageClass
 
 Create a storage class YAML file in order to define the storage parameters, such as pool name, secret reference, `SpaceEfficiency`, and `fstype`.
 
-**Note:** If you are using the CSI Topology feature, in addition to the information and parameter definitions provided here, be sure to follow the steps in [Creating a StorageClass with topology awareness](creating_storageclass_topology_aware.md).
+If you are using the CSI Topology feature, in addition to the information and parameter definitions provided here, be sure to follow the steps in [Creating a StorageClass with topology awareness](creating_storageclass_topology_aware.md).{: attention}
 
 Use the following procedure to create and apply the storage classes.
-
-**Note:** This procedure is applicable for both Kubernetes and Red Hat® OpenShift®. For Red Hat OpenShift, replace `kubectl` with `oc` in all relevant commands.
 
 Create a storage class YAML file, similar to the following `demo-storageclass.yaml` and update the storage parameters as needed.
 
@@ -14,7 +15,7 @@ When configuring the file, be sure to use the same array secret and array secret
 
 Use the `SpaceEfficiency` parameters for each storage system, as defined in the following table. These values are not case-sensitive.
 
-**Important:** When using external provisioning policies for linked pools, do not use the `SpaceEfficiency` parameter, the capacity savings within the linked pools are defined by the provisioning policy. If the `SpaceEfficiency` parameter is used together with provisioning policies, the volume cannot be created. For more information see **What's new** > **Getting started with policy-based replication** > **Configuring policy-based replication** > **Creating provisioning policy and assigning to pools**.
+When using external provisioning policies for linked pools, do not use the `SpaceEfficiency` parameter, the capacity savings within the linked pools are defined by the provisioning policy. If the `SpaceEfficiency` parameter is used together with provisioning policies, the volume cannot be created. For more information see **What's new** > **Getting started with policy-based replication** > **Configuring policy-based replication** > **Creating provisioning policy and assigning to pools**.{: attention}
 
 #### `SpaceEfficiency` parameter definitions per storage system type
 
@@ -29,8 +30,9 @@ Use the `SpaceEfficiency` parameters for each storage system, as defined in the 
   
   `pool: demo-pool1:demo-pool2`
   
-   **Important:** The two pools must be from different sites.<br>
-   **Important:** vdisk protection must be disabled globally or for the specific child pools to be used
+The two pools must be from different sites.{: important}
+
+vdisk protection must be disabled globally or for the specific child pools to be used.{: attention}
    
   For more information about high availability limitations, see [Limitations](../release_notes/limitations.md).
   
@@ -43,12 +45,16 @@ Use the `SpaceEfficiency` parameters for each storage system, as defined in the 
 - The `csi.storage.k8s.io/fstype` parameter is optional. The values that are allowed are _ext4_ or _xfs_. The default value is _ext4_.
 - The `volume_name_prefix` parameter is optional.
 - The `io_group` and `volume_group` parameters are only available on IBM Storage Virtualize storage systems.
-<br><br>**Attention:** Volume groups can only be managed by **either** the associated VolumeGroup **or** the associated StorageClass (with the `volume_group` parameter). If a volume group is already associated with a VolumeGroup, then each volume of this StorageClass can be automatically deleted.
-<br><br>**Note:** If no `io_group` is defined, the volume is created within the storage system's default I/O group(s).
+  - If no `io_group` is defined, the volume is created within the storage system's default I/O group(s).
+  - If a volume group is already associated with a VolumeGroup, then each volume of this StorageClass can be automatically deleted.
+
+Volume groups can only be managed by **either** the associated VolumeGroup **or** the associated StorageClass (with the `volume_group` parameter).{: restriction}
+
 - The `virt_snap_func` parameter is optional but necessary in IBM Storage Virtualize storage systems if using the Snapshot function. To enable the Snapshot function, set the value to _"true"_. The default value is _"false"_. If the value is _"false"_ the snapshot will use the FlashCopy function.
 
-    **Note:**
-    For IBM DS8000 family storage systems, the maximum prefix length is five characters. The maximum prefix length for other systems is 20 characters. <br /><br />For IBM Storage Virtualize family storage systems, the `CSI` prefix is added as default if not specified by the user.
+For IBM DS8000 family storage systems, the maximum prefix length is five characters. The maximum prefix length for other systems is 20 characters.{: requirement}
+
+For IBM Storage Virtualize family storage systems, the `CSI` prefix is added as default if not specified by the user.{: tip}
 
     
       kind: StorageClass
@@ -75,3 +81,6 @@ Apply the storage class.
       kubectl apply -f <filename>.yaml
 
 The `storageclass.storage.k8s.io/<storageclass-name> created` message is emitted.
+
+This procedure is applicable for both Kubernetes and Red Hat® OpenShift®. For Red Hat OpenShift, replace `kubectl` with `oc` in all relevant commands.{: tip}
+

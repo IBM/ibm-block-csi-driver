@@ -1,15 +1,17 @@
+
+{{site.data.keyword.attribute-definition-list}}
+
 # Creating a VolumeSnapshotClass with topology awareness
 
 When using the CSI Topology feature, different parameters must be taken into account when creating a VolumeSnapshotClass YAML file with specific `by_management_id` requirements. Use this information to help define a VolumeSnapshotClass that is topology aware and enables the creation and deletion of volume snapshots.
 
-**Note:** 
-  - For information and parameter definitions that are not related to topology awareness, be sure to see the information that is provided in [Creating a VolumeSnapshotClass](creating_volumesnapshotclass.md), in addition to the current section.
+For information and parameter definitions that are not related to topology awareness, be sure to see the information that is provided in [Creating a VolumeSnapshotClass](creating_volumesnapshotclass.md), in addition to the current section.{: note}
   
-  - This section refers to both the IBM FlashCopy® function and Snapshot function in IBM Storage Virtualize storage systems.
+This section refers to both the IBM FlashCopy® function and Snapshot function in IBM Storage Virtualize storage systems.{: note}
 
-In order to enable creation and deletion of volume snapshots for your storage system, create a VolumeSnapshotClass YAML file, similar to the following `demo-volumesnapshotclass-config-secret.yaml`.
+In order to enable creation and deletion of volume snapshots for your storage system, create a VolumeSnapshotClass YAML file, similar to `demo-volumesnapshotclass-config-secret.yaml` below.
 
-  The `by_management_id` parameter is optional and values such as the `pool`, `SpaceEfficiency`, and `volume_name_prefix` can all be specified.
+The `by_management_id` parameter is optional and values such as the `pool`, `SpaceEfficiency`, and `volume_name_prefix` can all be specified.{: tip}
 
 The various `by_management_id` parameters are chosen within the following hierarchical order:
 1. From within the `by_management_id` parameter, per system (if specified).

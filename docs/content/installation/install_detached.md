@@ -1,3 +1,6 @@
+
+{{site.data.keyword.attribute-definition-list}}
+
 # Detached Installation of the Driver
 
 The steps below can be applied for any detached Red Hat OpenShift container registry environment and on the amd64 architecture supported by Red Hat OpenShift and the IBM Block CSI Driver:
@@ -104,7 +107,7 @@ The IBM Block CSI Driver itself uses the following container images:
 
 All the images above must be copied to your private registry using ```skopeo```.<br>
 
-**Note**: Make sure to run the ```skopeo``` command from a node that uses the same CPU architecture as the node where you intend to deploy the operator.
+Make sure to run the ```skopeo``` command from a node that uses the same CPU architecture as the node where you intend to deploy the operator.{: important}
 
 ## Create CatalogSource and Patch Operator (CSV)
 
@@ -114,7 +117,7 @@ Once all the images have been copied to your private registry, the IBM Block CSI
 2. Deploy the IBM Block CSI Driver Operator via the Red Hat OpenShift Console
 3. Patch the IBM Block CSI Driver CSV, setting all image paths and tags to match your private registry images
 
-**Note**: To edit the CSV, go to the Red Hat OpenShift console or use the ```oc edit``` command. Use ```skopeo inspect``` to identify the digest of each image.
+To edit the CSV, go to the Red Hat OpenShift console or use the ```oc edit``` command. Use ```skopeo inspect``` to identify the digest of each image.{: tip}
 
 ## Install the Driver
 

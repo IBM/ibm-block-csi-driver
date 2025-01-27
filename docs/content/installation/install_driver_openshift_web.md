@@ -1,12 +1,15 @@
+
+{{site.data.keyword.attribute-definition-list}}
+
 # Installing the driver with the OpenShift web console
 
 When using the Red Hat® OpenShift® Container Platform, the operator for IBM® block storage CSI driver can be installed directly from OpenShift Container Platform web console, through the OperatorHub. Installing the CSI (Container Storage Interface) driver is part of the operator installation process.
 
-**Important:** Installation via the OpenShift Container Platform web console is only available for the x86 platform. For the IBM Z and IBM Power Systems platforms, please refer to [Installing the driver with GitHub](install_driver_github.md) or [Installing the driver with OperatorHub.io](install_driver_operatorhub.md)
+Installation via the OpenShift Container Platform web console is only available for the x86 platform. For the IBM Z and IBM Power Systems platforms, please refer to [Installing the driver with GitHub](install_driver_github.md) or [Installing the driver with OperatorHub.io](install_driver_operatorhub.md) {: attention}
 
 The Red Hat OpenShift Container Platform uses the following `SecurityContextConstraints` for the following `serviceAccounts`:
 
-**Note:** This data is for informational purposes only.
+This data is for informational purposes only. {: note}
 
 |serviceAccount|SecurityContextConstraint|
 |--------------|-------------------------|
@@ -22,7 +25,7 @@ The Red Hat OpenShift Container Platform uses the following `SecurityContextCons
 
 6. Set the **Approval Strategy** to either **Automatic** or **Manual** as per your preference.
 
-    **Note:** The general recommendation is to select **Automatic** option.
+The general recommendation is to select **Automatic** option.{: tip}
 
 7. Click **Install**.
 
@@ -30,7 +33,7 @@ The Red Hat OpenShift Container Platform uses the following `SecurityContextCons
 
     Wait until the **Status** is _Up to date_ and then _Succeeded_.
 
-    **Note:** While waiting for the **Status** to change from _Up to date_ to _Succeeded_, you can check the pod progress and readiness status from **Workloads** > **Pods**.
+While waiting for the **Status** to change from _Up to date_ to _Succeeded_, you can check the pod progress and readiness status from **Workloads** > **Pods**.{: tip}
 
 9. After the operator installation progress is complete, click the installed IBM block storage CSI driver operator.
 

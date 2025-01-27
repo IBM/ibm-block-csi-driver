@@ -1,9 +1,13 @@
+
+{{site.data.keyword.attribute-definition-list}}
+
 # Recovering from a crashed Kubernetes node
 
 This section details a manual operation required to revive Kubernetes pods that reside on a crashed node due to an existing Kubernetes limitation.
 
 ## Identifying a crashed node
-**Note:** These procedures are applicable for both Kubernetes and Red Hat® OpenShift®. For Red Hat OpenShift, replace `kubectl` with `oc` in all relevant commands.
+
+These procedures are applicable for both Kubernetes and Red Hat® OpenShift®. For Red Hat OpenShift, replace `kubectl` with `oc` in all relevant commands.{: tip}
 
 When a worker node shuts down or crashes, all pods in a StatefulSet that reside on it become unavailable. In these scenarios, the node status is _NotReady_, and the pod status appears as _Terminating_.
 
@@ -22,7 +26,7 @@ default sanity-statefulset-0 1/1 Terminating 0 19m 10.244.2.37 k8s-node2
 
 ## Recovering a crashed node
 
-**Attention:** In order to avoid data loss, before continuing, verify that there are no pods connected to this volume.
+In order to avoid data loss, before continuing, verify that there are no pods connected to this volume.{: attention}
 
 Follow the following procedure to recover from a crashed node (see a [full example](#for-example) at the end of the procedure):
 
