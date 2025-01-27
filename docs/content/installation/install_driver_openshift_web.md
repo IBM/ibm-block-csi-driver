@@ -1,6 +1,8 @@
 # Installing the driver with the OpenShift web console
 
-When using the Red Hat® OpenShift® Container Platform, the operator for IBM® block storage CSI driver can be installed directly from OpenShift Container Platform web console<sup>1</sup>, through the OperatorHub. Installing the CSI (Container Storage Interface) driver is part of the operator installation process.
+When using the Red Hat® OpenShift® Container Platform, the operator for IBM® block storage CSI driver can be installed directly from OpenShift Container Platform web console, through the OperatorHub. Installing the CSI (Container Storage Interface) driver is part of the operator installation process.
+
+**Important:** Installation via the OpenShift Container Platform web console is only available for the x86 platform. For the IBM Z and IBM Power Systems platforms, please refer to [Installing the driver with GitHub](install_driver_github.md) or [Installing the driver with OperatorHub.io](install_driver_operatorhub.md)
 
 The Red Hat OpenShift Container Platform uses the following `SecurityContextConstraints` for the following `serviceAccounts`:
 
@@ -44,4 +46,3 @@ The Red Hat OpenShift Container Platform uses the following `SecurityContextCons
 
 13. After everything is created, wait until the **Status** is _Running_.
 
-<sup>1</sup> Installation via the OpenShift Container Platform web console is only available for the x86 platform. For the IBM Z and IBM Power Systems platforms, please refer to [Installing the driver with GitHub](install_driver_github.md) or [Installing the driver with GitHub](install_driver_operatorhub.md) 
