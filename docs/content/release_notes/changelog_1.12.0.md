@@ -1,4 +1,9 @@
+
+{{site.data.keyword.attribute-definition-list}}
+
 # 1.12.0 (December 2024)
+
+As of this document's publication date, IBM Power® and zLinux® architectures are not supported for this release. {: restriction}
 
 IBM® Block Storage CSI driver 1.12.0 added new support and enhancements.
 - Added support for PVC ReadWriteMany (RWX) access mode
@@ -15,6 +20,3 @@ IBM® block storage CSI driver version 1.12.0 resolved the following issues:
 |---------|--------|-----------|
 |**CSI-5727**|Medium|HostDefiner fails to match hosts with NQN identifiers when FlashSystem lsnvmefabric is disabled|
 
-**Note:**
-
-- As of this document's publication date, IBM Power® and zLinux® architectures are not supported for this release.
