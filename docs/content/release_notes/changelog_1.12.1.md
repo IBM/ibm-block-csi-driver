@@ -6,5 +6,4 @@ IBM® Block Storage CSI driver 1.12.1 added new support and enhancements.
 
 **Note:**
 
-- As of this document's publication date, IBM DS8000® family is not supported for this release.
 - As of this document's publication date, IBM Power® and zLinux® architectures are not supported for this release.
