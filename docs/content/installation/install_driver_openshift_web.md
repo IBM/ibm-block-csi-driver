@@ -25,7 +25,7 @@ This data is for informational purposes only. {: note}
 
 6. Set the **Approval Strategy** to either **Automatic** or **Manual** as per your preference.
 
-    **Note:** The general recommendation is to select **Automatic** option.
+The general recommendation is to select **Automatic** option.{: tip}
 
 7. Click **Install**.
 
@@ -33,7 +33,7 @@ This data is for informational purposes only. {: note}
 
     Wait until the **Status** is _Up to date_ and then _Succeeded_.
 
-    **Note:** While waiting for the **Status** to change from _Up to date_ to _Succeeded_, you can check the pod progress and readiness status from **Workloads** > **Pods**.
+While waiting for the **Status** to change from _Up to date_ to _Succeeded_, you can check the pod progress and readiness status from **Workloads** > **Pods**.{: tip}
 
 9. After the operator installation progress is complete, click the installed IBM block storage CSI driver operator.
 
