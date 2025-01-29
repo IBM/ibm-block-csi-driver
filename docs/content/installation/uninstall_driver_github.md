@@ -1,10 +1,13 @@
+
+{{site.data.keyword.attribute-definition-list}}
+
 # Uninstalling the driver with GitHub
 
 Use this information to uninstall the IBM® CSI (Container Storage Interface) operator and driver with GitHub.
 
 Perform the following steps to uninstall the CSI driver and operator.
 
-**Note:** When using the host definer and `dynamicNodeLabeling` is set to `true`, be sure to complete the steps in the correct order or `hostdefiner.block.csi.ibm.com/manage-node=true` labels can be left on the nodes.
+When using the host definer and `dynamicNodeLabeling` is set to `true`, be sure to complete the steps in the correct order or `hostdefiner.block.csi.ibm.com/manage-node=true` labels can be left on the nodes.{: attention}
 
 1. Delete the IBMBlockCSI custom resource.
 
