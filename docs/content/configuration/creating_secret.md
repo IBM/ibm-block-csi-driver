@@ -1,10 +1,13 @@
+
+{{site.data.keyword.attribute-definition-list}}
+
 # Creating a Secret
 
 Create an array secret YAML file in order to define the storage credentials (username and password) and address.
 
-**Important:** When your storage system password is changed, be sure to also change the passwords in the corresponding secrets, particularly when LDAP is used on the storage systems. <br /><br />Failing to do so causes mismatched passwords across the storage systems and the secrets, causing the user to be locked out of the storage systems.
+When your storage system password is changed, be sure to also change the passwords in the corresponding secrets, particularly when LDAP is used on the storage systems. Failing to do so causes mismatched passwords across the storage systems and the secrets, causing the user to be locked out of the storage systems.{: important}
 
-**Note:** If using the CSI Topology feature, follow the steps in [Creating a Secret with topology awareness](creating_secret_topology_aware.md).
+If using the CSI Topology feature, follow the steps in [Creating a Secret with topology awareness](creating_secret_topology_aware.md).{: attention}
 
 Use one of the following procedures to create and apply the secret:
   - [Creating an array secret file](#creating-an-array-secret-file)
@@ -39,7 +42,8 @@ Use one of the following procedures to create and apply the secret:
 
 
 ## Creating an array secret via command line
-**Note:** This procedure is applicable for both Kubernetes and Red Hat® OpenShift®. For Red Hat OpenShift, replace `kubectl` with `oc` in all relevant commands.
+
+This procedure is applicable for both Kubernetes and Red Hat® OpenShift®. For Red Hat OpenShift, replace `kubectl` with `oc` in all relevant commands.{: note}
 
 Create the secret using the following command:
 
