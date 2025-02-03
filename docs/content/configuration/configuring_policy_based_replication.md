@@ -8,8 +8,6 @@ See the following sections for more information:
 - [Limitations](../release_notes/limitations.md)
 - [Compatibility and requirements](../installation/install_compatibility_requirements.md)
 - [Using the CSI driver with policy-based replication](../using/using_policy_based_replication.md).
-
-<br><br>
 - [Creating a StorageClass with volume groups](creating_storageclass_vg.md)
 - [Creating a PersistentVolumeClaim (PVC) with volume groups](creating_pvc_vg.md)
 - [Creating a VolumeReplication with policy-based replication](creating_volumereplication_pbr.md)
