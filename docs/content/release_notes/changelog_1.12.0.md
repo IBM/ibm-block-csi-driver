@@ -17,4 +17,4 @@ IBM® block storage CSI driver version 1.12.0 resolved the following issues:
 
 **Note:**
 
-- As of this document's publication date, IBM Power® and zLinux® architectures are not supported for this release.
+- As of this document's publication date, the IBM Power® architecture is not supported for this release.
