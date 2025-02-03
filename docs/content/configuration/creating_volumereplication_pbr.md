@@ -1,12 +1,15 @@
+
+{{site.data.keyword.attribute-definition-list}}
+
 # Creating a VolumeReplication with policy-based replication
 
 Create a VolumeReplication YAML file to replicate a specific PersistentVolumeClaim (PVC).
 
 VolumeReplicationClass needs to be present before a VolumeReplication can be created. For more information, see [Creating a VolumeReplicationClass](creating_volumereplicationclass.md).
 
-**Note:** For information and parameter definitions that are not related to topology awareness, be sure to see the information provided in [Creating a VolumeReplication](creating_volumereplication.md), in addition to the current section.
+For information and parameter definitions that are not related to topology awareness, be sure to see the information provided in [Creating a VolumeReplication](creating_volumereplication.md), in addition to the current section.{: note}
 
-**Note:** Use the `VolumeGroup` value for `spec.dataSource.kind`.
+Use the `VolumeGroup` value for `spec.dataSource.kind`.
 
 1.  Replicate a specific PersistentVolumeClaim (PVC) using the `demo-volumereplication.yaml`.
 
@@ -44,4 +47,5 @@ VolumeReplicationClass needs to be present before a VolumeReplication can be cre
     -   **Secondary** Indicates that the source volume is the secondary volume.
     -   **Unknown** Indicates that the driver does not recognize the replication state.
 
-    **Note:** For information about changing the replication state, see the [Usage](https://github.com/csiblock/volume-replication-operator/tree/v0.1.0#usage) section of the Volume Replication Operator for csi-addons.
+For information about changing the replication state, see the [Usage](https://github.com/csiblock/volume-replication-operator/tree/v0.1.0#usage) section of the Volume Replication Operator for csi-addons.{: tip}
+
