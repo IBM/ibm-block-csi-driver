@@ -1,3 +1,6 @@
+
+{{site.data.keyword.attribute-definition-list}}
+
 # Using the CSI driver with policy-based replication
 
 Policy-based replication was introduced in IBM Storage Virtualize 8.5.2 release. Policy-based replication provides simplified configuration and management of asynchronous replication between two systems.
@@ -8,7 +11,7 @@ When deleting volumes that are replicated, both the replicated volume and volume
 
 The CSI driver identifies that policy-based replication is being used based on the use of the `replication_policy` parameter within the VolumeReplicationClass YAML file.
 
-**Important:** `replication_policy` cannot be used together with the `system_id` parameter.
+`replication_policy` cannot be used together with the `system_id` parameter.{: restriction}
 
 Before replicating a volume with policy-based replication, verify that the proper replication policies are in place on your storage system.
 
@@ -16,4 +19,5 @@ Before replicating a volume with policy-based replication, verify that the prope
 - For more configuration information, see [Creating a VolumeReplicationClass](../configuration/creating_volumereplicationclass.md) and [Creating a VolumeReplication](../configuration/creating_volumereplication.md)
 - For information on importing existing volume groups, see [Importing an existing volume group](../configuration/importing_existing_volume_group.md)
 
-**Note:** For full information about this IBM Storage Virtualize feature, see **What's new** > **Getting started with policy-based replication** within your IBM Storage Virtualize product documentation on [IBM Documentation](https://www.ibm.com/docs).
+For full information about this IBM Storage Virtualize feature, see **What's new** > **Getting started with policy-based replication** within your IBM Storage Virtualize product documentation on [IBM Documentation](https://www.ibm.com/docs).{: tip}
+
