@@ -1,3 +1,6 @@
+
+{{site.data.keyword.attribute-definition-list}}
+
 # Creating a StatefulSet
 
 Create a StatefulSet YAML file to manage stateful applications.
@@ -6,7 +9,7 @@ The IBM® block storage CSI driver supports both file system and raw block volum
 
 StatefulSets can include file system volumes, raw block volumes, or both.
 
-**Important:** When defining the StatefulSet configuration, be sure to define volumes according to the PVC volume mode.
+When defining the StatefulSet configuration, be sure to define volumes according to the PVC volume mode.{: important}
 
 Use the following sections for YAML creation of StatefulSets with file system, raw block volume, and mixed volume modes.
 
