@@ -43,7 +43,7 @@ Use one of the following procedures to create and apply the secret:
 
 ## Creating an array secret via command line
 
-This procedure is applicable for both Kubernetes and Red Hat® OpenShift®. For Red Hat OpenShift, replace `kubectl` with `oc` in all relevant commands.{: note}
+This procedure is applicable for both Kubernetes and Red Hat® OpenShift®. For Red Hat OpenShift, replace `kubectl` with `oc` in all relevant commands.{: tip}
 
 Create the secret using the following command:
 
