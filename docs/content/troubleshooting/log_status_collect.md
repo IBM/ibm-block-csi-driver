@@ -1,8 +1,11 @@
+
+{{site.data.keyword.attribute-definition-list}}
+
 # Detecting errors and log collection
 
 Use the CSI (Container Storage Interface) driver debug information for problem identification.
 
-**Note:** These procedures are applicable for both Kubernetes and Red Hat® OpenShift®. For Red Hat OpenShift, replace `kubectl` with `oc` in all relevant commands.
+These procedures are applicable for both Kubernetes and Red Hat® OpenShift®. For Red Hat OpenShift, replace `kubectl` with `oc` in all relevant commands.{: tip}
 
 ## Detecting errors
 
@@ -34,9 +37,9 @@ Save logs and status reports directly to the created directory by adding in the 
 
     > logs/<log_filename>.log
 
-**Important:** Be sure that the logs cover any relevant timeframes for the specific issues that you are trying to debug when gathering logs from the storage system.
+Be sure that the logs cover any relevant timeframes for the specific issues that you are trying to debug when gathering logs from the storage system.{: important}
 
-**Note:** All commands here are listed with the collection command with the `logs` folder name example. Change the folder name according as needed.
+All commands here are listed with the collection command with the `logs` folder name example. Change the folder name according as needed.{: tip}
 
 ### General status and log collection for IBM Support
 Be sure to run the following steps and copy the output to an external file, when engaging IBM Support and sending log collections.
@@ -55,7 +58,7 @@ Be sure to run the following steps and copy the output to an external file, when
 
     `PVC NAME: demo-pvc-file-system PVC STATUS: Bound`
 
-    **Note:** If the PVCs are not in the _Bound_ state, collect the events of all unbound PVCs. (See [Details collection for unbound PVCs](#details-collection-for-unbound-pvcs).)
+If the PVCs are not in the _Bound_ state, collect the events of all unbound PVCs. (See [Details collection for unbound PVCs](#details-collection-for-unbound-pvcs).){: note}
 
 #### Log collection for all CSI driver node pods and their containers
 
