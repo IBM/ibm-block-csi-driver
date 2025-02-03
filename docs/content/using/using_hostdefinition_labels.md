@@ -1,3 +1,6 @@
+
+{{site.data.keyword.attribute-definition-list}}
+
 # Adding optional labels for dynamic host definition
 
 Adding labels to nodes allows for greater control over the system nodes, when using dynamic host definition.
@@ -18,9 +21,9 @@ For example, if `connectivityType` is defined as using `fc` but you want to use 
 
 `block.csi.ibm.com/connectivity-type=<connectivityType>
 
-**Note:**<br> 
-- The values for the connectivityType are the same as those for defining the HostDefiner: `nvmeofc`, `fc`, `iscsi`. If an invalid label is used, this label is ignored.
--  For more information about defining the connectivity type within the HostDefiner, see [Configuring the host definer](../configuration/configuring_hostdefiner.md)).
+The values for the connectivityType are the same as those for defining the HostDefiner: `nvmeofc`, `fc`, `iscsi`. If an invalid label is used, this label is ignored.{: note}
+
+For more information about defining the connectivity type within the HostDefiner, see [Configuring the host definer](../configuration/configuring_hostdefiner.md)).{: tip}
 
 ## Specifying I/O group usage
 
@@ -31,6 +34,6 @@ To specify which I/O group(s) a node should use, add any of the following labels
 - `hostdefiner.block.csi.ibm.com/io-group-2=true`
 - `hostdefiner.block.csi.ibm.com/io-group-3=true`
 
-**Note:** If no `io_group` is defined, the volume is created within the storage system's default I/O group(s).
+If no `io_group` is defined, the volume is created within the storage system's default I/O group(s).{: tip}
 
 For more about the I/O group function, see **Product overview** > **Technical overview** > **I/O group** within your IBM Storage Virtualize product documentation on [IBM Documentation](https://www.ibm.com/docs).
