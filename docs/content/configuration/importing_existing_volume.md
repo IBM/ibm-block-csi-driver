@@ -1,3 +1,6 @@
+
+{{site.data.keyword.attribute-definition-list}}
+
 # Importing an existing volume
 
 Use this information to import volumes that were created externally from the IBM® block storage CSI driver by using a persistent volume (PV) YAML file.
@@ -53,15 +56,15 @@ Before starting to import an existing volume, find the `volumeHandle` in the exi
 
 Use this procedure to help build a PV YAML file for your volumes.
 
-**Note:** These steps are set up for importing volumes from an IBM Storage Virtualize family system. Change parameters, as needed.
+These steps are set up for importing volumes from an IBM Storage Virtualize family system. Change parameters, as needed.{: note}
 
 1. Create a persistent volume (PV) YAML file.
 
-    **Important:** Be sure to include the `storageClassName` and `controllerPublishSecretRef` parameters or errors may occur.
+Be sure to include the `storageClassName` and `controllerPublishSecretRef` parameters or errors may occur.{: attention}
 
 2. Take the `volume_name` and other optional information (collected before the procedure) and insert it into the YAML file (under `spec.csi.volumeAttributes`).
 
-    **Important:** If using the CSI Topology feature, the `spec.csi.volumeHandle` contains the management ID (see [Creating a StorageClass with topology awareness](creating_storageclass_topology_aware.md)). In the example below, the `spec.csi.volumeHandle` would read similar to the following:<br> `SVC:demo-system-id-1:0;600507640082000B08000000000004FF`
+If using the CSI Topology feature, the `spec.csi.volumeHandle` contains the management ID (see [Creating a StorageClass with topology awareness](creating_storageclass_topology_aware.md)). In the example below, the `spec.csi.volumeHandle` would read similar to the following: `SVC:demo-system-id-1:0;600507640082000B08000000000004FF`{: important}
     
     ```
     apiVersion: v1
