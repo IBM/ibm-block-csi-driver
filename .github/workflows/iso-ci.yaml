@@ -1,0 +1,110 @@
+name: iso-ci.yaml
+
+on:
+  push:
+    branches: uriziv1/CSI-1544
+  pull_request:
+    branches: uriziv1/CSI-1544
+  release:
+    types: [ published ]
+
+env:
+  VCS_URL: https://github.com/IBM/ibm-block-csi-driver
+
+jobs:
+  precheck-and-build:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        go: ["1.23"]
+    steps:
+    - uses: actions/setup-go@v5
+      with:
+        go-version: ${{ matrix.go }}
+        cache: false
+
+    - uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+
+    - name: check copyright
+      run: |
+        make check-copyright
+
+    - name: run tests
+      run: |
+        make test
+
+    - name: login to Quay.io
+      # Only if we need to push an image
+      if: ${{ github.event_name == 'release' && github.event.action == 'published' }}
+      uses: docker/login-action@v3
+      with:
+        registry: quay.io
+        username: ${{ secrets.URIZIV1_QUAYIO_USERNAME }}
+        password: ${{ secrets.URIZIV1_QUAYIO_TOKEN }}
+
+      # Setup for buildx
+    - name: set up QEMU
+      uses: docker/setup-qemu-action@v3
+    - name: set up Docker Buildx
+      uses: docker/setup-buildx-action@v3
+
+    # Debugging information
+    - name: docker info
+      run: docker info
+    - name: buildx inspect
+      run: docker buildx inspect
+
+    - name: set output
+      id: vars
+      run: echo "{sha_short}={$(git rev-parse --short HEAD)}" >> $GITHUB_OUTPUT
+
+    - name: get tag without v
+      id: tag
+      shell: bash
+      if: ${{ github.event_name == 'release' && github.event.action == 'published' }}
+      run: |
+        BUILD_VERSION=${{ github.event.release.tag_name }}
+        echo "BUILD_VERSION=${BUILD_VERSION:1}" >> $GITHUB_ENV
+
+    # Build and (optionally) push the operator image
+    - name: build the operator image
+      uses: docker/build-push-action@v6
+      with:
+        context: .
+        file: ./Dockerfile-csi-node
+        platforms: linux/amd64,linux/ppc64le,linux/s390x
+        build-args: |
+          VCS_REF=${{ env.BUILD_VERSION || 'dev' }}-${{ steps.vars.outputs.sha_short }}
+          VCS_URL=${{ env.VCS_URL }}
+        # Only push if we are publishing a release
+        push: ${{ github.event_name == 'release' && github.event.action == 'published' }}
+        # Use a 'dev' tag, that won't be pushed, for non-release builds
+        tags: quay.io/uriziv1/ibm-block-csi-driver-node:${{ env.BUILD_VERSION || 'dev' }}
+
+    #- name: generate bundle manifests and metadata
+    #  run: |
+    #    export IMAGE_TAG=${{ env.BUILD_VERSION || 'dev' }}
+    #    make bundle
+    #    rm -rf ./bundle/manifests/ibm-storage-odf-operator_v1_serviceaccount.yaml
+
+    # Build and (optionally) push the operator bundle image
+    #- name: build the operator bundle image
+    #  uses: docker/build-push-action@v6
+    #  with:
+    #    context: .
+    #    file: ./bundle.Dockerfile
+    #    platforms: linux/amd64,linux/ppc64le,linux/s390x
+    #    push: ${{ github.event_name == 'release' && github.event.action == 'published' }}
+    #    tags: quay.io/ibmodffs/ibm-storage-odf-operator-bundle:${{ env.BUILD_VERSION || 'dev' }}
+
+      # Build and (optionally) push the operator must gather image
+    #- name: build the operator must gather image
+    #  uses: docker/build-push-action@v6
+    #  with:
+    #    context: ./must-gather
+    #    file: ./must-gather/Dockerfile
+    #    push: ${{ github.event_name == 'release' && github.event.action == 'published' }}
+    #    tags: quay.io/ibmodffs/ibm-storage-odf-operator-must-gather:${{ env.BUILD_VERSION || 'dev' }}
