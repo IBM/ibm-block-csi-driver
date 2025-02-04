@@ -1,9 +1,8 @@
-# Lifecycle and support matrix {#hak_lifecycle .reference}
+# Lifecycle and support matrix
 
 The following table details the IBM block storage CSI driver lifecycle with compatible IBM storage system microcodes and supported orchestration platforms.
 
-**Note:**
-
+**Notes:**
 -   The IBM® Storage Virtualize family includes Spectrum Virtualize as software only, Storage Virtualize for Public Cloud, SAN Volume Controller \(SVC\), Storwize and FlashSystem® family members built with Spectrum® Virtualize \(including FlashSystem 5xxx, 7xxx, 9xxx\).
 -   IBM Storage Virtualize family storage systems run the IBM Spectrum Virtualize™ software. In addition, the IBM Spectrum Virtualize package is available as a deployable solution that can be run on any compatible hardware.
 -   The IBM Storage Virtualize family microcode versions 8.4.x, 8.5.x, 8.6.x and 8.7.x include both LTS and Non-LTS releases. For more information, see [IBM Spectrum Virtualize FAQ for Continuous Development \(CD\) Release Model for software releases](https://www.ibm.com/support/pages/node/6409554).
@@ -13,24 +12,7 @@ The following table details the IBM block storage CSI driver lifecycle with comp
 
 |IBM Block Storage CSI driver version|General availability|End of support|Supported FlashSystem A9000 and A9000R microcode versions|Supported Storage Virtualize family microcode versions|Supported DS8000 family versions|Supported operating systems|Supported Kubernetes versions, platform architecture and installation methods|Supported Red Hat OpenShift versions, platform architecture and installation methods|
 |------------------------------------|--------------------|--------------|---------------------------------------------------------|------------------------------------------------------|--------------------------------|---------------------------|-----------------------------------------------------------------------------|------------------------------------------------------------------------------------|
-|1.12.0|December 2024|No|Not supported|8.4.x, 8.5.x, 8.6.x, 8.7.x|Not supported|Kubernetes support:  
- **Red Hat Enterprise Linux \(RHEL\) 8.x**   
- **Red Hat Enterprise Linux \(RHEL\) 9.x**   
- **Ubuntu 20.04.x LTS**  
- **Ubuntu 22.04.x LTS**  
- **Ubuntu 24.04.x LTS**  
-   
- Red Hat OpenShift support:  
- **Red Hat Enterprise Linux CoreOS \(RHCOS \) 4.14, 4.15, 4.16, 4.17**
-
-|1.29, 1.30, 1.31 -   x86
-    -   [GitHub](https://www.ibm.com/docs/en/stg-block-csi-driver/1.12.0?topic=driver-installing-github)
-    -   [OperatorHub](https://www.ibm.com/docs/en/stg-block-csi-driver/1.12.0?topic=driver-installing-operatorhubio)
-
-|4.14, 4.15, 4.16, 4.17-   x86
-    -   [GitHub](https://www.ibm.com/docs/en/stg-block-csi-driver/1.12.0?topic=driver-installing-github)
-
-|
+|1.12.0|December 2024|No|Not supported|8.4.x, 8.5.x, 8.6.x, 8.7.x|Not supported|Kubernetes support:<br>**Red Hat Enterprise Linux \(RHEL\) 8.x**<br>**Red Hat Enterprise Linux \(RHEL\) 9.x**<br>**Ubuntu 20.04.x LTS**<br>**Ubuntu 22.04.x LTS**<br>**Ubuntu 24.04.x LTS**<br><br>Red Hat OpenShift support:<br>**Red Hat Enterprise Linux CoreOS \(RHCOS \) 4.14, 4.15, 4.16, 4.17**|1.29, 1.30, 1.31<br>- x86<br>  - [GitHub](https://www.ibm.com/docs/en/stg-block-csi-driver/1.12.0?topic=driver-installing-github)<br>  - [OperatorHub](https://www.ibm.com/docs/en/stg-block-csi-driver/1.12.0?topic=driver-installing-operatorhubio)|4.14, 4.15, 4.16, 4.17<br>- x86<br>  - [GitHub](https://www.ibm.com/docs/en/stg-block-csi-driver/1.12.0?topic=driver-installing-github)|
 |1.11.4|September 2024|15 June 2025|Not supported|8.4.x, 8.5.x, 8.6.x, 8.7.x|8.x and higher with same API interface|Kubernetes support:  
  **Red Hat Enterprise Linux \(RHEL\) 8.x**   
  **Red Hat Enterprise Linux \(RHEL\) 9.x**   
