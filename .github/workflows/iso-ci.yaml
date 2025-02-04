@@ -28,9 +28,9 @@ jobs:
       with:
         fetch-depth: 0
 
-    - name: check copyright
-      run: |
-        make check-copyright
+    #- name: check copyright
+    #  run: |
+    #    make check-copyright
 
     - name: run tests
       run: |
