@@ -70,7 +70,7 @@ jobs:
         echo "BUILD_VERSION=${BUILD_VERSION:1}" >> $GITHUB_ENV
 
     # Build and (optionally) push the operator image
-    - name: build the operator image
+    - name: build csi node image
       uses: docker/build-push-action@v6
       with:
         context: .
