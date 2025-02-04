@@ -8,6 +8,7 @@
         * [Supported storage systems](content/release_notes/supported_storage.md)
         * [Supported operating systems](content/release_notes/supported_os.md)
         * [Supported orchestration platforms](content/release_notes/supported_orchestration.md)
+        * [Lifecycle and support matrix](content/release_notes/lifecycle_support_matrix.md)
     * [Change log](content/release_notes/change_log.md)
         * [1.12.1 (January 2025)](content/release_notes/changelog_1.12.1.md)
         * [1.12.0 (December 2024)](content/release_notes/changelog_1.12.0.md)
