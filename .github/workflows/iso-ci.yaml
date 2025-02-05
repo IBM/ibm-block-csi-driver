@@ -111,22 +111,22 @@ jobs:
     #    tags: quay.io/uriziv1/ibm-block-csi-host-definer:${{ env.BUILD_VERSION || 'dev' }}
     #    push: false
 
-  push-images:
-    needs: build-and-push
-    runs-on: ubuntu-latest
-    if: github.event_name == 'release' && github.event.action == 'published'
-    steps:
-      - name: Checkout code # Required for context.
-        uses: actions/checkout@v3
-      - name: push images
-        uses: docker/build-push-action@v6
-        with:
-          context: .
-          push: true
-          images: |
-            quay.io/uriziv1/ibm-block-csi-driver-node:${{ env.BUILD_VERSION || 'dev' }}
-            quay.io/uriziv1/ibm-block-csi-driver-controller:${{ env.BUILD_VERSION || 'dev' }}
-            quay.io/uriziv1/ibm-block-csi-driver-host-definer:${{ env.BUILD_VERSION || 'dev' }}
+  #push-images:
+  #  needs: build-and-push
+  #  runs-on: ubuntu-latest
+  #  if: github.event_name == 'release' && github.event.action == 'published'
+  #  steps:
+  #    - name: Checkout code # Required for context.
+  #      uses: actions/checkout@v3
+  #    - name: push images
+  #      uses: docker/build-push-action@v6
+  #      with:
+  #        context: .
+  #        push: true
+  #        images: |
+  #          quay.io/uriziv1/ibm-block-csi-driver-node:${{ env.BUILD_VERSION || 'dev' }}
+  #          quay.io/uriziv1/ibm-block-csi-driver-controller:${{ env.BUILD_VERSION || 'dev' }}
+  #          quay.io/uriziv1/ibm-block-csi-driver-host-definer:${{ env.BUILD_VERSION || 'dev' }}
 
 
     #- name: generate bundle manifests and metadata
