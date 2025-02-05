@@ -13,7 +13,6 @@ The following table lists supported operating systems for deployment of the IBM�
 |------------------------------------------------------|------------|
 | Red Hat® Enterprise Linux® (RHEL) 8.x                |x86|
 | Red Hat® Enterprise Linux® (RHEL) 9.x                |x86|
-| Ubuntu 20.04.x LTS                                   |x86|
 | Ubuntu 22.04.x LTS                                   |x86|
 | Ubuntu 24.04.x LTS                                   |x86|
 

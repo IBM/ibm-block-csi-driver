@@ -13,7 +13,6 @@ The following table details orchestration platforms suitable for deployment of t
 
 |Orchestration platform| Version |Architecture|
 |----------------------|---------|------------|
-|Kubernetes| 1.29    |x86|
 |Kubernetes| 1.30    |x86|
 |Kubernetes| 1.31    |x86|
 |Kubernetes| 1.32    |x86|
