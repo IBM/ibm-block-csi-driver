@@ -9,7 +9,7 @@ Use the following steps to install the operator and driver, with [GitHub](https:
 
 Before you begin, it is best practice to create a user-defined namespace. Create the project namespace, using the `kubectl create ns <namespace>` command.{: tip}
 
-When host definer is being installed, it is preferable to do so before installing the CSI driver IBMBlockCSI custom resource (see [Installing the host definer](install_hostdefiner.md).{: tip}
+When host definer is being installed, it is preferable to do so before installing the CSI driver IBMBlockCSI custom resource (see [Installing the host definer](install_hostdefiner.md)).{: tip}
 
 1.  Install the operator.
 
