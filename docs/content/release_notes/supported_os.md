@@ -5,6 +5,8 @@
 
 As of this document's publication date, IBM Power® and zLinux® architectures are not supported for this release. {: restriction}
 
+Kubernetes 1.32 is not supported on Red Hat® Enterprise Linux® (RHEL) 8.x.{: restriction}
+
 The following table lists supported operating systems for deployment of the IBM® block storage CSI driver on Kubernetes orchestration platforms:
 
 | Operating system                                     |Architecture|
@@ -15,17 +17,13 @@ The following table lists supported operating systems for deployment of the IBM�
 | Ubuntu 22.04.x LTS                                   |x86|
 | Ubuntu 24.04.x LTS                                   |x86|
 
-Kubernetes 1.32 is not supported on Red Hat® Enterprise Linux® (RHEL) 8.x. {: attention}
-
 The following table lists supported operating systems for deployment of the IBM® block storage CSI driver on OpenShift orchestration platforms:
 
 | Operating system                                     |Architecture|
 |------------------------------------------------------|------------|
 | Red Hat® Enterprise Linux CoreOS® (RHCOS) 4.14-4.18  |x86|
 
+Virtualized worker nodes (for example, VMware vSphere) are supported with iSCSI and Fibre Channel (FC) adapters, when the FC adapter is used in passthrough mode.{: tip}
 
-Virtualized worker nodes (for example, VMware vSphere) are supported with iSCSI and Fibre Channel (FC) adapters, when the FC adapter is used in passthrough mode. {: tip}
-
-For the latest operating system support information, see the [Lifecycle and support matrix](lifecycle_support_matrix.md). {: tip}
-
+For the latest operating system support information, see the [Lifecycle and support matrix](lifecycle_support_matrix.md).{: tip}
 
