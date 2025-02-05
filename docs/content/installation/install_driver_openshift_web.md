@@ -21,31 +21,31 @@ This data is for informational purposes only. {: note}
 
 2. Find and install **IBM block storage CSI driver operator** within the new project.<br /><br />The **Operator Installation** form appears.
 
-5. Set the **Installation Mode** to the project namespace selected previously.
+3. Set the **Installation Mode** to the project namespace selected previously.
 
-6. Set the **Approval Strategy** to either **Automatic** or **Manual** as per your preference.
+4. Set the **Approval Strategy** to either **Automatic** or **Manual** as per your preference.
 
 The general recommendation is to select **Automatic** option.{: tip}
 
-7. Click **Install**.
+5. Click **Install**.
 
-8. Check the status of the IBM block storage CSI driver operator.
+6. Check the status of the IBM block storage CSI driver operator.
 
     Wait until the **Status** is _Up to date_ and then _Succeeded_.
 
 While waiting for the **Status** to change from _Up to date_ to _Succeeded_, you can check the pod progress and readiness status from **Workloads** > **Pods**.{: tip}
 
-9. After the operator installation progress is complete, click the installed IBM block storage CSI driver operator.
+7. After the operator installation progress is complete, click the installed IBM block storage CSI driver operator.
 
-10. (Optional) Create the host definer (`HostDefiner`).
+8. (Optional) Create the host definer (`HostDefiner`).
 
     A YAML file opens in the web console. This file can be left as-is, or edited as needed. For more information, see [Configuring the host definer](../configuration/configuring_hostdefiner.md).
 
-11. Create the IBM block storage CSI driver (`IBMBlockCSI`).
+9. Create the IBM block storage CSI driver (`IBMBlockCSI`).
 
     A YAML file opens in the web console. This file can be left as-is, or edited as needed.
 
-12. Update the YAML file to include your user-defined namespace.
+10. Update the YAML file to include your user-defined namespace.
 
-13. After everything is created, wait until the **Status** is _Running_.
+11. After everything is created, wait until the **Status** is _Running_.
 

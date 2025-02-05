@@ -7,7 +7,7 @@ The operator for IBM® block storage CSI driver can be installed directly with G
 
 Use the following steps to install the operator and driver, with [GitHub](https://github.com/IBM/ibm-block-csi-operator).
 
-Before you begin, it is best practice to create a user-defined namespace. Create the project namespace, using the `kubectl create ns <namespace>` command.{: tip}
+Before you begin, it is best practice to create a user-defined namespace. Create the project namespace, using the `kubectl create ns <namespace>` command. If a user-defined namespace was created, edit the YAML files downloaded below changing the namespace value from `default` to `<namespace>`.{: tip}
 
 When host definer is being installed, it is preferable to do so before installing the CSI driver IBMBlockCSI custom resource (see [Installing the host definer](install_hostdefiner.md)).{: tip}
 
@@ -20,8 +20,6 @@ When host definer is being installed, it is preferable to do so before installin
         ```
 
     2.  (Optional) Update the image fields in the `ibm-block-csi-operator.yaml`.
-
-If a user-defined namespace was created, edit the namespace from `default` to `<namespace>`.{: important}
 
     3. Install the operator.
 
@@ -47,8 +45,6 @@ If a user-defined namespace was created, edit the namespace from `default` to `<
 
     2.  (Optional) Update the image repository field, tag field, or both in the `csi.ibm.com_v1_ibmblockcsi_cr.yaml`.
 
-If a user-defined namespace was created, edit the namespace from `default` to `<namespace>`.{: important}
-
     3.  Install the `csi.ibm.com_v1_ibmblockcsi_cr.yaml`.
 
         ```
@@ -64,5 +60,4 @@ If a user-defined namespace was created, edit the namespace from `default` to `<
         ibm-block-csi-node-tsppw                3/3     Running 0        9m36s
         ibm-block-csi-operator-5bb7996b86-xntss 1/1     Running 0        10m
         ```
-
 
