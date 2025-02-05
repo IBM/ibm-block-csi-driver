@@ -23,5 +23,5 @@ The following table details orchestration platforms suitable for deployment of t
 
 Kubernetes 1.32 is not supported on Red Hat® Enterprise Linux® (RHEL) 8.x. {:attention}
 
-For the latest orchestration platform support information, see the [Lifecycle and support matrix](https://www.ibm.com/docs/en/stg-block-csi-driver?topic=SSRQ8T/landing/csi_lifecycle_support_matrix.html). {: tip}
+For the latest orchestration platform support information, see the [Lifecycle and support matrix](lifecycle_support_matrix.md). {: tip}
 

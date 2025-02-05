@@ -26,6 +26,6 @@ The following table lists supported operating systems for deployment of the IBMÂ
 
 Virtualized worker nodes (for example, VMware vSphere) are supported with iSCSI and Fibre Channel (FC) adapters, when the FC adapter is used in passthrough mode. {: tip}
 
-For the latest operating system support information, see the [Lifecycle and support matrix](https://www.ibm.com/docs/en/stg-block-csi-driver?topic=SSRQ8T/landing/csi_lifecycle_support_matrix.html). {: tip}
+For the latest operating system support information, see the [Lifecycle and support matrix](lifecycle_support_matrix.md). {: tip}
 
 

@@ -9,7 +9,7 @@ IBM® block storage CSI driver 1.12.1 supports different IBM storage systems as 
 
 **Note:**
 
-- For the latest microcode storage support information, see the [Lifecycle and support matrix](https://www.ibm.com/docs/en/stg-block-csi-driver?topic=SSRQ8T/landing/csi_lifecycle_support_matrix.html).
+- For the latest microcode storage support information, see the [Lifecycle and support matrix](lifecycle_support_matrix.md). {: tip}
 - The IBM FlashSystem Storage family and SAN Volume Controller storage systems run the IBM Storage Virtualize software. In addition, the IBM Storage Virtualize package is available as a deployable solution that can be run on any compatible hardware.
 - The IBM Storage Virtualize microcode (available on IBM Storage Virtualize for Public Cloud, IBM Storage FlashSystem family members, and SAN Volume Controller) include both LTS and Non-LTS releases. For more information, see [IBM Spectrum Virtualize FAQ for Continuous Development (CD) Release Model for software releases](https://www.ibm.com/support/pages/node/6409554).
 
