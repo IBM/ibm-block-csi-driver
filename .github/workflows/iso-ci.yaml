@@ -85,21 +85,21 @@ jobs:
     #    # Use a 'dev' tag, that won't be pushed, for non-release builds
     #    tags: quay.io/uriziv1/ibm-block-csi-driver-node:${{ env.BUILD_VERSION || 'dev' }}
 
-    # Build and (optionally) push the csi controller image
-    - name: build csi controller image
-      uses: docker/build-push-action@v6
-      with:
-        context: .
-        file: ./Dockerfile-csi-controller
-        platforms: linux/amd64,linux/ppc64le,linux/s390x
-        build-args: |
-          VCS_REF=${{ env.BUILD_VERSION || 'dev' }}-${{ steps.vars.outputs.sha_short }}
-          VCS_URL=${{ env.VCS_URL }}
-        # Only push if we are publishing a release
-        #push: ${{ github.event_name == 'release' && github.event.action == 'published' }}
-        push: true
-        # Use a 'dev' tag, that won't be pushed, for non-release builds
-        tags: quay.io/uriziv1/ibm-block-csi-driver-controller:${{ env.BUILD_VERSION || 'dev' }}
+    ## Build and (optionally) push the csi controller image
+    #- name: build csi controller image
+    #  uses: docker/build-push-action@v6
+    #  with:
+    #    context: .
+    #    file: ./Dockerfile-csi-controller
+    #    platforms: linux/amd64,linux/ppc64le,linux/s390x
+    #    build-args: |
+    #      VCS_REF=${{ env.BUILD_VERSION || 'dev' }}-${{ steps.vars.outputs.sha_short }}
+    #      VCS_URL=${{ env.VCS_URL }}
+    #    # Only push if we are publishing a release
+    #    #push: ${{ github.event_name == 'release' && github.event.action == 'published' }}
+    #    push: true
+    #    # Use a 'dev' tag, that won't be pushed, for non-release builds
+    #    tags: quay.io/uriziv1/ibm-block-csi-driver-controller:${{ env.BUILD_VERSION || 'dev' }}
 
     # Build and (optionally) push the csi host-definer image
     - name: build csi host-definer image
