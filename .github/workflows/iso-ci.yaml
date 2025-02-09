@@ -80,7 +80,8 @@ jobs:
     #      VCS_REF=${{ env.BUILD_VERSION || 'dev' }}-${{ steps.vars.outputs.sha_short }}
     #      VCS_URL=${{ env.VCS_URL }}
     #    # Only push if we are publishing a release
-    #    push: ${{ github.event_name == 'release' && github.event.action == 'published' }}
+    #    #push: ${{ github.event_name == 'release' && github.event.action == 'published' }}
+    #    push: true
     #    # Use a 'dev' tag, that won't be pushed, for non-release builds
     #    tags: quay.io/uriziv1/ibm-block-csi-driver-node:${{ env.BUILD_VERSION || 'dev' }}
 
@@ -95,7 +96,8 @@ jobs:
           VCS_REF=${{ env.BUILD_VERSION || 'dev' }}-${{ steps.vars.outputs.sha_short }}
           VCS_URL=${{ env.VCS_URL }}
         # Only push if we are publishing a release
-        push: ${{ github.event_name == 'release' && github.event.action == 'published' }}
+        #push: ${{ github.event_name == 'release' && github.event.action == 'published' }}
+        push: true
         # Use a 'dev' tag, that won't be pushed, for non-release builds
         tags: quay.io/uriziv1/ibm-block-csi-driver-controller:${{ env.BUILD_VERSION || 'dev' }}
 
@@ -110,7 +112,8 @@ jobs:
           VCS_REF=${{ env.BUILD_VERSION || 'dev' }}-${{ steps.vars.outputs.sha_short }}
           VCS_URL=${{ env.VCS_URL }}
         # Only push if we are publishing a release
-        push: ${{ github.event_name == 'release' && github.event.action == 'published' }}
+        #push: ${{ github.event_name == 'release' && github.event.action == 'published' }}
+        push: true
         # Use a 'dev' tag, that won't be pushed, for non-release builds
         tags: quay.io/uriziv1/ibm-block-csi-host-definer:${{ env.BUILD_VERSION || 'dev' }}
 
