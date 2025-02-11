@@ -447,8 +447,12 @@ class TestCreateVolume(BaseControllerSetUp, CommonControllerTest):
 
     def test_create_volume_succeeds(self):
         self._test_create_volume_succeeds('xiv:{};{}'.format(INTERNAL_VOLUME_ID, VOLUME_UID))
+        self.mediator.register_plugin.not_called()
 
     def test_create_volume_with_topologies_succeeds(self):
+        self._test_create_volume_with_topologies_succeeds()
+
+    def _test_create_volume_with_topologies_succeeds(self):
         self.request.secrets = utils.get_fake_secret_config(system_id="u2", supported_topologies=[
             {"topology.block.csi.ibm.com/test": "topology_value"}])
         self.request.accessibility_requirements.preferred = [
@@ -460,6 +464,7 @@ class TestCreateVolume(BaseControllerSetUp, CommonControllerTest):
             {"u1": self.request.parameters, "u2": second_system_parameters})}
         self._test_create_volume_succeeds('xiv:u2:{};{}'.format(INTERNAL_VOLUME_ID, VOLUME_UID),
                                           expected_pool=DUMMY_POOL2)
+        self.mediator.register_plugin.assert_called_once_with('topology', '')
 
     def test_create_volume_with_space_efficiency_succeeds(self):
         self._prepare_create_volume_mocks()
