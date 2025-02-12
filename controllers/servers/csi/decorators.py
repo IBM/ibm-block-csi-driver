@@ -18,6 +18,31 @@ def csi_method(error_response_type, lock_request_attribute=''):
     @decorator
     def call_csi_method(controller_method, servicer, request, context):
         lock_id = getattr(request, lock_request_attribute, None)
+        return _set_sync_lock(lock_id, lock_request_attribute, error_response_type,
+                              controller_method, servicer, request, context)
+
+    return call_csi_method
+
+
+def csi_replication_method(error_response_type):
+    @decorator
+    def call_csi_method(controller_method, servicer, request, context):
+        replication_id = getattr(request, LOCK_REPLICATION_REQUEST_ATTR, None)
+        if replication_id:
+            if replication_id.HasField(VOLUME_GROUP_TYPE_NAME):
+                lock_id = replication_id.volumegroup.volume_group_id
+            elif replication_id.HasField(VOLUME_TYPE_NAME):
+                lock_id = replication_id.volume.volume_id
+            else:
+                lock_id = None
+        return _set_sync_lock(lock_id, LOCK_REPLICATION_REQUEST_ATTR, error_response_type,
+                              controller_method, servicer, request, context)
+
+    return call_csi_method
+
+
+def _set_sync_lock(lock_id, lock_request_attribute, error_response_type,
+                   controller_method, servicer, request, context):
     set_current_thread_name(lock_id)
     controller_method_name = controller_method.__name__
     logger.info(controller_method_name)
