@@ -1211,8 +1211,9 @@ class TestUnpublishVolume(BaseControllerSetUp, CommonControllerTest):
                                                                           grpc.StatusCode.OK)
 
     def test_unpublish_volume_unmap_volume_by_initiators_volume_not_mapped_to_host_error(self):
-        self._test_unpublish_volume_unmap_volume_by_initiators_with_error(array_errors.VolumeNotMappedToHostError("volume", "host"),
-                                                                          grpc.StatusCode.OK)
+        self._test_unpublish_volume_unmap_volume_by_initiators_with_error(
+            array_errors.VolumeNotMappedToHostError("volume", "host"),
+            grpc.StatusCode.OK)
 
     def test_unpublish_volume_unmap_volume_by_initiators_permission_denied_error(self):
         self._test_unpublish_volume_unmap_volume_by_initiators_with_error(array_errors.PermissionDeniedError("msg"),

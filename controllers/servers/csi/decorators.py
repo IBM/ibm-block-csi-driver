@@ -29,6 +29,7 @@ def csi_method(error_response_type, lock_request_attribute=''):
     logger.info("finished {}".format(controller_method_name))
     return response
 
+
 def register_csi_plugin():
     @decorator
     def call_csi_plugin_registration(mediator_method, mediator_class, *args):
