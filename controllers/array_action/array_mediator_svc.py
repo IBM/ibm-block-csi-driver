@@ -1026,10 +1026,12 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
     def _get_host_names_by_nqn(self, nqn):
         if not self._is_lsnvmefabric_supported():
             return None
-            nvme_fabrics = self._lsnvmefabric(nqn)
+
+        nvme_fabrics = self._lsnvmefabric(nqn)
         if nvme_fabrics is None:
             return None
-            return set(nvme_fabric.object_name for nvme_fabric in nvme_fabrics)
+
+        return set(nvme_fabric.object_name for nvme_fabric in nvme_fabrics)
 
     def _lshostiplogin(self, iqn):
         try:
