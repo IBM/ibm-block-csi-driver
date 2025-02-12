@@ -1,7 +1,8 @@
 module github.com/ibm/ibm-block-csi-driver
 
-go 1.22.5
-toolchain go1.23.4
+go 1.23.0
+
+toolchain go1.23.5
 
 require (
 	github.com/container-storage-interface/spec v1.9.0
