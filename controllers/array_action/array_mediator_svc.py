@@ -42,6 +42,7 @@ ENTITY_DOES_NOT_EXIST = 'CMMVC5868E'
 INVALID_FILTER_VALUE = 'CMMVC5741E'
 SPECIFIED_OBJ_NOT_EXIST = 'CMMVC5804E'
 LUN_ALREADY_IN_USE = 'CMMVC5879E'
+LUN_ALREADY_IN_USE2 = 'CMMVC5878E'
 VOL_ALREADY_UNMAPPED = 'CMMVC5842E'
 OBJ_ALREADY_EXIST = 'CMMVC6035E'
 FC_PORT_IS_NOT_VALID = 'CMMVC5867E'
@@ -1210,7 +1211,7 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
                 self._raise_error_when_host_not_exist_or_not_meet_the_rules(host_name, ex.my_message)
                 if SPECIFIED_OBJ_NOT_EXIST in ex.my_message:
                     raise array_errors.ObjectNotFoundError(volume_name)
-                if LUN_ALREADY_IN_USE in ex.my_message:
+                if LUN_ALREADY_IN_USE in ex.my_message or LUN_ALREADY_IN_USE2 in ex.my_message:
                     raise array_errors.LunAlreadyInUseError(lun,
                                                             host_name)
                 raise array_errors.MappingError(volume_name, host_name, ex)
