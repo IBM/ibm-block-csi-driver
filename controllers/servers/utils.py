@@ -850,4 +850,11 @@ def get_replication_object_type_and_id_info(request):
 
 
 def is_call_home_enabled():
-    return getenv(servers_settings.ENABLE_CALL_HOME_ENV_VAR, 'true') == 'true'
+    ch_enabled = getenv(servers_settings.ENABLE_CALL_HOME_ENV_VAR)
+    if ch_enabled is None:
+        return True
+
+    if ch_enabled == "0" or ch_enabled.lower() == "false" or ch_enabled.lower() == "no":
+        return False
+
+    return True
