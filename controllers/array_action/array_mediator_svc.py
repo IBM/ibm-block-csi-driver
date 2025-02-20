@@ -24,7 +24,7 @@ from controllers.array_action.utils import ClassProperty, convert_scsi_id_to_ngu
 from controllers.array_action.volume_group_interface import VolumeGroupInterface
 from controllers.common import settings as common_settings
 from controllers.common.csi_logger import get_stdout_logger
-from controllers.servers.utils import get_connectivity_type_ports, split_string, is_call_home_enabled
+from controllers.servers.utils import get_connectivity_type_ports, split_string  # , is_call_home_enabled
 from controllers.servers.settings import UNIQUE_KEY_KEY
 
 array_connections_dict = {}
@@ -1012,7 +1012,7 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
     def _lsnvmefabric(self, host_nqn):
         try:
             return self.client.svcinfo.lsnvmefabric(remotenqn=host_nqn).as_list
-        except(svc_errors.CommandExecutionError, CLIFailureError) as ex:
+        except (svc_errors.CommandExecutionError, CLIFailureError) as ex:
             if COMMAND_NOT_SUPPORTED in ex.my_message:
                 logger.warning("Failed to get nvme fabrics - command not supported")
                 return None
@@ -1036,7 +1036,7 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
     def _lshostiplogin(self, iqn):
         try:
             return self.client.svcinfo.lshostiplogin(object_id=iqn).as_single_element
-        except(svc_errors.CommandExecutionError, CLIFailureError) as ex:
+        except (svc_errors.CommandExecutionError, CLIFailureError) as ex:
             if SPECIFIED_OBJ_NOT_EXIST in ex.my_message:
                 return None
             logger.error("Failed to get iscsi host. Reason "
@@ -1127,7 +1127,7 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
     def _lsvdiskhostmap(self, volume_name):
         try:
             return self.client.svcinfo.lsvdiskhostmap(vdisk_name=volume_name)
-        except(svc_errors.CommandExecutionError, CLIFailureError) as ex:
+        except (svc_errors.CommandExecutionError, CLIFailureError) as ex:
             logger.error(ex)
             raise array_errors.ObjectNotFoundError(volume_name)
 
@@ -1150,7 +1150,7 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
         try:
             for mapping in self.client.svcinfo.lshostvdiskmap(host=host_name):
                 luns_in_use.add(mapping.get('SCSI_id', ''))
-        except(svc_errors.CommandExecutionError, CLIFailureError) as ex:
+        except (svc_errors.CommandExecutionError, CLIFailureError) as ex:
             logger.error(ex)
             raise array_errors.HostNotFoundError(host_name)
         logger.debug("The used lun ids for host :{0}".format(luns_in_use))
@@ -1306,7 +1306,7 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
     def _lsfabric(self, **kwargs):
         try:
             return self.client.svcinfo.lsfabric(**kwargs)
-        except(svc_errors.CommandExecutionError, CLIFailureError) as ex:
+        except (svc_errors.CommandExecutionError, CLIFailureError) as ex:
             logger.error("Failed to get fabrics for {0}. Reason "
                          "is: {1}".format(kwargs, ex))
             raise ex
@@ -2085,18 +2085,20 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
         cli_volume = self._get_cli_volume_by_wwn(volume_id, not_exist_err=True)
         self._change_volume_group(cli_volume.id, None)
 
-    def register_plugin(self, unique_key,  metadata):
-        che = is_call_home_enabled()
+    def register_plugin(self, unique_key, metadata):
+        # check call home enabled
+        che = True
+        ch_enabled = os.getenv(controller_settings.ENABLE_CALL_HOME_ENV_VAR)
+        if ch_enabled:
+            if ch_enabled == "0" or ch_enabled.lower() == "false" or ch_enabled.lower() == "no":
+                logger.info("CH Enabled ENV: {}".format(ch_enabled))
+                che = False
+
         rps = self._is_registerplugin_supported()
         ntbr = self._is_plugin_needs_to_be_registered(unique_key)
         logger.info("CH Enabled: {}, RP_Supported: {}, NTBR: {}".format(che, rps, ntbr))
-        if not che:
-            che = True
         if che and rps and ntbr:
             self._register_plugin(unique_key, metadata)
-        # if is_call_home_enabled() and self._is_registerplugin_supported() and \
-        #         self._is_plugin_needs_to_be_registered(unique_key):
-        #     self._register_plugin(unique_key, metadata)
 
     def _is_registerplugin_supported(self):
         return hasattr(self.client.svctask, "registerplugin")
