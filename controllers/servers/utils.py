@@ -535,6 +535,10 @@ def validate_publish_volume_request(request):
     logger.debug("publish volume request validation finished.")
 
 
+def is_publish_volume_request_exclusive_access(request):
+    return request.volume_capability.access_mode.mode in servers_settings.EXCLUSIVE_ACCESS_ACCESS_MODE
+
+
 def get_volume_id_info(volume_id):
     return get_object_id_info(volume_id, servers_settings.VOLUME_TYPE_NAME)
 

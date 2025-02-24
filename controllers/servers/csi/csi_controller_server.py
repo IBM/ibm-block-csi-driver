@@ -222,8 +222,10 @@ class CSIControllerServicer(csi_pb2_grpc.ControllerServicer):
 
             array_connection_info = utils.get_array_connection_info_from_secrets(request.secrets, system_id=system_id)
             with get_agent(array_connection_info, array_type).get_mediator() as array_mediator:
-                lun, connectivity_type, array_initiators = array_mediator.map_volume_by_initiators(volume_id,
-                                                                                                   initiators)
+                lun, connectivity_type, array_initiators = array_mediator.map_volume_by_initiators(
+                    volume_id,
+                    initiators,
+                    utils.is_publish_volume_request_exclusive_access(request))
             response = utils.generate_csi_publish_volume_response(lun,
                                                                   connectivity_type,
                                                                   array_initiators)

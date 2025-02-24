@@ -4,6 +4,7 @@ from unittest.mock import Mock
 import controllers.array_action.errors as array_errors
 import controllers.tests.array_action.test_settings as array_settings
 import controllers.tests.common.test_settings as common_settings
+from controllers.array_action.array_action_types import Host
 from controllers.array_action.array_mediator_abstract import ArrayMediatorAbstract
 from controllers.common.node_info import Initiators
 from controllers.tests import utils
@@ -38,6 +39,8 @@ class BaseMediatorAbstractSetUp(unittest.TestCase):
 
     def setUp(self):
         self.mediator = _get_array_mediator_abstract_class()
+
+        self.mediator.get_volume_mappings.return_value = {}
 
         self.fc_ports = [array_settings.DUMMY_FC_WWN1, array_settings.DUMMY_FC_WWN2]
         self.lun_id = array_settings.DUMMY_LUN_ID
@@ -85,6 +88,69 @@ class TestMapVolumeByInitiators(BaseMediatorAbstractSetUp):
 
         with self.assertRaises(array_errors.NoIscsiTargetsFoundError):
             self.mediator.map_volume_by_initiators('', self.initiators)
+
+    def test_map_volume_by_initiators_get_volume_mappings_more_then_one_mapping(self):
+        self.mediator.get_volume_mappings.return_value = {array_settings.DUMMY_HOST_ID1: array_settings.DUMMY_HOST_ID1,
+                                                          array_settings.DUMMY_HOST_ID2: array_settings.DUMMY_HOST_ID2}
+
+        with self.assertRaises(array_errors.VolumeAlreadyMappedToDifferentHostsError):
+            self.mediator.map_volume_by_initiators('', self.initiators)
+
+    def test_map_volume_by_initiators_get_volume_mappings_one_mapping(self):
+        self.mediator.get_volume_mappings.return_value = {array_settings.DUMMY_HOST_ID1: array_settings.DUMMY_HOST_ID1}
+        self.mediator.get_host_by_name.return_value = Host(name=self.hostname,
+                                                           connectivity_types=[array_settings.ISCSI_CONNECTIVITY_TYPE],
+                                                           iscsi_iqns=[self.iqn])
+
+        with self.assertRaises(array_errors.VolumeAlreadyMappedToDifferentHostsError):
+            self.mediator.map_volume_by_initiators('', self.initiators)
+
+    def _test_map_volume_by_initiators_get_volume_mappings_one_map_for_existing_host_common(self, exclusive_access):
+        self.mediator.get_volume_mappings = Mock()
+        self.mediator.get_volume_mappings.return_value = {self.hostname: self.lun_id}
+        self.mediator.get_host_by_name.return_value = Host(name=self.hostname,
+                                                           connectivity_types=[array_settings.ISCSI_CONNECTIVITY_TYPE],
+                                                           iscsi_iqns=[self.iqn])
+
+        self.initiators.iscsi_iqns = [self.iqn]
+        response = self.mediator.map_volume_by_initiators('', self.initiators, exclusive_access)
+        self.assertEqual((self.lun_id, array_settings.ISCSI_CONNECTIVITY_TYPE, self.iscsi_targets_by_iqn), response)
+
+    def test_map_volume_by_initiators_get_volume_mappings_one_map_for_existing_host(self):
+        self._test_map_volume_by_initiators_get_volume_mappings_one_map_for_existing_host_common(True)
+
+    def test_map_volume_by_initiators_get_volume_mappings_more_then_one_mapping_rwx(self):
+        self.mediator.get_volume_mappings.return_value = {array_settings.DUMMY_HOST_ID1:
+                                                          str(array_settings.DUMMY_LUN_ID_INT+1),
+                                                          array_settings.DUMMY_HOST_ID2:
+                                                          str(array_settings.DUMMY_LUN_ID_INT+2)}
+        self.mediator.get_host_by_name.side_effect = [Host(name=self.hostname,
+                                                      connectivity_types=[array_settings.FC_CONNECTIVITY_TYPE],
+                                                      fc_wwns=self.fc_ports),
+                                                      Host(name=self.hostname,
+                                                      connectivity_types=[array_settings.FC_CONNECTIVITY_TYPE],
+                                                      fc_wwns=self.fc_ports)]
+        self.initiators.iscsi_iqns = [self.iqn]
+        self.mediator.get_host_by_host_identifiers = Mock()
+        self.mediator.get_host_by_host_identifiers.return_value = (self.hostname,
+                                                                   [array_settings.ISCSI_CONNECTIVITY_TYPE])
+        response = self.mediator.map_volume_by_initiators('', self.initiators, False)
+        self.assertEqual((self.lun_id, array_settings.ISCSI_CONNECTIVITY_TYPE, self.iscsi_targets_by_iqn), response)
+
+    def test_map_volume_by_initiators_get_volume_mappings_one_mapping_rwx(self):
+        self.mediator.get_volume_mappings.return_value = {self.hostname: str(array_settings.DUMMY_LUN_ID_INT+1)}
+        self.mediator.get_host_by_name.return_value = Host(name=self.hostname,
+                                                           connectivity_types=[array_settings.FC_CONNECTIVITY_TYPE],
+                                                           fc_wwns=self.fc_ports)
+        self.initiators.iscsi_iqns = [self.iqn]
+        self.mediator.get_host_by_host_identifiers = Mock()
+        self.mediator.get_host_by_host_identifiers.return_value = (self.hostname,
+                                                                   [array_settings.ISCSI_CONNECTIVITY_TYPE])
+        response = self.mediator.map_volume_by_initiators('', self.initiators, False)
+        self.assertEqual((self.lun_id, array_settings.ISCSI_CONNECTIVITY_TYPE, self.iscsi_targets_by_iqn), response)
+
+    def test_map_volume_by_initiators_get_volume_mappings_one_map_for_existing_host_rwx(self):
+        self._test_map_volume_by_initiators_get_volume_mappings_one_map_for_existing_host_common(False)
 
     def test_map_volume_by_initiators_map_volume_excpetions(self):
         self.mediator.map_volume.side_effect = [array_errors.PermissionDeniedError('')]
