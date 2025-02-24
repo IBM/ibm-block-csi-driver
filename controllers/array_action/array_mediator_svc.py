@@ -2089,13 +2089,8 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
         self._change_volume_group(cli_volume.id, None)
 
     def register_plugin(self, unique_key,  metadata):
-        if not self._is_registerplugin_supported():
-            return
-
-        if not self._is_plugin_needs_to_be_registered(unique_key):
-            return
-
-        if is_call_home_enabled():
+        if is_call_home_enabled() and self._is_registerplugin_supported() \
+           and self._is_plugin_needs_to_be_registered(unique_key):
             self._register_plugin(unique_key, metadata)
 
     def _is_registerplugin_supported(self):
