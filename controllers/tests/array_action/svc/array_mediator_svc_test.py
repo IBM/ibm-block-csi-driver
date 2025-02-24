@@ -2563,3 +2563,26 @@ class TestArrayMediatorSVC(unittest.TestCase):
                                                                            metadata='some_metadata')
         else:
             self.svc.client.svctask.registerplugin.not_called()
+
+    @patch('{}.is_call_home_enabled'.format('controllers.array_action.array_mediator_svc'))
+    @patch('{}.get_odf_call_home_version'.format('controllers.array_action.array_mediator_svc'))
+    @patch('controllers.array_action.array_mediator_svc.SVC_REGISTRATION_CACHE')
+    def test_register_plugin_with_odf_success(self, mock_cache, mock_odf_version, is_enabled_mock):
+        current_time = datetime.now()
+        three_hours_ago = current_time - timedelta(hours=3)
+        mock_cache.get.return_value = {'test_key': three_hours_ago}
+        mock_odf_version.return_value = '1.7.0'
+        is_enabled_mock.return_value = True
+
+        self.svc.register_plugin('test_key', 'some_metadata')
+
+        call_1 = call(name='block.csi.ibm.com',
+                      uniquekey='test_key',
+                      version=config.identity.version,
+                      metadata='some_metadata')
+
+        call_2 = call(name='odf.ibm.com',
+                      uniquekey='basic',
+                      version='1.7.0')
+
+        self.svc.client.svctask.registerplugin.assert_has_calls([call_1, call_2])

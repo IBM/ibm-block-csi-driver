@@ -855,3 +855,7 @@ def get_replication_object_type_and_id_info(request):
 
 def is_call_home_enabled():
     return getenv(servers_settings.ENABLE_CALL_HOME_ENV_VAR, 'true') == 'true'
+
+
+def get_odf_call_home_version():
+    return getenv(servers_settings.ODF_VERSION_FOR_CALL_HOME_ENV_VAR, '')

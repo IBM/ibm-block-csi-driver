@@ -24,7 +24,10 @@ from controllers.array_action.utils import ClassProperty, convert_scsi_id_to_ngu
 from controllers.array_action.volume_group_interface import VolumeGroupInterface
 from controllers.common import settings as common_settings
 from controllers.common.csi_logger import get_stdout_logger
-from controllers.servers.utils import get_connectivity_type_ports, split_string, is_call_home_enabled
+from controllers.servers.utils import (get_connectivity_type_ports,
+                                       split_string,
+                                       is_call_home_enabled,
+                                       get_odf_call_home_version)
 from controllers.servers.settings import UNIQUE_KEY_KEY
 
 array_connections_dict = {}
@@ -207,10 +210,10 @@ def build_change_host_protocol_kwargs(host_name, protocol):
     }
 
 
-def build_register_plugin_kwargs(unique_key, metadata):
+def build_register_plugin_kwargs(unique_key, metadata, version):
     cli_kwargs = {
         UNIQUE_KEY_KEY: unique_key,
-        array_settings.VERSION_KEY: config.identity.version
+        array_settings.VERSION_KEY: version
     }
     if metadata:
         cli_kwargs[array_settings.METADATA_KEY] = metadata
@@ -2086,8 +2089,13 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
         self._change_volume_group(cli_volume.id, None)
 
     def register_plugin(self, unique_key,  metadata):
-        if is_call_home_enabled() and self._is_registerplugin_supported() and \
-                self._is_plugin_needs_to_be_registered(unique_key):
+        if not self._is_registerplugin_supported():
+            return
+
+        if not self._is_plugin_needs_to_be_registered(unique_key):
+            return
+
+        if is_call_home_enabled():
             self._register_plugin(unique_key, metadata)
 
     def _is_registerplugin_supported(self):
@@ -2106,7 +2114,8 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
 
     def _register_plugin(self, unique_key, metadata):
         self._update_registration_cache(unique_key)
-        self._registerplugin(unique_key, metadata)
+        self._register_csi_plugin(unique_key, metadata)
+        self._register_odf_plugin_if_needed()
 
     def _update_registration_cache(self, unique_key):
         endpoint_cache = SVC_REGISTRATION_CACHE.get(self.endpoint)
@@ -2114,13 +2123,21 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
             SVC_REGISTRATION_CACHE[self.endpoint] = {}
         SVC_REGISTRATION_CACHE[self.endpoint][unique_key] = datetime.now()
 
-    def _registerplugin(self, unique_key, metadata):
+    def _registerplugin(self, plugin_name, unique_key, metadata, version):
         logger.info("Registering {} plugin, using {} unique key with [{}] metadata".format(
-            array_settings.REGISTRATION_PLUGIN, unique_key, metadata))
-        cli_kwargs = build_register_plugin_kwargs(unique_key, metadata)
+            plugin_name, unique_key, metadata))
+        cli_kwargs = build_register_plugin_kwargs(unique_key, metadata, version)
         try:
-            self.client.svctask.registerplugin(name='{}'.format(array_settings.REGISTRATION_PLUGIN), **cli_kwargs)
+            self.client.svctask.registerplugin(name='{}'.format(plugin_name), **cli_kwargs)
         except Exception as ex:
             logger.error("exception encountered during"
                          "registering {} plugin using {} unique key with [{}] metadata: {}".format(
-                             array_settings.REGISTRATION_PLUGIN, unique_key, metadata, ex))
+                             plugin_name, unique_key, metadata, ex))
+
+    def _register_csi_plugin(self, unique_key, metadata):
+        self._registerplugin(array_settings.REGISTRATION_PLUGIN, unique_key, metadata, config.identity.version)
+
+    def _register_odf_plugin_if_needed(self):
+        odf_version = get_odf_call_home_version()
+        if odf_version:
+            self._registerplugin(array_settings.ODF_REGISTRATION_PLUGIN, 'basic', '', odf_version)

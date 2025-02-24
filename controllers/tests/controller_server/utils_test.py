@@ -547,3 +547,13 @@ class TestUtils(unittest.TestCase):
         result = utils.is_call_home_enabled()
         self.assertEqual(result, expected_result)
         mock_getenv.assert_called_once_with(controller_config.ENABLE_CALL_HOME_ENV_VAR, 'true')
+
+    def test_get_odf_call_home_version(self):
+        self._test_get_odf_call_home_version('Hello', 'Hello')
+
+    def _test_get_odf_call_home_version(self, get_env_return_value, expected_result):
+        mock_getenv = patch('{}.getenv'.format('controllers.servers.utils')).start()
+        mock_getenv.return_value = get_env_return_value
+        result = utils.get_odf_call_home_version()
+        self.assertEqual(result, expected_result)
+        mock_getenv.assert_called_once_with(controller_config.ODF_VERSION_FOR_CALL_HOME_ENV_VAR, '')
