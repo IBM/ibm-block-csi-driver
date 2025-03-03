@@ -46,35 +46,3 @@ If the following error occurs during stateful application pod creation (the pod 
     
     The multipath devices should be running properly and the pod should come up immediately.
 
-## Error during PVC expansion
-
-This troubleshooting procedure is a workaround for issue **CSI-5769** (see [Known issues](../release_notes/known_issues.md)){: note}
-
-If the PVC expansion fails with the following event
-
-``` screen
-      Type                      Status  LastProbeTime                     LastTransitionTime                Reason  Message
-      ----                      ------  -----------------                 ------------------                ------  -------
-      FileSystemResizePending   True    Mon, 01 Jan 0001 00:00:00 +0000   Tue, 14 Jan 2025 15:36:16 +0000           Waiting for user to (re-)start a pod to finish file system resize of volume on node.
-```
-
-1. Examine the logs of the IBM Block Storage CSI driver node pods. Check if there are log lines similar to the following
-
-``` screen
-    2025-01-20 15:43:49,1203 DEBUG	[639] [SVC:100;6005076810830237180000000000038F] (node.go:732) - Discovered device : {/dev/dm-2}
-    2025-01-20 15:43:49,1203 DEBUG	[639] [SVC:100;6005076810830237180000000000038F] (node_utils.go:168) - GetSysDevicesFromMpath with param : {dm-2}
-    2025-01-20 15:43:49,1203 DEBUG	[639] [SVC:100;6005076810830237180000000000038F] (node_utils.go:170) - looking in path : {/sys/block/dm-2/slaves}
-    2025-01-20 15:43:49,1203 DEBUG	[639] [SVC:100;6005076810830237180000000000038F] (node_utils.go:177) - found slaves : {[0xc000586340 0xc000586410]}
-    2025-01-20 15:43:49,1203 DEBUG	[639] [SVC:100;6005076810830237180000000000038F] (executer.go:75) - Executing command : {nvme} with args : {[list]}. and timeout : {10000} mseconds
-    2025-01-20 15:43:49,1203 DEBUG	[639] [SVC:100;6005076810830237180000000000038F] (executer.go:69) - Non-zero exit code: exit status 1
-    2025-01-20 15:43:49,1203 DEBUG	[639] [SVC:100;6005076810830237180000000000038F] (executer.go:86) - Finished executing command (no output)
-    2025-01-20 15:43:49,1203 ERROR	[639] [SVC:100;6005076810830237180000000000038F] (node.go:744) - Error while trying to check if sys devices are nvme devices : {exit status 1}
-    2025-01-20 15:43:49,1203 DEBUG	[639] [SVC:100;6005076810830237180000000000038F] (sync_lock.go:62) - Lock for action NodeExpandVolume, release lock for volume
-    2025-01-20 15:43:49,1203 DEBUG	[639] [SVC:100;6005076810830237180000000000038F] (node.go:745) - <<<< NodeExpandVolume
-    2025-01-20 15:43:49,1203 ERROR	[639] [-] (driver.go:85) - GRPC error: rpc error: code = Internal desc = exit status 1
-```
-
-
-2. Check if required NVMe kernel modules are loaded with command `lsmod | grep nvme`. Kernel modules `nvme` and `nvme_core` are required.
-
-3. If the required kernel modules `nvme` and `nvme_core` are not loaded, manually load them with command `modprobe nvme; modprove nvme_core` and then rerun PVC expansion.

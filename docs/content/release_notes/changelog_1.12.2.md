@@ -12,5 +12,5 @@ IBM® block storage CSI driver version 1.12.1 resolved the following issues:
 
 |Ticket ID|Severity|Description|
 |---------|--------|-----------|
-| | | |
+|**CSI-5769**|Service|In case the NVMe cli package is installed on a Kubernetes cluster node, but the NVMe kernel modules are not loaded, PVC resizing/expansion will not work.|
 
