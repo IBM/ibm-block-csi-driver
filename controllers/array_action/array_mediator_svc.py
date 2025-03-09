@@ -130,7 +130,7 @@ def _add_port_to_command_kwargs(connectivity_type, port, cli_kwargs):
     return cli_kwargs
 
 
-def build_create_host_kwargs(host_name, connectivity_type, port, io_group):
+def build_create_host_kwargs(partition_name, host_name, connectivity_type, port, io_group):
     cli_kwargs = {'name': host_name}
     cli_kwargs = _add_port_to_command_kwargs(connectivity_type, port, cli_kwargs)
     if connectivity_type == array_settings.NVME_OVER_FC_CONNECTIVITY_TYPE:
@@ -142,8 +142,8 @@ def build_create_host_kwargs(host_name, connectivity_type, port, io_group):
     if port_set is not None and port_set:
         logger.info("host {} is created with port set {}".format(host_name, port_set))
         cli_kwargs['portset'] = port_set
-    if self._partition_name is not None:
-        cli_kwargs['partition_name'] = self._partition_name
+    if partition_name is not None:
+        cli_kwargs['partition_name'] = partition_name
     return cli_kwargs
 
 
@@ -273,6 +273,7 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
                 endpoint)
         self.endpoint = self.endpoint[0]
         self._cluster = None
+        self._partition_name = None
 
         logger.debug("in init")
         self._connect()
@@ -1806,7 +1807,7 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
             NVME_PORT_IS_ALREADY_ASSIGNED in message_from_storage
 
     def _mkhost(self, host_name, connectivity_type, port, io_group):
-        cli_kwargs = build_create_host_kwargs(host_name, connectivity_type, port, io_group)
+        cli_kwargs = build_create_host_kwargs(self._partition_name, host_name, connectivity_type, port, io_group)
         try:
             self.client.svctask.mkhost(**cli_kwargs)
             return 200

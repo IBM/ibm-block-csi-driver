@@ -107,7 +107,7 @@ def get_agent(array_connection_info, array_type=None):
                 return found
 
         logger.debug("Creating a new agent for endpoint {}".format(endpoint_key))
-        agent = StorageAgent(endpoints, username, password, array_connection_info.partition_name, array_type)
+        agent = StorageAgent(endpoints, username, password, array_type, array_connection_info.partition_name)
         _array_agents[(username, endpoint_key)] = agent
         return agent
 
@@ -134,7 +134,7 @@ class StorageAgent:
     StorageAgent is an agent which caches several mediators of the same storage for reuse cross threads.
     """
 
-    def __init__(self, endpoints, username, password, partition_name, array_type=None):
+    def __init__(self, endpoints, username, password, array_type=None, partition_name=None):
         self.username = username
         self.password = password
         self.partition_name = partition_name
