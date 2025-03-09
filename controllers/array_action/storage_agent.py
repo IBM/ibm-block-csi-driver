@@ -108,7 +108,7 @@ def get_agent(array_connection_info, array_type=None):
 
         logger.debug("Creating a new agent for endpoint {}".format(endpoint_key))
         agent = StorageAgent(endpoints, username, password, array_type, array_connection_info.partition_name)
-        _array_agents[(username, endpoint_key)] = agent
+        _array_agents[(username, endpoint_key, partition_name)] = agent
         return agent
 
 
@@ -151,11 +151,11 @@ class StorageAgent:
             endpoints=self.endpoints,
             username=self.username,
             password=self.password,
-            partition_name=self.partition_name,
             med_class=med_class,
             # Specifying a non-zero min_size pre-populates the pool with min_size items
             min_size=1,
-            max_size=min(med_class.max_connections, settings.CSI_CONTROLLER_SERVER_WORKERS)
+            max_size=min(med_class.max_connections, settings.CSI_CONTROLLER_SERVER_WORKERS),
+            partition_name=self.partition_name
         )
 
     def __del__(self):

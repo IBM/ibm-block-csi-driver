@@ -8,8 +8,8 @@ class ArrayConnectionInfo:
     array_addresses: list
     user: str
     password: str
-    partition_name: str = None
     system_id: str = None
+    partition_name: str = None
 
 
 @dataclass
