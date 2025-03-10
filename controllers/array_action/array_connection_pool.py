@@ -9,13 +9,12 @@ logger = get_stdout_logger()
 class ConnectionPool:
     """A simple pool to hold connections."""
 
-    def __init__(self, endpoints, username, password, med_class, min_size, max_size, partition_name = None):
+    def __init__(self, endpoints, username, password, med_class, min_size, max_size):
         self.endpoints = endpoints
         self.username = username
         self.password = password
         self.med_class = med_class
         self.endpoint_key = settings.ENDPOINTS_SEPARATOR.join(endpoints)
-        self.partition_name = partition_name
 
         self.current_size = 0
         self.max_size = max_size

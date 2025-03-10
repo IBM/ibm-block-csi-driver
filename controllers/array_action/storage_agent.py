@@ -88,11 +88,8 @@ def get_agent(array_connection_info, array_type=None):
     username = array_connection_info.user
     password = array_connection_info.password
     endpoint_key = settings.ENDPOINTS_SEPARATOR.join(endpoints)
-    partition_name = array_connection_info.partition_name
-    if partition_name is None:
-        partition_name = ""
     with lock:
-        found = _array_agents.get((username, endpoint_key, partition_name), None)
+        found = _array_agents.get((username, endpoint_key), None)
         if found:
             # delete the agent and clear all the connections if password is changed.
             if found.password != password:
@@ -100,15 +97,15 @@ def get_agent(array_connection_info, array_type=None):
                     "The password is changed for endpoint {}, "
                     "remove the cached connection".format(endpoint_key)
                 )
-                del _array_agents[(username, endpoint_key, partition_name)]
+                del _array_agents[(username, endpoint_key)]
                 del found
             else:
                 logger.debug("Found a cached agent for endpoint {}, reuse it".format(endpoint_key))
                 return found
 
         logger.debug("Creating a new agent for endpoint {}".format(endpoint_key))
-        agent = StorageAgent(endpoints, username, password, array_type, array_connection_info.partition_name)
-        _array_agents[(username, endpoint_key, partition_name)] = agent
+        agent = StorageAgent(endpoints, username, password, array_type)
+        _array_agents[(username, endpoint_key)] = agent
         return agent
 
 
@@ -134,10 +131,9 @@ class StorageAgent:
     StorageAgent is an agent which caches several mediators of the same storage for reuse cross threads.
     """
 
-    def __init__(self, endpoints, username, password, array_type=None, partition_name=None):
+    def __init__(self, endpoints, username, password, array_type=None):
         self.username = username
         self.password = password
-        self.partition_name = partition_name
         self.endpoints = endpoints
         self.endpoint_key = settings.ENDPOINTS_SEPARATOR.join(endpoints)
         self.conn_pool = None
@@ -154,8 +150,7 @@ class StorageAgent:
             med_class=med_class,
             # Specifying a non-zero min_size pre-populates the pool with min_size items
             min_size=1,
-            max_size=min(med_class.max_connections, settings.CSI_CONTROLLER_SERVER_WORKERS),
-            partition_name=self.partition_name
+            max_size=min(med_class.max_connections, settings.CSI_CONTROLLER_SERVER_WORKERS)
         )
 
     def __del__(self):
