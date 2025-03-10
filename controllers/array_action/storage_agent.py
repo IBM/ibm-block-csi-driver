@@ -107,7 +107,7 @@ def get_agent(array_connection_info, array_type=None):
                 return found
 
         logger.debug("Creating a new agent for endpoint {}".format(endpoint_key))
-        agent = StorageAgent(endpoints, username, password, array_type, array_connection_info.partition_name)
+        agent = StorageAgent(endpoints, username, password, array_type, partition_name)
         _array_agents[(username, endpoint_key, partition_name)] = agent
         return agent
 
