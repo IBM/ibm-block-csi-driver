@@ -30,4 +30,4 @@ RUN go install github.com/golang/mock/gomock
 RUN go install github.com/golang/mock/mockgen
 
 COPY . .
-ENTRYPOINT ["make", "test-xunit"]
+ENTRYPOINT ["make"]
