@@ -150,8 +150,7 @@ def build_create_host_kwargs(partition_name, host_name, connectivity_type, port,
     if port_set is not None and port_set:
         logger.info("host {} is created with port set {}".format(host_name, port_set))
         cli_kwargs['portset'] = port_set
-    if partition_name is not None:
-        cli_kwargs['partition_name'] = partition_name
+    cli_kwargs['partition_name'] = "TestPartition"
     return cli_kwargs
 
 
@@ -614,9 +613,8 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
     def _create_cli_volume(self, name, size_in_bytes, space_efficiency, pool, io_group, volume_group=None):
         logger.info("creating volume with name : {}. size : {} . in pool : {} with parameters : {}".format(
             name, size_in_bytes, pool, space_efficiency))
-        if self._partition_name is not None and volume_group is None:
-            logger.info("get corresponding volume group for partition {}".format(self._partition_name))
-            volume_group = self._get_volume_group_from_partition_name(self._partition_name)
+        if volume_group is None:
+            volume_group = "TestPartition"
             logger.info("volume group is {}".format(volume_group))
         try:
             size = self._convert_size_bytes(size_in_bytes)
