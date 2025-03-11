@@ -34,9 +34,7 @@ The two pools must be from different sites.{: important}
 
 vdisk protection must be disabled globally or for the specific child pools to be used.{: attention}
    
-For more information about high availability limitations, see [Limitations](../release_notes/limitations.md).{: tip}
-  
-For more information about high availability requirements, see [Compatibility and requirements](../installation/install_compatibility_requirements.md).{: tip}
+For more information about high availability, see [Limitations](../release_notes/limitations.md) and [Compatibility and requirements](../installation/install_compatibility_requirements.md).{: tip}
 
 - The `allowVolumeExpansion` parameter is optional but is necessary for using volume expansion. The default value is _false_.
 
@@ -56,29 +54,27 @@ For IBM DS8000 family storage systems, the maximum prefix length is five charact
 
 For IBM Storage Virtualize family storage systems, the `CSI` prefix is added as default if not specified by the user.{: tip}
 
-    
-      kind: StorageClass
-      apiVersion: storage.k8s.io/v1
-      metadata:
-        name: demo-storageclass
-      provisioner: block.csi.ibm.com
-      parameters:
-        pool: demo-pool
-        io_group: demo-iogrp             # Optional.
-        volume_group: demo-volumegroup   # Optional.
-        SpaceEfficiency: thin            # Optional.
-        volume_name_prefix: demo-prefix  # Optional.
-        virt_snap_func: "false"          # Optional. Values "true"/"false". The default is "false".
+    kind: StorageClass
+    apiVersion: storage.k8s.io/v1
+    metadata:
+      name: demo-storageclass
+    provisioner: block.csi.ibm.com
+    parameters:
+      pool: demo-pool
+      io_group: demo-iogrp             # Optional.
+      volume_group: demo-volumegroup   # Optional.
+      SpaceEfficiency: thin            # Optional.
+      volume_name_prefix: demo-prefix  # Optional.
+      virt_snap_func: "false"          # Optional. Values "true"/"false". The default is "false".
 
-        csi.storage.k8s.io/fstype: xfs   # Optional. Values ext4/xfs. The default is ext4.
-        csi.storage.k8s.io/secret-name: demo-secret
-        csi.storage.k8s.io/secret-namespace: default
-      allowVolumeExpansion: true
-    
+      csi.storage.k8s.io/fstype: xfs   # Optional. Values ext4/xfs. The default is ext4.
+      csi.storage.k8s.io/secret-name: demo-secret
+      csi.storage.k8s.io/secret-namespace: default
+    allowVolumeExpansion: true
 
 Apply the storage class.
 
-      kubectl apply -f <filename>.yaml
+    kubectl apply -f <filename>.yaml
 
 The `storageclass.storage.k8s.io/<storageclass-name> created` message is emitted.
 

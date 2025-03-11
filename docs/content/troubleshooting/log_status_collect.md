@@ -13,11 +13,15 @@ To help pinpoint potential causes for stateful pod failure:
 
 1. Verify that all CSI pods are running.
 
-    kubectl get pods -n <namespace> -l product=ibm-block-csi-driver
+```
+kubectl get pods -n <namespace> -l product=ibm-block-csi-driver
+```
 
 2. If a pod is not in a _Running_ state, run the following command:
 
-    kubectl describe -n <namespace> pod/<pod-name>
+```
+kubectl describe -n <namespace> pod/<pod-name>
+```
 
    View the logs.
 
@@ -44,15 +48,21 @@ Be sure to run the following steps and copy the output to an external file, when
 
 1. Check the node status.
     
-    kubectl get nodes
+```
+kubectl get nodes
+```
 
 2. Check the CSI driver component status.
 
-    kubectl get -A pod -o wide | grep ibm-block-csi
+```
+kubectl get -A pod -o wide | grep ibm-block-csi
+```
 
 3. Check if the PersistentVolumeClaims (PVCs) are _Bound_.
 
-    kubectl get -n <namespace> pvc -o=jsonpath='{range .items[?(@.metadata.annotations.volume\.beta\.kubernetes\.io/storage-provisioner=="block.csi.ibm.com")]}{"PVC NAME: "}{@.metadata.name}{" PVC STATUS: "}{@.status.phase}{"\n"}{end}'
+```
+kubectl get -n <namespace> pvc -o=jsonpath='{range .items[?(@.metadata.annotations.volume\.beta\.kubernetes\.io/storage-provisioner=="block.csi.ibm.com")]}{"PVC NAME: "}{@.metadata.name}{" PVC STATUS: "}{@.status.phase}{"\n"}{end}'
+```
 
    The output should be similar to the following:
 

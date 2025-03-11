@@ -11,12 +11,11 @@ Before starting to import an existing volume, find the `volumeHandle` in the exi
 
   The `volumeHandle` is formatted as `SVC:id;vdisk_UID`.
 
-  - Through command line:
+  - With the command line:
+
     Find both the `id` and `vdisk_UID` attributes, by using the `lsvdisk` command.
 
-    For more information, see **Command-line interface** > **Volume commands** > **lsvdisk** within your specific product documentation on [IBM Documentation](https://www.ibm.com/docs/).
-
-  - Through the management GUI:
+  - With the management GUI:
 
     1. Select **Volumes** > **Volumes** from the side bar.
 
@@ -33,13 +32,11 @@ For more information about IBM Storage Virtualize products, find your product in
   The `volumeHandle` is formatted as `DS8K:id;GUID`.
   The `id` is the last four digits of the `GUID`.
 
-  - Through the command line:
+  - With the command line:
 
     Find the `GUID` for the volume, by using the `lsfbvol` command.
 
-     For more information, see **Reference** > **Command-line interface** > **CLI commands** > **Storage configuration commands** > **Fixed block logical volume specific commands** > **lsfbvol** within your specific product documentation on [IBM Documentation](https://www.ibm.com/docs/).
-
-  - Through the IBM DS8000 Storage Management GUI:
+  - With the IBM DS8000 Storage Management GUI:
 
     1. Select **Volumes** from the side bar.
 
@@ -57,11 +54,11 @@ These steps are set up for importing volumes from an IBM Storage Virtualize fami
 
 1. Create a persistent volume (PV) YAML file.
 
-Be sure to include the `storageClassName` and `controllerPublishSecretRef` parameters or errors may occur.{: attention}
-
 2. Take the `volume_name` and other optional information (collected before the procedure) and insert it into the YAML file (under `spec.csi.volumeAttributes`).
 
-If using the CSI Topology feature, the `spec.csi.volumeHandle` contains the management ID (see [Creating a StorageClass with topology awareness](creating_storageclass_topology_aware.md)). In the example below, the `spec.csi.volumeHandle` would read similar to the following: `SVC:demo-system-id-1:0;600507640082000B08000000000004FF`{: important}
+Be sure to include the `storageClassName` and `controllerPublishSecretRef` parameters or errors may occur.{: attention}
+
+If using the CSI Topology feature, the `spec.csi.volumeHandle` contains the management ID (see [Creating a StorageClass with topology awareness](creating_storageclass_topology_aware.md)). In the example below, the `spec.csi.volumeHandle` would read similar to the following: `SVC:demo-system-id-1:0;600507640082000B08000000000004FF` {: important}
     
     apiVersion: v1
     kind: PersistentVolume

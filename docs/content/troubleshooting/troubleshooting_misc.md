@@ -28,7 +28,9 @@ If the following error occurs during stateful application pod creation (the pod 
 
 1. Log in to the relevant worker node and run the `fsck` command to repair the filesystem manually.
 
-   `fsck /dev/dm-<X>`
+```
+fsck /dev/dm-<X>
+```
 
    The pod should come up immediately. If the pod is still in a _ContainerCreating_ state, continue to the next step.
 

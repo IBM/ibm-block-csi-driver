@@ -32,16 +32,22 @@ Follow the following procedure to recover from a crashed node (see a [full examp
 
 1. Find the `volumeattachment` of the created pod:
 
-    kubectl get volumeattachment
+```
+kubectl get volumeattachment
+```
 
 2. Copy the `volumeattachment` name.
 3. Delete the `volumeattachment`:
 
-    kubectl delete volumeattachment <volumeattachment name>
+```
+kubectl delete volumeattachment <volumeattachment name>
+```
 
 4. Delete the pod:
 
-    kubectl delete pod <pod name> --grace-period=0 --force
+```
+kubectl delete pod <pod name> --grace-period=0 --force
+```
 
 5. Verify that the pod is now in a _Running_ state and that the pod has moved to a _Ready_ node.
 

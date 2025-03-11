@@ -30,9 +30,11 @@ If any of the host definitions have an Error status, follow this procedure to ha
 
 1. Undeploy the CSI node pod from the relevant node that the HostDefinition is a part of.
 2. Verify that all HostDefinition instances of the node are deleted.
-     
-    kubectl get hostdefinitions -o=jsonpath='{range .items[?(@.spec.hostDefinition.nodeName=="<node-name>")]}{.metadata.name}{"\n"}{end}'
-     
+
+```
+kubectl get hostdefinitions -o=jsonpath='{range .items[?(@.spec.hostDefinition.nodeName=="<node-name>")]}{.metadata.name}{"\n"}{end}'
+```
+
    The output displays all HostDefinitions that do not need to be deleted for the `<node-name>`.
 
 3. Redeploy the CSI node pod on the relevant node.
@@ -41,7 +43,9 @@ If any of the host definitions have an Error status, follow this procedure to ha
         
 4. Verify that the `hostdefinition` is in the _Ready_ phase.
 
-    $> kubectl get hostdefinition
-    NAME                     AGE    PHASE   NODE          MANAGEMENT_ADDRESS   
-    <host_definition_name1>  102m   Ready   <node_name1>  <management_address>
-    <host_definition_name2>  102m   Ready   <node_name2>  <management_address>
+```
+$> kubectl get hostdefinition
+NAME                     AGE    PHASE   NODE          MANAGEMENT_ADDRESS   
+<host_definition_name1>  102m   Ready   <node_name1>  <management_address>
+<host_definition_name2>  102m   Ready   <node_name2>  <management_address>
+```

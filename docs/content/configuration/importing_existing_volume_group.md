@@ -24,30 +24,34 @@ Use this procedure to help build a VolumeGroupContent YAML file for your volume 
 1. Create a VolumeGroupContent YAML file.
 
    Update the volumeGroupHandle according to the volume group information found previously.
-   
-    apiVersion: csi.ibm.com/v1
-    kind: VolumeGroupContent
-    metadata:
-      name: demo-volumegroupcontent
-    spec:
-      source:
-        driver: block.csi.ibm.com
-        volumeGroupHandle: SVC:id;name
+
+```
+apiVersion: csi.ibm.com/v1
+kind: VolumeGroupContent
+metadata:
+  name: demo-volumegroupcontent
+spec:
+  source:
+    driver: block.csi.ibm.com
+    volumeGroupHandle: SVC:id;name
+```
 
 Be sure to include the `volumeGroupHandle` parameter or errors may occur.{: attention}
 
 2. Create a VolumeGroup YAML file.
 
-    apiVersion: csi.ibm.com/v1
-    kind: VolumeGroup
-    metadata:
-      name: demo-volumegroup-from-content
-    spec:
-      volumeGroupClassName: demo-volumegroupclass
-      source:
-        volumeGroupContentName: demo-volumegroupcontent
-        selector: 
-          matchLabels:
-            demo-volumegroup-key: demo-volumegroup-value
+```
+apiVersion: csi.ibm.com/v1
+kind: VolumeGroup
+metadata:
+  name: demo-volumegroup-from-content
+spec:
+  volumeGroupClassName: demo-volumegroupclass
+  source:
+    volumeGroupContentName: demo-volumegroupcontent
+    selector: 
+      matchLabels:
+        demo-volumegroup-key: demo-volumegroup-value
+```
 
 Be sure to include the `volumeGroupClassName`. For more information about creating a VolumeGroup YAML file, see [Creating a VolumeGroup](creating_volumegroup.md).{: important}
