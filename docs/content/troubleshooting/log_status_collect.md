@@ -16,13 +16,10 @@ To help pinpoint potential causes for stateful pod failure:
 kubectl get pods -n <namespace> -l product=ibm-block-csi-driver
 ```
 
-2. If a pod is not in a _Running_ state, run the following command:
+2. If a pod is not in a _Running_ state, run the following command and view the logs:
 ```
 kubectl describe -n <namespace> pod/<pod-name>
 ```
-
-     View the logs.
-
 
 ## Status and log collection
 To collect and display status and logs related to the different components of IBM® block storage CSI driver, use the Kubernetes commands that are found in this section.
@@ -54,14 +51,10 @@ kubectl get nodes
 kubectl get -A pod -o wide | grep ibm-block-csi
 ```
 
-3. Check if the PersistentVolumeClaims (PVCs) are _Bound_.
+3. Check if the PersistentVolumeClaims (PVCs) are _Bound_. The output of the following command should be similar to the following: `PVC NAME: demo-pvc-file-system PVC STATUS: Bound`
 ```
 kubectl get -n <namespace> pvc -o=jsonpath='{range .items[?(@.metadata.annotations.volume\.beta\.kubernetes\.io/storage-provisioner=="block.csi.ibm.com")]}{"PVC NAME: "}{@.metadata.name}{" PVC STATUS: "}{@.status.phase}{"\n"}{end}'
 ```
-
-     The output should be similar to the following:
-
-     `PVC NAME: demo-pvc-file-system PVC STATUS: Bound`
 
 If the PVCs are not in the _Bound_ state, collect the events of all unbound PVCs. (See [Details collection for unbound PVCs](#details-collection-for-unbound-pvcs).){: note}
 
