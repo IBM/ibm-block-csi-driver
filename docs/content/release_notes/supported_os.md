@@ -3,7 +3,7 @@
 
 # Supported operating systems
 
-As of this document's publication date, IBM Power® and zLinux® architectures are not supported for this release. {: restriction}
+As of this document's publication date, the IBM Power® architecture is not supported for this release.{: restriction}
 
 Kubernetes 1.32 is not supported on Red Hat® Enterprise Linux® (RHEL) 8.x.{: restriction}
 
@@ -20,7 +20,7 @@ The following table lists supported operating systems for deployment of the IBM�
 
 | Operating system                                     |Architecture|
 |------------------------------------------------------|------------|
-| Red Hat® Enterprise Linux CoreOS® (RHCOS) 4.14-4.18  |x86|
+| Red Hat® Enterprise Linux CoreOS® (RHCOS) 4.14-4.18  |x86, zLinux®|
 
 Virtualized worker nodes (for example, VMware vSphere) are supported with iSCSI and Fibre Channel (FC) adapters, when the FC adapter is used in passthrough mode.{: tip}
 

@@ -17,19 +17,14 @@ The `volumeGroupHandle` is formatted as `SVC:id;name`.
 
 Through the IBM Storage Virtualize command-line, find both the `id` and `name` attributes, by using the `lsvolumegroup` command.
 
-For more information, see **Command-line interface** > **Volume commands** > **lsvolumegroup** within your specific product documentation on [IBM Documentation](https://www.ibm.com/docs/).
-
-The volume group name can also be found through the management GUI. Go to **Volumes** > **Volume Groups** from the side bar.{: tip}
+For more information, see **Command-line interface** > **Volume commands** > **lsvolumegroup** within your specific product documentation on [IBM Documentation](https://www.ibm.com/docs/). The volume group name can also be found through the management GUI. Go to **Volumes** > **Volume Groups** from the side bar.{: tip}
   
 Use this procedure to help build a VolumeGroupContent YAML file for your volume groups.
 
 1. Create a VolumeGroupContent YAML file.
 
-Be sure to include the `volumeGroupHandle` parameter or errors may occur.{: attention}
-
-    Update the volumeGroupHandle according to the volume group information found previously.
+   Update the volumeGroupHandle according to the volume group information found previously.
    
-    ```
     apiVersion: csi.ibm.com/v1
     kind: VolumeGroupContent
     metadata:
@@ -38,13 +33,11 @@ Be sure to include the `volumeGroupHandle` parameter or errors may occur.{: atte
       source:
         driver: block.csi.ibm.com
         volumeGroupHandle: SVC:id;name
-    ```
 
-3. Create a VolumeGroup YAML file.
+Be sure to include the `volumeGroupHandle` parameter or errors may occur.{: attention}
 
-Be sure to include the `volumeGroupClassName`. For more information about creating a VolumeGroup YAML file, see [Creating a VolumeGroup](creating_volumegroup.md).{: important}
-    
-    ```
+2. Create a VolumeGroup YAML file.
+
     apiVersion: csi.ibm.com/v1
     kind: VolumeGroup
     metadata:
@@ -56,4 +49,5 @@ Be sure to include the `volumeGroupClassName`. For more information about creati
         selector: 
           matchLabels:
             demo-volumegroup-key: demo-volumegroup-value
-    ```
+
+Be sure to include the `volumeGroupClassName`. For more information about creating a VolumeGroup YAML file, see [Creating a VolumeGroup](creating_volumegroup.md).{: important}

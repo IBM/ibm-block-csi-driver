@@ -31,9 +31,9 @@ Volume groups can only be managed by **either** the associated VolumeGroup **or*
 
 Apply the storage class.
 
-  ```
-  kubectl apply -f <filename>.yaml
-  ```
+```
+kubectl apply -f <filename>.yaml
+```
 
 This procedure is applicable for both Kubernetes and Red Hat® OpenShift®. For Red Hat OpenShift, replace `kubectl` with `oc` in all relevant commands.{: tip}
 

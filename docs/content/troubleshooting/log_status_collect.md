@@ -11,16 +11,15 @@ These procedures are applicable for both Kubernetes and Red Hat® OpenShift®. F
 
 To help pinpoint potential causes for stateful pod failure:
 
-1.  Verify that all CSI pods are running.
-    ```
-    kubectl get pods -n <namespace> -l product=ibm-block-csi-driver
-    ```
+1. Verify that all CSI pods are running.
 
-2.  If a pod is not in a _Running_ state, run the following command:
-    ```
+    kubectl get pods -n <namespace> -l product=ibm-block-csi-driver
+
+2. If a pod is not in a _Running_ state, run the following command:
+
     kubectl describe -n <namespace> pod/<pod-name>
-    ```
-    View the logs.
+
+   View the logs.
 
 
 ## Status and log collection
@@ -30,9 +29,8 @@ Before you begin collecting logs, create a directory for the logs on the control
 
 For example:
 
-```
-mkdir logs
-```
+    mkdir logs
+
 Save logs and status reports directly to the created directory by adding in the following string at the end of the collection command:
 
     > logs/<log_filename>.log
@@ -46,17 +44,19 @@ Be sure to run the following steps and copy the output to an external file, when
 
 1. Check the node status.
     
-        kubectl get nodes
+    kubectl get nodes
+
 2. Check the CSI driver component status.
 
-        kubectl get -A pod -o wide | grep ibm-block-csi
+    kubectl get -A pod -o wide | grep ibm-block-csi
+
 3. Check if the PersistentVolumeClaims (PVCs) are _Bound_.
 
-        kubectl get -n <namespace> pvc -o=jsonpath='{range .items[?(@.metadata.annotations.volume\.beta\.kubernetes\.io/storage-provisioner=="block.csi.ibm.com")]}{"PVC NAME: "}{@.metadata.name}{" PVC STATUS: "}{@.status.phase}{"\n"}{end}'
+    kubectl get -n <namespace> pvc -o=jsonpath='{range .items[?(@.metadata.annotations.volume\.beta\.kubernetes\.io/storage-provisioner=="block.csi.ibm.com")]}{"PVC NAME: "}{@.metadata.name}{" PVC STATUS: "}{@.status.phase}{"\n"}{end}'
 
-    The output should be similar to the following:
+   The output should be similar to the following:
 
-    `PVC NAME: demo-pvc-file-system PVC STATUS: Bound`
+   `PVC NAME: demo-pvc-file-system PVC STATUS: Bound`
 
 If the PVCs are not in the _Bound_ state, collect the events of all unbound PVCs. (See [Details collection for unbound PVCs](#details-collection-for-unbound-pvcs).){: note}
 
