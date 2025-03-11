@@ -13,15 +13,15 @@ Before starting to import an existing volume, find the `volumeHandle` in the exi
 
   - With the command line:
 
-    Find both the `id` and `vdisk_UID` attributes, by using the `lsvdisk` command.
+      Find both the `id` and `vdisk_UID` attributes, by using the `lsvdisk` command.
 
   - With the management GUI:
 
-    1. Select **Volumes** > **Volumes** from the side bar.
+      1. Select **Volumes** > **Volumes** from the side bar.
 
         The **Volumes** page is displayed.
 
-    2. Browse to the volume that the port is on and right-click > **Properties**.
+      2. Browse to the volume that the port is on and right-click > **Properties**.
 
         The Properties window is displayed. Use the **Volume ID** and **Volume UID** values.
 
@@ -34,15 +34,15 @@ For more information about IBM Storage Virtualize products, find your product in
 
   - With the command line:
 
-    Find the `GUID` for the volume, by using the `lsfbvol` command.
+      Find the `GUID` for the volume, by using the `lsfbvol` command.
 
   - With the IBM DS8000 Storage Management GUI:
 
-    1. Select **Volumes** from the side bar.
+      1. Select **Volumes** from the side bar.
 
         The **Volumes** page is displayed.
 
-    2. Browse to the volume that the port is on and right-click > **Properties**.
+      2. Browse to the volume that the port is on and right-click > **Properties**.
 
         The Properties window is displayed. Use the **GUID** value.
 

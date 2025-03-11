@@ -4,6 +4,7 @@
 # Creating a StorageClass with volume groups
 
 Use the following procedure to create and apply the storage classes when using policy-based replication and volume groups.
+
 Create a storage class YAML file, similar to the following demo-storageclass.yaml (below) and update the storage parameters as needed.
 
 Volume groups can only be managed by **either** the associated VolumeGroup **or** the associated StorageClass (with the `volume_group` parameter). If a volume group is already associated with a VolumeGroup, then each volume of this StorageClass can be automatically deleted.{: restriction}

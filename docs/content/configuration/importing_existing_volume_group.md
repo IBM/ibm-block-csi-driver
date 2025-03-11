@@ -49,7 +49,7 @@ spec:
   volumeGroupClassName: demo-volumegroupclass
   source:
     volumeGroupContentName: demo-volumegroupcontent
-    selector: 
+    selector:
       matchLabels:
         demo-volumegroup-key: demo-volumegroup-value
 ```
