@@ -34,9 +34,9 @@ For more information about IBM Storage Virtualize products, find your product in
 
   - With the IBM DS8000 Storage Management GUI:
 
-      1. Select **Volumes** from the side bar. The **Volumes** page is displayed.
+      1. Select **Volumes** from the side bar. The **Volumes** page will be displayed.
 
-      2. Browse to the volume that the port is on and right-click > **Properties**. The Properties window is displayed. Use the **GUID** value.
+      2. Browse to the volume that the port is on and right-click > **Properties**. The Properties window will be displayed. Use the **GUID** value.
 
 For more information about IBM DS8000 family products, find your product information in [IBM Documentation](https://www.ibm.com/docs/).{: tip}
 
