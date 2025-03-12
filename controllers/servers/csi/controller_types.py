@@ -9,6 +9,7 @@ class ArrayConnectionInfo:
     user: str
     password: str
     system_id: str = None
+    partition_name: str = None
 
 
 @dataclass
