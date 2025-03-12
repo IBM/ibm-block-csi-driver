@@ -302,6 +302,7 @@ class Watcher(KubernetesManager):
             array_connection_info.array_addresses)
         array_connection_info.user = self._decode_base64_to_string(array_connection_info.user)
         array_connection_info.password = self._decode_base64_to_string(array_connection_info.password)
+        array_connection_info.partition_name = "TestPartition"
         return array_connection_info
 
     def _decode_list_base64_to_list_string(self, list_with_base64):
