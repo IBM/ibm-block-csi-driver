@@ -31,7 +31,7 @@ class ArrayMediator(ABC):
 
     @abstractmethod
     def create_volume(self, name, size_in_bytes, space_efficiency, pool, io_group, volume_group, source_ids,
-                      source_type, is_virt_snap_func):
+                      source_type, is_virt_snap_func, partition_name=None):
         """
         This function should create a volume in the storage system.
 
@@ -342,7 +342,7 @@ class ArrayMediator(ABC):
         raise NotImplementedError
 
     @abstractmethod
-    def create_host(self, host_name, initiators, connectivity_type, io_group):
+    def create_host(self, host_name, initiators, connectivity_type, io_group, partition_name=None):
         """
         This function should create a host in the storage system.
 
