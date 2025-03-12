@@ -138,7 +138,7 @@ def _add_port_to_command_kwargs(connectivity_type, port, cli_kwargs):
     return cli_kwargs
 
 
-def build_create_host_kwargs(host_name, connectivity_type, port, io_group):
+def build_create_host_kwargs(host_name, connectivity_type, port, io_group, partition_name):
     cli_kwargs = {'name': host_name}
     cli_kwargs = _add_port_to_command_kwargs(connectivity_type, port, cli_kwargs)
     if connectivity_type == array_settings.NVME_OVER_FC_CONNECTIVITY_TYPE:
@@ -150,6 +150,8 @@ def build_create_host_kwargs(host_name, connectivity_type, port, io_group):
     if port_set is not None and port_set:
         logger.info("host {} is created with port set {}".format(host_name, port_set))
         cli_kwargs['portset'] = port_set
+    if partition_name is not None:
+        cli_kwargs['partition_name'] = partition_name
     return cli_kwargs
 
 
@@ -608,9 +610,13 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
             raise array_errors.ObjectNotFoundError(volume_id)
         return vol_name
 
-    def _create_cli_volume(self, name, size_in_bytes, space_efficiency, pool, io_group, volume_group=None):
+    def _create_cli_volume(self, name, size_in_bytes, space_efficiency, pool, io_group, volume_group, partition_name=None):
         logger.info("creating volume with name : {}. size : {} . in pool : {} with parameters : {}".format(
             name, size_in_bytes, pool, space_efficiency))
+        if partition_name is not None and volume_group is None:
+            logger.info("get corresponding volume group for partition {}".format(self._partition_name))
+            volume_group = self._get_volume_group_from_partition_name(partition_name)
+            logger.info("volume group is {}".format(volume_group))
         try:
             size = self._convert_size_bytes(size_in_bytes)
             cli_kwargs = build_kwargs_from_parameters(space_efficiency, pool, io_group,
@@ -695,14 +701,14 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
 
     @register_csi_plugin()
     def create_volume(self, name, size_in_bytes, space_efficiency, pool, io_group, volume_group, source_ids,
-                      source_type, is_virt_snap_func):
+                      source_type, is_virt_snap_func, partition_name):
         if is_virt_snap_func and source_ids:
             if self._is_vdisk_support_addsnapshot(source_ids.uid):
                 self._create_cli_volume_from_source(name, pool, io_group, volume_group, source_ids, source_type)
             else:
                 raise array_errors.VirtSnapshotFunctionNotSupportedMessage(name)
         else:
-            self._create_cli_volume(name, size_in_bytes, space_efficiency, pool, io_group, volume_group)
+            self._create_cli_volume(name, size_in_bytes, space_efficiency, pool, io_group, volume_group, partition_name)
         cli_volume = self._get_cli_volume(name)
         return self._generate_volume_response(cli_volume, is_virt_snap_func)
 
@@ -1831,8 +1837,8 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
             ISCSI_PORT_IS_NOT_VALID in message_from_storage or \
             NVME_PORT_IS_ALREADY_ASSIGNED in message_from_storage
 
-    def _mkhost(self, host_name, connectivity_type, port, io_group):
-        cli_kwargs = build_create_host_kwargs(host_name, connectivity_type, port, io_group)
+    def _mkhost(self, host_name, connectivity_type, port, io_group, partition_name):
+        cli_kwargs = build_create_host_kwargs(host_name, connectivity_type, port, io_group, partition_name)
         try:
             self.client.svctask.mkhost(**cli_kwargs)
             return 200
@@ -1852,10 +1858,10 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
             raise ex
 
     @register_csi_plugin()
-    def create_host(self, host_name, initiators, connectivity_type, io_group):
+    def create_host(self, host_name, initiators, connectivity_type, io_group, partition_name):
         ports = get_connectivity_type_ports(initiators, connectivity_type)
         for port in ports:
-            status_code = self._mkhost(host_name, connectivity_type, port, io_group)
+            status_code = self._mkhost(host_name, connectivity_type, port, io_group, partition_name)
             if status_code == 200:
                 if io_group:
                     logger.info(svc_messages.CREATE_HOST_WITH_IO_GROUP.format(host_name, port, io_group))
@@ -2047,6 +2053,20 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
         filter_value = 'volume_group_name={}'.format(volume_group_name)
         cli_volumes = self._lsvdisk_list(filtervalue=filter_value)
         return [self._generate_thin_volume_response(cli_volume) for cli_volume in cli_volumes]
+
+    def _get_volume_group_from_partition_name(self, partition_name):
+        # When default volume group is implemented - fix this function (filter by default VG)
+        filter_value = 'partition_name={}'.format(partition_name)
+        logger.warning("Filter volume group")
+        try:
+            vol_groups = self.client.svcinfo.lsvolumegroup(filtervalue=filter_value).as_single_element
+            if vol_groups is None or vol_groups.name is None:
+                raise array_errors.ObjectNotFoundError(partition_name)
+            return vol_groups.name
+        except (svc_errors.CommandExecutionError, CLIFailureError) as ex:
+            if any(msg_id in ex.my_message for msg_id in (NON_ASCII_CHARS, VALUE_TOO_LONG)):
+                raise array_errors.InvalidArgumentError(ex.my_message)
+            raise ex
 
     def _generate_volume_group_response(self, cli_volume_group):
         volumes = []

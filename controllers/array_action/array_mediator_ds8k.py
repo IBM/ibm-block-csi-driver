@@ -266,7 +266,7 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
             raise array_errors.VolumeCreationError(name)
 
     def create_volume(self, name, size_in_bytes, space_efficiency, pool, io_group, volume_group, source_ids,
-                      source_type, is_virt_snap_func):
+                      source_type, is_virt_snap_func, partition_name):
         array_space_efficiency = get_array_space_efficiency(space_efficiency)
         api_volume = self._create_api_volume(name, size_in_bytes, array_space_efficiency, pool)
         self.volume_cache.add(api_volume.name, api_volume.id)
@@ -697,7 +697,7 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
     def demote_replication_volume(self, replication):
         raise NotImplementedError
 
-    def create_host(self, host_name, initiators, connectivity_type, io_group):
+    def create_host(self, host_name, initiators, connectivity_type, io_group, partition_name):
         raise NotImplementedError
 
     def delete_host(self, host_name):

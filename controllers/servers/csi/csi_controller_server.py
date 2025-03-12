@@ -103,7 +103,7 @@ class CSIControllerServicer(csi_pb2_grpc.ControllerServicer):
                         array_mediator.register_plugin('topology', '')
                     volume = array_mediator.create_volume(volume_final_name, required_bytes, space_efficiency, pool,
                                                           volume_parameters.io_group, volume_parameters.volume_group,
-                                                          source_ids, source_type, is_virt_snap_func)
+                                                          source_ids, source_type, is_virt_snap_func, array_connection_info.partition_name)
                 else:
                     logger.debug("volume found : {}".format(volume))
 
