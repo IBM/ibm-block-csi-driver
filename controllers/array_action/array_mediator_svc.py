@@ -236,6 +236,10 @@ def _get_cli_volume_space_efficiency_aliases(cli_volume):
     return space_efficiency_aliases
 
 
+def _get_ssh_port_from_environment():
+    return int(os.environ.get('SVC_SSH_PORT', '22'))
+
+
 class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
     ARRAY_ACTIONS = {}
     BLOCK_SIZE_IN_BYTES = 512
@@ -249,7 +253,7 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
 
     @ClassProperty
     def port(self):
-        return 22
+        return _get_ssh_port_from_environment()
 
     @ClassProperty
     def max_object_name_length(self):
@@ -297,7 +301,7 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
         logger.debug("Connecting to SVC {0}".format(self.endpoint))
         try:
             self.client = connect(self.endpoint, username=self.user,
-                                  password=self.password)
+                                  password=self.password, port=self.port)
             if Version(self._code_level) < Version(self.MIN_SUPPORTED_VERSION):
                 raise array_errors.UnsupportedStorageVersionError(
                     self._code_level, self.MIN_SUPPORTED_VERSION
