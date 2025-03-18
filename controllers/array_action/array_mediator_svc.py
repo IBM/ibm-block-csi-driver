@@ -255,8 +255,8 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
     def port(self):
         return _get_ssh_port_from_environment()
 
-    @ClassProperty
-    def is_custom_port(self):
+    @classmethod
+    def is_custom_port(cls):
         return _get_ssh_port_from_environment() != 22
 
     @ClassProperty

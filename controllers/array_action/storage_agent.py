@@ -20,7 +20,7 @@ lock = RLock()
 array_type_to_port = OrderedDict()
 array_type_to_mediator = {}
 
-if SVCArrayMediator.is_custom_port:
+if SVCArrayMediator.is_custom_port():
     array_type_to_port[SVCArrayMediator.array_type] = SVCArrayMediator.port
     array_type_to_mediator[SVCArrayMediator.array_type] = SVCArrayMediator
 else:
