@@ -257,7 +257,7 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
 
     @ClassProperty
     def is_custom_port(self):
-        return self.port() != 22
+        return _get_ssh_port_from_environment() != 22
 
     @ClassProperty
     def max_object_name_length(self):
