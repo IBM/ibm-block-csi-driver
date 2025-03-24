@@ -5,6 +5,8 @@
 
 As of this document's publication date, the IBM Power® architecture is not supported for this release.{: restriction}
 
+As of this document's publication date, the NVMe/FC connectivity is not supported by IBM Storage Virtualize family products from Ubuntu OS hosts.{: restriction}
+
 Kubernetes 1.32 is not supported on Red Hat® Enterprise Linux® (RHEL) 8.x.{: restriction}
 
 The following table lists supported operating systems for deployment of the IBM® block storage CSI driver on Kubernetes orchestration platforms:

@@ -270,6 +270,8 @@ func (r OsDeviceConnectivityHelperScsiGeneric) FlushMultipathDevice(mpathDevice 
 	if err != nil {
 		if _, e := os.Stat(fullDevice); os.IsNotExist(e) {
 			logger.Debugf("Mpath device {%v} was deleted", fullDevice)
+		} else if err.Error() == "exit status 1" {
+			logger.Debugf("Ignore multipath -f error on device {%v} to be deleted", fullDevice)
 		} else {
 			logger.Errorf("multipath -f {%v} did not succeed to delete the device. err={%v}", fullDevice, err.Error())
 			return err
