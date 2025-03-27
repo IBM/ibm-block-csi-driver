@@ -6,7 +6,7 @@ This file details additional third party software license agreements
 and third party notices and information that are required 
 to be reproduced for the following programs:
 
-IBM Block Storage CSI Driver version 1.12.0
+IBM Block Storage CSI Driver version 1.12.2
 
 
 
@@ -25,7 +25,7 @@ section and not the terms of the license agreement for the Program.
 The following are Separately Licensed Code:
 
 Red Hat Universal Base Image 9
-Red Hat Universal Base Image 9 Python-3.8
+Red Hat Universal Base Image 9 Python-3.9
 pylint 2.14.3
 astroid 2.11.7
 nose 1.3.7
@@ -201,7 +201,7 @@ END OF TERMS AND CONDITIONS FOR Red Hat Universal Base Image 9
 @@@@@@@@@@@@
 ===========================================================================
 THE FOLLOWING TERMS AND CONDITIONS APPLY to Red Hat Universal
-Base Image 9 Python-3.8 software:
+Base Image 9 Python-3.9 software:
 ---------------------------------------------------------------------------
 
 
@@ -355,7 +355,7 @@ registered trademark of Red Hat, Inc.  All other trademarks are the
 property of their respective owners.  
 
 ===========================================================================
-END OF TERMS AND CONDITIONS FOR Red Hat Universal Base Image 9 Python-3.8
+END OF TERMS AND CONDITIONS FOR Red Hat Universal Base Image 9 Python-3.9
 ===========================================================================
 
 
@@ -369,7 +369,7 @@ APPLY to the listed components below which are licensed under the GNU
 General Public License 2.0:
 
 Portions of Red Hat Universal Base Image 9  
-Portions of Red Hat Universal Base Image 9 Python-3.8
+Portions of Red Hat Universal Base Image 9 Python-3.9
 pylint 2.14.3
 
 ---------------------------------------------------------------------------
@@ -730,7 +730,7 @@ APPLY to the listed components below which are licensed under the GNU
 General Public License 3.0:
 
 Portions of Red Hat Universal Base Image 9  
-Portions of Red Hat Universal Base Image 9 Python-3.8 
+Portions of Red Hat Universal Base Image 9 Python-3.9
 
 ---------------------------------------------------------------------------
 Start of GNU GPL Version 3.0 License
@@ -2110,7 +2110,7 @@ End of GNU LESSER GENERAL PUBLIC LICENSE 3.0 License
 
 ===========================================================================
 END OF TERMS AND CONDITIONS FOR SEPARATELY LICENSED CODE for IBM Block 
-Storage CSI Driver version 1.12.0
+Storage CSI Driver version 1.12.2
 ===========================================================================
 
 
@@ -2122,7 +2122,7 @@ Storage CSI Driver version 1.12.0
 
 GNU GPL and / or LGPL Source Code for:
 
-IBM Block Storage CSI Driver 1.12.0
+IBM Block Storage CSI Driver 1.12.2
 
 ===========================================================================
 
@@ -2141,9 +2141,8 @@ General Public License 2.0.
 	pylint 2.14.3
 
 Source code to any of the above-listed packages distributed with
-Operator for IBM Block Storage CSI Driver 1.8.0 is available at the
-website below, when a URL is provided, or by sending a request to the
-following address or email: 
+IBM Block Storage CSI Driver 1.12.2 is available at the website below, when a 
+URL is provided, or by sending a request to the following address or email: 
 
     IBM Corporation
     Attn: oss-storage@ibm.com
@@ -2168,9 +2167,8 @@ General Public License 3.0.
     Red Hat Universal Base Image 9 Python-3.8 
 
 Source code to any of the above-listed packages distributed with
-Operator for IBM Block Storage CSI Driver 1.8.0 is available at the
-website below, when a URL is provided, or by sending a request to the
-following address or email: 
+IBM Block Storage CSI Driver 1.12.2 is available at the website below, when a 
+URL is provided, or by sending a request to the following address or email:
 
    IBM Corporation
    Attn: oss-storage@ibm.com
@@ -2196,9 +2194,8 @@ under the GNU Lesser General Public License 2.1.
 	paramiko 3.4.0
 
 Source code to any of the above-listed packages distributed with
-Operator for IBM Block Storage CSI Driver 1.8.0 is available at the
-website below, when a URL is provided, or by sending a request to the
-following address or email: 
+IBM Block Storage CSI Driver 1.12.2 is available at the website below, when a 
+URL is provided, or by sending a request to the following address or email:
 
     IBM Corporation
     Attn: oss-storage@ibm.com
@@ -2222,9 +2219,8 @@ under the GNU Lesser General Public License 3.0.
     func_timeout 4.3.5
 
 Source code to any of the above-listed packages distributed with
-Operator for IBM Block Storage CSI Driver 1.8.0 is available at the
-website below, when a URL is provided, or by sending a request to the
-following address or email: 
+IBM Block Storage CSI Driver 1.12.2 is available at the website below, when a 
+URL is provided, or by sending a request to the following address or email: 
 
     IBM Corporation
     Attn: oss-storage@ibm.com
@@ -2270,54 +2266,52 @@ APACHE 2.0 LICENSED CODE:  The Program includes all or portions of
 the following software which IBM obtained under the terms and conditions
 of the Apache License Version 2.0:
 
-go-systemd 22.5.0
 gopkg-yaml 2.4.0
 gopkg-yaml 3.0.1
 requests 2.32.3
-runc 1.1.14
+Portions of go 1.23.5
+Portions of sigs.k8s.io-yaml 1.4.0
 bcrypt 4.2.0
 coverage 5.5
 cryptography 43.0.0
-container-storage-interface-spec 1.10.0
+container-storage-interface-spec 1.9.0
 genproto-googleapis-rpc
 go-Logr-Logr 1.4.2
-go-openapi-jsonpointer 0.19.6
+go-openapi-jsonpointer 0.21.0
 go-openAPI-jsonreference 0.20.2
-go-openapi-swag 0.22.4
+go-openapi-swag 0.23.0
 golang-mock 1.6.0
 google-auth 2.32.0
 google-gnostic-models 0.6.8
 google-goFuzz 1.2.0
 grpcio 1.53.2
 grpcio-tools 1.41.1
-grpc 1.65.0
+grpc 1.70.0
 ibm-block-csi-driver 1.11.2
 idna 3.7
 isort 5.13.2
-k8s.io-api 0.31.0
-k8s.io-apimachinery 0.31.0
-k8s.io-client-go 0.31.0
+k8s.io-api 0.32.0
+k8s.io-apimachinery 0.32.0
+k8s.io-client-go 0.32.0
 k8s.io-klog 2.130.1
-k8s.io-Kube-openapi 0.0.0
-k8s.io-mount-utils 0.31.0
-k8s.io-utils 0.0.0
+k8s.io-Kube-openapi
+k8s.io-mount-utils 0.32.2
+k8s.io-utils
 kubernetes 23.6.0
 kubernetes-csi-csi-lib-utils 0.19.0
-moby-sys-mountinfo 0.6.2
-moby-sys-mountinfo 0.7.1
+moby-sys-mountinfo 0.7.2
 modern-go-conCurrent
 modern-go-refLect2 1.0.2
 pyds8k 1.5.0
 PyNaCl 1.5.0
-pysvc 1.1.1
+pysvc 2.0.1
 python-dateutil 2.9.0
 pyxcli 1.2.1
 retry2 0.9.5
 rsa 4.9
-runtime-spec 1.0.3
-sigs.k8s.io-json 0.0.0
-sigs.k8s.io-structured-merge-diff 4.4.1
-sigs.k8s.io-structured-merge-diff 4.2.3
+sigs.k8s.io-json
+sigs.k8s.io-structured-merge-diff 4.4.2
+sys-userns 0.1.0
 websocket-client 1.8.0
 
 ---------------------------------------------------------------------------
@@ -2534,19 +2528,6 @@ End of Apache License 2.0
 
 ===========================================================================
 NOTICE file corresponding to section 4(d) of the Apache License,
-Version 2.0, in this case for the go-systemd 22.5.0 distribution
-===========================================================================
-
-CoreOS Project
-Copyright 2018 CoreOS, Inc
-
-This product includes software developed at CoreOS, Inc.
-(http://www.coreos.com/).
-
-
-
-===========================================================================
-NOTICE file corresponding to section 4(d) of the Apache License,
 Version 2.0, in this case for the gopkg-yaml 2.4.0 distribution
 ===========================================================================
 
@@ -2592,37 +2573,6 @@ Version 2.0, in this case for the requests 2.32.3 distribution
 
 Requests
 Copyright 2019 Kenneth Reitz
-
-
-
-===========================================================================
-NOTICE file corresponding to section 4(d) of the Apache License,
-Version 2.0, in this case for the runc 1.1.14 distribution
-===========================================================================
-
-runc
-
-Copyright 2012-2015 Docker, Inc.
-
-This product includes software developed at Docker, Inc. (http://www.docker.com).
-
-The following is courtesy of our legal counsel:
-
-
-Use and transfer of Docker may be subject to certain restrictions by the
-United States and other governments.  
-It is your responsibility to ensure that your use and/or transfer does not
-violate applicable laws. 
-
-For more information, please see http://www.bis.doc.gov
-
-See also http://www.apache.org/dev/crypto.html and/or seek legal counsel.
---------------------------------------------------------------------------------
-CoreOS Project
-Copyright 2018 CoreOS, Inc
-
-This product includes software developed at CoreOS, Inc.
-(http://www.coreos.com/).
 
  
 ===========================================================================
@@ -2710,6 +2660,135 @@ END OF gopkg-yaml 2.4.0 NOTICES AND INFORMATION
 
 @@@@@@@@@@@@
 ===========================================================================
+k8s.io-apimachinery 0.32.0: The Program includes k8s.io-apimachinery 0.32.0
+software. IBM obtained portions of the k8s.io-apimachinery 0.32.0 software
+under the terms and conditions of the following license(s):
+---------------------------------------------------------------------------
+
+
+Copyright (c) 2009 The Go Authors. All rights reserved.
+
+Redistribution and use in source and binary forms, with or without
+modification, are permitted provided that the following conditions are
+met:
+
+   * Redistributions of source code must retain the above copyright
+notice, this list of conditions and the following disclaimer.
+   * Redistributions in binary form must reproduce the above
+copyright notice, this list of conditions and the following disclaimer
+in the documentation and/or other materials provided with the
+distribution.
+   * Neither the name of Google Inc. nor the names of its
+contributors may be used to endorse or promote products derived from
+this software without specific prior written permission.
+
+THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+"AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
+A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
+OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
+LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
+DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
+THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+(INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+
+
+===========================================================================
+END OF k8s.io-apimachinery 0.32.0 NOTICES AND INFORMATION
+===========================================================================
+
+
+@@@@@@@@@@@@
+===========================================================================
+k8s.io-client-go 0.32.0: The Program includes k8s.io-client-go 0.32.0
+software. IBM obtained portions of the k8s.io-client-go 0.32.0 software
+under the terms and conditions of the following license(s):
+---------------------------------------------------------------------------
+
+
+Copyright (c) 2009 The Go Authors. All rights reserved.
+
+Redistribution and use in source and binary forms, with or without
+modification, are permitted provided that the following conditions are
+met:
+
+   * Redistributions of source code must retain the above copyright
+notice, this list of conditions and the following disclaimer.
+   * Redistributions in binary form must reproduce the above
+copyright notice, this list of conditions and the following disclaimer
+in the documentation and/or other materials provided with the
+distribution.
+   * Neither the name of Google Inc. nor the names of its
+contributors may be used to endorse or promote products derived from
+this software without specific prior written permission.
+
+THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+"AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
+A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
+OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
+LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
+DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
+THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+(INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+
+
+===========================================================================
+END OF k8s.io-client-go 0.32.0 NOTICES AND INFORMATION
+===========================================================================
+
+
+@@@@@@@@@@@@
+===========================================================================
+moby-sys-mountinfo 0.7.2: The Program includes moby-sys-mountinfo 0.7.2
+software. IBM obtained portions of the moby-sys-mountinfo 0.7.2 software
+under the terms and conditions of the following license(s):
+---------------------------------------------------------------------------
+
+
+Copyright (c) 2014-2018 The Docker & Go Authors. All rights reserved.
+
+Redistribution and use in source and binary forms, with or without
+modification, are permitted provided that the following conditions are
+met:
+
+   * Redistributions of source code must retain the above copyright
+notice, this list of conditions and the following disclaimer.
+   * Redistributions in binary form must reproduce the above
+copyright notice, this list of conditions and the following disclaimer
+in the documentation and/or other materials provided with the
+distribution.
+   * Neither the name of Google Inc. nor the names of its
+contributors may be used to endorse or promote products derived from
+this software without specific prior written permission.
+
+THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+"AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
+A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
+OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
+LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
+DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
+THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+(INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+
+
+===========================================================================
+END OF moby-sys-mountinfo 0.7.2 NOTICES AND INFORMATION
+===========================================================================
+
+
+@@@@@@@@@@@@
+===========================================================================
 PyNaCl 1.5.0: The Program includes PyNaCl 1.5.0 software. IBM obtained
 portions of the PyNaCl 1.5.0 software under the terms and conditions of the
 following license(s):
@@ -2790,17 +2869,16 @@ END OF python-dateutil 2.9.0 NOTICES AND INFORMATION
 
 @@@@@@@@@@@@
 ===========================================================================
-runc 1.1.14: The Program includes runc 1.1.14 software. IBM obtained
-portions of the runc 1.1.14 software under the terms and conditions of the
-following license(s):
+sigs.k8s.io-structured-merge-diff 4.4.2: The Program includes
+sigs.k8s.io-structured-merge-diff 4.4.2 software. IBM obtained portions of
+the sigs.k8s.io-structured-merge-diff 4.4.2 software under the terms and
+conditions of the following license(s):
 ---------------------------------------------------------------------------
 
 
 MIT License
 
-Copyright (c) 2017 Nathan Sweet
-Copyright (c) 2018, 2019 Cloudflare
-Copyright (c) 2019 Authors of Cilium
+Copyright (c) 2016 json-iterator
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal
@@ -2820,146 +2898,26 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 --------------------------------------------------------------------------------
-The MIT License (MIT)
+The following files were ported to Go from C files of libyaml, and thus
+are still covered by their original copyright and license:
 
-Copyright (c) 2014 Brian Goff
+    apic.go
+    emitterc.go
+    parserc.go
+    readerc.go
+    scannerc.go
+    writerc.go
+    yamlh.go
+    yamlprivateh.go
 
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
+Copyright (c) 2006 Kirill Simonov
 
-The above copyright notice and this permission notice shall be included in all
-copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-SOFTWARE.
---------------------------------------------------------------------------------
-Copyright (C) 2014-2015 Docker Inc & Go Authors. All rights reserved.
-Copyright (C) 2017 SUSE LLC. All rights reserved.
-
-Redistribution and use in source and binary forms, with or without
-modification, are permitted provided that the following conditions are
-met:
-
-   * Redistributions of source code must retain the above copyright
-notice, this list of conditions and the following disclaimer.
-   * Redistributions in binary form must reproduce the above
-copyright notice, this list of conditions and the following disclaimer
-in the documentation and/or other materials provided with the
-distribution.
-   * Neither the name of Google Inc. nor the names of its
-contributors may be used to endorse or promote products derived from
-this software without specific prior written permission.
-
-THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
-"AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
-LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
-A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
-OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
-SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
-LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
-DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
-THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
-(INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
-OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
---------------------------------------------------------------------------------
-Copyright (c) 2013, Georg Reinke (<guelfey at gmail dot com), Google
-All rights reserved.
-
-Redistribution and use in source and binary forms, with or without
-modification, are permitted provided that the following conditions
-are met:
-
-1. Redistributions of source code must retain the above copyright notice,
-this list of conditions and the following disclaimer.
-
-2. Redistributions in binary form must reproduce the above copyright
-notice, this list of conditions and the following disclaimer in the
-documentation and/or other materials provided with the distribution.
-
-THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
-"AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
-LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
-A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
-HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
-SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED
-TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
-PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF
-LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING
-NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
-SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
---------------------------------------------------------------------------------
-Blackfriday is distributed under the Simplified BSD License:
-
- Copyright © 2011 Russ Ross
- All rights reserved.
-
- Redistribution and use in source and binary forms, with or without
- modification, are permitted provided that the following conditions
- are met:
-
- 1.  Redistributions of source code must retain the above copyright
-     notice, this list of conditions and the following disclaimer.
-
- 2.  Redistributions in binary form must reproduce the above
-     copyright notice, this list of conditions and the following
-     disclaimer in the documentation and/or other materials provided with
-     the distribution.
-
- THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
- "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
- LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS
- FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE
- COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT,
- INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
- BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
- LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
- CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
- LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN
- ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
- POSSIBILITY OF SUCH DAMAGE.
---------------------------------------------------------------------------------
-Copyright (c) 2015 Matthew Heon <mheon@redhat.com>
-Copyright (c) 2015 Paul Moore <pmoore@redhat.com>
-All rights reserved.
-
-Redistribution and use in source and binary forms, with or without
-modification, are permitted provided that the following conditions are met:
-- Redistributions of source code must retain the above copyright notice,
-  this list of conditions and the following disclaimer.
-- Redistributions in binary form must reproduce the above copyright notice,
-  this list of conditions and the following disclaimer in the documentation
-  and/or other materials provided with the distribution.
-
-THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
-ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
-WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
-DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
-FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
-DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
-SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
-CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
-OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
-OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
---------------------------------------------------------------------------------
-MIT License
-
-Copyright (c) 2015 Dmitri Shuralyov
-
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
+Permission is hereby granted, free of charge, to any person obtaining a copy of
+this software and associated documentation files (the "Software"), to deal in
+the Software without restriction, including without limitation the rights to
+use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies
+of the Software, and to permit persons to whom the Software is furnished to do
+so, subject to the following conditions:
 
 The above copyright notice and this permission notice shall be included in all
 copies or substantial portions of the Software.
@@ -2971,105 +2929,23 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
 LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
---------------------------------------------------------------------------------
-The MIT License (MIT)
 
-Copyright (c) 2014 Simon Eskildsen
 
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
 
-The above copyright notice and this permission notice shall be included in
-all copies or substantial portions of the Software.
+===========================================================================
+END OF sigs.k8s.io-structured-merge-diff 4.4.2 NOTICES AND INFORMATION
+===========================================================================
 
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
-THE SOFTWARE.
---------------------------------------------------------------------------------
-Copyright 2013 Suryandaru Triandana <syndtr@gmail.com>
-All rights reserved.
 
-Redistribution and use in source and binary forms, with or without
-modification, are permitted provided that the following conditions are
-met:
+@@@@@@@@@@@@
+===========================================================================
+sys-userns 0.1.0: The Program includes sys-userns 0.1.0 software. IBM
+obtained portions of the sys-userns 0.1.0 software under the terms and
+conditions of the following license(s):
+---------------------------------------------------------------------------
 
-    * Redistributions of source code must retain the above copyright
-notice, this list of conditions and the following disclaimer.
-    * Redistributions in binary form must reproduce the above copyright
-notice, this list of conditions and the following disclaimer in the
-documentation and/or other materials provided with the distribution.
 
-THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
-"AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
-LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
-A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
-HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
-SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
-LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
-DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
-THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
-(INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
-OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
---------------------------------------------------------------------------------
-MIT License
-
-Copyright (c) 2016 Jeremy Saenz & Contributors
-
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in all
-copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-SOFTWARE.
---------------------------------------------------------------------------------
-Copyright (c) 2009 The Go Authors. All rights reserved.
-
-Redistribution and use in source and binary forms, with or without
-modification, are permitted provided that the following conditions are
-met:
-
-   * Redistributions of source code must retain the above copyright
-notice, this list of conditions and the following disclaimer.
-   * Redistributions in binary form must reproduce the above
-copyright notice, this list of conditions and the following disclaimer
-in the documentation and/or other materials provided with the
-distribution.
-   * Neither the name of Google Inc. nor the names of its
-contributors may be used to endorse or promote products derived from
-this software without specific prior written permission.
-
-THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
-"AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
-LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
-A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
-OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
-SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
-LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
-DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
-THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
-(INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
-OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
---------------------------------------------------------------------------------
-Copyright (c) 2018 The Go Authors. All rights reserved.
+Copyright (c) 2014-2018 The Docker & Go Authors. All rights reserved.
 
 Redistribution and use in source and binary forms, with or without
 modification, are permitted provided that the following conditions are
@@ -3100,7 +2976,7 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 
 ===========================================================================
-END OF runc 1.1.14 NOTICES AND INFORMATION
+END OF sys-userns 0.1.0 NOTICES AND INFORMATION
 ===========================================================================
 
 
@@ -3392,46 +3268,6 @@ END OF configparser 7.0.0 NOTICES AND INFORMATION
 
 @@@@@@@@@@@@
 ===========================================================================
-dbus 5.1.0: The Program includes dbus 5.1.0 software. IBM obtained the dbus
-5.1.0 software under the terms and conditions of the following license(s):
----------------------------------------------------------------------------
-
-
-Copyright (c) 2013, Georg Reinke (<guelfey at gmail dot com>), Google
-All rights reserved.
-
-Redistribution and use in source and binary forms, with or without
-modification, are permitted provided that the following conditions
-are met:
-
-1. Redistributions of source code must retain the above copyright notice,
-this list of conditions and the following disclaimer.
-
-2. Redistributions in binary form must reproduce the above copyright
-notice, this list of conditions and the following disclaimer in the
-documentation and/or other materials provided with the distribution.
-
-THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
-"AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
-LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
-A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
-HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
-SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED
-TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
-PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF
-LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING
-NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
-SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-
-
-
-===========================================================================
-END OF dbus 5.1.0 NOTICES AND INFORMATION
-===========================================================================
-
-
-@@@@@@@@@@@@
-===========================================================================
 decorator 5.1.1: The Program includes decorator 5.1.1 software. IBM
 obtained the decorator 5.1.1 software under the terms and conditions of the
 following license(s):
@@ -3523,6 +3359,45 @@ END OF dill 0.3.8 NOTICES AND INFORMATION
 
 @@@@@@@@@@@@
 ===========================================================================
+errors 0.9.1: The Program includes errors 0.9.1 software. IBM obtained the
+errors 0.9.1 software under the terms and conditions of the following
+license(s):
+---------------------------------------------------------------------------
+
+
+Copyright (c) 2015, Dave Cheney <dave@cheney.net>
+All rights reserved.
+
+Redistribution and use in source and binary forms, with or without
+modification, are permitted provided that the following conditions are met:
+
+* Redistributions of source code must retain the above copyright notice, this
+  list of conditions and the following disclaimer.
+
+* Redistributions in binary form must reproduce the above copyright notice,
+  this list of conditions and the following disclaimer in the documentation
+  and/or other materials provided with the distribution.
+
+THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
+FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+
+
+===========================================================================
+END OF errors 0.9.1 NOTICES AND INFORMATION
+===========================================================================
+
+
+@@@@@@@@@@@@
+===========================================================================
 float16 0.8.4: The Program includes float16 0.8.4 software. IBM obtained
 the float16 0.8.4 software under the terms and conditions of the following
 license(s):
@@ -3560,12 +3435,12 @@ END OF float16 0.8.4 NOTICES AND INFORMATION
 
 @@@@@@@@@@@@
 ===========================================================================
-go 1.22.5: The Program includes go 1.22.5 software. IBM obtained the go
-1.22.5 software under the terms and conditions of the following license(s):
+go 1.23.5: The Program includes go 1.23.5 software. IBM obtained the go
+1.23.5 software under the terms and conditions of the following license(s):
 ---------------------------------------------------------------------------
 
 
-Copyright 2009 The Go Authors.
+Copyright 2015 The Go Authors.
 
 Redistribution and use in source and binary forms, with or without
 modification, are permitted provided that the following conditions are
@@ -3592,11 +3467,150 @@ DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
 THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+--------------------------------------------------------------------------------
+Copyright 2009-2017 Andrea Leofreddi <a.leofreddi@vleo.net>. All rights reserved.
+
+Redistribution and use in source and binary forms, with or without modification, 
+are permitted provided that the following conditions are met:
+
+   1. Redistributions of source code must retain the above copyright
+      notice, this list of conditions and the following disclaimer.
+   2. Redistributions in binary form must reproduce the above copyright
+      notice, this list of conditions and the following disclaimer in the
+      documentation and/or other materials provided with the distribution.
+   3. Neither the name of the copyright holder nor the names of its
+      contributors may be used to endorse or promote products derived from
+      this software without specific prior written permission.
+
+THIS SOFTWARE IS PROVIDED BY COPYRIGHT HOLDERS AND CONTRIBUTORS ``AS IS'' AND 
+ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED 
+WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE 
+DISCLAIMED. IN NO EVENT SHALL COPYRIGHT HOLDERS OR CONTRIBUTORS BE LIABLE FOR 
+ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES 
+(INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; 
+LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON 
+ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT 
+(INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS 
+SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+
+The views and conclusions contained in the software and documentation are those 
+of the authors and should not be interpreted as representing official policies, 
+either expressed or implied, of Andrea Leofreddi.
+--------------------------------------------------------------------------------
+  Copyright (C) 1995-1998 Eric Young (eay@cryptsoft.com)
+   All rights reserved.
+
+   This package is an SSL implementation written
+   by Eric Young (eay@cryptsoft.com).
+   The implementation was written so as to conform with Netscapes SSL.
+
+   This library is free for commercial and non-commercial use as long as
+   the following conditions are aheared to.  The following conditions
+   apply to all code found in this distribution, be it the RC4, RSA,
+   lhash, DES, etc., code; not just the SSL code.  The SSL documentation
+   included with this distribution is covered by the same copyright terms
+   except that the holder is Tim Hudson (tjh@cryptsoft.com).
+
+   Copyright remains Eric Young's, and as such any Copyright notices in
+   the code are not to be removed.
+   If this package is used in a product, Eric Young should be given attribution
+   as the author of the parts of the library used.
+   This can be in the form of a textual message at program startup or
+   in documentation (online or textual) provided with the package.
+
+   Redistribution and use in source and binary forms, with or without
+   modification, are permitted provided that the following conditions
+   are met:
+   1. Redistributions of source code must retain the copyright
+      notice, this list of conditions and the following disclaimer.
+   2. Redistributions in binary form must reproduce the above copyright
+      notice, this list of conditions and the following disclaimer in the
+      documentation and/or other materials provided with the distribution.
+   3. All advertising materials mentioning features or use of this software
+      must display the following acknowledgement:
+      "This product includes cryptographic software written by
+       Eric Young (eay@cryptsoft.com)"
+      The word 'cryptographic' can be left out if the rouines from the library
+      being used are not cryptographic related :-).
+   4. If you include any Windows specific code (or a derivative thereof) from
+      the apps directory (application code) you must include an acknowledgement:
+      "This product includes software written by Tim Hudson (tjh@cryptsoft.com)"
+
+   THIS SOFTWARE IS PROVIDED BY ERIC YOUNG ``AS IS'' AND
+   ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+   IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
+   ARE DISCLAIMED.  IN NO EVENT SHALL THE AUTHOR OR CONTRIBUTORS BE LIABLE
+   FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+   DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
+   OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
+   HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
+   LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
+   OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
+   SUCH DAMAGE.
+
+   The licence and distribution terms for any publically available version or
+   derivative of this code cannot be changed.  i.e. this code cannot simply be
+   copied and put under another distribution licence
+   [including the GNU Public Licence.]
+
+
+--------------------------------------------------------------------------------
+ISC license used for completely new code in BoringSSL:
+
+  Copyright (c) 2015, Google Inc.
+
+   Permission to use, copy, modify, and/or distribute this software for any
+   purpose with or without fee is hereby granted, provided that the above
+   copyright notice and this permission notice appear in all copies.
+
+   THE SOFTWARE IS PROVIDED "AS IS" AND THE AUTHOR DISCLAIMS ALL WARRANTIES
+   WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES OF
+   MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE FOR ANY
+   SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY DAMAGES
+   WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN ACTION
+   OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF OR IN
+   CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.  
+
+--------------------------------------------------------------------------------
+Some files from Intel carry the following license:
+
+  Copyright (c) 2012, Intel Corporation
+
+  All rights reserved.
+
+  Redistribution and use in source and binary forms, with or without
+  modification, are permitted provided that the following conditions are
+  met:
+
+  *  Redistributions of source code must retain the above copyright
+     notice, this list of conditions and the following disclaimer.
+
+  *  Redistributions in binary form must reproduce the above copyright
+     notice, this list of conditions and the following disclaimer in the
+     documentation and/or other materials provided with the
+     distribution.
+
+  *  Neither the name of the Intel Corporation nor the names of its
+     contributors may be used to endorse or promote products derived from
+     this software without specific prior written permission.
+
+
+  THIS SOFTWARE IS PROVIDED BY INTEL CORPORATION ""AS IS"" AND ANY
+  EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+  IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
+  PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL INTEL CORPORATION OR
+  CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
+  EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
+  PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
+  PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF
+  LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING
+  NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
+  SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 
 
 ===========================================================================
-END OF go 1.22.5 NOTICES AND INFORMATION
+END OF go 1.23.5 NOTICES AND INFORMATION
 ===========================================================================
 
 
@@ -4317,13 +4331,13 @@ END OF platformdirs 4.2.2 NOTICES AND INFORMATION
 
 @@@@@@@@@@@@
 ===========================================================================
-protobuf 1.34.2: The Program includes protobuf 1.34.2 software. IBM
-obtained the protobuf 1.34.2 software under the terms and conditions of the
+protobuf 1.35.2: The Program includes protobuf 1.35.2 software. IBM
+obtained the protobuf 1.35.2 software under the terms and conditions of the
 following license(s):
 ---------------------------------------------------------------------------
 
 
-Copyright (c) 2018 The Go Authors. All rights reserved.
+Copyright (c) 2018 - 2024 The Go Authors. All rights reserved.
 
 Redistribution and use in source and binary forms, with or without
 modification, are permitted provided that the following conditions are
@@ -4352,8 +4366,9 @@ THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 
+
 ===========================================================================
-END OF protobuf 1.34.2 NOTICES AND INFORMATION
+END OF protobuf 1.35.2 NOTICES AND INFORMATION
 ===========================================================================
 
 
@@ -4674,8 +4689,8 @@ END OF sirupsen-loGrUs 1.9.3 NOTICES AND INFORMATION
 
 @@@@@@@@@@@@
 ===========================================================================
-sigs.k8s.io-yaml 1.3.0: The Program includes sigs.k8s.io-yaml 1.3.0
-software. IBM obtained the sigs.k8s.io-yaml 1.3.0 software under the terms
+sigs.k8s.io-yaml 1.4.0: The Program includes sigs.k8s.io-yaml 1.4.0
+software. IBM obtained the sigs.k8s.io-yaml 1.4.0 software under the terms
 and conditions of the following license(s):
 ---------------------------------------------------------------------------
 
@@ -4702,7 +4717,7 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 
-
+--------------------------------------------------------------------------------
 Copyright (c) 2012 The Go Authors. All rights reserved.
 
 Redistribution and use in source and binary forms, with or without
@@ -4730,10 +4745,44 @@ DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
 THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+--------------------------------------------------------------------------------
+# The forked go-yaml.v3 library under this project is covered by two
+different licenses (MIT and Apache):
+
+#### MIT License ####
+
+The following files were ported to Go from C files of libyaml, and thus
+are still covered by their original MIT license, with the additional
+copyright staring in 2011 when the project was ported over:
+
+    apic.go emitterc.go parserc.go readerc.go scannerc.go
+    writerc.go yamlh.go yamlprivateh.go
+
+Copyright (c) 2006-2010 Kirill Simonov
+Copyright (c) 2006-2011 Kirill Simonov
+
+Permission is hereby granted, free of charge, to any person obtaining a copy of
+this software and associated documentation files (the "Software"), to deal in
+the Software without restriction, including without limitation the rights to
+use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies
+of the Software, and to permit persons to whom the Software is furnished to do
+so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+
 
 
 ===========================================================================
-END OF sigs.k8s.io-yaml 1.3.0 NOTICES AND INFORMATION
+END OF sigs.k8s.io-yaml 1.4.0 NOTICES AND INFORMATION
 ===========================================================================
 
 
@@ -5214,13 +5263,13 @@ END OF urllib3 2.2.2 NOTICES AND INFORMATION
 
 @@@@@@@@@@@@
 ===========================================================================
-x-net 0.25.0: The Program includes x-net 0.25.0 software. IBM obtained the
-x-net 0.25.0 software under the terms and conditions of the following
+x-net 0.33.0: The Program includes x-net 0.33.0 software. IBM obtained the
+x-net 0.33.0 software under the terms and conditions of the following
 license(s):
 ---------------------------------------------------------------------------
 
 
-Copyright (c) 2009 The Go Authors. All rights reserved.
+Copyright 2009 The Go Authors.
 
 Redistribution and use in source and binary forms, with or without
 modification, are permitted provided that the following conditions are
@@ -5232,10 +5281,9 @@ notice, this list of conditions and the following disclaimer.
 copyright notice, this list of conditions and the following disclaimer
 in the documentation and/or other materials provided with the
 distribution.
-   * Neither the name of Google Inc. nor the names of its
+   * Neither the name of Google LLC nor the names of its
 contributors may be used to endorse or promote products derived from
 this software without specific prior written permission.
-
 THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
 "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
 LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
@@ -5249,21 +5297,20 @@ THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 
-
 ===========================================================================
-END OF x-net 0.25.0 NOTICES AND INFORMATION
+END OF x-net 0.33.0 NOTICES AND INFORMATION
 ===========================================================================
 
 
 @@@@@@@@@@@@
 ===========================================================================
-x-oauth2 0.21.2: The Program includes x-oauth2 0.21.2 software. IBM
-obtained the x-oauth2 0.21.2 software under the terms and conditions of the
+x-oauth2 0.24.0: The Program includes x-oauth2 0.24.0 software. IBM
+obtained the x-oauth2 0.24.0 software under the terms and conditions of the
 following license(s):
 ---------------------------------------------------------------------------
 
 
-Copyright (c) 2009 The Go Authors. All rights reserved.
+Copyright 2009 - 2024 The Go Authors.
 
 Redistribution and use in source and binary forms, with or without
 modification, are permitted provided that the following conditions are
@@ -5275,7 +5322,7 @@ notice, this list of conditions and the following disclaimer.
 copyright notice, this list of conditions and the following disclaimer
 in the documentation and/or other materials provided with the
 distribution.
-   * Neither the name of Google Inc. nor the names of its
+   * Neither the name of Google LLC nor the names of its
 contributors may be used to endorse or promote products derived from
 this software without specific prior written permission.
 
@@ -5294,34 +5341,32 @@ OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 
 ===========================================================================
-END OF x-oauth2 0.21.2 NOTICES AND INFORMATION
+END OF x-oauth2 0.24.0 NOTICES AND INFORMATION
 ===========================================================================
 
 
 @@@@@@@@@@@@
 ===========================================================================
-x-sync 0.8.0: The Program includes x-sync 0.8.0 software. IBM obtained the
-x-sync 0.8.0 software under the terms and conditions of the following
+x-sync 0.11.0: The Program includes x-sync 0.11.0 software. IBM obtained
+the x-sync 0.11.0 software under the terms and conditions of the following
 license(s):
 ---------------------------------------------------------------------------
 
 
-Copyright (c) 2009 The Go Authors. All rights reserved.
+Copyright 2009 The Go Authors.
 
 Redistribution and use in source and binary forms, with or without
 modification, are permitted provided that the following conditions are
 met:
-
    * Redistributions of source code must retain the above copyright
 notice, this list of conditions and the following disclaimer.
    * Redistributions in binary form must reproduce the above
 copyright notice, this list of conditions and the following disclaimer
 in the documentation and/or other materials provided with the
 distribution.
-   * Neither the name of Google Inc. nor the names of its
+   * Neither the name of Google LLC nor the names of its
 contributors may be used to endorse or promote products derived from
 this software without specific prior written permission.
-
 THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
 "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
 LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
@@ -5335,21 +5380,20 @@ THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 
-
 ===========================================================================
-END OF x-sync 0.8.0 NOTICES AND INFORMATION
+END OF x-sync 0.11.0 NOTICES AND INFORMATION
 ===========================================================================
 
 
 @@@@@@@@@@@@
 ===========================================================================
-x-sys 0.24.0: The Program includes x-sys 0.24.0 software. IBM obtained the
-x-sys 0.24.0 software under the terms and conditions of the following
+x-sys 0.30.0: The Program includes x-sys 0.30.0 software. IBM obtained the
+x-sys 0.30.0 software under the terms and conditions of the following
 license(s):
 ---------------------------------------------------------------------------
 
 
-Copyright (c) 2009 The Go Authors. All rights reserved.
+Copyright 2009 The Go Authors.
 
 Redistribution and use in source and binary forms, with or without
 modification, are permitted provided that the following conditions are
@@ -5361,7 +5405,7 @@ notice, this list of conditions and the following disclaimer.
 copyright notice, this list of conditions and the following disclaimer
 in the documentation and/or other materials provided with the
 distribution.
-   * Neither the name of Google Inc. nor the names of its
+   * Neither the name of Google LLC nor the names of its
 contributors may be used to endorse or promote products derived from
 this software without specific prior written permission.
 
@@ -5378,21 +5422,20 @@ THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 
-
 ===========================================================================
-END OF x-sys 0.24.0 NOTICES AND INFORMATION
+END OF x-sys 0.30.0 NOTICES AND INFORMATION
 ===========================================================================
 
 
 @@@@@@@@@@@@
 ===========================================================================
-x-term 0.21.0: The Program includes x-term 0.21.0 software. IBM obtained
-the x-term 0.21.0 software under the terms and conditions of the following
+x-term 0.27.0: The Program includes x-term 0.27.0 software. IBM obtained
+the x-term 0.27.0 software under the terms and conditions of the following
 license(s):
 ---------------------------------------------------------------------------
 
 
-Copyright (c) 2009 The Go Authors. All rights reserved.
+Copyright 2009 The Go Authors.
 
 Redistribution and use in source and binary forms, with or without
 modification, are permitted provided that the following conditions are
@@ -5404,7 +5447,7 @@ notice, this list of conditions and the following disclaimer.
 copyright notice, this list of conditions and the following disclaimer
 in the documentation and/or other materials provided with the
 distribution.
-   * Neither the name of Google Inc. nor the names of its
+   * Neither the name of Google LLC nor the names of its
 contributors may be used to endorse or promote products derived from
 this software without specific prior written permission.
 
@@ -5421,21 +5464,20 @@ THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 
-
 ===========================================================================
-END OF x-term 0.21.0 NOTICES AND INFORMATION
+END OF x-term 0.27.0 NOTICES AND INFORMATION
 ===========================================================================
 
 
 @@@@@@@@@@@@
 ===========================================================================
-x-text 0.16.0: The Program includes x-text 0.16.0 software. IBM obtained
-the x-text 0.16.0 software under the terms and conditions of the following
+x-text 0.21.0: The Program includes x-text 0.21.0 software. IBM obtained
+the x-text 0.21.0 software under the terms and conditions of the following
 license(s):
 ---------------------------------------------------------------------------
 
 
-Copyright (c) 2009 The Go Authors. All rights reserved.
+Copyright 2009 The Go Authors.
 
 Redistribution and use in source and binary forms, with or without
 modification, are permitted provided that the following conditions are
@@ -5447,7 +5489,7 @@ notice, this list of conditions and the following disclaimer.
 copyright notice, this list of conditions and the following disclaimer
 in the documentation and/or other materials provided with the
 distribution.
-   * Neither the name of Google Inc. nor the names of its
+   * Neither the name of Google LLC nor the names of its
 contributors may be used to endorse or promote products derived from
 this software without specific prior written permission.
 
@@ -5464,21 +5506,20 @@ THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 
-
 ===========================================================================
-END OF x-text 0.16.0 NOTICES AND INFORMATION
+END OF x-text 0.21.0 NOTICES AND INFORMATION
 ===========================================================================
 
 
 @@@@@@@@@@@@
 ===========================================================================
-x time 0.3.0: The Program includes x time 0.3.0 software. IBM obtained the
-x time 0.3.0 software under the terms and conditions of the following
+x time 0.7.0: The Program includes x time 0.7.0 software. IBM obtained the
+x time 0.7.0 software under the terms and conditions of the following
 license(s):
 ---------------------------------------------------------------------------
 
 
-Copyright (c) 2009 The Go Authors. All rights reserved.
+Copyright 2009 The Go Authors.
 
 Redistribution and use in source and binary forms, with or without
 modification, are permitted provided that the following conditions are
@@ -5490,7 +5531,7 @@ notice, this list of conditions and the following disclaimer.
 copyright notice, this list of conditions and the following disclaimer
 in the documentation and/or other materials provided with the
 distribution.
-   * Neither the name of Google Inc. nor the names of its
+   * Neither the name of Google LLC nor the names of its
 contributors may be used to endorse or promote products derived from
 this software without specific prior written permission.
 
@@ -5507,9 +5548,8 @@ THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
 OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 
-
 ===========================================================================
-END OF x time 0.3.0 NOTICES AND INFORMATION
+END OF x time 0.7.0 NOTICES AND INFORMATION
 ===========================================================================
 
 
@@ -5555,7 +5595,7 @@ END OF wrapt 1.16.0 NOTICES AND INFORMATION
 
 ===========================================================================
 END OF NOTICES AND INFORMATION FOR IBM Block Storage CSI
-Driver 1.12.0 - Additional Third Party Software License
+Driver 1.12.2 - Additional Third Party Software License
 Agreements and Notices 
 ===========================================================================
 

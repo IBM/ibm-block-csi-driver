@@ -11,7 +11,7 @@ Dynamic host definitions supports the following:
 
 The host definer identifies the nodes available for host definition on each storage system and controls each of the host definitions. To see the phase status of all managed HostDefinitions by the host definer, use:
 
-     kubectl get hostdefinitions
+    kubectl get hostdefinitions
 
 |Phase|Description|
 |---------|--------|
@@ -29,21 +29,20 @@ Node labels can be used to help customize node usage with host definition. For m
 If any of the host definitions have an Error status, follow this procedure to have the host definer reattempt to define the hosts.
 
 1. Undeploy the CSI node pod from the relevant node that the HostDefinition is a part of.
-2. Verify that all HostDefinition instances of the node are deleted.
-     
-          kubectl get hostdefinitions -o=jsonpath='{range .items[?(@.spec.hostDefinition.nodeName=="<node-name>")]}{.metadata.name}{"\n"}{end}'
-     
-     The output displays all HostDefinitions that do not need to be deleted for the `<node-name>`.
+
+2. Verify that all HostDefinition instances of the node are deleted. The output of the following command displays all HostDefinitions that do not need to be deleted for the `<node-name>`.
+```
+kubectl get hostdefinitions -o=jsonpath='{range .items[?(@.spec.hostDefinition.nodeName=="<node-name>")]}{.metadata.name}{"\n"}{end}'
+```
 
 3. Redeploy the CSI node pod on the relevant node.
 
-     The host definer handles the creation of the new host definition on the storage side.
+   The host definer handles the creation of the new host definition on the storage side.
         
 4. Verify that the `hostdefinition` is in the _Ready_ phase.
-
-    ```
-    $> kubectl get hostdefinition
-    NAME                     AGE    PHASE   NODE          MANAGEMENT_ADDRESS   
-    <host_definition_name1>  102m   Ready   <node_name1>  <management_address>
-    <host_definition_name2>  102m   Ready   <node_name2>  <management_address>
-    ```
+```
+$> kubectl get hostdefinition
+NAME                     AGE    PHASE   NODE          MANAGEMENT_ADDRESS
+<host_definition_name1>  102m   Ready   <node_name1>  <management_address>
+<host_definition_name2>  102m   Ready   <node_name2>  <management_address>
+```
