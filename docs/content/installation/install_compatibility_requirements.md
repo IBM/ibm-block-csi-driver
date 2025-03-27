@@ -55,10 +55,10 @@ Complete these steps to prepare your environment for installing the CSI (Contain
     
     Be sure to configure your storage system host attachment according to your storage system instructions.
 
-    The CSI driver supports the following connectivity for each worker node: Fibre Channel (WWPN), NVMe®/FC (NQN), and iSCSI (IQN).
+    The CSI driver supports the following connectivity for each worker node: Fibre Channel (WWPN) and iSCSI (IQN).
         
     **Note:** 
-    - The CSI driver supports NVMe®/FC only on IBM Storage Virtualize family products.
+    - As of this document's publication date, NVMe/FC is not supported for this release.
     - For Fibre Channel connectivity be sure that storage system is using one of the fully supported HBAs compatible with your host connection, as listed in the [IBM® System Storage® Interoperation Center (SSIC)](https://www-03.ibm.com/systems/support/storage/ssic/interoperability.wss).
     - The CSI driver supports IBM DS8000 family storage systems only with Fibre Channel connectivity.
        
