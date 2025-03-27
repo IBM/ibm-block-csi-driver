@@ -9,7 +9,7 @@ If you are using the CSI Topology feature, in addition to the information and pa
 
 Use the following procedure to create and apply the storage classes.
 
-Create a storage class YAML file, similar to the following `demo-storageclass.yaml` and update the storage parameters as needed.
+Create a storage class YAML file, similar to the following `demo-storageclass.yaml` (below) and update the storage parameters as needed.
 
 When configuring the file, be sure to use the same array secret and array secret namespace as defined in [Creating a Secret](creating_secret.md).
 
@@ -34,13 +34,11 @@ The two pools must be from different sites.{: important}
 
 vdisk protection must be disabled globally or for the specific child pools to be used.{: attention}
    
-  For more information about high availability limitations, see [Limitations](../release_notes/limitations.md).
-  
-  For more information about high availability requirements, see [Compatibility and requirements](../installation/install_compatibility_requirements.md).
+For more information about high availability, see [Limitations](../release_notes/limitations.md) and [Compatibility and requirements](../installation/install_compatibility_requirements.md).{: tip}
 
 - The `allowVolumeExpansion` parameter is optional but is necessary for using volume expansion. The default value is _false_.
 
-  **Note:** Be sure to set the value to _true_ to allow volume expansion.
+Be sure to set the value to _true_ to allow volume expansion.{: attention}
 
 - The `csi.storage.k8s.io/fstype` parameter is optional. The values that are allowed are _ext4_ or _xfs_. The default value is _ext4_.
 - The `volume_name_prefix` parameter is optional.
@@ -56,29 +54,27 @@ For IBM DS8000 family storage systems, the maximum prefix length is five charact
 
 For IBM Storage Virtualize family storage systems, the `CSI` prefix is added as default if not specified by the user.{: tip}
 
-    
-      kind: StorageClass
-      apiVersion: storage.k8s.io/v1
-      metadata:
-        name: demo-storageclass
-      provisioner: block.csi.ibm.com
-      parameters:
-        pool: demo-pool
-        io_group: demo-iogrp             # Optional.
-        volume_group: demo-volumegroup   # Optional.
-        SpaceEfficiency: thin            # Optional.
-        volume_name_prefix: demo-prefix  # Optional.
-        virt_snap_func: "false"          # Optional. Values "true"/"false". The default is "false".
+    kind: StorageClass
+    apiVersion: storage.k8s.io/v1
+    metadata:
+      name: demo-storageclass
+    provisioner: block.csi.ibm.com
+    parameters:
+      pool: demo-pool
+      io_group: demo-iogrp             # Optional.
+      volume_group: demo-volumegroup   # Optional.
+      SpaceEfficiency: thin            # Optional.
+      volume_name_prefix: demo-prefix  # Optional.
+      virt_snap_func: "false"          # Optional. Values "true"/"false". The default is "false".
 
-        csi.storage.k8s.io/fstype: xfs   # Optional. Values ext4/xfs. The default is ext4.
-        csi.storage.k8s.io/secret-name: demo-secret
-        csi.storage.k8s.io/secret-namespace: default
-      allowVolumeExpansion: true
-    
+      csi.storage.k8s.io/fstype: xfs   # Optional. Values ext4/xfs. The default is ext4.
+      csi.storage.k8s.io/secret-name: demo-secret
+      csi.storage.k8s.io/secret-namespace: default
+    allowVolumeExpansion: true
 
 Apply the storage class.
 
-      kubectl apply -f <filename>.yaml
+    kubectl apply -f <filename>.yaml
 
 The `storageclass.storage.k8s.io/<storageclass-name> created` message is emitted.
 

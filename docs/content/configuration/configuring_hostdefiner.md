@@ -11,6 +11,8 @@ The prefix length is bound by the limitation of the storage system. When defined
 
 When left blank, the connectivity type will update along with any changes within the host ports, according to the set hierarchy (see `connectivityType` description below). If the value is set and there are host port changes, the connectivity needs to be manually updated. For more information, see [Changing node connectivity](../using/changing_node_connectivity.md).{: attention}
 
+As of this document's publication date, NVMe/FC is not supported for this release.{: restriction}
+
 |Field|Description|
 |---------|--------|
 |`prefix`|Adds a prefix to the hosts defined by the host definer.|

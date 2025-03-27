@@ -49,8 +49,8 @@ I/O group configuration is only supported for use with IBM Storage Virtualize fa
 
 ## NVMe®/FC usage limitations
 
-Red Hat® Enterprise Linux CoreOS (RHCOS) does not support NVMe®/FC.
- 
+As of this document's publication date, NVMe/FC is not supported for this release.{: restriction}
+
 For other limitations with your storage system, see the following section within your IBM Storage Virtualize product documentation on [IBM Documentation](https://www.ibm.com/docs/en/): **Configuring** > **Host attachment** > **NVMe over Fibre Channel host attachments** > **FC-NVMe limitations and SAN configuration guidelines**.
 
 ## Policy-based replication limitations

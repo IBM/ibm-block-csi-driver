@@ -93,7 +93,7 @@ These two files can be used in the next section.<br>
 The IBM Block CSI Driver itself uses the following container images:
 
 * ```registry.k8s.io/sig-storage/csi-node-driver-registrar:v2.13.0```
-* ```registry.k8s.io/sig-storage/csi-provisioner:v5.2.0```
+* ```registry.k8s.io/sig-storage/csi-provisioner:v4.0.1```
 * ```registry.k8s.io/sig-storage/csi-attacher:v4.8.0```
 * ```registry.k8s.io/sig-storage/csi-snapshotter:v8.2.0```
 * ```registry.k8s.io/sig-storage/csi-resizer:v1.13.1```

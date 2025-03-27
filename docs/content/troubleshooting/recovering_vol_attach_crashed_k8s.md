@@ -12,7 +12,6 @@ These procedures are applicable for both Kubernetes and Red Hat® OpenShift®. F
 When a worker node shuts down or crashes, all pods in a StatefulSet that reside on it become unavailable. In these scenarios, the node status is _NotReady_, and the pod status appears as _Terminating_.
 
 For example:
-
 ```
 $>kubectl get nodes
 NAME        STATUS   ROLES  AGE VERSION
@@ -30,26 +29,23 @@ In order to avoid data loss, before continuing, verify that there are no pods co
 
 Follow the following procedure to recover from a crashed node (see a [full example](#for-example) at the end of the procedure):
 
-1.  Find the `volumeattachment` of the created pod:
+1. Find the `volumeattachment` of the created pod:
+```
+kubectl get volumeattachment
+```
 
-    ```
-    kubectl get volumeattachment
-    ```
+2. Copy the `volumeattachment` name.
+3. Delete the `volumeattachment`:
+```
+kubectl delete volumeattachment <volumeattachment name>
+```
 
-2.  Copy the `volumeattachment` name.
-3.  Delete the `volumeattachment`:
+4. Delete the pod:
+```
+kubectl delete pod <pod name> --grace-period=0 --force
+```
 
-    ```
-    kubectl delete volumeattachment <volumeattachment name>
-    ```
-
-4.  Delete the pod:
-
-    ```
-    kubectl delete pod <pod name> --grace-period=0 --force
-    ```
-
-5.  Verify that the pod is now in a _Running_ state and that the pod has moved to a _Ready_ node.
+5. Verify that the pod is now in a _Running_ state and that the pod has moved to a _Ready_ node.
 
 ### For example:
 

@@ -84,6 +84,7 @@
     * [Using dynamic host connectivity](content/using/using_hostdefinition.md)
         * [Changing node connectivity](content/using/changing_node_connectivity.md)
         * [Adding optional labels for dynamic host definition](content/using/using_hostdefinition_labels.md)
+        * [Adding an FC Interface to a worker node](content/using/adding_fc_interface_to_worker_node.md)
     * [Using the CSI driver with policy-based replication](content/using/using_policy_based_replication.md)
         * [Promoting a volume group](content/using/promoting_vg.md)
         * [Deleting a VolumeGroup with a replication policy](content/using/delete_vg.md)

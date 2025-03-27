@@ -3,7 +3,7 @@
 
 # Supported orchestration platforms
 
-As of this document's publication date, IBM Power® and zLinux® architectures are not supported for this release.{: restriction}
+As of this document's publication date, the IBM Power® and zLinux® architectures are not supported for this release.{: restriction}
 
 Kubernetes 1.32 is not supported on Red Hat® Enterprise Linux® (RHEL) 8.x.{: restriction}
 
