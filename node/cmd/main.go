@@ -40,6 +40,7 @@ func main() {
 		exitAfterLogVersion = flag.Bool("version", false, "Log the version and exit.")
 		configFile          = flag.String("config-file-path", "./config.yaml", "Shared config file.")
 		hostname            = flag.String("hostname", "host-dns-name", "The name of the host the node is running on.")
+		max_invocations     = flag.Int("max-invocations", 100, "Max number of external processes allowed to run concurrently")
 	)
 
 	flag.Parse()
@@ -50,7 +51,7 @@ func main() {
 		os.Exit(0)
 	}
 
-	drv, err := driver.NewDriver(*endpoint, *configFile, *hostname)
+	drv, err := driver.NewDriver(*endpoint, *configFile, *hostname, *max_invocations)
 	if err != nil {
 		logger.Panicln(err)
 	}

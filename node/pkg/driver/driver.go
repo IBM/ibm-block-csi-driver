@@ -26,7 +26,7 @@ import (
 	"github.com/ibm/ibm-block-csi-driver/node/util"
 
 	"github.com/ibm/ibm-block-csi-driver/node/pkg/driver/device_connectivity"
-	"github.com/ibm/ibm-block-csi-driver/node/pkg/driver/executer"
+	"github.com/ibm/ibm-block-csi-driver/node/pkg/driver/executer_limited"
 	mountwrapper "github.com/ibm/ibm-block-csi-driver/node/pkg/driver/mount"
 	"google.golang.org/grpc"
 	yaml "gopkg.in/yaml.v2"
@@ -41,7 +41,7 @@ type Driver struct {
 	config   ConfigFile
 }
 
-func NewDriver(endpoint string, configFilePath string, hostname string) (*Driver, error) {
+func NewDriver(endpoint string, configFilePath string, hostname string, max_invocations int) (*Driver, error) {
 	configFile, err := ReadConfigFile(configFilePath)
 	if err != nil {
 		return nil, err
@@ -54,7 +54,7 @@ func NewDriver(endpoint string, configFilePath string, hostname string) (*Driver
 	}
 
 	syncLock := NewSyncLock()
-	executer := &executer.Executer{}
+	executer := executer_limited.NewExecuter(max_invocations)
 	osDeviceConnectivityMapping := map[string]device_connectivity.OsDeviceConnectivityInterface{
 		configFile.Connectivity_type.Nvme_over_fc: device_connectivity.NewOsDeviceConnectivityNvmeOFc(executer),
 		configFile.Connectivity_type.Fc:           device_connectivity.NewOsDeviceConnectivityFc(executer),

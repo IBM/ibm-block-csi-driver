@@ -63,3 +63,5 @@ require (
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20250115164207-1a7da9e5054f // indirect
 	gopkg.in/evanphx/json-patch.v4 v4.12.0 // indirect
 )
+
+replace github.com/ibm/ibm-block-csi-driver/node/pkg/driver/executer_limited => ./node/pkg/driver/executer_limited
