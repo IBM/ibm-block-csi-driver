@@ -54,7 +54,7 @@ func NewDriver(endpoint string, configFilePath string, hostname string) (*Driver
 	}
 
 	syncLock := NewSyncLock()
-	executer := &executer.Executer{}
+	executer := NewExecuter()
 	osDeviceConnectivityMapping := map[string]device_connectivity.OsDeviceConnectivityInterface{
 		configFile.Connectivity_type.Nvme_over_fc: device_connectivity.NewOsDeviceConnectivityNvmeOFc(executer),
 		configFile.Connectivity_type.Fc:           device_connectivity.NewOsDeviceConnectivityFc(executer),
