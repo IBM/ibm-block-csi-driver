@@ -43,9 +43,27 @@ type ExecuterInterface interface { // basic host dependent functions
 }
 
 type Executer struct {
+	tokens chan struct{}
+}
+
+func NewExecuter() ExecuterInterface {
+        return &Executer{
+                tokens: make(chan struct{}, 5),
+        }
+}
+
+func ReleaseSemaphore(e *Executer) {
+	logger.Debug("Before release semaphore")
+	<-e.tokens
+	logger.Debug("AFter release semaphore")
 }
 
 func (e *Executer) ExecuteWithTimeoutSilently(mSeconds int, command string, args []string) ([]byte, error) {
+	logger.Debug("before defer")
+	defer ReleaseSemaphore(e)
+	logger.Debug("before acquire")
+	e.tokens <- struct{}{}
+	logger.Debug("After acquire")
 	// Create a new context and add a timeout to it
 	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(mSeconds)*time.Millisecond)
 	defer cancel() // The cancel should be deferred so resources are cleaned up
