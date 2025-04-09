@@ -1,7 +1,7 @@
 
 {{site.data.keyword.attribute-definition-list}}
 
-# 1.12.2 (March 2025)
+# 1.12.2 (April 2025)
 
 As of this document's publication date, the IBM Power® and zLinux® architectures are not supported for this release.{: restriction}
 
