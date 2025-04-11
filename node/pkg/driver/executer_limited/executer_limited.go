@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package executer
+package executer_limited
 
 import (
 	"context"
@@ -47,9 +47,9 @@ type ExecuterLimited struct {
 }
 
 func NewExecuter() ExecuterInterfaceLimited {
-        return &ExecuterLimited{
-                tokens: make(chan struct{}, 5),
-        }
+	return &ExecuterLimited{
+		tokens: make(chan struct{}, 5),
+	}
 }
 
 func ReleaseSemaphore(e *ExecuterLimited) {
