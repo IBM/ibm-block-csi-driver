@@ -28,7 +28,7 @@ import (
 	"github.com/ibm/ibm-block-csi-driver/node/logger"
 )
 
-//go:generate mockgen -destination=../../../mocks/mock_executer.go -package=mocks github.com/ibm/ibm-block-csi-driver/node/pkg/driver/executer_limited ExecuterInterfaceLimited
+//go:generate mockgen -destination=../../../mocks/mock_executer_limited.go -package=mocks github.com/ibm/ibm-block-csi-driver/node/pkg/driver/executer_limited ExecuterInterfaceLimited
 type ExecuterInterfaceLimited interface { // basic host dependent functions
 	ExecuteWithTimeout(mSeconds int, command string, args []string) ([]byte, error)
 	ExecuteWithTimeoutSilently(mSeconds int, command string, args []string) ([]byte, error)
