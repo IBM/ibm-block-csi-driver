@@ -1,3 +1,6 @@
+
+{{site.data.keyword.attribute-definition-list}}
+
 # Detached Installation of the Driver
 
 The steps below can be applied for any detached Red Hat OpenShift container registry environment and on the amd64 architecture supported by Red Hat OpenShift and the IBM Block CSI Driver:
@@ -89,22 +92,22 @@ The command above should generate the following files in your current working di
 These two files can be used in the next section.<br>
 The IBM Block CSI Driver itself uses the following container images:
 
-* ```k8s.gcr.io/sig-storage/csi-node-driver-registrar:v2.9.0```
-* ```k8s.gcr.io/sig-storage/csi-provisioner:v3.6.0```
-* ```k8s.gcr.io/sig-storage/csi-attacher:v4.4.0```
-* ```k8s.gcr.io/sig-storage/csi-snapshotter:v6.3.0```
-* ```k8s.gcr.io/sig-storage/csi-resizer:v1.9.0```
-* ```k8s.gcr.io/sig-storage/livenessprobe:v2.12.0```
-* ```quay.io/ibmcsiblock/csi-block-volumereplication-operator:v0.9.0```
-* ```quay.io/ibmcsiblock/csi-volume-group-operator:v0.9.1```
-* ```quay.io/ibmcsiblock/ibm-block-csi-host-definer-amd64:1.12.0```
-* ```quay.io/ibmcsiblock/ibm-block-csi-operator-amd64:1.12.0 ```
-* ```quay.io/ibmcsiblock/ibm-block-csi-driver-controller-amd64:1.12.0```
-* ```quay.io/ibmcsiblock/ibm-block-csi-driver-node-amd64:1.12.0```
+* ```registry.k8s.io/sig-storage/csi-node-driver-registrar:v2.13.0```
+* ```registry.k8s.io/sig-storage/csi-provisioner:v4.0.1```
+* ```registry.k8s.io/sig-storage/csi-attacher:v4.8.0```
+* ```registry.k8s.io/sig-storage/csi-snapshotter:v8.2.0```
+* ```registry.k8s.io/sig-storage/csi-resizer:v1.13.1```
+* ```registry.k8s.io/sig-storage/livenessprobe:v2.15.0```
+* ```quay.io/ibmcsiblock/csi-block-volumereplication-operator:v0.9.2```
+* ```quay.io/ibmcsiblock/csi-volume-group-operator:v0.9.2```
+* ```quay.io/ibmcsiblock/ibm-block-csi-host-definer-amd64:1.12.2```
+* ```quay.io/ibmcsiblock/ibm-block-csi-operator-amd64:1.12.2 ```
+* ```quay.io/ibmcsiblock/ibm-block-csi-driver-controller-amd64:1.12.2```
+* ```quay.io/ibmcsiblock/ibm-block-csi-driver-node-amd64:1.12.2```
 
 All the images above must be copied to your private registry using ```skopeo```.<br>
 
-**Note**: Make sure to run the ```skopeo``` command from a node that uses the same CPU architecture as the node where you intend to deploy the operator.
+Make sure to run the ```skopeo``` command from a node that uses the same CPU architecture as the node where you intend to deploy the operator.{: important}
 
 ## Create CatalogSource and Patch Operator (CSV)
 
@@ -114,7 +117,7 @@ Once all the images have been copied to your private registry, the IBM Block CSI
 2. Deploy the IBM Block CSI Driver Operator via the Red Hat OpenShift Console
 3. Patch the IBM Block CSI Driver CSV, setting all image paths and tags to match your private registry images
 
-**Note**: To edit the CSV, go to the Red Hat OpenShift console or use the ```oc edit``` command. Use ```skopeo inspect``` to identify the digest of each image.
+To edit the CSV, go to the Red Hat OpenShift console or use the ```oc edit``` command. Use ```skopeo inspect``` to identify the digest of each image.{: tip}
 
 ## Install the Driver
 
@@ -122,11 +125,11 @@ Once the private registry is set up, the CatalogSource is configured and the IBM
 
 1. Download the driver installation yaml
 ```
-curl https://raw.githubusercontent.com/IBM/ibm-block-csi-operator/v1.12.0/config/samples/csi.ibm.com_v1_ibmblockcsi_cr.yaml > csi.ibm.com_v1_ibmblockcsi_cr.yaml
+curl https://raw.githubusercontent.com/IBM/ibm-block-csi-operator/v1.12.2/config/samples/csi.ibm.com_v1_ibmblockcsi_cr.yaml > csi.ibm.com_v1_ibmblockcsi_cr.yaml
 ```
 2. Update the driver installation yaml, setting all image paths and tags to match your private registry images
 3. Optionally, download the HostDefiner driver installation yaml and update it, setting all iamge paths and tags to match your private registry images
 ```
- curl https://raw.githubusercontent.com/IBM/ibm-block-csi-operator/v1.12.0/config/samples/csi_v1_hostdefiner_cr.yaml > csi_v1_hostdefiner_cr.yaml
+ curl https://raw.githubusercontent.com/IBM/ibm-block-csi-operator/v1.12.2/config/samples/csi_v1_hostdefiner_cr.yaml > csi_v1_hostdefiner_cr.yaml
  ```
 

@@ -1,4 +1,4 @@
-# Copyright IBM Corporation 2024.
+# Copyright IBM Corporation 2025.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -16,7 +16,7 @@
 #    This Dockerfile.test is for running the csi controller local tests inside a container.
 #    Its similar to the Dockerfile, but with additional requirements-tests.txt and ENTRYPOINT to run the local tests.
 
-FROM registry.access.redhat.com/ubi8/python-39:1-206.1732638092 AS builder
+FROM registry.access.redhat.com/ubi8/python-39:1-209.1739760684 AS builder
 USER root
 RUN if [[ "$(uname -m)" != "x86"* ]]; then yum install -y rust-toolset; fi
 USER default
@@ -30,6 +30,7 @@ RUN pip3 install -r ./csi_requirements.txt -r ./host_definer_requirements.txt
 
 USER root
 COPY controllers/scripts/csi_general .
+RUN chmod +x csi_pb2.sh
 RUN ./csi_pb2.sh
 RUN pip3 install .
 
@@ -38,7 +39,7 @@ COPY controllers/tests/requirements.txt ./requirements-tests.txt
 RUN pip3 install -r ./requirements-tests.txt
 
 
-FROM registry.access.redhat.com/ubi8/python-39:1-206.1732638092
+FROM registry.access.redhat.com/ubi8/python-39:1-209.1739760684
 
 COPY --from=builder /opt/app-root /opt/app-root
 COPY ./common /driver/common

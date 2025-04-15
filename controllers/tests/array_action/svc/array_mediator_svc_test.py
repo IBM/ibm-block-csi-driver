@@ -1,11 +1,13 @@
 import unittest
 from unittest.mock import MagicMock
+from datetime import datetime, timedelta
 
 from mock import patch, Mock, call, PropertyMock
 from munch import Munch
 from pysvc import errors as svc_errors
 from pysvc.unified.response import CLIFailureError, SVCResponse
 
+from controllers.common.config import config
 import controllers.array_action.errors as array_errors
 import controllers.tests.array_action.svc.test_settings as svc_settings
 import controllers.tests.array_action.test_settings as array_settings
@@ -1828,6 +1830,8 @@ class TestArrayMediatorSVC(unittest.TestCase):
                                                      array_errors.HostNotFoundError)
         self._test_unmap_volume_rmvdiskhostmap_error(svc_errors.CommandExecutionError("CMMVC5842E"),
                                                      array_errors.VolumeAlreadyUnmappedError)
+        self._test_unmap_volume_rmvdiskhostmap_error(svc_errors.CommandExecutionError("CMMVC5804E"),
+                                                     array_errors.VolumeNotMappedToHostError)
         self._test_unmap_volume_rmvdiskhostmap_error(svc_errors.CommandExecutionError(
             array_settings.DUMMY_ERROR_MESSAGE),
             array_errors.UnmappingError)
@@ -2501,3 +2505,84 @@ class TestArrayMediatorSVC(unittest.TestCase):
 
         self.svc.client.svctask.chvdisk.assert_called_once_with(vdisk_id=common_settings.INTERNAL_VOLUME_ID,
                                                                 novolumegroup=True)
+
+    @patch('{}.is_call_home_enabled'.format('controllers.array_action.array_mediator_svc'))
+    @patch('controllers.array_action.array_mediator_svc.SVC_REGISTRATION_CACHE')
+    def test_register_plugin_when_there_is_no_registered_storage_success(self, mock_cache, is_enabled_mock):
+        mock_cache.get.return_value = {}
+        is_enabled_mock.return_value = True
+
+        self._test_register_plugin_success(True)
+
+    @patch('{}.is_call_home_enabled'.format('controllers.array_action.array_mediator_svc'))
+    @patch('controllers.array_action.array_mediator_svc.SVC_REGISTRATION_CACHE')
+    def test_register_plugin_when_unique_key_is_registered_more_than_two_hours_ago_success(
+            self, mock_cache, is_enabled_mock):
+        current_time = datetime.now()
+        three_hours_ago = current_time - timedelta(hours=3)
+        mock_cache.get.return_value = {'test_key': three_hours_ago}
+        is_enabled_mock.return_value = True
+
+        self._test_register_plugin_success(True)
+
+    @patch('{}.is_call_home_enabled'.format('controllers.array_action.array_mediator_svc'))
+    @patch('controllers.array_action.array_mediator_svc.SVC_REGISTRATION_CACHE')
+    def test_do_not_register_plugin_when_unique_key_is_registered_less_than_two_hours_ago_success(
+            self, mock_cache, is_enabled_mock):
+        current_time = datetime.now()
+        one_hours_ago = current_time - timedelta(hours=1)
+        mock_cache.get.return_value = {'test_key': one_hours_ago}
+        is_enabled_mock.return_value = True
+
+        self._test_register_plugin_success(False)
+
+    @patch('{}.is_call_home_enabled'.format('controllers.array_action.array_mediator_svc'))
+    @patch('controllers.array_action.array_mediator_svc.SVC_REGISTRATION_CACHE')
+    def test_assert_no_exception_when_register_fail_success(self, mock_cache, is_enabled_mock):
+        self.svc.client.svctask.registerplugin.side_effect = [Exception]
+        mock_cache.get.return_value = {}
+        is_enabled_mock.return_value = True
+
+        self._test_register_plugin_success(True)
+
+    @patch('{}.is_call_home_enabled'.format('controllers.array_action.array_mediator_svc'))
+    @patch('controllers.array_action.array_mediator_svc.SVC_REGISTRATION_CACHE')
+    def test_do_not_register_plugin_when_call_home_is_not_enabled_success(self, mock_cache, is_enabled_mock):
+        is_enabled_mock.return_value = False
+
+        self._test_register_plugin_success(False)
+        self.assertEqual(mock_cache.get.call_count, 0)
+
+    def _test_register_plugin_success(self, should_register):
+        self.svc.register_plugin('test_key', 'some_metadata')
+
+        if should_register:
+            self.svc.client.svctask.registerplugin.assert_called_once_with(name='block.csi.ibm.com',
+                                                                           uniquekey='test_key',
+                                                                           version=config.identity.version,
+                                                                           metadata='some_metadata')
+        else:
+            self.svc.client.svctask.registerplugin.not_called()
+
+    @patch('{}.is_call_home_enabled'.format('controllers.array_action.array_mediator_svc'))
+    @patch('{}.get_odf_call_home_version'.format('controllers.array_action.array_mediator_svc'))
+    @patch('controllers.array_action.array_mediator_svc.SVC_REGISTRATION_CACHE')
+    def test_register_plugin_with_odf_success(self, mock_cache, mock_odf_version, is_enabled_mock):
+        current_time = datetime.now()
+        three_hours_ago = current_time - timedelta(hours=3)
+        mock_cache.get.return_value = {'test_key': three_hours_ago}
+        mock_odf_version.return_value = '1.7.0'
+        is_enabled_mock.return_value = True
+
+        self.svc.register_plugin('test_key', 'some_metadata')
+
+        call_1 = call(name='block.csi.ibm.com',
+                      uniquekey='test_key',
+                      version=config.identity.version,
+                      metadata='some_metadata')
+
+        call_2 = call(name='odf.ibm.com',
+                      uniquekey='basic',
+                      version='1.7.0')
+
+        self.svc.client.svctask.registerplugin.assert_has_calls([call_1, call_2])

@@ -1,8 +1,11 @@
+
+{{site.data.keyword.attribute-definition-list}}
+
 # Creating a VolumeSnapshotClass
 
 Create a VolumeSnapshotClass YAML file to enable creation and deletion of volume snapshots.
 
-**Note:** This section refers to both the IBM FlashCopy® function and Snapshot function in IBM Storage Virtualize storage systems.
+This section refers to both the IBM FlashCopy® function and Snapshot function in IBM Storage Virtualize storage systems.{: note}
 
 In order to enable creation and deletion of volume snapshots for your storage system, create a VolumeSnapshotClass YAML file, similar to the following `demo-volumesnapshotclass.yaml`.
 
@@ -10,17 +13,21 @@ When configuring the file, be sure to use the same array secret and array secret
 
 -   The `snapshot_name_prefix` parameter is optional.
 
-    **Note:** For IBM DS8000® family storage systems, the maximum prefix length is five characters.<br/>The maximum prefix length for other systems is 20 characters.<br/>For IBM Storage Virtualize family storage systems, the `CSI` prefix is added as default if not specified by the user.
+For IBM DS8000® family storage systems, the maximum prefix length is five characters. The maximum prefix length for other systems is 20 characters.{: requirement}
+
+For IBM Storage Virtualize family storage systems, the `CSI` prefix is added as default if not specified by the user.{: tip}
 
 - The `virt_snap_func` parameter is optional but necessary in IBM Storage Virtualize storage systems if using the Snapshot function. To enable the Snapshot function, set the value to _"true"_. The default value is _"false"_. If the value is `"false"` the snapshot will use the FlashCopy function.
     
+When electing to set the optional "virt_snap_func" parameter, it **must** also be set with an identical value in the relevant StorageClass yaml.{: requirement}
+
 - To create a stretched snapshot on SAN Volume Controller storage systems, put a colon (:) between the two pools within the `pool` value. For example:
   
   `pool: demo-pool1:demo-pool2`
   
-   **Important:** The two pools must be from different sites.
+The two pools must be from different sites.{: important}
 
-   For more information about stretched snapshot limitations and requirements, see [Limitations](../release_notes/limitations.md) and [Compatibility and requirements](../installation/install_compatibility_requirements.md).
+For more information about stretched snapshot limitations and requirements, see [Limitations](../release_notes/limitations.md) and [Compatibility and requirements](../installation/install_compatibility_requirements.md).{: tip}
 
 
 ```
@@ -34,7 +41,7 @@ parameters:
   pool: demo-pool                    # Optional. Use to create the snapshot on a different pool than the source.
   SpaceEfficiency: thin              # Optional. Use to create the snapshot with a different space efficiency than the source.
   snapshot_name_prefix: demo-prefix  # Optional.
-  virt_snap_func: "false"            # Optional. Values "true"/"false". The default is "false".
+  virt_snap_func: "false"            # Optional. Values "true"/"false". The default is "false". If set, this value MUST be identical to the value set in the StorageClass yaml
 
   csi.storage.k8s.io/snapshotter-secret-name: demo-secret
   csi.storage.k8s.io/snapshotter-secret-namespace: default

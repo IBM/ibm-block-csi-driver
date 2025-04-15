@@ -1,6 +1,6 @@
 pipeline {
     parameters {
-        string(name: 'IMAGE_VERSION', defaultValue: "1.12.0")
+        string(name: 'IMAGE_VERSION', defaultValue: "1.12.2")
         string(name: 'DOCKER_REGISTRY', defaultValue: DEFAULT_DOCKER_REGISTRY)
         string(name: 'EMAIL_TO', defaultValue: "")
     }

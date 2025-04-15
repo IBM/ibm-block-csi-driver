@@ -23,8 +23,33 @@ class ArrayMediatorAbstract(ArrayMediator, ABC):
         self.endpoint = endpoint
 
     @retry(NoConnectionAvailableException, tries=11, delay=1)
-    def map_volume_by_initiators(self, vol_id, initiators):
+    def map_volume_by_initiators(self, vol_id, initiators, exclusive_access=True):
         logger.debug("mapping volume : {0}".format(vol_id))
+        mappings = self.get_volume_mappings(vol_id)
+        if exclusive_access and len(mappings) > 1:
+            raise array_errors.VolumeAlreadyMappedToDifferentHostsError(mappings)
+
+        if len(mappings) >= 1:
+            logger.debug(
+                "{0} mappings have been found for volume. the mappings are: {1}".format(len(mappings), mappings))
+            for mapping_host_name in mappings:
+                host = self.get_host_by_name(mapping_host_name)
+                if host.initiators in initiators:
+                    logger.debug("idempotent case - volume is already mapped to host.")
+                    lun = mappings[mapping_host_name]
+                    logger.debug(
+                        "hostname : {}, connectivity_types  : {}".format(host.name, host.connectivity_types))
+                    connectivity_type = utils.choose_connectivity_type(host.connectivity_types)
+                    array_initiators = self._get_array_initiators(host.name, connectivity_type)
+                    return lun, connectivity_type, array_initiators
+                logger.debug(
+                    "volume is already mapped to a host but doesn't match initiators continue search."
+                    " host initiators: {} request initiators: {}.".format(host.initiators, initiators))
+
+        if exclusive_access and len(mappings) == 1:
+            raise array_errors.VolumeAlreadyMappedToDifferentHostsError(mappings)
+
+        logger.debug("no mappings were found for volume. mapping volume : {0}".format(vol_id))
 
         host_name, connectivity_types = self.get_host_by_host_identifiers(initiators)
 

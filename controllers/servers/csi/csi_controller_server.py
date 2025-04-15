@@ -99,6 +99,8 @@ class CSIControllerServicer(csi_pb2_grpc.ControllerServicer):
                         "volume was not found. creating a new volume with parameters: {0}".format(request.parameters))
 
                     array_mediator.validate_supported_space_efficiency(space_efficiency)
+                    if topologies:
+                        array_mediator.register_plugin('topology', '')
                     volume = array_mediator.create_volume(volume_final_name, required_bytes, space_efficiency, pool,
                                                           volume_parameters.io_group, volume_parameters.volume_group,
                                                           source_ids, source_type, is_virt_snap_func)
@@ -220,8 +222,10 @@ class CSIControllerServicer(csi_pb2_grpc.ControllerServicer):
 
             array_connection_info = utils.get_array_connection_info_from_secrets(request.secrets, system_id=system_id)
             with get_agent(array_connection_info, array_type).get_mediator() as array_mediator:
-                lun, connectivity_type, array_initiators = array_mediator.map_volume_by_initiators(volume_id,
-                                                                                                   initiators)
+                lun, connectivity_type, array_initiators = array_mediator.map_volume_by_initiators(
+                    volume_id,
+                    initiators,
+                    utils.is_publish_volume_request_exclusive_access(request))
             response = utils.generate_csi_publish_volume_response(lun,
                                                                   connectivity_type,
                                                                   array_initiators)
@@ -268,6 +272,8 @@ class CSIControllerServicer(csi_pb2_grpc.ControllerServicer):
             logger.debug("Idempotent case. volume is already unmapped.")
         except array_errors.ObjectNotFoundError:
             logger.debug("Idempotent case. volume is already deleted.")
+        except array_errors.VolumeNotMappedToHostError:
+            logger.debug("Idempotent case. volume is not mapped to host.")
         return csi_pb2.ControllerUnpublishVolumeResponse()
 
     @csi_method(error_response_type=csi_pb2.ValidateVolumeCapabilitiesResponse, lock_request_attribute="volume_id")

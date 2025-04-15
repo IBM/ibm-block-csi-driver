@@ -1,12 +1,11 @@
-# What's new in 1.12.0
+# What's new in 1.12.2
 
-IBM® block storage CSI driver 1.12.0 is a major release that adds support for:
+IBM® block storage CSI driver 1.12.2 is a minor release that adds support for:
 
-- PVC ReadWriteMany (RWX) access mode
-- New FlashSystem-specific configuration option for host definer to set the portset for new ports created by host definer
+- Utilizing FlashSystem plugin callhome extension to send IBM® Block Storage CSI driver callhome data
 
-**General availability date:** December 2024
+**General availability date:** April 2025
 
 ## Miscellaneous resolved issues
 
-For information about the resolved issues in version 1.12.0, see [1.12.0 (December 2024)](changelog_1.12.0.md).
+For information about the resolved issues in version 1.12.2, see [1.12.2 (April 2025)](changelog_1.12.2.md).

@@ -195,6 +195,10 @@ func (n NodeUtils) DevicesAreNvme(sysDevices []string) (bool, error) {
 	args := []string{"list"}
 	out, err := n.Executer.ExecuteWithTimeout(TimeOutNvmeCmd, nvmeCmd, args)
 	if err != nil {
+		if err.Error() == "exit status 1" {
+			logger.Debugf("'nvme list' failing, likely because 'nvme' and 'nvme-core' kernel modules are not loaded. Devices are certainly not NVMe in this case")
+			return false, nil
+		}
 		outMessage := strings.TrimSpace(string(out))
 		if strings.HasSuffix(outMessage, noSuchFileOrDirectoryErrorMessage) {
 			return false, nil

@@ -1,4 +1,9 @@
+
+{{site.data.keyword.attribute-definition-list}}
+
 # Installing the host definer
+
+HostDefiner is not supported when using IBM DS8000® family storage systems.{: restriction}
 
 Install the HostDefiner custom resource to enable dynamic host definitions of the CSI driver nodes.
 

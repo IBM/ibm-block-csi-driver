@@ -1,3 +1,4 @@
+from os import getenv
 import json
 import re
 from hashlib import sha256
@@ -534,6 +535,10 @@ def validate_publish_volume_request(request):
     logger.debug("publish volume request validation finished.")
 
 
+def is_publish_volume_request_exclusive_access(request):
+    return request.volume_capability.access_mode.mode in servers_settings.EXCLUSIVE_ACCESS_ACCESS_MODE
+
+
 def get_volume_id_info(volume_id):
     return get_object_id_info(volume_id, servers_settings.VOLUME_TYPE_NAME)
 
@@ -846,3 +851,11 @@ def get_replication_object_type_and_id_info(request):
             raise ValidationException(messages.UNSUPPORTED_REPLICATION_SOURCE_TYPE_MESSAGE)
     object_id_info = get_object_id_info(object_id, object_type)
     return object_type, object_id_info
+
+
+def is_call_home_enabled():
+    return getenv(servers_settings.ENABLE_CALL_HOME_ENV_VAR, 'true') == 'true'
+
+
+def get_odf_call_home_version():
+    return getenv(servers_settings.ODF_VERSION_FOR_CALL_HOME_ENV_VAR, '')

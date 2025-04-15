@@ -43,6 +43,8 @@ MAPPING_ERROR_MESSAGE = "Mapping error has occurred while mapping volume : {0} t
 
 VOLUME_ALREADY_UNMAPPED_MESSAGE = "Volume: {0} is already unmapped."
 
+VOLUME_NOT_MAPPED_TO_HOST_MESSAGE = "Volume {0} is not mapped to host {1}"
+
 UNMAPPING_ERROR_MESSAGE = "Unmapping error has occurred for volume : {0} and host : {1}. error : {2}"
 
 VOLUME_ALREADY_MAPPED_TO_DIFFERENT_HOSTS_ERROR_MESSAGE = "Volume is already mapped to different hosts {0}"

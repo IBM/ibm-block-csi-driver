@@ -1,17 +1,18 @@
+
+{{site.data.keyword.attribute-definition-list}}
+
 # Creating a PersistentVolumeClaim (PVC)
 
 Create a PersistentVolumeClaim (PVC) YAML file for a persistent volume (PV).
 
 The IBM® block storage CSI driver supports using both file system and raw block volume modes.
 
-**Important:**
-<br>
-  - If not defined, the default mode is `Filesystem`. Be sure to define the mode as `Block` if this configuration is preferred.<br>
-  - In all the examples, `accessModes` with value `ReadWriteOnce` is used, but `ReadWriteMany` can be used (instead or in addition) to allow multiple pod containers to access the mount (see [details](#creating-a-pvc-with-readwritemany-access-mode) below).<br>
-  - Changing `accessModes` of existing PVCs should follow the [procedure](#updating-access-modes) below.<br>
-  - The volume group labels are not pre-defined. Be sure to match the selector in the target volume group (`spec.source.selector`). For an example of creating a PVC using the VolumeGroup configuration, see [Creating a PVC within a volume group with the dynamic volume group feature](#creating-a-pvc-within-a-volume-group-with-the-dynamic-volume-group-feature).
+The following must be considered when configuring and creating a PVC.{: important}
 
-**Note:** The examples below create the PVC with a storage size 1 Gb. This can be changed, per customer needs.
+- If not defined, the default mode is `Filesystem`. Be sure to define the mode as `Block` if this configuration is preferred.
+- In all the examples, `accessModes` with value `ReadWriteOnce` is used, but `ReadWriteMany` can be used (instead or in addition) to allow multiple pod containers to access the mount (see [details](#creating-a-pvc-with-readwritemany-access-mode) below).
+- Changing `accessModes` of existing PVCs should follow the [procedure](#updating-access-modes) below.
+- The volume group labels are not pre-defined. Be sure to match the selector in the target volume group (`spec.source.selector`). For an example of creating a PVC using the VolumeGroup configuration, see [Creating a PVC within a volume group with the dynamic volume group feature](#creating-a-pvc-within-a-volume-group-with-the-dynamic-volume-group-feature).
 
 Use the sections below for creating YAML files for PVCs with file system and raw block volume modes. After each YAML file creation, use the `kubectl apply` command.
 
@@ -31,11 +32,11 @@ Use the following sections, according to your PVC needs:
 - [Creating a PVC that allows concurrent access from multiple pod containers](#creating-a-pvc-with-readwritemany-access-mode)
 - [Updating accessModes of existing PVC](#updating-access-modes)
 
+The examples below create the PVC with a storage size 1 Gb. This can be changed as needed.{: note}
+
 ## Creating a PVC for volume with file system
 
 Create a PVC YAML file, similar to the following `demo-pvc-file-system.yaml` file, with the size of 1 Gb, with `volumeMode` defined as `Filesystem`.
-
-**Note:** `volumeMode` is an optional field. `Filesystem` is the default if the value is not added.
 
     kind: PersistentVolumeClaim
     apiVersion: v1
@@ -71,8 +72,6 @@ Create a PVC YAML file, similar to the following `demo-pvc-raw-block.yaml` file,
 
 Create a PVC YAML file similar to the following `demo-pvc-in-volume-group.yaml` file, changing the `volumeMode` as needed.
 
-**Note:**  Be sure to match the selector in the target volume group (`spec.source.selector`). For more information, see [Creating a VolumeGroup](creating_volumegroup.md).
-
     kind: PersistentVolumeClaim
     apiVersion: v1
     metadata:
@@ -87,6 +86,8 @@ Create a PVC YAML file similar to the following `demo-pvc-in-volume-group.yaml` 
         requests:
           storage: 1Gi
       storageClassName: demo-storageclass
+
+Be sure to match the selector in the target volume group (`spec.source.selector`). For more information, see [Creating a VolumeGroup](creating_volumegroup.md).{: attention}
 
 ## Creating a PVC from volume snapshot
 
@@ -113,7 +114,7 @@ Update the `dataSource` parameters to reflect the existing volume snapshot infor
 
 ## Creating a volume clone from an existing PVC
 
-**Note:** This section refers to both the IBM FlashCopy® function and Snapshot function in IBM Storage Virtualize storage systems.
+This section refers to both the IBM FlashCopy® function and Snapshot function in IBM Storage Virtualize storage systems.{: note}
 
 To create a volume clone from an existing PVC object, create a PVC YAML file, similar to the following `demo-pvc-cloned-pvc.yaml` file, with the size of 1 Gb.
 

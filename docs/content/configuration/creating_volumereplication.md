@@ -1,10 +1,13 @@
+
+{{site.data.keyword.attribute-definition-list}}
+
 # Creating a VolumeReplication
 
 Create a VolumeReplication YAML file to replicate a specific PersistentVolumeClaim (PVC).
 
 VolumeReplicationClass needs to be present before a VolumeReplication can be created. For more information, see [Creating a VolumeReplicationClass](creating_volumereplicationclass.md).
 
-**Note:** Remote copy function is referred to as the more generic volume replication within this documentation set. Not all supported products use the remote-copy function terminology.
+Remote copy function is referred to as the more generic volume replication within this documentation set. Not all supported products use the remote-copy function terminology.{: note}
 
 When replicating a volume, be sure to follow all of the replication configurations, found in [Compatibility and requirements](../installation/install_compatibility_requirements.md) before volume replication.
 
@@ -50,4 +53,5 @@ When replicating a volume, be sure to follow all of the replication configuratio
     -   **Secondary** Indicates that the source volume is the secondary volume.
     -   **Unknown** Indicates that the driver does not recognize the replication state.
 
-    **Note:** For information about changing the replication state, see the [Usage](https://github.com/csiblock/volume-replication-operator/tree/v0.1.0#usage) section of the Volume Replication Operator for csi-addons.
+For information about changing the replication state, see the [Usage](https://github.com/csiblock/volume-replication-operator/tree/v0.1.0#usage) section of the Volume Replication Operator for csi-addons.{: tip}
+

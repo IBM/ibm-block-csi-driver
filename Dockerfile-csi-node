@@ -1,4 +1,4 @@
-# Copyright IBM Corporation 2024.
+# Copyright IBM Corporation 2025.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -13,7 +13,7 @@
 # limitations under the License.
 
 # Build stage
-FROM golang:1.22 AS builder
+FROM golang:1.23 AS builder
 
 WORKDIR /go/src/github.com/ibm/ibm-block-csi-driver
 ENV GO111MODULE=on
@@ -27,10 +27,10 @@ COPY . .
 RUN make ibm-block-csi-driver
 
 # Final stage
-FROM registry.access.redhat.com/ubi9-minimal:9.5-1733767867
+FROM registry.access.redhat.com/ubi9-minimal:9.5-1739420147
 MAINTAINER IBM Storage
 
-ARG VERSION=1.12.0
+ARG VERSION=1.12.2
 ARG BUILD_NUMBER=0
 
 LABEL name="IBM block storage CSI driver node" \
