@@ -50,6 +50,8 @@ Volume groups can only be managed by **either** the associated VolumeGroup **or*
 
 - The `virt_snap_func` parameter is optional but necessary in IBM Storage Virtualize storage systems if using the Snapshot function. To enable the Snapshot function, set the value to _"true"_. The default value is _"false"_. If the value is _"false"_ the snapshot will use the FlashCopy function.
 
+When electing to set the optional "virt_snap_func" parameter, it **must** also be set with an identical value in the relevant VolumeSnapshotClass yamls.{: requirement}
+
 For IBM DS8000 family storage systems, the maximum prefix length is five characters. The maximum prefix length for other systems is 20 characters.{: requirement}
 
 For IBM Storage Virtualize family storage systems, the `CSI` prefix is added as default if not specified by the user.{: tip}
@@ -65,7 +67,7 @@ For IBM Storage Virtualize family storage systems, the `CSI` prefix is added as 
       volume_group: demo-volumegroup   # Optional.
       SpaceEfficiency: thin            # Optional.
       volume_name_prefix: demo-prefix  # Optional.
-      virt_snap_func: "false"          # Optional. Values "true"/"false". The default is "false".
+      virt_snap_func: "false"          # Optional. Values "true"/"false". The default is "false". If set, this value MUST be identical to the value set in the VolumeSnapshotClass yamls
 
       csi.storage.k8s.io/fstype: xfs   # Optional. Values ext4/xfs. The default is ext4.
       csi.storage.k8s.io/secret-name: demo-secret
