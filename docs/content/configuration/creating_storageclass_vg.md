@@ -8,6 +8,8 @@ Use the following procedure to create and apply the storage classes when using p
 Create a storage class YAML file, similar to the following demo-storageclass.yaml (below) and update the storage parameters as needed.
 
 Volume groups can only be managed by **either** the associated VolumeGroup **or** the associated StorageClass (with the `volume_group` parameter). If a volume group is already associated with a VolumeGroup, then each volume of this StorageClass can be automatically deleted.{: restriction}
+
+When electing to set the optional "virt_snap_func" parameter, it **must** also be set with an identical value in the relevant VolumeSnapshotClass yamls.{: requirement}
   
     kind: StorageClass
     apiVersion: storage.k8s.io/v1
@@ -20,7 +22,7 @@ Volume groups can only be managed by **either** the associated VolumeGroup **or*
       volume_group: demo-volumegroup   # Optional.
       SpaceEfficiency: thin            # Optional.
       volume_name_prefix: demo-prefix  # Optional.
-      virt_snap_func: "false"          # Optional. Values "true"/"false". The default is "false".
+      virt_snap_func: "false"          # Optional. Values "true"/"false". The default is "false". If set, this value MUST be identical to the value set in the VolumeSnapshotClass yamls
 
       csi.storage.k8s.io/fstype: xfs   # Optional. Values ext4/xfs. The default is ext4.
       csi.storage.k8s.io/secret-name: demo-secret
