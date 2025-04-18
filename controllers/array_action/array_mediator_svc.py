@@ -243,7 +243,7 @@ def _get_ssh_port_from_environment():
 class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
     ARRAY_ACTIONS = {}
     BLOCK_SIZE_IN_BYTES = 512
-    MAX_LUN_NUMBER = 511
+    MAX_LUN_NUMBER = 1800
     MIN_LUN_NUMBER = 0
     MIN_SUPPORTED_VERSION = '7.8'
 
