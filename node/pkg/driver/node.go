@@ -27,7 +27,7 @@ import (
 	"github.com/ibm/ibm-block-csi-driver/node/goid_info"
 	"github.com/ibm/ibm-block-csi-driver/node/logger"
 	"github.com/ibm/ibm-block-csi-driver/node/pkg/driver/device_connectivity"
-	"github.com/ibm/ibm-block-csi-driver/node/pkg/driver/executer_limited"
+	"github.com/ibm/ibm-block-csi-driver/node/pkg/driver/executer"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	mount "k8s.io/mount-utils"
@@ -79,7 +79,7 @@ type NodeService struct {
 	ConfigYaml                  ConfigFile
 	Hostname                    string
 	NodeUtils                   NodeUtilsInterface
-	executer                    executer_limited.ExecuterInterfaceLimited
+	executer                    executer.ExecuterInterface
 	VolumeIdLocksMap            SyncLockInterface
 	OsDeviceConnectivityMapping map[string]device_connectivity.OsDeviceConnectivityInterface
 	OsDeviceConnectivityHelper  device_connectivity.OsDeviceConnectivityHelperScsiGenericInterface
@@ -95,12 +95,12 @@ type VolumeStatistics struct {
 func NewNodeService(configYaml ConfigFile, hostname string, nodeUtils NodeUtilsInterface,
 	OsDeviceConnectivityMapping map[string]device_connectivity.OsDeviceConnectivityInterface,
 	osDeviceConnectivityHelper device_connectivity.OsDeviceConnectivityHelperScsiGenericInterface,
-	executer_limited executer_limited.ExecuterInterfaceLimited, mounter NodeMounter, syncLock SyncLockInterface) NodeService {
+	executer executer.ExecuterInterface, mounter NodeMounter, syncLock SyncLockInterface) NodeService {
 	return NodeService{
 		ConfigYaml:                  configYaml,
 		Hostname:                    hostname,
 		NodeUtils:                   nodeUtils,
-		executer:                    executer_limited,
+		executer:                    executer,
 		OsDeviceConnectivityMapping: OsDeviceConnectivityMapping,
 		OsDeviceConnectivityHelper:  osDeviceConnectivityHelper,
 		Mounter:                     mounter,
