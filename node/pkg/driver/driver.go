@@ -55,7 +55,8 @@ func NewDriver(endpoint string, configFilePath string, hostname string) (*Driver
 	}
 
 	syncLock := NewSyncLock()
-	executer := executer_limited.NewExecuter(strconv.Atoi(configFile.parameters.max_invocations))
+	max_invocations, _ = strconv.Atoi(configFile.parameters.max_invocations)
+	executer := executer_limited.NewExecuter(max_invocations)
 	osDeviceConnectivityMapping := map[string]device_connectivity.OsDeviceConnectivityInterface{
 		configFile.Connectivity_type.Nvme_over_fc: device_connectivity.NewOsDeviceConnectivityNvmeOFc(executer),
 		configFile.Connectivity_type.Fc:           device_connectivity.NewOsDeviceConnectivityFc(executer),
