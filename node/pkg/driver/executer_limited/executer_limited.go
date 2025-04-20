@@ -48,22 +48,17 @@ type ExecuterLimited struct {
 
 func NewExecuter() ExecuterInterfaceLimited {
 	return &ExecuterLimited{
-		tokens: make(chan struct{}, 5),
+		tokens: make(chan struct{}, 1),
 	}
 }
 
 func ReleaseSemaphore(e *ExecuterLimited) {
-	logger.Debug("Before release semaphore")
 	<-e.tokens
-	logger.Debug("AFter release semaphore")
 }
 
 func (e *ExecuterLimited) ExecuteWithTimeoutSilently(mSeconds int, command string, args []string) ([]byte, error) {
-	logger.Debug("before defer")
 	defer ReleaseSemaphore(e)
-	logger.Debug("before acquire")
 	e.tokens <- struct{}{}
-	logger.Debug("After acquire")
 	// Create a new context and add a timeout to it
 	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(mSeconds)*time.Millisecond)
 	defer cancel() // The cancel should be deferred so resources are cleaned up
