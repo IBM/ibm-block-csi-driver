@@ -20,6 +20,7 @@ import (
 	"context"
 	"io/ioutil"
 	"net"
+	"strconv"
 
 	"github.com/container-storage-interface/spec/lib/go/csi"
 	"github.com/ibm/ibm-block-csi-driver/node/logger"
@@ -54,7 +55,7 @@ func NewDriver(endpoint string, configFilePath string, hostname string) (*Driver
 	}
 
 	syncLock := NewSyncLock()
-	executer := executer_limited.NewExecuter()
+	executer := executer_limited.NewExecuter(strconv.Atoi(configFile.parameters.max_invocations))
 	osDeviceConnectivityMapping := map[string]device_connectivity.OsDeviceConnectivityInterface{
 		configFile.Connectivity_type.Nvme_over_fc: device_connectivity.NewOsDeviceConnectivityNvmeOFc(executer),
 		configFile.Connectivity_type.Fc:           device_connectivity.NewOsDeviceConnectivityFc(executer),

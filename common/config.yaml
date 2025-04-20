@@ -23,6 +23,7 @@ parameters:
   node_id_info:
     delimiter: ";"
     fcs_delimiter: ":"
+  max_invocations: "5"
 
 connectivity_type:
   nvme_over_fc: "nvmeofc"

@@ -46,9 +46,9 @@ type ExecuterLimited struct {
 	tokens chan struct{}
 }
 
-func NewExecuter() ExecuterInterfaceLimited {
+func NewExecuter(max_invocations int) ExecuterInterfaceLimited {
 	return &ExecuterLimited{
-		tokens: make(chan struct{}, 5),
+		tokens: make(chan struct{}, max_invocations),
 	}
 }
 
