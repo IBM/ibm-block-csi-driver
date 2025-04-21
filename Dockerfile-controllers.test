@@ -39,7 +39,7 @@ COPY controllers/tests/requirements.txt ./requirements-tests.txt
 RUN pip3 install -r ./requirements-tests.txt
 
 
-FROM registry.access.redhat.com/ubi8/python-39:1-209.1739760684
+FROM registry.access.redhat.com/ubi8/python-39:1-210.1742347048
 
 COPY --from=builder /opt/app-root /opt/app-root
 COPY ./common /driver/common
