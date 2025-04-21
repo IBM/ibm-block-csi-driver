@@ -25,6 +25,13 @@ When using the CSI driver with IBM DS8000 family storage systems:
 - There is a limit of 11 FlashCopy relationships per volume (including all snapshots and clones).
 - HostDefiner is not supported.
 
+## IBM® Storage Virtualize Family usage limitations
+
+When using the CSI driver with IBM Storage Virtualize family storage systems:
+- CSI will only allow up to 511 LUN connections to each storage system (even if multiple StorageClass objects are defined to different pools on the same storage system)
+
+Check your operating system LUN limit.{: tip}
+
 ## High availability (HA) limitations
 
 High availability (HA) is not supported on all storage system types. {: attention}
