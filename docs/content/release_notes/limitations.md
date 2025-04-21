@@ -80,6 +80,8 @@ For other policy-based replication limitations with your storage system, see the
 
 FlashCopy mapping (`fcmap`) and Snapshot function cannot be used together on the same volume. However, they can be used on different volumes within the same storage system. {: restriction} 
 
+Check your IBM Storage Virtualize product documentation on [IBM Documentation](https://www.ibm.com/docs) if your product supports the Snapshot function prior to enabling with the `virt_snap_func` parameter.{: important}
+
 ## Volume clone limitations
 
 The following limitations apply when using volume clones with the IBM block storage CSI driver:
