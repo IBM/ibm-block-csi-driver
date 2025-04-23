@@ -18,6 +18,7 @@ package driver
 
 import (
 	"sync"
+	"time"
 
 	"github.com/ibm/ibm-block-csi-driver/node/logger"
 )
@@ -33,11 +34,13 @@ type SyncLockInterface interface {
 
 type SyncLock struct {
 	SyncMap *sync.Map
+	Tokens  chan struct{}
 }
 
 func NewSyncLock() SyncLockInterface {
 	return &SyncLock{
 		SyncMap: &sync.Map{},
+		Tokens:  make(chan struct{}, 2),
 	}
 
 }
@@ -48,9 +51,20 @@ func (s SyncLock) GetSyncMap() *sync.Map {
 
 func (s SyncLock) AddVolumeLock(id string, msg string) error {
 	logger.Debugf("Lock for action %s, Try to acquire lock for volume", msg)
+	timer := time.NewTimer(1 * time.Second)
+	defer timer.Stop()
+
+	select {
+	case <-timer.C:
+		logger.Debugf("Lock for action %s, failed to acquire execution semaphore", msg)
+		return &VolumeAlreadyProcessingError{id}
+	case s.Tokens <- struct{}{}:
+		break
+	}
 	_, exists := s.SyncMap.LoadOrStore(id, 0)
 	if !exists {
 		logger.Debugf("Lock for action %s, Succeed to acquire lock for volume", msg)
+		<-s.Tokens
 		return nil
 	} else {
 		logger.Debugf("Lock for action %s, Lock for volume is already in use by other thread", msg)
@@ -61,6 +75,7 @@ func (s SyncLock) AddVolumeLock(id string, msg string) error {
 func (s SyncLock) RemoveVolumeLock(id string, msg string) {
 	logger.Debugf("Lock for action %s, release lock for volume", msg)
 
+	<-s.Tokens
 	s.SyncMap.Delete(id)
 }
 
