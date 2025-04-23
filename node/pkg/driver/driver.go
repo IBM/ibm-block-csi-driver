@@ -41,19 +41,20 @@ type Driver struct {
 	config   ConfigFile
 }
 
-func NewDriver(endpoint string, configFilePath string, hostname string) (*Driver, error) {
+func NewDriver(endpoint string, configFilePath string, hostname string, max_invocations int) (*Driver, error) {
 	configFile, err := ReadConfigFile(configFilePath)
 	if err != nil {
 		return nil, err
 	}
 	logger.Infof("Driver: %v Version: %v", configFile.Identity.Name, configFile.Identity.Version)
+	logger.Infof("Max invocations: %d", max_invocations)
 
 	mounter := &mount.SafeFormatAndMount{
 		Interface: mountwrapper.New(""),
 		Exec:      exec.New(),
 	}
 
-	syncLock := NewSyncLock()
+	syncLock := NewSyncLock(max_invocations)
 	executer := &executer.Executer{}
 	osDeviceConnectivityMapping := map[string]device_connectivity.OsDeviceConnectivityInterface{
 		configFile.Connectivity_type.Nvme_over_fc: device_connectivity.NewOsDeviceConnectivityNvmeOFc(executer),

@@ -18,6 +18,7 @@ package driver
 
 import (
 	"sync"
+	"time"
 
 	"github.com/ibm/ibm-block-csi-driver/node/logger"
 )
@@ -33,11 +34,13 @@ type SyncLockInterface interface {
 
 type SyncLock struct {
 	SyncMap *sync.Map
+	Tokens  chan struct{}
 }
 
-func NewSyncLock() SyncLockInterface {
+func NewSyncLock(max_invocations int) SyncLockInterface {
 	return &SyncLock{
 		SyncMap: &sync.Map{},
+		Tokens:  make(chan struct{}, max_invocations),
 	}
 
 }
@@ -47,20 +50,29 @@ func (s SyncLock) GetSyncMap() *sync.Map {
 }
 
 func (s SyncLock) AddVolumeLock(id string, msg string) error {
-	logger.Debugf("Lock for action %s, Try to acquire lock for volume", msg)
+	logger.Debugf("Lock for action %s, try to acquire lock for volume", msg)
+
 	_, exists := s.SyncMap.LoadOrStore(id, 0)
-	if !exists {
-		logger.Debugf("Lock for action %s, Succeed to acquire lock for volume", msg)
-		return nil
-	} else {
-		logger.Debugf("Lock for action %s, Lock for volume is already in use by other thread", msg)
+	if exists {
+		logger.Debugf("Lock for action %s, lock for volume is already in use by other thread", msg)
 		return &VolumeAlreadyProcessingError{id}
+	}
+
+	select {
+	case s.Tokens <- struct{}{}:
+		logger.Debugf("Lock for action %s, succeeded to acquire lock for volume", msg)
+		return nil
+	case <-time.After(1 * time.Second):
+		logger.Debugf("Lock for action %s, failed to acquire lock for volume", msg)
+		s.SyncMap.Delete(id)
+		return &VolumeNoResources{id}
 	}
 }
 
 func (s SyncLock) RemoveVolumeLock(id string, msg string) {
 	logger.Debugf("Lock for action %s, release lock for volume", msg)
 
+	<-s.Tokens
 	s.SyncMap.Delete(id)
 }
 
