@@ -43,3 +43,11 @@ type VolumeAlreadyProcessingError struct {
 func (e *VolumeAlreadyProcessingError) Error() string {
 	return fmt.Sprintf("Volume %s is already processing. request cannot be completed.", e.volId)
 }
+
+type VolumeNoResources struct {
+	volId string
+}
+
+func (e *VolumeNoResources) Error() string {
+	return fmt.Sprintf("Volume %s cannot be processed due to lack of resources. request cannot be completed.", e.volId)
+}
