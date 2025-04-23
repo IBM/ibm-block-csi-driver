@@ -17,6 +17,7 @@
 package driver
 
 import (
+	"os"
 	"sync"
 	"time"
 
@@ -52,19 +53,20 @@ func (s SyncLock) GetSyncMap() *sync.Map {
 func (s SyncLock) AddVolumeLock(id string, msg string) error {
 	logger.Debugf("Lock for action %s, Try to acquire lock for volume", msg)
 
-        _, exists := s.SyncMap.LoadOrStore(id, 0)
-        if exists {
-                logger.Debugf("Lock for action %s, Lock for volume is already in use by other thread", msg)
-                return &VolumeAlreadyProcessingError{id}
-        }
+	_, exists := s.SyncMap.LoadOrStore(id, 0)
+	if exists {
+		logger.Debugf("Lock for action %s, Lock for volume is already in use by other thread", msg)
+		return &VolumeAlreadyProcessingError{id}
+	}
 
 	select {
-        case s.Tokens <- struct{}{}:
+	case s.Tokens <- struct{}{}:
 		logger.Debugf("Lock for action %s, Succeed to acquire lock for volume", msg)
-                return nil
+		return nil
 	case <-time.After(1 * time.Second):
 		logger.Debugf("Lock for action %s, failed to acquire execution semaphore", msg)
 		s.SyncMap.Delete(id)
+		os.Exit(0)
 		return &VolumeAlreadyProcessingError{id}
 	}
 }
