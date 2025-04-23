@@ -51,23 +51,20 @@ func (s SyncLock) GetSyncMap() *sync.Map {
 
 func (s SyncLock) AddVolumeLock(id string, msg string) error {
 	logger.Debugf("Lock for action %s, Try to acquire lock for volume", msg)
-	timer := time.NewTimer(1 * time.Second)
-	defer timer.Stop()
+
+        _, exists := s.SyncMap.LoadOrStore(id, 0)
+        if exists {
+                logger.Debugf("Lock for action %s, Lock for volume is already in use by other thread", msg)
+                return &VolumeAlreadyProcessingError{id}
+        }
 
 	select {
-	case <-timer.C:
-		logger.Debugf("Lock for action %s, failed to acquire execution semaphore", msg)
-		return &VolumeAlreadyProcessingError{id}
-	case s.Tokens <- struct{}{}:
-		break
-	}
-	_, exists := s.SyncMap.LoadOrStore(id, 0)
-	if !exists {
+        case s.Tokens <- struct{}{}:
 		logger.Debugf("Lock for action %s, Succeed to acquire lock for volume", msg)
-		<-s.Tokens
-		return nil
-	} else {
-		logger.Debugf("Lock for action %s, Lock for volume is already in use by other thread", msg)
+                return nil
+	case <-time.After(1 * time.Second):
+		logger.Debugf("Lock for action %s, failed to acquire execution semaphore", msg)
+		s.SyncMap.Delete(id)
 		return &VolumeAlreadyProcessingError{id}
 	}
 }
