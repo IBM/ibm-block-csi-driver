@@ -14,7 +14,7 @@ require (
 	gopkg.in/yaml.v2 v2.4.0
 	k8s.io/apimachinery v0.33.0
 	k8s.io/client-go v0.33.0
-	k8s.io/mount-utils v0.32.3
+	k8s.io/mount-utils v0.33.0
 	k8s.io/utils v0.0.0-20241104100929-3ea5e8cea738
 )
 
@@ -55,7 +55,6 @@ require (
 	github.com/fxamacker/cbor/v2 v2.7.0 // indirect
 	github.com/google/gnostic-models v0.6.9 // indirect
 	github.com/google/go-cmp v0.7.0 // indirect
-	github.com/moby/sys/userns v0.1.0 // indirect
 	github.com/pkg/errors v0.9.1 // indirect
 	github.com/x448/float16 v0.8.4 // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20250218202821-56aae31c358a // indirect
