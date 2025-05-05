@@ -3,13 +3,13 @@
 
 # 1.12.2 (April 2025)
 
-As of this document's publication date, the IBM Power® and zLinux® architectures are not supported for this release.{: restriction}
-
 As of this document's publication date, NVMe/FC is not supported for this release.{: restriction}
 
 IBM® Block Storage CSI driver 1.12.2 added new support and enhancements.
 - Security fixes and 3rd party dependency updates
 - Utilizing IBM FlashSystem® Call Home extension for plugins to send IBM® Block Storage CSI driver callhome data
+- New IBM Power® architecture support for Red Hat OpenShift® 4.14 through 4.18
+- New IBM Z® architecture support for Red Hat OpenShift® 4.18
 
 For more information regarding the IBM FlashSystem® Call Home feature, search IBM.com/docs for your product's documentation.{: tip}
 

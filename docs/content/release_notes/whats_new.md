@@ -3,6 +3,8 @@
 IBM® block storage CSI driver 1.12.2 is a minor release that adds support for:
 
 - Utilizing FlashSystem plugin callhome extension to send IBM® Block Storage CSI driver callhome data
+- New IBM Power® architecture support for Red Hat OpenShift® 4.14 through 4.18
+- New IBM Z® architecture support for Red Hat OpenShift® 4.18
 
 **General availability date:** April 2025
 

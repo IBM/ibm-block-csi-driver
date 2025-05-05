@@ -5,7 +5,8 @@
 
 As opposed to known issues, limitations are functionality restrictions that are part of the predefined system design and capabilities in a particular version.
 
-- [IBM DS8000 usage limitations](#ibm®-ds8000®-usage-limitations)
+- [IBM DS8000® usage limitations](#ibm-ds8000®-usage-limitations)
+- [IBM Storage Virtualize® family usage limitations](#ibm-storage-virtualize®-family-usage-limitations)
 - [High availability (HA) limitations](#high-availability-ha-limitations)
 - [I/O group limitations](#io-group-limitations)
 - [NVMe/FC usage limitations](#nvme®fc-usage-limitations)
@@ -18,16 +19,16 @@ As opposed to known issues, limitations are functionality restrictions that are 
 - [Volume replication limitations](#volume-replication-limitations)
 - [Volume snapshot limitations](#volume-snapshot-limitations)
 
-## IBM® DS8000® usage limitations
+## IBM DS8000® usage limitations
 
-When using the CSI driver with IBM DS8000 family storage systems:
-- Connectivity limits on the storage side might be reached with IBM DS8000 family products due to too many open connections. This occurs due to connection closing lag times from the storage side.
+When using the CSI driver with IBM DS8000® family storage systems:
+- Connectivity limits on the storage side might be reached with IBM DS8000® family products due to too many open connections. This occurs due to connection closing lag times from the storage side.
 - There is a limit of 11 FlashCopy relationships per volume (including all snapshots and clones).
 - HostDefiner is not supported.
 
-## IBM® Storage Virtualize Family usage limitations
+## IBM Storage Virtualize® family usage limitations
 
-When using the CSI driver with IBM Storage Virtualize family storage systems:
+When using the CSI driver with IBM Storage Virtualize® family storage systems:
 - CSI will only allow up to 511 LUN connections to each storage system (even if multiple StorageClass objects are defined to different pools on the same storage system)
 
 Check your operating system LUN limit.{: tip}
@@ -36,7 +37,7 @@ Check your operating system LUN limit.{: tip}
 
 High availability (HA) is not supported on all storage system types. {: attention}
 
-- HyperSwap topology is only supported for use with IBM Storage Virtualize family storage systems.
+- HyperSwap topology is only supported for use with IBM Storage Virtualize® family storage systems.
 - Stretched topology is only supported by SAN Volume Controller storage systems.
 
 ### HyperSwap volume limitations
@@ -52,22 +53,22 @@ When conducting volume cloning, both volumes must use stretched topology.
 
 ## I/O group limitations
 
-I/O group configuration is only supported for use with IBM Storage Virtualize family storage systems.
+I/O group configuration is only supported for use with IBM Storage Virtualize® family storage systems.
 
 ## NVMe®/FC usage limitations
 
 As of this document's publication date, NVMe/FC is not supported for this release.{: restriction}
 
-For other limitations with your storage system, see the following section within your IBM Storage Virtualize product documentation on [IBM Documentation](https://www.ibm.com/docs/en/): **Configuring** > **Host attachment** > **NVMe over Fibre Channel host attachments** > **FC-NVMe limitations and SAN configuration guidelines**.
+For other limitations with your storage system, see the following section within your IBM Storage Virtualize® product documentation on [IBM Documentation](https://www.ibm.com/docs/en/): **Configuring** > **Host attachment** > **NVMe over Fibre Channel host attachments** > **FC-NVMe limitations and SAN configuration guidelines**.
 
 ## Policy-based replication limitations
-Policy-based replication is only supported for use with IBM Storage Virtualize family storage system versions 8.5.2 or higher. To see if your specific product is supported and for more information, see **What's new** > **Getting started with policy-based replication** within your IBM Storage Virtualize product documentation on [IBM Documentation](https://www.ibm.com/docs).
+Policy-based replication is only supported for use with IBM Storage Virtualize® family storage system versions 8.5.2 or higher. To see if your specific product is supported and for more information, see **What's new** > **Getting started with policy-based replication** within your IBM Storage Virtualize® product documentation on [IBM Documentation](https://www.ibm.com/docs).
 
 For other policy-based replication limitations with your storage system, see the Configuration Limits and Restrictions for your product software version. From the [IBM Support](https://www.ibm.com/mysupport) website, search for `Configuration Limits and Restrictions` and your product name. For example, `Configuration Limits and Restrictions IBM Storage FlashSystem 9500`.
 
 ## Snapshot function limitations
 
-- Snapshot function is only supported for use with IBM Storage Virtualize family storage system versions 8.5.1 or higher. For more information, see **Product overview** > **Technical overview** > **Volume groups** > **Snapshot function** within your IBM Storage Virtualize product documentation on [IBM Documentation](https://www.ibm.com/docs).
+- Snapshot function is only supported for use with IBM Storage Virtualize® family storage system versions 8.5.1 or higher. For more information, see **Product overview** > **Technical overview** > **Volume groups** > **Snapshot function** within your IBM Storage Virtualize product documentation on [IBM Documentation](https://www.ibm.com/docs).
 - In very rare cases, due to a race condition, a different snapshot than intended may be mistakenly deleted during a snapshot deletion. This occurs as no snapshot unique ID (UID) is present on the storage side.
 - Both source and target PVCs (in a source PVC to snapshot to target PVC scenario) must have the same space efficiency set within their storage classes. If the space efficiency is set differently, the target PVC creation fails.
 - A PVC target must have the same volume size as the source volume.
@@ -80,7 +81,7 @@ For other policy-based replication limitations with your storage system, see the
 
 FlashCopy mapping (`fcmap`) and Snapshot function cannot be used together on the same volume. However, they can be used on different volumes within the same storage system. {: restriction} 
 
-Check your IBM Storage Virtualize product documentation on [IBM Documentation](https://www.ibm.com/docs) if your product supports the Snapshot function prior to enabling with the `virt_snap_func` parameter.{: important}
+Check your IBM Storage Virtualize® product documentation on [IBM Documentation](https://www.ibm.com/docs) if your product supports the Snapshot function prior to enabling with the `virt_snap_func` parameter.{: important}
 
 ## Volume clone limitations
 
@@ -99,13 +100,13 @@ The following limitations apply when expanding volumes with the IBM block storag
 
 -   When expanding a PVC while not in use by a pod, the volume size immediately increases on the storage side. However, the PVC size itself only increases after a pod uses the PVC.
 -   When expanding a file system PVC for a volume that was previously formatted but is now no longer being used by a pod, any copy or replication operations performed on the PVC (such as snapshots or cloning) results in a copy with the newer, larger, size on the storage. However, its file system retains the original, smaller, size.
--   When using the CSI driver with IBM Storage Virtualize family and IBM DS8000 family products, during size expansion of a PersistentVolumeClaim (PVC), the size remains until all snapshots of the specific PVC are deleted.
+-   When using the CSI driver with IBM Storage Virtualize® family and IBM DS8000® family products, during size expansion of a PersistentVolumeClaim (PVC), the size remains until all snapshots of the specific PVC are deleted.
 
 These limitations are not relevant when using the Snapshot the function. For more information, see [Snapshot function limitations](#snapshot-function-limitations). {: note}
 
 ## Volume group limitations
 
-Volume group configuration is only supported for use with IBM Storage Virtualize family storage systems.
+Volume group configuration is only supported for use with IBM Storage Virtualize® family storage systems.
 
 The following limitations apply when using volume groups:
 

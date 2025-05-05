@@ -36,4 +36,4 @@ To specify which I/O group(s) a node should use, add any of the following labels
 - `hostdefiner.block.csi.ibm.com/io-group-2=true`
 - `hostdefiner.block.csi.ibm.com/io-group-3=true`
 
-If no `io_group` is defined, the volume is created within the storage system's default I/O group(s). For more about the I/O group function, see **Product overview** > **Technical overview** > **I/O group** within your IBM Storage Virtualize product documentation on [IBM Documentation](https://www.ibm.com/docs).{: tip}
+If no `io_group` is defined, the volume is created within the storage system's default I/O group(s). For more about the I/O group function, see **Product overview** > **Technical overview** > **I/O group** within your IBM Storage Virtualize® product documentation on [IBM Documentation](https://www.ibm.com/docs).{: tip}

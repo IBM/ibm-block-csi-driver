@@ -4,7 +4,7 @@ Create a VolumeGroupClass YAML file to enable volume groups.
 
 Volume groups allow users to create PersistentVolumeClaim (PVC) groups. PVCs can be dynamically managed through the volume groups created. This allows actions across all PVCs within the same volume group at once.
 
-Volume groups are used with policy-based replication, allowing all PVCs within a single volume group to be replicated at once. For more information about volume groups and policy-based replication, see the following sections within your IBM Storage Virtualize product documentation [IBM Documentation](https://www.ibm.com/docs).
+Volume groups are used with policy-based replication, allowing all PVCs within a single volume group to be replicated at once. For more information about volume groups and policy-based replication, see the following sections within your IBM Storage Virtualize® product documentation [IBM Documentation](https://www.ibm.com/docs).
 
 - **Product overview** > **Technical overview** > **Volume groups**
 - **What's new** > **Getting started with policy-based replication**
