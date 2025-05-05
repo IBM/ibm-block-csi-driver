@@ -5,8 +5,8 @@
 
 As opposed to known issues, limitations are functionality restrictions that are part of the predefined system design and capabilities in a particular version.
 
-- [IBM DS8000® usage limitations](#ibm-ds8000®-usage-limitations)
-- [IBM Storage Virtualize® family usage limitations](#ibm-storage-virtualize®-family-usage-limitations)
+- [IBM DS8000 usage limitations](#ibm-ds8000-usage-limitations)
+- [IBM Storage Virtualize family usage limitations](#ibm-storage-virtualize-family-usage-limitations)
 - [High availability (HA) limitations](#high-availability-ha-limitations)
 - [I/O group limitations](#io-group-limitations)
 - [NVMe/FC usage limitations](#nvme®fc-usage-limitations)
@@ -19,14 +19,14 @@ As opposed to known issues, limitations are functionality restrictions that are 
 - [Volume replication limitations](#volume-replication-limitations)
 - [Volume snapshot limitations](#volume-snapshot-limitations)
 
-## IBM DS8000® usage limitations
+## IBM DS8000 usage limitations
 
 When using the CSI driver with IBM DS8000® family storage systems:
 - Connectivity limits on the storage side might be reached with IBM DS8000® family products due to too many open connections. This occurs due to connection closing lag times from the storage side.
 - There is a limit of 11 FlashCopy relationships per volume (including all snapshots and clones).
 - HostDefiner is not supported.
 
-## IBM Storage Virtualize® family usage limitations
+## IBM Storage Virtualize family usage limitations
 
 When using the CSI driver with IBM Storage Virtualize® family storage systems:
 - CSI will only allow up to 511 LUN connections to each storage system (even if multiple StorageClass objects are defined to different pools on the same storage system)
