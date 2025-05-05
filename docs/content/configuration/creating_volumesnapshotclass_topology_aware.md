@@ -7,7 +7,7 @@ When using the CSI Topology feature, different parameters must be taken into acc
 
 For information and parameter definitions that are not related to topology awareness, be sure to see the information that is provided in [Creating a VolumeSnapshotClass](creating_volumesnapshotclass.md), in addition to the current section.{: note}
   
-This section refers to both the IBM FlashCopy® function and Snapshot function in IBM Storage Virtualize storage systems.{: note}
+This section refers to both the IBM FlashCopy® function and Snapshot function in IBM Storage Virtualize® storage systems.{: note}
 
 In order to enable creation and deletion of volume snapshots for your storage system, create a VolumeSnapshotClass YAML file, similar to `demo-volumesnapshotclass-config-secret.yaml` below.
 

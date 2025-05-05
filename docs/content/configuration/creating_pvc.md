@@ -114,7 +114,7 @@ Update the `dataSource` parameters to reflect the existing volume snapshot infor
 
 ## Creating a volume clone from an existing PVC
 
-This section refers to both the IBM FlashCopy® function and Snapshot function in IBM Storage Virtualize storage systems.{: note}
+This section refers to both the IBM FlashCopy® function and Snapshot function in IBM Storage Virtualize® storage systems.{: note}
 
 To create a volume clone from an existing PVC object, create a PVC YAML file, similar to the following `demo-pvc-cloned-pvc.yaml` file, with the size of 1 Gb.
 

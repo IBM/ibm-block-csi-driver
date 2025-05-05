@@ -19,7 +19,7 @@ Be sure to only use one of the following parameters: `replication_policy` **or**
 
 Use one of the following examples, depending on the replication type that is being used.
 
-**Example 1: VolumeReplicationClass _not_ using IBM Storage Virtualize policy-based replication**
+**Example 1: VolumeReplicationClass _not_ using IBM Storage Virtualize® policy-based replication**
 
 ```
 apiVersion: replication.storage.openshift.io/v1alpha1
@@ -35,7 +35,7 @@ spec:
     replication.storage.openshift.io/replication-secret-name: demo-secret
     replication.storage.openshift.io/replication-secret-namespace: default
 ```
-**Example 2: VolumeReplicationClass using IBM Storage Virtualize policy-based replication**
+**Example 2: VolumeReplicationClass using IBM Storage Virtualize® policy-based replication**
 
 ```
 apiVersion: replication.storage.openshift.io/v1alpha1

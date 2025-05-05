@@ -5,7 +5,7 @@
 
 Create a VolumeSnapshotClass YAML file to enable creation and deletion of volume snapshots.
 
-This section refers to both the IBM FlashCopy® function and Snapshot function in IBM Storage Virtualize storage systems.{: note}
+This section refers to both the IBM FlashCopy® function and Snapshot function in IBM Storage Virtualize® storage systems.{: note}
 
 In order to enable creation and deletion of volume snapshots for your storage system, create a VolumeSnapshotClass YAML file, similar to the following `demo-volumesnapshotclass.yaml`.
 
@@ -15,9 +15,9 @@ When configuring the file, be sure to use the same array secret and array secret
 
 For IBM DS8000® family storage systems, the maximum prefix length is five characters. The maximum prefix length for other systems is 20 characters.{: requirement}
 
-For IBM Storage Virtualize family storage systems, the `CSI` prefix is added as default if not specified by the user.{: tip}
+For IBM Storage Virtualize® family storage systems, the `CSI` prefix is added as default if not specified by the user.{: tip}
 
-- The `virt_snap_func` parameter is optional but necessary in IBM Storage Virtualize storage systems if using the Snapshot function. To enable the Snapshot function, set the value to _"true"_. The default value is _"false"_. If the value is `"false"` the snapshot will use the FlashCopy function.
+- The `virt_snap_func` parameter is optional but necessary in IBM Storage Virtualize® storage systems if using the Snapshot function. To enable the Snapshot function, set the value to _"true"_. The default value is _"false"_. If the value is `"false"` the snapshot will use the FlashCopy function.
     
 When electing to set the optional "virt_snap_func" parameter, it **must** also be set with an identical value in the relevant StorageClass yaml.{: requirement}
 
