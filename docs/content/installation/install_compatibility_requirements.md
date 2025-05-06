@@ -51,7 +51,7 @@ Complete these steps to prepare your environment for installing the CSI (Contain
 2. Configure your storage system host attachment, per worker node.
 
     **Note:** IBM® block storage CSI driver 1.11.0 introduced dynamic host definition. For more information and installation instructions, see [Installing the host definer](install_hostdefiner.md). If this feature is not installed, the nodes are not dynamically defined on the storage system and they must be defined manually. <br />
-    **Note:** Dynamic host definition is only supported with IBM Storage Virtualize family products.
+    **Note:** Dynamic host definition is only supported with IBM Storage Virtualize® family products.
     
     Be sure to configure your storage system host attachment according to your storage system instructions.
 
@@ -59,8 +59,8 @@ Complete these steps to prepare your environment for installing the CSI (Contain
         
     **Note:** 
     - As of this document's publication date, NVMe/FC is not supported for this release.
-    - For Fibre Channel connectivity be sure that storage system is using one of the fully supported HBAs compatible with your host connection, as listed in the [IBM® System Storage® Interoperation Center (SSIC)](https://www-03.ibm.com/systems/support/storage/ssic/interoperability.wss).
-    - The CSI driver supports IBM DS8000 family storage systems only with Fibre Channel connectivity.
+    - For Fibre Channel connectivity be sure that storage system is using one of the fully supported HBAs compatible with your host connection, as listed in the [IBM System Storage Interoperation Center® (SSIC)](https://www-03.ibm.com/systems/support/storage/ssic/interoperability.wss).
+    - The CSI driver supports IBM DS8000® family storage systems only with Fibre Channel connectivity.
        
     For more information, find your storage system documentation in [IBM Documentation](http://www.ibm.com/docs/).
 
@@ -73,7 +73,7 @@ Complete these steps to prepare your environment for installing the CSI (Contain
     - device-mapper-multipath
     - xfsprogs (if XFS file system is required)
 
-4. (Optional) If planning on using volume snapshots (FlashCopy® function), enable support on your Kubernetes cluster.
+4. (Optional) If planning on using volume snapshots (IBM FlashCopy® function), enable support on your Kubernetes cluster.
 
    For more information and instructions, see the Kubernetes blog post, [Kubernetes 1.20: Kubernetes Volume Snapshot Moves to GA](https://kubernetes.io/blog/2020/12/10/kubernetes-1.20-volume-snapshot-moves-to-ga/).
 
@@ -96,7 +96,7 @@ Complete these steps to prepare your environment for installing the CSI (Contain
         kubectl apply -f csi.ibm.com_volumegroups.yaml
         ```
     
-    2. Enable policy-based replication on volume groups, see the following section within your IBM Storage Virtualize product documentation on [IBM Documentation](https://www.ibm.com/docs/): **Administering** > **Managing policy-based replication** > **Assigning replication policies to volume groups**.   
+    2. Enable policy-based replication on volume groups, see the following section within your IBM Storage Virtualize® product documentation on [IBM Documentation](https://www.ibm.com/docs/): **Administering** > **Managing policy-based replication** > **Assigning replication policies to volume groups**.
 
 6. (Optional) If planning on using volume replication (remote copy function), enable support on your orchestration platform cluster and storage system.
     
@@ -110,7 +110,7 @@ Complete these steps to prepare your environment for installing the CSI (Contain
         kubectl apply -f ./replication.storage.openshift.io_volumereplications.yaml
         ```
     
-    2. To enable support on your storage system, see the following section within your IBM Storage Virtualize product documentation on [IBM Documentation](https://www.ibm.com/docs/en/): **Administering** > **Managing Copy Services** > **Managing remote-copy partnerships**.
+    2. To enable support on your storage system, see the following section within your IBM Storage Virtualize® product documentation on [IBM Documentation](https://www.ibm.com/docs/en/): **Administering** > **Managing Copy Services** > **Managing remote-copy partnerships**.
 
 7. (Optional) To use CSI Topology, at least one node in the cluster must have the label-prefix of `topology.block.csi.ibm.com` to introduce topology awareness.
       
@@ -118,7 +118,7 @@ Complete these steps to prepare your environment for installing the CSI (Contain
 
       For more information, see [Configuring for CSI Topology](../configuration/configuring_topology.md).
 
-8. (Optional) If planning on using a high availability (HA) feature (either HyperSwap or stretched topology) on your storage system, see the appropriate sections within your IBM Storage Virtualize product documentation on [IBM Documentation](https://www.ibm.com/docs/en/):
+8. (Optional) If planning on using a high availability (HA) feature (either HyperSwap or stretched topology) on your storage system, see the appropriate sections within your IBM Storage Virtualize® product documentation on [IBM Documentation](https://www.ibm.com/docs/en/):
     - HyperSwap topology planning and configuration
         - **Planning** > **Planning for high availability** > **Planning for a HyperSwap topology system**
         - **Configuring** > **Configuration details** > **HyperSwap system configuration details**
@@ -126,4 +126,4 @@ Complete these steps to prepare your environment for installing the CSI (Contain
         - **Planning** > **Planning for high availability** > **Planning for a stretched topology system**
         - **Configuring** > **Configuration details** > **Stretched system configuration details**
 
-9. (Optional) If planning on using policy-based replication with your IBM Storage Virtualize storage system, verify that the correct replication policy is in place. This can be done either through the IBM Storage Virtualize user interface (go to **Policies** > **Replication policies**) or through the CLI (`lsreplicationpolicy`). If a replication policy is not in place create one before replicating a volume through the CSI driver.
+9. (Optional) If planning on using policy-based replication with your IBM Storage Virtualize® storage system, verify that the correct replication policy is in place. This can be done either through the IBM Storage Virtualize® user interface (go to **Policies** > **Replication policies**) or through the CLI (`lsreplicationpolicy`). If a replication policy is not in place create one before replicating a volume through the CSI driver.

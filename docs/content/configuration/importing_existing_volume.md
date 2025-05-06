@@ -7,7 +7,7 @@ Use this information to import volumes that were created externally from the IBM
 
 Before starting to import an existing volume, find the `volumeHandle` in the existing volume in order to include the information in the persistent volume (PV) YAML file. To find the `volumeHandle`, use one of the following procedures:
 
-- **For IBM Storage Virtualize family**
+- **For IBM Storage Virtualize® family**
 
   The `volumeHandle` is formatted as `SVC:id;vdisk_UID`.
 
@@ -21,9 +21,9 @@ Before starting to import an existing volume, find the `volumeHandle` in the exi
 
       2. Browse to the volume that the port is on and right-click > **Properties**. The Properties window will be displayed. Use the **Volume ID** and **Volume UID** values.
 
-For more information about IBM Storage Virtualize products, find your product information in [IBM Documentation](https://www.ibm.com/docs/).{: tip}
+For more information about IBM Storage Virtualize® products, find your product information in [IBM Documentation](https://www.ibm.com/docs/).{: tip}
 
-- **For IBM DS8000 family:**
+- **For IBM DS8000® family:**
 
   The `volumeHandle` is formatted as `DS8K:id;GUID`.
   The `id` is the last four digits of the `GUID`.
@@ -32,17 +32,17 @@ For more information about IBM Storage Virtualize products, find your product in
 
       Find the `GUID` for the volume, by using the `lsfbvol` command.
 
-  - With the IBM DS8000 Storage Management GUI:
+  - With the IBM DS8000® Storage Management GUI:
 
       1. Select **Volumes** from the side bar. The **Volumes** page will be displayed.
 
       2. Browse to the volume that the port is on and right-click > **Properties**. The Properties window will be displayed. Use the **GUID** value.
 
-For more information about IBM DS8000 family products, find your product information in [IBM Documentation](https://www.ibm.com/docs/).{: tip}
+For more information about IBM DS8000® family products, find your product information in [IBM Documentation](https://www.ibm.com/docs/).{: tip}
 
 Use this procedure to help build a PV YAML file for your volumes.
 
-These steps are set up for importing volumes from an IBM Storage Virtualize family system. Change parameters, as needed.{: note}
+These steps are set up for importing volumes from an IBM Storage Virtualize® family system. Change parameters, as needed.{: note}
 
 1. Create a persistent volume (PV) YAML file.
 

@@ -15,7 +15,7 @@ Before starting to import an existing volume group, find the `volumeGroupHandle`
 
 The `volumeGroupHandle` is formatted as `SVC:id;name`.
 
-Through the IBM Storage Virtualize command-line, find both the `id` and `name` attributes, by using the `lsvolumegroup` command.
+Through the IBM Storage Virtualize® command-line, find both the `id` and `name` attributes, by using the `lsvolumegroup` command.
 
 For more information, see **Command-line interface** > **Volume commands** > **lsvolumegroup** within your specific product documentation on [IBM Documentation](https://www.ibm.com/docs/). The volume group name can also be found through the management GUI. Go to **Volumes** > **Volume Groups** from the side bar.{: tip}
   
