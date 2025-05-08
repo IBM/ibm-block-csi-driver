@@ -83,7 +83,7 @@ func (e *Executer) ExecuteWithTimeout(mSeconds int, command string, args []strin
 	} else {
 		noOutputMessage = " (no output)"
 	}
-	logger.Debugf("Finished executing command" + noOutputMessage)
+	logger.Debugf("Finished executing command %s", noOutputMessage)
 	return out, err
 }
 

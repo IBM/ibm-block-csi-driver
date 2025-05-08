@@ -95,7 +95,7 @@ func TestReadNvmeNqn(t *testing.T) {
 				}
 
 				if err := tmpFile.Close(); err != nil {
-					t.Fatalf(err.Error())
+					t.Fatalf("%s", err.Error())
 				}
 				filePath = tmpFile.Name()
 			} else {
@@ -185,7 +185,7 @@ func TestParseFCPortsName(t *testing.T) {
 					}
 
 					if err := tmpFile.Close(); err != nil {
-						t.Fatalf(err.Error())
+						t.Fatalf("%s", err.Error())
 					}
 					filePath = tmpFile.Name()
 				} else {
@@ -276,7 +276,7 @@ func TestParseIscsiInitiators(t *testing.T) {
 				}
 
 				if err := tmpFile.Close(); err != nil {
-					t.Fatalf(err.Error())
+					t.Fatalf("%s", err.Error())
 				}
 				filePath = tmpFile.Name()
 			} else {

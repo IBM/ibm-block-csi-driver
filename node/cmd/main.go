@@ -30,7 +30,7 @@ func logVersionInfo(configFile *string) {
 	if err != nil {
 		logger.Errorln(err)
 	}
-	logger.Infof(fmt.Sprintf("Node version info: %v", info))
+	logger.Infof("%s", fmt.Sprintf("Node version info: %v", info))
 }
 
 func main() {
