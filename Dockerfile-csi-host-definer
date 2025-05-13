@@ -39,7 +39,6 @@ COPY --from=builder /opt/app-root /opt/app-root
 COPY ./common /driver/common
 COPY ./controllers/ /driver/controllers/
 COPY ./LICENSE /licenses/
-COPY ./NOTICES /licenses/
 
 WORKDIR /driver/controllers/servers/host_definer/
 ENV PYTHONPATH=/driver

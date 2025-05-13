@@ -53,7 +53,6 @@ COPY --from=builder /opt/app-root /opt/app-root
 COPY ./common /driver/common
 COPY ./controllers/ /driver/controllers/
 COPY ./LICENSE /licenses/
-COPY ./NOTICES /licenses/
 
 USER root
 RUN chmod +x /driver/controllers/scripts/entrypoint.sh
