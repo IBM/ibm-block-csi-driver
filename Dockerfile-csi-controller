@@ -33,7 +33,6 @@ RUN ./csi_pb2.sh
 RUN pip3 install .
 
 FROM registry.access.redhat.com/ubi8/python-39:1-211.1746445275
-MAINTAINER IBM Storage
 
 ARG VERSION=1.12.3
 ARG BUILD_NUMBER=0
@@ -41,6 +40,7 @@ ARG BUILD_NUMBER=0
 ###Required Labels
 LABEL name="IBM block storage CSI driver controller" \
       vendor="IBM" \
+      maintainer="IBM" \
       version=$VERSION \
       release=$BUILD_NUMBER \
       summary="The controller component of the IBM block storage CSI driver" \

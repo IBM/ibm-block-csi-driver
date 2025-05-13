@@ -26,7 +26,7 @@ ARG BUILD_NUMBER=0
 ###Required Labels
 LABEL name="IBM block storage CSI driver host definer" \
       vendor="IBM" \
-      maintainer="IBM Storage" \
+      maintainer="IBM" \
       version=$VERSION \
       release=$BUILD_NUMBER \
       summary="The host definer defines Kubernetes nodes on IBM block storage" \
