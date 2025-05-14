@@ -383,9 +383,20 @@ func (d *NodeService) NodeUnstageVolume(ctx context.Context, req *csi.NodeUnstag
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "Multipath -f command failed with error: %v", err)
 	}
+
+	var hbl [3]string
+	hbl, err = d.OsDeviceConnectivityHelper.GetHBLfromDevices(sysDevices)
+	if err != nil {
+		// Continue, as this is only for the ghost devices
+	}
+
 	err = d.OsDeviceConnectivityHelper.RemovePhysicalDevice(sysDevices)
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "Remove scsi device failed with error: %v", err)
+	}
+	err = d.OsDeviceConnectivityHelper.RemoveGhostDevice(hbl)
+	if err != nil {
+		logger.Errorf("Remove ghost scsi device failed with error: %v", err)
 	}
 
 	stageInfoPath := path.Join(stagingTargetPath, StageInfoFilename)

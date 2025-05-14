@@ -44,6 +44,8 @@ type OsDeviceConnectivityHelperScsiGenericInterface interface {
 	GetMpathDevice(volumeId string) (string, error)
 	FlushMultipathDevice(mpathDevice string) error
 	RemovePhysicalDevice(sysDevices []string) error
+	RemoveGhostDevice(hbl [3]string) error
+	GetHBLfromDevices(sysDevices []string) ([3]string, error)
 	ValidateLun(lun int, sysDevices []string) error
 	IsVolumePathMatchesVolumeId(volumeId string, volumePath string) (bool, error)
 }
@@ -320,6 +322,116 @@ func (r OsDeviceConnectivityHelperScsiGeneric) RemovePhysicalDevice(sysDevices [
 	}
 	logger.Debugf("Finished removing SCSI devices : {%v}", sysDevices)
 	return nil
+}
+
+func (r OsDeviceConnectivityHelperScsiGeneric) GetHBLfromDevices(sysDevices []string) ([3]string, error) {
+	HBL := [3]string{"-1", "-1", "-1"}
+	for index, dev := range sysDevices {
+		// Build the sysfs path
+		sysPath := filepath.Join("/sys/block", dev, "device")
+
+		// Resolve the symlink
+		resolvedPath, err := filepath.EvalSymlinks(sysPath)
+		if err != nil {
+			return HBL, fmt.Errorf("failed to resolve symlink: %v", err)
+		}
+
+		// Extract H:B:(T:)L from the path
+		parts := strings.Split(resolvedPath, "/")
+		for _, p := range parts {
+			if strings.Count(p, ":") == 3 {
+				stringSlice := strings.Split(p, ":")
+				if index == 0 {
+					HBL[0] = stringSlice[0] // H
+					HBL[1] = stringSlice[1] // B
+					HBL[2] = stringSlice[3] // L
+				} else {
+					if stringSlice[0] != HBL[0] ||
+						stringSlice[1] != HBL[1] ||
+						stringSlice[3] != HBL[2] {
+						HBL[0] = "-1"
+						return HBL, fmt.Errorf("Not all H:B:L are the same. Found %v and now %v", HBL, stringSlice)
+					}
+				}
+				break
+			}
+		}
+	}
+	logger.Debugf("H:B:(T:)L to remove: %v", HBL)
+	return HBL, nil
+}
+
+func writeToDeleteFileForDevices(sgDevices []string) error {
+	var (
+		f   *os.File
+		err error
+	)
+	for _, deviceName := range sgDevices {
+		sgDeviceDeletePathFormat := "/sys/class/scsi_generic/%s/device/delete"
+		filename := fmt.Sprintf(sgDeviceDeletePathFormat, deviceName)
+
+		if f, err = os.OpenFile(filename, os.O_APPEND|os.O_WRONLY, 0200); err != nil {
+			if os.IsNotExist(err) {
+				logger.Warningf("Idempotency: Block device {%v} was not found on the system, so skip deleting it", deviceName)
+				continue
+			} else {
+				logger.Errorf("Error while opening file : {%v}. error: {%v}", filename, err.Error())
+				return err
+			}
+		}
+
+		defer f.Close()
+
+		if _, err := f.WriteString("1"); err != nil {
+			logger.Errorf("Error while writing to file : {%v}. error: {%v}", filename, err.Error())
+			return err
+		}
+	}
+	return nil
+}
+
+func getSgDevicesByHBL(r OsDeviceConnectivityHelperScsiGeneric, hbl [3]string) ([]string, error) {
+	sgMapCmd := "sg_map"
+	args := []string{"-x"}
+
+	var sgDevices []string
+	output, err := r.Executer.ExecuteWithTimeout(TimeOutSgInqCmd, sgMapCmd, args)
+	if err != nil {
+		logger.Errorf("Error getting sg devices of H:B:L. error: {%v}", err.Error())
+		return sgDevices, err
+	}
+
+	lines := strings.Split(string(output), "\n")
+	//output: dev/sg683  33 0 46 110  0
+	//fields: 0          1  2 3  4
+
+	for _, line := range lines {
+		fields := strings.Fields(line)
+		if len(fields) >= 5 {
+			if fields[1] == hbl[0] && fields[2] == hbl[1] && fields[4] == hbl[2] {
+				dev := strings.TrimPrefix(fields[0], "/dev/")
+				sgDevices = append(sgDevices, dev)
+			}
+		}
+	}
+
+	logger.Infof("sgDevices for H:B:L %v: %v", hbl, sgDevices)
+	return sgDevices, nil
+}
+
+func (r OsDeviceConnectivityHelperScsiGeneric) RemoveGhostDevice(hbl [3]string) error {
+	if hbl[0] == "-1" {
+		return fmt.Errorf("RemoveGhostDevice: Couldn't determine H:B:L to delete")
+	}
+	sgDevices, err := getSgDevicesByHBL(r, hbl)
+	if err != nil {
+		logger.Warningf("RemoveGhostDevice: Couldn't get ghost sg devices to delete")
+		return err
+	}
+
+	err = writeToDeleteFileForDevices(sgDevices)
+	logger.Debugf("sg devices removed from host")
+	return err
 }
 
 func (r OsDeviceConnectivityHelperScsiGeneric) ValidateLun(lun int, sysDevices []string) error {
