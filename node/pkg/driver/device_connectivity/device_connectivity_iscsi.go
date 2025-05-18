@@ -170,6 +170,10 @@ func (r OsDeviceConnectivityIscsi) RemovePhysicalDevice(sysDevices []string) err
 	return r.HelperScsiGeneric.RemovePhysicalDevice(sysDevices)
 }
 
+func (r OsDeviceConnectivityIscsi) RemoveGhostDevice() error {
+	return r.HelperScsiGeneric.RemoveGhostDevice()
+}
+
 func (r OsDeviceConnectivityIscsi) ValidateLun(lun int, sysDevices []string) error {
 	return r.HelperScsiGeneric.ValidateLun(lun, sysDevices)
 }

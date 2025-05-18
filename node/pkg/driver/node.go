@@ -148,6 +148,8 @@ func (d *NodeService) NodeStageVolume(ctx context.Context, req *csi.NodeStageVol
 		return nil, status.Error(codes.Internal, err.Error())
 	}
 
+	d.OsDeviceConnectivityHelper.RemoveGhostDevice()
+
 	volumeUuid := d.NodeUtils.GetVolumeUuid(volumeID)
 	mpathDevice, err := osDeviceConnectivity.GetMpathDevice(volumeUuid)
 	logger.Debugf("Discovered device : {%v}", mpathDevice)

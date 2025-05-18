@@ -44,6 +44,7 @@ type OsDeviceConnectivityHelperScsiGenericInterface interface {
 	GetMpathDevice(volumeId string) (string, error)
 	FlushMultipathDevice(mpathDevice string) error
 	RemovePhysicalDevice(sysDevices []string) error
+	RemoveGhostDevice() error
 	ValidateLun(lun int, sysDevices []string) error
 	IsVolumePathMatchesVolumeId(volumeId string, volumePath string) (bool, error)
 }
@@ -320,6 +321,81 @@ func (r OsDeviceConnectivityHelperScsiGeneric) RemovePhysicalDevice(sysDevices [
 	}
 	logger.Debugf("Finished removing SCSI devices : {%v}", sysDevices)
 	return nil
+}
+
+func (o OsDeviceConnectivityHelperScsiGeneric) RemoveGhostDevice() error {
+	// get all devices from sg_map
+	sgMapCmd := "sg_map"
+	args := []string{"-x"}
+
+	out, err := o.Executer.ExecuteWithTimeout(TimeOutSgInqCmd, sgMapCmd, args)
+	if err != nil {
+		logger.Errorf("Error getting sg devices from sg_map. error: {%v}", err.Error())
+		return err
+	}
+
+	scanner := bufio.NewScanner(strings.NewReader(string(out)))
+	for scanner.Scan() {
+		line := scanner.Text()
+
+		// Skip lines that contain /dev/sd
+		if strings.Contains(line, "/dev/sd") || strings.Contains(line, "/dev/sr") {
+			continue
+		}
+
+		// Extract first field (e.g., /dev/sg3)
+		fields := strings.Fields(line)
+		if len(fields) == 0 {
+			continue
+		}
+		sgdev := fields[0]
+
+		// Step 3: Run sg_inq and check for PQual=1 and IBM
+		if isGhostIBMDevice(o, sgdev) {
+			sgBase := filepath.Base(sgdev)
+			deletePath := fmt.Sprintf("/sys/class/scsi_generic/%s/device/delete", sgBase)
+
+			logger.Debugf("Deleting ghost device: %s\n", sgdev)
+
+			// Step 4: Write "1" to delete path
+			if err := os.WriteFile(deletePath, []byte("1"), 0644); err != nil {
+				logger.Errorf("Error deleting device %s: %v\n", sgdev, err)
+				return err // I actualy think it's better to continue and delete what we can
+			}
+		}
+	}
+
+	if err := scanner.Err(); err != nil {
+		logger.Errorf("Error reading sg_map output: %v\n", err)
+	}
+	return err
+}
+
+func isGhostIBMDevice(o OsDeviceConnectivityHelperScsiGeneric, sgdev string) bool {
+	// Run sg_inq sgdev and check if both PQual=1 and IBM are present
+	sgInqCmd := "sg_inq"
+
+	if err := o.Executer.IsExecutable(sgInqCmd); err != nil {
+		return false
+	}
+
+	args := []string{sgdev}
+	// add timeout in case the call never comes back.
+	logger.Debugf("Calling [%s] with timeout", sgInqCmd)
+	outputBytes, err := o.Executer.ExecuteWithTimeout(TimeOutSgInqCmd, sgInqCmd, args)
+	if err != nil {
+		return false
+	}
+	outStr := string(outputBytes)
+	/*-------------------------------------
+	output, err := exec.Command("sg_inq", sgdev).Output() //shlomit: change this to ExecuteWithTimeout
+	if err != nil {
+		// Fail silently like Bash (2>/dev/null)
+		return false
+	}
+	outStr := string(output)
+	*/
+	return strings.Contains(outStr, "PQual=1") && strings.Contains(outStr, "IBM")
 }
 
 func (r OsDeviceConnectivityHelperScsiGeneric) ValidateLun(lun int, sysDevices []string) error {

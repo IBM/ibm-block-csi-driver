@@ -55,6 +55,10 @@ func (r OsDeviceConnectivityFc) RemovePhysicalDevice(sysDevices []string) error 
 	return r.HelperScsiGeneric.RemovePhysicalDevice(sysDevices)
 }
 
+func (r OsDeviceConnectivityFc) RemoveGhostDevice() error {
+	return r.HelperScsiGeneric.RemoveGhostDevice()
+}
+
 func (r OsDeviceConnectivityFc) ValidateLun(lun int, sysDevices []string) error {
 	return r.HelperScsiGeneric.ValidateLun(lun, sysDevices)
 }
