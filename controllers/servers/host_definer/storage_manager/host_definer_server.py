@@ -44,7 +44,8 @@ class HostDefinerServicer:
                         host_name = host.name
 
                 return self._generate_response(
-                    array_mediator, host_name, connectivity_type_from_user, array_addresses[0])
+                    array_mediator, host_name, connectivity_type_from_user, array_addresses[0],
+                    array_connection_info.partition_name)
         except Exception as ex:
             logger.exception(ex)
             return DefineHostResponse(error_message=str(ex))
@@ -143,7 +144,8 @@ class HostDefinerServicer:
     def _create_host(self, host, array_mediator, request):
         initiators = self._get_initiators_from_node_id(request.node_id_from_csi_node)
         connectivity_type = get_initiators_connectivity_type(initiators, request.connectivity_type_from_user)
-        array_mediator.create_host(host, initiators, connectivity_type, request.io_group)
+        array_mediator.create_host(host, initiators, connectivity_type, request.io_group,
+                                   request.array_connection_info.partition_name)
         array_mediator.add_ports_to_host(host, initiators, connectivity_type)
 
     def _is_port_update_needed_when_same_protocol(
@@ -196,12 +198,13 @@ class HostDefinerServicer:
             return DefineHostResponse(error_message=str(error_message))
         return DefineHostResponse()
 
-    def _generate_response(self, array_mediator, host_name, connectivity_type, management_address):
+    def _generate_response(self, array_mediator, host_name, connectivity_type, management_address, partition_name):
         define_host_response = DefineHostResponse(connectivity_type=connectivity_type, node_name_on_storage=host_name,
                                                   management_address=management_address)
         ports = array_mediator.get_host_connectivity_ports(host_name, connectivity_type)
         define_host_response.ports = ports
         io_group_ids = array_mediator.get_host_io_group(host_name).id
         define_host_response.io_group = [int(io_group_id) for io_group_id in io_group_ids]
+        # TODO include partition_name in message
         logger.info(messages.HOST_CREATED.format(host_name, management_address, ports, define_host_response.io_group))
         return define_host_response
