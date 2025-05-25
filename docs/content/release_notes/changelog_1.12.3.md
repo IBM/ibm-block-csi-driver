@@ -8,7 +8,6 @@ As of this document's publication date, the IBM Power® and zLinux® architectur
 As of this document's publication date, NVMe/FC is not supported for this release.{: restriction}
 
 IBM® Block Storage CSI driver 1.12.3 added new support and enhancements.
-- Support custom ssh port when connecting to IBM Storage Virtualize family storage systems only
 - Improve PVC scalability (creation and mounting), specifically for large scale VM deployments
 - Security fixes and 3rd party dependency updates
 
