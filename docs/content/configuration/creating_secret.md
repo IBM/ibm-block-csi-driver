@@ -10,8 +10,6 @@ When your storage system password is changed, be sure to also change the passwor
 If using the CSI Topology feature, follow the steps in [Creating a Secret with topology awareness](creating_secret_topology_aware.md).{: attention}
 
 Use one of the following procedures to create and apply the secret:
-  - [Creating an array secret file](#creating-an-array-secret-file)
-  - [Creating an array secret via command line](#creating-an-array-secret-via-command-line)
 
 ## Creating an array secret file
 1. Create the secret file, similar to the following `demo-secret.yaml`:
