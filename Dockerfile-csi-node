@@ -28,13 +28,13 @@ RUN make ibm-block-csi-driver
 
 # Final stage
 FROM registry.access.redhat.com/ubi9-minimal:9.5-1745855087
-MAINTAINER IBM Storage
 
 ARG VERSION=1.12.3
 ARG BUILD_NUMBER=0
 
 LABEL name="IBM block storage CSI driver node" \
       vendor="IBM" \
+      maintainer="IBM" \
       version=$VERSION \
       release=$BUILD_NUMBER \
       summary="The node component of the IBM block storage CSI driver" \
@@ -47,7 +47,6 @@ WORKDIR /root
 COPY --from=builder /go/src/github.com/ibm/ibm-block-csi-driver/common/config.yaml .
 COPY --from=builder /go/src/github.com/ibm/ibm-block-csi-driver/bin/ibm-block-csi-node-driver .
 COPY ./LICENSE /licenses/
-COPY ./NOTICES /licenses/
 COPY ./node/scripts/entrypoint.sh .
 RUN chmod 755 ./entrypoint.sh
 

@@ -26,7 +26,7 @@ ARG BUILD_NUMBER=0
 ###Required Labels
 LABEL name="IBM block storage CSI driver host definer" \
       vendor="IBM" \
-      maintainer="IBM Storage" \
+      maintainer="IBM" \
       version=$VERSION \
       release=$BUILD_NUMBER \
       summary="The host definer defines Kubernetes nodes on IBM block storage" \
@@ -39,7 +39,6 @@ COPY --from=builder /opt/app-root /opt/app-root
 COPY ./common /driver/common
 COPY ./controllers/ /driver/controllers/
 COPY ./LICENSE /licenses/
-COPY ./NOTICES /licenses/
 
 WORKDIR /driver/controllers/servers/host_definer/
 ENV PYTHONPATH=/driver

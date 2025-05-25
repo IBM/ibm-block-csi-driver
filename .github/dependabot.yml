@@ -10,8 +10,6 @@ updates:
     schedule:
       interval: "weekly"
     rebase-strategy: "disabled"
-    reviewers:
-      - "IBM/block-csi"
     labels:
       - go
       - dependencies
@@ -30,8 +28,6 @@ updates:
     schedule:
       interval: "weekly"
     rebase-strategy: "disabled"
-    reviewers:
-      - "IBM/block-csi"
     labels:
       - github_actions
       - dependencies
