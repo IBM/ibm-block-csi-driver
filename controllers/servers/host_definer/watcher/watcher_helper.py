@@ -432,6 +432,10 @@ class Watcher(KubernetesManager):
 
     def _convert_secret_config_to_dict(self, secret_data):
         if settings.SECRET_CONFIG_FIELD in secret_data.keys():
-            if type(secret_data[settings.SECRET_CONFIG_FIELD]) is str:
-                secret_data[settings.SECRET_CONFIG_FIELD] = json.loads(secret_data[settings.SECRET_CONFIG_FIELD])
+            secret_config = secret_data[settings.SECRET_CONFIG_FIELD]
+            if isinstance(secret_config, bytes):
+                secret_config = secret_config.decode("ascii")
+            if isinstance(secret_config, str):
+                secret_data[settings.SECRET_CONFIG_FIELD] = json.loads(secret_config)
+
         return secret_data
