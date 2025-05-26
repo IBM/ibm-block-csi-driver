@@ -18,16 +18,21 @@ _array_agents = {}
 lock = RLock()
 
 array_type_to_port = OrderedDict()
-# Don't change the order here since svc port (22) is also opened in ds8k.
-array_type_to_port[XIVArrayMediator.array_type] = XIVArrayMediator.port
-array_type_to_port[DS8KArrayMediator.array_type] = DS8KArrayMediator.port
-array_type_to_port[SVCArrayMediator.array_type] = SVCArrayMediator.port
+array_type_to_mediator = {}
 
-array_type_to_mediator = {
-    XIVArrayMediator.array_type: XIVArrayMediator,
-    SVCArrayMediator.array_type: SVCArrayMediator,
-    DS8KArrayMediator.array_type: DS8KArrayMediator,
-}
+if SVCArrayMediator.is_custom_port():
+    array_type_to_port[SVCArrayMediator.array_type] = SVCArrayMediator.port
+    array_type_to_mediator[SVCArrayMediator.array_type] = SVCArrayMediator
+else:
+    # Don't change the order here since svc port (22) is also opened in ds8k.
+    array_type_to_port[XIVArrayMediator.array_type] = XIVArrayMediator.port
+    array_type_to_port[DS8KArrayMediator.array_type] = DS8KArrayMediator.port
+    array_type_to_port[SVCArrayMediator.array_type] = SVCArrayMediator.port
+
+    # here order is not important
+    array_type_to_mediator[XIVArrayMediator.array_type] = XIVArrayMediator
+    array_type_to_mediator[DS8KArrayMediator.array_type] = DS8KArrayMediator
+    array_type_to_mediator[SVCArrayMediator.array_type] = SVCArrayMediator
 
 array_type_cache = {}
 
@@ -47,6 +52,7 @@ def detect_array_type(endpoints):
     storage_type = _get_array_type_from_cache(endpoints)
     if storage_type:
         return storage_type
+
     for storage_type, port in array_type_to_port.items():
         for endpoint in endpoints:
             if _socket_connect_test(endpoint, port) == 0:

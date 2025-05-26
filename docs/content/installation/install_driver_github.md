@@ -16,7 +16,7 @@ When host definer is being installed, it is preferable to do so before installin
     1. Download the manifest from GitHub.
 
         ```
-        curl https://raw.githubusercontent.com/IBM/ibm-block-csi-operator/v1.12.2/deploy/installer/generated/ibm-block-csi-operator.yaml > ibm-block-csi-operator.yaml
+        curl https://raw.githubusercontent.com/IBM/ibm-block-csi-operator/v1.12.3/deploy/installer/generated/ibm-block-csi-operator.yaml > ibm-block-csi-operator.yaml
         ```
 
     2.  (Optional) Update the image fields in the `ibm-block-csi-operator.yaml`.
@@ -40,7 +40,7 @@ When host definer is being installed, it is preferable to do so before installin
     1.  Download the manifest from GitHub.
 
         ```
-        curl https://raw.githubusercontent.com/IBM/ibm-block-csi-operator/v1.12.2/config/samples/csi.ibm.com_v1_ibmblockcsi_cr.yaml > csi.ibm.com_v1_ibmblockcsi_cr.yaml
+        curl https://raw.githubusercontent.com/IBM/ibm-block-csi-operator/v1.12.3/config/samples/csi.ibm.com_v1_ibmblockcsi_cr.yaml > csi.ibm.com_v1_ibmblockcsi_cr.yaml
         ```
 
     2.  (Optional) Update the image repository field, tag field, or both in the `csi.ibm.com_v1_ibmblockcsi_cr.yaml`.

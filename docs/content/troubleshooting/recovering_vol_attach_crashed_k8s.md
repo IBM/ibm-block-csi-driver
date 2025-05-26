@@ -35,7 +35,7 @@ kubectl get volumeattachment
 ```
 
 2. Copy the `volumeattachment` name.
-3. Delete the `volumeattachment`:
+3. Delete the `volumeattachment` (you may need to remove any finalizers for this operation to succeed):
 ```
 kubectl delete volumeattachment <volumeattachment name>
 ```

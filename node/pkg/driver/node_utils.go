@@ -248,7 +248,7 @@ func readFile(path string) (string, error) {
 		return "", err
 	}
 	if len(relevantLines) > 1 {
-		err := fmt.Errorf(fmt.Sprintf("too many lines in file %v", relevantLines))
+		err := fmt.Errorf("%s", fmt.Sprintf("too many lines in file %v", relevantLines))
 		return "", err
 	}
 
@@ -434,7 +434,7 @@ func (n NodeUtils) rescanPhysicalDevice(deviceName string) error {
 		return err
 	} else if written == 0 {
 		e := fmt.Errorf("rescan error: nothing was written to rescan file : {%s}", filename)
-		logger.Errorf(e.Error())
+		logger.Errorf("%s", e.Error())
 		return e
 	}
 	return nil

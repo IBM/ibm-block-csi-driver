@@ -1,4 +1,4 @@
-FROM registry.access.redhat.com/ubi8/python-39:1-209.1739760684 AS builder
+FROM registry.access.redhat.com/ubi8/python-39:1-211.1746445275 AS builder
 
 USER root
 RUN yum update -y
@@ -18,15 +18,15 @@ RUN chmod +x csi_pb2.sh
 RUN ./csi_pb2.sh
 RUN pip3 install .
 
-FROM registry.access.redhat.com/ubi8/python-39:1-209.1739760684
+FROM registry.access.redhat.com/ubi8/python-39:1-211.1746445275
 
-ARG VERSION=1.12.2
+ARG VERSION=1.12.3
 ARG BUILD_NUMBER=0
 
 ###Required Labels
 LABEL name="IBM block storage CSI driver host definer" \
       vendor="IBM" \
-      maintainer="IBM Storage" \
+      maintainer="IBM" \
       version=$VERSION \
       release=$BUILD_NUMBER \
       summary="The host definer defines Kubernetes nodes on IBM block storage" \
@@ -39,7 +39,6 @@ COPY --from=builder /opt/app-root /opt/app-root
 COPY ./common /driver/common
 COPY ./controllers/ /driver/controllers/
 COPY ./LICENSE /licenses/
-COPY ./NOTICES /licenses/
 
 WORKDIR /driver/controllers/servers/host_definer/
 ENV PYTHONPATH=/driver

@@ -132,14 +132,14 @@ func (r OsDeviceConnectivityHelperScsiGeneric) RescanDevices(lunId int, arrayIde
 	var errStrings []string
 	if len(arrayIdentifiers) == 0 {
 		e := &ErrorNotFoundArrayIdentifiers{lunId}
-		logger.Errorf(e.Error())
+		logger.Errorf("%s", e.Error())
 		return e
 	}
 
 	for _, arrayIdentifier := range arrayIdentifiers {
 		hostsId, e := r.Helper.GetHostsIdByArrayIdentifier(arrayIdentifier)
 		if e != nil {
-			logger.Errorf(e.Error())
+			logger.Errorf("%s", e.Error())
 			errStrings = append(errStrings, e.Error())
 		}
 		for _, hostId := range hostsId {
@@ -168,7 +168,7 @@ func (r OsDeviceConnectivityHelperScsiGeneric) RescanDevices(lunId int, arrayIde
 			return err
 		} else if written == 0 {
 			e := &ErrorNothingWasWrittenToScanFileError{filename}
-			logger.Errorf(e.Error())
+			logger.Errorf("%s", e.Error())
 			return e
 		}
 
