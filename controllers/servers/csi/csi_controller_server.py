@@ -356,7 +356,7 @@ class CSIControllerServicer(csi_pb2_grpc.ControllerServicer):
                             volume_id))
                     array_mediator.validate_supported_space_efficiency(space_efficiency)
                     snapshot = array_mediator.create_snapshot(volume_id, snapshot_final_name, space_efficiency, pool,
-                                                              snapshot_parameters.virt_snap_func)
+                                                              snapshot_parameters.virt_snap_func, array_connection_info.partition_name)
 
                 logger.debug("generating create snapshot response")
                 response = utils.generate_csi_create_snapshot_response(snapshot, system_id, source_id)

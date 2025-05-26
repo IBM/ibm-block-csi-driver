@@ -557,7 +557,7 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
     def _delete_target_volume_if_exist(self, target_volume_id):
         self._delete_volume(target_volume_id, not_exist_err=False)
 
-    def _create_snapshot(self, target_volume_name, source_api_volume, space_efficiency, pool):
+    def _create_snapshot(self, target_volume_name, source_api_volume, space_efficiency, pool, partition_name=None):
         target_api_volume = self._create_similar_volume(target_volume_name, source_api_volume, space_efficiency, pool)
         options = [FLASHCOPY_NO_BACKGROUND_COPY_OPTION, FLASHCOPY_PERSISTENT_OPTION]
         try:
