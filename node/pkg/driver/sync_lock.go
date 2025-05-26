@@ -28,8 +28,9 @@ import (
 type SyncLockInterface interface {
 	AddVolumeLock(id string, msg string) error
 	RemoveVolumeLock(id string, msg string)
+	AddVolumeAndLunLock(id string, lun int, msg string) error
+	RemoveVolumeAndLunLock(id string, lun int, msg string)
 	GetSyncMap() *sync.Map
-	//    RemoveVolumeLock(id string, msg string) func()
 }
 
 type SyncLock struct {
@@ -42,19 +43,29 @@ func NewSyncLock(max_invocations int) SyncLockInterface {
 		SyncMap: &sync.Map{},
 		Tokens:  make(chan struct{}, max_invocations),
 	}
-
 }
 
 func (s SyncLock) GetSyncMap() *sync.Map {
 	return s.SyncMap
 }
 
+func (s SyncLock) AddVolumeAndLunLock(id string, lun int, msg string) error {
+	err := s.addLunLock(lun, msg)
+	if err != nil {
+		return err
+	}
+	err = s.AddVolumeLock(id, msg)
+	if err != nil {
+		s.removeLunLock(lun, msg)
+	}
+	return err
+}
+
 func (s SyncLock) AddVolumeLock(id string, msg string) error {
 	logger.Debugf("Lock for action %s, try to acquire lock for volume", msg)
-
 	_, exists := s.SyncMap.LoadOrStore(id, 0)
 	if exists {
-		logger.Debugf("Lock for action %s, lock for volume is already in use by other thread", msg)
+		logger.Debugf("Lock for action %s, lock for volume %s is already in use by other thread", msg, id)
 		return &VolumeAlreadyProcessingError{id}
 	}
 
@@ -69,13 +80,29 @@ func (s SyncLock) AddVolumeLock(id string, msg string) error {
 	}
 }
 
+func (s SyncLock) RemoveVolumeAndLunLock(id string, lun int, msg string) {
+	s.removeLunLock(lun, msg)
+	s.RemoveVolumeLock(id, msg)
+}
+
 func (s SyncLock) RemoveVolumeLock(id string, msg string) {
 	logger.Debugf("Lock for action %s, release lock for volume", msg)
-
 	<-s.Tokens
 	s.SyncMap.Delete(id)
 }
 
-/*func (s SyncLock) RemoveVolumeLock(id string, msg string) func() {
-	return func() { s.RemoveVolumeLockDo(id, msg) }
-}*/
+func (s SyncLock) addLunLock(lun int, msg string) error {
+	logger.Debugf("Lock for action %s, try to acquire lock for lun %d", msg, lun)
+
+	_, exists := s.SyncMap.LoadOrStore(lun, 0)
+	if exists {
+		logger.Debugf("Lock for action %s, lock for lun %d is already in use by other thread", msg, lun)
+		return &LunAlreadyProcessingError{lun}
+	}
+	return nil
+}
+
+func (s SyncLock) removeLunLock(lun int, msg string) {
+	logger.Debugf("Lock for action %s, release lock for lun %d", msg, lun)
+	s.SyncMap.Delete(lun)
+}
