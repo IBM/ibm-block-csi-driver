@@ -24,5 +24,6 @@ type OsDeviceConnectivityInterface interface {
 	GetMpathDevice(volumeId string) (string, error)
 	FlushMultipathDevice(mpathDevice string) error
 	RemovePhysicalDevice(sysDevices []string) error
+	RemoveGhostDevice(lun int) error
 	ValidateLun(lun int, sysDevices []string) error
 }

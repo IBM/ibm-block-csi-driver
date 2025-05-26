@@ -44,6 +44,7 @@ type OsDeviceConnectivityHelperScsiGenericInterface interface {
 	GetMpathDevice(volumeId string) (string, error)
 	FlushMultipathDevice(mpathDevice string) error
 	RemovePhysicalDevice(sysDevices []string) error
+	RemoveGhostDevice(lun int) error
 	ValidateLun(lun int, sysDevices []string) error
 	IsVolumePathMatchesVolumeId(volumeId string, volumePath string) (bool, error)
 }
@@ -320,6 +321,60 @@ func (r OsDeviceConnectivityHelperScsiGeneric) RemovePhysicalDevice(sysDevices [
 	}
 	logger.Debugf("Finished removing SCSI devices : {%v}", sysDevices)
 	return nil
+}
+
+func (o OsDeviceConnectivityHelperScsiGeneric) RemoveGhostDevice(lun int) error {
+	//is_clean_scsi_device_enabled()
+	sgMapCmd := "sg_map"
+	args := []string{"-x"}
+
+	out, err := o.Executer.ExecuteWithTimeoutSilently(TimeOutSgInqCmd, sgMapCmd, args)
+	if err != nil {
+		logger.Errorf("Error getting sg devices from sg_map. error: {%v}", err.Error())
+		return err
+	}
+
+	var currLun int
+	lines := strings.Split(string(out), "\n")
+	for _, line := range lines {
+		if strings.Contains(line, "/dev/sd") || strings.Contains(line, "/dev/sr") {
+			continue
+		}
+		fields := strings.Fields(line)
+		if len(fields) < 5 {
+			continue
+		}
+		lunField := fields[4]
+		currLun, err = strconv.Atoi(lunField)
+		if err != nil {
+			logger.Debugf("converting %s to int failed?!?!", lunField)
+			continue
+		}
+		if currLun == lun && o.isGhostIBMDevice(fields[0]) {
+			sgDev := strings.TrimPrefix(fields[0], "/dev/")
+			deletePath := fmt.Sprintf("/sys/class/scsi_generic/%s/device/delete", sgDev)
+			logger.Debugf("Deleting ghost device: %s", sgDev) // should I print all of them in one line at the end?
+
+			if err := os.WriteFile(deletePath, []byte("1"), 0644); err != nil {
+				logger.Errorf("Error deleting device %s: %v\n", sgDev, err)
+			}
+		}
+	}
+	return nil
+}
+
+func (o OsDeviceConnectivityHelperScsiGeneric) isGhostIBMDevice(sgDev string) bool {
+	sgInqCmd := "sg_inq"
+	args := []string{sgDev}
+
+	outputBytes, err := o.Executer.ExecuteWithTimeoutSilently(TimeOutSgInqCmd, sgInqCmd, args)
+	if err != nil {
+		logger.Errorf("Error executing %v. error: {%v}", sgInqCmd, err.Error())
+		return false
+	}
+
+	outStr := string(outputBytes)
+	return strings.Contains(outStr, "PQual=1") && strings.Contains(outStr, "IBM")
 }
 
 func (r OsDeviceConnectivityHelperScsiGeneric) ValidateLun(lun int, sysDevices []string) error {

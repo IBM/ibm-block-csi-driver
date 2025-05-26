@@ -36,6 +36,14 @@ func (e *RequestValidationError) Error() string {
 	return fmt.Sprintf("Request Validation Error: %s", e.Msg)
 }
 
+type LunAlreadyProcessingError struct {
+	lun int
+}
+
+func (e *LunAlreadyProcessingError) Error() string {
+	return fmt.Sprintf("Lun %d is already processing. request cannot be completed.", e.lun)
+}
+
 type VolumeAlreadyProcessingError struct {
 	volId string
 }
