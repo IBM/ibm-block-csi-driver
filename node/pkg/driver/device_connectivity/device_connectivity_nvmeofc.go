@@ -51,6 +51,10 @@ func (r OsDeviceConnectivityNvmeOFc) RemovePhysicalDevice(sysDevices []string) e
 	return r.HelperScsiGeneric.RemovePhysicalDevice(sysDevices)
 }
 
+func (r OsDeviceConnectivityNvmeOFc) RemoveGhostDevice(lun int) error {
+	return r.HelperScsiGeneric.RemoveGhostDevice(lun)
+}
+
 func (r OsDeviceConnectivityNvmeOFc) ValidateLun(_ int, _ []string) error {
 	return nil
 }

@@ -44,6 +44,7 @@ type OsDeviceConnectivityHelperScsiGenericInterface interface {
 	GetMpathDevice(volumeId string) (string, error)
 	FlushMultipathDevice(mpathDevice string) error
 	RemovePhysicalDevice(sysDevices []string) error
+	RemoveGhostDevice(lun int) error
 	ValidateLun(lun int, sysDevices []string) error
 	IsVolumePathMatchesVolumeId(volumeId string, volumePath string) (bool, error)
 }
@@ -320,6 +321,79 @@ func (r OsDeviceConnectivityHelperScsiGeneric) RemovePhysicalDevice(sysDevices [
 	}
 	logger.Debugf("Finished removing SCSI devices : {%v}", sysDevices)
 	return nil
+}
+
+func (o OsDeviceConnectivityHelperScsiGeneric) RemoveGhostDevice(lun int) error {
+	sgMapCmd := "sg_map"
+	args := []string{"-x"}
+
+	out, err := o.Executer.ExecuteWithTimeoutSilently(TimeOutSgInqCmd, sgMapCmd, args)
+	if err != nil {
+		logger.Errorf("Error getting sg devices from sg_map. error: {%v}", err.Error())
+		return err
+	}
+
+	lines := strings.Split(string(out), "\n")
+	var (
+		deleted int = 0
+		notLun  int = 0
+		notPQ   int = 0
+	)
+
+	/*
+		output pattern that we're looking for is something like this:
+		/dev/sg2173  34 0 39 <lun>  0
+		namely: /dev/sg something, then 4 numbers with space between each, the last of which is the lun,
+		then two spaces and another number
+
+		If we want either with or without sd:
+		pattern := fmt.Sprintf(`^/dev/sg\d+\s+\d+\s\d+\s\d+\s%d\s{2}\d+(?:\s+/dev/\S+)?$`, lun)
+		If we want only lines with no sd device:
+	*/
+	pattern := fmt.Sprintf(`^/dev/sg\d+\s+\d+\s\d+\s\d+\s%d\s{2}\d+$`, lun)
+	re := regexp.MustCompile(pattern)
+
+	for _, line := range lines {
+		if !re.MatchString(line) {
+			notLun += 1
+			continue
+		}
+
+		fields := strings.Fields(line)
+		sgName := fields[0]
+
+		if !o.isGhostIBMDevice(sgName) {
+			notPQ += 1
+			continue
+		}
+		sgDev := strings.TrimPrefix(sgName, "/dev/")
+		deletePath := fmt.Sprintf("/sys/class/scsi_generic/%s/device/delete", sgDev)
+		logger.Debugf("Deleting ghost device: %s", sgDev) // should I print all of them in one line at the end?
+
+		if err := os.WriteFile(deletePath, []byte("1"), 0644); err != nil {
+			logger.Errorf("Error deleting device %s: %v\n", sgDev, err)
+		} else {
+			deleted += 1
+		}
+	}
+	if deleted != 0 {
+		logger.Debugf("Deleted %d devices. Found %d not-our-lun devices, and %d our lun but non ghost", deleted, notLun, notPQ)
+	}
+	return nil
+}
+
+func (o OsDeviceConnectivityHelperScsiGeneric) isGhostIBMDevice(sgDev string) bool {
+	sgInqCmd := "sg_inq"
+	args := []string{sgDev}
+
+	outputBytes, err := o.Executer.ExecuteWithTimeoutSilently(TimeOutSgInqCmd, sgInqCmd, args)
+	if err != nil {
+		logger.Errorf("Error executing %v. error: {%v}", sgInqCmd, err.Error())
+		return false
+	}
+
+	outStr := string(outputBytes)
+	return strings.Contains(outStr, "PQual=1") && strings.Contains(outStr, "IBM")
 }
 
 func (r OsDeviceConnectivityHelperScsiGeneric) ValidateLun(lun int, sysDevices []string) error {
