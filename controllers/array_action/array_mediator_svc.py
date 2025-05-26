@@ -775,7 +775,7 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
         cli_volume = self._get_cli_volume(cli_volume.name)
         return self._generate_volume_response(cli_volume)
 
-    def _create_similar_volume(self, source_cli_volume, target_volume_name, space_efficiency, pool):
+    def _create_similar_volume(self, source_cli_volume, target_volume_name, space_efficiency, pool, partition_name):
         logger.info("creating target cli volume '{0}' from source volume '{1}'".format(target_volume_name,
                                                                                        source_cli_volume.name))
         if not space_efficiency:
@@ -783,7 +783,7 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
             space_efficiency = space_efficiency_aliases.pop()
         size_in_bytes = int(source_cli_volume.capacity)
         io_group = source_cli_volume.IO_group_name
-        self._create_cli_volume(target_volume_name, size_in_bytes, space_efficiency, pool, io_group)
+        self._create_cli_volume(target_volume_name, size_in_bytes, space_efficiency, pool, io_group, None, partition_name)
 
     def _create_fcmap(self, source_volume_name, target_volume_name, is_copy):
         logger.info("creating FlashCopy Mapping from '{0}' to '{1}'".format(source_volume_name, target_volume_name))
@@ -905,9 +905,9 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
         target_cli_volume = self._delete_unstarted_fcmap_if_exists(target_volume_name)
         self._delete_target_volume_if_exists(target_cli_volume)
 
-    def _create_snapshot(self, target_volume_name, source_cli_volume, space_efficiency, pool):
+    def _create_snapshot(self, target_volume_name, source_cli_volume, space_efficiency, pool, partition_name):
         try:
-            self._create_similar_volume(source_cli_volume, target_volume_name, space_efficiency, pool)
+            self._create_similar_volume(source_cli_volume, target_volume_name, space_efficiency, pool, partition_name)
             return self._create_and_start_fcmap(source_cli_volume.name, target_volume_name, is_copy=False)
         except (svc_errors.CommandExecutionError, CLIFailureError) as ex:
             logger.error("Failed to create snapshot '{0}': {1}".format(target_volume_name, ex))
@@ -949,7 +949,7 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
         raise RuntimeError('could not find a volume for {} in site {}'.format(volume_name, pool_site_name))
 
     @register_csi_plugin()
-    def create_snapshot(self, volume_id, snapshot_name, space_efficiency, pool, is_virt_snap_func):
+    def create_snapshot(self, volume_id, snapshot_name, space_efficiency, pool, is_virt_snap_func, partition_name=None):
         logger.info("creating snapshot '{0}' from volume '{1}'".format(snapshot_name, volume_id))
         source_volume_name = self._get_volume_name_by_wwn(volume_id)
         source_cli_volume = self._get_cli_volume_in_pool_site(source_volume_name, pool)
@@ -962,7 +962,7 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
             else:
                 raise array_errors.VirtSnapshotFunctionNotSupportedMessage(volume_id)
         else:
-            target_cli_volume = self._create_snapshot(snapshot_name, source_cli_volume, space_efficiency, pool)
+            target_cli_volume = self._create_snapshot(snapshot_name, source_cli_volume, space_efficiency, pool, partition_name)
             snapshot = self._generate_snapshot_response_from_cli_volume(target_cli_volume, source_cli_volume.vdisk_UID)
         logger.info("finished creating snapshot '{0}' from volume '{1}'".format(snapshot_name, volume_id))
         return snapshot

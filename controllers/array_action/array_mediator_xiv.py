@@ -329,7 +329,7 @@ class XIVArrayMediator(ArrayMediatorAbstract):
             return self._generate_snapshot_response(cli_object)
         return self._generate_volume_response(cli_object)
 
-    def create_snapshot(self, volume_id, snapshot_name, space_efficiency, pool, is_virt_snap_func):
+    def create_snapshot(self, volume_id, snapshot_name, space_efficiency, pool, is_virt_snap_func, partition_name=None):
         logger.info("creating snapshot {0} from volume {1}".format(snapshot_name, volume_id))
         source_cli_volume = self._get_cli_object_by_wwn(volume_id)
         if pool and pool != source_cli_volume.pool_name:
