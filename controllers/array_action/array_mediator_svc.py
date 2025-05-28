@@ -123,8 +123,6 @@ def build_create_volume_in_volume_group_kwargs(pool, io_group, source_id, partit
     }
     if io_group:
         cli_kwargs['iogroup'] = io_group
-    if partition_name is not None:
-        cli_kwargs['partition'] = partition_name
     return cli_kwargs
 
 
