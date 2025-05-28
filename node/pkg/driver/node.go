@@ -121,35 +121,23 @@ func (d *NodeService) NodeStageVolume(ctx context.Context, req *csi.NodeStageVol
 		}
 	}
 
-	volumeID := req.VolumeId
-	err = d.VolumeIdLocksMap.AddVolumeLockNoSemaphore(volumeID, "NodeStageVolume")
-	if err != nil {
-		logger.Errorf("Another operation is being performed on volume : {%s}", volumeID)
-		return nil, status.Error(codes.Aborted, err.Error())
-	}
-	defer d.VolumeIdLocksMap.RemoveVolumeLockNoSempahore(volumeID, "NodeStageVolume")
-
 	connectivityType, lun, ipsByArrayInitiator, err := d.NodeUtils.GetInfoFromPublishContext(req.PublishContext)
 	if err != nil {
 		return nil, status.Error(codes.Internal, err.Error())
 	}
-
-	err = d.VolumeIdLocksMap.AddLunLock(lun, "NodeStageVolume")
+	volumeID := req.VolumeId
+	err = d.VolumeIdLocksMap.AddVolumeAndLunLock(volumeID, lun, "NodeStageVolume")
 	if err != nil {
-		logger.Errorf("Another operation is being performed on lun : {%d}", lun)
+		logger.Errorf("Another operation is being performed on volume : {%s}", volumeID)
 		return nil, status.Error(codes.Aborted, err.Error())
 	}
-	defer d.VolumeIdLocksMap.RemoveLunLock(lun, "NodeStageVolume")
-	err = d.VolumeIdLocksMap.AcquireSemaphore(volumeID, "NodeStageVolume")
-	if err != nil {
-		return nil, status.Error(codes.Aborted, err.Error())
-	}
-	defer d.VolumeIdLocksMap.ReleaseSemaphore()
+	defer d.VolumeIdLocksMap.RemoveVolumeLock(volumeID, "NodeStageVolume")
 
 	arrayInitiators := d.NodeUtils.GetArrayInitiators(ipsByArrayInitiator)
 
 	osDeviceConnectivity, ok := d.OsDeviceConnectivityMapping[connectivityType]
 	if !ok {
+		d.VolumeIdLocksMap.RemoveLunLock(lun, "NodeStageVolume")
 		return nil, status.Error(codes.InvalidArgument, fmt.Sprintf("Wrong connectivity type %s", connectivityType))
 	}
 
@@ -157,11 +145,13 @@ func (d *NodeService) NodeStageVolume(ctx context.Context, req *csi.NodeStageVol
 
 	err = d.OsDeviceConnectivityHelper.RemoveGhostDevice(lun)
 	if err != nil {
+		d.VolumeIdLocksMap.RemoveLunLock(lun, "NodeStageVolume")
 		return nil, status.Error(codes.Aborted, err.Error())
 	}
 
 	err = osDeviceConnectivity.RescanDevices(lun, arrayInitiators)
 	if err != nil {
+		d.VolumeIdLocksMap.RemoveLunLock(lun, "NodeStageVolume")
 		return nil, status.Error(codes.Internal, err.Error())
 	}
 
@@ -170,7 +160,7 @@ func (d *NodeService) NodeStageVolume(ctx context.Context, req *csi.NodeStageVol
 		logger.Debugf("Failed to clean ghost device for lun %d", lun)
 		// we can swallow the error here, since it's just for cleanliness
 	}
-	d.VolumeIdLocksMap.RemoveLunLock(lun, "NodeStageVolume") //should I keep it here?
+	d.VolumeIdLocksMap.RemoveLunLock(lun, "NodeStageVolume")
 
 	volumeUuid := d.NodeUtils.GetVolumeUuid(volumeID)
 	mpathDevice, err := osDeviceConnectivity.GetMpathDevice(volumeUuid)

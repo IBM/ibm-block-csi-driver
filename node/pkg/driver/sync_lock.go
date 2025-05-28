@@ -27,12 +27,8 @@ import (
 
 type SyncLockInterface interface {
 	AddVolumeLock(id string, msg string) error
-	AddVolumeLockNoSemaphore(id string, msg string) error
-	AcquireSemaphore(id string, msg string) error
 	RemoveVolumeLock(id string, msg string)
-	RemoveVolumeLockNoSempahore(id string, msg string)
-	ReleaseSemaphore()
-	AddLunLock(lun int, msg string) error
+	AddVolumeAndLunLock(id string, lun int, msg string) error
 	RemoveLunLock(lun int, msg string)
 	GetSyncMap() *sync.Map
 }
@@ -53,55 +49,44 @@ func (s SyncLock) GetSyncMap() *sync.Map {
 	return s.SyncMap
 }
 
-func (s SyncLock) AddVolumeLock(id string, msg string) error {
-	err := s.AddVolumeLockNoSemaphore(id, msg)
+func (s SyncLock) AddVolumeAndLunLock(id string, lun int, msg string) error {
+	err := s.addLunLock(lun, msg)
 	if err != nil {
 		return err
 	}
-	err = s.AcquireSemaphore(id, msg)
+	err = s.AddVolumeLock(id, msg)
 	if err != nil {
-		s.SyncMap.Delete(id)
-		return &VolumeNoResources{id}
+		s.RemoveLunLock(lun, msg)
 	}
 	return err
 }
 
-func (s SyncLock) AddVolumeLockNoSemaphore(id string, msg string) error {
+func (s SyncLock) AddVolumeLock(id string, msg string) error {
+	logger.Debugf("Lock for action %s, try to acquire lock for volume", msg)
 	_, exists := s.SyncMap.LoadOrStore(id, 0)
 	if exists {
 		logger.Debugf("Lock for action %s, lock for volume %s is already in use by other thread", msg, id)
 		return &VolumeAlreadyProcessingError{id}
 	}
-	logger.Debugf("Lock for action %s, acquire lock for volume %s", msg, id)
-	return nil
-}
 
-func (s SyncLock) AcquireSemaphore(id string, msg string) error {
 	select {
 	case s.Tokens <- struct{}{}:
 		logger.Debugf("Lock for action %s, succeeded to acquire lock for volume", msg)
 		return nil
 	case <-time.After(1 * time.Second):
 		logger.Debugf("Lock for action %s, failed to acquire lock for volume", msg)
+		s.SyncMap.Delete(id)
 		return &VolumeNoResources{id}
 	}
 }
 
 func (s SyncLock) RemoveVolumeLock(id string, msg string) {
-	s.ReleaseSemaphore()
-	s.RemoveVolumeLockNoSempahore(id, msg)
-}
-
-func (s SyncLock) RemoveVolumeLockNoSempahore(id string, msg string) {
 	logger.Debugf("Lock for action %s, release lock for volume", msg)
+	<-s.Tokens
 	s.SyncMap.Delete(id)
 }
 
-func (s SyncLock) ReleaseSemaphore() {
-	<-s.Tokens
-}
-
-func (s SyncLock) AddLunLock(lun int, msg string) error {
+func (s SyncLock) addLunLock(lun int, msg string) error {
 	logger.Debugf("Lock for action %s, try to acquire lock for lun %d", msg, lun)
 
 	_, exists := s.SyncMap.LoadOrStore(lun, 0)
