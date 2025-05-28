@@ -74,7 +74,7 @@ class CSIControllerServicer(csi_pb2_grpc.ControllerServicer):
                     logger.debug("requested size is 0 so the default size will be used : {0} ".format(
                         required_bytes))
 
-                is_virt_snap_func = volume_parameters.virt_snap_func
+                is_virt_snap_func = True
                 if is_virt_snap_func and source_id:
                     source_object = array_mediator.get_object_by_id(source_id, source_type, is_virt_snap_func)
                     if not source_object:
@@ -332,15 +332,13 @@ class CSIControllerServicer(csi_pb2_grpc.ControllerServicer):
                                                                 system_id=array_connection_info.system_id)
             pool = snapshot_parameters.pool
             space_efficiency = snapshot_parameters.space_efficiency
-            if snapshot_parameters.virt_snap_func and space_efficiency:
-                raise array_errors.SpaceEfficiencyNotSupported(space_efficiency)
             with get_agent(array_connection_info, array_type).get_mediator() as array_mediator:
                 logger.debug(array_mediator)
                 snapshot_final_name = self._get_snapshot_final_name(snapshot_parameters, request.name, array_mediator)
 
                 logger.info("Snapshot name : {}. Volume id : {}".format(snapshot_final_name, volume_id))
                 snapshot = array_mediator.get_snapshot(volume_id, snapshot_final_name, pool,
-                                                       snapshot_parameters.virt_snap_func)
+                                                       True)
 
                 if snapshot:
                     if snapshot.source_id != volume_id:
@@ -356,7 +354,7 @@ class CSIControllerServicer(csi_pb2_grpc.ControllerServicer):
                             volume_id))
                     array_mediator.validate_supported_space_efficiency(space_efficiency)
                     snapshot = array_mediator.create_snapshot(volume_id, snapshot_final_name, space_efficiency, pool,
-                                                              snapshot_parameters.virt_snap_func, array_connection_info.partition_name)
+                                                              True, array_connection_info.partition_name)
 
                 logger.debug("generating create snapshot response")
                 response = utils.generate_csi_create_snapshot_response(snapshot, system_id, source_id)
