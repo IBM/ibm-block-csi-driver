@@ -754,12 +754,7 @@ def join_object_prefix_with_name(prefix, name):
 
 
 def validate_parameters_match_source_volume(space_efficiency, required_bytes, volume):
-    _validate_space_efficiency_match(space_efficiency, volume)
-    volume_capacity_bytes = volume.capacity_bytes
-    if volume_capacity_bytes < required_bytes:
-        raise ValidationException(messages.REQUIRED_BYTES_MISMATCH_MESSAGE.format(
-            required_bytes, volume_capacity_bytes))
-
+    return
 
 def _get_connectivity_type_by_initiators(initiators):
     if initiators.nvme_nqns:

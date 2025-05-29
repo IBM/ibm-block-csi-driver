@@ -89,8 +89,6 @@ class CSIControllerServicer(csi_pb2_grpc.ControllerServicer):
                                                     csi_pb2.CreateVolumeResponse)
                     else:
                         source_volume = source_object
-                    if source_volume:
-                        utils.validate_parameters_match_source_volume(space_efficiency, required_bytes, source_volume)
 
                 try:
                     volume = array_mediator.get_volume(volume_final_name, pool, is_virt_snap_func)
