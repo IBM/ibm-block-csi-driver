@@ -324,7 +324,15 @@ func (r OsDeviceConnectivityHelperScsiGeneric) RemovePhysicalDevice(sysDevices [
 }
 
 func (o OsDeviceConnectivityHelperScsiGeneric) RemoveGhostDevice(lun int) error {
-	//is_clean_scsi_device_enabled()
+	err := o.removeGhostDevice(lun)
+	if err != nil {
+		return err
+	}
+	err = o.removeGhostDevice(lun)
+	return err
+}
+
+func (o OsDeviceConnectivityHelperScsiGeneric) removeGhostDevice(lun int) error {
 	sgMapCmd := "sg_map"
 	args := []string{"-x"}
 
@@ -334,8 +342,14 @@ func (o OsDeviceConnectivityHelperScsiGeneric) RemoveGhostDevice(lun int) error 
 		return err
 	}
 
-	var currLun int
 	lines := strings.Split(string(out), "\n")
+	var (
+		currLun int
+		deleted int = 0
+		notLun  int = 0
+		notPQ   int = 0
+	)
+
 	for _, line := range lines {
 		if strings.Contains(line, "/dev/sd") || strings.Contains(line, "/dev/sr") {
 			continue
@@ -350,16 +364,25 @@ func (o OsDeviceConnectivityHelperScsiGeneric) RemoveGhostDevice(lun int) error 
 			logger.Debugf("converting %s to int failed?!?!", lunField)
 			continue
 		}
-		if currLun == lun && o.isGhostIBMDevice(fields[0]) {
-			sgDev := strings.TrimPrefix(fields[0], "/dev/")
-			deletePath := fmt.Sprintf("/sys/class/scsi_generic/%s/device/delete", sgDev)
-			logger.Debugf("Deleting ghost device: %s", sgDev) // should I print all of them in one line at the end?
+		if currLun == lun {
+			if o.isGhostIBMDevice(fields[0]) {
+				sgDev := strings.TrimPrefix(fields[0], "/dev/")
+				deletePath := fmt.Sprintf("/sys/class/scsi_generic/%s/device/delete", sgDev)
+				logger.Debugf("Deleting ghost device: %s", sgDev) // should I print all of them in one line at the end?
 
-			if err := os.WriteFile(deletePath, []byte("1"), 0644); err != nil {
-				logger.Errorf("Error deleting device %s: %v\n", sgDev, err)
+				if err := os.WriteFile(deletePath, []byte("1"), 0644); err != nil {
+					logger.Errorf("Error deleting device %s: %v\n", sgDev, err)
+				} else {
+					deleted += 1
+				}
+			} else {
+				notPQ += 1
 			}
+		} else {
+			notLun += 1
 		}
 	}
+	logger.Debugf("Deleted %d devices. Found %d not-our-lun devices, and %d our lun but non ghost", deleted, notLun, notPQ)
 	return nil
 }
 
