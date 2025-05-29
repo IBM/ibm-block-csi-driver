@@ -5,6 +5,10 @@
 
 Some of the parameters within the HostDefiner custom resource are configurable. Use this information to help decide whether the parameters for your storage system need to be updated.
 
+Any configuration changes are reverted upon each IBM® Block Storage CSI driver upgrade. If configuration changes are required, it is recommended to uset InstallPlans to manual upgrade only.{: attention}
+
+Consider [configuring dynamic host definition labels](../using/using_hostdefinition_labels.md) when possible to preserve HostDefiner customizations during IBM® Block Storage CSI driver upgrades.{: tip}
+
 For more information about using the host definer, see [Using dynamic host definition](../using/using_hostdefinition.md).
 
 The prefix length is bound by the limitation of the storage system. When defined, the length is a combination of both the prefix and node (server) hostname.{: restriction}
