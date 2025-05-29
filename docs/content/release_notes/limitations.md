@@ -5,19 +5,11 @@
 
 As opposed to known issues, limitations are functionality restrictions that are part of the predefined system design and capabilities in a particular version.
 
-- [IBM DS8000 usage limitations](#ibm-ds8000-usage-limitations)
-- [IBM Storage Virtualize family usage limitations](#ibm-storage-virtualize-family-usage-limitations)
-- [High availability (HA) limitations](#high-availability-ha-limitations)
-- [I/O group limitations](#io-group-limitations)
-- [NVMe/FC usage limitations](#nvme®fc-usage-limitations)
-- [Policy-based replication limitations](#policy-based-replication-limitations)
-- [Snapshot function limitations](#snapshot-function-limitations)
-- [Volume attach limitations](#volume-attach-limitations)
-- [Volume clone limitations](#volume-clone-limitations)
-- [Volume expansion limitations](#volume-clone-limitations)
-- [Volume group limitations](#volume-group-limitations)
-- [Volume replication limitations](#volume-replication-limitations)
-- [Volume snapshot limitations](#volume-snapshot-limitations)
+## Custom configuration limitations
+
+Any configuration changes are reverted upon each IBM® Block Storage CSI driver upgradew. If configuration changes are required, it is recommended to uset InstallPlans to manual upgrade only.
+
+Consider [configuring dynamic host definition labels](../using/using_hostdefinition_labels.md) when possible to preserve HostDefiner customizations during IBM® Block Storage CSI driver upgrades.{: tip}
 
 ## IBM DS8000 usage limitations
 
@@ -33,14 +25,14 @@ When using the CSI driver with IBM Storage Virtualize® family storage systems:
 
 Check your operating system LUN limit.{: tip}
 
-## High availability (HA) limitations
+## High availability (HA) general limitations
 
 High availability (HA) is not supported on all storage system types. {: attention}
 
 - HyperSwap topology is only supported for use with IBM Storage Virtualize® family storage systems.
 - Stretched topology is only supported by SAN Volume Controller storage systems.
 
-### HyperSwap volume limitations
+## HyperSwap volume limitations
 The following IBM block storage CSI driver features are not supported on volumes where HyperSwap is used:
 
 - Volume cloning.
@@ -48,7 +40,7 @@ The following IBM block storage CSI driver features are not supported on volumes
 
 A snapshot can be created from a HyperSwap volume. {: note}
 
-### Stretched volume limitations
+## Stretched volume limitations
 When conducting volume cloning, both volumes must use stretched topology.
 
 ## I/O group limitations
