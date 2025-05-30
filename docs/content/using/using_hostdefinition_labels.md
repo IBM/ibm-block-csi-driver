@@ -23,7 +23,7 @@ For example, if `connectivityType` is defined as using `fc` but you want to use 
 
 The values for the connectivityType are the same as those for defining the HostDefiner: `nvmeofc`, `fc`, `iscsi`. If an invalid label is used, this label is ignored.{: note}
 
-For more information about defining the connectivity type within the HostDefiner, see [Configuring the host definer](../configuration/configuring_hostdefiner.md)).{: tip}
+For more information about defining the connectivity type within the HostDefiner, see [Configuring the host definer](../configuration/configuring_hostdefiner.md).{: tip}
 
 As of this document's publication date, NVMe/FC is not supported for this release.{: restriction}
 
