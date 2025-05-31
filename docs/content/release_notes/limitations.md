@@ -7,7 +7,7 @@ As opposed to known issues, limitations are functionality restrictions that are 
 
 ## Custom configuration limitations
 
-Any configuration changes are reverted upon each IBM® Block Storage CSI driver upgradew. If configuration changes are required, it is recommended to set InstallPlans to manual upgrade only.
+Any configuration changes are reverted upon each IBM® Block Storage CSI driver upgrade. If configuration changes are required, it is recommended to set InstallPlans to manual upgrade only.
 
 Consider [configuring dynamic host definition labels](../using/using_hostdefinition_labels.md) when possible to preserve HostDefiner customizations during IBM® Block Storage CSI driver upgrades.{: tip}
 
