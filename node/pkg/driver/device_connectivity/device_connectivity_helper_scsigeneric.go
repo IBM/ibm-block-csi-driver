@@ -326,6 +326,10 @@ func (r OsDeviceConnectivityHelperScsiGeneric) RemovePhysicalDevice(sysDevices [
 }
 
 func (o OsDeviceConnectivityHelperScsiGeneric) RemoveGhostDevice(lun int) error {
+	if !o.CleanScsiDevice {
+		logger.Debugf("Clean devices disabled, skipping removeGhostDevice") //Can be omitted, debug only.
+		return nil
+	}
 	sgMapCmd := "sg_map"
 	args := []string{"-x"}
 
