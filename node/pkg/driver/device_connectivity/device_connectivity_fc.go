@@ -25,10 +25,10 @@ type OsDeviceConnectivityFc struct {
 	HelperScsiGeneric OsDeviceConnectivityHelperScsiGenericInterface
 }
 
-func NewOsDeviceConnectivityFc(executer executer.ExecuterInterface) OsDeviceConnectivityInterface {
+func NewOsDeviceConnectivityFc(executer executer.ExecuterInterface, clean_scsi_device bool) OsDeviceConnectivityInterface {
 	return &OsDeviceConnectivityFc{
 		Executer:          executer,
-		HelperScsiGeneric: NewOsDeviceConnectivityHelperScsiGeneric(executer),
+		HelperScsiGeneric: NewOsDeviceConnectivityHelperScsiGeneric(executer, clean_scsi_device),
 	}
 }
 

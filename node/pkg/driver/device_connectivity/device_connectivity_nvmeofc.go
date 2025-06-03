@@ -25,10 +25,10 @@ type OsDeviceConnectivityNvmeOFc struct {
 	HelperScsiGeneric OsDeviceConnectivityHelperScsiGenericInterface
 }
 
-func NewOsDeviceConnectivityNvmeOFc(executer executer.ExecuterInterface) OsDeviceConnectivityInterface {
+func NewOsDeviceConnectivityNvmeOFc(executer executer.ExecuterInterface, clean_scsi_device bool) OsDeviceConnectivityInterface {
 	return &OsDeviceConnectivityNvmeOFc{
 		Executer:          executer,
-		HelperScsiGeneric: NewOsDeviceConnectivityHelperScsiGeneric(executer),
+		HelperScsiGeneric: NewOsDeviceConnectivityHelperScsiGeneric(executer, clean_scsi_device),
 	}
 }
 

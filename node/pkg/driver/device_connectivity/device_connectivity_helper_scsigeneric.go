@@ -53,6 +53,7 @@ type OsDeviceConnectivityHelperScsiGeneric struct {
 	Executer        executer.ExecuterInterface
 	Helper          OsDeviceConnectivityHelperInterface
 	MutexMultipathF *sync.Mutex
+	CleanScsiDevice bool
 }
 
 type WaitForMpathResult struct {
@@ -89,11 +90,12 @@ const (
 	procMountsFilePath          = "/proc/mounts"
 )
 
-func NewOsDeviceConnectivityHelperScsiGeneric(executer executer.ExecuterInterface) OsDeviceConnectivityHelperScsiGenericInterface {
+func NewOsDeviceConnectivityHelperScsiGeneric(executer executer.ExecuterInterface, clean_scsi_device bool) OsDeviceConnectivityHelperScsiGenericInterface {
 	return &OsDeviceConnectivityHelperScsiGeneric{
 		Executer:        executer,
 		Helper:          NewOsDeviceConnectivityHelperGeneric(executer),
 		MutexMultipathF: &sync.Mutex{},
+		CleanScsiDevice: clean_scsi_device,
 	}
 }
 
