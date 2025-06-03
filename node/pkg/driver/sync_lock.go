@@ -34,14 +34,16 @@ type SyncLockInterface interface {
 }
 
 type SyncLock struct {
-	SyncMap *sync.Map
-	Tokens  chan struct{}
+	SyncMap         *sync.Map
+	Tokens          chan struct{}
+	CleanScsiDevice bool
 }
 
-func NewSyncLock(max_invocations int) SyncLockInterface {
+func NewSyncLock(max_invocations int, clean_scsi_device bool) SyncLockInterface {
 	return &SyncLock{
-		SyncMap: &sync.Map{},
-		Tokens:  make(chan struct{}, max_invocations),
+		SyncMap:         &sync.Map{},
+		Tokens:          make(chan struct{}, max_invocations),
+		CleanScsiDevice: clean_scsi_device,
 	}
 }
 
