@@ -56,6 +56,7 @@ func (s SyncLock) AddVolumeAndLunLock(id string, lun int, msg string) error {
 	if err != nil {
 		return err
 	}
+
 	err = s.AddVolumeLock(id, msg)
 	if err != nil {
 		s.removeLunLock(lun, msg)
@@ -94,6 +95,10 @@ func (s SyncLock) RemoveVolumeLock(id string, msg string) {
 }
 
 func (s SyncLock) addLunLock(lun int, msg string) error {
+	if !s.CleanScsiDevice {
+		logger.Debugf("Clean devices disabled, skipping addLunLock") //Can be omitted, debug only.
+		return nil
+	}
 	logger.Debugf("Lock for action %s, try to acquire lock for lun %d", msg, lun)
 
 	_, exists := s.SyncMap.LoadOrStore(lun, 0)
@@ -105,6 +110,10 @@ func (s SyncLock) addLunLock(lun int, msg string) error {
 }
 
 func (s SyncLock) removeLunLock(lun int, msg string) {
+	if !s.CleanScsiDevice {
+		logger.Debugf("Clean devices disabled, skipping removeLunLock") //Can be omitted, debug only.
+		return nil
+	}
 	logger.Debugf("Lock for action %s, release lock for lun %d", msg, lun)
 	s.SyncMap.Delete(lun)
 }
