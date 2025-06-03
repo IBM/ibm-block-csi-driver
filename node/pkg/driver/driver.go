@@ -41,27 +41,28 @@ type Driver struct {
 	config   ConfigFile
 }
 
-func NewDriver(endpoint string, configFilePath string, hostname string, max_invocations int) (*Driver, error) {
+func NewDriver(endpoint string, configFilePath string, hostname string, max_invocations int, clean_scsi_device bool) (*Driver, error) {
 	configFile, err := ReadConfigFile(configFilePath)
 	if err != nil {
 		return nil, err
 	}
 	logger.Infof("Driver: %v Version: %v", configFile.Identity.Name, configFile.Identity.Version)
 	logger.Infof("Max invocations: %d", max_invocations)
+	logger.Infof("Clean scsi device enabled: %v", clean_scsi_device)
 
 	mounter := &mount.SafeFormatAndMount{
 		Interface: mountwrapper.New(""),
 		Exec:      exec.New(),
 	}
 
-	syncLock := NewSyncLock(max_invocations)
+	syncLock := NewSyncLock(max_invocations, clean_scsi_device)
 	executer := &executer.Executer{}
 	osDeviceConnectivityMapping := map[string]device_connectivity.OsDeviceConnectivityInterface{
-		configFile.Connectivity_type.Nvme_over_fc: device_connectivity.NewOsDeviceConnectivityNvmeOFc(executer),
-		configFile.Connectivity_type.Fc:           device_connectivity.NewOsDeviceConnectivityFc(executer),
-		configFile.Connectivity_type.Iscsi:        device_connectivity.NewOsDeviceConnectivityIscsi(executer),
+		configFile.Connectivity_type.Nvme_over_fc: device_connectivity.NewOsDeviceConnectivityNvmeOFc(executer, clean_scsi_device),
+		configFile.Connectivity_type.Fc:           device_connectivity.NewOsDeviceConnectivityFc(executer, clean_scsi_device),
+		configFile.Connectivity_type.Iscsi:        device_connectivity.NewOsDeviceConnectivityIscsi(executer, clean_scsi_device),
 	}
-	osDeviceConnectivityHelper := device_connectivity.NewOsDeviceConnectivityHelperScsiGeneric(executer)
+	osDeviceConnectivityHelper := device_connectivity.NewOsDeviceConnectivityHelperScsiGeneric(executer, clean_scsi_device)
 	return &Driver{
 		endpoint:    endpoint,
 		config:      configFile,
