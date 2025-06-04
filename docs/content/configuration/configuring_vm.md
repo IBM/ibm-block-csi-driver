@@ -5,7 +5,7 @@
 
 Prior to configuring Virtual Machines on RedHat Openshift® with the IBM® Block Storage CSI driver, vdisk protection must be disabled globally or for the specific child pools to be used on the connected IBM FlashSystem.{: important}
 
-When creating a Virtual Machine on RedHat OpenShift - configure the storage profile to "Shared Access (RWX)". This is required to support Virtual Machine live migration.
+When creating a Virtual Machine on RedHat OpenShift - configure the storage profile to "Shared Access (RWX)" and clone strategy to "csi-clone". This is required to support Virtual Machine live migration and Virtual Machine cloning.
 
 1. Set the StorageClass configured to use the IBM Block Storage CSI driver as the default for virtualization workloads, so that boot devices of VMs are created on the desired FlashSystem storage. For more details, please refer to the [Official OCP Virtualization installation guidance](https://docs.redhat.com/en/documentation/openshift_container_platform/4.18/html/virtualization/installing#os-requirements_preparing-cluster-for-virt).
 2. In the main VM creation window click the "Customize VirtualMachine" button.
