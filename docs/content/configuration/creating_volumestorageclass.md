@@ -52,6 +52,8 @@ Volume groups can only be managed by **either** the associated VolumeGroup **or*
 
 When electing to set the optional "virt_snap_func" parameter, it **must** also be set with an identical value in the relevant VolumeSnapshotClass yamls.{: requirement}
 
+When setting the optional "virt_snap_func" parameter to "true", the optional "SpaceEfficiency" parameter **must not** be set.{: restriction}
+
 For IBM DS8000® family storage systems, the maximum prefix length is five characters. The maximum prefix length for other systems is 20 characters.{: requirement}
 
 For IBM Storage Virtualize® family storage systems, the `CSI` prefix is added as default if not specified by the user.{: tip}
@@ -65,7 +67,7 @@ For IBM Storage Virtualize® family storage systems, the `CSI` prefix is added a
       pool: demo-pool
       io_group: demo-iogrp             # Optional.
       volume_group: demo-volumegroup   # Optional.
-      SpaceEfficiency: thin            # Optional.
+      SpaceEfficiency: thin            # Optional. Do not set this optional parameter if virt_snap_func is set to "true"
       volume_name_prefix: demo-prefix  # Optional.
       virt_snap_func: "false"          # Optional. Values "true"/"false". The default is "false". If set, this value MUST be identical to the value set in the VolumeSnapshotClass yamls
 
