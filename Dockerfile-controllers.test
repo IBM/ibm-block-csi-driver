@@ -16,7 +16,7 @@
 #    This Dockerfile.test is for running the csi controller local tests inside a container.
 #    Its similar to the Dockerfile, but with additional requirements-tests.txt and ENTRYPOINT to run the local tests.
 
-FROM registry.access.redhat.com/ubi8/python-39:1-211.1747789947 AS builder
+FROM registry.access.redhat.com/ubi8/python-39:1-212 AS builder
 USER root
 RUN if [[ "$(uname -m)" != "x86"* ]]; then yum install -y rust-toolset; fi
 USER default
@@ -39,7 +39,7 @@ COPY controllers/tests/requirements.txt ./requirements-tests.txt
 RUN pip3 install -r ./requirements-tests.txt
 
 
-FROM registry.access.redhat.com/ubi8/python-39:1-211.1747789947
+FROM registry.access.redhat.com/ubi8/python-39:1-212
 
 COPY --from=builder /opt/app-root /opt/app-root
 COPY ./common /driver/common
