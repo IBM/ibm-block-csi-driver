@@ -27,7 +27,7 @@ Check your operating system LUN limit.{: tip}
 
 ## High availability (HA) general limitations
 
-High availability (HA) is not supported on all storage system types. {: attention}
+Some storage system types do not support High availability (HA).{: attention}
 
 - HyperSwap topology is only supported for use with IBM Storage Virtualize® family storage systems.
 - Stretched topology is only supported by SAN Volume Controller storage systems.
