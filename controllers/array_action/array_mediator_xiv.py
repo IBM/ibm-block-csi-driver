@@ -208,7 +208,7 @@ class XIVArrayMediator(ArrayMediatorAbstract):
         return int(size_in_bytes / self.BLOCK_SIZE_IN_BYTES)
 
     def create_volume(self, name, size_in_bytes, space_efficiency, pool, io_group, volume_group, source_ids,
-                      source_type, is_virt_snap_func):
+                      source_type, is_virt_snap_func, partition_name=None, partition_vg=None):
         logger.info("creating volume with name : {}. size : {} . in pool : {} with parameters : {}".format(
             name, size_in_bytes, pool, space_efficiency))
 
@@ -529,7 +529,7 @@ class XIVArrayMediator(ArrayMediatorAbstract):
     def demote_replication_volume(self, replication):
         raise NotImplementedError
 
-    def create_host(self, host_name, initiators, connectivity_type, io_group):
+    def create_host(self, host_name, initiators, connectivity_type, io_group, partition_name=None):
         raise NotImplementedError
 
     def delete_host(self, host_name):

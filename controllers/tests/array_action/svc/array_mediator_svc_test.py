@@ -1123,6 +1123,7 @@ class TestArrayMediatorSVC(unittest.TestCase):
             pool = common_settings.DUMMY_POOL1
         self.assertEqual(array_settings.DUMMY_CAPACITY_INT, snapshot.capacity_bytes)
         self.svc.client.svctask.addsnapshot.assert_called_once_with(name=common_settings.SNAPSHOT_NAME,
+                                                                    type='clone',
                                                                     volumes=common_settings.INTERNAL_VOLUME_ID,
                                                                     pool=pool)
         self.svc.client.svcinfo.lsvolumesnapshot.assert_called_once_with(object_id=0)

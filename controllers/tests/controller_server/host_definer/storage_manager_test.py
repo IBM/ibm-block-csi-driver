@@ -59,7 +59,7 @@ class TestDefineHost(BaseSetUp):
         self._test_define_host_success()
         self.mediator.create_host.assert_called_once_with(
             HOST_NAME, Initiators(iscsi_iqns=[settings.IQN]),
-            self.request.connectivity_type_from_user, self.request.io_group)
+            self.request.connectivity_type_from_user, self.request.io_group, None)
 
     def test_define_host_failed(self):
         error_message = 'error'
@@ -106,7 +106,7 @@ class TestDefineHost(BaseSetUp):
         self.mediator.delete_host.assert_called_once_with(HOST_NAME)
         self.mediator.create_host.assert_called_once_with(
             HOST_NAME, Initiators(iscsi_iqns=[settings.IQN]),
-            self.request.connectivity_type_from_user, self.request.io_group)
+            self.request.connectivity_type_from_user, self.request.io_group, None)
         self.mediator.remove_ports_from_host.assert_called_once()
         self._assert_io_group()
 
