@@ -10,7 +10,7 @@
         * [Supported orchestration platforms](content/release_notes/supported_orchestration.md)
         * [Lifecycle and support matrix](content/release_notes/lifecycle_support_matrix.md)
     * [Change log](content/release_notes/change_log.md)
-        * [1.12.4 (TBD)](content/release_notes/changelog_1.12.4.md)
+        * [1.12.4 (June 2025)](content/release_notes/changelog_1.12.4.md)
         * [1.12.3 (May 2025)](content/release_notes/changelog_1.12.3.md)
         * [1.12.2 (April 2025)](content/release_notes/changelog_1.12.2.md)
         * [1.12.1 (February 2025)](content/release_notes/changelog_1.12.1.md)

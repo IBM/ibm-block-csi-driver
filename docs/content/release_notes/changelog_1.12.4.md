@@ -1,7 +1,7 @@
 
 {{site.data.keyword.attribute-definition-list}}
 
-# 1.12.4 (TBD)
+# 1.12.4 (June 2025)
 
 As of this document's publication date, the IBM Power® and zLinux® architectures are not supported for this release.{: restriction}
 
