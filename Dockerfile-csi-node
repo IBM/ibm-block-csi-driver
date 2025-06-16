@@ -29,7 +29,7 @@ RUN make ibm-block-csi-driver
 # Final stage
 FROM registry.access.redhat.com/ubi9-minimal:9.6-1747218906
 
-ARG VERSION=1.12.4
+ARG VERSION=1.12.5
 ARG BUILD_NUMBER=0
 
 LABEL name="IBM block storage CSI driver node" \
