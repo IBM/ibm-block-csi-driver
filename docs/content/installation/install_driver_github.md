@@ -61,3 +61,43 @@ When host definer is being installed, it is preferable to do so before installin
         ibm-block-csi-operator-5bb7996b86-xntss 1/1     Running 0        10m
         ```
 
+3. (Optional) If planning on using volume snapshots (IBM FlashCopy® function), enable support on your Kubernetes cluster.
+
+   For more information and instructions, see the Kubernetes blog post, [Kubernetes 1.20: Kubernetes Volume Snapshot Moves to GA](https://kubernetes.io/blog/2020/12/10/kubernetes-1.20-volume-snapshot-moves-to-ga/).
+
+   Install both the Snapshot CRDs and the Common Snapshot Controller once per cluster.
+
+   The instructions and relevant YAML files to enable volume snapshots can be found at: [https://github.com/kubernetes-csi/external-snapshotter#usage](https://github.com/kubernetes-csi/external-snapshotter#usage)
+
+4. (Optional) If planning on using policy-based replication with volume groups, enable support on your orchestration platform cluster and storage system.
+
+    1. To enable support on your Kubernetes cluster, install the following replication CRDs once per cluster.
+
+        ```
+        curl -O https://raw.githubusercontent.com/IBM/csi-volume-group-operator/v0.9.2/config/crd/bases/csi.ibm.com_volumegroupclasses.yaml
+        kubectl apply -f csi.ibm.com_volumegroupclasses.yaml
+
+        curl -O https://raw.githubusercontent.com/IBM/csi-volume-group-operator/v0.9.2/config/crd/bases/csi.ibm.com_volumegroupcontents.yaml
+        kubectl apply -f csi.ibm.com_volumegroupcontents.yaml
+
+        curl -O https://raw.githubusercontent.com/IBM/csi-volume-group-operator/v0.9.2/config/crd/bases/csi.ibm.com_volumegroups.yaml
+        kubectl apply -f csi.ibm.com_volumegroups.yaml
+        ```
+
+    2. Enable policy-based replication on volume groups, see the following section within your IBM Storage Virtualize® product documentation on [IBM Documentation](https://www.ibm.com/docs/): **Administering** > **Managing policy-based replication** > **Assigning replication policies to volume groups**.
+
+5. (Optional) If planning on using volume replication (remote copy function), enable support on your orchestration platform cluster and storage system.
+
+    1. To enable support on your Kubernetes cluster, install the following volume group CRDs once per cluster.
+
+        ```
+        curl -O https://raw.githubusercontent.com/csi-addons/volume-replication-operator/v0.3.0/config/crd/bases/replication.storage.openshift.io_volumereplicationclasses.yaml
+        kubectl apply -f ./replication.storage.openshift.io_volumereplicationclasses.yaml
+
+        curl -O https://raw.githubusercontent.com/csi-addons/volume-replication-operator/v0.3.0/config/crd/bases/replication.storage.openshift.io_volumereplications.yaml
+        kubectl apply -f ./replication.storage.openshift.io_volumereplications.yaml
+        ```
+
+    2. To enable support on your storage system, see the following section within your IBM Storage Virtualize® product documentation on [IBM Documentation](https://www.ibm.com/docs/en/): **Administering** > **Managing Copy Services** > **Managing remote-copy partnerships**.
+
+The procedures above are applicable for both Kubernetes and Red Hat OpenShift®. For Red Hat OpenShift, replace `kubectl` with `oc` in all relevant commands.{: tip}

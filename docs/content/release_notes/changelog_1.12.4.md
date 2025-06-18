@@ -17,4 +17,4 @@ IBM® block storage CSI driver version 1.12.4 resolved the following issues:
 
 |Ticket ID|Severity|Description|
 |---------|--------|-----------|
-|CSI-5875|Medium|host-definer cannot function when tolopoly awareness is defined|
+|CSI-5875|Medium|host-definer cannot function when topology awareness is defined|
