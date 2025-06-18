@@ -9,4 +9,4 @@ IBM® block storage CSI driver 1.12.4 is a minor release that adds support for:
 
 ## Miscellaneous resolved issues
 
-For information about the resolved issues in version 1.12.4, see [1.12.4 (May 2025)](changelog_1.12.4.md).
+For information about the resolved issues in version 1.12.4, see [1.12.4 (June 2025)](changelog_1.12.4.md).
