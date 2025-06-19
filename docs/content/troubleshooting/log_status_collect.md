@@ -81,7 +81,7 @@ To collect logs for all controller containers, use the following commands (colle
 #### Log collection for CSI operator logs
 To collect CSI operator logs, use the following commands (collection of 'previous' pod logs may fail if the pod has never restarted):
 
-    operatorpod=`kubectl get pods -n <namespace> -l app.kubernetes.io/instance=ibm-block-csi-operator --output=jsonpath='{.items..metadata.name}'`
+    operatorpod=`kubectl get pods -n <namespace> -l app.kubernetes.io/name=ibm-block-csi-operator --output=jsonpath='{.items..metadata.name}'`
     kubectl logs $operatorpod -n <namespace> > logs/operator.log
     kubectl logs --previous $operatorpod -n <namespace> > logs/operator.previous.log
 
