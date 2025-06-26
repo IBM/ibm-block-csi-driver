@@ -310,7 +310,7 @@ class KubernetesManager():
         decoded_string_content = self._decode_base64_to_string(content_with_base64)
         encoded_dict = str(decoded_string_content).encode('utf-8')
         base64_dict = base64.b64encode(encoded_dict)
-        my_dict_again = ast.literal_eval(base64.b64decode(base64_dict))
+        my_dict_again = ast.literal_eval(str(base64.b64decode(base64_dict)))
         return my_dict_again
 
     def _decode_base64_to_string(self, content_with_base64):

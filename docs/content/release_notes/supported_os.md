@@ -3,7 +3,7 @@
 
 # Supported operating systems
 
-Kubernetes 1.32 is not supported on Red Hat Enterprise Linux® (RHEL) 8.x.{: restriction}
+Kubernetes from 1.32 onwards is not supported on Red Hat Enterprise Linux® (RHEL) 8.x.{: restriction}
 
 The following table lists supported operating systems for deployment of the IBM® block storage CSI driver on Kubernetes orchestration platforms:
 
@@ -18,7 +18,7 @@ The following table lists supported operating systems for deployment of the IBM�
 
 | Operating system                                     |Architecture           |
 |------------------------------------------------------|-----------------------|
-| Red Hat Enterprise Linux CoreOS® (RHCOS) 4.15-4.18   |x86, IBM Z®, IBM Power®|
+| Red Hat Enterprise Linux CoreOS® (RHCOS) 4.15-4.19   |x86, IBM Z®, IBM Power®|
 
 IBM Power® architecture is only supported with IBM Storage Virtualize® family storage systems.{: restriction}
 
