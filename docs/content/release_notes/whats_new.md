@@ -1,6 +1,6 @@
-# What's new in 1.12.5
+# What's new in 1.13.0
 
-IBM® block storage CSI driver 1.12.5 is a minor release that adds support for:
+IBM® block storage CSI driver 1.13.0 is a minor release that adds support for:
 
 - TBD
 
@@ -8,4 +8,4 @@ IBM® block storage CSI driver 1.12.5 is a minor release that adds support for:
 
 ## Miscellaneous resolved issues
 
-For information about the resolved issues in version 1.12.5, see [1.12.5 (TBD)](changelog_1.12.5.md).
+For information about the resolved issues in version 1.13.0, see [1.13.0 (TBD)](changelog_1.13.0.md).
