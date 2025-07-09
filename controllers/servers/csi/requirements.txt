@@ -1,11 +1,11 @@
-grpcio==1.53.2
-grpcio-tools==1.41.1
+grpcio==1.73.1
+grpcio-tools==1.73.1
 protobuf==6.31.1
-pyyaml==6.0.1
-munch==2.3.2
+pyyaml==6.0.2
+munch==4.0.0
 retry2==0.9.5
-packaging==20.1
-base58==2.0.0
+packaging==25.0
+base58==2.1.1
 
 # A9000 python client
 pyxcli==1.2.1
