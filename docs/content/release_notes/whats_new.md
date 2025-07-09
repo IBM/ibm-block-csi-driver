@@ -1,12 +1,11 @@
-# What's new in 1.12.4
+# What's new in 1.13.0
 
-IBM® block storage CSI driver 1.12.4 is a minor release that adds support for:
+IBM® block storage CSI driver 1.13.0 is a minor release that adds support for:
 
-- Extended support to RedHat OpenShift® 4.19
-- Extended support to Kubernetes 1.33
+- TBD
 
-**General availability date:** June 2025
+**General availability date:** TBD
 
 ## Miscellaneous resolved issues
 
-For information about the resolved issues in version 1.12.4, see [1.12.4 (May 2025)](changelog_1.12.4.md).
+For information about the resolved issues in version 1.13.0, see [1.13.0 (TBD)](changelog_1.13.0.md).

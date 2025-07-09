@@ -37,10 +37,10 @@ type OsDeviceConnectivityIscsi struct {
 	HelperScsiGeneric OsDeviceConnectivityHelperScsiGenericInterface
 }
 
-func NewOsDeviceConnectivityIscsi(executer executer.ExecuterInterface) OsDeviceConnectivityInterface {
+func NewOsDeviceConnectivityIscsi(executer executer.ExecuterInterface, clean_scsi_device bool) OsDeviceConnectivityInterface {
 	return &OsDeviceConnectivityIscsi{
 		Executer:          executer,
-		HelperScsiGeneric: NewOsDeviceConnectivityHelperScsiGeneric(executer),
+		HelperScsiGeneric: NewOsDeviceConnectivityHelperScsiGeneric(executer, clean_scsi_device),
 	}
 }
 
@@ -168,6 +168,10 @@ func (r OsDeviceConnectivityIscsi) FlushMultipathDevice(mpathDevice string) erro
 
 func (r OsDeviceConnectivityIscsi) RemovePhysicalDevice(sysDevices []string) error {
 	return r.HelperScsiGeneric.RemovePhysicalDevice(sysDevices)
+}
+
+func (r OsDeviceConnectivityIscsi) RemoveGhostDevice(lun int) error {
+	return r.HelperScsiGeneric.RemoveGhostDevice(lun)
 }
 
 func (r OsDeviceConnectivityIscsi) ValidateLun(lun int, sysDevices []string) error {
