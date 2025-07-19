@@ -1,6 +1,6 @@
 from collections import defaultdict
 from io import StringIO
-from random import choice
+from random import choice, randint
 from datetime import datetime, timedelta
 
 import os
@@ -65,6 +65,7 @@ NOT_VALID_IO_GROUP = 'CMMVC5729E'
 NOT_SUPPORTED_PARAMETER = 'CMMVC5709E'
 CANNOT_CHANGE_HOST_PROTOCOL_BECAUSE_OF_MAPPED_PORTS = 'CMMVC9331E'
 COMMAND_NOT_SUPPORTED = 'CMMVC7205E'
+LUN_ID_IS_NOT_VALID = 'CMMVC5844E'
 
 HOST_NQN = 'nqn'
 HOST_WWPN = 'WWPN'
@@ -252,6 +253,7 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
     ARRAY_ACTIONS = {}
     BLOCK_SIZE_IN_BYTES = 512
     MAX_LUN_NUMBER = 511
+    MAX_LUN_NUMBER_INCREMENT = 512
     MIN_LUN_NUMBER = 0
     MIN_SUPPORTED_VERSION = '7.8'
 
@@ -1275,35 +1277,44 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
         logger.debug("getting used lun ids for host :{0}".format(host_name))
         luns_in_use = set()
 
+        max_lun_number = 0
+
         try:
             for mapping in self.client.svcinfo.lshostvdiskmap(host=host_name):
-                luns_in_use.add(mapping.get('SCSI_id', ''))
+                lun_number = mapping.get('SCSI_id', '')
+                lun_number_int = int(lun_number)
+                if lun_number_int > max_lun_number:
+                    max_lun_number = lun_number_int
+                luns_in_use.add(lun_number)
         except (svc_errors.CommandExecutionError, CLIFailureError) as ex:
             logger.error(ex)
             raise array_errors.HostNotFoundError(host_name)
-        logger.debug("The used lun ids for host :{0}".format(luns_in_use))
+        logger.debug("The max lun number {0}, used lun ids for host :{1}".format(max_lun_number, luns_in_use))
 
-        return luns_in_use
+        addition_luns_increments = 0
+        if max_lun_number > self.MAX_LUN_NUMBER:
+            addition_luns_increments = (
+                    max_lun_number - self.MAX_LUN_NUMBER + self.MAX_LUN_NUMBER_INCREMENT - 1
+                ) // self.MAX_LUN_NUMBER_INCREMENT
+
+        return luns_in_use, (self.MAX_LUN_NUMBER + addition_luns_increments * self.MAX_LUN_NUMBER_INCREMENT)
 
     def _get_free_lun(self, host_name):
         logger.debug("getting random free lun id for "
                      "host :{0}".format(host_name))
         lun = None
-        luns_in_use = self._get_used_lun_ids_from_host(host_name)
-        # Today we have SS_MAX_HLUN_MAPPINGS_PER_HOST as 2048 on high end
-        # platforms (SVC / V7000 etc.) and 512 for the lower
-        # end platforms (V3500 etc.). This limits the number of volumes that
-        # can be mapped to a single host. (Note that some hosts such as linux
+        luns_in_use, max_lun_number = self._get_used_lun_ids_from_host(host_name)
+        # Note that some hosts such as linux
         # do not support more than 255 or 511 mappings today irrespective of
         # our constraint).
-        lun_range_gen = range(self.MIN_LUN_NUMBER, self.MAX_LUN_NUMBER + 1)
+        lun_range_gen = range(self.MIN_LUN_NUMBER, max_lun_number + 1)
         lun_range = [str(lun) for lun in lun_range_gen]
         free_luns = [lun for lun in lun_range if lun not in luns_in_use]
         free_luns_in_interval = free_luns[:LUN_INTERVAL]
         if free_luns:
             lun = choice(free_luns_in_interval)
         else:
-            raise array_errors.NoAvailableLunError(host_name)
+            return str(randint(max_lun_number + 1, max_lun_number + self.MAX_LUN_NUMBER_INCREMENT))
         logger.debug("The chosen available lun is : {0}".format(lun))
         return lun
 
@@ -1341,6 +1352,8 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
                 if LUN_ALREADY_IN_USE in ex.my_message:
                     raise array_errors.LunAlreadyInUseError(lun,
                                                             host_name)
+                if LUN_ID_IS_NOT_VALID in ex.my_message:
+                    raise array_errors.NoAvailableLunError(host_name)
                 raise array_errors.MappingError(volume_name, host_name, ex)
 
         return str(lun)
