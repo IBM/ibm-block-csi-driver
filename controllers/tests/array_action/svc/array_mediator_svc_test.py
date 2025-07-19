@@ -1767,11 +1767,12 @@ class TestArrayMediatorSVC(unittest.TestCase):
 
     @patch.object(SVCArrayMediator, "MAX_LUN_NUMBER", 3)
     @patch.object(SVCArrayMediator, "MIN_LUN_NUMBER", 1)
-    def test_free_lun_no_available_lun(self):
-        maps = self._get_mock_host_list(("1", "2", "3"))
-        self.svc.client.svcinfo.lshostvdiskmap.return_value = maps
-        with self.assertRaises(array_errors.NoAvailableLunError):
-            self.svc._get_free_lun(common_settings.HOST_NAME)
+    @patch.object(SVCArrayMediator, "MAX_LUN_NUMBER_INCREMENT", 2)
+    @patch("controllers.array_action.array_mediator_svc.randint")
+    def test_free_lun_no_available_lun(self, random_choice):
+        random_choice.return_value = 4
+        self._test_get_free_lun_host_mappings(("1", "2", "3"), expected_lun="4")
+        random_choice.assert_called_with(4, 5)
 
     @patch("controllers.array_action.array_mediator_svc.SVCArrayMediator._get_free_lun")
     def _test_map_volume_mkvdiskhostmap_error(self, client_error, expected_error, mock_get_free_lun):
