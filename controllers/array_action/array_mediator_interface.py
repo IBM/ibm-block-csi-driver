@@ -31,7 +31,7 @@ class ArrayMediator(ABC):
 
     @abstractmethod
     def create_volume(self, name, size_in_bytes, space_efficiency, pool, io_group, volume_group, source_ids,
-                      source_type, is_virt_snap_func):
+                      source_type, is_virt_snap_func, partition_name=None, partition_vg=None):
         """
         This function should create a volume in the storage system.
 
@@ -342,7 +342,7 @@ class ArrayMediator(ABC):
         raise NotImplementedError
 
     @abstractmethod
-    def create_host(self, host_name, initiators, connectivity_type, io_group):
+    def create_host(self, host_name, initiators, connectivity_type, io_group, partition_name=None):
         """
         This function should create a host in the storage system.
 
@@ -632,6 +632,18 @@ class ArrayMediator(ABC):
             CannotChangeHostProtocolBecauseOfMappedPorts
         """
         raise NotImplementedError
+
+    @abstractmethod
+    def verify_host_partition(self, host_name, new_partition_name):
+        return True
+
+    @abstractmethod
+    def verify_volume_group_partition(self, volume_group, partition_name):
+        return
+
+    @abstractmethod
+    def verify_volume_partition(self, volume, partition_name):
+        return
 
     @abstractmethod
     def register_plugin(self, unique_key,  metadata):

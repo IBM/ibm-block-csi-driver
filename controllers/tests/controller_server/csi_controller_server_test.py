@@ -437,7 +437,7 @@ class TestCreateVolume(BaseControllerSetUp, CommonControllerTest):
         self.mediator.get_volume.assert_called_once_with(VOLUME_NAME, expected_pool, False)
         self.mediator.create_volume.assert_called_once_with(VOLUME_NAME, 10, None, expected_pool, DUMMY_IO_GROUP,
                                                             DUMMY_VOLUME_GROUP,
-                                                            ObjectIds(internal_id='', uid=''), None, False)
+                                                            ObjectIds(internal_id='', uid=''), None, False, None, None)
         self.assertEqual(response_volume.volume.content_source.volume.volume_id, '')
         self.assertEqual(response_volume.volume.content_source.snapshot.snapshot_id, '')
         self.assertEqual(response_volume.volume.volume_id, expected_volume_id)
@@ -477,7 +477,7 @@ class TestCreateVolume(BaseControllerSetUp, CommonControllerTest):
         self.mediator.get_volume.assert_called_once_with(VOLUME_NAME, DUMMY_POOL1, False)
         self.mediator.create_volume.assert_called_once_with(VOLUME_NAME, 10, "not_none", DUMMY_POOL1, DUMMY_IO_GROUP,
                                                             DUMMY_VOLUME_GROUP,
-                                                            ObjectIds(internal_id='', uid=''), None, False)
+                                                            ObjectIds(internal_id='', uid=''), None, False, None, None)
 
     def test_create_volume_idempotent_no_source_succeeds(self):
         self._prepare_create_volume_mocks()
@@ -579,7 +579,7 @@ class TestCreateVolume(BaseControllerSetUp, CommonControllerTest):
         self.mediator.create_volume.assert_called_once_with(VOLUME_NAME, self.capacity_bytes, None, DUMMY_POOL1,
                                                             DUMMY_IO_GROUP,
                                                             DUMMY_VOLUME_GROUP, ObjectIds(internal_id='', uid=''),
-                                                            None, False)
+                                                            None, False, None, None)
 
     def test_create_volume_with_illegal_object_name_exception(self):
         self.create_volume_returns_error(return_code=grpc.StatusCode.INVALID_ARGUMENT,
@@ -617,7 +617,7 @@ class TestCreateVolume(BaseControllerSetUp, CommonControllerTest):
         self.mediator.create_volume.assert_called_once_with(final_name, 10, space_efficiency, DUMMY_POOL1,
                                                             DUMMY_IO_GROUP,
                                                             DUMMY_VOLUME_GROUP, ObjectIds(internal_id='', uid=''),
-                                                            None, False)
+                                                            None, False, None, None)
 
     def test_create_volume_with_name_prefix(self):
         self.request.parameters[servers_settings.PARAMETERS_VOLUME_NAME_PREFIX] = NAME_PREFIX
@@ -659,7 +659,7 @@ class TestCreateVolume(BaseControllerSetUp, CommonControllerTest):
         self.assertEqual(self.context.code, grpc.StatusCode.OK)
         self.mediator.create_volume.assert_called_once_with(self.request.name, 2, None, DUMMY_POOL1, DUMMY_IO_GROUP,
                                                             DUMMY_VOLUME_GROUP,
-                                                            ObjectIds(internal_id='', uid=''), None, False)
+                                                            ObjectIds(internal_id='', uid=''), None, False, None, None)
 
     def test_create_volume_with_required_bytes_too_large_fail(self):
         self._prepare_create_volume_mocks()

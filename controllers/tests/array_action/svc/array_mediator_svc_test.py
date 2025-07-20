@@ -687,6 +687,7 @@ class TestArrayMediatorSVC(unittest.TestCase):
                       svc_settings.SNAPSHOT_NAME_ATTR_KEY: common_settings.SNAPSHOT_NAME,
                       svc_settings.SNAPSHOT_VOLUME_ID_ATTR_KEY: common_settings.INTERNAL_VOLUME_ID,
                       svc_settings.SNAPSHOT_VOLUME_NAME_ATTR_KEY: common_settings.VOLUME_NAME,
+                      svc_settings.VOLUME_VG_NAME_ATTR_KEY: None
                       })
 
     @classmethod
@@ -2442,7 +2443,7 @@ class TestArrayMediatorSVC(unittest.TestCase):
         self.svc.client.svctask.mkvolumegroup.return_value = Mock(response=(b"id [1]\n", b""))
         self._prepare_lsvolumegroup()
 
-        self.svc.create_volume_group(common_settings.VOLUME_GROUP_NAME)
+        self.svc.create_volume_group(common_settings.VOLUME_GROUP_NAME, None)
 
         self.svc.client.svcinfo.lsvolumegroup.assert_called_once_with(object_id=1)
         self.svc.client.svctask.mkvolumegroup.assert_called_once_with(name=common_settings.VOLUME_GROUP_NAME)

@@ -41,3 +41,5 @@ POOL_NOT_MATCH_VOLUME_MESSAGE = 'pool name: {0} does not match existing volume p
 PREFIX_NOT_MATCH_VOLUME_MESSAGE = 'prefix: {0} does not match existing volume name: {1}'
 REQUIRED_BYTES_MISMATCH_MESSAGE = "required bytes : {0} does not match the source volume required bytes : {1}"
 UNSUPPORTED_STORAGECLASS_VOLUME_GROUP = "Unsupported storage class volume group with volume group feature"
+VOLUME_PARTITION_MISMATCH = "Volume {0} is in partition {1}, not part of partition {2}"
+VOLUME_GROUP_PARTITION_MISMATCH = "Volume group {0} is in partition {1}, not part of partition {2}"

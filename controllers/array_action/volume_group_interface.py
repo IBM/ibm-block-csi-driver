@@ -4,12 +4,13 @@ from abc import ABC, abstractmethod
 class VolumeGroupInterface(ABC):
 
     @abstractmethod
-    def create_volume_group(self, name):
+    def create_volume_group(self, name, partition_name):
         """
         This function should create a volume group in the storage system.
 
         Args:
             name      : name of the volume group to be created in the storage system
+            partition_name  : partition volume group to be associated with
 
         Returns:
             VolumeGroup

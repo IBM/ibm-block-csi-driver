@@ -30,17 +30,20 @@ class Volume(ArrayObject):
     space_efficiency_aliases: set = field(default_factory=set)
     volume_group_id: str = None
     volume_group_name: str = None
+    partition_name: str = None
 
 
 @dataclass
 class VolumeGroup(ArrayObject):
     volumes: list = field(default_factory=list)
+    partition_name: str = None
 
 
 @dataclass
 class Snapshot(Volume):
     pool: str = None
     is_ready: bool = False
+    partition_name: str = None
 
 
 @dataclass
