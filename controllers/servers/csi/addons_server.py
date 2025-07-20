@@ -33,11 +33,7 @@ class ReplicationControllerServicer(pb2_grpc.ControllerServicer):
 
         connection_info = utils.get_array_connection_info_from_secrets(request.secrets)
         with get_agent(connection_info, object_id_info.array_type).get_mediator() as mediator:
-            object_uid = object_id_info.ids.uid if object_type == servers_settings.VOLUME_TYPE_NAME else \
-                object_id_info.ids.internal_id
-            replication_object = mediator.get_object_by_id(object_uid, object_type)
-            if not replication_object:
-                raise array_errors.ObjectNotFoundError(object_uid)
+            replication_object = self._get_replication_object(object_id_info, object_type, connection_info, mediator)
             replication = mediator.get_replication(replication_request)
             if replication:
                 error_message = self._ensure_replication_idempotency(replication_request, replication)
@@ -72,6 +68,7 @@ class ReplicationControllerServicer(pb2_grpc.ControllerServicer):
 
         connection_info = utils.get_array_connection_info_from_secrets(request.secrets)
         with get_agent(connection_info, object_id_info.array_type).get_mediator() as mediator:
+            self._get_replication_object(object_id_info, object_type, connection_info, mediator)
             replication = mediator.get_replication(replication_request)
             if replication:
                 logger.info("deleting replication {} with system {}".format(replication.name,
@@ -116,6 +113,7 @@ class ReplicationControllerServicer(pb2_grpc.ControllerServicer):
 
         connection_info = utils.get_array_connection_info_from_secrets(request.secrets)
         with get_agent(connection_info, object_id_info.array_type).get_mediator() as mediator:
+            self._get_replication_object(object_id_info, object_type, connection_info, mediator)
             replication = mediator.get_replication(replication_request)
             if not replication:
                 message = "could not find replication for volume internal id: {} with " \
@@ -155,6 +153,7 @@ class ReplicationControllerServicer(pb2_grpc.ControllerServicer):
 
         connection_info = utils.get_array_connection_info_from_secrets(request.secrets)
         with get_agent(connection_info, object_id_info.array_type).get_mediator() as mediator:
+            self._get_replication_object(object_id_info, object_type, connection_info, mediator)
             replication = mediator.get_replication(replication_request)
             if not replication:
                 message = "could not find replication for volume internal id: {} with " \
@@ -184,3 +183,14 @@ class ReplicationControllerServicer(pb2_grpc.ControllerServicer):
             error_message = "EAR replication is supported only on volume group level"
             return error_message
         return None
+
+    @staticmethod
+    def _get_replication_object(object_id_info, object_type, array_connection_info, mediator):
+        object_uid = object_id_info.ids.uid if object_type == servers_settings.VOLUME_TYPE_NAME else \
+            object_id_info.ids.internal_id
+        replication_object = mediator.get_object_by_id(object_uid, object_type)
+
+        if not replication_object:
+            raise array_errors.ObjectNotFoundError(object_uid)
+        mediator.verify_volume_partition(replication_object, array_connection_info.partition_name)
+        return replication_object

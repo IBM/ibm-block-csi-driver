@@ -29,6 +29,9 @@ class HostDefinerServicer:
                     initiators_from_host_definition = self._get_initiators_from_node_id(
                         request.node_id_from_host_definition)
                     found_host_name = self._get_host_name(initiators_from_host_definition, array_mediator)
+                    # Partition update is first one - verifies partition can be fixed (may fail if mapped)
+                    self._update_host_partition(request, found_host_name,
+                                                array_connection_info.partition_name, array_mediator)
                     self._update_host_ports(request, found_host_name, array_mediator)
                     self._update_host_io_group(request, found_host_name, array_mediator)
                     host_name = found_host_name
@@ -44,7 +47,8 @@ class HostDefinerServicer:
                         host_name = host.name
 
                 return self._generate_response(
-                    array_mediator, host_name, connectivity_type_from_user, array_addresses[0])
+                    array_mediator, host_name, connectivity_type_from_user, array_addresses[0],
+                    array_connection_info.partition_name)
         except Exception as ex:
             logger.exception(ex)
             return DefineHostResponse(error_message=str(ex))
@@ -75,6 +79,13 @@ class HostDefinerServicer:
         found_host_name, _ = array_mediator.get_host_by_host_identifiers(initiators)
         logger.debug(messages.HOST_FOUND.format(found_host_name))
         return found_host_name
+
+    def _update_host_partition(self, request, host_name, partition_name, array_mediator):
+        logger.warning("update host partition")
+        if not array_mediator.verify_host_partition(host_name, partition_name):
+            logger.warn("Need to update partition")
+            array_mediator.delete_host(host_name)
+            self._create_host(host_name, array_mediator, request)
 
     def _update_host_ports(self, request, host, array_mediator):
         initiators = self._get_initiators_from_node_id(request.node_id_from_csi_node)
@@ -143,7 +154,8 @@ class HostDefinerServicer:
     def _create_host(self, host, array_mediator, request):
         initiators = self._get_initiators_from_node_id(request.node_id_from_csi_node)
         connectivity_type = get_initiators_connectivity_type(initiators, request.connectivity_type_from_user)
-        array_mediator.create_host(host, initiators, connectivity_type, request.io_group)
+        array_mediator.create_host(host, initiators, connectivity_type, request.io_group,
+                                   request.array_connection_info.partition_name)
         array_mediator.add_ports_to_host(host, initiators, connectivity_type)
 
     def _is_port_update_needed_when_same_protocol(
@@ -196,12 +208,13 @@ class HostDefinerServicer:
             return DefineHostResponse(error_message=str(error_message))
         return DefineHostResponse()
 
-    def _generate_response(self, array_mediator, host_name, connectivity_type, management_address):
+    def _generate_response(self, array_mediator, host_name, connectivity_type, management_address, partition_name):
         define_host_response = DefineHostResponse(connectivity_type=connectivity_type, node_name_on_storage=host_name,
                                                   management_address=management_address)
         ports = array_mediator.get_host_connectivity_ports(host_name, connectivity_type)
         define_host_response.ports = ports
         io_group_ids = array_mediator.get_host_io_group(host_name).id
         define_host_response.io_group = [int(io_group_id) for io_group_id in io_group_ids]
-        logger.info(messages.HOST_CREATED.format(host_name, management_address, ports, define_host_response.io_group))
+        logger.info(messages.HOST_CREATED.format(host_name, partition_name, management_address,
+                    ports, define_host_response.io_group))
         return define_host_response

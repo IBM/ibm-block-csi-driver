@@ -49,7 +49,7 @@ DEFINE_NODE_ON_ARRAYS = 'Defining node {} on arrays {}'
 UNDEFINE_NODE_FROM_ARRAYS = 'Undefine node {} from arrays {}'
 NODE_WAS_NOT_FOUND_CREATE_NEW_HOST_DEFINITION = "Node {} was not found."\
     "creating a new host definition with initiators: {}"
-HOST_CREATED = 'Host {} created on array [{}], with ports [{}], and I/O group [{}]'
+HOST_CREATED = 'Host {} in partition {} created on array [{}], with ports [{}], and I/O group [{}]'
 NODE_WAS_NOT_FOUND = 'Node {} was not found'
 HOST_FOUND = 'host {} found on array'
 HOST_PROTOCOL_SHOULD_BE_CHANGE = 'Host {} protocol should be changed'

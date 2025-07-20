@@ -37,9 +37,12 @@ class VolumeGroupControllerServicer(volumegroup_pb2_grpc.ControllerServicer):
                 except array_errors.ObjectNotFoundError:
                     logger.debug(
                         "volume group was not found. creating a new volume group")
-                    volume_group = array_mediator.create_volume_group(volume_group_final_name)
+                    volume_group = array_mediator.create_volume_group(volume_group_final_name,
+                                                                      array_connection_info.partition_name)
                 else:
                     logger.debug("volume group found : {}".format(volume_group))
+
+                    array_mediator.verify_volume_group_partition(volume_group, array_connection_info.partition_name)
 
                     if len(volume_group.volumes) > 0:
                         message = "Volume group {} is not empty".format(volume_group.name)
@@ -71,6 +74,10 @@ class VolumeGroupControllerServicer(volumegroup_pb2_grpc.ControllerServicer):
             logger.debug(array_mediator)
 
             try:
+                volume_group = self._get_volume_group(array_mediator, volume_group_name)
+
+                array_mediator.verify_volume_group_partition(volume_group, array_connection_info.partition_name)
+
                 logger.debug("Deleting volume group {}".format(volume_group_name))
                 array_mediator.delete_volume_group(volume_group_name)
 
@@ -137,6 +144,8 @@ class VolumeGroupControllerServicer(volumegroup_pb2_grpc.ControllerServicer):
             logger.debug(array_mediator)
 
             volume_group = self._get_volume_group(array_mediator, volume_group_name)
+
+            array_mediator.verify_volume_group_partition(volume_group, array_connection_info.partition_name)
 
             volume_ids_in_volume_group = self._get_volume_ids_from_volume_group(volume_group.volumes)
             volume_ids_in_request = self._get_volume_ids_from_request(request.volume_ids)

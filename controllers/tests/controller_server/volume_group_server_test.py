@@ -75,7 +75,7 @@ class TestCreateVolumeGroup(BaseVgControllerSetUp, CommonControllerTest):
 
         response = self.servicer.CreateVolumeGroup(self.request, self.context)
 
-        self.mediator.create_volume_group.assert_called_once_with(VOLUME_GROUP_NAME)
+        self.mediator.create_volume_group.assert_called_once_with(VOLUME_GROUP_NAME, None)
         self.assertEqual(type(response), volumegroup_pb2.CreateVolumeGroupResponse)
         self.assertEqual(self.context.code, grpc.StatusCode.OK)
 
@@ -85,7 +85,7 @@ class TestCreateVolumeGroup(BaseVgControllerSetUp, CommonControllerTest):
 
         self.servicer.CreateVolumeGroup(self.request, self.context)
 
-        self.mediator.create_volume_group.assert_called_once_with('prefix_volume_group_name')
+        self.mediator.create_volume_group.assert_called_once_with('prefix_volume_group_name', None)
         self.assertEqual(self.context.code, grpc.StatusCode.OK)
 
     def test_create_volume_group_already_exist_fail(self):
@@ -94,7 +94,7 @@ class TestCreateVolumeGroup(BaseVgControllerSetUp, CommonControllerTest):
 
         response = self.servicer.CreateVolumeGroup(self.request, self.context)
 
-        self.mediator.create_volume_group.assert_called_once_with(VOLUME_GROUP_NAME)
+        self.mediator.create_volume_group.assert_called_once_with(VOLUME_GROUP_NAME, None)
         self.assertEqual(type(response), volumegroup_pb2.CreateVolumeGroupResponse)
         self.assertEqual(self.context.code, grpc.StatusCode.ALREADY_EXISTS)
 
