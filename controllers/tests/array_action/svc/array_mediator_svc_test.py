@@ -687,6 +687,7 @@ class TestArrayMediatorSVC(unittest.TestCase):
                       svc_settings.SNAPSHOT_NAME_ATTR_KEY: common_settings.SNAPSHOT_NAME,
                       svc_settings.SNAPSHOT_VOLUME_ID_ATTR_KEY: common_settings.INTERNAL_VOLUME_ID,
                       svc_settings.SNAPSHOT_VOLUME_NAME_ATTR_KEY: common_settings.VOLUME_NAME,
+                      svc_settings.VOLUME_VG_NAME_ATTR_KEY: None
                       })
 
     @classmethod
@@ -1766,11 +1767,12 @@ class TestArrayMediatorSVC(unittest.TestCase):
 
     @patch.object(SVCArrayMediator, "MAX_LUN_NUMBER", 3)
     @patch.object(SVCArrayMediator, "MIN_LUN_NUMBER", 1)
-    def test_free_lun_no_available_lun(self):
-        maps = self._get_mock_host_list(("1", "2", "3"))
-        self.svc.client.svcinfo.lshostvdiskmap.return_value = maps
-        with self.assertRaises(array_errors.NoAvailableLunError):
-            self.svc._get_free_lun(common_settings.HOST_NAME)
+    @patch.object(SVCArrayMediator, "MAX_LUN_NUMBER_INCREMENT", 2)
+    @patch("controllers.array_action.array_mediator_svc.randint")
+    def test_free_lun_no_available_lun(self, random_choice):
+        random_choice.return_value = 4
+        self._test_get_free_lun_host_mappings(("1", "2", "3"), expected_lun="4")
+        random_choice.assert_called_with(4, 5)
 
     @patch("controllers.array_action.array_mediator_svc.SVCArrayMediator._get_free_lun")
     def _test_map_volume_mkvdiskhostmap_error(self, client_error, expected_error, mock_get_free_lun):
@@ -2442,7 +2444,7 @@ class TestArrayMediatorSVC(unittest.TestCase):
         self.svc.client.svctask.mkvolumegroup.return_value = Mock(response=(b"id [1]\n", b""))
         self._prepare_lsvolumegroup()
 
-        self.svc.create_volume_group(common_settings.VOLUME_GROUP_NAME)
+        self.svc.create_volume_group(common_settings.VOLUME_GROUP_NAME, None)
 
         self.svc.client.svcinfo.lsvolumegroup.assert_called_once_with(object_id=1)
         self.svc.client.svctask.mkvolumegroup.assert_called_once_with(name=common_settings.VOLUME_GROUP_NAME)
