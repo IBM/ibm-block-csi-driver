@@ -22,6 +22,7 @@ NQN = 'nqn.2014-08.org.nvmexpress:uuid:b57708c7-5bb6-46a0-b2af-9d824bf539e1'
 FAKE_NODE_ID = '{};;;{}'.format(HOST_NAME, IQN)
 FAKE_CSI_PROVISIONER = 'fake_csi_provisioner'
 TRUE_STRING = 'true'
+FALSE_STRING = 'false'
 NODE_LABELS_FIELD = 'labels'
 FAKE_LABEL = 'FAKE_LABEL'
 MANAGE_NODE_LABEL = 'hostdefiner.block.csi.ibm.com/manage-node'

@@ -16,6 +16,9 @@ import controllers.common.settings as common_settings
 from controllers.servers.host_definer.hd_types import (
     DefineHostRequest, DefineHostResponse, HostDefinitionInfo, SecretInfo, ManagedNode)
 from controllers.servers.host_definer.storage_manager.host_definer_server import HostDefinerServicer
+from kubernetes import client, config
+import os
+
 
 MANAGED_SECRETS = []
 NODES = {}
@@ -208,7 +211,7 @@ class Watcher(KubernetesManager):
         return self._is_dynamic_node_labeling_allowed() or self._is_node_has_manage_node_label(node_name)
 
     def _is_dynamic_node_labeling_allowed(self):
-        return os.getenv(settings.DYNAMIC_NODE_LABELING_ENV_VAR) == settings.TRUE_STRING
+        self._get_config_value(settings.DYNAMIC_NODE_LABELING_ENV_VAR, settings.FALSE_STRING) == settings.TRUE_STRING
 
     def _is_host_can_be_undefined(self, node_name):
         return self._is_host_definer_can_delete_hosts() and \
@@ -216,7 +219,7 @@ class Watcher(KubernetesManager):
             not self._is_node_has_forbid_deletion_label(node_name)
 
     def _is_host_definer_can_delete_hosts(self):
-        return os.getenv(settings.ALLOW_DELETE_ENV_VAR) == settings.TRUE_STRING
+        self._get_config_value(settings.ALLOW_DELETE_ENV_VAR, settings.TRUE_STRING) == settings.TRUE_STRING
 
     def _is_node_has_manage_node_label(self, node_name):
         return self._is_host_has_label_in_true(node_name, settings.MANAGE_NODE_LABEL)
@@ -257,13 +260,13 @@ class Watcher(KubernetesManager):
         return request
 
     def _get_prefix(self):
-        return os.getenv(settings.PREFIX_ENV_VAR)
+        self._get_config_value(settings.PREFIX_ENV_VAR, "")
 
     def _get_connectivity_type_from_user(self, labels):
         connectivity_type_label_on_node = self._get_label_value(labels, settings.CONNECTIVITY_TYPE_LABEL)
         if connectivity_type_label_on_node in settings.SUPPORTED_CONNECTIVITY_TYPES:
             return connectivity_type_label_on_node
-        return os.getenv(settings.CONNECTIVITY_ENV_VAR)
+        self._get_config_value(settings.CONNECTIVITY_ENV_VAR, "")
 
     def _get_label_value(self, labels, label):
         return labels.get(label)
