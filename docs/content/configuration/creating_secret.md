@@ -39,6 +39,34 @@ Use one of the following procedures to create and apply the secret:
     The `secret/<secret-name> created` message is emitted.
 
 
+## Creating an array secret for use in IBM Storage Virtualize® partitions
+
+To use IBM Storage Virtualize® partitions - two additional parameters need to be specified:
+partition_name - name of partition on storage
+partition_default_vg - name of volume group associated with the partition to be used when new volumes are created
+
+IBM CSI doesn't configure the partition or volume group - this is configured by the user directly on the storage.
+
+A secret similar to `demo-secret.yaml` but for a partitions setup:
+
+
+    ```
+    kind: Secret
+    apiVersion: v1
+    metadata:
+      name:  demo-secret
+      namespace: default
+    type: Opaque
+    stringData:
+      management_address: demo-management-address  # Array management addresses
+      username: demo-username                      # Array username
+      partition_name: SVCPartition                 # Partition name as defined on storage
+      partition_default_vg: PartitionDefaultVG     # Volume group as defined on storage, part of the partition
+    data:
+      password: ZGVtby1wYXNzd29yZA==               # base64 array password
+     ```
+
+
 ## Creating an array secret via command line
 
 This procedure is applicable for both Kubernetes and Red Hat® OpenShift®. For Red Hat OpenShift, replace `kubectl` with `oc` in all relevant commands.{: tip}
