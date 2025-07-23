@@ -150,14 +150,14 @@ def build_create_host_kwargs(host_name, connectivity_type, port, io_group, parti
     if io_group:
         cli_kwargs['iogrp'] = io_group
     else:
-        if partition_name is None:
+        if not partition_name:
             cli_kwargs['iogrp'] = common_settings.FULL_IO_GROUP
 
     port_set = os.getenv(settings.PORT_SET_ENV_VAR)
     if port_set is not None and port_set:
         logger.info("host {} in partition {} is created with port set {}".format(host_name, partition_name, port_set))
         cli_kwargs['portset'] = port_set
-    if partition_name is not None:
+    if partition_name:
         cli_kwargs['partition'] = partition_name
     return cli_kwargs
 
@@ -354,9 +354,10 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
             source_id = self._get_source_volume_wwn_if_exists(cli_volume)
         space_efficiency = _get_cli_volume_space_efficiency_aliases(cli_volume)
         partition_name = None
-        if cli_volume.volume_group_name is not None:
+        if cli_volume.volume_group_name:
             cli_volume_group = self._lsvolumegroup(cli_volume.volume_group_name)
-            if cli_volume_group is not None and hasattr(cli_volume_group, "partition_name"):
+            if cli_volume_group is not None and hasattr(cli_volume_group, "partition_name") \
+                    and cli_volume_group.partition_name:
                 partition_name = cli_volume_group.partition_name
         return Volume(
             capacity_bytes=int(cli_volume.capacity),
@@ -377,15 +378,16 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
         if not hasattr(cli_snapshot, "volume_group_name"):
             # TODO remove from release, should return
             raise array_errors.InvalidArgumentError("Testing")
-        if cli_snapshot.volume_group_name is None:
+        if not cli_snapshot.volume_group_name:
             return None
         cli_volume_group = self._lsvolumegroup(cli_snapshot.volume_group_name)
-        if cli_volume_group is None:
+        if cli_volume_group is None or not hasattr(cli_volume_group, "partition_name") \
+                or not cli_volume_group.partition_name:
             return None
-        return cli_volume_group.partition_name if hasattr(cli_volume_group, "partition_name") else None
+        return cli_volume_group.partition_name
 
     def _get_partition_name_of_volume_snapshot(self, cli_volume):
-        if not hasattr(cli_volume, "partition_name"):
+        if not hasattr(cli_volume, "partition_name") or not cli_volume.partition_name:
             return None
         return cli_volume.partition_name
 
@@ -704,7 +706,7 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
         self._copy_to_target_volume(target_volume_name, source_name)
 
     def _create_volume_group(self, name, partition_name):
-        if partition_name is not None:
+        if partition_name:
             return self._mkvolumegroup(name=name, partition=partition_name)
         return self._mkvolumegroup(name=name)
 
@@ -730,7 +732,7 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
 
     def _create_cli_volume_from_snapshot(self, name, pool, io_group, volume_group, source_id, cli_snapshot,
                                          partition_name):
-        if partition_name is None:
+        if not partition_name:
             self._create_cli_volume_from_snapshot_old(name, pool, io_group, volume_group, source_id)
             return
         logger.info("creating volume from snapshot - new")
@@ -766,7 +768,7 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
         self.client.svctask.mkvolume(name=name, **cli_kwargs)
 
     def _create_cli_volume_from_volume(self, name, pool, io_group, volume_group, source_id, partition_name):
-        if partition_name is None:
+        if not partition_name:
             logger.info("creating volume from volume")
             cli_snapshot = self._add_snapshot(name, source_id, pool)
             self._create_cli_volume_from_snapshot(name, pool, io_group, volume_group, cli_snapshot.snapshot_id,
@@ -777,7 +779,7 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
             cli_volume = self._lsvdisk_by_id(source_id)
             if cli_volume is None:
                 raise array_errors.ObjectNotFoundError(source_id)
-            if cli_volume.volume_group_name is None:
+            if not cli_volume.volume_group_name:
                 raise array_errors.ObjectNotFoundError(source_id)
             cli_snapshot = self._add_vg_snapshot(name, cli_volume.volume_group_name, pool)
             try:
@@ -803,8 +805,8 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
     @register_csi_plugin()
     def create_volume(self, name, size_in_bytes, space_efficiency, pool, io_group, volume_group, source_ids,
                       source_type, is_virt_snap_func, partition_name=None, partition_vg=None):
-        if partition_name is not None:
-            if volume_group is None:
+        if partition_name:
+            if not volume_group:
                 # When default VG is implemented in SVC use this (add "default" to the filter)
                 # logger.info("get corresponding volume group for partition {}".format(partition_name))
                 # volume_group = self._get_volume_group_from_partition_name(partition_name)
@@ -812,7 +814,7 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
                 logger.info("partition {} use default volume group {}".format(partition_name, volume_group))
             else:
                 logger.info("partition {} use specfied volume group {}".format(partition_name, volume_group))
-            if volume_group is None:
+            if not volume_group:
                 raise array_errors.InvalidArgumentError("volume group not specified")
             if self._verify_volume_group_of_partition_name(partition_name, volume_group) is False:
                 raise array_errors.InvalidArgumentError("volume group not part of partition")
@@ -885,7 +887,7 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
         if object_type is controller_settings.SNAPSHOT_TYPE_NAME:
             return self._generate_snapshot_response_with_verification(cli_volume)
         cli_volume = self._get_cli_volume(cli_volume.name)
-        return self._generate_volume_response(cli_volume)
+        return self._generate_volume_response(cli_volume, is_virt_snap_func)
 
     def _create_similar_volume(self, source_cli_volume, target_volume_name, space_efficiency, pool):
         logger.info("creating target cli volume '{0}' from source volume '{1}'".format(target_volume_name,
@@ -2172,7 +2174,7 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
         if cli_host is None:
             return False
         current_partition = None
-        if hasattr(cli_host, "partition_name"):
+        if hasattr(cli_host, "partition_name") and cli_host.partition_name:
             current_partition = cli_host.partition_name
         return current_partition == new_partition_name
 
@@ -2224,7 +2226,7 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
         filter_value = 'partition_name={}'.format(partition_name)
         try:
             vol_groups = self.client.svcinfo.lsvolumegroup(filtervalue=filter_value).as_single_element
-            if vol_groups is None or vol_groups.name is None:
+            if vol_groups is None or not vol_groups.name:
                 raise array_errors.ObjectNotFoundError(partition_name)
             return vol_groups.name
         except (svc_errors.CommandExecutionError, CLIFailureError) as ex:
@@ -2236,17 +2238,16 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
         filter_value = 'partition_name={}:name={}'.format(partition_name, volume_group)
         try:
             vol_groups = self.client.svcinfo.lsvolumegroup(filtervalue=filter_value).as_single_element
-            if vol_groups is None or vol_groups.name is None:
+            if vol_groups is None or not vol_groups.name:
                 return False
-            return True
+            return vol_groups.partition_name == partition_name
         except (svc_errors.CommandExecutionError, CLIFailureError) as ex:
             if any(msg_id in ex.my_message for msg_id in (NON_ASCII_CHARS, VALUE_TOO_LONG)):
                 raise array_errors.InvalidArgumentError(ex.my_message)
             raise ex
 
     def _get_partition_name_of_volume_group(self, cli_volume_group):
-        if not hasattr(cli_volume_group, "partition_name"):
-            logger.info("get partition of volume group - no attrib")
+        if not hasattr(cli_volume_group, "partition_name") or not cli_volume_group.partition_name:
             return None
         return cli_volume_group.partition_name
 
