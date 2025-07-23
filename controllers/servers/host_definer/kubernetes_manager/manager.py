@@ -26,6 +26,7 @@ class KubernetesManager():
         self.apps_api = client.AppsV1Api()
         self.csi_nodes_api = self._get_csi_nodes_api()
         self.host_definitions_api = self._get_host_definitions_api()
+        self.node_namespace = self._get_node_namespace()
 
     def _get_dynamic_client(self):
         return dynamic.DynamicClient(api_client.ApiClient(configuration=self._load_cluster_configuration()))
@@ -366,3 +367,29 @@ class KubernetesManager():
         pod_info.name = k8s_pod.metadata.name
         pod_info.node_name = k8s_pod.spec.node_name
         return pod_info
+
+    def _get_node_namespace(self):
+        try:
+            with open("/var/run/secrets/kubernetes.io/serviceaccount/namespace", "r") as f:
+                namespace = f.read().strip()
+                logger.info("Namespace {}".format(namespace))
+                return namespace
+        except Exception as ex:
+            logger.warning("Could not get namespace - possibly testing environment {}".format(ex))
+        return None
+
+    def _get_config_value(self, key, defaultvalue=None):
+        if not hasattr(self, "node_namespace") or self.node_namespace is None:
+            return defaultvalue
+        cm_name = "ibm-csi-hostdefiner-config"
+
+        # Get ConfigMap
+        cm = self.core_api.read_namespaced_config_map(cm_name, self.node_namespace)
+
+        if key in cm.data:
+            value = cm.data[key]
+            logger.info("In namespace {} found config for key {} - {}".format(self.node_namespace, key, value))
+            return value
+
+        logger.info("In namespace {} did not find config for key {}".format(self.node_namespace, key))
+        return defautvalue

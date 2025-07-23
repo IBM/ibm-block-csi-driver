@@ -3,13 +3,14 @@ from io import StringIO
 from random import choice, randint
 from datetime import datetime, timedelta
 
-import os
 from packaging.version import Version
 from pysvc import errors as svc_errors
 from pysvc.unified.client import connect
 from pysvc.unified.response import CLIFailureError, SVCResponse
 from retry import retry
 
+from kubernetes import client
+from kubernetes import config as k8s_config
 from controllers.servers.host_definer import settings
 from controllers.common.config import config
 import controllers.array_action.errors as array_errors
@@ -98,6 +99,31 @@ def is_warning_message(exception):
     return False
 
 
+def _get_config_variable(key, defaultvalue):
+    namespace = None
+    try:
+        with open("/var/run/secrets/kubernetes.io/serviceaccount/namespace", "r", encoding="utf-8") as sa_namespace:
+            namespace = sa_namespace.read().strip()
+    except Exception as ex:
+        logger.warning("Could not get namespace - possibly testing environment {}".format(ex))
+        return defaultvalue
+    logger.info("Namespace {}".format(namespace))
+    cm_name = "ibm-csi-node-config"
+
+    k8s_config.load_incluster_config()
+
+    # Get ConfigMap
+    cm = client.CoreV1Api().read_namespaced_config_map(cm_name, namespace)
+
+    if key in cm.data:
+        value = cm.data[key]
+        logger.info("In namespace {} found config for key {} - {}".format(namespace, key, value))
+        return value
+
+    logger.info("In namespace {} did not find config for key {}".format(namespace, key))
+    return defaultvalue
+
+
 def _get_space_efficiency_kwargs(space_efficiency):
     if space_efficiency:
         space_efficiency = space_efficiency.lower()
@@ -153,7 +179,7 @@ def build_create_host_kwargs(host_name, connectivity_type, port, io_group, parti
         if not partition_name:
             cli_kwargs['iogrp'] = common_settings.FULL_IO_GROUP
 
-    port_set = os.getenv(settings.PORT_SET_ENV_VAR)
+    port_set = _get_config_variable(settings.PORT_SET_ENV_VAR, None)
     if port_set is not None and port_set:
         logger.info("host {} in partition {} is created with port set {}".format(host_name, partition_name, port_set))
         cli_kwargs['portset'] = port_set
@@ -246,7 +272,7 @@ def _get_cli_volume_space_efficiency_aliases(cli_volume):
 
 
 def _get_ssh_port_from_environment():
-    return int(os.environ.get('SVC_SSH_PORT', '22'))
+    return int(_get_config_variable('svcSshPort', '22'))
 
 
 class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
