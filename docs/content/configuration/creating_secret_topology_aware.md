@@ -7,6 +7,8 @@ Create an array secret YAML file to define the storage credentials (username and
 
 If you are not using the CSI Topology feature, follow the steps in [Creating a Secret](creating_secret.md).{: note}
 
+CSI Topology can be used with IBM Storage Virtualize® partitions, the additional parameters partition_name, partition_default_vg as described in [Creating a Secret](creating_secret.md) can be specified for topology secrets as well.
+
 Within the Secret, each user-defined management ID (here, represented by `demo-management-id-x`), is used to identify the storage system within other configuration files.
 
 The management ID must start and end with a character or number. In addition, only the following special symbols may be used within the management ID: '\_', '.', '-'{: restriction}
