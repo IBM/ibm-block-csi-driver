@@ -1285,8 +1285,7 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
             for mapping in self.client.svcinfo.lshostvdiskmap(host=host_name):
                 lun_number = mapping.get('SCSI_id', '')
                 lun_number_int = int(lun_number)
-                if lun_number_int > max_lun_number:
-                    max_lun_number = lun_number_int
+                max_lun_number = max(max_lun_number, lun_number_int)
                 luns_in_use.add(lun_number)
         except (svc_errors.CommandExecutionError, CLIFailureError) as ex:
             logger.error(ex)
@@ -1573,6 +1572,7 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
         return rcrelationships[0] if rcrelationships else None
 
     def get_replication(self, replication_request):
+        replication = None
         if replication_request.replication_type == array_settings.REPLICATION_TYPE_MIRROR:
             replication = self._get_replication(replication_request)
         elif replication_request.replication_type == array_settings.REPLICATION_TYPE_EAR:
