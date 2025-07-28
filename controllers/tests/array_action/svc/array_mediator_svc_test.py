@@ -1911,7 +1911,7 @@ class TestArrayMediatorSVC(unittest.TestCase):
         ips_by_iqn = self.svc.get_iscsi_targets_by_iqn(common_settings.HOST_NAME)
         filtervalue = self._get_filtervalue(svc_settings.LSIP_PORTSET_ID_ATTR_KEY, svc_settings.DUMMY_INTERNAL_ID1)
         self.svc.client.svcinfo.lsip.assert_called_once_with(filtervalue=filtervalue)
-        self.svc.client.svcinfo.lsportip.not_called()
+        self.svc.client.svcinfo.lsportip.assert_not_called()
         self.assertEqual({array_settings.DUMMY_NODE1_IQN: [array_settings.DUMMY_IP_ADDRESS1]},
                          ips_by_iqn)
 
@@ -2564,7 +2564,7 @@ class TestArrayMediatorSVC(unittest.TestCase):
                                                                            version=config.identity.version,
                                                                            metadata='some_metadata')
         else:
-            self.svc.client.svctask.registerplugin.not_called()
+            self.svc.client.svctask.registerplugin.assert_not_called()
 
     @patch('{}.is_call_home_enabled'.format('controllers.array_action.array_mediator_svc'))
     @patch('{}.get_odf_call_home_version'.format('controllers.array_action.array_mediator_svc'))
