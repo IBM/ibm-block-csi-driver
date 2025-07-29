@@ -23,6 +23,7 @@ import (
 	"context"
 	"fmt"
 	"io/ioutil"
+	"os"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
