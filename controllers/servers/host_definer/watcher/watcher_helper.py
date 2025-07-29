@@ -16,6 +16,9 @@ import controllers.common.settings as common_settings
 from controllers.servers.host_definer.hd_types import (
     DefineHostRequest, DefineHostResponse, HostDefinitionInfo, SecretInfo, ManagedNode)
 from controllers.servers.host_definer.storage_manager.host_definer_server import HostDefinerServicer
+from kubernetes import client, config
+import os
+
 
 MANAGED_SECRETS = []
 NODES = {}
@@ -208,6 +211,24 @@ class Watcher(KubernetesManager):
         return self._is_dynamic_node_labeling_allowed() or self._is_node_has_manage_node_label(node_name)
 
     def _is_dynamic_node_labeling_allowed(self):
+        with open("/var/run/secrets/kubernetes.io/serviceaccount/namespace", "r") as f:
+            namespace = f.read().strip()
+        logger.warning("Namespace {}".format(namespace))
+        # Load in-cluster config
+        config.load_incluster_config()
+
+        v1 = client.CoreV1Api()
+
+        cm_name = "ibm-csi-configmap"
+        key = "max-invocations"
+
+        # Get ConfigMap
+        cm = v1.read_namespaced_config_map(cm_name, namespace)
+
+        if key in cm.data:
+            logger.warning("found in config file {}".format(cm.data[key]))
+        else:
+            logger.warning("not found in config file")
         return os.getenv(settings.DYNAMIC_NODE_LABELING_ENV_VAR) == settings.TRUE_STRING
 
     def _is_host_can_be_undefined(self, node_name):

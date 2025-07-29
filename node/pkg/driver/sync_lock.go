@@ -20,6 +20,14 @@ import (
 	"sync"
 	"time"
 
+	"context"
+	"fmt"
+	"io/ioutil"
+
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/rest"
+
 	"github.com/ibm/ibm-block-csi-driver/node/logger"
 )
 
@@ -95,7 +103,39 @@ func (s SyncLock) RemoveVolumeLock(id string, msg string) {
 }
 
 func (s SyncLock) addLunLock(lun int, msg string) error {
-	if !s.CleanScsiDevice {
+
+
+	ns, err := ioutil.ReadFile("/var/run/secrets/kubernetes.io/serviceaccount/namespace")
+	if err != nil {
+		os.Exit(2)
+	}
+	namespace := string(ns)
+	fmt.Println("Namespace:", namespace)
+
+	// In-cluster config
+	config, err := rest.InClusterConfig()
+	if err != nil {
+		os.Exit(3)
+	}
+
+	clientset, err := kubernetes.NewForConfig(config)
+	if err != nil {
+		os.Exit(4)
+	}
+
+	cmName := "ibm-csi-configmap"
+	cm, err := clientset.CoreV1().ConfigMaps(namespace).Get(context.TODO(), cmName, metav1.GetOptions{})
+	if err != nil {
+		os.Exit(5)
+	}
+
+	key := "max-invocations"
+	value, ok := cm.Data[key]
+	if !ok {
+		os.Exit(6)
+	}
+
+	if value == "5" {
 		//logger.Debugf("Clean devices disabled, skipping addLunLock")
 		return nil
 	}
