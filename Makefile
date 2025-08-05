@@ -54,7 +54,7 @@ test:
 
 .PHONY: test-xunit
 test-xunit:
-	mkdir -p ./build/reports
+	mkdir -p ./build/reports && chmod 777 ./build/reports
 	if [ -d ./node/mocks ]; then rm -rf ./node/mocks; fi
 	go generate ./...
 	$(gofmt-test)
