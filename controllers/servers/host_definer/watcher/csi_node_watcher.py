@@ -22,12 +22,17 @@ class CsiNodeWatcher(Watcher):
             resource_version = self._get_k8s_object_resource_version(self.csi_nodes_api.get())
             stream = self.csi_nodes_api.watch(resource_version=resource_version, timeout=5)
             for watch_event in stream:
+                logger.info("In loop forever")
                 watch_event = self._munch(watch_event)
                 csi_node_info = self._generate_csi_node_info(watch_event.object)
                 if (watch_event.type == settings.DELETED_EVENT) and (csi_node_info.name in NODES):
+                    logger.info("In if DELETED_EVENT")
                     self._handle_deleted_csi_node_pod(csi_node_info)
                 elif watch_event.type == settings.MODIFIED_EVENT:
+                    logger.info("In if MODIFIED_EVENT")
                     self._handle_modified_csi_node(csi_node_info)
+                else:
+                    logger.info("Not in any if :-( ")
 
     def _handle_modified_csi_node(self, csi_node_info):
         if self._is_new_csi_node(csi_node_info):
