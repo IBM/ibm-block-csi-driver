@@ -1,6 +1,12 @@
 
 {{site.data.keyword.attribute-definition-list}}
 
+# Configuration paramaters now in config map
+
+Starting from release 1.13.0, the global configuration parameters are maintained in a config map, rather than the host definer yaml as earlier releases.
+Please refer to the host definer configuration page for more information.
+
+
 # Adding optional labels for dynamic host definition
 
 Adding labels to nodes allows for greater control over the system nodes, when using dynamic host definition.
@@ -9,11 +15,11 @@ Adding labels to nodes allows for greater control over the system nodes, when us
 
 To block a specific host definition from being deleted by the host definer, you can add the following label to the node: `hostdefiner.block.csi.ibm.com/avoid-deletion=true`.
 
-This label works on a per node basis, where the `allowDelete` parameter definition in the `csi_v1_hostdefiner_cr.yaml` is for all cluster nodes.
+This label works on a per node basis, where the `allowDelete` parameter definition in the config map is for all cluster nodes.
 
 ## Defining a specific host node
 
-In addition to defining `connectivityType` in the HostDefiner, the node's connectivity type can be defined by overriding the `connectivityType` definition within the HostDefiner by using the `connectivity-type` label.
+In addition to defining `connectivityType` in the HostDefiner, the node's connectivity type can be defined by overriding the `connectivityType` definition within the HostDefiner by using the `connectivity-type` parameter in the config map.
 
 This tag defines the connectivity type of the node regardless of connectivity hierarchy.
 

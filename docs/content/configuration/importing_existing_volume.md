@@ -21,6 +21,8 @@ Before starting to import an existing volume, find the `volumeHandle` in the exi
 
       2. Browse to the volume that the port is on and right-click > **Properties**. The Properties window will be displayed. Use the **Volume ID** and **Volume UID** values.
 
+If the volume is imported using an SVC partition secret - the volume on the storage must already be part of the partition
+
 For more information about IBM Storage Virtualize® products, find your product information in [IBM Documentation](https://www.ibm.com/docs/).{: tip}
 
 - **For IBM DS8000® family:**

@@ -80,6 +80,7 @@
         - [Creating a StorageClass with volume groups](content/configuration/creating_storageclass_vg.md)
         - [Creating a PersistentVolumeClaim (PVC) with volume groups](content/configuration/creating_pvc_vg.md)
         - [Creating a VolumeReplication with policy-based replication](content/configuration/creating_volumereplication_pbr.md)
+    * [Configuring for SVC partitions](content/configuration/configuring_svc_partitions.md)
     * [Advanced configuration](content/configuration/advanced_configuration.md)
         * [Importing an existing volume](content/configuration/importing_existing_volume.md)
         * [Importing an existing volume group](content/configuration/importing_existing_volume_group.md)

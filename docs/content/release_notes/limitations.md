@@ -18,19 +18,16 @@ When using the CSI driver with IBM DS8000® family storage systems:
 - There is a limit of 11 FlashCopy relationships per volume (including all snapshots and clones).
 - HostDefiner is not supported.
 
-## IBM Storage Virtualize family usage limitations
-
-When using the CSI driver with IBM Storage Virtualize® family storage systems:
-- CSI will only allow up to 511 LUN connections to each storage system (even if multiple StorageClass objects are defined to different pools on the same storage system)
-
-Check your operating system LUN limit.{: tip}
-
 ## High availability (HA) general limitations
 
 Some storage system types do not support High availability (HA).{: attention}
 
 - HyperSwap topology is only supported for use with IBM Storage Virtualize® family storage systems.
 - Stretched topology is only supported by SAN Volume Controller storage systems.
+
+## Partitions and high availability partitions (PBHA) limitations
+
+Some features aren't supported by SVC for partitions, please refer to the SVC documentation for details. For example - as of time of this release (1.13.0) IO groups are not supported and shouldn't be used.
 
 ## HyperSwap volume limitations
 The following IBM block storage CSI driver features are not supported on volumes where HyperSwap is used:
@@ -61,10 +58,11 @@ For other policy-based replication limitations with your storage system, see the
 ## Snapshot function limitations
 
 - Snapshot function is only supported for use with IBM Storage Virtualize® family storage system versions 8.5.1 or higher. For more information, see **Product overview** > **Technical overview** > **Volume groups** > **Snapshot function** within your IBM Storage Virtualize product documentation on [IBM Documentation](https://www.ibm.com/docs).
+- In Partitions environments - the snapshot function is always used, the `virt_snap_func` is ignored and assumed to be true.
 - In very rare cases, due to a race condition, a different snapshot than intended may be mistakenly deleted during a snapshot deletion. This occurs as no snapshot unique ID (UID) is present on the storage side.
 - Both source and target PVCs (in a source PVC to snapshot to target PVC scenario) must have the same space efficiency set within their storage classes. If the space efficiency is set differently, the target PVC creation fails.
 - A PVC target must have the same volume size as the source volume.
-- A snapshot that uses the Snapshot function cannot be created with space efficiency set. If the VolumeSnapshotClass has the `SpaceEfficiency` parameter set along with the snapshot flag (`virt_snap_func`) enabled, the snapshot creation fails.
+- A snapshot that uses the Snapshot function cannot be created with space efficiency set. If the VolumeSnapshotClass has the `SpaceEfficiency` parameter set along with the snapshot flag (`virt_snap_func`) enabled, the snapshot creation fails. This restriction doesn't apply to Partitions.
 - In very rare cases, there can be leftover or undeleted volumes. As a result of the Kubernetes/Openshift and CSI being stateless, in cases where the driver is not able to save a specific state, the CSI driver might administer the wrong process.
 
     For example, this can happen in a case where a volume is created from a snapshot but during the volume creation process a driver issue occurs. In such a case, the driver is not able to find the newly created volume and creates a new one. This results in both the initial volume that was created, but not found or linked by the snapshot, and the newly created volume.
@@ -99,6 +97,8 @@ These limitations are not relevant when using the Snapshot the function. For mor
 ## Volume group limitations
 
 Volume group configuration is only supported for use with IBM Storage Virtualize® family storage systems.
+
+Volume groups aren't supported in SVC partitions.
 
 The following limitations apply when using volume groups:
 

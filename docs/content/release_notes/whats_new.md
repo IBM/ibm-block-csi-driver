@@ -1,8 +1,8 @@
 # What's new in 1.13.0
 
-IBM® block storage CSI driver 1.13.0 is a minor release that adds support for:
+IBM® block storage CSI driver 1.13.0 adds support for:
 
-- TBD
+- SVC partitions, including high availability partitions (PBHA)
 
 **General availability date:** TBD
 

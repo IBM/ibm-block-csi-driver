@@ -5,7 +5,23 @@
 
 Some of the parameters within the HostDefiner custom resource are configurable. Use this information to help decide whether the parameters for your storage system need to be updated.
 
-Any configuration changes are reverted upon each IBM® Block Storage CSI driver upgrade. If configuration changes are required, it is recommended to uset InstallPlans to manual upgrade only.{: attention}
+Starting from 1.13.0 the configuation parameters are saved in the config map ibm-csi-hostdefiner-config and remain persistent on CSI software upgrade. The config map should be created in the same namespace as the pod.
+Applying configuration changes still requires host definer restart.
+
+Because the configuration is saved in a config map - it can be defined even before the upgrade to 1.13.0
+
+Use standard configmap CLIs to update the configuration, examples below.
+All CLIs accept an option -n parameter to specify the namepsace
+
+Create/update a configuration parameter (replace key value with actual parameter setting):
+  kubectl create configmap ibm-csi-hostdefiner-config --from-literal=key=value
+
+Get a ConfigMap
+  kubectl get configmap ibm-csi-hostdefiner-config
+
+Delete a ConfigMap:
+  kubectl delete configmap ibm-csi-hostdefiner-config
+
 
 Consider [configuring dynamic host definition labels](../using/using_hostdefinition_labels.md) when possible to preserve HostDefiner customizations during IBM® Block Storage CSI driver upgrades.{: tip}
 
@@ -25,4 +41,4 @@ As of this document's publication date, NVMe/FC is not supported for this releas
 |`dynamicNodeLabeling`|Defines whether the nodes that run the CSI node pod are dynamically labeled or if the user must create the `hostdefiner.block.csi.ibm.com/manage-node=true` label on each relevant node. This label tells the host definer which nodes to manage their host definition on the storage side.<br>Input values are `true` or `false`.<br>The default value is `false`, where the user must manually create this label on every node to be managed by the host definer for dynamic host definition on the storage.|
 |`portSet`|FlashSystem specific field - Specifies the portset for new port definitions (ports already defined on the FlashSystem are not modified).|
 
-For an example HostDefiner yaml file, see [csi_v1_hostdefiner_cr.yaml](https://raw.githubusercontent.com/IBM/ibm-block-csi-operator/v1.13.0/config/samples/csi_v1_hostdefiner_cr.yaml).
+
