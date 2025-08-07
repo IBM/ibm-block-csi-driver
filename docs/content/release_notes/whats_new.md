@@ -1,6 +1,6 @@
 # What's new in 1.12.5
 
-IBM® block storage CSI driver 1.12.5 is a minor release that works around an issue with scsi devices remaining hanging on the OS
+IBM® block storage CSI driver 1.12.5 is a minor release that mitigates hanging scsi devices on the OS level
 
 **General availability date:** August 2025
 

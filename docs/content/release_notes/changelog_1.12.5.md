@@ -8,10 +8,11 @@ As of this document's publication date, the IBM Power® and zLinux® architectur
 As of this document's publication date, NVMe/FC is not supported for this release.{: restriction}
 
 IBM® Block Storage CSI driver 1.12.5 added new support and enhancements:
-- Working around a problem with scsi devices remaining hanging in OS
+- Mitigation for OS hanging scsi devices
 
 
 IBM® block storage CSI driver version 1.12.5 resolved the following issues:
 
 |Ticket ID|Severity|Description|
+|---------|--------|-----------|
 |CSI-5856|Medium|remove ghost scsi devices|
