@@ -100,10 +100,10 @@ The IBM Block CSI Driver itself uses the following container images:
 * ```registry.k8s.io/sig-storage/livenessprobe:v2.15.0```
 * ```quay.io/ibmcsiblock/csi-block-volumereplication-operator:v0.9.2```
 * ```quay.io/ibmcsiblock/csi-volume-group-operator:v0.9.2```
-* ```quay.io/ibmcsiblock/ibm-block-csi-host-definer-amd64:1.12.4```
-* ```quay.io/ibmcsiblock/ibm-block-csi-operator-amd64:1.12.4 ```
-* ```quay.io/ibmcsiblock/ibm-block-csi-driver-controller-amd64:1.12.4```
-* ```quay.io/ibmcsiblock/ibm-block-csi-driver-node-amd64:1.12.4```
+* ```quay.io/ibmcsiblock/ibm-block-csi-host-definer-amd64:1.12.5```
+* ```quay.io/ibmcsiblock/ibm-block-csi-operator-amd64:1.12.5 ```
+* ```quay.io/ibmcsiblock/ibm-block-csi-driver-controller-amd64:1.12.5```
+* ```quay.io/ibmcsiblock/ibm-block-csi-driver-node-amd64:1.12.5```
 
 All the images above must be copied to your private registry using ```skopeo```.<br>
 
@@ -125,11 +125,11 @@ Once the private registry is set up, the CatalogSource is configured and the IBM
 
 1. Download the driver installation yaml
 ```
-curl https://raw.githubusercontent.com/IBM/ibm-block-csi-operator/v1.12.4/config/samples/csi.ibm.com_v1_ibmblockcsi_cr.yaml > csi.ibm.com_v1_ibmblockcsi_cr.yaml
+curl https://raw.githubusercontent.com/IBM/ibm-block-csi-operator/v1.12.5/config/samples/csi.ibm.com_v1_ibmblockcsi_cr.yaml > csi.ibm.com_v1_ibmblockcsi_cr.yaml
 ```
 2. Update the driver installation yaml, setting all image paths and tags to match your private registry images
 3. Optionally, download the HostDefiner driver installation yaml and update it, setting all iamge paths and tags to match your private registry images
 ```
- curl https://raw.githubusercontent.com/IBM/ibm-block-csi-operator/v1.12.4/config/samples/csi_v1_hostdefiner_cr.yaml > csi_v1_hostdefiner_cr.yaml
+ curl https://raw.githubusercontent.com/IBM/ibm-block-csi-operator/v1.12.5/config/samples/csi_v1_hostdefiner_cr.yaml > csi_v1_hostdefiner_cr.yaml
  ```
 

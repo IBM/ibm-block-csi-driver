@@ -25,10 +25,10 @@ type OsDeviceConnectivityNvmeOFc struct {
 	HelperScsiGeneric OsDeviceConnectivityHelperScsiGenericInterface
 }
 
-func NewOsDeviceConnectivityNvmeOFc(executer executer.ExecuterInterface) OsDeviceConnectivityInterface {
+func NewOsDeviceConnectivityNvmeOFc(executer executer.ExecuterInterface, clean_scsi_device bool) OsDeviceConnectivityInterface {
 	return &OsDeviceConnectivityNvmeOFc{
 		Executer:          executer,
-		HelperScsiGeneric: NewOsDeviceConnectivityHelperScsiGeneric(executer),
+		HelperScsiGeneric: NewOsDeviceConnectivityHelperScsiGeneric(executer, clean_scsi_device),
 	}
 }
 
@@ -49,6 +49,10 @@ func (r OsDeviceConnectivityNvmeOFc) FlushMultipathDevice(mpathDevice string) er
 
 func (r OsDeviceConnectivityNvmeOFc) RemovePhysicalDevice(sysDevices []string) error {
 	return r.HelperScsiGeneric.RemovePhysicalDevice(sysDevices)
+}
+
+func (r OsDeviceConnectivityNvmeOFc) RemoveGhostDevice(lun int) error {
+	return r.HelperScsiGeneric.RemoveGhostDevice(lun)
 }
 
 func (r OsDeviceConnectivityNvmeOFc) ValidateLun(_ int, _ []string) error {

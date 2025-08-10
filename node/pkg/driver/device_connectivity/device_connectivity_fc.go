@@ -25,10 +25,10 @@ type OsDeviceConnectivityFc struct {
 	HelperScsiGeneric OsDeviceConnectivityHelperScsiGenericInterface
 }
 
-func NewOsDeviceConnectivityFc(executer executer.ExecuterInterface) OsDeviceConnectivityInterface {
+func NewOsDeviceConnectivityFc(executer executer.ExecuterInterface, clean_scsi_device bool) OsDeviceConnectivityInterface {
 	return &OsDeviceConnectivityFc{
 		Executer:          executer,
-		HelperScsiGeneric: NewOsDeviceConnectivityHelperScsiGeneric(executer),
+		HelperScsiGeneric: NewOsDeviceConnectivityHelperScsiGeneric(executer, clean_scsi_device),
 	}
 }
 
@@ -53,6 +53,10 @@ func (r OsDeviceConnectivityFc) FlushMultipathDevice(mpathDevice string) error {
 
 func (r OsDeviceConnectivityFc) RemovePhysicalDevice(sysDevices []string) error {
 	return r.HelperScsiGeneric.RemovePhysicalDevice(sysDevices)
+}
+
+func (r OsDeviceConnectivityFc) RemoveGhostDevice(lun int) error {
+	return r.HelperScsiGeneric.RemoveGhostDevice(lun)
 }
 
 func (r OsDeviceConnectivityFc) ValidateLun(lun int, sysDevices []string) error {

@@ -34,7 +34,7 @@ RUN pip3 install .
 
 FROM registry.access.redhat.com/ubi8/python-39:1-212
 
-ARG VERSION=1.12.4
+ARG VERSION=1.12.5
 ARG BUILD_NUMBER=0
 
 ###Required Labels
