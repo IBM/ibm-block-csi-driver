@@ -8,7 +8,7 @@ As of this document's publication date, the IBM Power® and zLinux® architectur
 As of this document's publication date, NVMe/FC is not supported for this release.{: restriction}
 
 IBM® Block Storage CSI driver 1.13.0 added new support and enhancements.
-- TBD
+- SVC Partitions
 
 For more information regarding the IBM FlashSystem® Call Home feature, search IBM.com/docs for your product's documentation.{: tip}
 

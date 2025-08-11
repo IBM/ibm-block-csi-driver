@@ -27,7 +27,9 @@ Some storage system types do not support High availability (HA).{: attention}
 
 ## Partitions and high availability partitions (PBHA) limitations
 
-Some features aren't supported by SVC for partitions, please refer to the SVC documentation for details. For example - as of time of this release (1.13.0) IO groups are not supported and shouldn't be used.
+- High Availability requires SVC configuration of single management IP (supported since SVC 9.1.0)
+- Volume Groups aren't supported (SVC limitation and lack of CSI support)
+- Some features aren't supported by SVC for partitions, please refer to the SVC documentation for details. For example - as of time of this release (1.13.0) IO groups are not supported and shouldn't be used.
 
 ## HyperSwap volume limitations
 The following IBM block storage CSI driver features are not supported on volumes where HyperSwap is used:

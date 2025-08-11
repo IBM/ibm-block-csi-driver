@@ -11,7 +11,7 @@ Applying configuration changes still requires host definer restart.
 Because the configuration is saved in a config map - it can be defined even before the upgrade to 1.13.0
 
 Use standard configmap CLIs to update the configuration, examples below.
-All CLIs accept an option -n parameter to specify the namepsace
+All CLIs accept an optional -n parameter to specify the namepsace
 
 Create/update a configuration parameter (replace key value with actual parameter setting):
   kubectl create configmap ibm-csi-hostdefiner-config --from-literal=key=value
@@ -22,6 +22,14 @@ Get a ConfigMap
 Delete a ConfigMap:
   kubectl delete configmap ibm-csi-hostdefiner-config
 
+Delete a ConfigMap entry:
+  There's no simple command to delete an entry. You can either use:
+  kubectr edit configmap ibm-csi-hostdefiner-config
+    Which opens the editor to edit the config map.
+  OR you can patch the config map:
+  kubectl get configmap ibm-csi-hostdefiner-config -o yaml > ibm-csi-hostdefiner-config.yaml
+  edit yaml and then reapply:
+  kubectrl apply -f ibm-csi-hostdefiner-config.yaml
 
 Consider [configuring dynamic host definition labels](../using/using_hostdefinition_labels.md) when possible to preserve HostDefiner customizations during IBM® Block Storage CSI driver upgrades.{: tip}
 

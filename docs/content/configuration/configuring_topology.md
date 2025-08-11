@@ -7,6 +7,8 @@ Use this information for specific configuring information when using CSI Topolog
 
 Using the CSI Topology feature, volume access can be limited to a subset of nodes, based on regions and availability zones. Nodes can be located in various regions within an availability zone, or across the different availability zones. Using the CSI Topology feature can ease volume provisioning for workloads within a multi-zone architecture.
 
+With CSI Topology, different nodes can use different SVC partitions - the topolgy secret can define Partition access as well (partition_name / partition_default_vg parameters)
+
 Using dynamic host definition together with the CSI Topology feature, allows for defining hosts on the proper storage storage system, according to the topology zone configuration.
 
 Be sure that all of the topology requirements are met before starting. For more information, see [Compatibility and requirements](../installation/install_compatibility_requirements.md).{: important}

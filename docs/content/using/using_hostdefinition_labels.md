@@ -6,7 +6,6 @@
 Starting from release 1.13.0, the global configuration parameters are maintained in a config map, rather than the host definer yaml as earlier releases.
 Please refer to the host definer configuration page for more information.
 
-
 # Adding optional labels for dynamic host definition
 
 Adding labels to nodes allows for greater control over the system nodes, when using dynamic host definition.
