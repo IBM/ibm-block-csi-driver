@@ -423,6 +423,9 @@ class CSIControllerServicer(csi_pb2_grpc.ControllerServicer):
             with get_agent(array_connection_info, array_type).get_mediator() as array_mediator:
                 logger.debug(array_mediator)
                 try:
+                    """
+                    When the parent volume is also being deleted it is not listed as part of the volume group
+                    We can possibly fix the below check for also allowing deleting volumes (if not in partition)
                     if not snapshot_id:
                         snapshot = array_mediator.get_object_by_id(internal_snapshot_id,
                                                                    servers_settings.SNAPSHOT_TYPE_NAME, True)
@@ -437,6 +440,7 @@ class CSIControllerServicer(csi_pb2_grpc.ControllerServicer):
                     else:
                         if array_connection_info.partition_name is not None:
                             raise array_errors.ObjectNotFoundError(snapshot_id)
+                    """
                     array_mediator.delete_snapshot(snapshot_id, internal_snapshot_id)
                 except array_errors.ObjectNotFoundError as ex:
                     logger.debug("Snapshot was not found during deletion: {0}".format(ex))
