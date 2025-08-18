@@ -750,8 +750,6 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
         if io_group:
             cli_kwargs['iogroup'] = io_group
         self.client.svctask.mkvolume(name=name, **cli_kwargs)
-        logger.info("Remove temp snapshot")
-        self.client.svctask.rmsnapshot(snapshotid=source_id)
         logger.info("creating volume from snapshot - success")
 
     def _create_cli_volume_from_vg_snapshot(self, name, pool, io_group, volume_group, vg_snapshot_id, vol_id):
@@ -773,6 +771,7 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
             cli_snapshot = self._add_snapshot(name, source_id, pool)
             self._create_cli_volume_from_snapshot(name, pool, io_group, volume_group, cli_snapshot.snapshot_id,
                                                   cli_snapshot, partition_name)
+            self._rmsnapshot(cli_snapshot.snapshot_id)
         else:
             # VG snapshot is moore compatible than vol snapshot for certain partition types
             logger.info("creating volume from volume - partition")
