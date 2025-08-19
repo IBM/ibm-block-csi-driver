@@ -35,5 +35,4 @@ REGISTRATION_MAP = {
     'delete_host': host_definition_plugin_type,
     'add_ports_to_host': host_definition_plugin_type,
     'remove_ports_from_host': host_definition_plugin_type,
-    'verify_host_partition': host_definition_plugin_type,
 }
