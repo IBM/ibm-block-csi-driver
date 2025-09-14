@@ -203,7 +203,7 @@ class TestModifyVolumeGroupMembership(BaseVgControllerSetUp, CommonControllerTes
     def _verify_add_test(self, volume_group_response):
         self.assertEqual(self.context.code, grpc.StatusCode.OK)
         self.mediator.get_volume_group.assert_called_with(VOLUME_GROUP_NAME)
-        self.mediator.add_volume_to_volume_group.assert_called_once_with(VOLUME_GROUP_NAME, VOLUME_UID)
+        self.mediator.add_volume_to_volume_group.assert_called_once_with(VOLUME_GROUP_NAME, VOLUME_UID, None)
         self.mediator.remove_volume_from_volume_group.assert_not_called()
         self.assertEqual(volume_group_response.volume_group.volume_group_id, REQUEST_VOLUME_GROUP_ID)
         self.assertEqual(len(volume_group_response.volume_group.volumes), 1)
@@ -231,7 +231,7 @@ class TestModifyVolumeGroupMembership(BaseVgControllerSetUp, CommonControllerTes
 
         volume_group_response = self.servicer.ModifyVolumeGroupMembership(self.request, self.context)
         self.assertEqual(self.context.code, grpc.StatusCode.OK)
-        self.mediator.remove_volume_from_volume_group.assert_called_once_with(VOLUME_UID)
+        self.mediator.remove_volume_from_volume_group.assert_called_once_with(VOLUME_UID, None, None)
         self.mediator.add_volume_to_volume_group.assert_not_called()
         self.assertEqual(volume_group_response.volume_group.volume_group_id, REQUEST_VOLUME_GROUP_ID)
         self.assertEqual(len(volume_group_response.volume_group.volumes), 0)
