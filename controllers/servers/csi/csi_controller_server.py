@@ -74,16 +74,18 @@ class CSIControllerServicer(csi_pb2_grpc.ControllerServicer):
                     logger.debug("requested size is 0 so the default size will be used : {0} ".format(
                         required_bytes))
 
-                is_virt_snap_func = volume_parameters.virt_snap_func or \
-                    (array_connection_info.partition_name is not None)
+                use_snap_object = bool(volume_parameters.virt_snap_func and not array_connection_info.partition_name)
+                no_flash_copy = bool(volume_parameters.virt_snap_func or array_connection_info.partition_name)
 
-                if is_virt_snap_func and source_id:
-                    source_object = array_mediator.get_object_by_id(source_id, source_type, is_virt_snap_func)
+                if no_flash_copy and source_id:
+                    # Partitions - check that the source is in the partition
+                    # virt_snap_func - check the validity of the source snapshot
+                    source_object = array_mediator.get_object_by_id(source_id, source_type, use_snap_object)
                     if not source_object:
                         return handle_exception("source {}: {} not found".format(source_type, source_id), context,
                                                 grpc.StatusCode.NOT_FOUND, csi_pb2.CreateVolumeResponse)
 
-                    if source_type == servers_settings.SNAPSHOT_TYPE_NAME:
+                    if use_snap_object and source_type == servers_settings.SNAPSHOT_TYPE_NAME:
                         source_volume = array_mediator.get_object_by_id(source_object.source_id,
                                                                         servers_settings.VOLUME_TYPE_NAME)
                         if not source_volume:
@@ -95,12 +97,12 @@ class CSIControllerServicer(csi_pb2_grpc.ControllerServicer):
                     if source_volume:
                         # Apparently this was never supposed to be a restriction - enabling for partitions only for
                         # backward compatibility, need to revisit
-                        if array_connection_info.partition_name is None:
+                        if not array_connection_info.partition_name:
                             utils.validate_parameters_match_source_volume(space_efficiency, required_bytes,
                                                                           source_volume)
                         array_mediator.verify_volume_partition(source_volume, array_connection_info.partition_name)
                 try:
-                    volume = array_mediator.get_volume(volume_final_name, pool, is_virt_snap_func)
+                    volume = array_mediator.get_volume(volume_final_name, pool, use_snap_object)
                 except array_errors.ObjectNotFoundError:
                     logger.debug(
                         "volume was not found. creating a new volume with parameters: {0}".format(request.parameters))
@@ -110,7 +112,7 @@ class CSIControllerServicer(csi_pb2_grpc.ControllerServicer):
                         array_mediator.register_plugin('topology', '')
                     volume = array_mediator.create_volume(volume_final_name, required_bytes, space_efficiency, pool,
                                                           volume_parameters.io_group, volume_parameters.volume_group,
-                                                          source_ids, source_type, is_virt_snap_func,
+                                                          source_ids, source_type, use_snap_object,
                                                           array_connection_info.partition_name,
                                                           array_connection_info.partition_vg)
                 else:
@@ -126,7 +128,7 @@ class CSIControllerServicer(csi_pb2_grpc.ControllerServicer):
                         return build_error_response(message, context, grpc.StatusCode.ALREADY_EXISTS,
                                                     csi_pb2.CreateVolumeResponse)
 
-                    if not is_virt_snap_func:
+                    if not use_snap_object:
                         response = self._get_create_volume_response_for_existing_volume_source(volume,
                                                                                                source_id,
                                                                                                source_type, system_id,
@@ -134,7 +136,7 @@ class CSIControllerServicer(csi_pb2_grpc.ControllerServicer):
                         if response:
                             return response
 
-                if source_id and not is_virt_snap_func:
+                if source_id and not no_flash_copy:
                     array_mediator.copy_to_existing_volume_from_source(volume, source_id,
                                                                        source_type, required_bytes)
                 volume.source_id = source_id
@@ -352,12 +354,12 @@ class CSIControllerServicer(csi_pb2_grpc.ControllerServicer):
             array_connection_info = utils.get_array_connection_info_from_secrets(secrets, system_id=system_id)
             snapshot_parameters = utils.get_snapshot_parameters(parameters=request.parameters,
                                                                 system_id=array_connection_info.system_id)
-            is_virt_snap_func = snapshot_parameters.virt_snap_func or (array_connection_info.partition_name is not None)
+            use_snap_object = bool(snapshot_parameters.virt_snap_func and not array_connection_info.partition_name)
             pool = snapshot_parameters.pool
             space_efficiency = snapshot_parameters.space_efficiency
             # Apparently this was never supposed to be a restriction - meanwhile enabling for partitions only for
             # backward compatibility, need to revisit
-            if snapshot_parameters.virt_snap_func and (array_connection_info.partition_name is None) \
+            if snapshot_parameters.virt_snap_func and not array_connection_info.partition_name \
                     and space_efficiency:
                 raise array_errors.SpaceEfficiencyNotSupported(space_efficiency)
             with get_agent(array_connection_info, array_type).get_mediator() as array_mediator:
@@ -366,17 +368,16 @@ class CSIControllerServicer(csi_pb2_grpc.ControllerServicer):
 
                 logger.info("Snapshot name : {}. Volume id : {}".format(snapshot_final_name, volume_id))
                 snapshot = array_mediator.get_snapshot(volume_id, snapshot_final_name, pool,
-                                                       is_virt_snap_func)
+                                                       use_snap_object)
 
                 if snapshot:
+                    array_mediator.verify_volume_partition(snapshot, array_connection_info.partition_name)
                     if snapshot.source_id != volume_id:
                         message = messages.SNAPSHOT_WRONG_VOLUME_ERROR_MESSAGE.format(snapshot_final_name,
                                                                                       snapshot.source_id,
                                                                                       volume_id)
                         return build_error_response(message, context, grpc.StatusCode.ALREADY_EXISTS,
                                                     csi_pb2.CreateSnapshotResponse)
-
-                    array_mediator.verify_volume_partition(snapshot, array_connection_info.partition_name)
                 else:
                     logger.debug(
                         "Snapshot doesn't exist. Creating a new snapshot {0} from volume {1}".format(
@@ -392,7 +393,7 @@ class CSIControllerServicer(csi_pb2_grpc.ControllerServicer):
                     array_mediator.verify_volume_partition(volume, array_connection_info.partition_name)
 
                     snapshot = array_mediator.create_snapshot(volume_id, snapshot_final_name, space_efficiency, pool,
-                                                              is_virt_snap_func)
+                                                              use_snap_object, array_connection_info.partition_name)
 
                 logger.debug("generating create snapshot response")
                 response = utils.generate_csi_create_snapshot_response(snapshot, system_id, source_id)
@@ -423,25 +424,8 @@ class CSIControllerServicer(csi_pb2_grpc.ControllerServicer):
             with get_agent(array_connection_info, array_type).get_mediator() as array_mediator:
                 logger.debug(array_mediator)
                 try:
-                    """
-                    When the parent volume is also being deleted it is not listed as part of the volume group
-                    We can possibly fix the below check for also allowing deleting volumes (if not in partition)
-                    if not snapshot_id:
-                        snapshot = array_mediator.get_object_by_id(internal_snapshot_id,
-                                                                   servers_settings.SNAPSHOT_TYPE_NAME, True)
-                        if snapshot is not None:
-                            array_mediator.verify_volume_partition(snapshot, array_connection_info.partition_name)
-                        else:
-                            if array_connection_info.partition_name is not None:
-                                logger.warning("Could not find snapshot by internal id for partitions,  \
-                                                internal id {0} id {1}".format(internal_snapshot_id, snapshot_id))
-                                # TODO remove this testing exception for release
-                                raise array_errors.ObjectNotFoundError(snapshot_id)
-                    else:
-                        if array_connection_info.partition_name is not None:
-                            raise array_errors.ObjectNotFoundError(snapshot_id)
-                    """
-                    array_mediator.delete_snapshot(snapshot_id, internal_snapshot_id)
+                    array_mediator.delete_snapshot(snapshot_id, internal_snapshot_id,
+                                                   array_connection_info.partition_name)
                 except array_errors.ObjectNotFoundError as ex:
                     logger.debug("Snapshot was not found during deletion: {0}".format(ex))
 

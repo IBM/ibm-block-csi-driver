@@ -59,13 +59,14 @@ class VolumeGroupInterface(ABC):
         """
         raise NotImplementedError
 
-    def add_volume_to_volume_group(self, volume_group_id, volume_id):
+    def add_volume_to_volume_group(self, volume_group_id, volume_id, partition_name):
         """
         This function should add a volume to a volume group in the storage system.
 
         Args:
             volume_group_id  : id of the volume group on storage system.
             volume_id  : id of the volume on storage system.
+            partition_name  :  partition name or empty/None if not in partition
 
         Returns:
             None
@@ -78,13 +79,15 @@ class VolumeGroupInterface(ABC):
         """
         raise NotImplementedError
 
-    def remove_volume_from_volume_group(self, volume_id):
+    def remove_volume_from_volume_group(self, volume_id, partition_name, partition_vg):
         """
         This function should remove a volume from a volume group in the storage system.
 
         Args:
             volume_group_id  : id of the volume group on storage system.
             volume_id  : id of the volume on storage system.
+            partition_name  :  partition name or empty/None if not in partition
+            partition_vg  :   partition default vg (to move volume into)
 
         Returns:
             None

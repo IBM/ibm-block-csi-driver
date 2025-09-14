@@ -192,5 +192,6 @@ class ReplicationControllerServicer(pb2_grpc.ControllerServicer):
 
         if not replication_object:
             raise array_errors.ObjectNotFoundError(object_uid)
+        # TODO function name misleading - checks partition_name attribute, not necessarily volume
         mediator.verify_volume_partition(replication_object, array_connection_info.partition_name)
         return replication_object
