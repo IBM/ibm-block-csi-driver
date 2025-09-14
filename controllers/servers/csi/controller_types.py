@@ -11,6 +11,7 @@ class ArrayConnectionInfo:
     system_id: str = None
     partition_name: str = None
     partition_vg: str = None
+    port_set: str = None
 
 
 @dataclass

@@ -306,6 +306,8 @@ class Watcher(KubernetesManager):
             array_connection_info.partition_name = self._decode_base64_to_string(array_connection_info.partition_name)
         if array_connection_info.partition_vg is not None:
             array_connection_info.partition_vg = self._decode_base64_to_string(array_connection_info.partition_vg)
+        if array_connection_info.port_set is not None:
+            array_connection_info.port_set = self._decode_base64_to_string(array_connection_info.port_set)
         return array_connection_info
 
     def _decode_list_base64_to_list_string(self, list_with_base64):

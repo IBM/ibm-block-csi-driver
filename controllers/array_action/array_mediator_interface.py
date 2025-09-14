@@ -342,7 +342,7 @@ class ArrayMediator(ABC):
         raise NotImplementedError
 
     @abstractmethod
-    def create_host(self, host_name, initiators, connectivity_type, io_group, partition_name=None):
+    def create_host(self, host_name, initiators, connectivity_type, io_group, partition_name=None, port_set=None):
         """
         This function should create a host in the storage system.
 

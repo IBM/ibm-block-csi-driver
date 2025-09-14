@@ -74,8 +74,7 @@ class CSIControllerServicer(csi_pb2_grpc.ControllerServicer):
                     logger.debug("requested size is 0 so the default size will be used : {0} ".format(
                         required_bytes))
 
-                is_virt_snap_func = volume_parameters.virt_snap_func or \
-                    (array_connection_info.partition_name is not None)
+                is_virt_snap_func = bool(volume_parameters.virt_snap_func or array_connection_info.partition_name)
 
                 if is_virt_snap_func and source_id:
                     source_object = array_mediator.get_object_by_id(source_id, source_type, is_virt_snap_func)
@@ -352,7 +351,7 @@ class CSIControllerServicer(csi_pb2_grpc.ControllerServicer):
             array_connection_info = utils.get_array_connection_info_from_secrets(secrets, system_id=system_id)
             snapshot_parameters = utils.get_snapshot_parameters(parameters=request.parameters,
                                                                 system_id=array_connection_info.system_id)
-            is_virt_snap_func = snapshot_parameters.virt_snap_func or (array_connection_info.partition_name is not None)
+            is_virt_snap_func = bool(snapshot_parameters.virt_snap_func or array_connection_info.partition_name)
             pool = snapshot_parameters.pool
             space_efficiency = snapshot_parameters.space_efficiency
             # Apparently this was never supposed to be a restriction - meanwhile enabling for partitions only for
