@@ -10,7 +10,7 @@ class DefineHostRequest:
     node_id_from_host_definition: str = ''
     node_id_from_csi_node: str = ''
     array_connection_info: ArrayConnectionInfo = ArrayConnectionInfo(array_addresses='', user='', password='',
-                                                                     partition_name='', partition_vg='')
+                                                                     partition_name='', partition_vg='', port_set='')
     io_group: str = ''
 
 

@@ -583,7 +583,7 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
         return self._generate_volume_response(api_object)
 
     @convert_scsi_ids_to_array_ids()
-    def create_snapshot(self, volume_id, snapshot_name, space_efficiency, pool, is_virt_snap_func):
+    def create_snapshot(self, volume_id, snapshot_name, space_efficiency, pool, is_virt_snap_func, partition_name=None):
         logger.info("creating snapshot '{0}' from volume '{1}'".format(snapshot_name, volume_id))
         source_api_volume = self._get_api_volume_by_id(volume_id)
         if source_api_volume is None:
@@ -607,7 +607,7 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
             raise ex
 
     @convert_scsi_ids_to_array_ids()
-    def delete_snapshot(self, snapshot_id, internal_snapshot_id):
+    def delete_snapshot(self, snapshot_id, internal_snapshot_id, partition_name=None):
         logger.info("deleting snapshot with id : {0}".format(snapshot_id))
         self._delete_object(snapshot_id, object_is_snapshot=True)
         logger.info("finished snapshot deletion. id : {0}".format(snapshot_id))
@@ -697,7 +697,7 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
     def demote_replication_volume(self, replication):
         raise NotImplementedError
 
-    def create_host(self, host_name, initiators, connectivity_type, io_group, partition_name=None):
+    def create_host(self, host_name, initiators, connectivity_type, io_group, partition_name=None, port_set=None):
         raise NotImplementedError
 
     def delete_host(self, host_name):

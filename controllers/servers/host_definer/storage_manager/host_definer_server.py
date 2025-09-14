@@ -155,7 +155,8 @@ class HostDefinerServicer:
         initiators = self._get_initiators_from_node_id(request.node_id_from_csi_node)
         connectivity_type = get_initiators_connectivity_type(initiators, request.connectivity_type_from_user)
         array_mediator.create_host(host, initiators, connectivity_type, request.io_group,
-                                   request.array_connection_info.partition_name)
+                                   request.array_connection_info.partition_name,
+                                   request.array_connection_info.port_set)
         array_mediator.add_ports_to_host(host, initiators, connectivity_type)
 
     def _is_port_update_needed_when_same_protocol(
