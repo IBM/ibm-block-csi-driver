@@ -8,7 +8,9 @@ from packaging.version import Version
 from pysvc import errors as svc_errors
 from pysvc.unified.client import connect
 from pysvc.unified.response import CLIFailureError, SVCResponse
+from pysvc.errors import BadHostFingerPrintException
 from retry import retry
+from paramiko import HostKeys
 
 from controllers.servers.host_definer import settings
 from controllers.common.config import config
@@ -312,7 +314,7 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
         logger.debug("in init")
         self._connect()
 
-    def _connect(self):
+    def _connect_with_fingerprint_update(self, allow_fingerprint_change):
         logger.debug("Connecting to SVC {0}".format(self.endpoint))
         try:
             self.client = connect(self.endpoint, username=self.user,
@@ -321,9 +323,57 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
                 raise array_errors.UnsupportedStorageVersionError(
                     self._code_level, self.MIN_SUPPORTED_VERSION
                 )
+        except BadHostFingerPrintException as e:
+            if not allow_fingerprint_change:
+                logger.error("Already tried finger prints update")
+                raise e
+            known_hosts_file = "%s/.xsf_known_hosts" % os.path.expanduser("~")
+            logger.error("Updating hosts file: {}".format(known_hosts_file))
+
+            original_ex = e.original_exception
+            hostname = original_ex.hostname
+            expected_key = getattr(original_ex, 'expected_key', None)
+            received_key = getattr(original_ex, 'key', None)
+            logger.error("Fingerprint mismatch for host: {}".format(hostname))
+            if expected_key:
+                logger.error("Expected key type: {}".format(expected_key.get_name()))
+                logger.error("Expected fingerprint: {}".format(expected_key.get_base64()))
+            if received_key:
+                logger.error("Received key type: {}".format(received_key.get_name()))
+                logger.error("Received fingerprint: {}".format(received_key.get_base64()))
+            logger.error("Updating known hosts file: {}".format(known_hosts_file))
+            try:
+                host_keys = HostKeys(known_hosts_file)
+            except IOError:
+                logger.error("{} not found".format(known_hosts_file))
+                raise e
+            # Remove old key if it exists
+            if expected_key:
+                key_type = expected_key.get_name()
+                hostname_keys = host_keys.get(hostname, {})
+                if key_type in hostname_keys:
+                    del host_keys[hostname][key_type]
+                    logger.error("Removed old {} key for {}".format(key_type, hostname))
+            # Add new key
+            if received_key:
+                host_keys.add(hostname, received_key.get_name(), received_key)
+                logger.error("Added new {} key for {}".format(received_key.get_name(), hostname))
+            # Save updated keys
+            try:
+                host_keys.save(known_hosts_file)
+                logger.error("Saved updated keys to {}".format(known_hosts_file))
+                return False
+            except IOError as save_err:
+                logger.error("Error saving {}: {}".format(known_hosts_file, save_err))
+                raise e
         except (svc_errors.IncorrectCredentials,
                 svc_errors.StorageArrayClientException):
             raise array_errors.CredentialsError(self.endpoint)
+        return True
+
+    def _connect(self):
+        if not self._connect_with_fingerprint_update(True):
+            self._connect_with_fingerprint_update(False)
 
     def disconnect(self):
         if self.client:
