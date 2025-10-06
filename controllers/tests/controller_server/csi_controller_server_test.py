@@ -179,7 +179,7 @@ class TestCreateSnapshot(BaseControllerSetUp, CommonControllerTest):
         self.assertEqual(grpc.StatusCode.OK, self.context.code)
         self.mediator.get_snapshot.assert_called_once_with(SNAPSHOT_VOLUME_UID, SNAPSHOT_NAME, expected_pool, False)
         self.mediator.create_snapshot.assert_called_once_with(SNAPSHOT_VOLUME_UID, SNAPSHOT_NAME,
-                                                              expected_space_efficiency, expected_pool, False)
+                                                              expected_space_efficiency, expected_pool, False, None)
         system_id_part = ':{}'.format(system_id) if system_id else ''
         snapshot_id = 'xiv{}:0;{}'.format(system_id_part, SNAPSHOT_VOLUME_UID)
         self.assertEqual(snapshot_id, response_snapshot.snapshot.snapshot_id)
@@ -288,7 +288,8 @@ class TestCreateSnapshot(BaseControllerSetUp, CommonControllerTest):
         self.assertEqual(self.context.code, return_code)
         self.assertIn(msg, self.context.details)
         self.mediator.get_snapshot.assert_called_once_with(SNAPSHOT_VOLUME_UID, SNAPSHOT_NAME, None, False)
-        self.mediator.create_snapshot.assert_called_once_with(SNAPSHOT_VOLUME_UID, SNAPSHOT_NAME, None, None, False)
+        self.mediator.create_snapshot.assert_called_once_with(SNAPSHOT_VOLUME_UID, SNAPSHOT_NAME, None, None, False,
+                                                              None)
 
     def test_create_snapshot_with_not_found_exception(self):
         self.create_snapshot_returns_error(return_code=grpc.StatusCode.NOT_FOUND,
@@ -332,7 +333,7 @@ class TestCreateSnapshot(BaseControllerSetUp, CommonControllerTest):
         self.assertEqual(self.context.code, grpc.StatusCode.OK)
         full_name = "{}_{}".format(NAME_PREFIX, VOLUME_NAME)
         self.mediator.create_snapshot.assert_called_once_with(SNAPSHOT_VOLUME_UID, full_name, None, None,
-                                                              False)
+                                                              False, None)
 
 
 class TestDeleteSnapshot(BaseControllerSetUp, CommonControllerTest):

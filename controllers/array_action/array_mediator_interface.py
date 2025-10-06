@@ -234,7 +234,7 @@ class ArrayMediator(ABC):
         raise NotImplementedError
 
     @abstractmethod
-    def create_snapshot(self, volume_id, snapshot_name, space_efficiency, pool, is_virt_snap_func):
+    def create_snapshot(self, volume_id, snapshot_name, space_efficiency, pool, is_virt_snap_func, partition_name=None):
         """
         This function should create a snapshot from volume in the storage system.
         Args:
@@ -255,7 +255,7 @@ class ArrayMediator(ABC):
         raise NotImplementedError
 
     @abstractmethod
-    def delete_snapshot(self, snapshot_id, internal_snapshot_id):
+    def delete_snapshot(self, snapshot_id, internal_snapshot_id, partition_name=None):
         """
         This function should delete a snapshot in the storage system.
         Args:
