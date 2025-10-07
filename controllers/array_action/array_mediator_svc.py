@@ -233,6 +233,7 @@ def build_register_plugin_kwargs(unique_key, metadata, version):
 
 
 def _get_cli_volume_space_efficiency_aliases(cli_volume):
+    logger.info("cli_volume {}".format(str(cli_volume)))
     space_efficiency_aliases = {common_settings.SPACE_EFFICIENCY_THICK, ''}
     if cli_volume.se_copy == YES:
         space_efficiency_aliases = {common_settings.SPACE_EFFICIENCY_THIN}
@@ -671,10 +672,6 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
         filter_value = 'vdisk_UID=' + vdisk_uid
         return self._lsvdisk_single_element(filtervalue=filter_value)
 
-    def _lsvdisk_by_id(self, vdisk_id):
-        filter_value = 'id=' + vdisk_id
-        return self._lsvdisk_single_element(filtervalue=filter_value)
-
     def _get_cli_volume_by_wwn(self, volume_id, not_exist_err=False):
         cli_volume = self._lsvdisk_by_uid(volume_id)
         if not cli_volume:
@@ -808,13 +805,13 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
         finally:
             logger.info("Remove temp snapshot")
             self.client.svctask.rmsnapshot(snapshotid=cli_snapshot.snapshot_id)
-            logger.info("creating volume from snapshot - success")
+        logger.info("creating volume from snapshot - success")
 
     def _partition_create_cli_volume_from_volume(self, name, pool, io_group, volume_group, source_id, space_efficiency,
                                                  partition_name):
         # VG snapshot is more compatible than vol snapshot for certain partition types
         logger.info("creating volume from volume - partition")
-        cli_volume = self._lsvdisk_by_id(source_id)
+        cli_volume = self._get_cli_volume_by_wwn(source_id)
         if cli_volume is None:
             raise array_errors.ObjectNotFoundError(source_id)
         self._partition_create_cli_volume_from_cli_vol(name, pool, io_group, volume_group, cli_volume,
@@ -844,7 +841,7 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
         if self._verify_volume_group_of_partition_name(partition_name, volume_group) is False:
             raise array_errors.InvalidArgumentError("volume group not part of partition")
         if source_ids:
-            self._partition_create_cli_volume_from_volume(name, pool, io_group, volume_group, source_ids.internal_id,
+            self._partition_create_cli_volume_from_volume(name, pool, io_group, volume_group, source_ids.uid,
                                                           space_efficiency, partition_name)
         else:
             self._create_cli_volume(name, size_in_bytes, space_efficiency, pool, io_group, volume_group)
