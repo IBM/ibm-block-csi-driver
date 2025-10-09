@@ -412,7 +412,9 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
         pool = self._get_volume_pool(cli_volume)
         source_id = None
         partition_name = self._get_partition_name_of_cli_volume(cli_volume)
-        if partition_name is None and not is_virt_snap_func:
+        if partition_name:
+            source_id = self._get_wwn_by_volume_name_if_exists(cli_volume.source_volume_name)
+        elif not is_virt_snap_func:
             source_id = self._get_source_volume_wwn_if_exists(cli_volume)
         space_efficiency = _get_cli_volume_space_efficiency_aliases(cli_volume)
         return Volume(
@@ -454,9 +456,15 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
         )
 
     def _generate_snapshot_response_with_verification(self, cli_object):
+        # Convert cli_volume from concise to full view
+        cli_vol = self._get_cli_volume(cli_object.name)
+        if cli_vol is None:
+            raise array_errors.ObjectNotFoundError(cli_object.id)
+        cli_object = cli_vol
         partition_name = self._get_partition_name_of_cli_volume(cli_object)
-        if partition_name is not None:
-            return self._generate_snapshot_response_from_cli_volume(cli_object, 0, partition_name)
+        if partition_name:
+            source_id = self._get_wwn_by_volume_name_if_exists(cli_object.source_volume_name)
+            return self._generate_snapshot_response_from_cli_volume(cli_object, source_id, partition_name)
         if not cli_object.FC_id:
             logger.error("FlashCopy Mapping not found for target volume: {}".format(cli_object.name))
             raise array_errors.ExpectedSnapshotButFoundVolumeError(cli_object.name, self.endpoint)
@@ -814,6 +822,10 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
         cli_volume = self._get_cli_volume_by_wwn(source_id)
         if cli_volume is None:
             raise array_errors.ObjectNotFoundError(source_id)
+        # Convert cli_volume from concise to full view
+        cli_volume = self._get_cli_volume(cli_volume.name)
+        if cli_volume is None:
+            raise array_errors.ObjectNotFoundError(source_id)
         self._partition_create_cli_volume_from_cli_vol(name, pool, io_group, volume_group, cli_volume,
                                                        space_efficiency, partition_name)
 
@@ -924,6 +936,7 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
             return None
         if object_type is controller_settings.SNAPSHOT_TYPE_NAME:
             return self._generate_snapshot_response_with_verification(cli_volume)
+        # Convert cli_volume from concise to full view
         cli_volume = self._get_cli_volume(cli_volume.name)
         return self._generate_volume_response(cli_volume, is_virt_snap_func)
 

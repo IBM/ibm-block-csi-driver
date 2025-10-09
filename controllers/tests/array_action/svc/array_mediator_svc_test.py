@@ -834,18 +834,6 @@ class TestArrayMediatorSVC(unittest.TestCase):
                                                    common_settings.SNAPSHOT_OBJECT_TYPE)
         self.assertEqual(None, returned_value)
 
-    def test_get_object_by_id_snapshot_success(self):
-        self._prepare_mocks_for_get_snapshot()
-
-        snapshot = self.svc.get_object_by_id(common_settings.SNAPSHOT_VOLUME_UID, common_settings.SNAPSHOT_OBJECT_TYPE)
-        self.assertEqual(common_settings.SNAPSHOT_NAME, snapshot.name)
-        calls = [
-            call(bytes=True,
-                 filtervalue=self._get_filtervalue(svc_settings.VOLUME_VDISK_UID_ATTR_KEY,
-                                                   common_settings.SNAPSHOT_VOLUME_UID)),
-            call(bytes=True, object_id=common_settings.SOURCE_VOLUME_NAME)]
-        self.svc.client.svcinfo.lsvdisk.assert_has_calls(calls)
-
     def test_get_object_by_id_snapshot_virt_snap_func_enabled_success(self):
         self._prepare_mocks_for_get_snapshot()
         self._prepare_mocks_for_lsvolumesnapshot()

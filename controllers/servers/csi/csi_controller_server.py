@@ -78,6 +78,8 @@ class CSIControllerServicer(csi_pb2_grpc.ControllerServicer):
                 no_flash_copy = bool(volume_parameters.virt_snap_func or array_connection_info.partition_name)
 
                 if no_flash_copy and source_id:
+                    # Partitions - check that the source is in the partition
+                    # virt_snap_func - check the validity of the source snapshot
                     source_object = array_mediator.get_object_by_id(source_id, source_type, use_snap_object)
                     if not source_object:
                         return handle_exception("source {}: {} not found".format(source_type, source_id), context,
@@ -95,7 +97,7 @@ class CSIControllerServicer(csi_pb2_grpc.ControllerServicer):
                     if source_volume:
                         # Apparently this was never supposed to be a restriction - enabling for partitions only for
                         # backward compatibility, need to revisit
-                        if array_connection_info.partition_name is None:
+                        if not array_connection_info.partition_name:
                             utils.validate_parameters_match_source_volume(space_efficiency, required_bytes,
                                                                           source_volume)
                         array_mediator.verify_volume_partition(source_volume, array_connection_info.partition_name)
@@ -126,7 +128,7 @@ class CSIControllerServicer(csi_pb2_grpc.ControllerServicer):
                         return build_error_response(message, context, grpc.StatusCode.ALREADY_EXISTS,
                                                     csi_pb2.CreateVolumeResponse)
 
-                    if not no_flash_copy:
+                    if not use_snap_object:
                         response = self._get_create_volume_response_for_existing_volume_source(volume,
                                                                                                source_id,
                                                                                                source_type, system_id,
@@ -357,7 +359,7 @@ class CSIControllerServicer(csi_pb2_grpc.ControllerServicer):
             space_efficiency = snapshot_parameters.space_efficiency
             # Apparently this was never supposed to be a restriction - meanwhile enabling for partitions only for
             # backward compatibility, need to revisit
-            if snapshot_parameters.virt_snap_func and (array_connection_info.partition_name is None) \
+            if snapshot_parameters.virt_snap_func and not array_connection_info.partition_name \
                     and space_efficiency:
                 raise array_errors.SpaceEfficiencyNotSupported(space_efficiency)
             with get_agent(array_connection_info, array_type).get_mediator() as array_mediator:
@@ -370,8 +372,7 @@ class CSIControllerServicer(csi_pb2_grpc.ControllerServicer):
 
                 if snapshot:
                     array_mediator.verify_volume_partition(snapshot, array_connection_info.partition_name)
-                    # In partitions - there's no source id information
-                    if not array_connection_info.partition_name and snapshot.source_id != volume_id:
+                    if snapshot.source_id != volume_id:
                         message = messages.SNAPSHOT_WRONG_VOLUME_ERROR_MESSAGE.format(snapshot_final_name,
                                                                                       snapshot.source_id,
                                                                                       volume_id)
