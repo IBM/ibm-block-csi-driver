@@ -58,6 +58,10 @@ class ArrayMediatorAbstract(ArrayMediator, ABC):
         connectivity_type = utils.choose_connectivity_type(connectivity_types)
         array_initiators = self._get_array_initiators(host_name, connectivity_type)
 
+        if not array_initiators:
+            logger.debug("EMPTY ARRAY LIST")
+            raise array_errors.NoIscsiTargetsFoundError(self.endpoint)
+
         try:
             lun = self.map_volume(vol_id, host_name, connectivity_type)
             logger.debug("lun : {}".format(lun))

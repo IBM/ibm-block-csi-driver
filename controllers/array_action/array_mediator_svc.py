@@ -1526,6 +1526,7 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
         fc_port_wwns = []
         fc_wwns = self._lsfabric(host=host_name)
         for wwn in fc_wwns:
+            logger.debug("fc wwn : {}".format(str(wwn)))
             state = wwn.get('state', '')
             if state in ('active', 'inactive'):
                 fc_port_wwns.append(wwn.get('local_wwpn', ''))
