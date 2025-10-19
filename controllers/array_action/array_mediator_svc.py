@@ -2068,6 +2068,7 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
     def _mkhost(self, host_name, connectivity_type, port, io_group, partition_name, port_set):
         cli_kwargs = build_create_host_kwargs(host_name, connectivity_type, port, io_group, partition_name, port_set)
         try:
+            logger.warning("args are {}".format(str(cli_kwargs)))
             self.client.svctask.mkhost(**cli_kwargs)
             return 200
         except (svc_errors.CommandExecutionError, CLIFailureError) as ex:
