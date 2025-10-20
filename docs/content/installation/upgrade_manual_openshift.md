@@ -8,7 +8,7 @@ When using the Red Hat® OpenShift® Container Platform, the CSI (Container Stor
 
 3. Install the IBM block storage CSI driver operator and driver.
 
-4. Verify that both the **Controller Image Tab** and **Node Image Tag** are showing the most up-to-date version of the driver and the **Status** is _Running_.
+4. Verify that both the **Controller Image Tag** and **Node Image Tag** are showing the most up-to-date version of the driver and the **Status** is _Running_.
 
 13. (Optional for initial host definer installation) If desired, create the host definer (`HostDefiner`).
 
