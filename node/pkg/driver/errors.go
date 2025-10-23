@@ -57,5 +57,5 @@ type VolumeNoResources struct {
 }
 
 func (e *VolumeNoResources) Error() string {
-	return fmt.Sprintf("Volume %s cannot be processed due to lack of resources. Request cannot be completed.", e.volId)
+	return fmt.Sprintf("Volume %s cannot be processed. Probably volumes locking issue (max invocations reached). Request cannot be completed.", e.volId)
 }
