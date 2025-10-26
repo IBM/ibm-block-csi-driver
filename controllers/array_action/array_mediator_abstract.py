@@ -58,7 +58,7 @@ class ArrayMediatorAbstract(ArrayMediator, ABC):
         connectivity_type = utils.choose_connectivity_type(connectivity_types)
         array_initiators = self._get_array_initiators(host_name, connectivity_type)
 
-        if not array_initiators:
+        if NVME_OVER_FC_CONNECTIVITY_TYPE != connectivity_type and not array_initiators:
             logger.warning("No stroage ports reachable - fail mapping")
             raise array_errors.NoIscsiTargetsFoundError(self.endpoint)
 
