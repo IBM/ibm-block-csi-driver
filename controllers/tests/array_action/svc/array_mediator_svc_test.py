@@ -2035,7 +2035,7 @@ class TestArrayMediatorSVC(unittest.TestCase):
 
     def _test_expand_volume_expandvdisksize_errors(self, client_error, expected_error):
         self._prepare_mocks_for_expand_volume()
-        self._test_mediator_method_client_error(self.svc.expand_volume, (common_settings.VOLUME_UID, 2),
+        self._test_mediator_method_client_error(self.svc.expand_volume, (common_settings.VOLUME_UID, 2, None),
                                                 self.svc.client.svctask.expandvdisksize, client_error, expected_error)
 
     def test_expand_volume_expandvdisksize_errors(self):
@@ -2049,7 +2049,8 @@ class TestArrayMediatorSVC(unittest.TestCase):
 
     def _expand_volume_lsvdisk_errors(self, client_error, expected_error, volume_id=common_settings.VOLUME_UID):
         self._test_mediator_method_client_error(self.svc.expand_volume, (volume_id,
-                                                                         array_settings.DUMMY_CAPACITY_INT),
+                                                                         array_settings.DUMMY_CAPACITY_INT,
+                                                                         None),
                                                 self.svc.client.svcinfo.lsvdisk, client_error, expected_error)
 
     def test_expand_volume_lsvdisk_errors(self):

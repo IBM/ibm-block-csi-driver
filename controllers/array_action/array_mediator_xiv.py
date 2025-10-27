@@ -187,7 +187,7 @@ class XIVArrayMediator(ArrayMediatorAbstract):
                 raise array_errors.NotEnoughSpaceInPool(cli_volume.pool_name)
             raise ex
 
-    def expand_volume(self, volume_id, required_bytes):
+    def expand_volume(self, volume_id, required_bytes, partition_name=None):
         logger.info("Expanding volume with id : {0} to {1} bytes".format(volume_id, required_bytes))
         cli_volume = self._get_cli_object_by_wwn(volume_id=volume_id, not_exist_err=True)
 

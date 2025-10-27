@@ -1308,7 +1308,8 @@ class TestExpandVolume(BaseControllerSetUp, CommonControllerTest):
         self.assertTrue(response.node_expansion_required)
         self.assertEqual(response.capacity_bytes, self.volume_after_expand.capacity_bytes)
         self.mediator.expand_volume.assert_called_once_with(volume_id=self.volume_id,
-                                                            required_bytes=self.capacity_bytes)
+                                                            required_bytes=self.capacity_bytes,
+                                                            partition_name=None)
 
     def test_expand_volume_with_bad_id(self):
         self._prepare_expand_volume_mocks()
@@ -1350,7 +1351,8 @@ class TestExpandVolume(BaseControllerSetUp, CommonControllerTest):
         self.assertEqual(self.context.code, return_code)
         self.assertIn(msg, self.context.details)
         self.mediator.expand_volume.assert_called_once_with(volume_id=self.volume_id,
-                                                            required_bytes=self.capacity_bytes)
+                                                            required_bytes=self.capacity_bytes,
+                                                            partition_name=None)
 
     def test_expand_volume_with_illegal_object_id_exception(self):
         self._expand_volume_returns_error(return_code=grpc.StatusCode.INVALID_ARGUMENT,

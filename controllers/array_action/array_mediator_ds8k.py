@@ -372,7 +372,7 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
         raise array_errors.ObjectNotFoundError(name)
 
     @convert_scsi_ids_to_array_ids()
-    def expand_volume(self, volume_id, required_bytes):
+    def expand_volume(self, volume_id, required_bytes, partition_name=None):
         logger.info("expanding volume with id : {0} to {1} bytes".format(volume_id, required_bytes))
         api_volume = self._get_api_volume_by_id(volume_id)
         flashcopies = api_volume.flashcopy

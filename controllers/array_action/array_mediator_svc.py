@@ -571,18 +571,40 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
                     raise array_errors.NotEnoughSpaceInPool(id_or_name=cli_volume.mdisk_grp_name)
                 raise ex
 
-    def expand_volume(self, volume_id, required_bytes):
+    def _change_volume_size(self, cli_volume, size_in_bytes):
+        volume_name = cli_volume.name
+        try:
+            self.client.svctask.chvolume(size=size_in_bytes, unit='b', vdisk_id=cli_volume.id)
+        except (svc_errors.CommandExecutionError, CLIFailureError) as ex:
+            if is_warning_message(ex.my_message):
+                logger.warning("exception encountered during volume expansion of {}: {}".format(volume_name,
+                                                                                                ex.my_message))
+            else:
+                logger.error("Failed to expand volume {}".format(volume_name))
+                if OBJ_NOT_FOUND in ex.my_message or VOL_NOT_FOUND in ex.my_message:
+                    raise array_errors.ObjectNotFoundError(volume_name)
+                if NOT_ENOUGH_EXTENTS_IN_POOL_EXPAND in ex.my_message:
+                    raise array_errors.NotEnoughSpaceInPool(id_or_name=cli_volume.mdisk_grp_name)
+                raise ex
+
+    def expand_volume(self, volume_id, required_bytes, partition_name=None):
         logger.info("Expanding volume with id : {0} to {1} bytes".format(volume_id, required_bytes))
         cli_volume = self._get_cli_volume_by_wwn(volume_id, not_exist_err=True)
         volume_name = cli_volume.name
-        fcmaps = self._get_object_fcmaps(volume_name)
-        self._safe_delete_fcmaps(volume_name, fcmaps)
-        is_hyperswap = any(self._is_in_remote_copy_relationship(fcmap) for fcmap in fcmaps)
-
         current_size = int(cli_volume.capacity)
         final_size = self._convert_size_bytes(required_bytes)
-        increase_in_bytes = final_size - current_size
-        self._expand_cli_volume(cli_volume, increase_in_bytes, is_hyperswap)
+        if final_size < current_size:
+            raise array_errors.InvalidArgumentError("New volume size smaller than current")
+        if partition_name:
+            self._change_volume_size(cli_volume, final_size)
+        else:
+            fcmaps = self._get_object_fcmaps(volume_name)
+            self._safe_delete_fcmaps(volume_name, fcmaps)
+            is_hyperswap = any(self._is_in_remote_copy_relationship(fcmap) for fcmap in fcmaps)
+
+            increase_in_bytes = final_size - current_size
+            self._expand_cli_volume(cli_volume, increase_in_bytes, is_hyperswap)
+
         logger.info(
             "Finished volume expansion. id : {0}. volume increased by {1} bytes".format(volume_id, increase_in_bytes))
 

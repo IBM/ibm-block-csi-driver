@@ -479,7 +479,8 @@ class CSIControllerServicer(csi_pb2_grpc.ControllerServicer):
                 logger.debug("expanding volume {0}".format(volume_id))
                 array_mediator.expand_volume(
                     volume_id=volume_id,
-                    required_bytes=required_bytes)
+                    required_bytes=required_bytes,
+                    partition_name=array_connection_info.partition_name)
 
                 volume_after_expand = array_mediator.get_object_by_id(volume_id, servers_settings.VOLUME_TYPE_NAME)
                 if not volume_after_expand:

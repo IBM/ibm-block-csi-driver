@@ -121,7 +121,7 @@ class ArrayMediator(ABC):
         raise NotImplementedError
 
     @abstractmethod
-    def expand_volume(self, volume_id, required_bytes):
+    def expand_volume(self, volume_id, required_bytes, partition_name=None):
         """
         Expand the volume size on storage.
         Args:
