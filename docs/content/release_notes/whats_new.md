@@ -3,6 +3,7 @@
 IBM® block storage CSI driver 1.13.0 adds support for:
 
 - IBM Storage Virtualize® partitions, including high availability partitions (PBHA)
+- IBM Storage Virtualize® - option to define secret-specific port set
 
 **General availability date:** TBD
 
