@@ -26,6 +26,8 @@ Use one of the following procedures to create and apply the secret:
     stringData:
       management_address: demo-management-address  # Array management addresses
       username: demo-username                      # Array username
+      port_set: PortSet                            # (Optional) Per-secret port set, for new ports only
+                                                   # Overrides global port-set config
     data:
       password: ZGVtby1wYXNzd29yZA==               # base64 array password
      ```

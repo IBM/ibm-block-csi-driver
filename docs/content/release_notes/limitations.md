@@ -28,7 +28,7 @@ Some storage system types do not support High availability (HA).{: attention}
 ## IBM Storage Virtualize® partitions and high availability partitions (PBHA) limitations
 
 - High Availability requires configuration of single management IP (supported since IBM Storage Virtualize® 9.1.0.1)
-- Volume Groups aren't supported (IBM Storage Virtualize® limitation and lack of CSI support)
+- Snapshots aren't supported yet in HA (IBM Storage Virtualize® 9.1.0.1)
 - Some features aren't supported for partitions, please refer to the docuemntation for details. For example - as of time of this release (1.13.0) IO groups are not supported and shouldn't be used.
 
 ## HyperSwap volume limitations
@@ -60,7 +60,6 @@ For other policy-based replication limitations with your storage system, see the
 ## Snapshot function limitations
 
 - Snapshot function is only supported for use with IBM Storage Virtualize® family storage system versions 8.5.1 or higher. For more information, see **Product overview** > **Technical overview** > **Volume groups** > **Snapshot function** within your IBM Storage Virtualize product documentation on [IBM Documentation](https://www.ibm.com/docs).
-- In Partitions environments - the snapshot function is always used, the `virt_snap_func` is ignored and assumed to be true.
 - In very rare cases, due to a race condition, a different snapshot than intended may be mistakenly deleted during a snapshot deletion. This occurs as no snapshot unique ID (UID) is present on the storage side.
 - Both source and target PVCs (in a source PVC to snapshot to target PVC scenario) must have the same space efficiency set within their storage classes. If the space efficiency is set differently, the target PVC creation fails.
 - A PVC target must have the same volume size as the source volume.
@@ -100,8 +99,6 @@ These limitations are not relevant when using the Snapshot the function. For mor
 
 Volume group configuration is only supported for use with IBM Storage Virtualize® family storage systems.
 
-Volume groups aren't supported in IBM Storage Virtualize® partitions.
-
 The following limitations apply when using volume groups:
 
 - PersistentVolumeClaims (PVCs) can only be defined inside volume groups in the following ways:
@@ -128,4 +125,8 @@ The following limitations apply when using volume snapshots with the IBM block s
 - When using the CSI driver with IBM DS8000® family storage systems, a snapshot is limited to creating 11 volumes.
 
 These limitations are not relevant when using the Snapshot function. For more information, see [Snapshot function limitations](#snapshot-function-limitations). {: note}
+
+# Port set limitations
+
+- Changing the port set of existing hosts isn't supported and will be ignored, the setting is only used in creation of new hosts.
 
