@@ -595,6 +595,7 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
         final_size = self._convert_size_bytes(required_bytes)
         if final_size < current_size:
             raise array_errors.InvalidArgumentError("New volume size smaller than current")
+        increase_in_bytes = final_size - current_size
         if partition_name:
             self._change_volume_size(cli_volume, final_size)
         else:
@@ -602,7 +603,6 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
             self._safe_delete_fcmaps(volume_name, fcmaps)
             is_hyperswap = any(self._is_in_remote_copy_relationship(fcmap) for fcmap in fcmaps)
 
-            increase_in_bytes = final_size - current_size
             self._expand_cli_volume(cli_volume, increase_in_bytes, is_hyperswap)
 
         logger.info(
