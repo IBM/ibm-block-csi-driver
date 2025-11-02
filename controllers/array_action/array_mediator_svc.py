@@ -788,7 +788,7 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
         logger.info("creating volume from snapshot - success")
 
     def _partition_create_cli_volume_from_volume(self, name, pool, io_group, volume_group, source_id, space_efficiency,
-                                                 partition_name):
+                                                 size_in_bytes, partition_name):
         # VG snapshot is more compatible than vol snapshot for certain partition types
         logger.info("creating volume from volume - partition")
         cli_volume = self._get_cli_volume_by_wwn(source_id)
@@ -798,6 +798,11 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
         cli_volume = self._get_cli_volume(cli_volume.name)
         if cli_volume is None:
             raise array_errors.ObjectNotFoundError(source_id)
+        if self._convert_size_bytes(size_in_bytes) != int(cli_volume.capacity):
+            raise array_errors.InvalidArgumentError(
+                "clone not created because the source and target volumes are different sizes {} {}".format(
+                    size_in_bytes, cli_volume.capacity)
+            )
         self._partition_create_cli_volume_from_cli_vol(name, pool, io_group, volume_group, cli_volume,
                                                        space_efficiency, partition_name)
 
@@ -826,7 +831,7 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
             raise array_errors.InvalidArgumentError("volume group not part of partition")
         if source_ids:
             self._partition_create_cli_volume_from_volume(name, pool, io_group, volume_group, source_ids.uid,
-                                                          space_efficiency, partition_name)
+                                                          space_efficiency, size_in_bytes, partition_name)
         else:
             self._create_cli_volume(name, size_in_bytes, space_efficiency, pool, io_group, volume_group)
         cli_volume = self._get_cli_volume(name)
