@@ -1656,7 +1656,7 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
     def _get_replication_mode(self, volume_group_id):
         volume_group_replication = self._lsvolumegroupreplication(volume_group_id)
         if not volume_group_replication:
-            logger.warning"vg replication is None")
+            logger.warning("vg replication is None")
             return None
         logger.warning("vg rp {}".format(str(volume_group_replication)))
         if hasattr(volume_group_replication, local_partition_location):
