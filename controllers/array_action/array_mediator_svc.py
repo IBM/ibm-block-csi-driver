@@ -1662,8 +1662,8 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
         if hasattr(volume_group_replication, local_partition_location):
             local_partition_location = volume_group_replication.local_partition_location
             logger.warning("have partition location {}".format(local_partition_location))
-            location_attr_name = f"{locat_partition_location}_partition_replication_mode"
-            logger.warning("attrib is {}",format(location_attr_name))
+            location_attr_name = f"{local_partition_location}_partition_replication_mode"
+            logger.warning("attrib is {}".format(location_attr_name))
         else:
             replication_local_location = volume_group_replication.local_location
             location_attr_name = f"location{replication_local_location}_replication_mode"
