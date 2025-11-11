@@ -1659,7 +1659,8 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
             logger.warning("vg replication is None")
             return None
         logger.warning("vg rp {}".format(str(volume_group_replication)))
-        if hasattr(volume_group_replication, local_partition_location):
+        if hasattr(volume_group_replication, "local_partition_location") \
+                and volume_group_replication.local_partition_location:
             local_partition_location = volume_group_replication.local_partition_location
             logger.warning("have partition location {}".format(local_partition_location))
             location_attr_name = f"{local_partition_location}_partition_replication_mode"

@@ -197,7 +197,9 @@ class TestArrayMediatorSVC(unittest.TestCase):
     def test_get_ear_replication_success(self):
         _, replication_request = self._prepare_mocks_for_ear_replication()
         replication_request.replication_policy = None
-        self.svc.client.svcinfo.lsvolumegroupreplication.side_effect = [Mock(as_single_element=None), Mock()]
+        self.svc.client.svcinfo.lsvolumegroupreplication.side_effect = [Mock(as_single_element=None,
+                                                                             local_partition_location=None),
+                                                                        Mock(local_partition_location=None)]
 
         replication = self.svc.get_replication(replication_request)
 
@@ -218,7 +220,8 @@ class TestArrayMediatorSVC(unittest.TestCase):
     def test_get_ear_replication_illegal_mode_failure(self):
         _, replication_request = self._prepare_mocks_for_ear_replication()
 
-        self.svc.client.svcinfo.lsvolumegroupreplication.return_value = Mock(as_single_element=None)
+        self.svc.client.svcinfo.lsvolumegroupreplication.return_value = Mock(as_single_element=None,
+                                                                             local_partition_location=None)
 
         replication = self.svc.get_replication(replication_request)
         self.assertEqual(replication, None)
@@ -227,7 +230,8 @@ class TestArrayMediatorSVC(unittest.TestCase):
     def test_create_ear_replication_success(self):
         _, replication_request = self._prepare_mocks_for_ear_replication()
 
-        self.svc.client.svcinfo.lsvolumegroupreplication.return_value = Mock(as_single_element=None)
+        self.svc.client.svcinfo.lsvolumegroupreplication.return_value = Mock(as_single_element=None,
+                                                                             local_partition_location=None)
 
         self.svc.create_replication(replication_request)
         self.svc.client.svctask.chvolumegroup.assert_called_with(object_id=OBJECT_INTERNAL_ID,
