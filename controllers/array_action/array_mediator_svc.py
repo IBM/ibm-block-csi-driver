@@ -1618,8 +1618,10 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
     def get_replication(self, replication_request):
         replication = None
         if replication_request.replication_type == array_settings.REPLICATION_TYPE_MIRROR:
+            logger.warning("get mirrorign replication")
             replication = self._get_replication(replication_request)
         elif replication_request.replication_type == array_settings.REPLICATION_TYPE_EAR:
+            logger.warning("get ear replication")
             replication = self._get_ear_replication(replication_request)
         return replication
 
@@ -1639,9 +1641,11 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
 
         volume_group_id = replication_request.volume_internal_id
         replication_policy = self._get_replication_policy(volume_group_id)
+        logger.warning("rp {} {}".format(replication_policy, replication_request.replication_policy))
         if replication_policy != replication_request.replication_policy:
             return None
         replication_mode = self._get_replication_mode(volume_group_id)
+        logger.warning("rm {}".format(replication_mode))
         if not replication_mode:
             return None
         logger.info("found ear replication: {} in mode: {}".format(volume_group_id,
@@ -1652,9 +1656,17 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
     def _get_replication_mode(self, volume_group_id):
         volume_group_replication = self._lsvolumegroupreplication(volume_group_id)
         if not volume_group_replication:
+            logger.warning"vg replication is None")
             return None
-        replication_local_location = volume_group_replication.local_location
-        location_attr_name = f"location{replication_local_location}_replication_mode"
+        logger.warning("vg rp {}".format(str(volume_group_replication)))
+        if hasattr(volume_group_replication, local_partition_location):
+            local_partition_location = volume_group_replication.local_partition_location
+            logger.warning("have partition location {}".format(local_partition_location))
+            location_attr_name = f"{locat_partition_location}_partition_replication_mode"
+            logger.warning("attrib is {}",format(location_attr_name))
+        else:
+            replication_local_location = volume_group_replication.local_location
+            location_attr_name = f"location{replication_local_location}_replication_mode"
 
         return getattr(volume_group_replication, location_attr_name, None)
 
@@ -1984,8 +1996,10 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
     def _change_volume_group_policy(self, id_or_name, replication_policy=None):
         cli_kwargs = {}
         if replication_policy:
+            logger.warning("change rp {}".format(replication_policy))
             cli_kwargs['replicationpolicy'] = replication_policy
         else:
+            logger.warning("no rp")
             cli_kwargs['noreplicationpolicy'] = True
         self._chvolumegroup(id_or_name, **cli_kwargs)
 
