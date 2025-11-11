@@ -1653,8 +1653,13 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
         volume_group_replication = self._lsvolumegroupreplication(volume_group_id)
         if not volume_group_replication:
             return None
-        replication_local_location = volume_group_replication.local_location
-        location_attr_name = f"location{replication_local_location}_replication_mode"
+        if hasattr(volume_group_replication, "local_partition_location") \
+                and volume_group_replication.local_partition_location:
+            local_partition_location = volume_group_replication.local_partition_location
+            location_attr_name = f"{local_partition_location}_partition_replication_mode"
+        else:
+            replication_local_location = volume_group_replication.local_location
+            location_attr_name = f"location{replication_local_location}_replication_mode"
 
         return getattr(volume_group_replication, location_attr_name, None)
 
