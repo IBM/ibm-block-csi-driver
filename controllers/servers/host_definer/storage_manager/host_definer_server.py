@@ -80,7 +80,7 @@ class HostDefinerServicer:
         logger.debug(messages.HOST_FOUND.format(found_host_name))
         return found_host_name
 
-    def _recreate_host(self, host_name, request array_mediator)
+    def _recreate_host(self, host_name, request array_mediator):
         array_mediator.delete_host(host_name)
         raise array_errors.HostNotFoundError(host_name)
 
