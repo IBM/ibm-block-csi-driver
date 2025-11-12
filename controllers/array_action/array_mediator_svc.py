@@ -2069,6 +2069,19 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
     @register_csi_plugin()
     def create_host(self, host_name, initiators, connectivity_type, io_group, partition_name=None, port_set=None):
         ports = get_connectivity_type_ports(initiators, connectivity_type)
+        if partition_name:
+            good_ports = []
+            for port in ports:
+                status_code = self._mkhost(host_name, connectivity_type, port, io_group, partition_name, port_set)
+                if status_code == 200:
+                    logger.info("Partition host {} port {} is verified".format(host_name, port))
+                    good_ports.append(port)
+                    self._rmhost(host_name)
+                else:
+                    logger.info("Partition host {} port {} is not verified".format(host_name, port))
+            if not good_ports:
+                raise array_errors.NoPortIsValid(host_name)
+            ports = [",".join(good_ports)]
         for port in ports:
             status_code = self._mkhost(host_name, connectivity_type, port, io_group, partition_name, port_set)
             if status_code == 200:
