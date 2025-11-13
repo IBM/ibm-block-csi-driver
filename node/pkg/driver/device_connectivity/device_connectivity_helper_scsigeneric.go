@@ -256,8 +256,7 @@ func (r OsDeviceConnectivityHelperScsiGeneric) RescanDevices(lunId int, arrayIde
 	updated, err := updateHostIDs(hostIDs)
 	if err != nil {
 		hostIDs = updated
-	}
-	else {
+	} else {
 		logger.Warningf("Rescan : Could not detect additional host devices: {%v}", err)
 	}
 	
