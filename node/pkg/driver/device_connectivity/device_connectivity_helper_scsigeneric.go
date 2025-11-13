@@ -195,8 +195,7 @@ func updateHostIDs(known map[int]bool) (map[int]bool, error) {
 		return nil, err
 	}
 	if len(active) == 0 {
-		fmt.Println("No active iSCSI sessions.")
-		return updated, nil
+		return updated, "No active iSCSI sessions."
 	}
 
 	// 2. Build sourceIQN → list of known host numbers
@@ -221,7 +220,7 @@ func updateHostIDs(known map[int]bool) (map[int]bool, error) {
 		if knownHosts, found := iqnToKnown[s.sourceIQN]; found && len(knownHosts) > 0 {
 			updated[s.num] = true
 			iqnToKnown[s.sourceIQN] = append(iqnToKnown[s.sourceIQN], s.num)
-			fmt.Printf("Added host%d (source IQN: %s) – matches known hosts: %v\n",
+			logger.Debugf("Added host%d (source IQN: %s) – matches known hosts: %v\n",
 				s.num, s.sourceIQN, knownHosts)
 		}
 	}
@@ -253,6 +252,15 @@ func (r OsDeviceConnectivityHelperScsiGeneric) RescanDevices(lunId int, arrayIde
 		err := errors.New(strings.Join(errStrings, ","))
 		return err
 	}
+	
+	updated, err := updateHostIDs(hostIDs)
+	if err != nil {
+		hostIDs = updated
+	}
+	else {
+		logger.Warningf("Rescan : Could not detect additional host devices: {%v}", err)
+	}
+	
 	for hostNumber := range hostIDs {
 
 		filename := fmt.Sprintf("/sys/class/scsi_host/host%d/scan", hostNumber)
