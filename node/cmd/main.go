@@ -20,6 +20,7 @@ import (
 	"flag"
 	"fmt"
 	"os"
+	"runtime/debug"
 
 	"github.com/ibm/ibm-block-csi-driver/node/logger"
 	"github.com/ibm/ibm-block-csi-driver/node/pkg/driver"
@@ -44,6 +45,9 @@ func main() {
 		max_invocations   = flag.Int("max-invocations", 1000, "Max number of external processes allowed to run concurrently")
 		clean_scsi_device = flag.String("clean-scsi-device", "true", "Should clean ghost scsi device upon nodeStage")
 	)
+
+	// Set a hard limit on the total OS threads this process can ever create.
+	debug.SetMaxThreads(2000)
 
 	flag.Parse()
 
