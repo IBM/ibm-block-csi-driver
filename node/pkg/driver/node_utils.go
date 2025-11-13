@@ -354,7 +354,7 @@ func (n NodeUtils) IsDirectory(path string) bool {
 
 // Deletes file or directory with all sub-directories and files
 func (n NodeUtils) RemoveFileOrDirectory(path string) error {
-	return os.RemoveAll(path)
+	return os.Remove(path)
 }
 
 func (n NodeUtils) MakeDir(dirPath string) error {
@@ -455,8 +455,10 @@ func (n NodeUtils) RescanPhysicalDevices(sysDevices []string) error {
 func (n NodeUtils) FormatDevice(devicePath string, fsType string) {
 	var args []string
 	if fsType == "ext4" {
+		// TODO Add -F - force format?
 		args = []string{"-m0", "-Enodiscard,lazy_itable_init=1,lazy_journal_init=1", devicePath}
 	} else if fsType == "xfs" {
+		// TODO add -f - force format?
 		args = []string{"-K", devicePath}
 	} else {
 		logger.Errorf("Could not format unsupported fsType: %v", fsType)
@@ -468,6 +470,11 @@ func (n NodeUtils) FormatDevice(devicePath string, fsType string) {
 	if err != nil {
 		logger.Errorf("Failed to run mkfs, error: %v", err)
 	}
+
+	// TODO waitDelay of 5 seconds
+
+
+	// TODO related to FormatDeviceNative in mount wrapper?
 }
 
 func (n NodeUtils) IsNotMountPoint(file string) (bool, error) {
@@ -614,6 +621,7 @@ func (d NodeUtils) GetBlockVolumeStats(volumeId string) (VolumeStatistics, error
 
 	return volumeStats, nil
 }
+
 
 func (d NodeUtils) GetVolumeUuid(volumeId string) string {
 	volumeIdParts := strings.Split(volumeId, d.ConfigYaml.Parameters.Object_id_info.Delimiter)

@@ -140,12 +140,25 @@ func (d *NodeService) NodeStageVolume(ctx context.Context, req *csi.NodeStageVol
 		return nil, status.Error(codes.InvalidArgument, fmt.Sprintf("Wrong connectivity type %s", connectivityType))
 	}
 
+	stagingPath := req.GetStagingTargetPath() // e.g in k8s /var/lib/kubelet/plugins/kubernetes.io/csi/pv/pvc-21967c74-b456-11e9-b93e-005056a45d5f/globalmount
+	stagingPathWithHostPrefix := d.NodeUtils.GetPodPath(stagingPath)
+
+
+	mounted, err = d.OsDeviceConnectivityHelper.VerifyStagingMount(stagingPathWithHostPrefix, volumeUuid)
+
+	if mounted {
+		&csi.NodeStageVolumeResponse{}, nil
+	}
+
 	osDeviceConnectivity.EnsureLogin(ipsByArrayInitiator)
 
 	err = d.OsDeviceConnectivityHelper.RemoveGhostDevice(lun)
 	if err != nil {
 		return nil, status.Error(codes.Aborted, err.Error())
 	}
+
+	d.OsDeviceConnectivityHelper.FullPreScanSanityCleanup(volumeUuid)
+	d.OsDeviceConnectivityHelper.cleanupVolumeDevices(volumeUuid)
 
 	err = osDeviceConnectivity.RescanDevices(lun, arrayInitiators)
 	if err != nil {
@@ -159,7 +172,7 @@ func (d *NodeService) NodeStageVolume(ctx context.Context, req *csi.NodeStageVol
 	}
 
 	volumeUuid := d.NodeUtils.GetVolumeUuid(volumeID)
-	mpathDevice, err := osDeviceConnectivity.GetMpathDevice(volumeUuid)
+	mpathDevice, err := osDeviceConnectivity.VerifyAndGetDmDevice(volumeUuid, lun)
 	logger.Debugf("Discovered device : {%v}", mpathDevice)
 	if err != nil {
 		logger.Errorf("Error while discovering the device : {%v}", err.Error())
@@ -171,17 +184,6 @@ func (d *NodeService) NodeStageVolume(ctx context.Context, req *csi.NodeStageVol
 	case *csi.VolumeCapability_Block:
 		logger.Debugf("NodeStageVolume Finished: multipath device [%s] is ready to be mounted by NodePublishVolume API", mpathDevice)
 		return &csi.NodeStageVolumeResponse{}, nil
-	}
-	baseDevice := path.Base(mpathDevice)
-	sysDevices, err := d.NodeUtils.GetSysDevicesFromMpath(baseDevice)
-	if err != nil {
-		logger.Errorf("Error while trying to get sys devices : {%v}", err.Error())
-		return nil, status.Error(codes.Internal, err.Error())
-	}
-	err = osDeviceConnectivity.ValidateLun(lun, sysDevices)
-	if err != nil {
-		logger.Errorf("Error while trying to validate lun : {%v}", err.Error())
-		return nil, status.Error(codes.Internal, err.Error())
 	}
 
 	existingFormat, err := d.Mounter.GetDiskFormat(mpathDevice)
@@ -197,9 +199,6 @@ func (d *NodeService) NodeStageVolume(ctx context.Context, req *csi.NodeStageVol
 		return nil, err
 	}
 
-	stagingPath := req.GetStagingTargetPath() // e.g in k8s /var/lib/kubelet/plugins/kubernetes.io/csi/pv/pvc-21967c74-b456-11e9-b93e-005056a45d5f/globalmount
-	stagingPathWithHostPrefix := d.NodeUtils.GetPodPath(stagingPath)
-
 	// check if already mounted
 	isMounted, err := d.isTargetMounted(stagingPathWithHostPrefix, true)
 	if err != nil {
@@ -209,6 +208,8 @@ func (d *NodeService) NodeStageVolume(ctx context.Context, req *csi.NodeStageVol
 	if isMounted { // idempotent case
 		return &csi.NodeStageVolumeResponse{}, nil
 	}
+
+	// TODO don't format if existingFormat is ok
 
 	err = d.formatAndMount(mpathDevice, stagingPath, fsTypeForMount, existingFormat)
 	if err != nil {
@@ -317,6 +318,42 @@ func (d *NodeService) resolveFsTypeForMount(requestedFsType string, existingForm
 	return fsTypeForMount, nil
 }
 
+
+
+// Since mkfs must remain an external process, we wrap it in a Global Mutex and use your ExecuteWithTimeout logic to prevent the "Memory Explosion" and "D-state hangs."
+func (d *NodeService) formatAndMount(mpathDevice string, stagingPath string, fsType string, existingFormat string) error {
+	// 1. Format phase (Internal Throttled Execution)
+	if existingFormat == "" {
+		if err := d.NodeUtils.FormatDevice(mpathDevice, fsType); err != nil {
+			return fmt.Errorf("format failed: %w", err)
+		}
+	}
+
+	// 2. Prepare Mount Options
+	var flags uintptr = syscall.MS_NODEV | syscall.MS_NOSUID
+	var data []string
+
+	if fsType == "xfs" {
+		data = append(data, "nouuid")
+	}
+
+	// 3. Ensure Staging Directory exists
+	if err := os.MkdirAll(stagingPath, 0750); err != nil {
+		return fmt.Errorf("failed to create staging dir: %w", err)
+	}
+
+	// 4. DIRECT SYSCALL (Process-free replacement for Mounter.FormatAndMount)
+	logger.Infof("Direct syscall mount: %s -> %s (%s)", mpathDevice, stagingPath, fsType)
+	err := syscall.Mount(mpathDevice, stagingPath, fsType, flags, strings.Join(data, ","))
+	if err != nil {
+		return fmt.Errorf("syscall.Mount failed: %w", err)
+	}
+
+	return nil
+}
+
+
+
 func (d *NodeService) formatAndMount(mpathDevice string, stagingPath string, fsTypeForMount string, existingFormat string) error {
 	if existingFormat == "" {
 		d.NodeUtils.FormatDevice(mpathDevice, fsTypeForMount)
@@ -330,6 +367,7 @@ func (d *NodeService) formatAndMount(mpathDevice string, stagingPath string, fsT
 	logger.Debugf("Mount the device with fs_type = {%v} (Create filesystem if needed)", fsTypeForMount)
 	return d.Mounter.FormatAndMount(mpathDevice, stagingPath, fsTypeForMount, mountOptions) // Passing without /host because k8s mounter uses mount\mkfs\fsck
 }
+
 
 func (d *NodeService) NodeUnstageVolume(ctx context.Context, req *csi.NodeUnstageVolumeRequest) (*csi.NodeUnstageVolumeResponse, error) {
 	defer logger.Exit(logger.Enter(req))
@@ -354,13 +392,22 @@ func (d *NodeService) NodeUnstageVolume(ctx context.Context, req *csi.NodeUnstag
 	}
 
 	stagingPathWithHostPrefix := d.NodeUtils.GetPodPath(stagingTargetPath)
+
+
 	logger.Debugf("Check if staging path {%s} is mounted", stagingPathWithHostPrefix)
+
+
 	isNotMounted, err := d.NodeUtils.IsNotMountPoint(stagingPathWithHostPrefix)
 	if err != nil {
 		logger.Warningf("Failed to check if (%s), is mounted", stagingPathWithHostPrefix)
 		return nil, status.Error(codes.Internal, err.Error())
 	}
 	if !isNotMounted {
+		actualHw, err := r.GetDeviceWWN(devicePath)
+		if err == nil && !r.IsSerialMatch(actualHw, volUuid) {
+			return fmt.Errorf("UNSTAGE ABORT: Mount point %s belongs to Serial %s, not %s", stagingPath, actualHw, volUuid)
+		}
+
 		err = d.Mounter.Unmount(stagingTargetPath)
 		if err != nil {
 			logger.Errorf("Unmount failed. Target : %q, err : %v", stagingTargetPath, err.Error())
@@ -369,41 +416,10 @@ func (d *NodeService) NodeUnstageVolume(ctx context.Context, req *csi.NodeUnstag
 	}
 
 	volumeUuid := d.NodeUtils.GetVolumeUuid(volumeID)
-	mpathDevice, err := d.OsDeviceConnectivityHelper.GetMpathDevice(volumeUuid)
-	if err != nil {
-		switch err.(type) {
-		case *device_connectivity.MultipathDeviceNotFoundForVolumeError:
-			return &csi.NodeUnstageVolumeResponse{}, nil
-		default:
-			logger.Errorf("Error while discovering the device : {%v}", err.Error())
-			return nil, status.Error(codes.Internal, err.Error())
-		}
-	}
-	logger.Debugf("Discovered device : {%v}", mpathDevice)
 
-	baseDevice := path.Base(mpathDevice)
+	err = d.OsDeviceConnectivityHelper.cleanupVolumeDevices(volumeUuid)
 
-	sysDevices, err := d.NodeUtils.GetSysDevicesFromMpath(baseDevice)
-	if err != nil {
-		logger.Errorf("Error while trying to get sys devices : {%v}", err.Error())
-		return nil, status.Error(codes.Internal, err.Error())
-	}
-
-	err = d.OsDeviceConnectivityHelper.FlushMultipathDevice(baseDevice)
-	if err != nil {
-		return nil, status.Errorf(codes.Internal, "Multipath -f command failed with error: %v", err)
-	}
-	err = d.OsDeviceConnectivityHelper.RemovePhysicalDevice(sysDevices)
-	if err != nil {
-		return nil, status.Errorf(codes.Internal, "Remove scsi device failed with error: %v", err)
-	}
-
-	stageInfoPath := path.Join(stagingTargetPath, StageInfoFilename)
-	if d.NodeUtils.StageInfoFileIsExist(stageInfoPath) {
-		if err := d.NodeUtils.ClearStageInfoFile(stageInfoPath); err != nil {
-			return nil, status.Errorf(codes.Internal, "Fail to clear the stage info file: error %v", err)
-		}
-	}
+	err = os.Remove(stagingPathWithHostPrefix)
 
 	logger.Debugf("NodeUnStageVolume Finished: multipath device removed from host")
 
