@@ -81,7 +81,7 @@ class HostDefinerServicer:
         logger.debug(messages.HOST_FOUND.format(found_host_name))
         return found_host_name
 
-    def _recreate_host(self, host_name, request array_mediator):
+    def _recreate_host(self, host_name, array_mediator):
         array_mediator.delete_host(host_name)
         raise array_errors.HostNotFoundError(host_name)
 
@@ -89,7 +89,7 @@ class HostDefinerServicer:
         logger.warning("update host partition")
         if not array_mediator.verify_host_partition(host_name, partition_name):
             logger.warn("Need to update partition")
-            self._recreate_host(host_name, request array_mediator)
+            self._recreate_host(host_name, array_mediator)
 
     def _update_host_ports(self, request, host, array_mediator, partition_name):
         initiators = self._get_initiators_from_node_id(request.node_id_from_csi_node)
@@ -97,13 +97,13 @@ class HostDefinerServicer:
         connectivity_type_from_host = array_mediator.get_host_connectivity_type(host)
         if self._is_protocol_switched(connectivity_type_from_user, connectivity_type_from_host):
             if partition_name:
-                self._recreate_host(host, request array_mediator)  # raises exception to force recreate
+                self._recreate_host(host, array_mediator)  # raises exception to force recreate
             self._change_host_protocol(array_mediator, host, connectivity_type_from_host, request)
         elif self._is_port_update_needed_when_same_protocol(request, connectivity_type_from_user,
                                                             connectivity_type_from_host):
             logger.info(messages.HOST_PORTS_SHOULD_BE_CHANGE.format(host, initiators))
             if partition_name:
-                self._recreate_host(host, request array_mediator)  # raises exception to force recreate
+                self._recreate_host(host, array_mediator)  # raises exception to force recreate
             self._remove_host_ports(array_mediator, host, connectivity_type_from_host)
             array_mediator.add_ports_to_host(host, initiators, connectivity_type_from_user)
 
