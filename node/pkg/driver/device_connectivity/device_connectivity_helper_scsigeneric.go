@@ -90,12 +90,13 @@ const (
 	procMountsFilePath          = "/proc/mounts"
 )
 
-func NewOsDeviceConnectivityHelperScsiGeneric(executer executer.ExecuterInterface, clean_scsi_device bool) OsDeviceConnectivityHelperScsiGenericInterface {
+func NewOsDeviceConnectivityHelperScsiGeneric(executer executer.ExecuterInterface, clean_scsi_device bool, update_known_host_ids bool) OsDeviceConnectivityHelperScsiGenericInterface {
 	return &OsDeviceConnectivityHelperScsiGeneric{
 		Executer:        executer,
 		Helper:          NewOsDeviceConnectivityHelperGeneric(executer),
 		MutexMultipathF: &sync.Mutex{},
 		CleanScsiDevice: clean_scsi_device,
+		UpdateKnownHostIds: update_known_host_ids,
 	}
 }
 
@@ -129,6 +130,7 @@ func (r OsDeviceConnectivityHelperScsiGeneric) IsVolumePathMatchesVolumeId(volum
 	return r.Helper.IsAnyVariationInMpathVolumeId(mpathVolumeId, volumeIdVariations), nil
 }
 
+
 var (
 	// Host Number line
 	hostLineRE = regexp.MustCompile(`Host Number:\s*(\d+)`)
@@ -144,7 +146,7 @@ type activeSession struct {
 }
 
 // parseActiveSessions returns a slice of all active sessions (host number + source IQN)
-func parseActiveSessions() ([]activeSession, error) {
+func  (r OsDeviceConnectivityHelperScsiGeneric) parseActiveSessions() ([]activeSession, error) {
 	out, err := r.Executer.ExecuteWithTimeout(2 * 1000, "iscsiadm", []string{"-m", "session", "-P", "3"})
 	
 	if err != nil {
@@ -183,19 +185,19 @@ func parseActiveSessions() ([]activeSession, error) {
 }
 
 // updateHostIDs adds new active hosts that share the *source* IQN with any known host
-func updateHostIDs(known map[int]bool) (map[int]bool, error) {
+func  (r OsDeviceConnectivityHelperScsiGeneric) updateHostIDs(known map[int]bool) error {
 	updated := make(map[int]bool)
 	for k, v := range known {
 		updated[k] = v
 	}
 
 	// 1. Get all active sessions
-	active, err := parseActiveSessions()
+	active, err := r.parseActiveSessions()
 	if err != nil {
 		return nil, err
 	}
 	if len(active) == 0 {
-		return updated, "No active iSCSI sessions."
+		return updated, errors.New("No active iSCSI sessions.")
 	}
 
 	// 2. Build sourceIQN → list of known host numbers
@@ -253,12 +255,13 @@ func (r OsDeviceConnectivityHelperScsiGeneric) RescanDevices(lunId int, arrayIde
 		return err
 	}
 	
-	updated, err := updateHostIDs(hostIDs)
-	if err != nil {
-		hostIDs = updated
-	} else {
-		logger.Warningf("Rescan : Could not detect additional host devices: {%v}", err)
+	if r.UpdateKnownHostIds {
+		err := r.updateHostIDs(hostIDs)
+		if err != nil {
+			logger.Warningf("Rescan : Could not detect additional host devices: {%v}", err)
+		}
 	}
+	
 	
 	for hostNumber := range hostIDs {
 
