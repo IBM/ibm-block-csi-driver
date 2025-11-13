@@ -110,7 +110,6 @@ type NodeUtilsInterface interface {
 type NodeUtils struct {
 	Executer                   executer.ExecuterInterface
 	mounter                    mount.Interface
-	osDeviceConnectivityHelper device_connectivity.OsDeviceConnectivityHelperScsiGenericInterface
 	ConfigYaml                 ConfigFile
 }
 
@@ -119,7 +118,6 @@ func NewNodeUtils(executer executer.ExecuterInterface, mounter mount.Interface, 
 	return &NodeUtils{
 		Executer:                   executer,
 		mounter:                    mounter,
-		osDeviceConnectivityHelper: osDeviceConnectivityHelper,
 		ConfigYaml:                 configYaml,
 	}
 }
@@ -189,26 +187,55 @@ func (n NodeUtils) ClearStageInfoFile(filePath string) error {
 	return os.Remove(filePath)
 }
 
+
 func (n NodeUtils) GetSysDevicesFromMpath(baseDevice string) ([]string, error) {
-	// this will return the 	/sys/block/dm-3/slaves/
-	logger.Debugf("GetSysDevicesFromMpath with param : {%v}", baseDevice)
-	deviceSlavePath := path.Join("/sys", "block", baseDevice, "slaves")
-	logger.Debugf("looking in path : {%v}", deviceSlavePath)
-	slaves, err := ioutil.ReadDir(deviceSlavePath)
-	if err != nil {
-		logger.Errorf("an error occured while looking for device slaves : {%v}", err.Error())
-		return nil, err
+	// baseDevice is expected to be "dm-X" or "nvmeXnY"
+	logger.Debugf("GetSysDevicesFromMpath with param: {%v}", baseDevice)
+
+	// 1. Branching Logic: DM vs NVMe
+	if strings.HasPrefix(baseDevice, "dm-") {
+		// Device Mapper Path: /sys/block/dm-X/slaves/
+		deviceSlavePath := filepath.Join("/sys", "block", baseDevice, "slaves")
+		slaves, err := os.ReadDir(deviceSlavePath)
+		if err != nil {
+			logger.Errorf("an error occured while looking for device slaves : {%v}", err.Error())
+			return nil, fmt.Errorf("failed to read dm slaves at %s: %w", deviceSlavePath, err)
+		}
+
+		var slavesNames []string
+		for _, slave := range slaves {
+			slavesNames = append(slavesNames, slave.Name())
+		}
+		return slavesNames, nil
 	}
 
-	logger.Debugf("found slaves : {%v}", slaves)
+	if strings.HasPrefix(baseDevice, "nvme") {
+		// NVMe Native Multipath Path: /sys/block/nvmeXnY/device/subsystem/
+		// Each path is a controller link (e.g., nvme0, nvme1)
+		subsysPath := filepath.Join("/sys", "block", baseDevice, "device", "subsystem")
+		controllers, err := os.ReadDir(subsysPath)
+		if err != nil {
+			return nil, fmt.Errorf("failed to read nvme subsystem at %s: %w", subsysPath, err)
+		}
 
-	var slavesNames []string
-	for _, slave := range slaves {
-		slavesNames = append(slavesNames, slave.Name())
+		var pathNames []string
+		for _, ctrl := range controllers {
+			// In NVMe, the paths are the namespaces under each controller
+			// e.g., if base is nvme-subsys0n1, paths are nvme0n1, nvme1n1
+			nsID := strings.Split(baseDevice, "n")[1]
+			pathName := fmt.Sprintf("%sn%s", ctrl.Name(), nsID)
+
+			// Verify the path exists in /sys/block
+			if _, err := os.Stat(filepath.Join("/sys/block", pathName)); err == nil {
+				pathNames = append(pathNames, pathName)
+			}
+		}
+		return pathNames, nil
 	}
 
-	return slavesNames, nil
+	return nil, fmt.Errorf("unsupported device type: %s", baseDevice)
 }
+
 
 func (n NodeUtils) StageInfoFileIsExist(filePath string) bool {
 	if _, err := os.Stat(filePath); err != nil {
@@ -419,7 +446,7 @@ func (n NodeUtils) IsDirectory(path string) bool {
 
 // Deletes file or directory with all sub-directories and files
 func (n NodeUtils) RemoveFileOrDirectory(path string) error {
-	return os.RemoveAll(path)
+	return os.Remove(path)
 }
 
 func (n NodeUtils) MakeDir(dirPath string) error {
@@ -517,22 +544,28 @@ func (n NodeUtils) RescanPhysicalDevices(sysDevices []string) error {
 	return nil
 }
 
-func (n NodeUtils) FormatDevice(devicePath string, fsType string) {
-	var args []string
-	if fsType == "ext4" {
-		args = []string{"-m0", "-Enodiscard,lazy_itable_init=1,lazy_journal_init=1", devicePath}
-	} else if fsType == "xfs" {
-		args = []string{"-K", devicePath}
-	} else {
-		logger.Errorf("Could not format unsupported fsType: %v", fsType)
-		return
-	}
+func (n NodeUtils) FormatDevice(devicePath string, fsType string) error {
+	// TODO wrap
+    var args []string
+    if fsType == "ext4" {
+        args = []string{"-m0", "-Enodiscard,lazy_itable_init=1,lazy_journal_init=1", devicePath}
+    } else if fsType == "xfs" {
+		// TODO review -f
+        args = []string{"-f", "-K", devicePath} // Added -f (force) to ensure it works on raw disks
+    } else {
+        return fmt.Errorf("unsupported fsType: %v", fsType)
+    }
 
-	logger.Debugf("Formatting the device with fs_type = {%v}", fsType)
-	_, err := n.Executer.ExecuteWithTimeout(mkfsTimeoutMilliseconds, "mkfs."+fsType, args)
-	if err != nil {
-		logger.Errorf("Failed to run mkfs, error: %v", err)
-	}
+    logger.Debugf("Formatting the device with fs_type = {%v}", fsType)
+    _, err := n.Executer.ExecuteWithTimeout(mkfsTimeoutMilliseconds, "mkfs."+fsType, args)
+    if err != nil {
+        return fmt.Errorf("mkfs.%s execution failed: %v", fsType, err)
+    }
+
+    // TODO Brief pause to allow kernel to settle partition table/FS metadata
+    // time.Sleep(2 * time.Second)
+    return nil
+
 }
 
 func (n NodeUtils) IsNotMountPoint(file string) (bool, error) {
@@ -645,66 +678,87 @@ func (n NodeUtils) UpdateNodeInitiatorsAnnotation(ctx context.Context, nodeName 
 }
 
 func (n NodeUtils) IsBlock(devicePath string) (bool, error) {
-	var stat unix.Stat_t
-	err := unix.Stat(devicePath, &stat)
-	if err != nil {
-		return false, err
-	}
-	return (stat.Mode & unix.S_IFMT) == unix.S_IFBLK, nil
+    // Specify [bool] as the generic type T
+    res, err := n.KeyedGater.ExecuteUninterruptible[bool](
+        "is-block-"+devicePath,
+        10,              // maxRunning: 10 concurrent stat calls
+        50,              // maxSpare: budget for hung threads (D-state)
+        1*time.Second,   // handoffTimeout: move to spare if kernel blocks
+        5*time.Second,   // hardTimeout: return error to caller
+        func(ctx context.Context) (bool, error) {
+            var stat unix.Stat_t
+            // unix.Stat (syscall) can hang if the device is a stale NFS mount or ghost LUN
+            if err := unix.Stat(devicePath, &stat); err != nil {
+                return false, err
+            }
+            return (stat.Mode & unix.S_IFMT) == unix.S_IFBLK, nil
+        },
+    )
+
+    // In Go Generics, if err != nil, res will be the 'zero value' (false)
+    if err != nil {
+        return false, err
+    }
+
+    // No type assertion needed! 'res' is already a bool.
+    return res, nil
 }
+
 
 func (d NodeUtils) GetFileSystemVolumeStats(path string) (VolumeStatistics, error) {
-	statfs := &unix.Statfs_t{}
-	err := unix.Statfs(path, statfs)
+	// Specify [unix.Statfs_t] as the generic type T
+	stat, err := d.KeyedGater.ExecuteUninterruptible[unix.Statfs_t](
+		"statfs-"+path,
+		5,               // maxRunning: 5 concurrent statfs per path
+		20,              // maxSpare: budget for "zombie" threads
+		1*time.Second,   // handoffTimeout: move to spare if kernel blocks
+		5*time.Second,   // hardTimeout: return error to caller
+		func(ctx context.Context) (unix.Statfs_t, error) {
+			var s unix.Statfs_t
+			// unix.Statfs (syscall) is highly prone to D-state hangs on RHEL 7
+			// especially with stale NFS or disconnected iSCSI targets.
+			err := unix.Statfs(path, &s)
+			return s, err
+		},
+	)
+
 	if err != nil {
-		return VolumeStatistics{}, err
+		return nil, err
 	}
 
-	availableBytes := int64(statfs.Bavail) * int64(statfs.Bsize)
-	totalBytes := int64(statfs.Blocks) * int64(statfs.Bsize)
-	usedBytes := (int64(statfs.Blocks) - int64(statfs.Bfree)) * int64(statfs.Bsize)
-
-	totalInodes := int64(statfs.Files)
-	availableInodes := int64(statfs.Ffree)
-	usedInodes := totalInodes - availableInodes
-
-	volumeStats := VolumeStatistics{
-		AvailableBytes: availableBytes,
-		TotalBytes:     totalBytes,
-		UsedBytes:      usedBytes,
-
-		AvailableInodes: availableInodes,
-		TotalInodes:     totalInodes,
-		UsedInodes:      usedInodes,
-	}
-
-	return volumeStats, nil
+	bsize := int64(stat.Bsize)
+	return VolumeStatistics{
+		AvailableBytes:  int64(stat.Bavail) * bsize,
+		TotalBytes:      int64(stat.Blocks) * bsize,
+		UsedBytes:       (int64(stat.Blocks) - int64(stat.Bfree)) * bsize,
+		AvailableInodes: int64(stat.Ffree),
+		TotalInodes:     int64(stat.Files),
+		UsedInodes:      int64(stat.Files) - int64(stat.Ffree),
+	}, nil
 }
 
-func (d NodeUtils) GetBlockVolumeStats(volumeId string) (VolumeStatistics, error) {
-	volumeUuid := d.GetVolumeUuid(volumeId)
-	mpathDevice, err := d.osDeviceConnectivityHelper.GetMpathDevice(volumeUuid)
+
+func (d NodeUtils) GetBlockVolumeStats(devicePath string) (VolumeStatistics, error) {
+	// Use O_RDONLY to ensure we don't interfere with active I/O
+	f, err := os.OpenFile(devicePath, os.O_RDONLY, 0)
 	if err != nil {
-		return VolumeStatistics{}, err
+		return nil, fmt.Errorf("failed to open block device %s: %w", devicePath, err)
 	}
+	defer f.Close()
 
-	args := []string{"--getsize64", mpathDevice}
-	out, err := d.Executer.ExecuteWithTimeoutSilently(device_connectivity.TimeOutBlockDevCmd, BlockDevCmd, args)
+	// BLKGETSIZE64 is stable on RHEL 7+
+	size, err := unix.IoctlGetUint64(int(f.Fd()), unix.BLKGETSIZE64)
 	if err != nil {
-		return VolumeStatistics{}, err
+		return nil, fmt.Errorf("ioctl BLKGETSIZE64 failed on %s: %w", devicePath, err)
 	}
 
-	strOut := strings.TrimSpace(string(out))
-	sizeInBytes, err := strconv.ParseInt(strOut, 10, 64)
-	if err != nil {
-		return VolumeStatistics{}, err
-	}
+	// TODO is this more compatible?
+	//var size uint64
+	//_, _, errno := unix.Syscall(unix.SYS_IOCTL, f.Fd(), unix.BLKGETSIZE64, uintptr(unsafe.Pointer(&size)))
 
-	volumeStats := VolumeStatistics{
-		TotalBytes: sizeInBytes,
-	}
-
-	return volumeStats, nil
+	return VolumeStatistics{
+		TotalBytes:     int64(size)
+	}, nil
 }
 
 func (d NodeUtils) GetVolumeUuid(volumeId string) string {
@@ -712,8 +766,13 @@ func (d NodeUtils) GetVolumeUuid(volumeId string) string {
 	idsPart := volumeIdParts[len(volumeIdParts)-1]
 	splittedIdsPart := strings.Split(idsPart, d.ConfigYaml.Parameters.Object_id_info.Ids_delimiter)
 	if len(splittedIdsPart) == 2 {
-		return splittedIdsPart[1]
+		return "3" + splittedIdsPart[1]
 	} else {
-		return splittedIdsPart[0]
+		return "3" + splittedIdsPart[0]
 	}
 }
+
+func (d NodeUtils) CleanSysfsData (data) {
+	return strings.Trim(string(data), " \n\r\t\x00")
+}
+
