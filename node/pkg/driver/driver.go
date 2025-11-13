@@ -50,13 +50,14 @@ func NewDriver(endpoint string, configFilePath string, hostname string, max_invo
 	logger.Infof("Max invocations: %d", max_invocations)
 	logger.Infof("Clean scsi device enabled: %v", clean_scsi_device)
 
+	executer := &executer.Executer{}
+
 	mounter := &mount.SafeFormatAndMount{
-		Interface: mountwrapper.New(""),
-		Exec:      exec.New(),
+		Interface: mountwrapper.NewWithExecutor(executer),
+		Exec:      executer,
 	}
 
 	syncLock := NewSyncLock(max_invocations, clean_scsi_device)
-	executer := &executer.Executer{}
 	osDeviceConnectivityMapping := map[string]device_connectivity.OsDeviceConnectivityInterface{
 		configFile.Connectivity_type.Nvme_over_fc: device_connectivity.NewOsDeviceConnectivityNvmeOFc(executer, clean_scsi_device),
 		configFile.Connectivity_type.Fc:           device_connectivity.NewOsDeviceConnectivityFc(executer, clean_scsi_device),
