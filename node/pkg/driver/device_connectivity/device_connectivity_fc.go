@@ -37,7 +37,11 @@ func (r OsDeviceConnectivityFc) EnsureLogin(_ map[string][]string) {
 }
 
 func (r OsDeviceConnectivityFc) RescanDevices(lunId int, arrayIdentifiers []string) error {
-	return r.HelperScsiGeneric.RescanDevices(lunId, arrayIdentifiers)
+	hostIDs, err := r.HelperScsiGeneric.RescanDevicesGetHostIds(lunId, arrayIdentifiers)
+	if err != nil {
+		return err
+	}
+	return r.HelperScsiGeneric.RescanDevices(lunId, arrayIdentifiers, hostIDs)
 }
 
 func (r OsDeviceConnectivityFc) GetMpathDevice(volumeId string) (string, error) {
@@ -55,10 +59,10 @@ func (r OsDeviceConnectivityFc) RemovePhysicalDevice(sysDevices []string) error 
 	return r.HelperScsiGeneric.RemovePhysicalDevice(sysDevices)
 }
 
-func (r OsDeviceConnectivityFc) RemoveGhostDevice(lun int) error {
-	return r.HelperScsiGeneric.RemoveGhostDevice(lun)
+func (r OsDeviceConnectivityFc) RemoveGhostDevice(expectedSerial string, expectedLun int, arrayIdentifiers []string) error {
+	return r.HelperScsiGeneric.RemoveGhostDevice(expectedSerial, expectedLun, arrayIdentifiers)
 }
 
-func (r OsDeviceConnectivityFc) ValidateLun(lun int, sysDevices []string) error {
-	return r.HelperScsiGeneric.ValidateLun(lun, sysDevices)
+func (r OsDeviceConnectivityFc) ValidateLun(targetDm string, lun int, sysDevices []string, expectedSerial string) error {
+	return r.HelperScsiGeneric.ValidateLun(targetDm, lun, sysDevices, expectedSerial)
 }
