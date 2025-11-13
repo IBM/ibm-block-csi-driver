@@ -17,38 +17,47 @@
 package device_connectivity
 
 import (
+	"context"
 	"fmt"
+	"os"
+	"path/filepath"
+	"strconv"
 	"strings"
+	"time"
 
 	"github.com/ibm/ibm-block-csi-driver/node/logger"
 	"github.com/ibm/ibm-block-csi-driver/node/pkg/driver/executer"
+	"github.com/ibm/ibm-block-csi-driver/node/pkg/driver/mount"
 )
 
 const (
 	nvmeCmdTimeout                      = 10 * 1000
 	nvmeTransportFC                     = "fc"
 	nvmeDiscoveryNqn                    = "nqn.2014-08.org.nvmexpress.discovery"
+	recordSize                          = 1024 // NVMe Spec discovery log page entry size
 	FCPortPath                          = "/sys/class/fc_host/host*/port_name"
-	nvmeTargetPathCount                 = 3
+	nvmeTargetPathCount                 = 4 // Set according to your environment's requirements
 	nvmeMinPathsForNonNativeDmMultipath = 2
 )
 
 type OsDeviceConnectivityNvmeOFc struct {
 	Executer          executer.ExecuterInterface
+	KeyedGater        *executer.KeyedGater
 	HelperScsiGeneric OsDeviceConnectivityHelperScsiGenericInterface
 }
 
-func NewOsDeviceConnectivityNvmeOFc(executer executer.ExecuterInterface, clean_scsi_device bool) OsDeviceConnectivityInterface {
+func NewOsDeviceConnectivityNvmeOFc(executer executer.ExecuterInterface, KeyedGater *executer.KeyedGater, Mounter *mount.Mounter, clean_scsi_device bool) OsDeviceConnectivityInterface {
 	return &OsDeviceConnectivityNvmeOFc{
 		Executer:          executer,
-		HelperScsiGeneric: NewOsDeviceConnectivityHelperScsiGeneric(executer, clean_scsi_device),
+		KeyedGater:        KeyedGater,
+		HelperScsiGeneric: NewOsDeviceConnectivityHelperScsiGeneric(executer, KeyedGater, Mounter, clean_scsi_device),
 	}
 }
 
 // EnsureLogin performs NVMe-oFC discovery and connect for each (arrayTargetPort, hostPort) pair.
 // Connects paths until nvmeTargetPathCount is reached. Logs error if 0 paths result,
 // warning if below target. For non-native NVMe with find_multipaths=on, logs error if < 2 paths.
-func (r OsDeviceConnectivityNvmeOFc) EnsureLogin(ipsByArrayInitiator map[string][]string) {
+func (r *OsDeviceConnectivityNvmeOFc) EnsureLogin(ctx context.Context, ipsByArrayInitiator map[string][]string) {
 	if len(ipsByArrayInitiator) == 0 {
 		logger.Warningf("NVMe-oFC EnsureLogin: no array target ports in publish context, skipping")
 		return
@@ -90,7 +99,7 @@ func (r OsDeviceConnectivityNvmeOFc) EnsureLogin(ipsByArrayInitiator map[string]
 				continue
 			}
 
-			subNqn, err := r.discoverSubNqn(arrayTargetPort, hostPort)
+			subNqn, err := r.discoverSubNqn(ctx, arrayTargetPort, hostPort)
 			if err != nil {
 				logger.Debugf("NVMe-oFC EnsureLogin: discover error target=%s host=%s: %v",
 					arrayTargetPort, hostPort, err)
@@ -104,7 +113,7 @@ func (r OsDeviceConnectivityNvmeOFc) EnsureLogin(ipsByArrayInitiator map[string]
 
 			logger.Infof("NVMe-oFC EnsureLogin: connecting NQN=%s target=%s host=%s",
 				subNqn, arrayTargetPort, hostPort)
-			if r.nvmeConnect(arrayTargetPort, hostPort, subNqn) {
+			if r.nvmeConnect(ctx, arrayTargetPort, hostPort, subNqn) {
 				connectedPaths++
 			}
 		}
@@ -128,13 +137,13 @@ func (r OsDeviceConnectivityNvmeOFc) EnsureLogin(ipsByArrayInitiator map[string]
 
 	// Non-native NVMe + find_multipaths=on + < 2 paths: multipathd will not
 	// create a dm device, causing GetMpathDevice to fail.
-	nativeMpath, err := isNvmeCoreMultipathEnabled()
+	nativeMpath, err := isNvmeCoreMultipathEnabled(ctx, r.KeyedGater)
 	if err != nil {
 		logger.Warningf("NVMe-oFC EnsureLogin: could not determine nvme_core multipath mode: %v", err)
 		return
 	}
 	if !nativeMpath && finalPathCount < nvmeMinPathsForNonNativeDmMultipath {
-		findMpathsOn, err := r.isFindMultipathsOn()
+		findMpathsOn, err := r.isFindMultipathsOn(ctx)
 		if err != nil {
 			logger.Warningf("NVMe-oFC EnsureLogin: could not read find_multipaths setting: %v", err)
 			return
@@ -163,27 +172,124 @@ func countLivePathsForSubsystem(livePaths map[string]bool, ipsByArrayInitiator m
 	return count
 }
 
-// isFindMultipathsOn queries multipathd effective config for the find_multipaths setting.
-func (r OsDeviceConnectivityNvmeOFc) isFindMultipathsOn() (bool, error) {
-	out, err := r.Executer.ExecuteWithTimeout(TimeOutMultipathdCmd, multipathdCmd, []string{"show", "config"})
+func (r OsDeviceConnectivityNvmeOFc) updateHostIDs(ctx context.Context, hostIDs map[int]bool) {
+	// 1. Get a map of HostNumber -> PhysicalIdentifier (PCI or WWPN)
+	hostMap, err := r.mapHostsToPhysicalHardware(ctx)
 	if err != nil {
-		return false, fmt.Errorf("multipathd show config failed: %w", err)
+		logger.Errorf("Failed to map FC hosts: %v", err)
+		return
 	}
-	for _, line := range strings.Split(string(out), "\n") {
+
+	// 2. Identify the hardware IDs associated with the hosts we already have
+	knownHardware := make(map[string]bool)
+	for hostNum := range hostIDs {
+		if hardwareID, exists := hostMap[hostNum]; exists {
+			knownHardware[hardwareID] = true
+		}
+	}
+
+	// 3. Find siblings: any host sharing the same hardwareID but not yet in our set
+	for hostNum, hardwareID := range hostMap {
+		if knownHardware[hardwareID] && !hostIDs[hostNum] {
+			hostIDs[hostNum] = true
+			logger.Infof("Multipath discovery: host%d shares physical hardware %s", hostNum, hardwareID)
+		}
+	}
+}
+
+func (r OsDeviceConnectivityNvmeOFc) mapHostsToPhysicalHardware(ctx context.Context) (map[int]string, error) {
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
+
+	// RULE 1: Enforce explicit infrastructure gating around the volatile sysfs parsing pass
+	// to shield your worker threads from permanent hangs if a hardware controller collapses.
+	return executer.ExecuteUninterruptible[map[int]string](
+		ctx,
+		r.KeyedGater,
+		"global-fc-host-hardware-mapping", // Static key space limits overlapping checks safely
+		15,                                // maxRunning: balances simultaneous HBA state scans across the host
+		100,                               // maxSpare
+		2*time.Second,
+		10*time.Second, // Bounded hard timeout wall for full directory scans
+		func(wCtx context.Context) (map[int]string, error) {
+			hostMap := make(map[int]string)
+			baseClassPath := "/sys/class/fc_host"
+
+			entries, err := os.ReadDir(baseClassPath)
+			if err != nil {
+				if os.IsNotExist(err) {
+					return hostMap, nil // Return empty map smoothly if FC is unmounted/absent
+				}
+				return nil, err
+			}
+
+			for _, entry := range entries {
+				if err := wCtx.Err(); err != nil {
+					return nil, err
+				}
+
+				name := entry.Name()
+				// Match precisely against exactly named target host slots
+				if !strings.HasPrefix(name, "host") {
+					continue
+				}
+
+				hostNumStr := strings.TrimPrefix(name, "host")
+				hostNum, _ := strconv.Atoi(hostNumStr)
+
+				h := filepath.Join(baseClassPath, name)
+
+				// Option A: Use PCI Address (Best for Multi-port/Multi-channel cards)
+				pciLink, errLink := os.Readlink(filepath.Join(h, "device"))
+				if errLink == nil {
+					hostMap[hostNum] = filepath.Base(pciLink)
+					continue
+				}
+
+				// Option B: Use Physical WWPN (Best for NPIV / Rule 3 Parity)
+				wwpn, errRead := os.ReadFile(filepath.Join(h, "permanent_port_name"))
+				if errRead == nil {
+					hostMap[hostNum] = strings.TrimSpace(string(wwpn))
+				}
+			}
+			return hostMap, nil
+		},
+	)
+}
+
+// isFindMultipathsOn queries multipathd effective config for the find_multipaths setting.
+func (r OsDeviceConnectivityNvmeOFc) isFindMultipathsOn(ctx context.Context) (bool, error) {
+	// Req 3 & 4: Use the existing socket-based Executer instead of forking 'multipathd'
+	// 'show config' is too large; 'show daemon' or specific queries are lighter if supported,
+	// but using the socket is already a massive win.
+	out, err := r.Executer.MultipathdCmd(ctx, "global", "show config")
+	if err != nil {
+		return false, fmt.Errorf("multipathd socket query failed: %w", err)
+	}
+
+	// Req 8: Context is already respected by your MultipathdCmd infra
+	for _, line := range strings.Split(out, "\n") {
 		trimmed := strings.TrimSpace(line)
 		if !strings.HasPrefix(trimmed, "find_multipaths") {
 			continue
 		}
+
 		fields := strings.Fields(trimmed)
 		if len(fields) < 2 {
 			continue
 		}
-		val := strings.ToLower(fields[1])
-		result := val == "yes" || val == "on"
+
+		// Handle "quoted" values often found in multipathd config
+		val := strings.ToLower(strings.Trim(fields[1], "\""))
+
+		// In RHEL 7 and newer, valid "on" values include yes, on, or smart
+		result := val == "yes" || val == "on" || val == "smart"
+
 		logger.Debugf("NVMe-oFC isFindMultipathsOn: find_multipaths=%s result=%v", val, result)
 		return result, nil
 	}
-	// Not found — multipathd default is "no".
+
 	return false, nil
 }
 
@@ -228,25 +334,30 @@ func extractNvmeField(line, field string) string {
 
 // discoverSubNqn runs "nvme discover" for one (arrayTargetPort, hostPort) pair
 // and returns the storage subsystem NQN. Returns ("", nil) if no path exists.
-func (r OsDeviceConnectivityNvmeOFc) discoverSubNqn(arrayTargetPort, hostPort string) (string, error) {
+func (r *OsDeviceConnectivityNvmeOFc) discoverSubNqn(ctx context.Context, arrayTargetPort, hostPort string) (string, error) {
 	args := []string{
 		"discover",
 		"--transport=" + nvmeTransportFC,
 		"--traddr=" + arrayTargetPort,
 		"--host-traddr=" + hostPort,
 	}
-	out, err := r.Executer.ExecuteWithTimeout(nvmeCmdTimeout, "nvme", args)
-	if err != nil {
-		logger.Debugf("NVMe-oFC discoverSubNqn: nvme discover failed target=%s host=%s: %v",
-			arrayTargetPort, hostPort, err)
-		return "", nil
-	}
-	subNqn := parseSubNqnFromDiscoverOutput(string(out))
-	if subNqn != "" {
-		logger.Debugf("NVMe-oFC discoverSubNqn: discovered subnqn=%s target=%s host=%s",
-			subNqn, arrayTargetPort, hostPort)
-	}
-	return subNqn, nil
+	output := ""
+	r.KeyedGater.ExecuteNvmeFabric(ctx, func() error {
+		out, err := r.Executer.ExecuteWithTimeout(nvmeCmdTimeout, "nvme", args)
+		if err != nil {
+			logger.Debugf("NVMe-oFC discoverSubNqn: nvme discover failed target=%s host=%s: %v",
+				arrayTargetPort, hostPort, err)
+			return nil
+		}
+		subNqn := parseSubNqnFromDiscoverOutput(string(out))
+		if subNqn != "" {
+			logger.Debugf("NVMe-oFC discoverSubNqn: discovered subnqn=%s target=%s host=%s",
+				subNqn, arrayTargetPort, hostPort)
+			output = subNqn
+		}
+		return nil
+	})
+	return output, nil
 }
 
 // parseSubNqnFromDiscoverOutput extracts the storage subsystem NQN from "nvme discover" output.
@@ -272,7 +383,7 @@ func parseSubNqnFromDiscoverOutput(output string) string {
 }
 
 // nvmeConnect runs "nvme connect" for one (arrayTargetPort, hostPort, subNqn) combination.
-func (r OsDeviceConnectivityNvmeOFc) nvmeConnect(arrayTargetPort, hostPort, subNqn string) bool {
+func (r *OsDeviceConnectivityNvmeOFc) nvmeConnect(ctx context.Context, arrayTargetPort, hostPort, subNqn string) bool {
 	args := []string{
 		"connect",
 		"--transport=" + nvmeTransportFC,
@@ -280,14 +391,17 @@ func (r OsDeviceConnectivityNvmeOFc) nvmeConnect(arrayTargetPort, hostPort, subN
 		"--host-traddr=" + hostPort,
 		"--nqn=" + subNqn,
 	}
-	out, err := r.Executer.ExecuteWithTimeout(nvmeCmdTimeout, "nvme", args)
-	if err != nil {
-		logger.Errorf("NVMe-oFC nvmeConnect: failed NQN=%s target=%s host=%s: %v output=%s",
-			subNqn, arrayTargetPort, hostPort, err, string(out))
-		return false
-	}
-	logger.Infof("NVMe-oFC nvmeConnect: connected NQN=%s target=%s host=%s", subNqn, arrayTargetPort, hostPort)
-	return true
+	err := r.KeyedGater.ExecuteNvmeFabric(ctx, func() error {
+		out, err := r.Executer.ExecuteWithTimeout(nvmeCmdTimeout, "nvme", args)
+		if err != nil {
+			logger.Errorf("NVMe-oFC nvmeConnect: failed NQN=%s target=%s host=%s: %v output=%s",
+				subNqn, arrayTargetPort, hostPort, err, string(out))
+			return err
+		}
+		logger.Infof("NVMe-oFC nvmeConnect: connected NQN=%s target=%s host=%s", subNqn, arrayTargetPort, hostPort)
+		return nil
+	})
+	return err == nil
 }
 
 // getHostFCPorts reads node_name and port_name for every FC host adapter from sysfs
@@ -334,26 +448,23 @@ func (r OsDeviceConnectivityNvmeOFc) getHostFCPorts() ([]string, error) {
 	return hostPorts, nil
 }
 
-func (r OsDeviceConnectivityNvmeOFc) RescanDevices(_ int, _ []string) error {
+func (r OsDeviceConnectivityNvmeOFc) RescanDevices(_ context.Context, _ int, _ []string) error {
 	return nil
 }
 
-func (r OsDeviceConnectivityNvmeOFc) GetMpathDevice(volumeId string) (string, error) {
-	return r.HelperScsiGeneric.GetMpathDevice(volumeId)
+func (r OsDeviceConnectivityNvmeOFc) GetMpathDevice(ctx context.Context, volumeId string) (string, error) {
+	return r.HelperScsiGeneric.GetMpathDevice(ctx, volumeId)
 }
 
-func (r OsDeviceConnectivityNvmeOFc) FlushMultipathDevice(mpathDevice string) error {
-	return r.HelperScsiGeneric.FlushMultipathDevice(mpathDevice)
+func (r OsDeviceConnectivityNvmeOFc) RemovePhysicalDevice(ctx context.Context, sysDevices []string) error {
+	return r.HelperScsiGeneric.RemovePhysicalDevice(ctx, sysDevices)
 }
 
-func (r OsDeviceConnectivityNvmeOFc) RemovePhysicalDevice(sysDevices []string) error {
-	return r.HelperScsiGeneric.RemovePhysicalDevice(sysDevices)
+func (r OsDeviceConnectivityNvmeOFc) RemoveGhostDevice(ctx context.Context, expectedSerial string, expectedLun int, arrayIdentifiers []string) error {
+	return r.HelperScsiGeneric.RemoveGhostDevice(ctx, expectedSerial, expectedLun, arrayIdentifiers)
 }
 
-func (r OsDeviceConnectivityNvmeOFc) RemoveGhostDevice(lun int) error {
-	return r.HelperScsiGeneric.RemoveGhostDevice(lun)
-}
-
-func (r OsDeviceConnectivityNvmeOFc) ValidateLun(_ int, _ []string) error {
+// TODO
+func (r OsDeviceConnectivityNvmeOFc) ValidateLun(_ context.Context, _ string, _ int, _ []string, _ string) error {
 	return nil
 }
