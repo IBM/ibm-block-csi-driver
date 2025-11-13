@@ -37,7 +37,11 @@ func (r OsDeviceConnectivityFc) EnsureLogin(_ map[string][]string) {
 }
 
 func (r OsDeviceConnectivityFc) RescanDevices(lunId int, arrayIdentifiers []string) error {
-	return r.HelperScsiGeneric.RescanDevices(lunId, arrayIdentifiers)
+	hostIDs, err := r.HelperScsiGeneric.RescanDevicesGetHostIds(lunId, arrayIdentifiers)
+	if err != nil {
+		return err
+	}
+	return r.HelperScsiGeneric.RescanDevices(lunId, arrayIdentifiers, hostIDs)
 }
 
 func (r OsDeviceConnectivityFc) GetMpathDevice(volumeId string) (string, error) {
