@@ -354,7 +354,7 @@ func (n NodeUtils) IsDirectory(path string) bool {
 
 // Deletes file or directory with all sub-directories and files
 func (n NodeUtils) RemoveFileOrDirectory(path string) error {
-	return os.RemoveAll(path)
+	return os.Remove(path)
 }
 
 func (n NodeUtils) MakeDir(dirPath string) error {
@@ -455,8 +455,10 @@ func (n NodeUtils) RescanPhysicalDevices(sysDevices []string) error {
 func (n NodeUtils) FormatDevice(devicePath string, fsType string) {
 	var args []string
 	if fsType == "ext4" {
+		// TODO Add -F - force format?
 		args = []string{"-m0", "-Enodiscard,lazy_itable_init=1,lazy_journal_init=1", devicePath}
 	} else if fsType == "xfs" {
+		// TODO add -f - force format?
 		args = []string{"-K", devicePath}
 	} else {
 		logger.Errorf("Could not format unsupported fsType: %v", fsType)
@@ -468,6 +470,11 @@ func (n NodeUtils) FormatDevice(devicePath string, fsType string) {
 	if err != nil {
 		logger.Errorf("Failed to run mkfs, error: %v", err)
 	}
+
+	// TODO waitDelay of 5 seconds
+
+
+	// TODO related to FormatDeviceNative in mount wrapper?
 }
 
 func (n NodeUtils) IsNotMountPoint(file string) (bool, error) {
@@ -554,66 +561,62 @@ func (n NodeUtils) GetTopologyLabels(ctx context.Context, nodeName string) (map[
 
 func (n NodeUtils) IsBlock(devicePath string) (bool, error) {
 	var stat unix.Stat_t
+	// Use the input parameter devicePath consistently
 	err := unix.Stat(devicePath, &stat)
 	if err != nil {
 		return false, err
 	}
+
+	// This is the definitive check for a block device in Unix/Linux
 	return (stat.Mode & unix.S_IFMT) == unix.S_IFBLK, nil
 }
 
+
+
 func (d NodeUtils) GetFileSystemVolumeStats(path string) (VolumeStatistics, error) {
-	statfs := &unix.Statfs_t{}
-	err := unix.Statfs(path, statfs)
-	if err != nil {
-		return VolumeStatistics{}, err
+	var stat unix.Statfs_t
+	if err := unix.Statfs(path, &stat); err != nil {
+		return nil, fmt.Errorf("failed to statfs %s: %w", path, err)
 	}
 
-	availableBytes := int64(statfs.Bavail) * int64(statfs.Bsize)
-	totalBytes := int64(statfs.Blocks) * int64(statfs.Bsize)
-	usedBytes := (int64(statfs.Blocks) - int64(statfs.Bfree)) * int64(statfs.Bsize)
+	// Bsize is the optimal transfer block size.
+	// We cast to int64 immediately to handle large storage arrays.
+	bsize := int64(stat.Bsize)
 
-	totalInodes := int64(statfs.Files)
-	availableInodes := int64(statfs.Ffree)
-	usedInodes := totalInodes - availableInodes
+	return VolumeStatistics{
+		AvailableBytes: int64(stat.Bavail) * bsize,
+		TotalBytes:     int64(stat.Blocks) * bsize,
+		UsedBytes:      (int64(stat.Blocks) - int64(stat.Bfree)) * bsize,
 
-	volumeStats := VolumeStatistics{
-		AvailableBytes: availableBytes,
-		TotalBytes:     totalBytes,
-		UsedBytes:      usedBytes,
-
-		AvailableInodes: availableInodes,
-		TotalInodes:     totalInodes,
-		UsedInodes:      usedInodes,
-	}
-
-	return volumeStats, nil
+		AvailableInodes: int64(stat.Ffree),
+		TotalInodes:     int64(stat.Files),
+		UsedInodes:      int64(stat.Files) - int64(stat.Ffree),
+	}, nil
 }
 
-func (d NodeUtils) GetBlockVolumeStats(volumeId string) (VolumeStatistics, error) {
-	volumeUuid := d.GetVolumeUuid(volumeId)
-	mpathDevice, err := d.osDeviceConnectivityHelper.GetMpathDevice(volumeUuid)
+func (d NodeUtils) GetBlockVolumeStats(devicePath string) (VolumeStatistics, error) {
+	// Use O_RDONLY to ensure we don't interfere with active I/O
+	f, err := os.OpenFile(devicePath, os.O_RDONLY, 0)
 	if err != nil {
-		return VolumeStatistics{}, err
+		return nil, fmt.Errorf("failed to open block device %s: %w", devicePath, err)
 	}
+	defer f.Close()
 
-	args := []string{"--getsize64", mpathDevice}
-	out, err := d.Executer.ExecuteWithTimeoutSilently(device_connectivity.TimeOutBlockDevCmd, BlockDevCmd, args)
+	// BLKGETSIZE64 is stable on RHEL 7+
+	size, err := unix.IoctlGetUint64(int(f.Fd()), unix.BLKGETSIZE64)
 	if err != nil {
-		return VolumeStatistics{}, err
+		return nil, fmt.Errorf("ioctl BLKGETSIZE64 failed on %s: %w", devicePath, err)
 	}
 
-	strOut := strings.TrimSpace(string(out))
-	sizeInBytes, err := strconv.ParseInt(strOut, 10, 64)
-	if err != nil {
-		return VolumeStatistics{}, err
-	}
-
-	volumeStats := VolumeStatistics{
-		TotalBytes: sizeInBytes,
-	}
-
-	return volumeStats, nil
+	return VolumeStatistics{
+		TotalBytes:     int64(size),
+		AvailableBytes: int64(size),
+		UsedBytes:      0,
+	}, nil
 }
+
+
+
 
 func (d NodeUtils) GetVolumeUuid(volumeId string) string {
 	volumeIdParts := strings.Split(volumeId, d.ConfigYaml.Parameters.Object_id_info.Delimiter)
@@ -624,4 +627,8 @@ func (d NodeUtils) GetVolumeUuid(volumeId string) string {
 	} else {
 		return splittedIdsPart[0]
 	}
+}
+
+func (d NodeUtils) cleanSysfsData (data) {
+	return strings.Trim(string(data), " \n\r\t\x00")
 }
