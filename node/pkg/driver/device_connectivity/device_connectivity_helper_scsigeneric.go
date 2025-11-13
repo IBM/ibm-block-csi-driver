@@ -18,19 +18,29 @@ package device_connectivity
 
 import (
 	"bufio"
+	"context"
+	"encoding/binary"
 	"errors"
 	"fmt"
 	"io/ioutil"
+	"math/rand/v2"
+	"net"
 	"os"
 	"path/filepath"
 	"regexp"
 	"strconv"
 	"strings"
+	"syscall"
 	"sync"
 	"time"
+	"unicode"
+	"unsafe"
 
 	"github.com/ibm/ibm-block-csi-driver/node/logger"
 	"github.com/ibm/ibm-block-csi-driver/node/pkg/driver/executer"
+	"github.com/ibm/ibm-block-csi-driver/node/pkg/driver/mount"
+
+	"golang.org/x/sys/unix"
 )
 
 //go:generate mockgen -destination=../../../mocks/mock_OsDeviceConnectivityHelperScsiGenericInterface.go -package=mocks github.com/ibm/ibm-block-csi-driver/node/pkg/driver/device_connectivity OsDeviceConnectivityHelperScsiGenericInterface
@@ -40,17 +50,20 @@ type OsDeviceConnectivityHelperScsiGenericInterface interface {
 		This is helper interface for OsDeviceConnectivityHelperScsiGenericInterface.
 		Mainly for writing clean unit testing, so we can Mock this interface in order to unit test logic.
 	*/
-	RescanDevices(lunId int, arrayIdentifiers []string) error
+	RescanDevicesGetHostIds(lunId int, arrayIdentifiers []string) (map[int]bool, error)
+	RescanDevices(lunId int, arrayIdentifiers []string, hostIDs map[int]bool) error
 	GetMpathDevice(volumeId string) (string, error)
 	FlushMultipathDevice(mpathDevice string) error
 	RemovePhysicalDevice(sysDevices []string) error
-	RemoveGhostDevice(lun int) error
-	ValidateLun(lun int, sysDevices []string) error
+	RemoveGhostDevice(lexpectedSerial string, expectedLun int, arrayIdentifiers []string) error
+	ValidateLun(targetDm string, lun int, sysDevices []string, expectedSerial string) error
 	IsVolumePathMatchesVolumeId(volumeId string, volumePath string) (bool, error)
 }
 
 type OsDeviceConnectivityHelperScsiGeneric struct {
 	Executer        executer.ExecuterInterface
+	KeyedGater		*executer.KeyedGater
+	Mounter         *mount.Mounter
 	Helper          OsDeviceConnectivityHelperInterface
 	MutexMultipathF *sync.Mutex
 	CleanScsiDevice bool
@@ -66,10 +79,156 @@ var (
 	TimeOutMultipathdCmd                    = 10 * 1000
 	TimeOutBlockDevCmd                      = 10 * 1000
 	TimeOutSgInqCmd                         = 3 * 1000
-	MultipathdWildcardsVolumeIdAndMpath     = []string{"%w", "%d"}
-	MultipathdWildcardsMpathNameAndVolumeId = []string{"%n", "%w"}
-	multipathdWildcardsMpathAndVolumeId     = []string{"%d", "%w"}
 )
+
+// SgIoHeader matches the C struct sg_io_hdr_t for Linux ioctl
+type SgIoHeader struct {
+	InterfaceID    int32
+	DxferDirection int32
+	CmdLen         uint8
+	MxSbpLen       uint8
+	IovecCount     uint16
+	DxferLen       uint32
+	Dxferp         uintptr
+	Cmdp           uintptr
+	Sbp            uintptr
+	Timeout        uint32
+	Flags          uint32
+	PackID         int32
+	UsrPtr         uintptr
+	Status         uint8
+	MaskedStatus   uint8
+	MsgStatus      uint8
+	SbLenIv        uint8
+	HostStatus     uint16
+	DriverStatus   uint16
+	Resid          int32
+	Duration       uint32
+	Info           uint32
+}
+
+
+// sgIoHdr is the Linux SG_IO ioctl structure
+// TODO duplicates SgIoHeader
+type sgIoHdr struct {
+	interface_id    int32
+	dxfer_direction int32
+	cmd_len         uint8
+	mx_sb_len       uint8
+	iovec_count     uint16
+	dxfer_len       uint32
+	dxferp          uintptr
+	cmdp            uintptr
+	sbp             uintptr
+	timeout         uint32
+	flags           uint32
+	pack_id         int32
+	usr_ptr         uintptr
+	status          uint8
+	masked_status   uint8
+	msg_status      uint8
+	sb_len_wr       uint8
+	host_status     uint16
+	driver_status   uint16
+	resid           int32
+	duration        uint32
+	info            uint32
+}
+
+
+
+const (
+	SG_IO             = 0x2285
+	SG_DXFER_FROM_DEV = -3
+)
+
+// DmIoctl corresponds to struct dm_ioctl in <linux/dm-ioctl.h>
+type DmIoctl struct {
+    Version      [3]uint32
+    DataSize     uint32
+    DataStart    uint32
+    TargetCount  uint32
+    OpenCount    int32
+    Flags        uint32
+    EventNr      uint32
+    Padding      uint32
+    Dev          uint64
+    Name         [128]byte
+    Uuid         [129]byte
+    Data         [7]byte // Padding to align
+}
+
+
+
+const (
+    // Correct OpCode for DM_DEV_REMOVE (Cmd 0x04)
+    // _IOWR(0xfd, 0x04, 312 bytes)
+    DM_DEV_REMOVE = 0xc138fd04
+	DM_DEV_SUSPEND = 0xc138fd06
+	//DM_DEV_STATUS = 0xc138fd07
+
+
+    DM_VERSION_MAJOR = 4
+    DM_VERSION_MINOR = 0
+    DM_VERSION_PATCH = 0
+
+
+	DM_SUSPEND_FLAG    = 1 << 1  // Used to freeze I/O
+	DM_NOFLUSH_FLAG    = 1 << 8  // Critical: do not hang on dead paths, Equivalent to --noflush: drops pending I/O on remove
+	DM_DEFERRED_REMOVE = 1 << 17 // Standard for CSI Unstage
+)
+
+
+
+// Constants for Device Mapper ioctl interface
+const (
+	DM_IOCTL     = 0xfd
+	DM_NAME_LEN  = 128
+	DM_UUID_LEN  = 129
+
+	// DM_DEV_STATUS_CMD is typically 7 in the kernel's enum
+	DM_DEV_STATUS_CMD = 7
+)
+
+const (
+	BLKFLSBUF = 0x1261
+)
+
+// DM_DEV_STATUS is the ioctl command to retrieve device status
+// Calculated using _IOWR(DM_IOCTL, DM_DEV_STATUS_CMD, struct dm_ioctl)
+var DM_DEV_STATUS = iowr(DM_IOCTL, DM_DEV_STATUS_CMD, uint32(unsafe.Sizeof(dmIoctl{})))
+
+// dmIoctl matches the C struct dm_ioctl from <linux/dm-ioctl.h>
+// This layout is stable for RHEL 7 and later
+type dmIoctl struct {
+	VersionMajor uint32
+	VersionMinor uint32
+	VersionPatch uint32
+	DataSize     uint32
+	DataStart    uint32
+	TargetCount  uint32
+	OpenCount    int32
+	Flags        uint32
+	EventNr      uint32
+	Padding      uint32
+	Dev          uint64
+	Name         [DM_NAME_LEN]byte
+	Uuid         [DM_UUID_LEN]byte
+	Data         [7]byte // Padding to align
+}
+
+
+
+
+// iowr helper to calculate ioctl command values based on direction, type, nr, and size
+func iowr(t, nr, size uint32) uintptr {
+	// Formula: (dir << 30) | (size << 16) | (type << 8) | nr
+	// For _IOWR, direction is 3 (read & write bits 0x3)
+	return uintptr((3 << 30) | (size << 16) | (t << 8) | nr)
+}
+
+
+
 
 const (
 	DevPath                     = "/dev"
@@ -85,14 +244,17 @@ const (
 	mpathdSeparator             = ","
 	multipathdCmd               = "multipathd"
 	multipathCmd                = "multipath"
+	dmsetupCmd                  = "dmsetup"
 	WwnOuiEnd                   = 7
 	WwnVendorIdentifierEnd      = 16
 	procMountsFilePath          = "/proc/mounts"
 )
 
-func NewOsDeviceConnectivityHelperScsiGeneric(executer executer.ExecuterInterface, clean_scsi_device bool) OsDeviceConnectivityHelperScsiGenericInterface {
+func NewOsDeviceConnectivityHelperScsiGeneric(executer executer.ExecuterInterface, KeyedGater *executer.KeyedGater, Mounter *mount.Mounter, clean_scsi_device bool) OsDeviceConnectivityHelperScsiGenericInterface {
 	return &OsDeviceConnectivityHelperScsiGeneric{
 		Executer:        executer,
+		KeyedGater:      KeyedGater,
+		Mounter:         Mounter,
 		Helper:          NewOsDeviceConnectivityHelperGeneric(executer),
 		MutexMultipathF: &sync.Mutex{},
 		CleanScsiDevice: clean_scsi_device,
@@ -100,59 +262,38 @@ func NewOsDeviceConnectivityHelperScsiGeneric(executer executer.ExecuterInterfac
 }
 
 func (r OsDeviceConnectivityHelperScsiGeneric) IsVolumePathMatchesVolumeId(volumeUuid string, volumePath string) (bool, error) {
-	logger.Infof("IsVolumePathMatchesVolumeId: Searching matching volume id for volume path: [%s] ", volumePath)
-	volumeIdVariations := r.Helper.GetVolumeIdVariations(volumeUuid)
+    logger.Infof("IsVolumePathMatchesVolumeId: Searching matching volume id for volume path: [%s] ", volumePath)
+    volumeIdVariations := r.Helper.GetVolumeIdVariations(volumeUuid)
 
 	mpathDeviceName, err := r.Helper.GetMpathDeviceName(volumePath)
 	if err != nil {
 		return false, err
 	}
 
-	dmDirectory := DevPath
-	multipathdCommandFormatArgs := multipathdWildcardsMpathAndVolumeId
-	if r.Helper.IsDmName(mpathDeviceName) {
-		dmDirectory = DevMapperPath
-		multipathdCommandFormatArgs = MultipathdWildcardsMpathNameAndVolumeId
-	}
-
-	mpathdOutput, err := r.Helper.GetMpathdOutputForVolume(volumeIdVariations, multipathdCommandFormatArgs)
+	SgInqWwn, err := r.Helper.GetWwnByScsiInq(mpathDeviceName)
 	if err != nil {
 		return false, err
 	}
 
-	mpathVolumeId, err := r.Helper.GetMpathVolumeId(mpathdOutput, mpathDeviceName, dmDirectory)
-	if err != nil {
-		return false, err
+	if !isSameId(SgInqWwn, volumeIdVariations) {
+		return false, &ErrorWrongDeviceFound{mpathDeviceName, volumeUuid, SgInqWwn}
 	}
 
-	logger.Infof("IsVolumePathMatchesVolumeId: found volume id [%s] for volume path [%s] ", mpathVolumeId, volumePath)
-	return r.Helper.IsAnyVariationInMpathVolumeId(mpathVolumeId, volumeIdVariations), nil
+	return true, nil
 }
 
-func (r OsDeviceConnectivityHelperScsiGeneric) RescanDevices(lunId int, arrayIdentifiers []string) error {
+func (r OsDeviceConnectivityHelperScsiGeneric) RescanDevicesGetHostIds(lunId int, arrayIdentifiers []string) (map[int]bool, error) {
 	logger.Debugf("Rescan : Start rescan on specific lun, on lun : {%v}, with array identifiers : {%v}", lunId, arrayIdentifiers)
-	var hostIDs = make(map[int]bool)
-	var errStrings []string
 	if len(arrayIdentifiers) == 0 {
 		e := &ErrorNotFoundArrayIdentifiers{lunId}
 		logger.Errorf("%s", e.Error())
-		return e
+		return nil, e
 	}
 
-	for _, arrayIdentifier := range arrayIdentifiers {
-		hostsId, e := r.Helper.GetHostsIdByArrayIdentifier(arrayIdentifier)
-		if e != nil {
-			logger.Errorf("%s", e.Error())
-			errStrings = append(errStrings, e.Error())
-		}
-		for _, hostId := range hostsId {
-			hostIDs[hostId] = true
-		}
-	}
-	if len(hostIDs) == 0 && len(errStrings) != 0 {
-		err := errors.New(strings.Join(errStrings, ","))
-		return err
-	}
+	return r.Helper.GetHostsIdByArrayIdentifiers(arrayIdentifiers)
+}
+
+func (r OsDeviceConnectivityHelperScsiGeneric) RescanDevices(lunId int, arrayIdentifiers []string, hostIDs map[int]bool) error {
 	for hostNumber := range hostIDs {
 
 		filename := fmt.Sprintf("/sys/class/scsi_host/host%d/scan", hostNumber)
@@ -184,8 +325,9 @@ func (r OsDeviceConnectivityHelperScsiGeneric) RescanDevices(lunId int, arrayIde
 func (r OsDeviceConnectivityHelperScsiGeneric) GetMpathDevice(volumeId string) (string, error) {
 	logger.Infof("GetMpathDevice: Searching multipath devices for volume : [%s] ", volumeId)
 
-	volumeIdVariations := r.Helper.GetVolumeIdVariations(volumeId)
-	dmPath, _ := r.Helper.GetDmsPath(volumeIdVariations)
+	dmPath, _ := r.Helper.GetMpathDeviceName(volumeId)
+
+	volumeIdVariations := []string{volumeId}
 
 	if dmPath != "" {
 		SgInqWwn, _ := r.Helper.GetWwnByScsiInq(dmPath)
@@ -193,53 +335,79 @@ func (r OsDeviceConnectivityHelperScsiGeneric) GetMpathDevice(volumeId string) (
 			return dmPath, nil
 		}
 		logger.Warningf("Expected {%v} but got {%v} from sg_inq", volumeId, SgInqWwn)
+		return "", &ErrorWrongDeviceFound{dmPath, volumeIdVariations[0], SgInqWwn}
 	}
-
-	if err := r.Helper.ReloadMultipath(); err != nil {
-		return "", err
-	}
-
-	dmPath, err := r.Helper.GetDmsPath(volumeIdVariations)
-
-	if err != nil {
-		return "", err
-	}
-
-	if dmPath == "" {
-		return "", &MultipathDeviceNotFoundForVolumeError{volumeId}
-	}
-
-	SgInqWwn, err := r.Helper.GetWwnByScsiInq(dmPath)
-	if err != nil {
-		return "", err
-	}
-	if isSameId(SgInqWwn, volumeIdVariations) {
-		return dmPath, nil
-	}
-	// To make sure we found the right WWN, if not raise error instead of using wrong mpath
-	return "", &ErrorWrongDeviceFound{dmPath, volumeIdVariations[0], SgInqWwn}
+	return dmPath, nil
 }
 
 func isSameId(wwn string, volumeIdVariations []string) bool {
 	wwn = strings.ToLower(wwn)
 	for _, volumeIdVariation := range volumeIdVariations {
-		if wwn == volumeIdVariation {
-			return true
-		}
+			if wwn == volumeIdVariation {
+					return true
+			}
 	}
 	return false
 }
 
+
 func (r OsDeviceConnectivityHelperScsiGeneric) flushDeviceBuffers(deviceName string) error {
-	devicePath := filepath.Join(DevPath, deviceName)
-	_, err := r.Executer.ExecuteWithTimeoutSilently(TimeOutBlockDevCmd, blockDevCmd, []string{flushBufsFlag, devicePath})
+	f, err := os.OpenFile(deviceName, os.O_RDONLY, 0)
 	if err != nil {
-		logger.Errorf("%v %v {%v} did not succeed to flush the device buffers. err={%v}", blockDevCmd, flushBufsFlag, devicePath,
-			err.Error())
 		return err
 	}
+	defer f.Close()
+	_, _, errno := syscall.Syscall(syscall.SYS_IOCTL, f.Fd(), BLKFLSBUF, 0)
+	if errno != 0 {
+		return errno
+	}
 	return nil
+	// TODO
+	//	if err != nil && strings.Contains(err.Error(), "kernel hang") {
+	//	c.limiter.StuckOps.Add(1)
 }
+
+// TODO
+func (r *OsDeviceConnectivityHelperScsiGeneric) flushDeviceBuffersWithContext(ctx context.Context, devPath string) error {
+	done := make(chan error, 1)
+
+	go func() {
+		// 1. Open the device with O_NONBLOCK
+		// This prevents the open() itself from hanging if the driver is wedged [3]
+		f, err := os.OpenFile(devPath, os.O_WRONLY|syscall.O_NONBLOCK, 0)
+		if err != nil {
+			done <- fmt.Errorf("flush: failed to open %s: %w", devPath, err)
+			return
+		}
+		defer f.Close()
+
+		// 2. Execute the flush ioctl
+		// This tells the kernel to commit and invalidate the buffer cache [4]
+		_, _, errno := syscall.Syscall(
+			syscall.SYS_IOCTL,
+			f.Fd(),
+			uintptr(BLKFLSBUF),
+			0,
+		)
+
+		if errno != 0 && errno != syscall.ENOTTY {
+			done <- fmt.Errorf("flush: ioctl BLKFLSBUF failed: %v", errno)
+			return
+		}
+		done <- nil
+	}()
+
+	// 3. Monitor for completion or context timeout (Safety Gate)
+	select {
+	case err := <-done:
+		return err
+	case <-ctx.Done():
+		// If the hardware is in D-state, the goroutine will remain
+		// leaked, but our CSI logic can proceed [2]
+		return fmt.Errorf("flush: timed out (D-state suspected) on %s: %w", devPath, ctx.Err())
+	}
+}
+
 
 func (r OsDeviceConnectivityHelperScsiGeneric) flushDevicesBuffers(deviceNames []string) error {
 	logger.Debugf("executing commands : {%v %v} on devices : {%v} and timeout : {%v} mseconds", blockDevCmd, flushBufsFlag, deviceNames, TimeOutBlockDevCmd)
@@ -283,145 +451,1383 @@ func (r OsDeviceConnectivityHelperScsiGeneric) FlushMultipathDevice(mpathDevice 
 	return nil
 }
 
-func (r OsDeviceConnectivityHelperScsiGeneric) RemovePhysicalDevice(sysDevices []string) error {
-	flushErr := r.flushDevicesBuffers(sysDevices)
-	if flushErr != nil {
-		return flushErr
+
+
+func (r *OsDeviceConnectivityHelperScsiGeneric) RemovePhysicalDevice(sysDevices []string) error {
+    logger.Debugf(`Removing scsi device : {%v} by writing "1" to the delete file of each device: {%v}`, sysDevices, fmt.Sprintf(sysDeviceDeletePathFormat, "<deviceName>"))
+    var wg sync.WaitGroup
+
+    for _, deviceName := range sysDevices {
+        if deviceName == "" { continue }
+
+        wg.Add(1)
+        // In Go 1.22, 'deviceName' is safe to use directly, but 'name' works fine too
+        go func(name string) {
+            defer wg.Done()
+
+            // CHANGE: Call the package function and pass r.KeyedGater as the first arg
+            _, err := executer.ExecuteUninterruptible[struct{}](
+                r.KeyedGater,          // State instance passed here
+                "path-delete-"+name,   // Unique key per device is safer
+                10,
+                100,
+                5*time.Second,
+                30*time.Second,
+                func(ctx context.Context) (struct{}, error) {
+                    devPath := fmt.Sprintf("/dev/%s", name)
+                    _ = r.flushDeviceBuffers(devPath)
+
+                    var deletePath string
+                    if strings.HasPrefix(name, "nvme") {
+                        deletePath = fmt.Sprintf("/sys/block/%s/device/delete_controller", name)
+                    } else {
+                        deletePath = fmt.Sprintf("/sys/block/%s/device/delete", name)
+                    }
+
+                    if _, err := os.Stat(deletePath); os.IsNotExist(err) {
+			logger.Warningf("Idempotency: Block device {%v} was not found on the system, so skip deleting it", deletePath)
+                        return struct{}{}, nil
+                    }
+
+                    if err := os.WriteFile(deletePath, []byte("1"), 0200); err != nil {
+                        return struct{}{}, fmt.Errorf("failed to delete device %s: %w", name, err)
+                    }
+                    return struct{}{}, nil
+                },
+            )
+            if err != nil {
+                logger.Errorf("Gater failed for device %s: %v", name, err)
+            }
+        }(deviceName)
+    }
+
+    wg.Wait()
+    return nil
+}
+
+
+// normalizeLun converts sysfs LUN strings (hex or decimal) to a standard decimal string.
+// Example: "0x0001000000000000" -> "1"
+// Example: "1" -> "1"
+func (r *OsDeviceConnectivityHelperScsiGeneric) normalizeLun(lunStr string) string {
+	lunStr = strings.TrimSpace(lunStr)
+	if lunStr == "" {
+		return ""
 	}
 
-	// sysDevices  = sdb, sda,...
-	logger.Debugf(`Removing scsi device : {%v} by writing "1" to the delete file of each device: {%v}`, sysDevices, fmt.Sprintf(sysDeviceDeletePathFormat, "<deviceName>"))
-	// NOTE: this func could be also relevant for SCSI (not only for iSCSI)
-	var (
-		f   *os.File
-		err error
-	)
+	// If it starts with 0x, it's a hexadecimal representation (Common in 2025 Kernels)
+	if strings.HasPrefix(lunStr, "0x") {
+		// Parse the hex string to a 64-bit unsigned integer
+		val, err := strconv.ParseUint(lunStr, 0, 64)
+		if err != nil {
+			return lunStr // Fallback to raw string if parsing fails
+		}
+
+		// SCSI LUNs in sysfs often use the "Peripheral Device Addressing" format.
+		// For LUNs 0-255, the integer value is exactly what we expect.
+		// For larger/hierarchical LUNs, we return the full integer string.
+		return fmt.Sprintf("%d", val)
+	}
+
+	// If it's already a decimal string, return it as-is
+	return lunStr
+}
+
+func (r *OsDeviceConnectivityHelperScsiGeneric) readSysfs(path string) string {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return ""
+	}
+	return strings.Trim(string(data), " \n\r\t\x00")
+}
+
+func (r *OsDeviceConnectivityHelperScsiGeneric) ValidateLun(targetDm string, expectedLun int, sysDevices []string, expectedSerial string) error {
+	logger.Debugf("Validating LUN {%v} on devices: {%v}", expectedLun, sysDevices)
+
+	validPathsFound := 0
+	normLun := r.normalizeLun(strconv.Itoa(expectedLun))
+	normExpectedSerial := normalizeWWID(expectedSerial)
 
 	for _, deviceName := range sysDevices {
 		if deviceName == "" {
 			continue
 		}
 
-		filename := fmt.Sprintf(sysDeviceDeletePathFormat, deviceName)
+		// 1. D-State Gating: Don't inquiry hardware if it's already wedged
+		if r.Mounter.IsPathStuck(deviceName) {
+			logger.Warningf("Path %s is stuck in D-state, skipping validation", deviceName)
+			continue
+		}
 
-		if f, err = os.OpenFile(filename, os.O_APPEND|os.O_WRONLY, 0200); err != nil {
-			if os.IsNotExist(err) {
-				logger.Warningf("Idempotency: Block device {%v} was not found on the system, so skip deleting it", deviceName)
-				continue
-			} else {
-				logger.Errorf("Error while opening file : {%v}. error: {%v}", filename, err.Error())
-				return err
+		var actualLun, sysfsId, hwId string
+		var err error
+
+		// 2. Branching Logic for NVMe vs SCSI
+		if strings.HasPrefix(deviceName, "nvme") {
+			// NVMe Logic (Native Multipath)
+			actualLun = r.readSysfs(fmt.Sprintf("/sys/block/%s/device/nsid", deviceName))
+			sysfsId = r.readSysfs(fmt.Sprintf("/sys/block/%s/wwid", deviceName))
+			if sysfsId == "" {
+				// Fallback to nguid/uuid
+				sysfsId = r.readSysfs(fmt.Sprintf("/sys/block/%s/nguid", deviceName))
 			}
+			hwId = sysfsId // NVMe sysfs is generally authoritative
+		} else {
+			// SCSI Logic (iSCSI/FC)
+			actualLun = r.normalizeLun(r.readSysfs(fmt.Sprintf("/sys/block/%s/device/lun", deviceName)))
+			sysfsId = r.readSysfs(fmt.Sprintf("/sys/block/%s/device/wwid", deviceName))
+
+			// Force Hardware Inquiry (SG_IO) to detect stale kernel cache (Identity Split)
+			hwId, err = r.Helper.GetWwnByScsiInq("/dev/" + deviceName)
 		}
 
-		defer f.Close()
+		// 3. Evaluation of Identity & Health
+		reason := ""
+		state := r.readSysfs(fmt.Sprintf("/sys/block/%s/device/state", deviceName))
 
-		if _, err := f.WriteString("1"); err != nil {
-			logger.Errorf("Error while writing to file : {%v}. error: {%v}", filename, err.Error())
-			return err // TODO: maybe we need to just swallow the error and continnue??
+		if state != "running" {
+			reason = fmt.Sprintf("Path state is %s", state)
+			logger.Errorf("Safety Check Failed for path %s on %s: %s", deviceName, targetDm, reason)
+			continue
 		}
+		if err != nil {
+			reason = fmt.Sprintf("Hardware inquiry failed: %v", err)
+			logger.Errorf("Safety Check Failed for path %s on %s: %s", deviceName, targetDm, reason)
+		} else if !r.IsSerialMatch(hwId, normExpectedSerial) {
+			reason = fmt.Sprintf("Hardware Serial mismatch (got %s, exp %s)", hwId, normExpectedSerial)
+			return fmt.Errorf("Safety Check Failed for path %s on %s: %s", deviceName, targetDm, reason)
+		} else if actualLun != normLun {
+			reason = fmt.Sprintf("LUN Mismatch (got %s, exp %s)", actualLun, normLun)
+			return fmt.Errorf("Safety Check Failed for path %s on %s: %s", deviceName, targetDm, reason)
+		}
+		if sysfsId != "" && !r.IsSerialMatch(sysfsId, hwId) {
+			// CRITICAL: Identity Split. The kernel thinks it's one LUN, the hardware says another.
+			reason = fmt.Sprintf("Kernel/Hardware Identity Split (Sysfs: %s, HW: %s)", sysfsId, hwId)
+			return fmt.Errorf("Safety Check Failed for path %s on %s: %s", deviceName, targetDm, reason)
+		}
+
+		if reason != "" {
+			logger.Errorf("Safety Check Failed for path %s on %s: %s", deviceName, targetDm, reason)
+			continue
+		}
+
+		validPathsFound++
 	}
-	logger.Debugf("Finished removing SCSI devices : {%v}", sysDevices)
+
+	if validPathsFound == 0 {
+		return fmt.Errorf("all paths for device %s failed safety verification", targetDm)
+	}
+
+	logger.Debugf("LUN validation successful. %d healthy paths found for %s", validPathsFound, targetDm)
 	return nil
 }
 
-func (o OsDeviceConnectivityHelperScsiGeneric) RemoveGhostDevice(lun int) error {
-	if !o.CleanScsiDevice {
-		logger.Debugf("Clean devices disabled, skipping removeGhostDevice") //Can be omitted, debug only.
+
+
+
+
+
+
+
+func (r *OsDeviceConnectivityHelperScsiGeneric) RemoveGhostDevice(expectedSerial string, expectedLun int, arrayIdentifiers []string) error {
+	if !r.CleanScsiDevice {
 		return nil
 	}
-	sgMapCmd := "sg_map"
-	args := []string{"-x"}
-
-	out, err := o.Executer.ExecuteWithTimeoutSilently(TimeOutSgInqCmd, sgMapCmd, args)
+	sgEntries, err := os.ReadDir("/sys/class/scsi_generic")
 	if err != nil {
-		logger.Errorf("Error getting sg devices from sg_map. error: {%v}", err.Error())
+		if os.IsNotExist(err) { return nil }
+		return fmt.Errorf("failed to read scsi_generic: %w", err)
+	}
+
+	var (
+		deleted int
+		notLun  int
+		notPQ   int
+	)
+
+	normLun := r.normalizeLun(fmt.Sprintf("%d", expectedLun))
+
+	for _, entry := range sgEntries {
+		sgName := entry.Name()
+		deviceDir := filepath.Join("/sys/class/scsi_generic", sgName, "device")
+
+		// 2. Validate LUN Match
+		lunBytes, _ := os.ReadFile(filepath.Join(deviceDir, "lun"))
+		if r.normalizeLun(string(lunBytes)) != normLun {
+			notLun++
+			continue
+		}
+
+		// 3. TRANSPORT SCOPE CHECK
+		// Fix: Removed 'filepath.EvalSymlinks' shadowing; calling method on 'r'
+		isOurPath := r.isPathOwnedByMyArray(sgName, arrayIdentifiers)
+
+		// 4. VENDOR CHECK (IBM)
+		vendorBytes, _ := os.ReadFile(filepath.Join(deviceDir, "vendor"))
+		vendor := strings.TrimSpace(string(vendorBytes))
+		isIBM := strings.Contains(vendor, "IBM")
+
+		// 5. Identity/Ghost Logic
+		// Fix: getHardwareSerial returns (string, error). Added hwErr handling.
+		hwSerial, hwErr := r.getHardwareSerial(deviceDir)
+
+		isGhost, _ := r.IsGhostDevice(sgName)
+
+		// Logic: Prune if it's an IBM Ghost OR if it's a path we own but the hardware ID is wrong.
+		shouldDelete := (isGhost && isIBM) || (isOurPath && (isGhost || !isIBM || (hwSerial != "" && !r.IsSerialMatch(hwSerial, expectedSerial))))
+
+		// TODO fix reason - some are wrong
+		if shouldDelete {
+			reason := "serial mismatch"
+			if isGhost {
+				reason = "IBM PQ=1 Ghost (No block device)"
+			} else if hwErr != nil {
+				reason = fmt.Sprintf("IBM path inquiry failed: %v", hwErr)
+			}
+
+			logger.Warningf("Pruning stale IBM device %s. Reason: %s", sgName, reason)
+
+			// 6. REMEDIATION: Using the Safety Gater to prevent D-state hangs
+			// Fix: Writing "1" to sysfs delete must be 0200 (Write-only) for root.
+			// TODO restore check
+			_, err := executer.ExecuteUninterruptible[struct{}](
+				r.KeyedGater,
+				"path-delete-"+sgName, // Unique key per device for granular gating
+				1,                     // maxRunning: only 1 delete at a time for THIS specific device
+				10,                    // maxSpare: budget for stuck threads
+				2*time.Second,         // handoffTimeout: move to spare pool if kernel hangs
+				15*time.Second,        // hardTimeout: return error to caller if still stuck
+				func(ctx context.Context) (struct{}, error) {
+					deletePath := filepath.Join(deviceDir, "delete")
+
+					// Trigger the kernel removal
+					if err := os.WriteFile(deletePath, []byte("1"), 0200); err != nil {
+						return struct{}{}, err
+					}
+
+					return struct{}{}, nil
+				},
+			)
+			if err == nil {
+				deleted++
+			}
+		} else {
+			notPQ++
+		}
+	}
+
+	if deleted != 0 {
+		logger.Debugf("Deleted %d devices. Found %d not-our-lun, %d our lun but not ghost", deleted, notLun, notPQ)
+	}
+	return nil
+}
+
+
+// TODO integrate
+func (r *OsDeviceConnectivityHelperScsiGeneric) isNvmeGhost(nvmeName string) bool {
+    // Check Namespace state
+    path := fmt.Sprintf("/sys/block/%s/device/state", nvmeName)
+    state, err := os.ReadFile(path)
+    if err != nil { return true } // Gone
+
+    s := strings.TrimSpace(string(state))
+    // NVMe states: live, resetting, connecting, deleting, dead
+    return s == "deleting" || s == "dead"
+}
+
+func (r *OsDeviceConnectivityHelperScsiGeneric) PruneNvmeGhosts(expectedWWID string, arrayNqns []string) error {
+	// 1. Iterate through NVMe namespaces in sysfs
+	// Path: /sys/block/nvmeXnY
+	entries, err := os.ReadDir("/sys/block")
+	if err != nil {
 		return err
 	}
 
-	lines := strings.Split(string(out), "\n")
-	var (
-		deleted int = 0
-		notLun  int = 0
-		notPQ   int = 0
-	)
+	normExpected := normalizeWWID(expectedWWID)
 
-	/*
-		output pattern that we're looking for is something like this:
-		/dev/sg2173  34 0 39 <lun>  0
-		namely: /dev/sg something, then 4 numbers with space between each, the last of which is the lun,
-		then two spaces and another number
-
-		If we want either with or without sd:
-		pattern := fmt.Sprintf(`^/dev/sg\d+\s+\d+\s\d+\s\d+\s%d\s{2}\d+(?:\s+/dev/\S+)?$`, lun)
-		If we want only lines with no sd device:
-	*/
-	pattern := fmt.Sprintf(`^/dev/sg\d+\s+\d+\s\d+\s\d+\s%d\s{2}\d+$`, lun)
-	re := regexp.MustCompile(pattern)
-
-	for _, line := range lines {
-		if !re.MatchString(line) {
-			notLun += 1
+	for _, entry := range entries {
+		name := entry.Name()
+		if !strings.HasPrefix(name, "nvme") {
 			continue
 		}
 
-		fields := strings.Fields(line)
-		sgName := fields[0]
-
-		if !o.isGhostIBMDevice(sgName) {
-			notPQ += 1
+		// 2. Identify the Controller and Subsystem NQN
+		// Path: /sys/block/nvme0n1/device -> /sys/devices/virtual/nvme-fabrics/ctl/nvme0
+		deviceDir := filepath.Join("/sys/block", name, "device")
+		subsysNqnPath := filepath.Join(deviceDir, "subsysnqn")
+		nqnData, err := os.ReadFile(subsysNqnPath)
+		if err != nil {
 			continue
 		}
-		sgDev := strings.TrimPrefix(sgName, "/dev/")
-		deletePath := fmt.Sprintf("/sys/class/scsi_generic/%s/device/delete", sgDev)
-		logger.Debugf("Deleting ghost device: %s", sgDev) // should I print all of them in one line at the end?
+		currentNqn := strings.TrimSpace(string(nqnData))
 
-		if err := os.WriteFile(deletePath, []byte("1"), 0644); err != nil {
-			logger.Errorf("Error deleting device %s: %v\n", sgDev, err)
-		} else {
-			deleted += 1
+		// 3. Ownership Check: Is this NVMe device from our array?
+		isOurArray := false
+		for _, nqn := range arrayNqns {
+			if strings.EqualFold(currentNqn, nqn) {
+				isOurArray = true
+				break
+			}
 		}
-	}
-	if deleted != 0 {
-		logger.Debugf("Deleted %d devices. Found %d not-our-lun devices, and %d our lun but non ghost", deleted, notLun, notPQ)
+		if !isOurArray {
+			continue
+		}
+
+		// 4. Identity & State Check
+		wwid, _ := r.getWWIDBySysfs(name) // Uses nguid/uuid as implemented before
+		stateData, _ := os.ReadFile(filepath.Join(deviceDir, "state"))
+		state := strings.TrimSpace(string(stateData))
+
+		// 5. Remediation Logic
+		// Prune if:
+		// - State is dead/deleting (Kernel Ghost)
+		// - Or WWID mismatch on our expected array (Stale mapping)
+		isGhost := (state == "dead" || state == "deleting")
+		isMismatch := (wwid != "" && normalizeWWID(wwid) != normExpected)
+
+		if isGhost || isMismatch {
+			logger.Warningf("Pruning stale NVMe device %s. State: %s, WWID Match: %v", name, state, !isMismatch)
+
+			_, err := executer.ExecuteUninterruptible[struct{}](
+				r.KeyedGater,
+				"nvme-delete-"+name,
+				1,
+				10,
+				2*time.Second,
+				15*time.Second,
+				func(ctx context.Context) (struct{}, error) {
+					deletePath := filepath.Join(deviceDir, "delete_controller")
+
+					if _, err := os.Stat(deletePath); err == nil {
+						if err := os.WriteFile(deletePath, []byte("1"), 0200); err != nil {
+							return struct{}{}, err
+						}
+					}
+
+					// Return the "Zero Value" of the struct
+					return struct{}{}, nil
+				},
+			)
+			if err != nil {
+			}
+		}
 	}
 	return nil
 }
 
-func (o OsDeviceConnectivityHelperScsiGeneric) isGhostIBMDevice(sgDev string) bool {
-	sgInqCmd := "sg_inq"
-	args := []string{sgDev}
 
-	outputBytes, err := o.Executer.ExecuteWithTimeoutSilently(TimeOutSgInqCmd, sgInqCmd, args)
+
+
+
+func(r *OsDeviceConnectivityHelperScsiGeneric) GetHCTLFromSg(sgName string) (string, error) {
+	// sysPath: /sys/class/scsi_generic/sg5
+	// This symlink is provided by the kernel specifically to link the generic
+	// interface to the underlying SCSI device object.
+	deviceLink := filepath.Join("/sys/class/scsi_generic", sgName, "device")
+
+	realPath, err := filepath.EvalSymlinks(deviceLink)
 	if err != nil {
-		logger.Errorf("Error executing %v. error: {%v}", sgInqCmd, err.Error())
+		return "", fmt.Errorf("failed to resolve SCSI device link for %s: %w", sgName, err)
+	}
+
+	// The HCTL (Host:Channel:Target:LUN) is the base name of the leaf directory.
+	// Example: /sys/devices/pci0000:00/.../target4:0:0/4:0:0:1 -> "4:0:0:1"
+	hctl := filepath.Base(realPath)
+
+	// 3. Validation
+	// Standard SCSI HCTL always has exactly 3 colons (4 parts).
+	if strings.Count(hctl, ":") != 3 {
+		// Fallback: If it's a newer NVMe-oF device, the naming might differ.
+		// For CSI/SCSI, we treat anything without 3 colons as an error.
+		return "", fmt.Errorf("invalid HCTL format '%s' for device %s", hctl, sgName)
+	}
+
+	return hctl, nil
+}
+
+func (r *OsDeviceConnectivityHelperScsiGeneric) getIscsiTargetName(deviceBase string) string {
+    // On RHEL 7, the session directory is a child of the SCSI device directory
+    files, err := os.ReadDir(deviceBase)
+    if err != nil {
+        return ""
+    }
+    for _, f := range files {
+        if strings.HasPrefix(f.Name(), "session") {
+            // Traverse deeper to find the iscsi_session attributes
+            // Path: .../sessionX/iscsi_session/sessionX/targetname
+            targetNamePath := filepath.Join(deviceBase, f.Name(), "iscsi_session", f.Name(), "targetname")
+            if data, err := os.ReadFile(targetNamePath); err == nil {
+                return strings.TrimSpace(string(data))
+            }
+        }
+    }
+    return ""
+}
+
+func (r *OsDeviceConnectivityHelperScsiGeneric) isPathOwnedByMyArray(deviceName string, arrayIdentifiers []string) bool {
+	var targetID string
+
+	// 1. Branching: NVMe vs SCSI
+	if strings.HasPrefix(deviceName, "nvme") {
+		// NVMe Logic: The Subsystem NQN is the source of truth
+		// Path: /sys/block/nvmeXnY/device/subsysnqn
+		nqnPath := fmt.Sprintf("/sys/block/%s/device/subsysnqn", deviceName)
+		if data, err := os.ReadFile(nqnPath); err == nil {
+			targetID = strings.TrimSpace(string(data))
+		}
+	} else {
+		// SCSI Logic (iSCSI/FC): Get HCTL and probe transport
+		hctl, err := r.GetHCTLFromSg(deviceName)
+		if err != nil {
+			// Fallback: Try to get HCTL from the device directory if it's an 'sd' name
+			hctl = r.readSysfs(fmt.Sprintf("/sys/block/%s/device/scsi_device", deviceName))
+		}
+
+		if hctl != "" {
+			targetID = r.getScsiTargetID(hctl)
+		}
+	}
+
+	if targetID == "" {
 		return false
 	}
 
-	outStr := string(outputBytes)
-	return strings.Contains(outStr, "PQual=1") && strings.Contains(outStr, "IBM")
+	// 2. Case-Insensitive Comparison
+	targetID = strings.ToLower(strings.TrimPrefix(targetID, "0x"))
+	for _, id := range arrayIdentifiers {
+		normalizedExpected := strings.ToLower(strings.TrimPrefix(id, "0x"))
+		if targetID == normalizedExpected {
+			return true
+		}
+	}
+	return false
 }
 
-func (r OsDeviceConnectivityHelperScsiGeneric) ValidateLun(lun int, sysDevices []string) error {
-	logger.Debugf("Validating lun {%v} on devices: {%v}", lun, sysDevices)
-	for _, sysDevice := range sysDevices {
-		sysDeviceParts := strings.Split(sysDevice, "/")
-		device := sysDeviceParts[len(sysDeviceParts)-1]
+// Internal helper for SCSI logic (FC/iSCSI/SAS)
+func (r *OsDeviceConnectivityHelperScsiGeneric) getScsiTargetID(hctl string) string {
+	parts := strings.Split(hctl, ":")
+	if len(parts) < 4 { return "" }
+	hct := strings.Join(parts[:3], ":")
+	deviceBase := fmt.Sprintf("/sys/class/scsi_device/%s/device", hctl)
+	targetDir := fmt.Sprintf("target%s", hct)
 
-		symLinkPath := fmt.Sprintf(sysDeviceSymLinkFormat, device)
-		destinationPath, err := filepath.EvalSymlinks(symLinkPath)
+	// Try FC
+	fcPath := filepath.Join(deviceBase, "fc_transport", targetDir, "port_name")
+	if data, err := os.ReadFile(fcPath); err == nil {
+		return string(data)
+	}
+
+	// Try SAS
+	sasPath := filepath.Join(deviceBase, "sas_device", targetDir, "sas_address")
+	if data, err := os.ReadFile(sasPath); err == nil {
+		return string(data)
+	}
+
+	// Try iSCSI
+	return r.getIscsiTargetName(deviceBase)
+}
+
+
+// getHardwareSerial safely retrieves the serial, returning error if path is blocked
+func (r *OsDeviceConnectivityHelperScsiGeneric) getHardwareSerial(deviceDir string) (string, error) {
+	// Try the standard 'wwid' file first
+	wwidBytes, err := os.ReadFile(filepath.Join(deviceDir, "wwid"))
+	if err != nil || len(strings.TrimSpace(string(wwidBytes))) == 0 {
+		// Fallback: If 'wwid' is empty, path might be blocked or transitioning
+		return "", fmt.Errorf("serial unavailable")
+	}
+	return strings.TrimSpace(string(wwidBytes)), nil
+}
+
+
+func (r *OsDeviceConnectivityHelperScsiGeneric) IsGhostDevice(sgName string) (bool, error) {
+	// 1. Sysfs Fast-Check (Kernel-Level Knowledge)
+	deviceBase := fmt.Sprintf("/sys/class/scsi_generic/%s/device", sgName)
+	stateBytes, err := os.ReadFile(filepath.Join(deviceBase, "state"))
+	if err == nil {
+		state := strings.TrimSpace(string(stateBytes))
+		// 'offline' or 'deleting' means the kernel has already severed ties
+		if state == "offline" || state == "cancelled" || state == "deleting" {
+			return true, nil
+		}
+		// 'blocked' or 'quiesce' means we CANNOT run ioctl without hanging
+		if state == "blocked" || state == "quiesce" {
+			return false, fmt.Errorf("device %s is blocked; cannot verify ghost status", sgName)
+		}
+	}
+
+	// 2. Type 31 Check (PQ=1 mapped to Type 31)
+	typeBytes, err := os.ReadFile(filepath.Join(deviceBase, "type"))
+	if err == nil && strings.TrimSpace(string(typeBytes)) == "31" {
+		return true, nil
+	}
+
+	// 3. Disk vs Block Check
+	// If it's a disk type (0) but has no block child, it's a stale/ghost entry
+	if r.isDiskType(deviceBase) {
+		blockPath := filepath.Join(deviceBase, "block")
+		if _, err := os.Stat(blockPath); os.IsNotExist(err) {
+			return true, nil
+		}
+	}
+
+	// 4. The Hardware Truth (SCSI Inquiry)
+	return r.checkPQviaIoctl(sgName)
+}
+
+
+
+func (r *OsDeviceConnectivityHelperScsiGeneric) isDiskType(deviceBase string) bool {
+	data, err := os.ReadFile(filepath.Join(deviceBase, "type"))
+	return err == nil && strings.TrimSpace(string(data)) == "0"
+}
+
+
+
+func (r *OsDeviceConnectivityHelperScsiGeneric) checkPQviaIoctl(sgName string) (bool, error) {
+
+	// 1. Avoid opening if sysfs already tells us the path is blocked
+	if r.isHardwareBlocked(sgName) {
+		return false, fmt.Errorf("device %s is in blocked/quiesce state, skipping ioctl", sgName)
+	}
+
+	devPath := filepath.Join("/dev", sgName)
+
+	// 1. Try O_RDONLY first (The "Clean" way)
+	fd, err := syscall.Open(devPath, syscall.O_RDONLY|syscall.O_NONBLOCK, 0)
+
+	// 2. If EACCES or EPERM, try O_RDWR (The "Privileged" way)
+	// Some RHEL 7 drivers require Write bits to allow ANY SG_IO ioctl.
+	if err != nil && (errors.Is(err, syscall.EACCES) || errors.Is(err, syscall.EPERM)) {
+		fd, err = syscall.Open(devPath, syscall.O_RDWR|syscall.O_NONBLOCK, 0)
+	}
+
+	if err != nil {
+		// ENXIO/ENODEV means the hardware is physically gone (Ghost)
+		if errors.Is(err, syscall.ENXIO) || errors.Is(err, syscall.ENODEV) {
+			return true, nil
+		}
+		return false, fmt.Errorf("failed to open %s: %w", devPath, err)
+	}
+
+
+	defer syscall.Close(fd)
+
+	// 1. Check Subsystem (Avoid sending SCSI Inquiry to non-SCSI devices)
+	subsystem, _ := os.Readlink(fmt.Sprintf("/sys/class/scsi_generic/%s/device/subsystem", sgName))
+	if strings.Contains(subsystem, "nvme") {
+		// NVMe 'ghosts' are handled differently (Namespace state)
+		return false, nil
+	}
+
+
+	const allocationLen = 36
+	inqResp := make([]byte, allocationLen)
+	senseBuf := make([]byte, 32)
+	cdb := [6]byte{0x12, 0, 0, 0, uint8(allocationLen), 0}
+
+	header := sgIoHdr{
+		interface_id:    'S',
+		dxfer_direction: SG_DXFER_FROM_DEV,
+		cmd_len:         uint8(len(cdb)),
+		mx_sb_len:       uint8(len(senseBuf)),
+		sbp:             uintptr(unsafe.Pointer(&senseBuf[0])),
+		dxfer_len:       uint32(len(inqResp)),
+		dxferp:          uintptr(unsafe.Pointer(&inqResp[0])),
+		cmdp:            uintptr(unsafe.Pointer(&cdb[0])),
+		timeout:         1000, // 1 second is standard
+		flags:           0, // Ensure no direct I/O or other flags are set by accident
+	}
+
+	// Use a retry loop specifically for transient SCSI errors like Unit Attention (UA)
+	maxRetries := 2
+	for attempt := 0; attempt < maxRetries; attempt++ {
+		// Reset sense buffer before each attempt
+		for i := range senseBuf {
+			senseBuf[i] = 0
+		}
+		header.sb_len_wr = 0 // Reset written sense length
+
+		// Syscall with retry on EAGAIN/EBUSY
+		var errno syscall.Errno
+		for i := 0; i < 3; i++ {
+			_, _, errno = syscall.Syscall(syscall.SYS_IOCTL, uintptr(fd), SG_IO, uintptr(unsafe.Pointer(&header)))
+			if errno != syscall.EAGAIN && errno != syscall.EBUSY {
+				break
+			}
+			time.Sleep(10 * time.Millisecond)
+		}
+
+		if errno != 0 {
+			// syscall.ENOTTY - Inappropriate ioctl for device, means the device doesn't support the SG_IO ioctl (e.g., a partition node or a non-SCSI device).
+			// TODO Should  we return FALSE for ENOTTY
+			if errno == syscall.ENXIO || errno == syscall.ENODEV || errno == syscall.ENOTTY {
+				return true, nil // Confirmed gone at kernel level
+			}
+			return false, fmt.Errorf("ioctl failed: %v", errno)
+		}
+
+		// Validate Transport Health (Host Status) - if fabric is down, this isn't a ghost
+		if header.host_status != 0 {
+			return false, fmt.Errorf("transport failure (host: 0x%x): path is down, not a ghost", header.host_status)
+		}
+
+		// Evaluate SCSI Status
+		switch header.status {
+		case 0x00: // GOOD: Break retry loop and process the PQ bits
+			goto PROCESS_PQ
+
+		case 0x02: // CHECK CONDITION: Inspect Sense Data
+			if header.sb_len_wr >= 18 {
+				senseKey := senseBuf[2] & 0x0f
+
+				if senseKey == 0x06 { // UNIT ATTENTION
+					logger.Debugf("UA detected on %s, retrying inquiry...", sgName)
+					continue // Retry the main 'attempt' loop
+				}
+
+				// Handle other "ghost" conditions if they appear on the first try:
+				asc := senseBuf[12]
+				ascq := senseBuf[13]
+				if senseKey == 0x05 && asc == 0x25 && ascq == 0x00 { // LU Not Supported
+					logger.Debugf("Confirmed Ghost via Sense Data: LU Not Supported")
+					return true, nil
+				}
+
+				// Sense Key 0x02 (Not Ready) + ASC 0x3A (Medium Not Present)
+				if senseKey == 0x02 && asc == 0x3A {
+					return true, nil
+				}
+
+			}
+			// If it's a different error, the path might just be transiently failing
+			return false, fmt.Errorf("scsi check condition: sense key 0x%02x", senseBuf[2]&0x0f)
+
+		case 0x08, 0x28: // BUSY or Task Set Full
+			time.Sleep(50 * time.Millisecond)
+			continue // Retry
+
+		default:
+			return false, fmt.Errorf("unexpected scsi status: 0x%02x", header.status)
+		}
+	} // End of 'attempt' loop
+
+	// If we exhausted retries and are still here (very rare)
+	return false, fmt.Errorf("failed to get reliable status after retries")
+
+
+PROCESS_PQ:
+	// 5. Evaluate Peripheral Qualifier
+	// PQ is bits 7-5 of byte 0.
+	// 000b = Connected
+	// 001b = Supported but not connected (GHOST)
+	// 011b = Not supported
+	pq := (inqResp[0] >> 5) & 0x07
+
+	// Also check byte 0 bits 4-0 (Device Type)
+	// Type 0x1f (31) is the standard "no device" type.
+	devType := inqResp[0] & 0x1f
+	// device 0x1f - Unknown or no device type.
+
+	// 0x01 = PQ 1 (Logical unit is capable of being supported, but not connected)
+	// 0x03 = PQ 3 (The device server is not capable of supporting a device on this
+	if pq == 1 || pq == 3 || devType == 0x1f {
+		logger.Debugf("SCSI Inquiry confirmed ghost: PQ=%d, Type=%d", pq, devType)
+		return true, nil
+	}
+    return false, nil
+}
+
+//State	isGhostDevice Result	Reasoning
+//offline/deleting	true	Kernel has marked the path as dead.
+//blocked/quiesce	Error	Path is frozen; ioctl may hang despite O_NONBLOCK.
+//running + PQ=1	true	Target confirms LUN is configured but disconnected.
+//running + PQ=3	true	Target confirms LUN is unsupported.
+//running + Type=31
+
+func (r *OsDeviceConnectivityHelperScsiGeneric) isHardwareBlocked(sgName string) bool {
+	statePath := fmt.Sprintf("/sys/class/scsi_generic/%s/device/state", sgName)
+	state, err := os.ReadFile(statePath)
+	if err != nil {
+		return true // Assume blocked if we can't read state
+	}
+	s := strings.TrimSpace(string(state))
+	// 'blocked' means the transport layer has paused queues (e.g., FC cable pulled)
+	// 'quiesce' means the driver is busy.
+	// Both will cause an ioctl to hang despite O_NONBLOCK.
+	// "quiesce" may be used during upgrade / failover - add log
+	return s == "blocked"
+}
+
+
+func (r *OsDeviceConnectivityHelperScsiGeneric) TeardownVolume(target string, expectedWWID string) error {
+
+	// --- PHASE 1: UNMOUNT ---
+	isMounted, err := r.Mounter.IsMounted(target)
+	if err != nil {
+		return err
+	}
+	if isMounted {
+		if err := r.Mounter.UnmountWithTimeout(target, 20); err != nil {
+			return fmt.Errorf("unmount phase failed: %w", err)
+		}
+	}
+
+	// --- PHASE 1: VFS LAYER (UNMOUNT STACK) ---
+	mounts, _ := r.Mounter.GetMountsForPath(target)
+	var major, minor int
+	if len(mounts) > 0 {
+		major, minor = mounts[0].Major, mounts[0].Minor
+		for i := len(mounts) - 1; i >= 0; i-- {
+			_ = r.Mounter.EscalateToLazy(target)
+			_ = r.pollLayerDeleted(target, mounts[i].MountID, 5*time.Second)
+		}
+	}
+
+	// BARRIER: Mountinfo must be clean
+	if !r.Mounter.PollMountDeleted(target, 10*time.Second) {
+		return fmt.Errorf("teardown: mountinfo not clean for %s", target)
+	}
+
+	// Resolve Hardware
+	mpathName := r.Helper.findDMByWWID(expectedWWID)
+	// If major/minor weren't found via mount, resolve via mpathName
+	if major == 0 && mpathName != "" {
+		major, minor, _ = r.Helper.GetMajorMinorFromSysfs(mpathName)
+	}
+
+	// Standardize on [[]string]
+	slaves, err := executer.ExecuteUninterruptible[[]string](
+		r.KeyedGater,
+		fmt.Sprintf("get-slaves-%d:%d", major, minor),
+		5, 20, 1*time.Second, 5*time.Second,
+		func(ctx context.Context) ([]string, error) {
+			return r.Helper.getSlavesForDevice(major, minor)
+		},
+	)
+
+	if err != nil {
+		return err
+	}
+
+	// --- PHASE 2: BLOCK LAYER (IDENTITY & OPENCOUNT) ---
+	if mpathName != "" {
+		// Verify OpenCount to determine removal strategy
+		openCount, err := r.Helper.GetOpenCount(mpathName)
+
 		if err != nil {
 			return err
 		}
 
-		if !strings.HasSuffix(destinationPath, strconv.Itoa(lun)) {
-			return fmt.Errorf("lun not valid, storage lun: %v, linkedPath: %v to device: %v", lun, destinationPath, device)
+		needDeferRemove := false
+
+		if openCount == 0 {
+		    // --- PHASE 2: DEVICE-MAPPER LAYER ---
+			// 1. FLUSH: High risk of D-state hang
+			_, _ = executer.ExecuteUninterruptible[struct{}](
+				r.KeyedGater,
+				"flush-"+mpathName, // Specific key prevents one stuck mpath from blocking others
+				10,
+				50,
+				5*time.Second,
+				30*time.Second,
+				func(ctx context.Context) (struct{}, error) {
+					err := r.flushDeviceBuffers(fmt.Sprintf("/dev/mapper/%s", mpathName))
+					return struct{}{}, err
+				},
+			)
+
+			// 2. DELETE: Socket call (Interruptible)
+			// Note: Assuming ExecuteInterruptible also uses Generics now for consistency
+			_, err := executer.ExecuteUninterruptible[struct{}](
+				r.KeyedGater,
+				"mpath-socket",
+				3,
+				20,
+				10*time.Second,
+				0,
+				func(ctx context.Context) (struct{}, error) {
+					err := r.multipathdAction("del map " + mpathName)
+					return struct{}{}, err
+				},
+			)
+
+			if err != nil {
+				needDeferRemove = true
+				// Fallback if socket fails despite opencount being 0
+			}
+		} else if openCount > 0 {
+			// STUBBORN PATH: Mount is gone, but a process has a raw FD open.
+			// Do not block. Use Deferred Remove (Fire-and-Forget).
+
+			// TODO should we try  DM_SKIP_BDGET_FLAG (same as dmsetup --force)
+			// return exec.Command("dmsetup", "remove", "--force", "--retry", dmName).Run()
+
+			needDeferRemove = true
+		}
+		if needDeferRemove {
+			_ = r.multipathdAction("disablequeueing map " + mpathName)
+			for _, s := range slaves {
+				_ = r.multipathdAction("fail path " + s)
+			}
+			_ = r.deferredRemove(mpathName)
 		}
 	}
-	logger.Debugf("Finished lun validation")
-	return nil
 
+	// --- PHASE 3 & 4: EMERGENCY & PHYSICAL ---
+	// If mpathName still exists in sysfs after the above, Phase 3 triggers
+	if len(slaves) > 0 {
+		r.RemovePhysicalDevice(slaves)
+	}
+
+	// Final File Cleanup
+	if _, err := os.Stat(target); err == nil {
+		return os.Remove(target)
+	}
+	return nil
 }
+
+
+
+func (o *OsDeviceConnectivityHelperGeneric) getSlavesForDevice(major, minor int) ([]string, error) {
+	slavesPath := fmt.Sprintf("/sys/dev/block/%d:%d/slaves", major, minor)
+
+	entries, err := os.ReadDir(slavesPath)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return nil, nil
+		}
+		return nil, err
+	}
+
+	var results []string
+	for _, entry := range entries {
+		slaveName := entry.Name() // e.g., "sda" or "nvme0n1"
+
+		if strings.HasPrefix(slaveName, "nvme") {
+			// NVMe: The slave name is usually what we need (e.g., nvme0n1)
+			results = append(results, slaveName)
+		} else {
+			// SCSI: We need the 'sg' equivalent
+			sgPath := filepath.Join("/sys/block", slaveName, "device", "scsi_generic")
+			sgEntries, _ := os.ReadDir(sgPath)
+			for _, sgEntry := range sgEntries {
+				if strings.HasPrefix(sgEntry.Name(), "sg") {
+					results = append(results, sgEntry.Name())
+				}
+			}
+		}
+	}
+	return results, nil
+}
+
+
+
+type IdentityResult struct {
+	WWID string
+	HW   string
+}
+
+// TODO call FinalWwidPurge
+func (r *OsDeviceConnectivityHelperScsiGeneric) IdentityAwarePreScan(targetPath string, expectedWWID string) error {
+	mounts, _ := r.Mounter.GetMountsForPath(targetPath)
+	mpathName := r.Helper.findDMByWWID(expectedWWID)
+	normExpected := normalizeWWID(expectedWWID)
+
+	// CASE 1: Path is mounted
+	if len(mounts) > 0 {
+
+		res, err := executer.ExecuteUninterruptible[IdentityResult](
+			r.KeyedGater,
+			"wwid-check",
+			5,
+			20,
+			2*time.Second,
+			10*time.Second,
+			func(ctx context.Context) (IdentityResult, error) {
+				wwid, _ := r.Helper.getWWIDByDev(mounts[0].Major, mounts[0].Minor)
+				hw, _ := r.GetDeviceWWN(mpathName)
+
+				return IdentityResult{WWID: wwid, HW: hw}, nil
+			},
+		)
+
+		if err != nil {
+			return err
+		}
+
+		var currentWWID = res.WWID
+		var actualHw = res.HW
+
+		if strings.EqualFold(currentWWID, normExpected) && (actualHw == "" ||  strings.EqualFold(actualHw, normExpected)) {
+			// Zombie Match: Same volume from a crashed attempt. Full cleanup.
+			// TODO not null case?
+			err := r.TeardownVolume(targetPath, expectedWWID)
+			if err != nil {
+				return fmt.Errorf("pre-scan: failed to clear zombie volume: %w", err)
+			}
+			return nil
+		} else {
+			// Collision: A DIFFERENT volume is here.
+			// We MUST NOT delete the DM map (we don't own it), but we must rescue the path.
+			// TODO call immedidate unmount
+			for i := len(mounts) - 1; i >= 0; i-- {
+				_ = syscall.Unmount(targetPath, syscall.MNT_DETACH)
+			}
+
+			// Verify the collision is cleared
+			// TODO should we expect the detach to be immediate or add small polling loop a la pollLayerDeleted
+			if mounted, _ := r.Mounter.IsMounted(targetPath); mounted {
+				return fmt.Errorf("pre-scan: collision at %s; failed to detach rogue volume %s", targetPath, currentWWID)
+			}
+		}
+	}
+
+	// CASE 2: Unmounted Zombie Device
+	if mpathName != "" {
+		// Before checking OpenCount, ensure we aren't queuing I/O to a dead map
+		_ = r.multipathdAction("disablequeueing map " + mpathName)
+
+		openCount, err := r.Helper.GetOpenCount(mpathName)
+		if err != nil {
+			return err
+		}
+		if openCount == 0 {
+			// Clean fresh start
+			_ = r.multipathdAction("del map " + mpathName)
+		} else {
+			// Device is busy (e.g. by an old LVM scan or udev).
+			// Schedule for deletion the moment it's released.
+			_ = r.deferredRemove(mpathName)
+		}
+	}
+
+	// CASE 2: Unmounted Zombie Device (Cleanup DM/Multipath leftovers)
+	if mpathName != "" {
+		// Stop I/O queuing to prevent D-state hangs during deletion
+		_ = r.multipathdAction("disablequeueing map " + mpathName)
+
+		openCount, err := r.Helper.GetOpenCount(mpathName)
+		if err == nil {
+			if openCount <= 0 {
+				// Clean fresh start: No one is using it
+				_ = r.multipathdAction("del map " + mpathName)
+			} else {
+				// Device is busy (LVM/udev). Use Deferred Remove for RHEL 7 safety.
+				_ = r.deferredRemove(mpathName)
+			}
+		}
+	}
+
+	// CASE 3: Directory Cleanup
+	// If we are here, targetPath is NOT a mount point.
+	if st, err := os.Stat(targetPath); err == nil {
+		if st.IsDir() {
+			// Use RemoveAll ONLY if it is a directory.
+			// If it's a stale block device node, RemoveAll might try to
+			// recurse into a corrupted sysfs link.
+			_ = os.RemoveAll(targetPath)
+		} else {
+			_ = os.Remove(targetPath)
+		}
+	}
+
+	return nil
+}
+
+func (r *OsDeviceConnectivityHelperScsiGeneric) FinalWwidPurge(expectedWWID string) error {
+	targetWWID := normalizeWWID(expectedWWID)
+
+	// 1. CLEANUP MULTIPATH LAYER
+	mpathName := r.Helper.findDMByWWID(targetWWID)
+	if mpathName != "" {
+		_, err := executer.ExecuteUninterruptible[struct{}](
+			r.KeyedGater,
+			"mpath-final-del-"+mpathName, // Unique key per map to prevent head-of-line blocking
+			1,                            // maxRunning: 1 operation per specific map
+			5,                            // maxSpare: tight budget for this final cleanup
+			2*time.Second,                // handoffTimeout: move to spare if socket/ioctl hangs
+			10*time.Second,               // hardTimeout: return error to caller
+			func(ctx context.Context) (struct{}, error) {
+				// 1. Primary Method: Socket call to multipathd
+				if err := r.multipathdAction("del map " + mpathName); err != nil {
+					// 2. Fallback: If socket fails, try a deferred removal
+					// Note: deferredRemove likely triggers a kernel-level 'delete'
+					if errDeffered := r.deferredRemove(mpathName); errDeffered != nil {
+						return struct{}{}, fmt.Errorf("socket delete failed (%w) and deferred removal failed (%v)", err, errDeffered)
+					}
+				}
+				return struct{}{}, nil
+			},
+		)
+		if err != nil {
+			return err
+		}
+	}
+
+	// 2. SCAN FOR ORPHAN DM DEVICES (Multipathd-lost)
+	dmUUIDs, _ := filepath.Glob("/sys/block/dm-*/dm/uuid")
+	for _, path := range dmUUIDs {
+		data, err := os.ReadFile(path)
+		if err == nil && strings.Contains(normalizeWWID(string(data)), targetWWID) {
+			dmName := filepath.Base(filepath.Dir(filepath.Dir(path)))
+			_, err := executer.ExecuteUninterruptible[struct{}](
+				r.KeyedGater,
+				"mpath-stale-del-"+dmName, // Unique key per DM device name
+				1,                         // maxRunning: 1 per device
+				5,                         // maxSpare: budget for stuck threads
+				2*time.Second,             // handoffTimeout: move to spare pool if kernel stalls
+				10*time.Second,            // hardTimeout: return error to caller
+				func(ctx context.Context) (struct{}, error) {
+					// Trigger the kernel-level deferred removal
+					err := r.deferredRemove(dmName)
+					return struct{}{}, err
+				},
+			)
+			if err != nil {
+				// Log the timeout or execution error
+				logger.Warningf("Stale device deletion for %s incomplete: %v", dmName, err)
+			}
+		}
+	}
+
+	// 3. SEVER PHYSICAL PATHS (sdX and nvme)
+	devices, err := os.ReadDir("/sys/block")
+	if err != nil {
+		return fmt.Errorf("failed to scan /sys/block: %w", err)
+	}
+
+	for _, dev := range devices {
+		name := dev.Name()
+		if !strings.HasPrefix(name, "sd") && !strings.HasPrefix(name, "nvme") {
+			continue
+		}
+
+		// Use the Gater to check if this major:minor is already marked as stuck
+		// TODO 
+		//if r.Mounter.isPathStuck(name) {
+		//	continue
+		//}
+
+		//canonicalID, err := r.getCanonicalID("/dev/" + devName)
+		//if err == nil && r.Executer.IsStuck(canonicalID) {
+		//	logger.Warningf("FinalPurge: Skipping %s (%s) - hardware is wedged in D-state", devName, canonicalID)
+		//	continue
+		//}
+
+		_, err := executer.ExecuteUninterruptible[struct{}](
+			r.KeyedGater,
+			"scsi-purge-"+name, // Unique key per device prevents a hang on sda from blocking sdb
+			5,                  // maxRunning: allow up to 5 concurrent purges for this specific ID
+			50,                 // maxSpare: budget for "zombie" threads stuck in D-state
+			2*time.Second,      // handoffTimeout: move to spare pool if any step below hangs
+			15*time.Second,     // hardTimeout: return error to the caller
+			func(ctx context.Context) (struct{}, error) {
+				// 1. Identity Check (Sysfs is safer than ioctl, but can still hang if bus is reset)
+				currentWWID, _ := r.getWWIDBySysfs(name)
+				if !strings.EqualFold(normalizeWWID(currentWWID), targetWWID) {
+					return struct{}{}, nil
+				}
+
+				// 2. Fail Path (Socket call to multipathd)
+				_ = r.multipathdAction("fail path " + name)
+
+				// 3. Flush Buffers (Highest risk of D-state hang)
+				// Use the context provided by the worker if flushDeviceBuffers supports it
+				flushCtx, cancel := context.WithTimeout(ctx, 2*time.Second)
+				defer cancel()
+				_ = r.flushDeviceBuffersWithContext(flushCtx, "/dev/"+name)
+
+				// 4. Determine Delete Path
+				var deletePath string
+				if strings.HasPrefix(name, "nvme") {
+					deletePath = fmt.Sprintf("/sys/block/%s/device/delete_controller", name)
+				} else {
+					deletePath = fmt.Sprintf("/sys/block/%s/device/delete", name)
+				}
+
+				// 5. Final Trigger
+				if _, err := os.Stat(deletePath); err == nil {
+					if errWrite := os.WriteFile(deletePath, []byte("1"), 0200); errWrite != nil {
+						return struct{}{}, errWrite
+					}
+				}
+
+				return struct{}{}, nil
+			},
+		)
+
+		if err != nil {
+			logger.Warningf("Purge operation for %s reached timeout or failed: %v", name, err)
+		}
+	}
+	return nil
+}
+
+
+func (r OsDeviceConnectivityHelperScsiGeneric) VerifyAndGetDmDevice(devName string, volumeUuid string) (string, error) {
+	expectedSerial := strings.ToLower(volumeUuid)
+	//TODO restore check
+	//expectedLunStr := fmt.Sprintf("%d", lun)
+	//expectedMpathUuid := "mpath-" + expectedSerial
+
+	// 1. GLOBAL CONFLICT AUDIT
+	// Ensure the serial isn't already claimed by a DIFFERENT dm device.
+	allDmDirs, _ := filepath.Glob("/sys/block/dm-*")
+	for _, dmDir := range allDmDirs {
+		// TODO need to normalize
+		if dmDir == devName {
+			continue
+		}
+
+		uuidContent, err := os.ReadFile(filepath.Join(dmDir, "dm/uuid"))
+		if err != nil {
+			continue
+		}
+
+		actualUuid := strings.TrimSpace(string(uuidContent))
+		// Check for identity match (handling common mpath-3 / mpath- prefix variations)
+		if r.IsSerialMatch(actualUuid, expectedSerial) {
+			dmName := filepath.Base(dmDir)
+
+			// Check if this is a "zombie" or an active device
+			holders, _ := os.ReadDir(filepath.Join(dmDir, "holders"))
+			if len(holders) > 0 {
+				// If holders exist and it's NOT our current target, we have a fatal safety conflict
+				return "", fmt.Errorf("FATAL: Serial %s is already in use by active device %s", volumeUuid, dmName)
+			}
+
+			// If it's a stale map for our serial, clean it up before proceeding
+			logger.Warningf("Found stale multipath map %s for serial %s. Removing.", dmName, volumeUuid)
+			//forceFlushDM(..)
+			//_, _ = r.Executer.Execute("dmsetup", "remove", "-f", dmName)
+		}
+	}
+
+	// TODO Discover based on uuid (this version) OR discover baese on dm name (and then cleanup is pre-scan step)
+
+	// 2. DISCOVERY & INTERNAL TRIPLE-CHECK
+	// Re-scan dm devices to find the one we just verified/cleaned
+	targetDm := ""
+	for _, dmDir := range allDmDirs {
+		uuidContent, _ := os.ReadFile(filepath.Join(dmDir, "dm/uuid"))
+		if r.IsSerialMatch(string(uuidContent), expectedSerial) {
+			targetDm = filepath.Base(dmDir)
+			break
+		}
+	}
+
+	if targetDm == "" {
+		return "", fmt.Errorf("no multipath device found in kernel for serial %s", volumeUuid)
+	}
+	return targetDm, nil
+}
+
+
+func (r *OsDeviceConnectivityHelperScsiGeneric) multipathdAction(cmd string) error {
+	response, err := r.Executer.MultipathdCmd("", cmd)
+
+	if err != nil {
+		return err
+	}
+
+	// 5. Parse Response Content
+	// Multipathd returns "ok" or "map deleted" on success.
+	// It returns "fail [reason]" on logical errors.
+	if strings.HasPrefix(response, "fail") {
+		// Identify specific failure types
+		if strings.Contains(response, "map in use") {
+			return fmt.Errorf("map in use") // Caller should use deferredRemove
+		}
+		if strings.Contains(response, "not found") {
+			return nil // Already deleted, treat as success
+		}
+		return fmt.Errorf("multipathd command failed: %s", response)
+	}
+
+	return nil // Success
+}
+
+
+// pollLayerDeleted verifies that a specific MountID has vanished from the system
+func (r *OsDeviceConnectivityHelperScsiGeneric) pollLayerDeleted(target string, mountID int, timeout time.Duration) bool {
+	expiry := time.Now().Add(timeout)
+	for time.Now().Before(expiry) {
+		currentMounts, _ := r.Mounter.GetMountsForPath(target)
+		found := false
+		for _, m := range currentMounts {
+			if m.MountID == mountID {
+				found = true
+				break
+			}
+		}
+		if !found {
+			return true
+		}
+		time.Sleep(500 * time.Millisecond)
+	}
+	return false
+}
+
+
+func (r *OsDeviceConnectivityHelperScsiGeneric) deferredRemove(name string) error {
+	// DM_NOFLUSH_FLAG is critical: it prevents the ioctl from hanging if paths are failed (D-state)
+	flags := uint32(DM_DEFERRED_REMOVE | DM_NOFLUSH_FLAG)
+
+	err := r.ExecuteDmIoctl(uintptr(DM_DEV_REMOVE), name, flags)
+	if err != nil {
+		return err
+	}
+	return nil
+}
+
+func (r *OsDeviceConnectivityHelperScsiGeneric) ExecuteDmIoctl(command uintptr, dmName string, flags uint32) error {
+    // 1. Structural Validation
+    const expectedSize = 312
+    if size := unsafe.Sizeof(DmIoctl{}); size != expectedSize {
+        return fmt.Errorf("invalid DmIoctl size: expected %d, got %d", expectedSize, size)
+    }
+
+    // 2. Open Control Device
+    control, err := os.OpenFile("/dev/mapper/control", os.O_RDWR|syscall.O_CLOEXEC, 0)
+    if err != nil {
+        return fmt.Errorf("failed to open /dev/mapper/control: %w", err)
+    }
+    defer control.Close()
+
+    // 3. Prepare Data Structure
+	data := DmIoctl{
+		Version:   [3]uint32{DM_VERSION_MAJOR, DM_VERSION_MINOR, DM_VERSION_PATCH},
+		DataSize:  uint32(unsafe.Sizeof(DmIoctl{})),
+		DataStart: uint32(unsafe.Sizeof(DmIoctl{})), // Matches dmsetup behavior
+		Flags:     flags,
+	}
+
+    copy(data.Name[:], dmName)
+
+    // 4. Execute Syscall
+    // WARNING: conversion to uintptr MUST happen inside the argument list to prevent GC moving data
+    _, _, errno := syscall.Syscall(
+        syscall.SYS_IOCTL,
+        control.Fd(),
+        command,
+        uintptr(unsafe.Pointer(&data)),
+    )
+
+    // 5. Handle Results
+    if errno != 0 {
+        switch errno {
+        case syscall.EBUSY:
+            // Crucial for 2026 CSI drivers: identifies if a pod still holds a mount
+            return fmt.Errorf("dm: %s is busy (OpenCount: %d)", dmName, data.OpenCount)
+        case syscall.ENOENT:
+            return nil // Already removed or doesn't exist
+        case syscall.ENXIO:
+            return fmt.Errorf("dm: device %s not found or invalid major/minor", dmName)
+        case syscall.EINVAL:
+            return fmt.Errorf("dm: invalid ioctl version or malformed DataSize")
+        default:
+            return fmt.Errorf("dm ioctl (0x%x) failed: %w", command, errno)
+        }
+    }
+
+    return nil
+}
+
+
+//func (r *OsDeviceConnectivityHelperScsiGeneric) MountVolume(source, target, wwid string, options []string) error {
+//	// 1. SELF-HEAL: Clear rogue/zombie mounts using the 2026 Pre-Scan
+//	if err := r.IdentityAwarePreScan(target, wwid); err != nil {
+//		return fmt.Errorf("mount-safety: pre-scan failed: %w", err)
+//	}
+
+//	// 2. RESOURCE PROTECTION: Use the "Mount" pool (Limit 10, Handoff 15s)
+//	// We use ExecuteUninterruptible because mount(2) can hang in D-state.
+//	_, err = executer.ExecuteUninterruptible[struct{}](
+//		r.KeyedGater,
+//		"mount-ops",
+//		10,               // maxRunning: limit concurrent mounts to 10
+//		50,               // maxSpare: allow up to 50 "zombie" mount threads
+//		15*time.Second,   // handoffTimeout: move to spare pool if mount hangs
+//		2*time.Minute,    // hardTimeout: return error to caller after 2 minutes
+//		func(ctx context.Context) (struct{}, error) {
+//			// Modern VFS API implementation (OpenTree -> MountSetattr -> MoveMount)
+//			// Ensure MountNative accepts the context to allow for potential cancellation
+//			err := m.Mounter.MountNative(source, target, options)
+//			return struct{}{}, err
+//		},
+//	)
+//	return err
+//}
+
+
+//func (r *OsDeviceConnectivityHelperScsiGeneric) UnmountVolume(target, wwid string) error {
+//	// 1. Use the "Teardown" pool (Limit 20, Handoff 10s)
+//	// Phase 3 Emergency logic is triggered internally if del-map hangs.
+//	_, err = executer.ExecuteUninterruptible[struct{}](
+//		r.KeyedGater,
+//		"teardown-ops",
+//		20,               // maxRunning: allow up to 20 concurrent teardowns
+//		100,              // maxSpare: large budget for "zombie" teardown threads
+//		10*time.Second,   // handoffTimeout: move to spare pool if unmount/cleanup hangs
+//		6*time.Minute,    // hardTimeout: 6 mins allows for lazy unmounts/retries
+//		func(ctx context.Context) (struct{}, error) {
+//			// Triggers the unmount and device cleanup logic
+//			err := r.TeardownVolume(target, wwid)
+//			return struct{}{}, err
+//		},
+//	)
+//	return err
+//}
+
+func (r *OsDeviceConnectivityHelperScsiGeneric) IsSerialMatch(hwSerial, expectedSerial string) bool {
+    // Sysfs 'wwid' files often look like: "naa.600507680c80843d3000000000000123"
+    // Expected serial is often just the hex: "600507680c80843d3000000000000123"
+    hw := strings.ToLower(strings.TrimSpace(hwSerial))
+    expected := strings.ToLower(strings.TrimSpace(expectedSerial))
+
+    // Strip common SCSI prefixes
+    prefixes := []string{"naa.", "t10.", "eui.", "uuid."}
+    for _, p := range prefixes {
+        hw = strings.TrimPrefix(hw, p)
+    }
+
+    return strings.Contains(hw, expected) || strings.Contains(expected, hw)
+}
+
+
+func (r *OsDeviceConnectivityHelperScsiGeneric) getWWIDBySysfs(deviceName string) (string, error) {
+	// Remove /dev/ prefix if present
+	name := filepath.Base(deviceName)
+
+	var wwidPath string
+	if strings.HasPrefix(name, "nvme") {
+		// 1. NVMe Logic
+		// Enterprise arrays (like IBM FlashSystem) populate nguid or uuid
+		wwidPath = fmt.Sprintf("/sys/block/%s/device/nguid", name)
+		if _, err := os.Stat(wwidPath); os.IsNotExist(err) {
+			wwidPath = fmt.Sprintf("/sys/block/%s/device/uuid", name)
+		}
+	} else if strings.HasPrefix(name, "dm-") {
+		// 2. Device Mapper Logic
+		// The UUID here is the "mpath-<wwid>" string created by multipathd
+		wwidPath = fmt.Sprintf("/sys/block/%s/dm/uuid", name)
+	} else {
+		// 3. Standard SCSI (sdX) Logic
+		// Modern kernels (and RHEL 7.4+) expose the WWID here
+		wwidPath = fmt.Sprintf("/sys/block/%s/device/wwid", name)
+	}
+
+	data, err := os.ReadFile(wwidPath)
+	if err != nil {
+		return "", err
+	}
+
+	// Returns the raw string (e.g., "naa.600507680c80843d3000000000000123")
+	return strings.TrimSpace(string(data)), nil
+}
+
+
 
 // ============== OsDeviceConnectivityHelperInterface ==========================
 
@@ -432,16 +1838,16 @@ type OsDeviceConnectivityHelperInterface interface {
 		This is helper interface for OsDeviceConnectivityScsiGeneric.
 		Mainly for writting clean unit testing, so we can Mock this interface in order to unit test OsDeviceConnectivityHelperGeneric logic.
 	*/
-	GetHostsIdByArrayIdentifier(arrayIdentifier string) ([]int, error)
-	GetDmsPath(volumeIdVariations []string) (string, error)
+	GetHostsIdByArrayIdentifiers(arrayIdentifier []string) (map[int]bool, error)
 	GetWwnByScsiInq(dev string) (string, error)
-	ReloadMultipath() error
-	GetMpathdOutputForVolume(volumeIdVariations []string, multipathdCommandFormatArgs []string) (string, error)
 	GetVolumeIdVariations(volumeUuid string) []string
 	GetMpathDeviceName(volumePath string) (string, error)
-	IsAnyVariationInMpathVolumeId(mpathVolumeId string, volumeIdVariations []string) bool
-	GetMpathVolumeId(mpathdOutput string, mpathDeviceName string, dmDirectory string) (string, error)
-	IsDmName(mpathDeviceName string) bool
+	GetMpathVolumeId(mpathDeviceName string) ([]string, error)
+	findDMByWWID(wwid string) string
+	getSlavesForDevice(major, minor int) ([]string, error)
+	GetOpenCount(dmName string) (int32, error)
+	GetMajorMinorFromSysfs(devicePath string) (major int, minor int, err error)
+	getWWIDByDev(major, minor int) (string, error)
 }
 
 type OsDeviceConnectivityHelperGeneric struct {
@@ -456,385 +1862,1118 @@ func NewOsDeviceConnectivityHelperGeneric(executer executer.ExecuterInterface) O
 	}
 }
 
-func (o OsDeviceConnectivityHelperGeneric) GetHostsIdByArrayIdentifier(arrayIdentifier string) ([]int, error) {
-	/*
-		Description:
-			This function find all the hosts IDs under directory /sys/class/fc_host/ or /sys/class/iscsi_host"
-			So the function goes over all the above hosts and return back only the host numbers as a list.
-	*/
-	//arrayIdentifier is wwn, value is 500507680b25c0aa
-	var targetFilePath string
-	var regexpValue string
 
-	//IQN format is iqn.yyyy-mm.naming-authority:unique name
-	//For example: iqn.1986-03.com.ibm:2145.v7k194.node2
-	iscsiMatchRex := `^iqn\.(\d{4}-\d{2})\.([^:]+)(:)([^,:\s']+)`
-	isIscsi, err := regexp.MatchString(iscsiMatchRex, arrayIdentifier)
-	if isIscsi {
-		targetFilePath = IscsiHostRexExPath
-		regexpValue = "host([0-9]+)"
-	} else {
-		targetFilePath = FcHostSysfsPath
-		regexpValue = "rport-([0-9]+)"
+func (o *OsDeviceConnectivityHelperGeneric) GetHostsIdByArrayIdentifiers(arrayIdentifier []string) (map[int]bool, error) {
+	cleanLookup := make(map[string]bool)
+	var hasIscsi, hasFC, hasNVMe bool
+
+	for _, id := range arrayIdentifier {
+		logger.Debugf("Check if any match is relevant for storage target (%s)", id)
+		clean := strings.ToLower(strings.TrimPrefix(strings.TrimSpace(id), "0x"))
+		cleanLookup[clean] = true
+
+		if strings.HasPrefix(clean, "iqn.") {
+			hasIscsi = true
+		} else if strings.HasPrefix(clean, "nqn.") {
+			hasNVMe = true
+		} else if len(clean) == 16 {
+			hasFC = true
+		}
 	}
 
-	var HostIDs []int
-	matches, err := o.Executer.FilepathGlob(targetFilePath)
-	if err != nil {
-		logger.Errorf("Error while Glob targetFilePath : {%v}. err : {%v}", targetFilePath, err)
-		return nil, err
+	activeHosts := make(map[int]bool)
+
+	// Protocol Search Configuration
+	type searchGroup struct {
+		root   string
+		suffix string
+	}
+	var groups []searchGroup
+	if hasIscsi {
+		groups = append(groups, searchGroup{"/sys/class/iscsi_host", "targetname"})
+	}
+	if hasFC {
+		groups = append(groups, searchGroup{"/sys/class/fc_remote_ports", "port_name"})
+	}
+	if hasNVMe {
+		// Correct path for established NVMe connections
+		groups = append(groups, searchGroup{"/sys/class/nvme", "subsysnqn"})
 	}
 
-	logger.Debugf("{%v} targetname files matches were found", len(matches))
-
-	re := regexp.MustCompile(regexpValue)
-	logger.Debugf("Check if any match is relevant for storage target (%s)", arrayIdentifier)
-	for _, targetPath := range matches {
-		targetName, err := o.Executer.IoutilReadFile(targetPath)
+	for _, group := range groups {
+		entries, err := os.ReadDir(group.root)
 		if err != nil {
-			logger.Warningf("Could not read target name from file : {%v}, error : {%v}", targetPath, err)
 			continue
 		}
-		identifierFromHost := strings.TrimSpace(string(targetName))
-		//For FC WWNs from the host, the value will like this: 0x500507680b26c0aa, but the arrayIdentifier doesn't have this prefix
-		if strings.HasPrefix(identifierFromHost, "0x") {
-			identifierFromHost = strings.TrimLeft(identifierFromHost, "0x")
-		}
-		if strings.EqualFold(identifierFromHost, arrayIdentifier) {
-			regexMatch := re.FindStringSubmatch(targetPath)
-			logger.Tracef("Found regex matches : {%v}", regexMatch)
-			hostNumber := -1
 
-			if len(regexMatch) < 2 {
-				logger.Warningf("Could not find host number for targetFilePath : {%v}", targetPath)
+		for _, entry := range entries {
+			idPath := filepath.Join(group.root, entry.Name(), group.suffix)
+			data, err := os.ReadFile(idPath)
+			if err != nil {
+				logger.Warningf("Could not read target name from file : {%v}, error : {%v}", idPath, err)
 				continue
-			} else {
-				hostNumber, err = strconv.Atoi(regexMatch[1])
-				if err != nil {
-					logger.Warningf("Host number in for target file was not valid : {%v}", regexMatch[1])
+			}
+
+			idFromSys := strings.ToLower(strings.TrimPrefix(strings.TrimSpace(string(data)), "0x"))
+
+			if cleanLookup[idFromSys] {
+				// Special Case: NVMe controllers don't use "hostX" naming directly
+				if strings.HasPrefix(entry.Name(), "nvme") {
+					// TODO is this NVME over TCP
+					// Logic to map nvmeX to hostY if required for scans
 					continue
 				}
-			}
 
-			HostIDs = append(HostIDs, hostNumber)
-			logger.Debugf("portState path (%s) was found. Adding host ID {%v} to the id list", targetPath, hostNumber)
+				hostNum, err := o.extractHostNumber(entry.Name())
+				if err == nil {
+					logger.Debugf("portState path (%s) was found. Adding host ID {%v} to the id list", idPath, hostNum)
+					activeHosts[hostNum] = true
+				} else {
+					logger.Warningf("Host number in for target file was not valid : {%v}", idPath)
+				}
+			}
 		}
 	}
 
-	if len(HostIDs) == 0 {
-		return []int{}, &ConnectivityIdentifierStorageTargetNotFoundError{StorageTargetName: arrayIdentifier, DirectoryPath: targetFilePath}
-	}
-
-	return HostIDs, nil
-
+	return activeHosts, nil
 }
 
-func (o OsDeviceConnectivityHelperGeneric) GetMpathVolumeId(mpathdOutput string, mpathDeviceName string,
-	dmDirectory string) (string, error) {
-
-	mpathVolumeId, err := o.Helper.ExtractVolumeId(mpathDeviceName, mpathdOutput)
-	if err != nil {
-		return "", err
-	}
-	dmPath := filepath.Join(dmDirectory, filepath.Base(strings.TrimSpace(mpathDeviceName)))
-
-	SgInqWwn, err := o.GetWwnByScsiInq(dmPath)
-	if err != nil {
-		return "", err
-	}
-	if o.IsAnyVariationInMpathVolumeId(mpathVolumeId, []string{SgInqWwn}) {
-		return mpathVolumeId, nil
-	}
-	return "", &ErrorWrongDeviceFound{dmPath, mpathVolumeId, SgInqWwn}
+// TODO perhaps strengthen prefix check
+func (o *OsDeviceConnectivityHelperGeneric) extractHostNumber(entryName string) (int, error) {
+    if strings.HasPrefix(entryName, "host") {
+		return o.extractHostNumberInternal(strings.TrimPrefix(entryName, "host"))
+    }
+    // Handle both "rport-" and "remote_port-"
+    if idx := strings.Index(entryName, "-"); idx != -1 {
+        idPart := entryName[idx+1:]
+        if colonIdx := strings.Index(idPart, ":"); colonIdx != -1 {
+			return o.extractHostNumberInternal(idPart[:colonIdx])
+        }
+    }
+    return 0, fmt.Errorf("unknown host format: %s", entryName)
 }
 
-func (o OsDeviceConnectivityHelperGeneric) GetWwnByScsiInq(dev string) (string, error) {
-	/* scsi inq example
-	$> sg_inq -p 0x83 /dev/mapper/mpathhe
-		VPD INQUIRY: Device Identification page
-		  Designation descriptor number 1, descriptor length: 20
-			designator_type: NAA,  code_set: Binary
-			associated with the addressed logical unit
-			  NAA 6, IEEE Company_id: 0x1738
-			  Vendor Specific Identifier: 0xcfc9035eb
-			  Vendor Specific Identifier Extension: 0xcea5f6
-			  [0x6001738cfc9035eb0000000000ceaaaa]
-		  Designation descriptor number 2, descriptor length: 52
-			designator_type: T10 vendor identification,  code_set: ASCII
-			associated with the addressed logical unit
-			  vendor id: IBM
-			  vendor specific: 2810XIV          60035EB0000000000CEAAAA
-		  Designation descriptor number 3, descriptor length: 43
-			designator_type: vendor specific [0x0],  code_set: ASCII
-			associated with the addressed logical unit
-			  vendor specific: vol=u_k8s_longevity_ibm-ubiquity-db
-		  Designation descriptor number 4, descriptor length: 37
-			designator_type: vendor specific [0x0],  code_set: ASCII
-			associated with the addressed logical unit
-			  vendor specific: host=k8s-acceptance-v18-node1
-		  Designation descriptor number 5, descriptor length: 8
-			designator_type: Target port group,  code_set: Binary
-			associated with the target port
-			  Target port group: 0x0
-		  Designation descriptor number 6, descriptor length: 8
-			designator_type: Relative target port,  code_set: Binary
-			associated with the target port
-			  Relative target port: 0xd22
-	*/
-	sgInqCmd := "sg_inq"
+func (o *OsDeviceConnectivityHelperGeneric) extractHostNumberInternal(entryName string) (int, error) {
+	hostNumber, err := strconv.Atoi(entryName)
+	if (err != nil) {
+		return 0, fmt.Errorf("Host number in for target file was not valid : {%v}", entryName)
 
-	if err := o.Executer.IsExecutable(sgInqCmd); err != nil {
-		return "", err
 	}
+	return hostNumber, nil
+}
 
-	args := []string{"-p", "0x83", dev}
-	// add timeout in case the call never comes back.
-	logger.Debugf("Calling [%s] with timeout", sgInqCmd)
-	outputBytes, err := o.Executer.ExecuteWithTimeout(TimeOutSgInqCmd, sgInqCmd, args)
-	if err != nil {
-		return "", err
-	}
-	wwnRegex := "(?i)" + `\[0x(.*?)\]`
-	wwnRegexCompiled, err := regexp.Compile(wwnRegex)
 
-	if err != nil {
-		return "", err
-	}
-	/*
-	   sg_inq on device NAA6 returns "Vendor Specific Identifier Extension"
-	   sg_inq on device EUI-64 returns "Vendor Specific Extension Identifier".
-	*/
-	pattern := "(?i)" + "Vendor Specific (Identifier Extension|Extension Identifier):"
-	scanner := bufio.NewScanner(strings.NewReader(string(outputBytes[:])))
-	regex, err := regexp.Compile(pattern)
-	if err != nil {
-		return "", err
-	}
-	wwn := ""
-	found := false
-	for scanner.Scan() {
-		line := scanner.Text()
-		if found {
-			matches := wwnRegexCompiled.FindStringSubmatch(line)
-			if len(matches) != 2 {
-				logger.Debugf("wrong line, too many matches in sg_inq output : %#v", matches)
-				return "", &ErrorNoRegexWwnMatchInScsiInq{dev, line}
-			}
-			wwn = matches[1]
-			logger.Debugf("Found wwn [%s] in sg_inq", wwn)
-			return wwn, nil
-		}
-		if regex.MatchString(line) {
-			found = true
-			// its one line after "Vendor Specific Identifier Extension:" line which should contain the WWN
+
+
+
+func (o *OsDeviceConnectivityHelperGeneric) RescanHosts(hostIDs []int) error {
+	var errs []error
+	for _, id := range hostIDs {
+		scanPath := fmt.Sprintf("/sys/class/scsi_host/host%d/scan", id)
+
+		// Writing "- - -" triggers a full scan of all channels, targets, and LUNs
+		err := os.WriteFile(scanPath, []byte("- - -"), 0644)
+		if err != nil {
+			logger.Errorf("Failed to rescan host %d: %v", id, err)
+			errs = append(errs, err)
 			continue
 		}
-
-	}
-	return "", &MultipathDeviceNotFoundForVolumeError{wwn}
-}
-
-func (o OsDeviceConnectivityHelperGeneric) ReloadMultipath() error {
-	logger.Infof("ReloadMultipath: reload start")
-	if err := o.Executer.IsExecutable(multipathCmd); err != nil {
-		return err
+		logger.Infof("Successfully triggered rescan for host %d", id)
 	}
 
-	args := []string{}
-	_, err := o.Executer.ExecuteWithTimeout(TimeOutMultipathCmd, multipathCmd, args)
-	if err != nil {
-		return err
+	if len(errs) > 0 {
+		return fmt.Errorf("failed to rescan %d hosts", len(errs))
 	}
-
-	args = []string{"-r"}
-	_, err = o.Executer.ExecuteWithTimeout(TimeOutMultipathCmd, multipathCmd, args)
-	if err != nil {
-		return err
-	}
-	logger.Infof("ReloadMultipath: reload finished successfully")
 	return nil
 }
 
-func (o OsDeviceConnectivityHelperGeneric) GetMpathdOutputForVolume(volumeIdVariations []string,
+// TODO unused
+func (o OsDeviceConnectivityHelperGeneric) GetMpathVolumeId(dmPath string) (volId []string, err error) {
+	SgInqWwn, err := o.GetWwnByScsiInq(dmPath)
+	if err != nil {
+			return nil, err
+	}
+	return SgInqWwn, nil
+}
+
+
+func (o OsDeviceConnectivityHelperGeneric) GetWwnByScsiInq(dev string) ([]string, error) {
+	if o.willIoctl0x83Fail(filepath.Base(dev)) {
+		return nil, fmt.Errorf("path %s in unsafe state", dev)
+	}
+	// 1. Try O_RDONLY first (The "Clean" way)
+	fd, err := syscall.Open(dev, syscall.O_RDONLY|syscall.O_NONBLOCK, 0)
+
+	// 2. If EACCES or EPERM, try O_RDWR (The "Privileged" way)
+	// Some RHEL 7 drivers require Write bits to allow ANY SG_IO ioctl.
+	if err != nil && (errors.Is(err, syscall.EACCES) || errors.Is(err, syscall.EPERM)) {
+		fd, err = syscall.Open(dev, syscall.O_RDWR|syscall.O_NONBLOCK, 0)
+	}
+	if err != nil {
+		// If the device is gone/dead, we want to know immediately
+		return nil, err
+	}
+	f := os.NewFile(uintptr(fd), dev)
+	defer f.Close()
+
+	// SCSI INQUIRY CDB: 12h=Cmd, 01h=EVPD, 83h=DeviceIDPage, 00h=Res, FFh=Len, 00h=Ctrl
+	cdb := [6]byte{0x12, 0x01, 0x83, 0x00, 0xFF, 0x00}
+	respBuf := make([]byte, 256)
+	senseBuf := make([]byte, 32)
+
+	// TODO TimeOutSgInqCmd should be 2 seconds
+
+	header := SgIoHeader{
+		InterfaceID:    'S',
+		DxferDirection: SG_DXFER_FROM_DEV,
+		CmdLen:         uint8(len(cdb)),
+		MxSbpLen:       uint8(len(senseBuf)),
+		DxferLen:       uint32(len(respBuf)),
+		Dxferp:         uintptr(unsafe.Pointer(&respBuf[0])),
+		Cmdp:           uintptr(unsafe.Pointer(&cdb[0])),
+		Sbp:            uintptr(unsafe.Pointer(&senseBuf[0])),
+		Timeout:        uint32(TimeOutSgInqCmd),				// TODO verify - should be ms
+	}
+
+	maxRetries := 3
+	for i := 0; i < maxRetries; i++ {
+		_, _, errno := syscall.Syscall(syscall.SYS_IOCTL, f.Fd(), SG_IO, uintptr(unsafe.Pointer(&header)))
+		if errno != 0 {
+			return nil, fmt.Errorf("ioctl failed: %v", errno)
+		}
+
+		// Check for Busy Status (0x08) or Task Set Full (0x28)
+		if header.Status == 0x08 || header.Status == 0x28 {
+			time.Sleep(100 * time.Millisecond)
+			continue
+		}
+
+		// 1. Check for Host/HBA Errors (No point in retrying if the cable is pulled)
+		if header.HostStatus != 0 {
+			return nil, fmt.Errorf("SCSI host error: 0x%04x", header.HostStatus)
+		}
+
+		// 2. Check for Check Condition (0x02)
+		if header.Status == 0x02 {
+			// Sense data is usually in senseBuf. Sense Key is byte 2 (offset 2)
+			// in fixed format sense data.
+			senseKey := senseBuf[2] & 0x0f
+			if senseKey == 0x06 { // 0x06 = UNIT ATTENTION
+				logger.Infof("Unit Attention detected on %s, retrying...", dev)
+				continue // Try again, the UA is now cleared
+			}
+			return nil, fmt.Errorf("SCSI Check Condition: SenseKey 0x%02x", senseKey)
+		}
+
+		// 3. Status is 0 (Good) - break and process result
+		if header.Status == 0 {
+			break
+		}
+
+		return nil, fmt.Errorf("Unexpected SCSI status: 0x%02x", header.Status)
+	}
+
+	actualLen := int(header.DxferLen) - int(header.Resid)
+
+    if actualLen < 4 {
+        return nil, fmt.Errorf("response too short")
+    }
+	// respBuf[1] is the Page Code. It should be 0x83.
+	if respBuf[1] != 0x83 {
+		return nil, fmt.Errorf("unexpected VPD page: 0x%02x", respBuf[1])
+	}
+
+	return o.parseVPD83(respBuf[:actualLen])
+}
+
+func (r *OsDeviceConnectivityHelperGeneric) willIoctl0x83Fail(sgName string) bool {
+    statePath := fmt.Sprintf("/sys/class/scsi_generic/%s/device/state", sgName)
+    state, err := os.ReadFile(statePath)
+    if err != nil {
+        return true
+    }
+
+    s := strings.TrimSpace(string(state))
+    switch s {
+    case "running":
+        return false // Best case for success
+    case "blocked", "quiesce", "offline", "transport-offline", "deleting", "cancel":
+        return true
+    default:
+        // Any unknown state should be treated as a failure for safety
+        return true
+    }
+}
+//blocked: Occurs during error recovery (e.g., a Fibre Channel rport is lost). The SCSI mid-layer queues all I/O, including SG_IO ioctls. Even with O_NONBLOCK, the ioctl call itself can block in the kernel until the timeout (dev_loss_tmo) expires.
+//quiesce: Used when a device is being suspended or during certain driver-level resets. The device is temporarily not accepting commands.
+//offline: The kernel has already determined the device is unusable after failed error recovery. Most ioctls will return an immediate -ENXIO (No such device or address) or -EIO (I/O error).
+//transport-offline: Similar to offline but specifically indicates the transport layer (SAS/FC) has severed the link
+//deleting/cancel - kernel is actively tearing down the device structures, and attempting an ioctl here is unreliable.
+
+
+func (o *OsDeviceConnectivityHelperGeneric) parseVPD83(data []byte) ([]string, error) {
+	// 1. Initial boundary check
+	if len(data) < 4 {
+		return nil, fmt.Errorf("invalid VPD data: buffer too short")
+	}
+
+	// 2. Determine the true limit based on the header vs actual bytes read
+	pageLen := int(binary.BigEndian.Uint16(data[2:4]))
+	headerLimit := 4 + pageLen
+
+	// The "True Limit" is the smaller of:
+	// - The header's reported length + 4 bytes of header
+	// - The actual number of bytes the kernel wrote to the buffer (actualLen)
+	limit := len(data)
+	if headerLimit < limit {
+		limit = headerLimit
+	}
+
+	cursor := 4
+	var candidates []string
+
+	// 3. Iterate through designators with safety checks
+	for cursor+4 <= limit {
+		// Byte 1: [PIV (7) | Association (5:4) | Designator Type (3:0)]
+		designatorType := int(data[cursor+1] & 0x0F)
+		association := (data[cursor+1] >> 4) & 0x03
+
+		// Byte 3 is the length of the specific designator data
+		length := int(data[cursor+3])
+
+		idStart := cursor + 4
+		idEnd := idStart + length
+
+		// Safety check: Does this designator exceed our buffer limit?
+		if idEnd > limit {
+			logger.Warningf("VPD 83 designator at offset %d truncated by buffer limit", cursor)
+			break
+		}
+
+		// Only Association 0 (Logical Unit) is relevant for Volume WWIDs
+		if association == 0 {
+			idData := data[idStart:idEnd]
+
+			switch designatorType {
+			case 1, 2, 3: // T10, EUI-64, or NAA
+				// Prepend type for udev-style compatibility (e.g., "3" + hex_data)
+				candidates = append(candidates, fmt.Sprintf("%d%x", designatorType, idData))
+			case 8: // SCSI Name String
+				candidates = append(candidates, strings.ToLower(strings.TrimSpace(string(idData))))
+			}
+		}
+
+		// Advance to next designator
+		cursor += 4 + length
+	}
+
+	if len(candidates) == 0 {
+		return nil, fmt.Errorf("no Association 0 identifiers found in VPD 83")
+	}
+	return candidates, nil
+}
+
+
+func (o *OsDeviceConnectivityHelperGeneric) NormalizeDmVolumeIdentifier(filename string) string {
+	// 1. Initial cleanup
+	id := strings.ToLower(strings.TrimSpace(filename))
+
+	// 2. Handle DM-specific UUID format
+	// Filenames in /dev/mapper/ can be aliases (mpatha),
+	// but the underlying UUIDs (found in /sys/block/dm-X/uuid)
+	// often look like: "mpath-3600601..." or "dm-uuid-mpath-3600601..."
+	// prefixes := []string{"dm-uuid-mpath-", "mpath-", "scsi-", "pci-", "nvme-", "naa.", "eui.", "wwn-0x", "wwn-"}
+	prefixes := []string{"dm-uuid-mpath-", "mpath-", "scsi-", "wwn-0x", "wwn-"}
+	for _, p := range prefixes {
+		if strings.HasPrefix(id, p) {
+			id = strings.TrimPrefix(id, p)
+			break
+		}
+	}
+
+	// 3. IQN/NQN Check (Network targets don't follow hex rules)
+	if strings.HasPrefix(id, "iqn.") || strings.HasPrefix(id, "nqn.") {
+		return id
+	}
+
+	// 4. Hex-only filter for standard WWIDs
+	var b strings.Builder
+	for _, r := range id {
+		if (r >= '0' && r <= '9') || (r >= 'a' && r <= 'f') {
+			b.WriteRune(r)
+		}
+	}
+	cleanID := b.String()
+
+	// 5. The "Type Digit" Check
+	// Your parseVPD83 returns "[type][hex]" (e.g. "3600...").
+	// Linux dm-uuid usually includes that '3' (for NAA) automatically.
+	// If it's 32 chars and lacks the prefix, we assume it's a raw NAA-6 hex string.
+	if len(cleanID) == 32 && !strings.HasPrefix(cleanID, "3") {
+		return "3" + cleanID
+	}
+
+	// If it's 16 chars and starts with '5', it's an NAA-5 (standard for many arrays).
+	// We keep it as-is because udev and multipathd treat '5...' as the primary key.
+
+	return cleanID
+}
+
+
+func (o *OsDeviceConnectivityHelperGeneric) NormalizeOsVolumeIdentifier(id string) string {
+	id = strings.ToLower(strings.TrimSpace(id))
+
+	// 1. Convert udev-style hints to SCSI Type Digits (standard for WWIDs)
+	if strings.HasPrefix(id, "naa.") {
+		id = "3" + strings.TrimPrefix(id, "naa.")
+	} else if strings.HasPrefix(id, "eui.") {
+		id = "2" + strings.TrimPrefix(id, "eui.")
+	}
+
+	// 2. Handle standard DM/Multipath/SCSI prefixes
+	prefixes := []string{"dm-uuid-mpath-", "mpath-", "scsi-", "wwn-0x", "wwn-"}
+	for _, p := range prefixes {
+		if strings.HasPrefix(id, p) {
+			id = strings.TrimPrefix(id, p)
+			break
+		}
+	}
+
+	// 3. DECLARE the builder 'b' and filter for hex characters only
+	var b strings.Builder
+	b.Grow(len(id)) // Optimization: pre-allocate memory
+	for _, r := range id {
+		if (r >= '0' && r <= '9') || (r >= 'a' && r <= 'f') {
+			b.WriteRune(r)
+		}
+	}
+	
+	cleanID := b.String()
+	
+	// Fallback: If stripping everything results in empty, return original trimmed
+	if cleanID == "" {
+		return id
+	}
+
+	return cleanID
+}
+
+
+
+func (o *OsDeviceConnectivityHelperGeneric) MatchVolumeWWID(targetWWID string, candidates []string) bool {
+	// Normalize target: lowercase and strip '0x' or 'scsi-' prefixes
+	target := strings.ToLower(strings.TrimSpace(targetWWID))
+	target = strings.TrimPrefix(target, "scsi-")
+	target = strings.TrimPrefix(target, "0x")
+
+	// Prepare a version for numeric comparison (strip leading zeros)
+	targetBody := strings.TrimLeft(target, "0")
+
+	for _, candidate := range candidates {
+		// 1. Direct match (covers Type 8 / SCSI Name Strings and exact hex matches)
+		if candidate == target {
+			return true
+		}
+
+		// 2. Handle prefixed hex strings from your parseVPD83 (Types 1, 2, 3)
+		if len(candidate) > 1 {
+			prefix := candidate[0]
+			if prefix == '1' || prefix == '2' || prefix == '3' {
+				// Strip the type digit, then strip leading zeros
+				candidateBody := strings.TrimLeft(candidate[1:], "0")
+
+				// If the 'clean' hex bodies match, it's a hit.
+				// This matches target "123" with candidate "20000123"
+				if candidateBody == targetBody && targetBody != "" {
+					return true
+				}
+			}
+		}
+	}
+	return false
+}
+
+
+func (o *OsDeviceConnectivityHelperGeneric) GetMpathdOutputForVolume(volumeIdVariations []string,
 	multipathdCommandFormatArgs []string) (string, error) {
 	mpathdOutput, err := o.Helper.WaitForDmToExist(volumeIdVariations, WaitForMpathRetries,
-		WaitForMpathWaitIntervalSec, multipathdCommandFormatArgs)
+		WaitForMpathWaitIntervalSec)
 	if err != nil {
 		return "", err
 	}
 	return mpathdOutput, nil
 }
 
-func (o OsDeviceConnectivityHelperGeneric) GetDmsPath(volumeIdVariations []string) (string, error) {
-	mpathdOutput, err := o.Helper.WaitForDmToExist(volumeIdVariations, WaitForMpathRetries,
-		WaitForMpathWaitIntervalSec, MultipathdWildcardsVolumeIdAndMpath)
-	if err != nil {
-		return "", err
+
+
+
+
+// GetMpathDeviceName identifies the underlying DM device for a given path.
+// It uses an O(1) stat check for block devices and falls back to /proc/self/mountinfo.
+// It's quicker to parse than /proc/mounts
+// It also translates aliases to DM names
+func (o *OsDeviceConnectivityHelperGeneric) GetMpathDeviceName(volumePath string) (string, error) {
+	var stat syscall.Stat_t
+	// Tier 1: Get Device ID directly from the volume path inode
+	if err := syscall.Stat(volumePath, &stat); err != nil {
+		return "", fmt.Errorf("failed to stat path %s: %w", volumePath, err)
 	}
-	dms := o.Helper.ExtractDmFieldValues(volumeIdVariations, mpathdOutput)
-	return o.Helper.GetFullDmPath(dms, volumeIdVariations[0])
-}
 
-func (OsDeviceConnectivityHelperGeneric) GetVolumeIdVariations(volumeUuid string) []string {
-	volumeUuidLower := strings.ToLower(volumeUuid)
-	volumeNguid := convertScsiIdToNguid(volumeUuidLower)
-	return []string{volumeUuidLower, volumeNguid}
-}
+	major := unix.Major(uint64(stat.Rdev))
+	minor := unix.Minor(uint64(stat.Rdev))
 
-func (o OsDeviceConnectivityHelperGeneric) GetMpathDeviceName(volumePath string) (string, error) {
-	procMountsFileContent, err := ioutil.ReadFile(procMountsFilePath)
-	if err != nil {
-		return "", err
-	}
-	procMounts := string(procMountsFileContent)
-
-	return o.Helper.GetMpathDeviceNameFromProcMounts(procMounts, volumePath)
-}
-
-func (o OsDeviceConnectivityHelperGeneric) IsAnyVariationInMpathVolumeId(mpathVolumeId string, volumeIdVariations []string) bool {
-	for _, volumeIdVariation := range volumeIdVariations {
-		if strings.Contains(mpathVolumeId, volumeIdVariation) {
-			return true
+	// Tier 2: High-Speed Sysfs Resolution (The "Source of Truth")
+	if major > 0 {
+		if kernelName, err := o.resolveIdToKernelName(major, minor); err == nil {
+			return kernelName, nil
 		}
 	}
-	return false
+
+	// Tier 3: Fallback (MountInfo)
+	deviceName, err := o.getDeviceFromMountInfo(volumePath)
+	if err != nil {
+		return "", err
+	}
+
+	return o.ResolveToKernelName(deviceName)
 }
 
-func (o OsDeviceConnectivityHelperGeneric) IsDmName(mpathDeviceName string) bool {
-	return strings.Contains(mpathDeviceName, "mpath")
+
+// resolveIdToKernelName performs the sysfs symlink resolution
+func (o *OsDeviceConnectivityHelperGeneric) resolveIdToKernelName(major, minor uint32) (string, error) {
+	// /sys/dev/block is available on all RHEL 7+ kernels.
+	sysPath := fmt.Sprintf("/sys/dev/block/%d:%d", major, minor)
+	realPath, err := os.Readlink(sysPath)
+	if err != nil {
+		return "", err
+	}
+	// Resolves to e.g. "../../devices/virtual/block/dm-5" -> "dm-5"
+	return filepath.Base(realPath), nil
 }
+
+
+
+func (o *OsDeviceConnectivityHelperGeneric) ResolveToKernelName(deviceName string) (string, error) {
+	if strings.HasPrefix(deviceName, "dm-") || strings.HasPrefix(deviceName, "nvme") {
+		return deviceName, nil
+	}
+
+	devPath := deviceName
+	if !strings.HasPrefix(devPath, "/dev/") {
+		// Probing logic for shorthand names
+		searchPaths := []string{
+			deviceName,
+			filepath.Join("/dev/mapper", deviceName),
+			filepath.Join("/dev", deviceName),
+		}
+		for _, p := range searchPaths {
+			var stat syscall.Stat_t
+			if err := syscall.Stat(p, &stat); err == nil {
+				return o.resolveIdToKernelName(unix.Major(uint64(stat.Rdev)), unix.Minor(uint64(stat.Rdev)))
+			}
+		}
+	}
+
+
+	return deviceName, nil
+}
+
+// findDMByWWID helper to map a WWID to a /dev/mapper name (e.g., mpatha)
+func (o *OsDeviceConnectivityHelperGeneric) findDMByWWID(wwid string) string {
+	files, err := os.ReadDir("/dev/mapper")
+	if err != nil {
+		return ""
+	}
+
+	for _, file := range files {
+		name := file.Name()
+		if name == "control" {
+			continue
+		}
+
+		// 1. Resolve /dev/mapper/name to its kernel dm-X name
+		// Aliases like 'mpatha' are symlinks to ../dm-X
+		fullPath := filepath.Join("/dev/mapper", name)
+		realPath, err := filepath.EvalSymlinks(fullPath)
+		if err != nil {
+			continue
+		}
+		dmKernelName := filepath.Base(realPath) // e.g., "dm-5"
+
+		// 2. Read the UUID from sysfs
+		// The UUID in dm/uuid follows the format "mpath-<WWID>"
+		uuidPath := fmt.Sprintf("/sys/block/%s/dm/uuid", dmKernelName)
+		content, err := os.ReadFile(uuidPath)
+		if err == nil {
+			// Multipath UUIDs are prefixed with 'mpath-'
+			// We use strings.Contains to handle different prefix conventions (mpath, part, etc.)
+			if strings.Contains(strings.ToLower(string(content)), strings.ToLower(wwid)) {
+				return name // Return the alias (e.g. mpatha) for multipathd commands
+			}
+		}
+	}
+	return ""
+}
+
+
+// GetMountWWID retrieves the unique hardware identifier (WWID or DM UUID)
+// for the block device currently mounted at targetPath.
+//func (o *OsDeviceConnectivityHelperGeneric) GetMountWWID(targetPath string) (string, error) {
+//	var st unix.Stat_t
+//	if err := unix.Stat(targetPath, &st); err != nil {
+//		return "", fmt.Errorf("identity-check: failed to stat %s: %w", targetPath, err)
+//	}
+//
+//	var major, minor int
+//	// Check if targetPath is a block device (Raw Block) or a directory (Mounted FS)
+//	if (st.Mode & unix.S_IFMT) == unix.S_IFBLK {
+//		// For block device nodes, Rdev is the hardware ID
+//		major, minor = int(unix.Major(st.Rdev)), int(unix.Minor(st.Rdev))
+//	} else {
+//		// For directories/files, Dev is the ID of the filesystem device
+//		major, minor = int(unix.Major(st.Dev)), int(unix.Minor(st.Dev))
+//	}
+
+//	// 0:0 Major:Minor is usually a virtual or pseudo-filesystem (like tmpfs)
+//	if major == 0 {
+//		return "", fmt.Errorf("identity-check: %s is on a virtual device (major 0)", targetPath)
+//	}
+
+//	wwid, err := executer.ExecuteUninterruptible[string](
+//		r.KeyedGater,
+//		fmt.Sprintf("id-check-%d:%d", major, minor),
+//		5,
+//		20,
+//		1*time.Second,
+//		5*time.Second,
+//		func(ctx context.Context) (string, error) {
+//			// Call your sysfs helper
+//			result, innerErr := o.getWWIDByDev(major, minor)
+//
+//			// Return the string and the error to the Gater
+//			return result, innerErr
+//		},
+//	)
+//
+//	if err != nil {
+//		// Handles both syscall errors and Gater timeouts/congestions
+//		return "", fmt.Errorf("failed to get WWID for %d:%d: %w", major, minor, err)
+//	}
+
+	// 'wwid' is now populated and safe to use
+//	o.logger.Debugf("Device %d:%d has WWID: %s", major, minor, wwid)
+
+//	return normalizeWWID(wwid), err
+//}
+
+func (o *OsDeviceConnectivityHelperGeneric) getWWIDByDev(major, minor int) (string, error) {
+	basePath := fmt.Sprintf("/sys/dev/block/%d:%d", major, minor)
+
+	// Order of operations: DM -> NVMe -> SCSI
+	// 1. Device Mapper (Multipath) - Most common for IBM Block
+	if uuid, err := os.ReadFile(filepath.Join(basePath, "dm/uuid")); err == nil {
+		return strings.TrimSpace(string(uuid)), nil
+	}
+
+	// 2. NVMe (Standardized in modern kernels)
+	if wwid, err := os.ReadFile(filepath.Join(basePath, "wwid")); err == nil {
+		return strings.TrimSpace(string(wwid)), nil
+	}
+
+	// 3. SCSI (Legacy/Standard)
+	if wwid, err := os.ReadFile(filepath.Join(basePath, "device/wwid")); err == nil {
+		return strings.TrimSpace(string(wwid)), nil
+	}
+
+	return "", fmt.Errorf("identity-check: could not resolve WWID for device %d:%d at %s", major, minor, basePath)
+}
+
+// GetOpenCount retrieves the current open count of a DM device via ioctl
+func (o *OsDeviceConnectivityHelperGeneric) GetOpenCount(dmName string) (int32, error) {
+	// Standard DM control node is used for all DM-related ioctls
+	f, err := os.OpenFile("/dev/mapper/control", os.O_RDWR|syscall.O_CLOEXEC, 0)
+	if err != nil {
+		return -1, fmt.Errorf("failed to open dm control: %w", err)
+	}
+	defer f.Close()
+
+	// Initialize the DM ioctl structure with version 4 (Standard for RH7/8/9)
+	io := dmIoctl{
+		VersionMajor: 4,
+		VersionMinor: 0,
+		VersionPatch: 0,
+		DataSize:     uint32(unsafe.Sizeof(dmIoctl{})),
+	}
+
+	//io := dmIoctl{
+	//	VersionMajor: 4,
+	//	VersionMinor: 0,
+	//	VersionPatch: 0,
+	//	DataSize:     uint32(unsafe.Sizeof(dmIoctl{})),
+	//	Flags:        0,
+	//}
+
+	//io := dmIoctl{
+	//	VersionMajor: 4,
+	//	DataSize:     uint32(unsafe.Sizeof(dmIoctl{})),
+	//	DataStart:    uint32(unsafe.Sizeof(dmIoctl{})), // Standard practice
+	//}
+
+	// Ensure the name fits and copy it to the fixed-size buffer
+	copy(io.Name[:], dmName)
+
+	// Execute the ioctl directly on the control node
+	_, _, errno := unix.Syscall(
+		unix.SYS_IOCTL,
+		f.Fd(),
+		uintptr(DM_DEV_STATUS),
+		uintptr(unsafe.Pointer(&io)),
+	)
+
+	if errno != 0 {
+		// Both ENOENT and ENXIO indicate the device is already detached or missing
+		if errno == unix.ENOENT || errno == unix.ENXIO {
+			return -1, nil
+		}
+		return -1, fmt.Errorf("ioctl DM_DEV_STATUS failed for %s: %v", dmName, errno)
+	}
+
+	// The kernel updates the OpenCount field in-place
+	// TODO should we cast to int32
+	return io.OpenCount, nil
+}
+
+func (o *OsDeviceConnectivityHelperGeneric) GetMajorMinorFromSysfs(devicePath string) (major int, minor int, err error) {
+    var st syscall.Stat_t
+    if err := syscall.Stat(devicePath, &st); err != nil {
+        return 0, 0, fmt.Errorf("stale-%s-%d", devicePath, time.Now().UnixNano())
+    }
+
+    major = int(unix.Major(st.Rdev))
+    minor = int(unix.Minor(st.Rdev))
+    name := filepath.Base(devicePath)
+
+    // 1. Branch: Resolve SG to its Block sibling
+    if (st.Mode & syscall.S_IFMT) == syscall.S_IFCHR && strings.HasPrefix(name, "sg") {
+        // Path: /sys/class/scsi_generic/sgX/device/block/sdY
+        // Or simpler: /sys/class/scsi_generic/sgX/device points to the shared SCSI object
+        sysPath := fmt.Sprintf("/sys/class/scsi_generic/%s/device", name)
+
+        // Find the block child
+        blockEntries, _ := os.ReadDir(filepath.Join(sysPath, "block"))
+        if len(blockEntries) > 0 {
+            // Update to the SD device's major:minor
+            sdName := blockEntries[0].Name()
+            var sdSt syscall.Stat_t
+	    if err := syscall.Stat(filepath.Join("/dev", sdName), &sdSt); err == nil {
+                major = int(unix.Major(sdSt.Rdev))
+                minor = int(unix.Minor(sdSt.Rdev))
+            }
+        }
+    }
+    return major, minor, nil
+}
+
+func (o *OsDeviceConnectivityHelperGeneric) GetGaterKey(devicePath string) string {
+
+	major, minor, _ := o.getMajorMinorFromSysfs(devicePath)
+
+    // 2. Volume Identity (WWID) - Fetched via sysfs or ioctl
+    wwid, _ := o.GetDeviceWWID(devicePath)
+
+    // 3. Instance Identity (Inode of the /sys/dev/block entry)
+    // We ALWAYS use the block ID for the key to unify SG and SD protection.
+    var instanceID string
+    sysBlockPath := fmt.Sprintf("/sys/dev/block/%d:%d", major, minor)
+    if sysSt, err := os.Stat(sysBlockPath); err == nil {
+        instanceID = fmt.Sprintf("ino-%d", sysSt.Sys().(*syscall.Stat_t).Ino)
+    } else {
+        instanceID = fmt.Sprintf("transient-%d", time.Now().UnixNano())
+    }
+
+	return fmt.Sprintf("%d:%d-%s-%s", major, minor, wwid, instanceID)
+}
+
+func (o *OsDeviceConnectivityHelperGeneric) GetDeviceWWID(dev string) ([]string, error) {
+	name := filepath.Base(dev)
+
+	if strings.HasPrefix(name, "nvme") {
+		return o.GetWwnByNvmeSysfs(dev)
+	}
+
+	// Assume SCSI for everything else (sdX, dm-X, etc)
+	return o.GetWwnByScsiInq(dev)
+}
+
+func (o *OsDeviceConnectivityHelperGeneric) GetWwnByNvmeSysfs(dev string) ([]string, error) {
+	name := filepath.Base(dev) // e.g. nvme0n1
+	sysPath := filepath.Join("/sys/block", name)
+
+	// Check for NGUID first (Common in Enterprise Storage)
+	if nguid, err := os.ReadFile(filepath.Join(sysPath, "nguid")); err == nil {
+		return []string{normalizeWWID(string(nguid))}, nil
+	}
+
+	// Fallback to UUID
+	if uuid, err := os.ReadFile(filepath.Join(sysPath, "uuid")); err == nil {
+		return []string{normalizeWWID(string(uuid))}, nil
+	}
+
+	// Fallback to Serial (Note: Serial is often not globally unique enough for CSI)
+	if serial, err := os.ReadFile(filepath.Join(sysPath, "device/serial")); err == nil {
+		return []string{normalizeWWID(string(serial))}, nil
+	}
+
+	return nil, fmt.Errorf("no unique identifier found for nvme device %s", name)
+}
+
+
+
 
 //go:generate mockgen -destination=../../../mocks/mock_GetDmsPathHelperInterface.go -package=mocks github.com/ibm/ibm-block-csi-driver/node/pkg/driver/device_connectivity GetDmsPathHelperInterface
 
 type GetDmsPathHelperInterface interface {
-	WaitForDmToExist(volumeIdVariations []string, maxRetries int, intervalSeconds int, multipathdCommandFormatArgs []string) (string, error)
-	ExtractDmFieldValues(dmFilterValues []string, mpathdOutput string) map[string]bool
-	GetFullDmPath(dms map[string]bool, volumeId string) (string, error)
-	IsIndicatorMatchesFilterValues(dmFilterValues []string, dmFieldValue string) bool
-	GetMpathDeviceNameFromProcMounts(procMounts string, volumePath string) (string, error)
-	ExtractVolumeId(mpathDeviceName string, mpathdOutput string) (string, error)
+        WaitForDmToExist(volumeIdVariations []string, maxRetries int, intervalSeconds int) (string, error)
+        GetFullDmPath(dms map[string]bool, volumeId string) (string, error)
+        IsIndicatorMatchesFilterValues(dmFilterValues []string, dmFieldValue string) bool
+        GetMpathDeviceNameFromProcMounts(procMounts string, volumePath string) (string, error)
+        ExtractVolumeId(mpathDeviceName string, mpathdOutput string) (string, error)
 }
 
 type GetDmsPathHelperGeneric struct {
-	executer executer.ExecuterInterface
+        executer executer.ExecuterInterface
 }
 
 func NewGetDmsPathHelperGeneric(executer executer.ExecuterInterface) GetDmsPathHelperInterface {
-	return &GetDmsPathHelperGeneric{executer: executer}
+        return &GetDmsPathHelperGeneric{executer: executer}
 }
 
-func (o GetDmsPathHelperGeneric) ExtractVolumeId(mpathDeviceName string, mpathdOutput string) (string, error) {
-	mpathDeviceNames := []string{mpathDeviceName}
-	volumeIds := o.ExtractDmFieldValues(mpathDeviceNames, mpathdOutput)
-	volumeId, err := getUniqueDmFieldValue(volumeIds, mpathDeviceName)
+ func convertScsiIdToNguid(scsiId string) string {
+        logger.Infof("Converting scsi uuid : %s to nguid", scsiId)
+        oui := scsiId[1:WwnOuiEnd]
+        vendorIdentifier := scsiId[WwnOuiEnd:WwnVendorIdentifierEnd]
+        vendorIdentifierExtension := scsiId[WwnVendorIdentifierEnd:]
+        finalNguid := vendorIdentifierExtension + oui + "0" + vendorIdentifier
+        logger.Infof("Nguid is : %s", finalNguid)
+        return finalNguid
+}
+
+
+
+func (o GetDmsPathHelperGeneric) WaitForDmToExist(volumeWWID string, maxRetries int, intervalSeconds int) (string, error) {
+	var lastCount int
+	var stableCycles int
+	norm := normalizeWWID(volumeWWID)
+
+	for i := 0; i < maxRetries; i++ {
+		// 1. Discovery (Resolves WWID to /dev/dm-X or /dev/nvme-subsysX)
+		path, err := o.performDiscovery(norm)
+		if err == nil {
+			// 2. KERNEL READINESS: Check if driver is suspended or initializing
+			// This is the "D-state" prevention gate.
+			if !o.isKernelSettled(path) {
+				stableCycles = 0
+				goto retry
+			}
+
+			// 3. PATH STABILIZATION:
+			// Monitors DM slaves or NVMe controllers to ensure multipathd
+			// is finished adding paths from your 'host%d/scan'.
+			count := o.getSlaveCount(path)
+			if count > 0 && count == lastCount {
+				stableCycles++
+			} else {
+				stableCycles = 0 // Reset if count is still growing
+			}
+
+			// Require 2 consecutive stable cycles (e.g., 2-4 seconds)
+			// to confirm multipathd isn't mid-reload.
+			if stableCycles >= 2 {
+				// 4. UDEV SETTLEMENT: The "Last Mile" gate
+				// Ensures /dev/dm-X is chmod'd and symlinks are created.
+				return o.validateAndSettle(path)
+			}
+			lastCount = count
+		}
+
+	retry:
+		logger.Debugf("Attempt %d/%d: %v", i+1, maxRetries, err)
+		time.Sleep(time.Duration(intervalSeconds) * time.Second)
+	}
+	return "", &MultipathDeviceNotFoundForVolumeError{volumeWWID}
+}
+
+func (o GetDmsPathHelperGeneric) isKernelSettled(path string) bool {
+	name := filepath.Base(path)
+
+	// DM (iSCSI/FC): If suspended == 1, multipathd is loading a new table
+	if strings.HasPrefix(name, "dm-") {
+		suspended, err := os.ReadFile(fmt.Sprintf("/sys/block/%s/dm/suspended", name))
+		return err == nil && strings.TrimSpace(string(suspended)) == "0"
+	}
+
+	// NVMe: Check if the subsystem head is 'live'
+	if strings.HasPrefix(name, "nvme") {
+		state, err := os.ReadFile(fmt.Sprintf("/sys/block/%s/device/state", name))
+		// If file doesn't exist, it's a subsys node; check for existence as 'live'
+		if err != nil { return true }
+		return strings.TrimSpace(string(state)) == "live"
+	}
+
+	return true
+}
+
+func (o GetDmsPathHelperGeneric) getSlaveCount(path string) int {
+	name := filepath.Base(path)
+
+	// DM: Count /sys/block/dm-X/slaves/*
+	if strings.HasPrefix(name, "dm-") {
+		entries, _ := os.ReadDir(fmt.Sprintf("/sys/block/%s/slaves", name))
+		return len(entries)
+	}
+
+	if strings.HasPrefix(name, "nvme") {
+		// TODO is this correct Native NVMe heads (nvmeXnY) are virtual heads; they don't have 'slaves' dirs.
+		// if strings.HasPrefix(name, "nvme") {
+		//	return 1
+		// }
+
+		// NVMe: Count /sys/block/nvme-subsysXnY/device/nvmeX links
+		entries, _ := os.ReadDir(fmt.Sprintf("/sys/block/%s/device", name))
+		count := 0
+		for _, e := range entries {
+			if strings.HasPrefix(e.Name(), "nvme") { count++ }
+		}
+		return count
+	}
+	return 1
+}
+
+func (o GetDmsPathHelperGeneric) validateAndSettle(path string) (string, error) {
+    for i := 0; i < 5; i++ {
+        fd, err := unix.Open(path, unix.O_RDONLY|unix.O_EXCL|unix.O_NONBLOCK, 0)
+        if err == nil {
+            unix.Close(fd)
+			return o.validateDMIntegrity(path)
+        }
+
+        if err == unix.EBUSY {
+            // Random jitter (10-50ms) ensures we don't sync up with
+            // multipathd's own retry loops (the "thundering herd").
+            jitter := time.Duration(10 + rand.IntN(40)) * time.Millisecond
+            time.Sleep(jitter)
+            continue
+        }
+        return "", err
+    }
+    return "", fmt.Errorf("device %s remains busy (settlement timeout)", path)
+}
+
+
+// FetchDeviceByWWID executes discovery under a global lock to prevent sysfs thrashing.
+//func (o GetDmsPathHelperGeneric) FetchDeviceByWWID(normalizedWWID string) (string, error) {
+//	var dev string
+	// "global-discovery" ensures only 2 discovery threads run simultaneously across the node
+//	err := o.KeyedGater.ExecuteKernelCall("global-discovery", 2, 0, 0, 45*time.Second, func() (interface{}, error) {
+//		return o.performDiscovery(normalizedWWID)
+//	})
+//	if err != nil {
+//		return "", err
+//	}
+//	return dev, nil
+//}
+
+
+func (o GetDmsPathHelperGeneric) performDiscovery(volumeWWID string) (string, error) {
+	// TODO is this normalization safe
+	normalizedWWID := strings.ToLower(strings.ReplaceAll(volumeWWID, "-", ""))
+
+	// 1. STRATEGY A: DM-Multipath (SCSI or NVMe via DM)
+	// Check udev shortcut first (O(1))
+	dmPath := fmt.Sprintf("/dev/disk/by-id/dm-uuid-mpath-%s", normalizedWWID)
+	if dev, err := o.verifyDevice(dmPath); err == nil {
+		return dev, nil
+	}
+
+	// 2. STRATEGY B: Native NVMe (NVMe-oF / TCP / RDMA)
+	// Check udev shortcut: /dev/disk/by-id/nvme-<uuid>
+	nvmePath := fmt.Sprintf("/dev/disk/by-id/nvme-%s", normalizedWWID)
+	if dev, err := o.verifyDevice(nvmePath); err == nil {
+		return dev, nil
+	}
+
+	// Fallback: Scan DM list in sysfs (O(N_dm))
+	// Catches cases where udev is slow or stale
+	if dev, err := o.scanDMSubsystem(normalizedWWID); err == nil {
+		return dev, nil
+	}
+
+
+	// Fallback: Scan NVMe subsystems (O(N_nvme))
+	if dev, err := o.scanNVMeSubsystem(normalizedWWID); err == nil {
+		return dev, nil
+	}
+
+	// Fallback: Scan all SCSI blocks for WWID match
+	if dev, err := o.scanSCSISubsystem(normalizedWWID); err == nil {
+		return dev, nil
+	}
+
+	return "", fmt.Errorf("device with WWID %s not found after exhaustive scan", volumeWWID)
+}
+
+
+
+// verifyDevice ensures the link exists and returns the canonical path
+func (o GetDmsPathHelperGeneric) verifyDevice(path string) (string, error) {
+	if _, err := os.Stat(path); err != nil {
+		return "", err
+	}
+	// Crucial for CSI: Resolve /dev/mapper/mpatha to /dev/dm-X
+	realPath, err := filepath.EvalSymlinks(path)
 	if err != nil {
 		return "", err
 	}
-
-	if volumeId == "" {
-		return "", &VolumeIdNotFoundForMultipathDeviceNameError{mpathDeviceName}
-	}
-
-	return volumeId, nil
+	return realPath, nil
 }
 
-func convertScsiIdToNguid(scsiId string) string {
-	logger.Infof("Converting scsi uuid : %s to nguid", scsiId)
-	oui := scsiId[1:WwnOuiEnd]
-	vendorIdentifier := scsiId[WwnOuiEnd:WwnVendorIdentifierEnd]
-	vendorIdentifierExtension := scsiId[WwnVendorIdentifierEnd:]
-	finalNguid := vendorIdentifierExtension + oui + "0" + vendorIdentifier
-	logger.Infof("Nguid is : %s", finalNguid)
-	return finalNguid
-}
+// scanDMSubsystem finds the DM device using robust normalization.
+func (o GetDmsPathHelperGeneric) scanDMSubsystem(targetID string) (string, error) {
+	matches, _ := filepath.Glob("/sys/block/dm-*/dm/uuid")
+	target := normalizeWWID(targetID)
 
-func (o GetDmsPathHelperGeneric) WaitForDmToExist(volumeIdVariations []string, maxRetries int, intervalSeconds int,
-	multipathdCommandFormatArgs []string) (string, error) {
-	formatTemplate := strings.Join(multipathdCommandFormatArgs, mpathdSeparator)
-	args := []string{"show", "maps", "raw", "format", "\"", formatTemplate, "\""}
-	logger.Debugf("Waiting for dm to exist")
-	for i := 0; i < maxRetries; i++ {
-		out, err := o.executer.ExecuteWithTimeout(TimeOutMultipathdCmd, multipathdCmd, args)
-		if err != nil {
-			return "", err
+	for _, m := range matches {
+		if content, err := os.ReadFile(m); err == nil {
+			// normalize() strips 'mpath-', handles case, and removes newlines
+			if normalizeWWID(string(content)) == target {
+				// Safely get 'dm-X' regardless of path depth
+				dmName := filepath.Base(filepath.Dir(filepath.Dir(m)))
+				return filepath.Join("/dev", dmName), nil
+			}
 		}
-		dms := string(out)
-		for _, volumeIdVariation := range volumeIdVariations {
-			if strings.Contains(dms, volumeIdVariation) {
-				return dms, nil
+	}
+	return "", fmt.Errorf("dm device not found")
+}
+
+func (o GetDmsPathHelperGeneric) scanNVMeSubsystem(targetID string) (string, error) {
+	// 1. Find all namespaces. /sys/block/nvme*n* covers both local and remote.
+	matches, _ := filepath.Glob("/sys/block/nvme*n*")
+	target := normalizeWWID(targetID)
+
+	for _, m := range matches {
+		var foundID string
+		// NGUID is preferred for NVMe-oF (FlashSystem/SVC)
+		if nguid, err := os.ReadFile(filepath.Join(m, "nguid")); err == nil {
+			foundID = normalizeWWID(string(nguid))
+		}
+		// Fallback to UUID
+		if foundID != target {
+			if uuid, err := os.ReadFile(filepath.Join(m, "uuid")); err == nil {
+				foundID = normalizeWWID(string(uuid))
 			}
 		}
 
-		time.Sleep(time.Second * time.Duration(intervalSeconds))
-	}
-	return "", &MultipathDeviceNotFoundForVolumeError{volumeIdVariations[0]}
-}
+		if foundID == target {
+			// 2. CHECK FOR MULTIPATH HEAD
+			// If /sys/block/nvmeXnY/multipath exists, this is a private path.
+			// We MUST find and return the shared head node instead.
+			if _, err := os.Stat(filepath.Join(m, "multipath")); err == nil {
+				subsysPath := filepath.Join(m, "subsystem")
+				if subsys, err := os.Readlink(subsysPath); err == nil {
+					headName := filepath.Base(subsys) // e.g., "nvme-subsys0"
 
-func (o GetDmsPathHelperGeneric) ExtractDmFieldValues(dmFilterValues []string, mpathdOutput string) map[string]bool {
-	dmFieldValues := make(map[string]bool)
+					// Find the head node (e.g., /dev/nvme-subsys0n1)
+					// The namespace ID 'n1' matches between path and head.
+					parts := strings.Split(filepath.Base(m), "n")
+					if len(parts) > 1 {
+						headNode := fmt.Sprintf("/dev/%sn%s", headName, parts[1])
+						if _, err := os.Stat(headNode); err == nil {
+							return headNode, nil
+						}
+					}
 
-	scanner := bufio.NewScanner(strings.NewReader(mpathdOutput))
-	for scanner.Scan() {
-		dmIndicator, dmFieldValue := o.getLineParts(scanner)
-		if o.IsIndicatorMatchesFilterValues(dmFilterValues, dmIndicator) {
-			dmFieldValues[dmFieldValue] = true
-			logger.Infof("ExtractDmFieldValues: found: %s for: %s", dmFieldValue, dmIndicator)
+					// TODO is this better or less reliable than the split method to get the heade node
+					//	Search for the shared head node
+					//	headPattern := fmt.Sprintf("/dev/%sn*", subsysName)
+					//	heads, _ := filepath.Glob(headPattern)
+					//	for _, h := range heads {
+					//		// Verify this head node is actually a block device
+					//		if _, err := os.Stat(h); err == nil {
+					//			logger.Infof("Found NVMe multipath head for %s: %s", devName, h)
+					//			return h, nil
+					//		}
+					//	}
+
+				}
+			}
+			// 3. Return the direct node if not multipathed
+			return filepath.Join("/dev", filepath.Base(m)), nil
 		}
 	}
-
-	return dmFieldValues
+	return "", fmt.Errorf("NVMe WWID %s not found", targetID)
 }
 
-func (GetDmsPathHelperGeneric) getLineParts(scanner *bufio.Scanner) (string, string) {
-	deviceLine := scanner.Text()
-	lineParts := strings.Split(deviceLine, mpathdSeparator)
-	return lineParts[0], lineParts[1]
-}
 
-func (o GetDmsPathHelperGeneric) IsIndicatorMatchesFilterValues(dmFilterValues []string, indicatorValue string) bool {
-	for _, filterValue := range dmFilterValues {
-		if strings.Contains(indicatorValue, filterValue) {
-			return true
+// scanSCSISubsystem finds raw /dev/sdX devices.
+func (o GetDmsPathHelperGeneric) scanSCSISubsystem(targetID string) (string, error) {
+	matches, _ := filepath.Glob("/sys/block/sd*/device/wwid")
+	target := normalize(targetID)
+
+	for _, m := range matches {
+		if content, err := os.ReadFile(m); err == nil {
+			// SCSI wwid files often contain 'naa.' prefixes
+			if strings.Contains(normalize(string(content)), target) {
+				// /sys/block/sdX/device/wwid -> sdX is 3 levels up from wwid,
+				// or 2 levels up from device.
+				sdName := filepath.Base(filepath.Dir(filepath.Dir(m)))
+				return filepath.Join("/dev", sdName), nil
+			}
 		}
 	}
-	return false
+	return "", fmt.Errorf("scsi device not found")
 }
 
-func (GetDmsPathHelperGeneric) GetFullDmPath(dms map[string]bool, volumeId string) (string, error) {
-	dm, err := getUniqueDmFieldValue(dms, volumeId)
+
+func (o GetDmsPathHelperGeneric) getWWIDByDevName(devName string) (string, error) {
+	// Modern Linux kernels (4.x+) expose the WWID in sysfs for SCSI devices
+	wwidPath := fmt.Sprintf("/sys/block/%s/device/wwid", devName)
+	data, err := os.ReadFile(wwidPath)
 	if err != nil {
 		return "", err
 	}
-
-	dmPath := filepath.Join(DevPath, filepath.Base(strings.TrimSpace(dm)))
-	return dmPath, nil
+	return strings.TrimSpace(string(data)), nil
 }
 
-func getUniqueDmFieldValue(dmFieldValues map[string]bool, filter string) (string, error) {
-	if len(dmFieldValues) > 1 {
-		return "", &MultipleDmFieldValuesError{filter, dmFieldValues}
-	}
 
-	var dmFieldValue string
-	for dmFieldValue = range dmFieldValues {
-		break // because its a single value in the map(1 mpath device, if not it should fail above), so just take the first
-	}
-	return dmFieldValue, nil
+// TODO NVMe
+// TODO integrate in the main discovery loop (slaves count)
+func (o GetDmsPathHelperGeneric) validateDMIntegrity(dmPath string) (string, error) {
+    dmName := filepath.Base(dmPath)
+    slavesPath := fmt.Sprintf("/sys/block/%s/slaves", dmName)
+
+    slaves, err := os.ReadDir(slavesPath)
+    if err != nil || len(slaves) == 0 {
+        return "", fmt.Errorf("dm device %s has no active slaves", dmName)
+    }
+
+    // Optional: Check if at least one slave is 'running'
+    for _, s := range slaves {
+        state, _ := os.ReadFile(fmt.Sprintf("/sys/block/%s/device/state", s.Name()))
+        if strings.TrimSpace(string(state)) == "running" {
+            return dmPath, nil
+        }
+    }
+
+    return "", fmt.Errorf("dm device %s has slaves but none are in 'running' state", dmName)
 }
 
-func (GetDmsPathHelperGeneric) GetMpathDeviceNameFromProcMounts(procMounts string, volumePath string) (string, error) {
-	scanner := bufio.NewScanner(strings.NewReader(procMounts))
-	for scanner.Scan() {
-		procMountLine := scanner.Text()
-		if strings.Contains(procMountLine, volumePath) {
-			return extractMpathDeviceName(procMountLine), nil
-		}
+func normalizeWWID(raw string) string {
+	s := strings.ToLower(strings.TrimSpace(raw))
+	// Remove protocol-specific prefixes found in sysfs wwid files
+	prefixes := []string{"mpath-", "naa.", "uuid.", "nvme.", "t10.", "eui."}
+	for _, p := range prefixes {
+		s = strings.TrimPrefix(s, p)
 	}
-	return "", &MultipathDeviceNotFoundForVolumePathError{volumePath}
-}
-
-func extractMpathDeviceName(procMountLine string) string {
-	lineParts := strings.Fields(procMountLine)
-	mpathDevicePath := lineParts[0]
-	return filepath.Base(mpathDevicePath)
+	// TODO is this true always:
+	return strings.ReplaceAll(s, "-", "")
 }
