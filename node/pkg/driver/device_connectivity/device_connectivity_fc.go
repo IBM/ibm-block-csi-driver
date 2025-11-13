@@ -25,10 +25,10 @@ type OsDeviceConnectivityFc struct {
 	HelperScsiGeneric OsDeviceConnectivityHelperScsiGenericInterface
 }
 
-func NewOsDeviceConnectivityFc(executer executer.ExecuterInterface, clean_scsi_device bool) OsDeviceConnectivityInterface {
+func NewOsDeviceConnectivityFc(executer executer.ExecuterInterface, KeyedGater *executer.KeyedGater, Mounter *mount.Mounter, clean_scsi_device bool) OsDeviceConnectivityInterface {
 	return &OsDeviceConnectivityFc{
 		Executer:          executer,
-		HelperScsiGeneric: NewOsDeviceConnectivityHelperScsiGeneric(executer, clean_scsi_device),
+		HelperScsiGeneric: NewOsDeviceConnectivityHelperScsiGeneric(executer, KeyGater, Mounter, clean_scsi_device),
 	}
 }
 
@@ -59,10 +59,10 @@ func (r OsDeviceConnectivityFc) RemovePhysicalDevice(sysDevices []string) error 
 	return r.HelperScsiGeneric.RemovePhysicalDevice(sysDevices)
 }
 
-func (r OsDeviceConnectivityFc) RemoveGhostDevice(lun int) error {
-	return r.HelperScsiGeneric.RemoveGhostDevice(lun)
+func (r OsDeviceConnectivityFc) RemoveGhostDevice(expectedSerial string, expectedLun int, arrayIdentifiers []string) error {
+	return r.HelperScsiGeneric.RemoveGhostDevice(expectedSerial, expectedLun, arrayIdentifiers)
 }
 
-func (r OsDeviceConnectivityFc) ValidateLun(lun int, sysDevices []string) error {
-	return r.HelperScsiGeneric.ValidateLun(lun, sysDevices)
+func (r OsDeviceConnectivityFc) ValidateLun(targetDm string, lun int, sysDevices []string, expectedSerial string) error {
+	return r.HelperScsiGeneric.ValidateLun(targetDm, lun, sysDevices, expectedSerial)
 }
