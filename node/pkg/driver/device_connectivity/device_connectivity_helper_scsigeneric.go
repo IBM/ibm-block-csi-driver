@@ -146,8 +146,6 @@ type activeSession struct {
 // parseActiveSessions returns a slice of all active sessions (host number + source IQN)
 func parseActiveSessions() ([]activeSession, error) {
 	out, err := r.Executer.ExecuteWithTimeout(2 * 1000, "iscsiadm", []string{"-m", "session", "-P", "3"})
-	if err != nil {
-	
 	
 	if err != nil {
 		if exitErr, ok := err.(*exec.ExitError); ok && exitErr.ExitCode() == 21 {
