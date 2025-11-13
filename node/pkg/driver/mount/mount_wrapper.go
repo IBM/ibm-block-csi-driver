@@ -18,6 +18,8 @@ package mount
 
 import (
 	"fmt"
+	"os"
+	"syscall"
 	"time"
 
 	"github.com/ibm/ibm-block-csi-driver/node/logger"
@@ -54,6 +56,24 @@ func NewWithExecutor(mounterPath string, e executer.ExecuterInterface) mount.Int
 // Unmount unmounts the target.
 func (mounter *Mounter) Unmount(target string) error {
 	logger.Infof("Unmounting %s", target)
+
+
+	// Open the mount point directory
+	f, err := os.Open(mountPath)
+	if err != nil {
+		return fmt.Errorf("failed to open mount point: %w", err)
+	}
+	defer f.Close()
+
+	// syscall.Syncfs is the Go wrapper for the syncfs(2) system call
+	// It flushes all dirty data and metadata for the specific filesystem
+	err = syscall.Syncfs(int(f.Fd()))
+	if err != nil {
+		return fmt.Errorf("syncfs failed for %s: %w", mountPath, err)
+	}
+
+
+	//_ = r.Executer.Execute("sync")
 	output, err := mounter.executer.ExecuteWithTimeout(int(timeout.Seconds()*1000), "umount", []string{target})
 	if err != nil {
 		return fmt.Errorf("Unmount failed: %v\nUnmounting arguments: %s\nOutput: %s\n", err, target, string(output))

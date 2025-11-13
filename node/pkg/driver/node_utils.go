@@ -616,6 +616,38 @@ func (d NodeUtils) GetBlockVolumeStats(volumeId string) (VolumeStatistics, error
 }
 
 func (d NodeUtils) GetVolumeUuid(volumeId string) string {
+    if volumeId == "" {
+        return ""
+    }
+
+    // 1. Safety check for primary delimiter
+    delimiter := d.ConfigYaml.Parameters.Object_id_info.Delimiter
+    volumeIdParts := strings.Split(volumeId, delimiter)
+    if len(volumeIdParts) == 0 {
+        return ""
+    }
+
+    // 2. Extract the IDs part (the last segment)
+    idsPart := volumeIdParts[len(volumeIdParts)-1]
+
+    // 3. Safety check for IDs delimiter
+    idsDelimiter := d.ConfigYaml.Parameters.Object_id_info.Ids_delimiter
+    splittedIdsPart := strings.Split(idsPart, idsDelimiter)
+
+    rawUUID := ""
+    if len(splittedIdsPart) >= 2 {
+        rawUUID = splittedIdsPart[1]
+    } else {
+        rawUUID = splittedIdsPart[0]
+    }
+
+    // 4. CRITICAL: Normalize for 2025 storage lookups
+    // This ensures the ID matches the lowercase hex in sysfs/ioctl
+    return d.Normalize(rawUUID)
+}
+
+
+func (d NodeUtils) GetVolumeUuid(volumeId string) string {
 	volumeIdParts := strings.Split(volumeId, d.ConfigYaml.Parameters.Object_id_info.Delimiter)
 	idsPart := volumeIdParts[len(volumeIdParts)-1]
 	splittedIdsPart := strings.Split(idsPart, d.ConfigYaml.Parameters.Object_id_info.Ids_delimiter)
