@@ -1276,7 +1276,6 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
 
         logger.debug("detailed cmd: {}".format(str(detailed_hosts_list_cmd)))
 
-
         logger.debug("Sending getting detailed hosts list commands batch")
         raw_response = self.client.send_raw_command(detailed_hosts_list_cmd)
 
