@@ -1155,6 +1155,7 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
         nvme_host, fc_host, iscsi_host = None, None, None
         connectivity_types = set()
         for host in detailed_hosts_list:
+            logger.debug("Test host {}".format(host))
             host_nqns = self._get_host_ports(host, HOST_NQN)
             if initiators.is_array_nvme_nqn_match(host_nqns):
                 nvme_host = host.name
@@ -1162,12 +1163,14 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
                 logger.debug("found nvme nqn in list : {0} for host : "
                              "{1}".format(initiators.nvme_nqns, nvme_host))
             host_wwns = self._get_host_ports(host, HOST_WWPN)
+            logger.debug("wwns {}".format(str(host_wwns)))
             if initiators.is_array_wwns_match(host_wwns):
                 fc_host = host.name
                 connectivity_types.add(array_settings.FC_CONNECTIVITY_TYPE)
                 logger.debug("found fc wwns in list : {0} for host : "
                              "{1}".format(initiators.fc_wwns, fc_host))
             host_iqns = self._get_host_ports(host, HOST_ISCSI_NAME)
+            logger.debug("iqns {}".format(str(host_iqns)))
             if initiators.is_array_iscsi_iqns_match(host_iqns):
                 iscsi_host = host.name
                 connectivity_types.add(array_settings.ISCSI_CONNECTIVITY_TYPE)
@@ -1266,11 +1269,23 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
         if not hosts_list:
             return []
 
+        logger.debug("Host list: {}".format(str(hosts_list)))
+
         # get all hosts details by sending a single batch of commands, in which each command is per host
         detailed_hosts_list_cmd = self._get_detailed_hosts_list_cmd(hosts_list)
+
+        logger.debug("detailed cmd: {}".format(str(detailed_hosts_list_cmd)))
+
+
         logger.debug("Sending getting detailed hosts list commands batch")
         raw_response = self.client.send_raw_command(detailed_hosts_list_cmd)
+
+        logger.debug("raw response: {}".format(str(raw_response)))
+
         response = SVCResponse(raw_response, {'delim': ' '})
+
+        logger.debug("response: {} as list {}".format(str(response), str(response.as_list)))
+
         return response.as_list
 
     def _get_detailed_hosts_list_cmd(self, host_list):
@@ -1280,6 +1295,7 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
         return writer.getvalue()
 
     def _get_cli_host(self, id_or_name):
+        logger.debug("get cli host {}".format(id_or_name))
         cli_host = self.client.svcinfo.lshost(object_id=id_or_name).as_single_element
         if not cli_host:
             raise array_errors.HostNotFoundError(id_or_name)
@@ -2081,7 +2097,8 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
                     logger.info("Partition host {} port {} is not verified".format(host_name, port))
             if not good_ports:
                 raise array_errors.NoPortIsValid(host_name)
-            ports = [",".join(good_ports)]
+            delim = ":" if connectivity_type == array_settings.FC_CONNECTIVITY_TYPE else ","
+            ports = [delim.join(good_ports)]
         for port in ports:
             status_code = self._mkhost(host_name, connectivity_type, port, io_group, partition_name, port_set)
             if status_code == 200:

@@ -46,6 +46,7 @@ class HostDefinerServicer:
                         if define_host_response.error_message:
                             return define_host_response
                         host_name = host.name
+                        logger.debug("found host {}".format(host_name))
 
                 return self._generate_response(
                     array_mediator, host_name, connectivity_type_from_user, array_addresses[0],
