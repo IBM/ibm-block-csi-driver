@@ -24,12 +24,12 @@ Delete a ConfigMap:
 
 Delete a ConfigMap entry:
   There's no simple command to delete an entry. You can either use:
-  kubectr edit configmap ibm-csi-hostdefiner-config
+  kubectl edit configmap ibm-csi-hostdefiner-config
     Which opens the editor to edit the config map.
   OR you can patch the config map:
   kubectl get configmap ibm-csi-hostdefiner-config -o yaml > ibm-csi-hostdefiner-config.yaml
   edit yaml and then reapply:
-  kubectrl apply -f ibm-csi-hostdefiner-config.yaml
+  kubectl apply -f ibm-csi-hostdefiner-config.yaml
 
 Consider [configuring dynamic host definition labels](../using/using_hostdefinition_labels.md) when possible to preserve HostDefiner customizations during IBM® Block Storage CSI driver upgrades.{: tip}
 

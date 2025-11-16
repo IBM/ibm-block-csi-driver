@@ -103,9 +103,9 @@ class HostDefinerServicer:
             except Exception as ex:
                 if partition_name:
                     logger.error(ex)
-                    logger.warning("Could not update host {} ports - try recreate".format(host_name))
-                    array_mediator.delete_host(host_name)
-                    self._create_host(host_name, array_mediator, request)
+                    logger.warning("Could not update host {} ports - try recreate".format(host))
+                    array_mediator.delete_host(host)
+                    self._create_host(host, array_mediator, request)
                     return
                 raise ex
 
