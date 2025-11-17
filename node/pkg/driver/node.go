@@ -129,7 +129,7 @@ func (d *NodeService) NodeStageVolume(ctx context.Context, req *csi.NodeStageVol
 	err = d.VolumeIdLocksMap.AddVolumeAndLunLock(volumeID, lun, "NodeStageVolume")
 	if err != nil {
 		logger.Errorf("Another operation is being performed on volume : {%s}", volumeID)
-		return nil, status.Error(codes.Aborted, err.Error())
+		return nil, status.Error(codes.FailedPrecondition, err.Error())
 	}
 	defer d.VolumeIdLocksMap.RemoveVolumeAndLunLock(volumeID, lun, "NodeStageVolume")
 
@@ -343,7 +343,7 @@ func (d *NodeService) NodeUnstageVolume(ctx context.Context, req *csi.NodeUnstag
 	err := d.VolumeIdLocksMap.AddVolumeLock(volumeID, "NodeUnstageVolume")
 	if err != nil {
 		logger.Errorf("Another operation is being performed on volume : {%s}", volumeID)
-		return nil, status.Error(codes.Aborted, err.Error())
+		return nil, status.Error(codes.FailedPrecondition, err.Error())
 	}
 	defer d.VolumeIdLocksMap.RemoveVolumeLock(volumeID, "NodeUnstageVolume")
 
@@ -427,7 +427,7 @@ func (d *NodeService) NodePublishVolume(ctx context.Context, req *csi.NodePublis
 	err = d.VolumeIdLocksMap.AddVolumeLock(volumeID, "NodePublishVolume")
 	if err != nil {
 		logger.Errorf("Another operation is being perfomed on volume : {%s}", volumeID)
-		return nil, status.Error(codes.Aborted, err.Error())
+		return nil, status.Error(codes.FailedPrecondition, err.Error())
 	}
 	defer d.VolumeIdLocksMap.RemoveVolumeLock(volumeID, "NodePublishVolume")
 
@@ -587,7 +587,7 @@ func (d *NodeService) NodeUnpublishVolume(ctx context.Context, req *csi.NodeUnpu
 	err := d.VolumeIdLocksMap.AddVolumeLock(volumeID, "NodeUnpublishVolume")
 	if err != nil {
 		logger.Errorf("Another operation is being perfomed on volume : {%s}", volumeID)
-		return nil, status.Error(codes.Aborted, err.Error())
+		return nil, status.Error(codes.FailedPrecondition, err.Error())
 	}
 	defer d.VolumeIdLocksMap.RemoveVolumeLock(volumeID, "NodeUnpublishVolume")
 
@@ -729,7 +729,7 @@ func (d *NodeService) NodeExpandVolume(ctx context.Context, req *csi.NodeExpandV
 	err = d.VolumeIdLocksMap.AddVolumeLock(volumeID, "NodeExpandVolume")
 	if err != nil {
 		logger.Errorf("Another operation is being performed on volume : {%s}", volumeID)
-		return nil, status.Error(codes.Aborted, err.Error())
+		return nil, status.Error(codes.FailedPrecondition, err.Error())
 	}
 	defer d.VolumeIdLocksMap.RemoveVolumeLock(volumeID, "NodeExpandVolume")
 
