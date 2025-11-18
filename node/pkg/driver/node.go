@@ -868,6 +868,10 @@ func (d *NodeService) NodeGetInfo(ctx context.Context, req *csi.NodeGetInfoReque
 	}
 
 	nodeId, err := d.NodeUtils.GenerateNodeID(d.Hostname, nvmeNQN, fcWWNs, iscsiIQN)
+	logger.Info("DEBUG uriziv - 1")
+	logger.Info(nodeId)
+	logger.Info(err)
+	logger.Info("DEBUG uriziv - 1")
 	if err != nil {
 		return nil, status.Error(codes.Internal, err.Error())
 	}
