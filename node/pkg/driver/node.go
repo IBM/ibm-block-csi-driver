@@ -129,9 +129,9 @@ func (d *NodeService) NodeStageVolume(ctx context.Context, req *csi.NodeStageVol
 
 	volumeID := req.VolumeId
 	if rand.IntN(3) == 0 {
-		errorMsg := fmt.Sprintf("Emulate FailedPrecondition on volume : {%s}", volumeID)
+		errorMsg := fmt.Sprintf("Emulate Aborted on volume : {%s}", volumeID)
 		logger.Errorf("%s", errorMsg)
-		return nil, status.Error(codes.FailedPrecondition, errorMsg)
+		return nil, status.Error(codes.Aborted, errorMsg)
 	}
 
 	err = d.VolumeIdLocksMap.AddVolumeAndLunLock(volumeID, lun, "NodeStageVolume")
