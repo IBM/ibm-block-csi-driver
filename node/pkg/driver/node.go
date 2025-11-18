@@ -19,6 +19,7 @@ package driver
 import (
 	"context"
 	"fmt"
+	"math/rand/v2"
 	"path"
 	"reflect"
 	"strings"
@@ -125,7 +126,14 @@ func (d *NodeService) NodeStageVolume(ctx context.Context, req *csi.NodeStageVol
 	if err != nil {
 		return nil, status.Error(codes.Internal, err.Error())
 	}
+
 	volumeID := req.VolumeId
+	if rand.IntN(3) == 0 {
+		errorMsg := fmt.Sprintf("Emulate FailedPrecondition on volume : {%s}", volumeID)
+		logger.Errorf("%s", errorMsg)
+		return nil, status.Error(codes.FailedPrecondition, errorMsg)
+	}
+
 	err = d.VolumeIdLocksMap.AddVolumeAndLunLock(volumeID, lun, "NodeStageVolume")
 	if err != nil {
 		logger.Errorf("Another operation is being performed on volume : {%s}", volumeID)
