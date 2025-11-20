@@ -36,14 +36,15 @@ def string_to_array(str_val, separator):
 
 
 def get_node_id_info(node_id):
+    """get_node_id_info"""
     logger.info("DEBUG - uriziv - 5")
     api = ApiextensionsV1Api()
     crds = api.list_custom_resource_definition()
     for crd in crds.items:
-        logger.info(f"Name: {crd.metadata.name}")
-        logger.info(f"Group: {crd.spec.group}")
-        logger.info(f"Versions: {[v.name for v in crd.spec.versions]}")
-        logger.info("-" * 40)
+        logger.info("Name: %s", crd.metadata.name)
+        logger.info("Group: %s", crd.spec.group)
+        logger.info("Versions: %s", [v.name for v in crd.spec.versions])
+        logger.info("%s", "-" * 40)
     logger.info("DEBUG - uriziv - 6")
 
 
