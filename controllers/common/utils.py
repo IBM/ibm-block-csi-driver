@@ -35,8 +35,8 @@ def string_to_array(str_val, separator):
     return res
 
 
-def get_node_id_info(node_id):
-    """get_node_id_info"""
+def get_crds_info():
+    """get_crds_info"""
     logger.info("DEBUG - uriziv - 5")
     api = ApiextensionsV1Api()
     crds = api.list_custom_resource_definition()
@@ -47,6 +47,8 @@ def get_node_id_info(node_id):
         logger.info("%s", "-" * 40)
     logger.info("DEBUG - uriziv - 6")
 
+
+def get_node_id_info(node_id):
     logger.debug("getting node info for node id : {0}".format(node_id))
     split_node = node_id.split(settings.PARAMETERS_NODE_ID_DELIMITER)
     hostname, nvme_nqn, fc_wwns, iscsi_iqn = "", "", "", ""
