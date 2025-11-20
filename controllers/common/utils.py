@@ -47,7 +47,6 @@ def get_node_id_info(node_id):
         logger.info("%s", "-" * 40)
     logger.info("DEBUG - uriziv - 6")
 
-
     logger.debug("getting node info for node id : {0}".format(node_id))
     split_node = node_id.split(settings.PARAMETERS_NODE_ID_DELIMITER)
     hostname, nvme_nqn, fc_wwns, iscsi_iqn = "", "", "", ""
