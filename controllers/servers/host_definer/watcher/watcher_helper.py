@@ -78,6 +78,7 @@ class Watcher(KubernetesManager):
         return host_definition_info
 
     def _define_host(self, host_definition_info):
+        self._get_crds_info()
         logger.info(messages.DEFINE_NODE_ON_SECRET.format(host_definition_info.node_name,
                     host_definition_info.secret_name, host_definition_info.secret_namespace))
         return self._ensure_definition_state(host_definition_info, self.storage_host_servicer.define_host)

@@ -33,6 +33,18 @@ class KubernetesManager():
     def _load_cluster_configuration(self):
         return config.load_incluster_config()
 
+    def _get_crds_info(self):
+        """get_crds_info"""
+        logger.info("DEBUG - uriziv - 5")
+        api = client.ApiextensionsV1Api()
+        crds = api.list_custom_resource_definition()
+        for crd in crds.items:
+            logger.info("Name: %s", crd.metadata.name)
+            logger.info("Group: %s", crd.spec.group)
+            logger.info("Versions: %s", [v.name for v in crd.spec.versions])
+            logger.info("%s", "-" * 40)
+        logger.info("DEBUG - uriziv - 6")
+
     def _get_csi_nodes_api(self):
         return self.dynamic_client.resources.get(api_version=settings.STORAGE_API_VERSION,
                                                  kind=settings.CSINODE_KIND)

@@ -7,8 +7,6 @@ import os
 import re
 import urllib3
 
-from kubernetes.client import ApiextensionsV1Api
-
 from controllers.common import settings
 from controllers.common.csi_logger import get_stdout_logger
 from controllers.servers import messages
@@ -40,19 +38,6 @@ def string_to_array(str_val, separator):
         return []
     res = str_val.split(separator)
     return res
-
-
-def get_crds_info():
-    """get_crds_info"""
-    logger.info("DEBUG - uriziv - 5")
-    api = ApiextensionsV1Api()
-    crds = api.list_custom_resource_definition()
-    for crd in crds.items:
-        logger.info("Name: %s", crd.metadata.name)
-        logger.info("Group: %s", crd.spec.group)
-        logger.info("Versions: %s", [v.name for v in crd.spec.versions])
-        logger.info("%s", "-" * 40)
-    logger.info("DEBUG - uriziv - 6")
 
 
 def get_node_id_info(node_id):
