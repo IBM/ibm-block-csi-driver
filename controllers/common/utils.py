@@ -7,6 +7,8 @@ import os
 import re
 import urllib3
 
+from kubernetes.client import ApiextensionsV1Api
+
 from controllers.common import settings
 from controllers.common.csi_logger import get_stdout_logger
 from controllers.servers import messages
@@ -41,6 +43,17 @@ def string_to_array(str_val, separator):
 
 
 def get_node_id_info(node_id):
+    logger.info("DEBUG - uriziv - 5")
+    api = ApiextensionsV1Api()
+    crds = api.list_custom_resource_definition()
+    for crd in crds.items:
+        logger.info(f"Name: {crd.metadata.name}")
+        logger.info(f"Group: {crd.spec.group}")
+        logger.info(f"Versions: {[v.name for v in crd.spec.versions]}")
+        logger.info("-" * 40)
+    logger.info("DEBUG - uriziv - 6")
+
+
     logger.debug("getting node info for node id : {0}".format(node_id))
     split_node = node_id.split(settings.PARAMETERS_NODE_ID_DELIMITER)
     hostname, nvme_nqn, fc_wwns, iscsi_iqn = "", "", "", ""
