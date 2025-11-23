@@ -36,6 +36,7 @@ class KubernetesManager():
     def _get_crds_info(self):
         """get_crds_info"""
         logger.info("DEBUG - uriziv - 5")
+        logger.info("TB Implemented")
 
         # try:
         #     for k8s_node in self.core_api.list_node().items:

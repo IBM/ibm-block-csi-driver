@@ -41,15 +41,19 @@ class Watcher(KubernetesManager):
         return host_definition_info
 
     def _get_host_definition_info_from_secret(self, secret_info):
+        logger.info("DEBUG - uriziv - 13")
         host_definition_info = HostDefinitionInfo()
         host_definition_info.secret_name = secret_info.name
         host_definition_info.secret_namespace = secret_info.namespace
         return host_definition_info
+    logger.info("DEBUG - uriziv - 14")
 
     def _define_nodes(self, host_definition_info):
+        logger.info("DEBUG - uriziv - 11")
         for node_name, _ in NODES.items():
             host_definition_info = self._add_name_to_host_definition_info(node_name, host_definition_info)
             self._create_definition(host_definition_info)
+        logger.info("DEBUG - uriziv - 12")
 
     def _add_name_to_host_definition_info(self, node_name, host_definition_info):
         host_definition_info.node_name = node_name
@@ -62,8 +66,11 @@ class Watcher(KubernetesManager):
                 host_definition_info.node_name, host_definition_info.secret_name,
                 host_definition_info.secret_namespace):
             return
+        logger.info("DEBUG - uriziv - 9")
         host_definition_info = self._update_host_definition_info(host_definition_info)
         response = self._define_host(host_definition_info)
+        logger.info("response %s", response)
+        logger.info("DEBUG - uriziv - 10")
         current_host_definition_info_on_cluster = self._create_host_definition_if_not_exist(
             host_definition_info, response)
         self._set_status_to_host_definition_after_definition(
