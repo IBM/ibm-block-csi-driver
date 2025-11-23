@@ -36,13 +36,17 @@ class KubernetesManager():
     def _get_crds_info(self):
         """get_crds_info"""
         logger.info("DEBUG - uriziv - 5")
-        api = client.ApiextensionsV1Api()
-        crds = api.list_custom_resource_definition()
-        for crd in crds.items:
-            logger.info("Name: %s", crd.metadata.name)
-            logger.info("Group: %s", crd.spec.group)
-            logger.info("Versions: %s", [v.name for v in crd.spec.versions])
-            logger.info("%s", "-" * 40)
+        for k8s_node in self.core_api.list_node().items:
+            logger.info("k8s_node.metadata: %s", k8s_node.metadata)
+            node_info = NodeInfo(k8s_node.metadata.name, k8s_node.metadata.labels)
+            logger.info("node_info: %s", node_info)
+        # api = client.ApiextensionsV1Api()
+        # crds = api.list_custom_resource_definition()
+        # for crd in crds.items:
+        #     logger.info("Name: %s", crd.metadata.name)
+        #     logger.info("Group: %s", crd.spec.group)
+        #     logger.info("Versions: %s", [v.name for v in crd.spec.versions])
+        #     logger.info("%s", "-" * 40)
         logger.info("DEBUG - uriziv - 6")
 
     def _get_csi_nodes_api(self):
