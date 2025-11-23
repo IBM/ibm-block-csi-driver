@@ -8,6 +8,7 @@ Minimum IBM Storage Virtualize® version supported by CSI is 9.1.0.1
 
 The partition, default volume group and high availability policy is defined directly on the storage, there's no option to configure from CSI.
 PBHA configurations require a single management IP (supported in IBM Storage Virtualize® since 9.1.0.1) - single secret needs to be used with that management IP.
+In PBHA - CSI doesn't support iSCSI (between cluster and storage).
 
 Since host definer (if used) always defines all the ports of each worker (if allowed by node labelling / configuration) - assignment to partitions is also cluster/node based.
 
@@ -18,7 +19,6 @@ High Hvailability Partitions:
 - Note if volume is mapped when the peer system is down - multipath devices won't be created for the down system.
 - It is strongly advised to install the utility that fascilitates auto rescan of devices in case of failover.
 https://github.com/IBM/oss-rescan-storage-linux-udeva
-- In iSCSI - even when both systems are up - devices aren't automatically created and need to be manually defined followed by manual rescan.
 - Snapshots aren't supported yet in IBM Storage Virtualize® (9.1.0.1).
 
 

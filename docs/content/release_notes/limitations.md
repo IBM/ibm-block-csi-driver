@@ -27,8 +27,8 @@ Some storage system types do not support High availability (HA).{: attention}
 
 ## IBM Storage Virtualize® partitions and high availability partitions (PBHA) limitations
 
-- High Availability requires configuration of single management IP (supported since IBM Storage Virtualize® 9.1.0.1)
 - Snapshots aren't supported yet in HA (IBM Storage Virtualize® 9.1.0.1)
+- iSCSI connectivity (from cluster to storage) isn't supported in PBHA (can be used with other partition types)
 - Some features aren't supported for partitions, please refer to the docuemntation for details. For example - as of time of this release (1.13.0) IO groups are not supported and shouldn't be used.
 
 ## HyperSwap volume limitations
@@ -125,8 +125,3 @@ The following limitations apply when using volume snapshots with the IBM block s
 - When using the CSI driver with IBM DS8000® family storage systems, a snapshot is limited to creating 11 volumes.
 
 These limitations are not relevant when using the Snapshot function. For more information, see [Snapshot function limitations](#snapshot-function-limitations). {: note}
-
-# Port set limitations
-
-- Changing the port set of existing hosts isn't supported and will be ignored, the setting is only used in creation of new hosts.
-
