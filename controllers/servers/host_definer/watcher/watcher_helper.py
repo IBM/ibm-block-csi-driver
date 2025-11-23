@@ -45,8 +45,8 @@ class Watcher(KubernetesManager):
         host_definition_info = HostDefinitionInfo()
         host_definition_info.secret_name = secret_info.name
         host_definition_info.secret_namespace = secret_info.namespace
+        logger.info("DEBUG - uriziv - 14")
         return host_definition_info
-    logger.info("DEBUG - uriziv - 14")
 
     def _define_nodes(self, host_definition_info):
         logger.info("DEBUG - uriziv - 11")
