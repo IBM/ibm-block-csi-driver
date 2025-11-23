@@ -43,6 +43,8 @@ class SecretWatcher(Watcher):
             self._define_host_after_watch_event(secret_info)
 
     def _define_host_after_watch_event(self, secret_info):
+        logger.info("DEBUG - uriziv - 15")
         logger.info(messages.SECRET_HAS_BEEN_MODIFIED.format(secret_info.name, secret_info.namespace))
         host_definition_info = self._get_host_definition_info_from_secret(secret_info)
         self._define_nodes(host_definition_info)
+        logger.info("DEBUG - uriziv - 16")

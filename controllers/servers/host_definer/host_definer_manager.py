@@ -28,12 +28,14 @@ class HostDefinerManager:
         self._start_watchers()
 
     def _start_watchers(self):
+        logger.info("DEBUG - uriziv - 17")
         watchers = (
             self.csi_node_watcher.watch_csi_nodes_resources,
             self.host_definition_watcher.watch_host_definitions_resources,
             self.secret_watcher.watch_secret_resources,
             self.node_watcher.watch_nodes_resources,
             self.storage_class_watcher.watch_storage_class_resources)
+        logger.info("DEBUG - uriziv - 18")
         for watch_function in watchers:
             thread = Thread(target=watch_function,)
             thread.start()
