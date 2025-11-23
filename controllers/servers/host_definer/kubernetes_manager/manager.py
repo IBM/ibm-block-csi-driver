@@ -38,7 +38,7 @@ class KubernetesManager():
         logger.info("DEBUG - uriziv - 5")
 
         try:
-            for k8s_node in self.core_api.list_node().items:
+            for k8s_node in self.core_api.list_node().items():
                 k8s_node = self._generate_node_info(k8s_node)
                 logger.info(k8s_node)
         except ApiException as ex:
