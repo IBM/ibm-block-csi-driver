@@ -37,12 +37,12 @@ class KubernetesManager():
         """get_crds_info"""
         logger.info("DEBUG - uriziv - 5")
 
-        try:
-            for k8s_node in self.core_api.list_node().items():
-                k8s_node = self._generate_node_info(k8s_node)
-                logger.info(k8s_node)
-        except ApiException as ex:
-            logger.error(messages.FAILED_TO_GET_NODES.format(ex.body))
+        # try:
+        #     for k8s_node in self.core_api.list_node().items:
+        #         k8s_node = self._generate_node_info(k8s_node)
+        #         logger.info(k8s_node)
+        # except ApiException as ex:
+        #     logger.error(messages.FAILED_TO_GET_NODES.format(ex.body))
 
         # for k8s_node in self.core_api.list_node().items:
         #     logger.info("k8s_node.metadata: %s", k8s_node.metadata)
