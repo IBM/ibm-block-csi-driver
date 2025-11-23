@@ -11,7 +11,7 @@ class NodeIdInfo:
         Args:
             node_id: <node_name>,<iqn>,<wwns>
         """
-        utils.get_crds_info()
+        # utils.get_crds_info()
         node_name, nvme_nqn, fc_wwns_str, iscsi_iqn = utils.get_node_id_info(node_id)
         fc_wwns = fc_wwns_str.split(servers_settings.PARAMETERS_FC_WWN_DELIMITER)
         self.node_name = node_name
