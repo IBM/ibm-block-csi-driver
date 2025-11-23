@@ -520,9 +520,9 @@ func (n NodeUtils) GenerateNodeID(hostName string, nvmeNQN string, fcWWNs []stri
 	}
 
 	finalNodeId := strings.TrimSuffix(nodeId.String(), ";")
-	logger.Info("Dubug - uriziv - 3")
+	logger.Info("Debug - uriziv - 3")
 	logger.Info(finalNodeId)
-	logger.Info("Dubug - uriziv - 4")
+	logger.Info("Debug - uriziv - 4")
 	return finalNodeId, nil
 }
 
