@@ -3,7 +3,7 @@ set -x
 
 CSI_VERSION="v1.9.0"
 ADDONS_VERSION="v0.2.0"
-VG_VERSION="v0.9.2"
+VG_VERSION="v0.9.3"
 PB2_DIR="csi_general"
 
 mkdir -p ./proto/${PB2_DIR}

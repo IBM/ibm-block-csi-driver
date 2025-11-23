@@ -74,13 +74,13 @@ When host definer is being installed, it is preferable to do so before installin
     1. To enable support on your Kubernetes cluster, install the following replication CRDs once per cluster.
 
         ```
-        curl -O https://raw.githubusercontent.com/IBM/csi-volume-group-operator/v0.9.2/config/crd/bases/csi.ibm.com_volumegroupclasses.yaml
+        curl -O https://raw.githubusercontent.com/IBM/csi-volume-group-operator/v0.9.3/config/crd/bases/csi.ibm.com_volumegroupclasses.yaml
         kubectl apply -f csi.ibm.com_volumegroupclasses.yaml
 
-        curl -O https://raw.githubusercontent.com/IBM/csi-volume-group-operator/v0.9.2/config/crd/bases/csi.ibm.com_volumegroupcontents.yaml
+        curl -O https://raw.githubusercontent.com/IBM/csi-volume-group-operator/v0.9.3/config/crd/bases/csi.ibm.com_volumegroupcontents.yaml
         kubectl apply -f csi.ibm.com_volumegroupcontents.yaml
 
-        curl -O https://raw.githubusercontent.com/IBM/csi-volume-group-operator/v0.9.2/config/crd/bases/csi.ibm.com_volumegroups.yaml
+        curl -O https://raw.githubusercontent.com/IBM/csi-volume-group-operator/v0.9.3/config/crd/bases/csi.ibm.com_volumegroups.yaml
         kubectl apply -f csi.ibm.com_volumegroups.yaml
         ```
 
