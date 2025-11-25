@@ -19,6 +19,7 @@ class HostDefinerManager:
         self.csi_node_watcher = CsiNodeWatcher()
         self.host_definition_watcher = HostDefinitionWatcher()
         self.node_watcher = NodeWatcher()
+        # self.crd_watcher = CrdWatcher()
 
     def start_host_definition(self):
         logger.info('starting host definer')
