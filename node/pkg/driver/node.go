@@ -867,6 +867,20 @@ func (d *NodeService) NodeGetInfo(ctx context.Context, req *csi.NodeGetInfoReque
 		return nil, status.Error(codes.Internal, err.Error())
 	}
 
+	logger.Info("DEBUG uriziv - 23")
+	go func() {
+		err := d.NodeUtils.UpdateNodePortsAnnotation(
+			d.Hostname,
+			iscsiIQN,
+			fcWWNs,
+			nvmeNQN,
+		)
+		if err != nil {
+			logger.Warningf("failed updating node-ports annotation: %v", err)
+		}
+	}()
+	logger.Info("DEBUG uriziv - 24")
+
 	nodeId, err := d.NodeUtils.GenerateNodeID(d.Hostname, nvmeNQN, fcWWNs, iscsiIQN)
 	logger.Info("DEBUG uriziv - 1")
 	logger.Info(nodeId)
