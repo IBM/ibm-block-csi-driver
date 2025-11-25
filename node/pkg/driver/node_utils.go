@@ -19,6 +19,7 @@ package driver
 import (
 	"bufio"
 	"context"
+	"encoding/json"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -29,6 +30,7 @@ import (
 
 	"github.com/ibm/ibm-block-csi-driver/node/pkg/driver/device_connectivity"
 	"golang.org/x/sys/unix"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/errors"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -90,6 +92,7 @@ type NodeUtilsInterface interface {
 	GetPodPath(filepath string) string
 	GenerateNodeID(hostName string, nvmeNQN string, fcWWNs []string, iscsiIQN string) (string, error)
 	GetTopologyLabels(ctx context.Context, nodeName string) (map[string]string, error)
+	UpdateNodePortsAnnotation(nodeName string, iscsiIQN string, fcWWNs []string, nvmeNQN string) error
 	IsBlock(devicePath string) (bool, error)
 	GetFileSystemVolumeStats(path string) (VolumeStatistics, error)
 	GetBlockVolumeStats(volumeId string) (VolumeStatistics, error)
@@ -553,6 +556,80 @@ func (n NodeUtils) GetTopologyLabels(ctx context.Context, nodeName string) (map[
 		}
 	}
 	return topologyLabels, nil
+}
+
+func (n NodeUtils) UpdateNodePortsAnnotation(
+	nodeName string,
+	iscsiIQN string,
+	fcWWNs []string,
+	nvmeNQN string,
+) error {
+
+	logger.Info("Debug - uriziv - 21")
+
+	kubeConfig, err := rest.InClusterConfig()
+	if err != nil {
+		return fmt.Errorf("unable to load in-cluster configuration: %w", err)
+	}
+
+	client, err := kubernetes.NewForConfig(kubeConfig)
+	if err != nil {
+		return fmt.Errorf("failed creating kube client: %w", err)
+	}
+
+	portsData := map[string]interface{}{
+		"iscsi": []string{},
+		"fc":    []string{},
+		"nvme":  map[string]interface{}{},
+	}
+
+	if iscsiIQN != "" {
+		portsData["iscsi"] = []string{iscsiIQN}
+	}
+
+	if len(fcWWNs) > 0 {
+		portsData["fc"] = fcWWNs
+	}
+
+	if nvmeNQN != "" {
+		portsData["nvme"] = map[string]interface{}{"nqn": nvmeNQN}
+	}
+
+	jsonBytes, err := json.Marshal(portsData)
+	if err != nil {
+		return fmt.Errorf("marshal portsData: %w", err)
+	}
+
+	patch := map[string]interface{}{
+		"metadata": map[string]interface{}{
+			"annotations": map[string]string{
+				"block.csi.ibm.com/node-ports": string(jsonBytes),
+			},
+		},
+	}
+
+	patchBytes, err := json.Marshal(patch)
+	if err != nil {
+		return fmt.Errorf("marshal patch: %w", err)
+	}
+
+	logger.Infof("Patching node %s with annotation block.csi.ibm.com/node-ports", nodeName)
+
+	_, err = client.CoreV1().Nodes().Patch(
+		context.Background(),
+		nodeName,
+		types.MergePatchType,
+		patchBytes,
+		metav1.PatchOptions{},
+	)
+
+	if err != nil {
+		return fmt.Errorf("failed PATCH node ports annotation: %w", err)
+	}
+
+	logger.Info("Debug - uriziv - 22")
+
+	return nil
 }
 
 func (n NodeUtils) IsBlock(devicePath string) (bool, error) {
