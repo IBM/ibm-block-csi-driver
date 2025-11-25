@@ -7,6 +7,7 @@ from controllers.servers.host_definer.watcher.secret_watcher import SecretWatche
 from controllers.servers.host_definer.watcher.storage_class_watcher import StorageClassWatcher
 from controllers.servers.host_definer.watcher.host_definition_watcher import HostDefinitionWatcher
 from controllers.servers.host_definer.watcher.node_watcher import NodeWatcher
+from controllers.servers.host_definer.watcher.crd_watcher import CrdWatcher
 
 logger = get_stdout_logger()
 
@@ -19,7 +20,7 @@ class HostDefinerManager:
         self.csi_node_watcher = CsiNodeWatcher()
         self.host_definition_watcher = HostDefinitionWatcher()
         self.node_watcher = NodeWatcher()
-        # self.crd_watcher = CrdWatcher()
+        self.crd_watcher = CrdWatcher()
 
     def start_host_definition(self):
         logger.info('starting host definer')
@@ -35,6 +36,7 @@ class HostDefinerManager:
             self.host_definition_watcher.watch_host_definitions_resources,
             self.secret_watcher.watch_secret_resources,
             self.node_watcher.watch_nodes_resources,
+            self.crd_watcher.watch_nodes_resources,
             self.storage_class_watcher.watch_storage_class_resources)
         logger.info("DEBUG - uriziv - 18")
         for watch_function in watchers:
