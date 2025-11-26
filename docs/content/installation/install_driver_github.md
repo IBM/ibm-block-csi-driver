@@ -16,7 +16,7 @@ When host definer is being installed, it is preferable to do so before installin
     1. Download the manifest from GitHub.
 
         ```
-        curl https://raw.githubusercontent.com/IBM/ibm-block-csi-operator/v1.13.0/deploy/installer/generated/ibm-block-csi-operator.yaml > ibm-block-csi-operator.yaml
+        curl https://raw.githubusercontent.com/IBM/ibm-block-csi-operator/v1.13.1/deploy/installer/generated/ibm-block-csi-operator.yaml > ibm-block-csi-operator.yaml
         ```
 
     2.  (Optional) Update the image fields in the `ibm-block-csi-operator.yaml`.
@@ -40,7 +40,7 @@ When host definer is being installed, it is preferable to do so before installin
     1.  Download the manifest from GitHub.
 
         ```
-        curl https://raw.githubusercontent.com/IBM/ibm-block-csi-operator/v1.13.0/config/samples/csi.ibm.com_v1_ibmblockcsi_cr.yaml > csi.ibm.com_v1_ibmblockcsi_cr.yaml
+        curl https://raw.githubusercontent.com/IBM/ibm-block-csi-operator/v1.13.1/config/samples/csi.ibm.com_v1_ibmblockcsi_cr.yaml > csi.ibm.com_v1_ibmblockcsi_cr.yaml
         ```
 
     2.  (Optional) Update the image repository field, tag field, or both in the `csi.ibm.com_v1_ibmblockcsi_cr.yaml`.
@@ -50,7 +50,7 @@ When host definer is being installed, it is preferable to do so before installin
         ```
         kubectl apply -f csi.ibm.com_v1_ibmblockcsi_cr.yaml
         ```
-    
+
     4.  Verify that the driver is running:
         ```
         $> kubectl get pods -n <namespace> -l product=ibm-block-csi-driver

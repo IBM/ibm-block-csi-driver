@@ -29,7 +29,7 @@ Some storage system types do not support High availability (HA).{: attention}
 
 - Snapshots aren't supported yet in HA (IBM Storage Virtualize® 9.1.0.1)
 - iSCSI connectivity (from cluster to storage) isn't supported in PBHA (can be used with other partition types)
-- Some features aren't supported for partitions, please refer to the docuemntation for details. For example - as of time of this release (1.13.0) IO groups are not supported and shouldn't be used.
+- Some features aren't supported for partitions, please refer to the docuemntation for details. For example - as of time of this release (1.13.1) IO groups are not supported and shouldn't be used.
 
 ## HyperSwap volume limitations
 The following IBM block storage CSI driver features are not supported on volumes where HyperSwap is used:
@@ -70,7 +70,7 @@ For other policy-based replication limitations with your storage system, see the
 - A snapshot that uses the Snapshot function must be created within the same pool or child pool as the original PVC.
 - Any object that is linked in any way (for example, a clone or a snapshot) must have the same definition of snapshot support. For example, a clone cannot be created with `virt_snap_func` disabled (indicating FlashCopy mapping is enabled) from a PVC with an existing Snapshot function connection.
 
-FlashCopy mapping (`fcmap`) and Snapshot function cannot be used together on the same volume. However, they can be used on different volumes within the same storage system. {: restriction} 
+FlashCopy mapping (`fcmap`) and Snapshot function cannot be used together on the same volume. However, they can be used on different volumes within the same storage system. {: restriction}
 
 Check your IBM Storage Virtualize® product documentation on [IBM Documentation](https://www.ibm.com/docs) if your product supports the Snapshot function prior to enabling with the `virt_snap_func` parameter.{: important}
 

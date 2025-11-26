@@ -13,7 +13,7 @@ The CSI driver requires the following ports to be opened on the worker nodes OS 
 
         Port 3260
 
- 
+
  -   **IBM Storage® Virtualize family**
 
         Port 22
@@ -33,7 +33,7 @@ Complete these steps to prepare your environment for installing the CSI (Contain
    Download and save the following YAML file:
 
    ```
-   curl https://raw.githubusercontent.com/IBM/ibm-block-csi-operator/v1.13.0/deploy/99-ibm-attach.yaml > 99-ibm-attach.yaml
+   curl https://raw.githubusercontent.com/IBM/ibm-block-csi-operator/v1.13.1/deploy/99-ibm-attach.yaml > 99-ibm-attach.yaml
    ```
 
    This file can be used for both Fibre Channel and iSCSI configurations. To support iSCSI, uncomment the last two lines in the file.
@@ -52,16 +52,16 @@ Complete these steps to prepare your environment for installing the CSI (Contain
 
     **Note:** IBM® block storage CSI driver 1.11.0 introduced dynamic host definition. For more information and installation instructions, see [Installing the host definer](install_hostdefiner.md). If this feature is not installed, the nodes are not dynamically defined on the storage system and they must be defined manually. <br />
     **Note:** Dynamic host definition is only supported with IBM Storage Virtualize® family products.
-    
+
     Be sure to configure your storage system host attachment according to your storage system instructions.
 
     The CSI driver supports the following connectivity for each worker node: Fibre Channel (WWPN) and iSCSI (IQN).
-        
-    **Note:** 
+
+    **Note:**
     - As of this document's publication date, NVMe/FC is not supported for this release.
     - For Fibre Channel connectivity be sure that storage system is using one of the fully supported HBAs compatible with your host connection, as listed in the [IBM System Storage Interoperation Center® (SSIC)](https://www-03.ibm.com/systems/support/storage/ssic/interoperability.wss).
     - The CSI driver supports IBM DS8000® family storage systems only with Fibre Channel connectivity.
-       
+
     For more information, find your storage system documentation in [IBM Documentation](http://www.ibm.com/docs/).
 
 3. **For RHEL OS users:** Ensure that the following packages are installed per worker node.
@@ -74,7 +74,7 @@ Complete these steps to prepare your environment for installing the CSI (Contain
     - xfsprogs (if XFS file system is required)
 
 4. (Optional) To use CSI Topology, at least one node in the cluster must have the label-prefix of `topology.block.csi.ibm.com` to introduce topology awareness.
-      
+
       **Important:** This label-prefix must be found on the nodes in the cluster **before** installing the IBM® block storage CSI driver. If the nodes do not have the proper label-prefix before installation, CSI Topology cannot be used with the CSI driver.
 
       For more information, see [Configuring for CSI Topology](../configuration/configuring_topology.md).

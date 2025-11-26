@@ -3,7 +3,7 @@
 
 # Known issues
 
-This section details the known issues in IBM® block storage CSI driver 1.13.0, along with possible solutions or workarounds (if available).
+This section details the known issues in IBM® block storage CSI driver 1.13.1, along with possible solutions or workarounds (if available).
 
 The following severity levels apply to known issues:
 
@@ -14,9 +14,9 @@ The following severity levels apply to known issues:
 -   **Low** – Low-impact usability-related issue.
 
 
-**The issues listed below apply to IBM® block storage CSI driver 1.13.0**. As long as a newer version has not yet been released, a newer release notes edition for IBM® block storage CSI driver 1.13.0 might be issued to provide a more updated list of known issues and workarounds.{: important}
+**The issues listed below apply to IBM® block storage CSI driver 1.13.1**. As long as a newer version has not yet been released, a newer release notes edition for IBM® block storage CSI driver 1.13.1 might be issued to provide a more updated list of known issues and workarounds.{: important}
 
-When a newer version is released for general availability, the release notes of this version will no longer be updated. Accordingly, check the release notes of the newer version to learn whether any newly discovered issues affect IBM block storage CSI driver 1.13.0 or whether the newer version resolves any of the issues listed below.
+When a newer version is released for general availability, the release notes of this version will no longer be updated. Accordingly, check the release notes of the newer version to learn whether any newly discovered issues affect IBM block storage CSI driver 1.13.1 or whether the newer version resolves any of the issues listed below.
 
 |Ticket ID|Severity|Description|
 |---------|--------|-----------|
@@ -28,4 +28,3 @@ When a newer version is released for general availability, the release notes of 
 |**CSI-5722**|Service|In rare cases, when recreating a pod with a previously used PVC, volume attachment may be stuck and needs to be manually released <br>**Workaround:** get the list of volume attachments and find the one that is stuck, then release the volume attachment by deleting any finalizers. Then recreate the pod with the previously used PVC.|
 |**CSI-5841**|Service|NVMe/FC support not working properly on RHEL 8 & 9 due to use of incompatible SCSI and multipath tools by CSI. As of this document's publication date, NVMe/FC is not supported for this release.|
 |**CSI-6018**|Service|Portset change isn't supported in same config change as changing protocol type or list of ports - need to apply as 2 separate changes.|
-
