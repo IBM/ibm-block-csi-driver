@@ -17,7 +17,10 @@
 package device_connectivity
 
 import (
+	"bufio"
 	"errors"
+	"fmt"
+	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -151,8 +154,107 @@ func (r OsDeviceConnectivityIscsi) EnsureLogin(allPortalsByTarget map[string][]s
 	}
 }
 
+var (
+	// Host Number line
+	hostLineRE = regexp.MustCompile(`Host Number:\s*(\d+)`)
+
+	// Source IQN line – this is the *initiator* IQN, not the target
+	sourceIQNLineRE = regexp.MustCompile(`^Initiator:\s*(iqn\..+)$`)
+)
+
+// activeSession holds the data we need for one host
+type activeSession struct {
+	num      int    // host number (0,1,2,…)
+	sourceIQN string // initiator IQN
+}
+
+// parseActiveSessions returns a slice of all active sessions (host number + source IQN)
+func (r OsDeviceConnectivityIscsi) parseActiveSessions() ([]activeSession, error) {
+	out, err := r.iscsiCmd("-m", "session", "-P", "3")
+
+	if err != nil {
+		//if exitErr, ok := err.(*exec.ExitError); ok && exitErr.ExitCode() == 21 {
+		//	return nil, nil // no sessions
+		//}
+		return nil, fmt.Errorf("iscsiadm failed: %w", err)
+	}
+
+	var sessions []activeSession
+	scanner := bufio.NewScanner(strings.NewReader(string(out)))
+	var curNum = -1
+
+	for scanner.Scan() {
+		line := strings.TrimSpace(scanner.Text())
+
+		// ---- Host Number ----
+		if m := hostLineRE.FindStringSubmatch(line); m != nil {
+			num, _ := strconv.Atoi(m[1])
+			curNum = num
+			continue
+		}
+
+		// ---- Source IQN (Initiator) ----
+		if curNum != -1 {
+			if m := sourceIQNLineRE.FindStringSubmatch(line); m != nil {
+				sessions = append(sessions, activeSession{
+					num:       curNum,
+					sourceIQN: m[1],
+				})
+				curNum = -1 // reset for next block
+			}
+		}
+	}
+	return sessions, scanner.Err()
+}
+
+// updateHostIDs adds new active hosts that share the *source* IQN with any known host
+func (r OsDeviceConnectivityIscsi) updateHostIDs(hostIDs map[int]bool) {
+	// 1. Get all active sessions
+	active, err := r.parseActiveSessions()
+	if err != nil {
+		logger.Errorf("Failed to parse iSCSI sessions: {%s}", err)
+		return
+	}
+	if len(active) == 0 {
+		logger.Error("No active iSCSI sessions.")
+		return
+	}
+
+	// 2. Build sourceIQN → list of known host numbers
+	iqnToKnown := make(map[string][]int)
+	for num := range hostIDs {
+		// Find source IQN for this known host (must exist in active list)
+		for _, s := range active {
+			if s.num == num {
+				iqnToKnown[s.sourceIQN] = append(iqnToKnown[s.sourceIQN], num)
+				break
+			}
+		}
+	}
+
+	// 3. Walk through every active session
+	for _, s := range active {
+		if hostIDs[s.num] {
+			continue // already known
+		}
+
+		// If this source IQN is used by any known host → add it
+		if knownHosts, found := iqnToKnown[s.sourceIQN]; found && len(knownHosts) > 0 {
+			hostIDs[s.num] = true
+			iqnToKnown[s.sourceIQN] = append(iqnToKnown[s.sourceIQN], s.num)
+			logger.Debugf("Added host%d (source IQN: %s) – matches known hosts: %v\n",
+				s.num, s.sourceIQN, knownHosts)
+		}
+	}
+}
+
 func (r OsDeviceConnectivityIscsi) RescanDevices(lunId int, arrayIdentifiers []string) error {
-	return r.HelperScsiGeneric.RescanDevices(lunId, arrayIdentifiers)
+	hostIDs, err := r.HelperScsiGeneric.RescanDevicesGetHostIds(lunId, arrayIdentifiers)
+	if err != nil {
+		return err
+	}
+	r.updateHostIDs(hostIDs)
+	return r.HelperScsiGeneric.RescanDevices(lunId, arrayIdentifiers, hostIDs)
 }
 
 func (r OsDeviceConnectivityIscsi) GetMpathDevice(volumeId string) (string, error) {
