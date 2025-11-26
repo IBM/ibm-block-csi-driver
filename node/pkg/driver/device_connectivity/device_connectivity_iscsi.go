@@ -164,7 +164,7 @@ var (
 
 // activeSession holds the data we need for one host
 type activeSession struct {
-	num      int    // host number (0,1,2,…)
+	num       int    // host number (0,1,2,…)
 	sourceIQN string // initiator IQN
 }
 
