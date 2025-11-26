@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-FROM registry.access.redhat.com/ubi8/python-39:1-1753379689 AS builder
+FROM registry.access.redhat.com/ubi9/python-39:9.7-1764102594 AS builder
 
 USER root
 RUN if [[ "$(uname -m)" != "x86"* ]]; then yum install -y rust-toolset; fi
@@ -32,7 +32,7 @@ RUN chmod +x csi_pb2.sh
 RUN ./csi_pb2.sh
 RUN pip3 install .
 
-FROM registry.access.redhat.com/ubi8/python-39:1-1753379689
+FROM registry.access.redhat.com/ubi9/python-39:9.7-1764102594
 
 ARG VERSION=1.13.1
 ARG BUILD_NUMBER=0
