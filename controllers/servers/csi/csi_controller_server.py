@@ -220,6 +220,7 @@ class CSIControllerServicer(csi_pb2_grpc.ControllerServicer):
 
     @csi_method(error_response_type=csi_pb2.ControllerPublishVolumeResponse, lock_request_attribute="volume_id")
     def ControllerPublishVolume(self, request, context):
+        logger.info("debug - uriziv - 25")
         try:
             utils.validate_publish_volume_request(request)
 
@@ -228,6 +229,7 @@ class CSIControllerServicer(csi_pb2_grpc.ControllerServicer):
             array_type = volume_id_info.array_type
             volume_id = volume_id_info.ids.uid
             node_id_info = NodeIdInfo(request.node_id)
+            logger.info(request)
             node_name = node_id_info.node_name
             initiators = node_id_info.initiators
 
@@ -248,6 +250,7 @@ class CSIControllerServicer(csi_pb2_grpc.ControllerServicer):
             response = utils.generate_csi_publish_volume_response(lun,
                                                                   connectivity_type,
                                                                   array_initiators)
+            logger.info("debug - uriziv - 26")
             return response
 
         except array_errors.VolumeAlreadyMappedToDifferentHostsError as ex:
