@@ -5,7 +5,7 @@ The following table details the IBM® block storage CSI driver lifecycle with co
 **Notes:**
 -   The IBM Storage Virtualize® family includes Spectrum Virtualize as software only, Storage Virtualize for Public Cloud, SAN Volume Controller \(SVC\), Storwize and FlashSystem® family members built with Spectrum® Virtualize \(including FlashSystem 5xxx, 7xxx, 9xxx\).
 -   IBM Storage Virtualize® family storage systems run the IBM Spectrum Virtualize® software. In addition, the IBM Spectrum Virtualize package is available as a deployable solution that can be run on any compatible hardware.
--   The IBM Storage Virtualize® family microcode versions 8.4.x, 8.5.x, 8.6.x and 8.7.x include both LTS and Non-LTS releases. For more information, see [IBM Spectrum Virtualize FAQ for Continuous Development \(CD\) Release Model for software releases](https://www.ibm.com/support/pages/node/6409554).
+-   The IBM Storage Virtualize® family microcode versions 8.4.x, 8.5.x, 8.6.x, 8.7.x and 9.1.x include both LTS and Non-LTS releases. For more information, see [IBM Spectrum Virtualize FAQ for Continuous Development \(CD\) Release Model for software releases](https://www.ibm.com/support/pages/node/6409554).
 -   Ubuntu 22.04.x and 24.04.x are only supported from Kubernetes 1.29.
 -   Virtualized worker nodes \(for example, VMware vSphere\) are supported with iSCSI and Fibre Channel \(FC\) adapters, when the FC adapter is used in passthrough mode.
 
