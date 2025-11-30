@@ -54,32 +54,6 @@ class KubernetesManager():
     def _generate_node_id_info(self, k8s_node):
         return NodeIdInfo(k8s_node.metadata.name)
 
-    def _get_crds_info(self):
-        """get_crds_info"""
-        logger.info("DEBUG - uriziv - 5")
-        logger.info("TB Implemented")
-
-        # try:
-        #     for k8s_node in self.core_api.list_node().items:
-        #         k8s_node = self._generate_node_info(k8s_node)
-        #         logger.info(k8s_node)
-        # except ApiException as ex:
-        #     logger.error(messages.FAILED_TO_GET_NODES.format(ex.body))
-
-        # for k8s_node in self.core_api.list_node().items:
-        #     logger.info("k8s_node.metadata: %s", k8s_node.metadata)
-        #     node_info = NodeInfo(k8s_node.metadata.name, k8s_node.metadata.labels)
-        #     logger.info("node_info: %s", node_info)
-
-        # api = client.ApiextensionsV1Api()
-        # crds = api.list_custom_resource_definition()
-        # for crd in crds.items:
-        #     logger.info("Name: %s", crd.metadata.name)
-        #     logger.info("Group: %s", crd.spec.group)
-        #     logger.info("Versions: %s", [v.name for v in crd.spec.versions])
-        #     logger.info("%s", "-" * 40)
-        logger.info("DEBUG - uriziv - 6")
-
     def _get_csi_nodes_api(self):
         return self.dynamic_client.resources.get(api_version=settings.STORAGE_API_VERSION,
                                                  kind=settings.CSINODE_KIND)
