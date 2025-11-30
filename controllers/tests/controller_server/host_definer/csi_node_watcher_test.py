@@ -193,7 +193,6 @@ class TestWatchCsiNodesResources(CsiNodeWatcherBase):
 
     def test_define_host_called_on_new_csi_node(self):
         self._prepare_default_mocks_for_modified_event()
-        # self.csi_node_watcher.core_api.list_node.return_value = test_utils.get_fake_k8s_nodes_items()
         self.csi_node_watcher.host_definitions_api.get.side_effect = [
             test_utils.get_empty_k8s_host_definitions(), self.ready_k8s_host_definitions]
         self.os.getenv.side_effect = [test_settings.TRUE_STRING, test_settings.FAKE_PREFIX, '']
