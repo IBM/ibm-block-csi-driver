@@ -14,24 +14,40 @@ Use standard configmap CLIs to update the configuration, examples below.
 All CLIs accept an optional -n parameter to specify the namepsace
 
 Create/update a configuration parameter (replace key value with actual parameter setting):
+```
   kubectl create configmap ibm-csi-hostdefiner-config --from-literal=key=value
+```
+The key may be any key from the below table, under Field. The possible values are also specified in the table.
 
 Get a ConfigMap
+```
   kubectl get configmap ibm-csi-hostdefiner-config
+```
 
 Delete a ConfigMap:
+```
   kubectl delete configmap ibm-csi-hostdefiner-config
+```
 
 Delete a ConfigMap entry:
-  There's no simple command to delete an entry. You can either use:
-  kubectl edit configmap ibm-csi-hostdefiner-config
-    Which opens the editor to edit the config map.
-  OR you can patch the config map:
-  kubectl get configmap ibm-csi-hostdefiner-config -o yaml > ibm-csi-hostdefiner-config.yaml
-  edit yaml and then reapply:
-  kubectl apply -f ibm-csi-hostdefiner-config.yaml
 
-Consider [configuring dynamic host definition labels](../using/using_hostdefinition_labels.md) when possible to preserve HostDefiner customizations during IBM® Block Storage CSI driver upgrades.{: tip}
+There's no simple command to delete an entry. You can either use:
+```
+  kubectl edit configmap ibm-csi-hostdefiner-config
+```
+
+  Which opens the editor to edit the config map.
+  OR you can patch the config map:
+```
+  kubectl get configmap ibm-csi-hostdefiner-config -o yaml > ibm-csi-hostdefiner-config.yaml
+```
+
+  edit yaml and then reapply:
+```
+  kubectl apply -f ibm-csi-hostdefiner-config.yaml
+```
+
+Consider [configuring dynamic host definition labels](../using/using_hostdefinition_labels.md) for node-specific customizations.{: tip}
 
 For more information about using the host definer, see [Using dynamic host definition](../using/using_hostdefinition.md).
 
