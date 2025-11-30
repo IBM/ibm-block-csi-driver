@@ -36,7 +36,7 @@ class HostDefinerManager:
             self.host_definition_watcher.watch_host_definitions_resources,
             self.secret_watcher.watch_secret_resources,
             self.node_watcher.watch_nodes_resources,
-            self.crd_watcher.watch_nodes_resources,
+            # self.crd_watcher.watch_nodes_resources,
             self.storage_class_watcher.watch_storage_class_resources)
         logger.info("DEBUG - uriziv - 18")
         for watch_function in watchers:
