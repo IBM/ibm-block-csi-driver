@@ -9,6 +9,7 @@
         * [Supported operating systems](content/release_notes/supported_os.md)
         * [Supported orchestration platforms](content/release_notes/supported_orchestration.md)
         * [Lifecycle and support matrix](content/release_notes/lifecycle_support_matrix.md)
+        * [Features and Capabilities](content/release_notes/features_and_capabilities.md)
     * [Change log](content/release_notes/change_log.md)
         * [1.13.1 (TBD)](content/release_notes/changelog_1.13.1.md)
         * [1.13.0 (TBD)](content/release_notes/changelog_1.13.0.md)
