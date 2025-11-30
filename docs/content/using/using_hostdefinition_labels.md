@@ -18,15 +18,15 @@ This label works on a per node basis, where the `allowDelete` parameter definiti
 
 ## Defining a specific host node
 
-In addition to defining `connectivityType` in the HostDefiner, the node's connectivity type can be defined by overriding the `connectivityType` definition within the HostDefiner by using the `connectivity-type` parameter in the config map.
+In addition to defining `connectivityType` in the config map, the node's connectivity type can be defined to override the `connectivityType` definition within the config map by using the `connectivity-type` label.
 
 This tag defines the connectivity type of the node regardless of connectivity hierarchy.
 
-For example, if `connectivityType` is defined as using `fc` but you want to use NVMe on a specific node, you can define `nvmeofc` for this specific node, using this label.
+For example, if `connectivityType` is defined as using `fc` in the config map, but you want to use NVMe on a specific node, you can define `nvmeofc` for this specific node, using this label.
 
 `block.csi.ibm.com/connectivity-type=<connectivityType>`
 
-The values for the connectivityType are the same as those for defining the HostDefiner: `nvmeofc`, `fc`, `iscsi`. If an invalid label is used, this label is ignored.{: note}
+The values for the connectivityType label are the same as those for defining the config map: `nvmeofc`, `fc`, `iscsi`. If an invalid label is used, this label is ignored.{: note}
 
 For more information about defining the connectivity type within the HostDefiner, see [Configuring the host definer](../configuration/configuring_hostdefiner.md).{: tip}
 
