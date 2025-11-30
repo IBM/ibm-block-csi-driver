@@ -12,6 +12,7 @@ from controllers.servers.host_definer import settings
 import controllers.common.settings as common_settings
 from controllers.servers.host_definer.hd_types import (
     CsiNodeInfo, PodInfo, NodeInfo, StorageClassInfo, HostDefinitionInfo)
+from controllers.common.node_info import NodeIdInfo
 
 logger = get_stdout_logger()
 
@@ -32,6 +33,26 @@ class KubernetesManager():
 
     def _load_cluster_configuration(self):
         return config.load_incluster_config()
+
+    def _get_node_ids_info(self):
+        try:
+            node_ids_info = []
+            for k8s_node in self.core_api.list_node().items:
+                k8s_node = self._generate_node_id_info(k8s_node)
+                node_ids_info.append(k8s_node)
+            return node_ids_info
+        except ApiException as ex:
+            logger.error(messages.FAILED_TO_GET_NODES.format(ex.body))
+            return []
+
+    def _get_node_id_info(self, node_name):
+        k8s_node = self._read_node(node_name)
+        if k8s_node:
+            return self._generate_node_id_info(k8s_node)
+        return NodeIdInfo('')
+
+    def _generate_node_id_info(self, k8s_node):
+        return NodeIdInfo(k8s_node.metadata.name)
 
     def _get_crds_info(self):
         """get_crds_info"""
