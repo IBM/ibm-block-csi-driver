@@ -52,10 +52,10 @@ class KubernetesManager():
         if k8s_node:
             return self._generate_node_id_info(k8s_node)
         logger.info("DEBUG - uriziv - 27")
-        return NodeIdInfo('')
+        return NodeIdInfo(',,,')
 
     def _generate_node_id_info(self, k8s_node):
-        return NodeIdInfo(k8s_node.metadata.name)
+        return NodeIdInfo("%s,,," % k8s_node.metadata.name)
 
     def _get_csi_nodes_api(self):
         return self.dynamic_client.resources.get(api_version=settings.STORAGE_API_VERSION,
