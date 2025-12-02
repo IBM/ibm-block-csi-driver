@@ -49,7 +49,7 @@ mirror:
       channels:
       - name: stable
   additionalImages:
-  - name: registry.redhat.io/ubi8/ubi:latest
+  - name: registry.redhat.io/ubi9/ubi:latest
   helm: {}
 ```
 
@@ -75,7 +75,7 @@ mirror:
       channels:
       - name: stable
 #  additionalImages:
-#  - name: registry.redhat.io/ubi8/ubi:latest
+#  - name: registry.redhat.io/ubi9/ubi:latest
 #  helm: {}
 ```
 

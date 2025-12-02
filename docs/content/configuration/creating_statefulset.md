@@ -49,7 +49,7 @@ Be sure to indicate the `volumeMounts`, listing each volume's name and path. In 
         spec:
           containers:
           - name: demo-container
-            image: registry.access.redhat.com/ubi8/ubi:latest
+            image: registry.access.redhat.com/ubi9/ubi:latest
             command: [ "/bin/sh", "-c", "--" ]
             args: [ "while true; do sleep 30; done;" ]
             volumeMounts:
@@ -83,7 +83,7 @@ Be sure to indicate the `volumeDevices`, listing each volume's name and path. In
         spec:
           containers:
           - name: demo-container
-            image: registry.access.redhat.com/ubi8/ubi:latest
+            image: registry.access.redhat.com/ubi9/ubi:latest
             command: [ "/bin/sh", "-c", "--" ]
             args: [ "while true; do sleep 30; done;" ]
             volumeDevices:
@@ -117,7 +117,7 @@ In a StatefulSet file that uses both volume modes, it is important to indicate b
         spec:
           containers:
           - name: demo-container
-            image: registry.access.redhat.com/ubi8/ubi:latest
+            image: registry.access.redhat.com/ubi9/ubi:latest
             command: [ "/bin/sh", "-c", "--" ]
             args: [ "while true; do sleep 30; done;" ]
             volumeMounts:
@@ -125,7 +125,7 @@ In a StatefulSet file that uses both volume modes, it is important to indicate b
                 mountPath: "/data"
             volumeDevices:
               - name: demo-volume-raw-block
-                devicePath: "/dev/block"            
+                devicePath: "/dev/block"
           volumes:
           - name: demo-volume-file-system
             persistentVolumeClaim:
@@ -133,4 +133,3 @@ In a StatefulSet file that uses both volume modes, it is important to indicate b
           - name: demo-volume-raw-block
             persistentVolumeClaim:
               claimName: demo-pvc-raw-block
-

@@ -7,26 +7,26 @@ This section shows how to:
 - Create k8s secret `svc-array` for the storage system.
 - Create storage class `gold`.
 - Create PVC `demo-pvc-file-system`from the storage class `gold` and show some details on the created PVC and PV.
-- Create StatefulSet application `demo-statefulset-file-system` and observe the mountpoint \ multipath device that was created by the driver. 
+- Create StatefulSet application `demo-statefulset-file-system` and observe the mountpoint \ multipath device that was created by the driver.
 - Write some data inside the 'demo-statefulset-file-system', delete the 'demo-statefulset-file-system' and then create it again, to validate that the data remains.
 
 Create secret and storage class:
 
 ```sh
-###### Create secret 
+###### Create secret
 $> cat demo-secret.yaml
 kind: Secret
 apiVersion: v1
 metadata:
   name: svc-array
-  namespace: default 
+  namespace: default
 type: Opaque
 stringData:
   management_address: <ADDRESS_1,ADDRESS_2> # Array management addresses
   username: <USERNAME>                      # Array username
 data:
   password: <PASSWORD base64>               # Array password
-  
+
 $> kubectl create -f demo-secret.yaml
 secret/svc-array created
 
@@ -42,7 +42,7 @@ parameters:
   pool: gold
 
   csi.storage.k8s.io/provisioner-secret-name: svc-array
-  csi.storage.k8s.io/provisioner-secret-namespace: default 
+  csi.storage.k8s.io/provisioner-secret-namespace: default
   csi.storage.k8s.io/controller-publish-secret-name: svc-array
   csi.storage.k8s.io/controller-publish-secret-namespace: default
 
@@ -55,7 +55,7 @@ storageclass.storage.k8s.io/gold created
 
 Create PVC demo-pvc-gold using `demo-pvc-gold.yaml`:
 
-```sh 
+```sh
 $> cat demo-pvc-file-system.yaml
 kind: PersistentVolumeClaim
 apiVersion: v1
@@ -69,7 +69,7 @@ spec:
     requests:
       storage: 1Gi
   storageClassName: gold
-      
+
 
 $> kubectl apply -f demo-pvc-file-system.yaml
 persistentvolumeclaim/demo-pvc-file-system created
@@ -142,7 +142,7 @@ spec:
     spec:
       containers:
       - name: container-demo
-        image: registry.access.redhat.com/ubi8/ubi:latest
+        image: registry.access.redhat.com/ubi9/ubi:latest
         command: [ "/bin/sh", "-c", "--" ]
         args: [ "while true; do sleep 30; done;" ]
         volumeMounts:
@@ -155,13 +155,13 @@ spec:
 
 #      nodeSelector:
 #        kubernetes.io/hostname: HOSTNAME
-      
+
 
 $> kubectl create -f demo-statefulset-file-system.yml
 statefulset/demo-statefulset-file-system created
 ```
 
-Display the newly created pod (make sure that the pod status is Running) and write data to its persistent volume. 
+Display the newly created pod (make sure that the pod status is Running) and write data to its persistent volume.
 
 ```sh
 ###### Wait for the pod Status to be Running.
@@ -189,16 +189,16 @@ File
 Log into the worker node that has the running pod and display the newly attached volume on the node.
 
 ```sh
-###### Verify which worker node is running the pod demo-statefulset-file-system-0 
+###### Verify which worker node is running the pod demo-statefulset-file-system-0
 $> kubectl describe pod demo-statefulset-file-system-0| grep "^Node:"
 Node: k8s-node1/hostname
 
 ###### Establish an SSH connection and log into the worker node
 $> ssh k8s-node1
 
-###### List multipath devices on the worker node (view the same `mpathz` that was mentioned above) 
+###### List multipath devices on the worker node (view the same `mpathz` that was mentioned above)
 $>[k8s-node1]  multipath -ll
-mpathz (828ce9096eb211eaabc8005056a49b44) dm-3 IBM     ,2810XIV         
+mpathz (828ce9096eb211eaabc8005056a49b44) dm-3 IBM     ,2810XIV
 size=1.0G features='1 queue_if_no_path' hwhandler='0' wp=rw
 `-+- policy='service-time 0' prio=1 status=active
   |- 37:0:0:12 sdc 8:32 active ready running
@@ -208,16 +208,16 @@ $>[k8s-node1] ls -l /dev/mapper/mpathz
 lrwxrwxrwx. 1 root root 7 Aug 12 19:29 /dev/mapper/mpathz -> ../dm-3
 
 
-###### List the physical devices of the multipath `mpathz` and its mountpoint on the host. (This is the /data inside the stateful pod). 
+###### List the physical devices of the multipath `mpathz` and its mountpoint on the host. (This is the /data inside the stateful pod).
 $>[k8s-node1]  lsblk /dev/sdb /dev/sdc
 NAME     MAJ:MIN RM SIZE RO TYPE  MOUNTPOINT
-sdb        8:16   0   1G  0 disk  
+sdb        8:16   0   1G  0 disk
 └─mpathz 253:3    0   1G  0 mpath /var/lib/kubelet/pods/d67d22b8-bd10-11e9-a1f5-005056a45d5f/volumes/kubernetes.io~csi/pvc-828ce909-6eb2-11ea-abc8-005056a49b44
-sdc        8:32   0   1G  0 disk  
+sdc        8:32   0   1G  0 disk
 └─mpathz 253:3    0   1G  0 mpath /var/lib/kubelet/pods/d67d22b8-bd10-11e9-a1f5-005056a45d5f/volumes/kubernetes.io~csi/pvc-828ce909-6eb2-11ea-abc8-005056a49b44
 
-###### View the PV mounted on this host 
-######  (All PV mountpoints looks like the following: `/var/lib/kubelet/pods/*/volumes/kubernetes.io~csi/pvc-*/mount`) 
+###### View the PV mounted on this host
+######  (All PV mountpoints looks like the following: `/var/lib/kubelet/pods/*/volumes/kubernetes.io~csi/pvc-*/mount`)
 $>[k8s-node1]  df | egrep pvc
 /dev/mapper/mpathz      1038336    32944   1005392   4% /var/lib/kubelet/pods/d67d22b8-bd10-11e9-a1f5-005056a45d5f/volumes/kubernetes.io~csi/pvc-828ce909-6eb2-11ea-abc8-005056a49b44/mount
 
@@ -312,11 +312,11 @@ $> kubectl log -f -n default  ibm-block-csi-node-<PODID> -c ibm-block-csi-node
 
 Additional driver details:
 ```
-###### If `feature-gates=CSIDriverRegistry` was set to `true` then CSIDriver object for the driver will be automatically created. See this by running: 
+###### If `feature-gates=CSIDriverRegistry` was set to `true` then CSIDriver object for the driver will be automatically created. See this by running:
 
 $> kubectl describe csidriver block.csi.ibm.com
 Name:         block.csi.ibm.com
-Namespace:    
+Namespace:
 Labels:       <none>
 Annotations:  <none>
 API Version:  csi.storage.k8s.io/v1alpha1
@@ -329,7 +329,7 @@ Metadata:
   UID:                 b46db4ed-a6f8-11e9-b93e-005056a45d5f
 Spec:
   Attach Required:            true
-  Pod Info On Mount Version:  
+  Pod Info On Mount Version:
 Events:                       <none>
 
 
@@ -370,4 +370,3 @@ distributed under the License is distributed on an "AS IS" BASIS,
 WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
 limitations under the License.
-

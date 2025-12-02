@@ -15,7 +15,7 @@ spec:
     spec:
       containers:
       - name: demo-container
-        image: registry.access.redhat.com/ubi8/ubi:latest
+        image: registry.access.redhat.com/ubi9/ubi:latest
         command: [ "/bin/sh", "-c", "--" ]
         args: [ "while true; do sleep 30; done;" ]
         volumeMounts:
@@ -23,7 +23,7 @@ spec:
             mountPath: "/data"
         volumeDevices:
           - name: demo-volume-raw-block
-            devicePath: "/dev/block"            
+            devicePath: "/dev/block"
       volumes:
       - name: demo-volume-file-system
         persistentVolumeClaim:
