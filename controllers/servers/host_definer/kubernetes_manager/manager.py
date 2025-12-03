@@ -61,7 +61,6 @@ class KubernetesManager():
         node_id_for_node_id_info_object = f"{k8s_node.metadata.name},,,"
         logger.info("DEBUG - uriziv - 30")
         return NodeIdInfo(node_id_for_node_id_info_object)
-    
 
     def _get_csi_nodes_api(self):
         return self.dynamic_client.resources.get(api_version=settings.STORAGE_API_VERSION,
