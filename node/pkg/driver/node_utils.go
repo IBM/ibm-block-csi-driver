@@ -484,6 +484,11 @@ func (n NodeUtils) GetPodPath(origPath string) string {
 }
 
 func (n NodeUtils) GenerateNodeID(hostName string, nvmeNQN string, fcWWNs []string, iscsiIQN string) (string, error) {
+	logger.Info("Debug - uriziv - 3")
+	logger.Infof("hostName: %s", hostName)
+	logger.Infof("nvmeNQN: %s", nvmeNQN)
+	logger.Infof("fcWWNs: %v", fcWWNs)
+	logger.Infof("iscsiIQN: %s", iscsiIQN)
 	var nodeId strings.Builder
 	nodeIdDelimiter := n.ConfigYaml.Parameters.Node_id_info.Delimiter
 	nodeIdFcDelimiter := n.ConfigYaml.Parameters.Node_id_info.Fcs_delimiter
@@ -523,7 +528,6 @@ func (n NodeUtils) GenerateNodeID(hostName string, nvmeNQN string, fcWWNs []stri
 	}
 
 	finalNodeId := strings.TrimSuffix(nodeId.String(), ";")
-	logger.Info("Debug - uriziv - 3")
 	logger.Info(finalNodeId)
 	logger.Info("Debug - uriziv - 4")
 	return finalNodeId, nil
