@@ -51,14 +51,14 @@ class KubernetesManager():
         logger.info(k8s_node)
         if k8s_node:
             return self._generate_node_id_info(k8s_node)
-        node_id_for_node_id_info_object = ',,,'
+        node_id_for_node_id_info_object = ';;;'
         logger.info(node_id_for_node_id_info_object)
         logger.info("DEBUG - uriziv - 28")
         return NodeIdInfo(node_id_for_node_id_info_object)
 
     def _generate_node_id_info(self, k8s_node):
         logger.info("DEBUG - uriziv - 29")
-        node_id_for_node_id_info_object = f"{k8s_node.metadata.name},,,"
+        node_id_for_node_id_info_object = f"{k8s_node.metadata.name};;;"
         logger.info("DEBUG - uriziv - 30")
         return NodeIdInfo(node_id_for_node_id_info_object)
 
