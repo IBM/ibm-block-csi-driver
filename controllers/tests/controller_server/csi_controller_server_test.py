@@ -27,7 +27,10 @@ from controllers.tests.common.test_settings import (CLONE_VOLUME_NAME,
                                                     NAME_PREFIX, INTERNAL_SNAPSHOT_ID, SOURCE_VOLUME_ID,
                                                     SECRET_MANAGEMENT_ADDRESS_KEY, SECRET_PASSWORD_KEY,
                                                     SECRET_USERNAME_KEY, SECRET)
-from controllers.tests.controller_server.common import mock_get_agent, mock_array_type, mock_mediator, mock_get_node_initiators
+from controllers.tests.controller_server.common import (mock_get_agent,
+                                                        mock_array_type,
+                                                        mock_mediator,
+                                                        mock_get_node_initiators)
 from controllers.tests.utils import ProtoBufMock
 
 CONTROLLER_SERVER_PATH = "controllers.servers.csi.csi_controller_server"
