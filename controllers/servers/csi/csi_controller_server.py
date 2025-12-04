@@ -16,6 +16,7 @@ from controllers.servers.csi.decorators import csi_method
 from controllers.servers.csi.exception_handler import handle_exception, \
     build_error_response
 from controllers.servers.errors import ObjectIdError, ValidationException, InvalidNodeId
+from controllers.servers.host_definer.kubernetes_manager.manager import KubernetesManager
 
 logger = get_stdout_logger()
 
@@ -218,6 +219,15 @@ class CSIControllerServicer(csi_pb2_grpc.ControllerServicer):
 
         return csi_pb2.DeleteVolumeResponse()
 
+    def _get_node_initiators(self, node_id):
+        logger.info("debug - uriziv - 31")
+        kubernetes_manager = KubernetesManager()
+        k8s_node = kubernetes_manager.core_api.read_node(name=node_id)
+        ret_val = k8s_node.metadata.annotations
+        logger.info(ret_val)
+        logger.info("debug - uriziv - 32")
+        return ret_val
+
     @csi_method(error_response_type=csi_pb2.ControllerPublishVolumeResponse, lock_request_attribute="volume_id")
     def ControllerPublishVolume(self, request, context):
         logger.info("debug - uriziv - 25")
@@ -228,9 +238,12 @@ class CSIControllerServicer(csi_pb2_grpc.ControllerServicer):
             system_id = volume_id_info.system_id
             array_type = volume_id_info.array_type
             volume_id = volume_id_info.ids.uid
+            # TODO: Get Initator and then update: NodeIdInfo(..., ..., ..., ...)
+            # node_id_info.utils
             node_id_info = NodeIdInfo(request.node_id)
             logger.info(request)
             node_name = node_id_info.node_name
+            node_annotations = self._get_node_initiators(node_name)
             initiators = node_id_info.initiators
 
             logger.debug("node name for this publish operation is : {0}".format(node_name))
