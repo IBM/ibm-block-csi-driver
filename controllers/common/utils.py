@@ -57,8 +57,8 @@ def get_node_id_info(node_id):
     return hostname, nvme_nqn, fc_wwns, iscsi_iqn
 
 
-def _get_workers_limit_info():
-    return os.environ.get('WORKERS_LIMIT')
+def _get_config_map_info():
+    pass
 
 
 def _default_callhome_metadata_aux():
@@ -106,15 +106,11 @@ def _default_callhome_metadata_aux():
     # for k8s only 'ocp_version' would be None
     #
     ocp_version = None
-    if ocp_match:
-        ocp_version = ocp_match.group(1)
+    if ocp_match and ocp_match.groups():
+        ocp_version = ocp_match.groups[0]
 
     if ocp_version:
         ch_info.append(f"ocp:{ocp_version}")
-
-    max_invocations = _get_workers_limit_info()
-    if max_invocations:
-        ch_info.append(f"max_workers:{max_invocations}")
 
     callhome_metadata = ", ".join(ch_info)
     return callhome_metadata
@@ -123,12 +119,8 @@ def _default_callhome_metadata_aux():
 # just a wrapper around real code above
 #
 def default_callhome_metadata():
-    ch_metadata = ''
-
     try:
-        ch_metadata = _default_callhome_metadata_aux()
+        return _default_callhome_metadata_aux()
     except Exception as e:
         logger.error("Could not fetch metadata: {}".format(e))
-
-    logger.info("CH Metadata: \"{}\"".format(ch_metadata))
-    return ch_metadata
+        return ''
