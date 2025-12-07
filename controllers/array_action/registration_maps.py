@@ -1,8 +1,11 @@
 from controllers.array_action.settings import METADATA_KEY
 from controllers.servers.settings import UNIQUE_KEY_KEY
+from controllers.common.utils import default_callhome_metadata
+
+DEFAULT_METADATA = default_callhome_metadata()
 
 
-def _generate_plugin_type(unique_key, metadata=''):
+def _generate_plugin_type(unique_key, metadata=DEFAULT_METADATA):
     return {
         UNIQUE_KEY_KEY: unique_key,
         METADATA_KEY: metadata
