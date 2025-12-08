@@ -48,7 +48,6 @@ class KubernetesManager():
     def _get_node_id_info(self, node_name):
         k8s_node = self._read_node(node_name)
         logger.info("DEBUG - uriziv - 27")
-        logger.info(k8s_node)
         if k8s_node:
             return self._generate_node_id_info(k8s_node)
         node_id_for_node_id_info_object = ';;;'
