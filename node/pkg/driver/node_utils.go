@@ -44,6 +44,7 @@ import (
 
 var (
 	getOpts          = metav1.GetOptions{}
+	patchOpts        = metav1.PatchOptions{}
 	topologyPrefixes = [...]string{"topology.block.csi.ibm.com"}
 )
 
@@ -92,7 +93,7 @@ type NodeUtilsInterface interface {
 	GetPodPath(filepath string) string
 	GenerateNodeID(hostName string, nvmeNQN string, fcWWNs []string, iscsiIQN string) (string, error)
 	GetTopologyLabels(ctx context.Context, nodeName string) (map[string]string, error)
-	UpdateNodePortsAnnotation(nodeName string, iscsiIQN string, fcWWNs []string, nvmeNQN string) error
+	UpdateNodePortsAnnotation(ctx context.Context, nodeName string, iscsiIQN string, fcWWNs []string, nvmeNQN string) error
 	IsBlock(devicePath string) (bool, error)
 	GetFileSystemVolumeStats(path string) (VolumeStatistics, error)
 	GetBlockVolumeStats(volumeId string) (VolumeStatistics, error)
@@ -562,23 +563,21 @@ func (n NodeUtils) GetTopologyLabels(ctx context.Context, nodeName string) (map[
 	return topologyLabels, nil
 }
 
-func (n NodeUtils) UpdateNodePortsAnnotation(
-	nodeName string,
-	iscsiIQN string,
-	fcWWNs []string,
-	nvmeNQN string,
-) error {
+func (n NodeUtils) UpdateNodePortsAnnotation(ctx context.Context, nodeName string,
+	iscsiIQN string, fcWWNs []string, nvmeNQN string) error {
 
 	logger.Info("Debug - uriziv - 21")
 
 	kubeConfig, err := rest.InClusterConfig()
 	if err != nil {
-		return fmt.Errorf("unable to load in-cluster configuration: %w", err)
+		logger.Infof("Failed to update initiators. Unable to load in-cluster configuration.")
+		return err
 	}
 
 	client, err := kubernetes.NewForConfig(kubeConfig)
 	if err != nil {
-		return fmt.Errorf("failed creating kube client: %w", err)
+		logger.Infof("Failed to update initiators. Unable to create Kubernetes client.")
+		return err
 	}
 
 	portsData := map[string]interface{}{
@@ -619,16 +618,12 @@ func (n NodeUtils) UpdateNodePortsAnnotation(
 
 	logger.Infof("Patching node %s with annotation block.csi.ibm.com/node-ports", nodeName)
 
-	_, err = client.CoreV1().Nodes().Patch(
-		context.Background(),
-		nodeName,
-		types.MergePatchType,
-		patchBytes,
-		metav1.PatchOptions{},
-	)
+	_, err = client.CoreV1().Nodes().Patch(ctx, nodeName,
+		types.MergePatchType, patchBytes, patchOpts)
 
 	if err != nil {
-		return fmt.Errorf("failed PATCH node ports annotation: %w", err)
+		logger.Infof("failed PATCH node ports annotation.")
+		return err
 	}
 
 	logger.Info("Debug - uriziv - 22")
