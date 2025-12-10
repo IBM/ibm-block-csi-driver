@@ -867,22 +867,16 @@ func (d *NodeService) NodeGetInfo(ctx context.Context, req *csi.NodeGetInfoReque
 		return nil, status.Error(codes.Internal, err.Error())
 	}
 
-	logger.Info("DEBUG uriziv - 23")
+	var nodeId = d.Hostname
 	err = d.NodeUtils.UpdateNodePortsAnnotation(ctx, d.Hostname, iscsiIQN, fcWWNs, nvmeNQN)
 	if err != nil {
 		return nil, status.Error(codes.Internal, err.Error())
 	}
 
-	logger.Info("DEBUG uriziv - 24")
-
-	var nodeId = d.Hostname
 	logger.Info("DEBUG uriziv - 1")
 	logger.Info(nodeId)
 	logger.Info(err)
 	logger.Info("DEBUG uriziv - 2")
-	if err != nil {
-		return nil, status.Error(codes.Internal, err.Error())
-	}
 
 	logger.Debugf("node id is : %s", nodeId)
 
