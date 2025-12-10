@@ -106,8 +106,10 @@ def _default_callhome_metadata_aux():
     # for k8s only 'ocp_version' would be None
     #
     ocp_version = None
-    if ocp_match and ocp_match.groups():
-        ocp_version = ocp_match.groups[0]
+    if ocp_match:
+        logger.info("OCP group(0) = {}".format(ocp_match.group()))
+        logger.info("OCP groups = {}".format(ocp_match.groups()))
+        ocp_version = ocp_match.group()
 
     if ocp_version:
         ch_info.append(f"ocp:{ocp_version}")
@@ -127,4 +129,4 @@ def default_callhome_metadata():
 
 
 G_CH_METADATA = default_callhome_metadata()
-logger.info("CH Metadata: {}".format(G_CH_METADATA))
+logger.info("CH Metadata: \"{}\"".format(G_CH_METADATA))
