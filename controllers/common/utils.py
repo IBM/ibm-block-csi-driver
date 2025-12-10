@@ -124,3 +124,7 @@ def default_callhome_metadata():
     except Exception as e:
         logger.error("Could not fetch metadata: {}".format(e))
         return ''
+
+
+G_CH_METADATA = default_callhome_metadata()
+logger.info("CH Metadata: {}".format(G_CH_METADATA))
