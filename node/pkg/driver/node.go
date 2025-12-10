@@ -875,7 +875,7 @@ func (d *NodeService) NodeGetInfo(ctx context.Context, req *csi.NodeGetInfoReque
 
 	logger.Info("DEBUG uriziv - 24")
 
-	nodeId, err := d.NodeUtils.GenerateNodeID(d.Hostname, nvmeNQN, fcWWNs, iscsiIQN)
+	var nodeId = d.Hostname
 	logger.Info("DEBUG uriziv - 1")
 	logger.Info(nodeId)
 	logger.Info(err)
