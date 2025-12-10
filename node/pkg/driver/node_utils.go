@@ -91,7 +91,6 @@ type NodeUtilsInterface interface {
 	FormatDevice(devicePath string, fsType string)
 	IsNotMountPoint(file string) (bool, error)
 	GetPodPath(filepath string) string
-	GenerateNodeID(hostName string, nvmeNQN string, fcWWNs []string, iscsiIQN string) (string, error)
 	GetTopologyLabels(ctx context.Context, nodeName string) (map[string]string, error)
 	UpdateNodePortsAnnotation(ctx context.Context, nodeName string, iscsiIQN string, fcWWNs []string, nvmeNQN string) error
 	IsBlock(devicePath string) (bool, error)
@@ -484,56 +483,6 @@ func (n NodeUtils) GetPodPath(origPath string) string {
 	return path.Join(PrefixChrootOfHostRoot, origPath)
 }
 
-func (n NodeUtils) GenerateNodeID(hostName string, nvmeNQN string, fcWWNs []string, iscsiIQN string) (string, error) {
-	logger.Info("Debug - uriziv - 3")
-	logger.Infof("hostName: %s", hostName)
-	logger.Infof("nvmeNQN: %s", nvmeNQN)
-	logger.Infof("fcWWNs: %v", fcWWNs)
-	logger.Infof("iscsiIQN: %s", iscsiIQN)
-	var nodeId strings.Builder
-	nodeIdDelimiter := n.ConfigYaml.Parameters.Node_id_info.Delimiter
-	nodeIdFcDelimiter := n.ConfigYaml.Parameters.Node_id_info.Fcs_delimiter
-	nodeId.Grow(MaxNodeIdLength)
-	nodeId.WriteString(hostName)
-	nodeId.WriteString(nodeIdDelimiter)
-
-	if len(nvmeNQN) > 0 {
-		if nodeId.Len()+len(nvmeNQN)+len(nodeIdDelimiter) <= MaxNodeIdLength {
-			nodeId.WriteString(nvmeNQN)
-		} else {
-			return "", fmt.Errorf(ErrorNoPortsCouldFitInNodeId, nodeId.String(), MaxNodeIdLength)
-		}
-	}
-	nodeId.WriteString(nodeIdDelimiter)
-	if len(fcWWNs) > 0 {
-		if nodeId.Len()+len(fcWWNs[0]) <= MaxNodeIdLength {
-			nodeId.WriteString(fcWWNs[0])
-		} else if nvmeNQN == "" {
-			return "", fmt.Errorf(ErrorNoPortsCouldFitInNodeId, nodeId.String(), MaxNodeIdLength)
-		}
-
-		for _, fcPort := range fcWWNs[1:] {
-			if nodeId.Len()+len(nodeIdFcDelimiter)+len(fcPort) <= MaxNodeIdLength {
-				nodeId.WriteString(nodeIdFcDelimiter)
-				nodeId.WriteString(fcPort)
-			}
-		}
-	}
-	if len(iscsiIQN) > 0 {
-		if nodeId.Len()+len(nodeIdDelimiter)+len(iscsiIQN) <= MaxNodeIdLength {
-			nodeId.WriteString(nodeIdDelimiter)
-			nodeId.WriteString(iscsiIQN)
-		} else if len(fcWWNs) == 0 && nvmeNQN == "" {
-			return "", fmt.Errorf(ErrorNoPortsCouldFitInNodeId, nodeId.String(), MaxNodeIdLength)
-		}
-	}
-
-	finalNodeId := strings.TrimSuffix(nodeId.String(), ";")
-	logger.Info(finalNodeId)
-	logger.Info("Debug - uriziv - 4")
-	return finalNodeId, nil
-}
-
 func (n NodeUtils) GetTopologyLabels(ctx context.Context, nodeName string) (map[string]string, error) {
 	kubeConfig, err := rest.InClusterConfig()
 	if err != nil {
@@ -580,7 +529,7 @@ func (n NodeUtils) UpdateNodePortsAnnotation(ctx context.Context, nodeName strin
 		return err
 	}
 
-	portsData := map[string]interface{}{
+	portsData := map[string]string{}{
 		"iscsi": []string{},
 		"fc":    []string{},
 		"nvme":  map[string]interface{}{},
