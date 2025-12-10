@@ -119,12 +119,12 @@ def _default_callhome_metadata_aux():
 # just a wrapper around real code above
 #
 def default_callhome_metadata():
+    ch_metadata = ''
+
     try:
-        return _default_callhome_metadata_aux()
+        ch_metadata = _default_callhome_metadata_aux()
     except Exception as e:
         logger.error("Could not fetch metadata: {}".format(e))
-        return ''
 
-
-G_CH_METADATA = default_callhome_metadata()
-logger.info("CH Metadata: \"{}\"".format(G_CH_METADATA))
+    logger.info("CH Metadata: \"{}\"".format(ch_metadata))
+    return ch_metadata
