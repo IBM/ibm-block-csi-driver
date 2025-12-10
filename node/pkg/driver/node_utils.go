@@ -529,10 +529,10 @@ func (n NodeUtils) UpdateNodePortsAnnotation(ctx context.Context, nodeName strin
 		return err
 	}
 
-	portsData := map[string]string{}{
+	portsData := map[string]interface{}{
 		"iscsi": []string{},
 		"fc":    []string{},
-		"nvme":  map[string]interface{}{},
+		"nvme":  []string{},
 	}
 
 	if iscsiIQN != "" {
@@ -544,7 +544,7 @@ func (n NodeUtils) UpdateNodePortsAnnotation(ctx context.Context, nodeName strin
 	}
 
 	if nvmeNQN != "" {
-		portsData["nvme"] = map[string]interface{}{"nqn": nvmeNQN}
+		portsData["nvme"] = []string{nvmeNQN}
 	}
 
 	jsonBytes, err := json.Marshal(portsData)
