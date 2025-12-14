@@ -57,8 +57,8 @@ def get_node_id_info(node_id):
     return hostname, nvme_nqn, fc_wwns, iscsi_iqn
 
 
-def _get_config_map_info():
-    pass
+def _get_workers_limit_info():
+    return os.environ.get('WORKERS_LIMIT')
 
 
 def _default_callhome_metadata_aux():
@@ -111,6 +111,10 @@ def _default_callhome_metadata_aux():
 
     if ocp_version:
         ch_info.append(f"ocp:{ocp_version}")
+
+    max_invocations = _get_workers_limit_info()
+    if max_invocations:
+        ch_info.append(f"max_workers:{max_invocations}")
 
     callhome_metadata = ", ".join(ch_info)
     return callhome_metadata
