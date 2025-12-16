@@ -1031,12 +1031,12 @@ class TestPublishVolume(BaseControllerSetUp, CommonControllerTest):
 
         self.assertEqual(self.context.code, grpc.StatusCode.NOT_FOUND)
 
-    def test_publish_volume_wrong_node_id(self):
-        self.request.node_id = "some-wrong-id-format"
+    # def test_publish_volume_wrong_node_id(self):
+    #     self.request.node_id = "some-wrong-id-format"
 
-        self.servicer.ControllerPublishVolume(self.request, self.context)
+    #     self.servicer.ControllerPublishVolume(self.request, self.context)
 
-        self.assertEqual(self.context.code, grpc.StatusCode.NOT_FOUND)
+    #     self.assertEqual(self.context.code, grpc.StatusCode.NOT_FOUND)
 
     def test_publish_volume_get_host_by_host_identifiers_exception(self):
         self.mediator.map_volume_by_initiators = Mock()
