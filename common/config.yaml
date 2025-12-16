@@ -21,7 +21,6 @@ parameters:
     delimiter: ":"
     ids_delimiter: ";"
   node_id_info:
-    delimiter: ";"
     fcs_delimiter: ":"
 
 connectivity_type:
