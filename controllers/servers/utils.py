@@ -514,12 +514,13 @@ def validate_delete_volume_request(request):
 
 
 def _validate_node_id(node_id):
-    logger.debug("validating node id")
+    logger.debug("validating node id: %s", node_id)
 
-    delimiter_count = node_id.count(settings.PARAMETERS_NODE_ID_DELIMITER)
-
-    if not 1 <= delimiter_count <= 3:
-        raise InvalidNodeId(node_id)
+    # In the past we used ';' (config.parameters.node_id_info.delimiter) to
+    # seperate vlues inside node_id. We don't use it any more.
+    # Currently node id is just the node name and config.parameters.node_id_info.delimiter
+    # is not in use.
+    # For now - no special validations are needed here.
 
     logger.debug("node id validation finished")
 
