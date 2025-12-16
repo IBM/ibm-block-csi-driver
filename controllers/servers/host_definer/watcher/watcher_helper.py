@@ -252,6 +252,7 @@ class Watcher(KubernetesManager):
         request = self._get_new_request(node_info.labels)
         request = self._add_array_connectivity_info_to_request(
             request, host_definition_info.secret_name, host_definition_info.secret_namespace, node_info.labels)
+        # TODO(uriziv1) _add_initiators to request
         if request:
             request.node_id_from_host_definition = host_definition_info.node_id
             request.node_id_from_csi_node = self._get_node_id_by_node(host_definition_info)

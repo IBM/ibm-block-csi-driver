@@ -2,7 +2,7 @@ from controllers.array_action import settings as array_config
 from controllers.array_action.errors import HostNotFoundError, HostAlreadyExists
 from controllers.array_action.storage_agent import detect_array_type, get_agent
 from controllers.common.csi_logger import get_stdout_logger
-from controllers.common.node_info import NodeIdInfo
+from controllers.common.node_info import NodeIdInfo, Initiators
 import controllers.common.settings as common_settings
 from controllers.servers.host_definer.hd_types import DefineHostResponse
 from controllers.servers.utils import join_object_prefix_with_name, get_initiators_connectivity_type
@@ -21,7 +21,8 @@ class HostDefinerServicer:
         array_connection_info = request.array_connection_info
         array_addresses = array_connection_info.array_addresses
         node_id_info = NodeIdInfo(request.node_id_from_csi_node)
-        initiators = node_id_info.initiators
+        # TODO(uriziv1): get initiators
+        initiators = Initiators(["iscsi"], ["fc1", "fc2", "fc3"], ["nvme"])
         node_name = node_id_info.node_name
         connectivity_type_from_user = get_initiators_connectivity_type(initiators, request.connectivity_type_from_user)
         host_name = join_object_prefix_with_name(prefix=request.prefix, name=node_name)
@@ -62,7 +63,8 @@ class HostDefinerServicer:
         node_id_info = NodeIdInfo(request.node_id_from_csi_node)
         array_connection_info = request.array_connection_info
         array_addresses = array_connection_info.array_addresses
-        initiators = node_id_info.initiators
+        # TODO(uriziv1): get initiators
+        initiators = Initiators(["iscsi"], ["fc1", "fc2", "fc3"], ["nvme"])
         node_name = node_id_info.node_name
         logger.info(messages.UNDEFINE_NODE_FROM_ARRAYS.format(node_name, array_addresses))
         try:
@@ -114,7 +116,8 @@ class HostDefinerServicer:
 
     def _get_initiators_from_node_id(self, node_id):
         node_id_info = NodeIdInfo(node_id)
-        return node_id_info.initiators
+        # TODO(uriziv1) function to init Initiators according to node_id
+        return Initiators(["iscsi"], ["fc1", "fc2", "fc3"], ["nvme"])
 
     def _is_protocol_switched(self, connectivity_type_from_user, connectivity_type_from_host):
         return self._is_switching_from_nvme_to_scsi(connectivity_type_from_user, connectivity_type_from_host) or \

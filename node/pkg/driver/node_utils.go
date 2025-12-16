@@ -575,6 +575,9 @@ func (n NodeUtils) UpdateNodePortsAnnotation(ctx context.Context, nodeName strin
 		return err
 	}
 
+	logger.Infof("DEBUG - read node: %s", nodeName)
+	updatedNode, err := client.CoreV1().Nodes().Get(ctx, nodeName, getOpts)
+	logger.Infof("updatedNode: %s", updatedNode)
 	logger.Info("Debug - uriziv - 22")
 
 	return nil
