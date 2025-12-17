@@ -14,13 +14,17 @@ logger = get_stdout_logger()
 class HostDefinitionWatcher(Watcher):
 
     def watch_host_definitions_resources(self):
+        logger.info("Debug - uriziv - 69")
         self._watch_host_definition_with_timeout('')
+        logger.info("Debug - uriziv - 70")
         while self._loop_forever():
             resource_version = self._get_k8s_object_resource_version(self.host_definitions_api.get())
             self._watch_host_definition_with_timeout(resource_version)
 
     def _watch_host_definition_with_timeout(self, resource_version, timeout=5):
+        logger.info("Debug - uriziv - 67")
         stream = self.host_definitions_api.watch(resource_version=resource_version, timeout=timeout)
+        logger.info("Debug - uriziv - 68")
         for watch_event in stream:
             watch_event = self._munch(watch_event)
             host_definition_info = self._generate_host_definition_info(watch_event.object)
@@ -32,12 +36,15 @@ class HostDefinitionWatcher(Watcher):
         return phase.startswith(settings.PENDING_PREFIX)
 
     def _define_host_definition_after_pending_state(self, host_definition_info):
+        logger.info("Debug - uriziv - 65")
         logger.info(messages.FOUND_HOST_DEFINITION_IN_PENDING_STATE.format(host_definition_info.name))
         remove_host_thread = Thread(target=self._define_host_using_exponential_backoff,
                                     args=(host_definition_info, ))
+        logger.info("Debug - uriziv - 66")
         remove_host_thread.start()
 
     def _define_host_using_exponential_backoff(self, host_definition_info):
+        logger.info("Debug - uriziv - 63")
         retries = settings.HOST_DEFINITION_PENDING_RETRIES
         backoff_in_seconds = settings.HOST_DEFINITION_PENDING_EXPONENTIAL_BACKOFF_IN_SECONDS
         delay_in_seconds = settings.HOST_DEFINITION_PENDING_DELAY_IN_SECONDS
@@ -53,6 +60,7 @@ class HostDefinitionWatcher(Watcher):
             delay_in_seconds *= backoff_in_seconds
             sleep(delay_in_seconds)
 
+        logger.info("Debug - uriziv - 64")
         self._set_host_definition_phase_to_error(host_definition_info)
 
     def _is_host_definition_not_pending(self, host_definition_info):
@@ -62,9 +70,11 @@ class HostDefinitionWatcher(Watcher):
             current_host_definition_info_on_cluster.phase == settings.READY_PHASE
 
     def _handle_pending_host_definition(self, host_definition_info):
+        logger.info("Debug - uriziv - 61")
         response = DefineHostResponse()
         phase = host_definition_info.phase
         action = self._get_action(phase)
+        logger.info("Debug - uriziv - 62")
         if phase == settings.PENDING_CREATION_PHASE:
             response = self._define_host_after_pending(host_definition_info)
         elif self._is_pending_for_deletion_need_to_be_handled(phase, host_definition_info.node_name):
@@ -78,6 +88,8 @@ class HostDefinitionWatcher(Watcher):
         return settings.UNDEFINE_ACTION
 
     def _define_host_after_pending(self, host_definition_info):
+        logger.info("Debug - uriziv - 59")
+        logger.info(host_definition_info)
         response = DefineHostResponse()
         if self._is_node_should_be_managed_on_secret(
                 host_definition_info.node_name, host_definition_info.secret_name,
@@ -86,11 +98,15 @@ class HostDefinitionWatcher(Watcher):
             self._update_host_definition_from_storage_response(host_definition_info.name, response)
         else:
             self._delete_host_definition(host_definition_info.name)
+        logger.info(response)
+        logger.info("Debug - uriziv - 60")
         return response
 
     def _update_host_definition_from_storage_response(self, host_definition_name, response):
+        logger.info("Debug - uriziv - 57")
         logger.info(messages.UPDATE_HOST_DEFINITION_FIELDS_FROM_STORAGE.format(host_definition_name, response))
         host_definition_manifest = self._generate_host_definition_manifest(host_definition_name, response)
+        logger.info("Debug - uriziv - 57")
         self._patch_host_definition(host_definition_manifest)
 
     def _generate_host_definition_manifest(self, host_definition_name, response):

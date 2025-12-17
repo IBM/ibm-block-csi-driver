@@ -271,7 +271,7 @@ class Watcher(KubernetesManager):
             request.node_id_from_csi_node = self._get_node_id_by_node(host_definition_info)
             request.io_group = self._get_io_group_by_node(host_definition_info.node_name)
         logger.info(request)
-        logger.info("debug - uriziv - 33")
+        logger.info("debug - uriziv - 34")
         return request
 
     def _get_new_request(self, labels):
