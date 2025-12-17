@@ -37,10 +37,10 @@ class HostDefinitionWatcher(Watcher):
 
     def _define_host_definition_after_pending_state(self, host_definition_info):
         logger.info("Debug - uriziv - 65")
+        logger.info("Debug - uriziv - 66")
         logger.info(messages.FOUND_HOST_DEFINITION_IN_PENDING_STATE.format(host_definition_info.name))
         remove_host_thread = Thread(target=self._define_host_using_exponential_backoff,
                                     args=(host_definition_info, ))
-        logger.info("Debug - uriziv - 66")
         remove_host_thread.start()
 
     def _define_host_using_exponential_backoff(self, host_definition_info):
@@ -106,7 +106,7 @@ class HostDefinitionWatcher(Watcher):
         logger.info("Debug - uriziv - 57")
         logger.info(messages.UPDATE_HOST_DEFINITION_FIELDS_FROM_STORAGE.format(host_definition_name, response))
         host_definition_manifest = self._generate_host_definition_manifest(host_definition_name, response)
-        logger.info("Debug - uriziv - 57")
+        logger.info("Debug - uriziv - 58")
         self._patch_host_definition(host_definition_manifest)
 
     def _generate_host_definition_manifest(self, host_definition_name, response):
