@@ -115,8 +115,10 @@ class HostDefinerServicer:
                 raise ex
 
     def _get_initiators_from_node_id(self, node_id):
+        logger.info("DEBUG - uriziv - 43")
         node_id_info = NodeIdInfo(node_id)
         # TODO(uriziv1) function to init Initiators according to node_id
+        logger.info("DEBUG - uriziv - 44")
         return Initiators(["iscsi"], ["fc1", "fc2", "fc3"], ["nvme"])
 
     def _is_protocol_switched(self, connectivity_type_from_user, connectivity_type_from_host):
