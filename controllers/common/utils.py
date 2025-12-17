@@ -38,7 +38,6 @@ def string_to_array(str_val, separator):
     return res
 
 
-
 def _get_workers_limit_info():
     return os.environ.get('WORKERS_LIMIT')
 
