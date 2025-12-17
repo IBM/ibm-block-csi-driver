@@ -85,8 +85,11 @@ class Watcher(KubernetesManager):
         return host_definition_info
 
     def _define_host(self, host_definition_info):
+        logger.info("DEBUG - uriziv - 39")
+        logger.info(host_definition_info)
         logger.info(messages.DEFINE_NODE_ON_SECRET.format(host_definition_info.node_name,
                     host_definition_info.secret_name, host_definition_info.secret_namespace))
+        logger.info("DEBUG - uriziv - 40")
         return self._ensure_definition_state(host_definition_info, self.storage_host_servicer.define_host)
 
     def _create_host_definition_if_not_exist(self, host_definition_info, response):
@@ -236,15 +239,25 @@ class Watcher(KubernetesManager):
         return self._get_label_value(node_info.labels, label) == settings.TRUE_STRING
 
     def _ensure_definition_state(self, host_definition_info, define_function):
+        logger.info("debug - uriziv - 35")
+        logger.info(host_definition_info)
+        logger.info(define_function)
         request = self._get_request_from_host_definition(host_definition_info)
+        logger.info(request)
         if not request:
+            logger.info("debug - uriziv - 37")
             response = DefineHostResponse()
             response.error_message = messages.FAILED_TO_GET_SECRET_EVENT.format(
                 host_definition_info.secret_name, host_definition_info.secret_namespace)
+            logger.info(response)
+            logger.info("debug - uriziv - 38")
             return response
+        logger.info("debug - uriziv - 36")
         return define_function(request)
 
     def _get_request_from_host_definition(self, host_definition_info):
+        logger.info("debug - uriziv - 33")
+        logger.info(host_definition_info)
         node_name = host_definition_info.node_name
         logger.info(messages.GENERATE_REQUEST_FOR_NODE.format(node_name))
         node_info = self._get_node_info(node_name)
@@ -257,12 +270,16 @@ class Watcher(KubernetesManager):
             request.node_id_from_host_definition = host_definition_info.node_id
             request.node_id_from_csi_node = self._get_node_id_by_node(host_definition_info)
             request.io_group = self._get_io_group_by_node(host_definition_info.node_name)
+        logger.info(request)
+        logger.info("debug - uriziv - 33")
         return request
 
     def _get_new_request(self, labels):
+        logger.info("debug - uriziv - 41")
         request = DefineHostRequest()
         request.prefix = self._get_prefix()
         request.connectivity_type_from_user = self._get_connectivity_type_from_user(labels)
+        logger.info("debug - uriziv - 42")
         return request
 
     def _get_prefix(self):
