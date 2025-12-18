@@ -61,18 +61,18 @@ class TestDefineHost(BaseSetUp):
     #         HOST_NAME, Initiators(iscsi_iqns=[settings.IQN]),
     #         self.request.connectivity_type_from_user, self.request.io_group, None, None)
 
-    # def test_define_host_failed(self):
-    #     error_message = 'error'
-    #     self.mediator.get_host_by_host_identifiers.side_effect = Exception(error_message)
-    #     response = self.servicer.define_host(self.request)
-    #     self.assertEqual(response.error_message, error_message)
+    def test_define_host_failed(self):
+        error_message = 'error'
+        self.mediator.get_host_by_host_identifiers.side_effect = Exception(error_message)
+        response = self.servicer.define_host(self.request)
+        self.assertEqual(response.error_message, error_message)
 
-    # def _prepare_define_host_already_exists(self, nqn, iqn):
-    #     self._prepare_define_host()
-    #     self.mediator.get_host_io_group.return_value = test_utils.get_fake_host_io_group()
-    #     self.mediator.create_host.side_effect = HostAlreadyExists(HOST_NAME, '')
-    #     self.mediator.get_host_by_name.return_value = Host(name=HOST_NAME, nvme_nqns=[nqn], iscsi_iqns=[iqn],
-    #                                                        connectivity_types=[])
+    def _prepare_define_host_already_exists(self, nqn, iqn):
+        self._prepare_define_host()
+        self.mediator.get_host_io_group.return_value = test_utils.get_fake_host_io_group()
+        self.mediator.create_host.side_effect = HostAlreadyExists(HOST_NAME, '')
+        self.mediator.get_host_by_name.return_value = Host(name=HOST_NAME, nvme_nqns=[nqn], iscsi_iqns=[iqn],
+                                                           connectivity_types=[])
 
     # def test_define_host_already_exists_success(self):
     #     self._prepare_define_host_already_exists(settings.NQN, settings.IQN)

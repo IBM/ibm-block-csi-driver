@@ -265,7 +265,6 @@ class Watcher(KubernetesManager):
         request = self._get_new_request(node_info.labels)
         request = self._add_array_connectivity_info_to_request(
             request, host_definition_info.secret_name, host_definition_info.secret_namespace, node_info.labels)
-        request = self._add_initiators_to_request(request, node_info.name)
         # TODO(uriziv1) _add_initiators to request
         if request:
             request.node_id_from_host_definition = host_definition_info.node_id
@@ -299,12 +298,6 @@ class Watcher(KubernetesManager):
         request.array_connection_info = self._get_array_connection_info_from_secret(
             secret_name, secret_namespace, labels)
         if request.array_connection_info:
-            return request
-        return None
-
-    def _add_initiators_to_request(self, request, node_name):
-        request.node_initiators = self._get_node_initiators(node_name)
-        if request.node_initiators:
             return request
         return None
 
