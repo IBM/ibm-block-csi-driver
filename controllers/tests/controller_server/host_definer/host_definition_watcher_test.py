@@ -34,14 +34,14 @@ class TestWatchHostDefinitionsResources(HostDefinitionWatcherBase):
         test_utils.run_function_with_timeout(self.host_definition_watcher.watch_host_definitions_resources, 0.5)
         self.host_definition_watcher.csi_nodes_api.get.assert_called_with(name=test_settings.FAKE_NODE_NAME)
 
-    # def test_set_error_event_on_pending_deletion(self):
-    #     self._prepare_default_mocks_for_pending_deletion()
-    #     self.host_definition_watcher.storage_host_servicer.undefine_host.return_value = DefineHostResponse(
-    #         error_message=test_settings.FAIL_MESSAGE_FROM_STORAGE)
-    #     test_utils.patch_pending_variables()
-    #     test_utils.run_function_with_timeout(self.host_definition_watcher.watch_host_definitions_resources, 0.5)
-    #     self.assertEqual(self.host_definition_watcher.storage_host_servicer.undefine_host.call_count,
-    #                      test_settings.HOST_DEFINITION_PENDING_VARS['HOST_DEFINITION_PENDING_RETRIES'])
+    def test_set_error_event_on_pending_deletion(self):
+        self._prepare_default_mocks_for_pending_deletion()
+        self.host_definition_watcher.storage_host_servicer.undefine_host.return_value = DefineHostResponse(
+            error_message=test_settings.FAIL_MESSAGE_FROM_STORAGE)
+        test_utils.patch_pending_variables()
+        test_utils.run_function_with_timeout(self.host_definition_watcher.watch_host_definitions_resources, 0.5)
+        self.assertEqual(self.host_definition_watcher.storage_host_servicer.undefine_host.call_count,
+                         test_settings.HOST_DEFINITION_PENDING_VARS['HOST_DEFINITION_PENDING_RETRIES'])
 
     def _prepare_default_mocks_for_pending_deletion(self):
         self.host_definition_watcher.host_definitions_api.watch.return_value = iter(

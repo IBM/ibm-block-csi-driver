@@ -13,7 +13,6 @@ import controllers.common.settings as common_settings
 from controllers.servers.host_definer.hd_types import (
     CsiNodeInfo, PodInfo, NodeInfo, StorageClassInfo, HostDefinitionInfo)
 from controllers.common.node_info import NodeIdInfo
-from controllers.common.node_info import Initiators
 
 logger = get_stdout_logger()
 
@@ -356,12 +355,6 @@ class KubernetesManager():
             return self._generate_node_info(k8s_node)
         return NodeInfo('', {})
 
-    def _get_node_initiators(self, node_name):
-        k8s_node = self._read_node(node_name)
-        if k8s_node:
-            return self._generate_node_initiators(k8s_node)
-        return Initiators([], [], [])
-
     def _read_node(self, node_name):
         try:
             logger.info(messages.READ_NODE.format(node_name))
@@ -372,12 +365,6 @@ class KubernetesManager():
 
     def _generate_node_info(self, k8s_node):
         return NodeInfo(k8s_node.metadata.name, k8s_node.metadata.labels)
-
-    def _generate_node_initiators(self, k8s_node):
-        logger.info("DEBUG - uriziv - 71")
-        logger.info(k8s_node.metadata.annotations)
-        logger.info("DEBUG - uriziv - 72")
-        return Initiators([], [], [])
 
     def _get_csi_daemon_set(self):
         try:
