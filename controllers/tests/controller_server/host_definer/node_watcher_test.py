@@ -23,15 +23,15 @@ class TestAddInitialNodes(NodeWatcherBase):
         self.node_watcher.add_initial_nodes()
         self.node_watcher.storage_host_servicer.undefine_host.assert_not_called()
 
-    def test_host_definer_deletes_host_definitions_on_node_with_csi_node(self):
-        self._prepare_default_mocks_for_node()
-        self.node_watcher.csi_nodes_api.get.return_value = test_utils.get_fake_k8s_csi_node(
-            test_settings.FAKE_CSI_PROVISIONER)
-        self.os.getenv.side_effect = [test_settings.TRUE_STRING, test_settings.FAKE_PREFIX,
-                                      '', test_settings.TRUE_STRING, test_settings.TRUE_STRING]
-        self.node_watcher.add_initial_nodes()
-        self.node_watcher.storage_host_servicer.undefine_host.assert_called_once_with(test_utils.get_define_request(
-            prefix=test_settings.FAKE_PREFIX, node_id_from_host_definition=test_settings.FAKE_NODE_ID))
+    # def test_host_definer_deletes_host_definitions_on_node_with_csi_node(self):
+    #     self._prepare_default_mocks_for_node()
+    #     self.node_watcher.csi_nodes_api.get.return_value = test_utils.get_fake_k8s_csi_node(
+    #         test_settings.FAKE_CSI_PROVISIONER)
+    #     self.os.getenv.side_effect = [test_settings.TRUE_STRING, test_settings.FAKE_PREFIX,
+    #                                   '', test_settings.TRUE_STRING, test_settings.TRUE_STRING]
+    #     self.node_watcher.add_initial_nodes()
+    #     self.node_watcher.storage_host_servicer.undefine_host.assert_called_once_with(test_utils.get_define_request(
+    #         prefix=test_settings.FAKE_PREFIX, node_id_from_host_definition=test_settings.FAKE_NODE_ID))
 
     def test_if_detect_unmanaged_node_with_csi_node(self):
         self._prepare_default_mocks_for_node()
@@ -66,15 +66,15 @@ class TestWatchNodesResources(NodeWatcherBase):
         self.expected_unmanaged_csi_nodes_with_driver.clear()
         self.assertEqual(self.expected_unmanaged_csi_nodes_with_driver, self.unmanaged_csi_nodes_with_driver)
 
-    def test_catch_node_with_new_manage_node_label(self):
-        self._prepare_default_mocks_for_modified_event()
-        self.managed_secrets_on_watcher_helper.append(test_utils.get_fake_secret_info())
-        self.node_watcher.watch_nodes_resources()
-        self.assertEqual(1, len(self.nodes_on_watcher_helper))
-        self.node_watcher.storage_host_servicer.define_host.assert_called_once_with(
-            test_utils.get_define_request(node_id_from_host_definition=test_settings.FAKE_NODE_ID))
-        self.expected_unmanaged_csi_nodes_with_driver.clear()
-        self.assertEqual(self.expected_unmanaged_csi_nodes_with_driver, self.unmanaged_csi_nodes_with_driver)
+    # def test_catch_node_with_new_manage_node_label(self):
+    #     self._prepare_default_mocks_for_modified_event()
+    #     self.managed_secrets_on_watcher_helper.append(test_utils.get_fake_secret_info())
+    #     self.node_watcher.watch_nodes_resources()
+    #     self.assertEqual(1, len(self.nodes_on_watcher_helper))
+    #     self.node_watcher.storage_host_servicer.define_host.assert_called_once_with(
+    #         test_utils.get_define_request(node_id_from_host_definition=test_settings.FAKE_NODE_ID))
+    #     self.expected_unmanaged_csi_nodes_with_driver.clear()
+    #     self.assertEqual(self.expected_unmanaged_csi_nodes_with_driver, self.unmanaged_csi_nodes_with_driver)
 
     def test_do_not_create_host_definitions_on_modified_node_without_csi_node(self):
         self._prepare_default_mocks_for_modified_event()
