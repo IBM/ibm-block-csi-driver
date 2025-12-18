@@ -23,6 +23,7 @@ FAKE_NODE_ID = '{};;;{}'.format(HOST_NAME, IQN)
 FAKE_CSI_PROVISIONER = 'fake_csi_provisioner'
 TRUE_STRING = 'true'
 NODE_LABELS_FIELD = 'labels'
+NODE_ANNOTATIONS_FIELD = 'annotations'
 FAKE_LABEL = 'FAKE_LABEL'
 MANAGE_NODE_LABEL = 'hostdefiner.block.csi.ibm.com/manage-node'
 FORBID_DELETION_LABEL = 'hostdefiner.block.csi.ibm.com/do-not-delete-definition'
