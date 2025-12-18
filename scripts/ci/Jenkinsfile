@@ -21,7 +21,7 @@ pipeline {
         }
         stage ('Controllers: Unit testing + coverage') {
             steps {
-                echo 'Temporarily Skip: Controllers: Unit testing + coverage'
+                sh 'Temporarily Skip: Controllers: Unit testing + coverage'
                 // sh 'mkdir -p build/reports && chmod 777 build/reports'
                 // sh './scripts/run_unitests.sh `pwd`/build/reports'
             }

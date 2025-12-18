@@ -191,35 +191,35 @@ class TestWatchCsiNodesResources(CsiNodeWatcherBase):
             test_settings.CSI_PROVISIONER_NAME)
         self.managed_secrets_on_csi_node_watcher.append(test_utils.get_fake_secret_info())
 
-    # def test_define_host_called_on_new_csi_node(self):
-    #     self._prepare_default_mocks_for_modified_event()
-    #     self.csi_node_watcher.host_definitions_api.get.side_effect = [
-    #         test_utils.get_empty_k8s_host_definitions(), self.ready_k8s_host_definitions]
-    #     self.os.getenv.side_effect = [test_settings.TRUE_STRING, test_settings.FAKE_PREFIX, '']
-    #     test_utils.run_function_with_timeout(self.csi_node_watcher.watch_csi_nodes_resources, 0.5)
-    #     self.assertEqual(1, len(self.nodes_on_watcher_helper))
-    #     self.csi_node_watcher.storage_host_servicer.define_host.assert_called_once_with(test_utils.get_define_request(
-    #         prefix=test_settings.FAKE_PREFIX, node_id_from_host_definition=test_settings.FAKE_NODE_ID))
+    def test_define_host_called_on_new_csi_node(self):
+        self._prepare_default_mocks_for_modified_event()
+        self.csi_node_watcher.host_definitions_api.get.side_effect = [
+            test_utils.get_empty_k8s_host_definitions(), self.ready_k8s_host_definitions]
+        self.os.getenv.side_effect = [test_settings.TRUE_STRING, test_settings.FAKE_PREFIX, '']
+        test_utils.run_function_with_timeout(self.csi_node_watcher.watch_csi_nodes_resources, 0.5)
+        self.assertEqual(1, len(self.nodes_on_watcher_helper))
+        self.csi_node_watcher.storage_host_servicer.define_host.assert_called_once_with(test_utils.get_define_request(
+            prefix=test_settings.FAKE_PREFIX, node_id_from_host_definition=test_settings.FAKE_NODE_ID))
 
-    # def test_define_host_not_called_on_new_csi_node_when_failed_to_get_secret(self):
-    #     self._prepare_default_mocks_for_modified_event()
-    #     self.csi_node_watcher.host_definitions_api.get.side_effect = [
-    #         test_utils.get_empty_k8s_host_definitions(), self.ready_k8s_host_definitions]
-    #     self.csi_node_watcher.core_api.read_namespaced_secret.side_effect = self.fake_api_exception
-    #     test_utils.run_function_with_timeout(self.csi_node_watcher.watch_csi_nodes_resources, 0.5)
-    #     self.csi_node_watcher.storage_host_servicer.define_host.assert_not_called()
+    def test_define_host_not_called_on_new_csi_node_when_failed_to_get_secret(self):
+        self._prepare_default_mocks_for_modified_event()
+        self.csi_node_watcher.host_definitions_api.get.side_effect = [
+            test_utils.get_empty_k8s_host_definitions(), self.ready_k8s_host_definitions]
+        self.csi_node_watcher.core_api.read_namespaced_secret.side_effect = self.fake_api_exception
+        test_utils.run_function_with_timeout(self.csi_node_watcher.watch_csi_nodes_resources, 0.5)
+        self.csi_node_watcher.storage_host_servicer.define_host.assert_not_called()
 
-    # def test_fail_define_host_on_storage(self):
-    #     self._prepare_default_mocks_for_modified_event()
-    #     self.csi_node_watcher.host_definitions_api.get.side_effect = [
-    #         test_utils.get_empty_k8s_host_definitions(), self.ready_k8s_host_definitions]
-    #     self.csi_node_watcher.storage_host_servicer.define_host.return_value = DefineHostResponse(
-    #         error_message=test_settings.FAIL_MESSAGE_FROM_STORAGE)
-    #     test_utils.run_function_with_timeout(self.csi_node_watcher.watch_csi_nodes_resources, 0.5)
-    #     self.csi_node_watcher.custom_object_api.patch_cluster_custom_object_status.assert_called_with(
-    #         common_settings.CSI_IBM_GROUP, common_settings.VERSION,
-    #         common_settings.HOST_DEFINITION_PLURAL, test_settings.FAKE_NODE_NAME,
-    #         test_utils.get_pending_creation_status_manifest())
+    def test_fail_define_host_on_storage(self):
+        self._prepare_default_mocks_for_modified_event()
+        self.csi_node_watcher.host_definitions_api.get.side_effect = [
+            test_utils.get_empty_k8s_host_definitions(), self.ready_k8s_host_definitions]
+        self.csi_node_watcher.storage_host_servicer.define_host.return_value = DefineHostResponse(
+            error_message=test_settings.FAIL_MESSAGE_FROM_STORAGE)
+        test_utils.run_function_with_timeout(self.csi_node_watcher.watch_csi_nodes_resources, 0.5)
+        self.csi_node_watcher.custom_object_api.patch_cluster_custom_object_status.assert_called_with(
+            common_settings.CSI_IBM_GROUP, common_settings.VERSION,
+            common_settings.HOST_DEFINITION_PLURAL, test_settings.FAKE_NODE_NAME,
+            test_utils.get_pending_creation_status_manifest())
 
     def _prepare_default_mocks_for_modified_event(self):
         self.nodes_on_watcher_helper[test_settings.FAKE_NODE_NAME] = test_utils.get_fake_managed_node()

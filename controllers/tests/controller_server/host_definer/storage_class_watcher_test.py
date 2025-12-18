@@ -25,13 +25,13 @@ class TestAddInitialStorageClasses(StorageClassWatcherBase):
         self.os.getenv.return_value = ''
         self.storage_class_watcher.core_api.read_node.return_value = self.k8s_node_with_fake_label
 
-    # def test_add_new_storage_class_with_new_secret(self):
-    #     self.storage_class_watcher.host_definitions_api.get.return_value = \
-    #         test_utils.get_fake_k8s_host_definitions_items('not_ready')
-    #     self.nodes_on_watcher_helper[test_settings.FAKE_NODE_NAME] = test_utils.get_fake_managed_node()
-    #     self.storage_class_watcher.add_initial_storage_classes()
-    #     self.storage_class_watcher.storage_host_servicer.define_host.assert_called_once_with(
-    #         test_utils.get_define_request(node_id_from_host_definition=test_settings.FAKE_NODE_ID))
+    def test_add_new_storage_class_with_new_secret(self):
+        self.storage_class_watcher.host_definitions_api.get.return_value = \
+            test_utils.get_fake_k8s_host_definitions_items('not_ready')
+        self.nodes_on_watcher_helper[test_settings.FAKE_NODE_NAME] = test_utils.get_fake_managed_node()
+        self.storage_class_watcher.add_initial_storage_classes()
+        self.storage_class_watcher.storage_host_servicer.define_host.assert_called_once_with(
+            test_utils.get_define_request(node_id_from_host_definition=test_settings.FAKE_NODE_ID))
 
     def test_add_new_storage_class_with_existing_secret(self):
         self.managed_secrets_on_storage_class_watcher.append(test_utils.get_fake_secret_info())
@@ -62,14 +62,14 @@ class TestWatchStorageClassResources(StorageClassWatcherBase):
         self.storage_class_watcher._loop_forever.side_effect = [True, False]
         self.storage_class_watcher.core_api.read_node.return_value = self.k8s_node_with_fake_label
 
-    # def test_add_new_storage_class_with_new_secret(self):
-    #     self.storage_class_watcher.host_definitions_api.get.return_value = \
-    #         test_utils.get_fake_k8s_host_definitions_items('not_ready')
-    #     self.nodes_on_watcher_helper[test_settings.FAKE_NODE_NAME] = test_utils.get_fake_managed_node()
-    #     self.storage_class_watcher.watch_storage_class_resources()
-    #     self.storage_class_watcher.storage_host_servicer.define_host.assert_called_once_with(
-    #         test_utils.get_define_request(node_id_from_host_definition=test_settings.FAKE_NODE_ID))
-    #     self.assertEqual(1, len(self.managed_secrets_on_storage_class_watcher))
+    def test_add_new_storage_class_with_new_secret(self):
+        self.storage_class_watcher.host_definitions_api.get.return_value = \
+            test_utils.get_fake_k8s_host_definitions_items('not_ready')
+        self.nodes_on_watcher_helper[test_settings.FAKE_NODE_NAME] = test_utils.get_fake_managed_node()
+        self.storage_class_watcher.watch_storage_class_resources()
+        self.storage_class_watcher.storage_host_servicer.define_host.assert_called_once_with(
+            test_utils.get_define_request(node_id_from_host_definition=test_settings.FAKE_NODE_ID))
+        self.assertEqual(1, len(self.managed_secrets_on_storage_class_watcher))
 
     def test_add_new_storage_class_with_existing_secret(self):
         self.managed_secrets_on_storage_class_watcher.append(test_utils.get_fake_secret_info())
