@@ -31,6 +31,7 @@ import (
 
 	"github.com/ibm/ibm-block-csi-driver/node/logger"
 	"github.com/ibm/ibm-block-csi-driver/node/pkg/driver/executer"
+	"github.com/ibm/ibm-block-csi-driver/node/pkg/driver/sgio"
 )
 
 //go:generate mockgen -destination=../../../mocks/mock_OsDeviceConnectivityHelperScsiGenericInterface.go -package=mocks github.com/ibm/ibm-block-csi-driver/node/pkg/driver/device_connectivity OsDeviceConnectivityHelperScsiGenericInterface
@@ -389,6 +390,7 @@ func (o OsDeviceConnectivityHelperScsiGeneric) RemoveGhostDevice(lun int) error 
 }
 
 func (o OsDeviceConnectivityHelperScsiGeneric) isGhostIBMDevice(sgDev string) bool {
+	sgio.TestUnitReady(sgDev)
 	sgInqCmd := "sg_inq"
 	args := []string{sgDev}
 
