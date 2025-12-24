@@ -125,7 +125,7 @@ func ExecIoctl(inqCmdBlk []uint8, respBuf []byte, device string) error {
 
 // TestUnitReady to know if device is connected
 func TestUnitReady(device string) error {
-	logger.Info(">>>>>>>> TestUnitReady called for %s", device)
+	logger.Infof(">>>>>>>> TestUnitReady called for %s", device)
 	defer logger.Info("<<<<<<< TestUnitReady")
 	f, err := openScsiDevice(device)
 	if err != nil {
@@ -159,7 +159,7 @@ func TestUnitReady(device string) error {
 
 // GetDeviceSerial returns unit serial number of the device using vpd page 0x80
 func GetDeviceSerial(device string) (string, error) {
-	logger.Info(">>> GetDeviceSerial called for %s", device)
+	logger.Infof(">>> GetDeviceSerial called for %s", device)
 	defer logger.Info("<<< GetDeviceSerial")
 	respBuf := make([]byte, respBufLen)
 	err := ExecIoctl(Vpd80Inquiry, respBuf, device)
