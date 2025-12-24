@@ -96,7 +96,7 @@ func openScsiDevice(fname string) (*os.File, error) {
 	return f, nil
 }
 
-//ExecIoctl :
+// ExecIoctl :
 func ExecIoctl(inqCmdBlk []uint8, respBuf []byte, device string) error {
 	f, err := openScsiDevice(device)
 	defer f.Close()
@@ -123,7 +123,7 @@ func ExecIoctl(inqCmdBlk []uint8, respBuf []byte, device string) error {
 	return nil
 }
 
-//TestUnitReady to know if device is connected
+// TestUnitReady to know if device is connected
 func TestUnitReady(device string) error {
 	logger.Info(">>>>>>>> TestUnitReady called for %s", device)
 	defer logger.Info("<<<<<<< TestUnitReady")
