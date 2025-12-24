@@ -185,10 +185,10 @@ func (r OsDeviceConnectivityIscsi) parseActiveSessions() ([]activeSession, error
 		}
 
 		// Check for all common initiator label variations
-		isInitiatorLine := 	strings.HasPrefix(line, "Iface Initiatorname:") ||
-					strings.HasPrefix(line, "Initiator Name:") ||
-					strings.HasPrefix(line, "Initiator node name:") ||
-					strings.HasPrefix(line, "Initiator:")
+		isInitiatorLine := strings.HasPrefix(line, "Iface Initiatorname:") ||
+			strings.HasPrefix(line, "Initiator Name:") ||
+			strings.HasPrefix(line, "Initiator node name:") ||
+			strings.HasPrefix(line, "Initiator:")
 
 		if isInitiatorLine {
 			fields := strings.Fields(line)
@@ -215,8 +215,8 @@ func (r OsDeviceConnectivityIscsi) parseActiveSessions() ([]activeSession, error
 			if len(fields) >= 3 {
 				if hostNum, err := strconv.Atoi(fields[2]); err == nil {
 					sessions = append(sessions, activeSession{
-						sourceIQN:	currentInitiator,
-						num:		hostNum,
+						sourceIQN: currentInitiator,
+						num:       hostNum,
 					})
 				}
 			}
