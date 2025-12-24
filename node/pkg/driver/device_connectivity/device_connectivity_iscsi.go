@@ -20,7 +20,6 @@ import (
 	"bufio"
 	"errors"
 	"fmt"
-	"regexp"
 	"strconv"
 	"strings"
 	"time"
@@ -154,14 +153,6 @@ func (r OsDeviceConnectivityIscsi) EnsureLogin(allPortalsByTarget map[string][]s
 	}
 }
 
-var (
-	// Host Number line
-	hostLineRE = regexp.MustCompile(`Host Number:\s*(\d+)`)
-
-	// Source IQN line – this is the *initiator* IQN, not the target
-	sourceIQNLineRE = regexp.MustCompile(`^Initiator:\s*(iqn\..+)$`)
-)
-
 // activeSession holds the data we need for one host
 type activeSession struct {
 	num       int    // host number (0,1,2,…)
@@ -173,6 +164,7 @@ func (r OsDeviceConnectivityIscsi) parseActiveSessions() ([]activeSession, error
 	out, err := r.iscsiCmd("-m", "session", "-P", "3")
 
 	if err != nil {
+		// Exit code 21 is no session
 		//if exitErr, ok := err.(*exec.ExitError); ok && exitErr.ExitCode() == 21 {
 		//	return nil, nil // no sessions
 		//}
@@ -181,26 +173,52 @@ func (r OsDeviceConnectivityIscsi) parseActiveSessions() ([]activeSession, error
 
 	var sessions []activeSession
 	scanner := bufio.NewScanner(strings.NewReader(string(out)))
-	var curNum = -1
+	var currentInitiator string
 
 	for scanner.Scan() {
 		line := strings.TrimSpace(scanner.Text())
 
-		// ---- Host Number ----
-		if m := hostLineRE.FindStringSubmatch(line); m != nil {
-			num, _ := strconv.Atoi(m[1])
-			curNum = num
+		// Reset state for new session blocks
+		if strings.HasPrefix(line, "Target:") {
+			currentInitiator = ""
 			continue
 		}
 
-		// ---- Source IQN (Initiator) ----
-		if curNum != -1 {
-			if m := sourceIQNLineRE.FindStringSubmatch(line); m != nil {
-				sessions = append(sessions, activeSession{
-					num:       curNum,
-					sourceIQN: m[1],
-				})
-				curNum = -1 // reset for next block
+		// Check for all common initiator label variations
+		isInitiatorLine := 	strings.HasPrefix(line, "Iface Initiatorname:") ||
+					strings.HasPrefix(line, "Initiator Name:") ||
+					strings.HasPrefix(line, "Initiator node name:") ||
+					strings.HasPrefix(line, "Initiator:")
+
+		if isInitiatorLine {
+			fields := strings.Fields(line)
+			if len(fields) > 0 {
+				// The IQN is always the last field in these labels
+				foundIQN := fields[len(fields)-1]
+
+				if currentInitiator == "" {
+					// First discovery for this block
+					currentInitiator = foundIQN
+				} else if currentInitiator != foundIQN {
+					// shouldn't happen, sanity check
+					logger.Warningf("Warning: Found conflicting initiator IQNs in one session block: %s vs %s\n",
+						currentInitiator, foundIQN)
+				}
+				currentInitiator = fields[len(fields)-1]
+			}
+			continue
+		}
+
+		// Match Host Number to the discovered Initiator
+		if currentInitiator != "" && strings.HasPrefix(line, "Host Number:") {
+			fields := strings.Fields(line)
+			if len(fields) >= 3 {
+				if hostNum, err := strconv.Atoi(fields[2]); err == nil {
+					sessions = append(sessions, activeSession{
+						IQN:        currentInitiator,
+						HostNumber: hostNum,
+					})
+				}
 			}
 		}
 	}
