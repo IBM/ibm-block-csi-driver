@@ -9,6 +9,8 @@ import (
 	"os"
 	"syscall"
 	"unsafe"
+
+	"github.com/ibm/ibm-block-csi-driver/node/logger"
 )
 
 const (
@@ -123,11 +125,11 @@ func ExecIoctl(inqCmdBlk []uint8, respBuf []byte, device string) error {
 
 //TestUnitReady to know if device is connected
 func TestUnitReady(device string) error {
-	log.Tracef(">>>>>>>> TestUnitReady called for %s", device)
-	defer log.Trace("<<<<<<< TestUnitReady")
+	logger.Tracef(">>>>>>>> TestUnitReady called for %s", device)
+	defer logger.Trace("<<<<<<< TestUnitReady")
 	f, err := openScsiDevice(device)
 	if err != nil {
-		log.Errorf("unable to open the device %s : %s", device, err.Error())
+		logger.Errorf("unable to open the device %s : %s", device, err.Error())
 		return err
 	}
 	defer f.Close()
@@ -144,12 +146,12 @@ func TestUnitReady(device string) error {
 	}
 	err = sgioSyscall(f, ioHdr)
 	if err != nil {
-		log.Errorf("unable to execute sgio call on device %s : %s", device, err.Error())
+		logger.Errorf("unable to execute sgio call on device %s : %s", device, err.Error())
 		return err
 	}
 	err = CheckSense(ioHdr, &senseBuf)
 	if err != nil {
-		log.Errorf("unable to execute CheckSense on device %s : %s", device, err.Error())
+		logger.Errorf("unable to execute CheckSense on device %s : %s", device, err.Error())
 		return err
 	}
 	return nil
@@ -157,12 +159,12 @@ func TestUnitReady(device string) error {
 
 // GetDeviceSerial returns unit serial number of the device using vpd page 0x80
 func GetDeviceSerial(device string) (string, error) {
-	log.Tracef(">>> GetDeviceSerial called for %s", device)
-	defer log.Tracef("<<< GetDeviceSerial")
+	logger.Tracef(">>> GetDeviceSerial called for %s", device)
+	defer logger.Tracef("<<< GetDeviceSerial")
 	respBuf := make([]byte, respBufLen)
 	err := ExecIoctl(Vpd80Inquiry, respBuf, device)
 	if err != nil {
-		log.Tracef("unable to obtain unit serial number on device %s, err %s", device, err.Error())
+		logger.Tracef("unable to obtain unit serial number on device %s, err %s", device, err.Error())
 		return "", err
 	}
 	return string(respBuf[4:36]), nil
@@ -181,8 +183,7 @@ func CheckSense(i *Hdr, s *[]byte) error {
 		}
 		if i.SbLenWr > 0 {
 			_, err := b.WriteString(
-				fmt.Sprintf("\nSENSE:\n%v\n%v",
-					dumpHex(*s), GetErrString((*s)[12], (*s)[13])))
+				fmt.Sprintf("\nSENSE (raw):\n%x\nASC: %d, ASCQ: %d", *s, (*s)[12], (*s)[13]))
 			if err != nil {
 				return err
 			}
