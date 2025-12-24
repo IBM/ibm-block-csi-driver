@@ -215,8 +215,8 @@ func (r OsDeviceConnectivityIscsi) parseActiveSessions() ([]activeSession, error
 			if len(fields) >= 3 {
 				if hostNum, err := strconv.Atoi(fields[2]); err == nil {
 					sessions = append(sessions, activeSession{
-						IQN:        currentInitiator,
-						HostNumber: hostNum,
+						sourceIQN:	currentInitiator,
+						num:		hostNum,
 					})
 				}
 			}
