@@ -27,6 +27,14 @@ class Watcher(KubernetesManager):
         super().__init__()
         self.storage_host_servicer = HostDefinerServicer()
 
+    def get_nodes_var(self):
+        """docstring"""
+        return NODES
+
+    def get_managed_secrets_var(self):
+        """docstring"""
+        return MANAGED_SECRETS
+
     def _define_host_on_all_storages(self, node_name):
         logger.info(messages.DEFINE_NODE_ON_ALL_MANAGED_SECRETS.format(node_name))
         for secret_info in MANAGED_SECRETS:
@@ -365,9 +373,11 @@ class Watcher(KubernetesManager):
         return ''.join(random.choices(string.ascii_lowercase + string.digits, k=20))
 
     def _add_node_to_nodes(self, csi_node_info):
+        logger.info("DEBUG - uriziv - 79")
         logger.info(messages.NEW_KUBERNETES_NODE.format(csi_node_info.name))
         self._add_manage_node_label_to_node(csi_node_info.name)
         NODES[csi_node_info.name] = self._generate_managed_node(csi_node_info)
+        logger.info("DEBUG - uriziv - 80")
 
     def _add_manage_node_label_to_node(self, node_name):
         if self._is_node_has_manage_node_label(node_name):
