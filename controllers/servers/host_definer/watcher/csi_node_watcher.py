@@ -12,10 +12,12 @@ logger = get_stdout_logger()
 class CsiNodeWatcher(Watcher):
 
     def add_initial_csi_nodes(self):
+        logger.info("DEBUG - uriziv - 77")
         csi_nodes_info = self._get_csi_nodes_info_with_driver()
         for csi_node_info in csi_nodes_info:
             if self._is_host_can_be_defined(csi_node_info.name):
                 self._add_node_to_nodes(csi_node_info)
+        logger.info("DEBUG - uriziv - 78")
 
     def watch_csi_nodes_resources(self):
         while self._loop_forever():

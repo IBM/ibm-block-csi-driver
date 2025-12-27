@@ -22,9 +22,17 @@ class HostDefinerManager:
 
     def start_host_definition(self):
         logger.info('starting host definer')
+        logger.info("DEBUG - uriziv - 73")
         self.csi_node_watcher.add_initial_csi_nodes()
+        logger.info("DEBUG - uriziv - 74")
         self.storage_class_watcher.add_initial_storage_classes()
+        logger.info("DEBUG - uriziv - 75")
         self.node_watcher.add_initial_nodes()
+        logger.info(self.csi_node_watcher.get_nodes_var)
+        logger.info(self.csi_node_watcher.get_managed_secrets_var)
+        logger.info(self.storage_class_watcher.get_nodes_var)
+        logger.info(self.storage_class_watcher.get_managed_secrets_var)
+        logger.info("DEBUG - uriziv - 76")
         self._start_watchers()
 
     def _start_watchers(self):
