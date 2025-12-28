@@ -302,16 +302,24 @@ class Watcher(KubernetesManager):
         return labels.get(label)
 
     def _add_array_connectivity_info_to_request(self, request, secret_name, secret_namespace, labels):
+        logger.info("Debug - uriziv - 83")
+        logger.info(type(request))
+        logger.info(request)
         request.array_connection_info = self._get_array_connection_info_from_secret(
             secret_name, secret_namespace, labels)
         if request.array_connection_info:
             return request
+        logger.info("Debug - uriziv - 84")
         return None
 
     def _add_initiators_to_request(self, request, node_name):
+        logger.info("Debug - uriziv - 81")
+        logger.info(type(request))
+        logger.info(request)
         request.node_initiators = self._get_node_initiators(node_name)
         if request.node_initiators:
             return request
+        logger.info("Debug - uriziv - 82")
         return None
 
     def _get_array_connection_info_from_secret(self, secret_name, secret_namespace, labels):
