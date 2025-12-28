@@ -35,6 +35,7 @@ class HostDefinerServicer:
                 try:
                     initiators_from_host_definition = self._get_initiators_from_node_id(
                         request.node_id_from_host_definition)
+                    # TODO(uriziv12): consider: initiators_from_host_definition = request.node_initiators
                     found_host_name = self._get_host_name(initiators_from_host_definition, array_mediator)
                     # Partition update is first one - verifies partition can be fixed (may fail if mapped)
                     self._update_host_partition(request, found_host_name,
