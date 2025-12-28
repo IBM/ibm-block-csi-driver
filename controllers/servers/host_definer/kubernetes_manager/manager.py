@@ -1,6 +1,7 @@
 import ast
 import datetime
 import base64
+import json
 
 from kubernetes import client, config, dynamic
 from kubernetes.client import api_client
@@ -376,8 +377,13 @@ class KubernetesManager():
     def _generate_node_initiators(self, k8s_node):
         logger.info("DEBUG - uriziv - 71")
         logger.info(k8s_node.metadata.annotations)
+        node_initiators_raw = k8s_node.metadata.annotations.get("block.csi.ibm.com/node-ports", "{}")
+        initiators_data = json.loads(node_initiators_raw)
+        nvme_nqns = initiators_data.get("nvme", [])
+        fc_wwns = initiators_data.get("fc", [])
+        iscsi_iqns = initiators_data.get("iscsi", [])
         logger.info("DEBUG - uriziv - 72")
-        return Initiators([], [], [])
+        return Initiators(nvme_nqns, fc_wwns, iscsi_iqns)
 
     def _get_csi_daemon_set(self):
         try:
