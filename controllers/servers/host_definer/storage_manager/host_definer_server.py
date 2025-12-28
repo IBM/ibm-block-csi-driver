@@ -15,7 +15,7 @@ logger = get_stdout_logger()
 class HostDefinerServicer:
     def define_host(self, request):
         logger.info("DEBUG - uriziv - 7")
-        logger.info(type(request))
+        logger.info(type(request))  # DefineHostRequest
         logger.info(request)
         logger.info("DEBUG - uriziv - 8")
         array_connection_info = request.array_connection_info
