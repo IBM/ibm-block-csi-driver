@@ -1,3 +1,6 @@
+"""host_definer_server.py"""
+import json
+
 from controllers.array_action import settings as array_config
 from controllers.array_action.errors import HostNotFoundError, HostAlreadyExists
 from controllers.array_action.storage_agent import detect_array_type, get_agent
@@ -6,8 +9,8 @@ from controllers.common.node_info import NodeIdInfo, Initiators
 import controllers.common.settings as common_settings
 from controllers.servers.host_definer.hd_types import DefineHostResponse
 from controllers.servers.utils import join_object_prefix_with_name, get_initiators_connectivity_type
-import controllers.servers.host_definer.settings as host_definer_settings
 from controllers.servers.host_definer import messages
+from controllers.servers.host_definer.kubernetes_manager.manager import KubernetesManager
 
 logger = get_stdout_logger()
 
@@ -21,8 +24,7 @@ class HostDefinerServicer:
         array_connection_info = request.array_connection_info
         array_addresses = array_connection_info.array_addresses
         node_id_info = NodeIdInfo(request.node_id_from_csi_node)
-        # TODO(uriziv1): get initiators
-        initiators = Initiators(["iscsi"], ["fc1", "fc2", "fc3"], ["nvme"])
+        initiators = request.node_initiators
         node_name = node_id_info.node_name
         connectivity_type_from_user = get_initiators_connectivity_type(initiators, request.connectivity_type_from_user)
         host_name = join_object_prefix_with_name(prefix=request.prefix, name=node_name)
@@ -116,10 +118,16 @@ class HostDefinerServicer:
 
     def _get_initiators_from_node_id(self, node_id):
         logger.info("DEBUG - uriziv - 43")
-        node_id_info = NodeIdInfo(node_id)
-        # TODO(uriziv1) function to init Initiators according to node_id
+        # node_id_info = NodeIdInfo(node_id)
+        kubernetes_manager = KubernetesManager()
+        k8s_node = kubernetes_manager.core_api.read_node(name=node_id)
+        node_initiators_raw = k8s_node.metadata.annotations.get("block.csi.ibm.com/node-ports", "{}")
+        initiators_data = json.loads(node_initiators_raw)
+        nvme_nqns = initiators_data.get("nvme", [])
+        fc_wwns = initiators_data.get("fc", [])
+        iscsi_iqns = initiators_data.get("iscsi", [])
         logger.info("DEBUG - uriziv - 44")
-        return Initiators(["iscsi"], ["fc1", "fc2", "fc3"], ["nvme"])
+        return Initiators(nvme_nqns, fc_wwns, iscsi_iqns)
 
     def _is_protocol_switched(self, connectivity_type_from_user, connectivity_type_from_host):
         return self._is_switching_from_nvme_to_scsi(connectivity_type_from_user, connectivity_type_from_host) or \
