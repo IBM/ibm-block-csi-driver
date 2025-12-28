@@ -16,9 +16,11 @@ class HostDefinitionWatcher(Watcher):
     def watch_host_definitions_resources(self):
         logger.info("Debug - uriziv - 69")
         self._watch_host_definition_with_timeout('')
-        logger.info("Debug - uriziv - 70")
         while self._loop_forever():
             resource_version = self._get_k8s_object_resource_version(self.host_definitions_api.get())
+            logger.info("self.host_definitions_api.get(): %s", self.host_definitions_api.get())
+            logger.info(resource_version)
+            logger.info("Debug - uriziv - 70")
             self._watch_host_definition_with_timeout(resource_version)
 
     def _watch_host_definition_with_timeout(self, resource_version, timeout=5):
