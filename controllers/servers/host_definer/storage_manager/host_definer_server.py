@@ -24,7 +24,7 @@ class HostDefinerServicer:
         array_connection_info = request.array_connection_info
         array_addresses = array_connection_info.array_addresses
         node_id_info = NodeIdInfo(request.node_id_from_csi_node)
-        initiators = request.node_initiators
+        initiators = request.node_initiators_from_csi_node
         node_name = node_id_info.node_name
         connectivity_type_from_user = get_initiators_connectivity_type(initiators, request.connectivity_type_from_user)
         host_name = join_object_prefix_with_name(prefix=request.prefix, name=node_name)
@@ -33,9 +33,9 @@ class HostDefinerServicer:
             array_type = detect_array_type(array_addresses)
             with get_agent(array_connection_info, array_type).get_mediator() as array_mediator:
                 try:
-                    initiators_from_host_definition = self._get_initiators_from_node_id(
-                        request.node_id_from_host_definition)
-                    # TODO(uriziv12): consider: initiators_from_host_definition = request.node_initiators
+                    initiators_from_host_definition = request.node_initiators_from_host_definition
+                    # TODO: Make sure it works with the new concept of "initiators_from_host_definition"
+                    # (which are always from one type only)
                     found_host_name = self._get_host_name(initiators_from_host_definition, array_mediator)
                     # Partition update is first one - verifies partition can be fixed (may fail if mapped)
                     self._update_host_partition(request, found_host_name,
@@ -66,8 +66,7 @@ class HostDefinerServicer:
         node_id_info = NodeIdInfo(request.node_id_from_csi_node)
         array_connection_info = request.array_connection_info
         array_addresses = array_connection_info.array_addresses
-        # TODO(uriziv1): get initiators
-        initiators = Initiators(["iscsi"], ["fc1", "fc2", "fc3"], ["nvme"])
+        initiators = request.node_initiators_from_csi_node
         node_name = node_id_info.node_name
         logger.info(messages.UNDEFINE_NODE_FROM_ARRAYS.format(node_name, array_addresses))
         try:
@@ -98,6 +97,7 @@ class HostDefinerServicer:
 
     def _update_host_ports(self, request, host, array_mediator, partition_name):
         initiators = self._get_initiators_from_node_id(request.node_id_from_csi_node)
+        # TODO: Consider changing it to initiators = request.node_initiators_from_csi_node
         connectivity_type_from_user = get_initiators_connectivity_type(initiators, request.connectivity_type_from_user)
         connectivity_type_from_host = array_mediator.get_host_connectivity_type(host)
         if self._is_protocol_switched(connectivity_type_from_user, connectivity_type_from_host):
@@ -190,8 +190,20 @@ class HostDefinerServicer:
 
     def _is_port_update_needed_when_same_protocol(
             self, request, connectivity_type_from_user, connectivity_type_from_host):
-        return connectivity_type_from_user != connectivity_type_from_host \
-            or request.node_id_from_csi_node != request.node_id_from_host_definition
+        if connectivity_type_from_user != connectivity_type_from_host:
+            return True
+
+        if request.node_id_from_csi_node != request.node_id_from_host_definition:
+            return True
+
+        initiators_from_csi_node_by_type = \
+            request.node_initiators_from_csi_node.get_by_connectivity_type(connectivity_type_from_host)
+        initiators_from_host_definition_by_type = \
+            request.node_initiators_from_host_definition.get_by_connectivity_type(connectivity_type_from_host)
+        if initiators_from_csi_node_by_type != initiators_from_host_definition_by_type:
+            return True
+
+        return False
 
     def _update_host_io_group(self, request, host, array_mediator):
         io_group_from_host = array_mediator.get_host_io_group(host)
