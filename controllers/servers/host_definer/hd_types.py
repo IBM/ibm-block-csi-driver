@@ -9,8 +9,9 @@ class DefineHostRequest:
     prefix: str = ''
     connectivity_type_from_user: str = ''
     node_id_from_host_definition: str = ''
+    node_initiators_from_host_definition: Initiators = Initiators(nvme_nqns=[], fc_wwns=[], iscsi_iqns=[])
     node_id_from_csi_node: str = ''
-    node_initiators: Initiators = Initiators(nvme_nqns=[], fc_wwns=[], iscsi_iqns=[])
+    node_initiators_from_csi_node: Initiators = Initiators(nvme_nqns=[], fc_wwns=[], iscsi_iqns=[])
     array_connection_info: ArrayConnectionInfo = ArrayConnectionInfo(array_addresses='', user='', password='',
                                                                      partition_name='', partition_vg='', port_set='')
     io_group: str = ''

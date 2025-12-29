@@ -16,6 +16,8 @@ import controllers.common.settings as common_settings
 from controllers.servers.host_definer.hd_types import (
     DefineHostRequest, DefineHostResponse, HostDefinitionInfo, SecretInfo, ManagedNode)
 from controllers.servers.host_definer.storage_manager.host_definer_server import HostDefinerServicer
+from controllers.common.node_info import Initiators
+from controllers.array_action import settings as array_config
 
 MANAGED_SECRETS = []
 NODES = {}
@@ -272,10 +274,12 @@ class Watcher(KubernetesManager):
         request = self._get_new_request(node_info.labels)
         request = self._add_array_connectivity_info_to_request(
             request, host_definition_info.secret_name, host_definition_info.secret_namespace, node_info.labels)
-        request = self._add_initiators_to_request(request, node_info.name)
         if request:
             request.node_id_from_host_definition = host_definition_info.node_id
+            request.node_initiators_from_host_definition = \
+                self._get_node_initiators_from_host_definition(host_definition_info)
             request.node_id_from_csi_node = self._get_node_id_by_node(host_definition_info)
+            request.node_initiators_from_csi_node = self._get_node_initiators_by_node(host_definition_info)
             request.io_group = self._get_io_group_by_node(host_definition_info.node_name)
         logger.info(request)
         logger.info("debug - uriziv - 34")
@@ -310,16 +314,6 @@ class Watcher(KubernetesManager):
         if request.array_connection_info:
             return request
         logger.info("Debug - uriziv - 84")
-        return None
-
-    def _add_initiators_to_request(self, request, node_name):
-        logger.info("Debug - uriziv - 81")
-        logger.info(type(request))
-        logger.info(request)
-        request.node_initiators = self._get_node_initiators(node_name)
-        if request.node_initiators:
-            return request
-        logger.info("Debug - uriziv - 82")
         return None
 
     def _get_array_connection_info_from_secret(self, secret_name, secret_namespace, labels):
@@ -367,6 +361,33 @@ class Watcher(KubernetesManager):
             return NODES[host_definition_info.node_name].node_id
         except Exception:
             return host_definition_info.node_id
+
+    def _get_node_initiators_by_node(self, host_definition_info):
+        try:
+            return self._get_node_initiators(host_definition_info.node_name)
+        except Exception:
+            return self._get_node_initiators_from_host_definition(host_definition_info)
+
+    def _get_node_initiators_from_host_definition(self, host_definition_info):
+        ports = host_definition_info.ports or []
+        conn_type = host_definition_info.connectivity_type
+
+        fc_wwns = []
+        iscsi_iqns = []
+        nvme_nqns = []
+
+        if conn_type == array_config.FC_CONNECTIVITY_TYPE:
+            fc_wwns = ports
+        elif conn_type == array_config.ISCSI_CONNECTIVITY_TYPE:
+            iscsi_iqns = ports
+        elif conn_type == array_config.NVME_OVER_FC_CONNECTIVITY_TYPE:
+            nvme_nqns = ports
+
+        return Initiators(
+            nvme_nqns=nvme_nqns,
+            fc_wwns=fc_wwns,
+            iscsi_iqns=iscsi_iqns
+        )
 
     def _get_io_group_by_node(self, node_name):
         try:
