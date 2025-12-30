@@ -119,7 +119,6 @@ class HostDefinerServicer:
 
     def _get_initiators_from_node_id(self, node_id):
         logger.info("DEBUG - uriziv - 43")
-        # node_id_info = NodeIdInfo(node_id)
         kubernetes_manager = KubernetesManager()
         k8s_node = kubernetes_manager.core_api.read_node(name=node_id)
         node_initiators_raw = k8s_node.metadata.annotations.get("block.csi.ibm.com/node-ports", "{}")

@@ -36,33 +36,6 @@ class KubernetesManager():
     def _load_cluster_configuration(self):
         return config.load_incluster_config()
 
-    def _get_node_ids_info(self):
-        try:
-            node_ids_info = []
-            for k8s_node in self.core_api.list_node().items:
-                k8s_node = self._generate_node_id_info(k8s_node)
-                node_ids_info.append(k8s_node)
-            return node_ids_info
-        except ApiException as ex:
-            logger.error(messages.FAILED_TO_GET_NODES.format(ex.body))
-            return []
-
-    def _get_node_id_info(self, node_name):
-        k8s_node = self._read_node(node_name)
-        logger.info("DEBUG - uriziv - 27")
-        if k8s_node:
-            return self._generate_node_id_info(k8s_node)
-        node_id_for_node_id_info_object = ';;;'
-        logger.info(node_id_for_node_id_info_object)
-        logger.info("DEBUG - uriziv - 28")
-        return NodeIdInfo(node_id_for_node_id_info_object)
-
-    def _generate_node_id_info(self, k8s_node):
-        logger.info("DEBUG - uriziv - 29")
-        node_id_for_node_id_info_object = f"{k8s_node.metadata.name};;;"
-        logger.info("DEBUG - uriziv - 30")
-        return NodeIdInfo(node_id_for_node_id_info_object)
-
     def _get_csi_nodes_api(self):
         return self.dynamic_client.resources.get(api_version=settings.STORAGE_API_VERSION,
                                                  kind=settings.CSINODE_KIND)
