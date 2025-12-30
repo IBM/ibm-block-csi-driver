@@ -190,9 +190,11 @@ class HostDefinerServicer:
     def _is_port_update_needed_when_same_protocol(
             self, request, connectivity_type_from_user, connectivity_type_from_host):
         if connectivity_type_from_user != connectivity_type_from_host:
+            logger.info("Port update needed due to changes in connectivity type")
             return True
 
         if request.node_id_from_csi_node != request.node_id_from_host_definition:
+            logger.info("Port update needed due to changes in node id")
             return True
 
         initiators_from_csi_node_by_type = \
@@ -200,6 +202,7 @@ class HostDefinerServicer:
         initiators_from_host_definition_by_type = \
             request.node_initiators_from_host_definition.get_by_connectivity_type(connectivity_type_from_host)
         if initiators_from_csi_node_by_type != initiators_from_host_definition_by_type:
+            logger.info("Port update needed due to changes in node initiators")
             return True
 
         return False
