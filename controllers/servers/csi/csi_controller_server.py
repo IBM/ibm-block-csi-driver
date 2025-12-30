@@ -229,9 +229,12 @@ class CSIControllerServicer(csi_pb2_grpc.ControllerServicer):
             array_type = volume_id_info.array_type
             volume_id = volume_id_info.ids.uid
             node_id_info = NodeIdInfo(request.node_id)
-            logger.info(request)
             node_name = node_id_info.node_name
             initiators = utils.get_node_initiators(node_name)
+
+            logger.info(node_id_info)
+            logger.info(node_name)
+            logger.info(initiators)
 
             logger.debug("node name for this publish operation is : {0}".format(node_name))
 
@@ -250,6 +253,9 @@ class CSIControllerServicer(csi_pb2_grpc.ControllerServicer):
             response = utils.generate_csi_publish_volume_response(lun,
                                                                   connectivity_type,
                                                                   array_initiators)
+            logger.info(lun)
+            logger.info(connectivity_type)
+            logger.info(array_initiators)
             logger.info("debug - uriziv - 26")
             return response
 
@@ -267,6 +273,7 @@ class CSIControllerServicer(csi_pb2_grpc.ControllerServicer):
 
     @csi_method(error_response_type=csi_pb2.ControllerUnpublishVolumeResponse, lock_request_attribute="volume_id")
     def ControllerUnpublishVolume(self, request, context):
+        logger.info("debug - uriziv - 85")
         try:
             utils.validate_unpublish_volume_request(request)
 
@@ -278,6 +285,10 @@ class CSIControllerServicer(csi_pb2_grpc.ControllerServicer):
             node_name = node_id_info.node_name
             initiators = utils.get_node_initiators(node_name)
             logger.debug("node name for this unpublish operation is : {0}".format(node_name))
+
+            logger.info(node_id_info)
+            logger.info(node_name)
+            logger.info(initiators)
 
             array_connection_info = utils.get_array_connection_info_from_secrets(request.secrets,
                                                                                  system_id=system_id)
@@ -301,6 +312,7 @@ class CSIControllerServicer(csi_pb2_grpc.ControllerServicer):
             logger.debug("Idempotent case. volume is already deleted.")
         except array_errors.VolumeNotMappedToHostError:
             logger.debug("Idempotent case. volume is not mapped to host.")
+        logger.info("debug - uriziv - 86")
         return csi_pb2.ControllerUnpublishVolumeResponse()
 
     @csi_method(error_response_type=csi_pb2.ValidateVolumeCapabilitiesResponse, lock_request_attribute="volume_id")
