@@ -10,13 +10,12 @@ from controllers.array_action.array_action_types import ObjectIds
 from controllers.array_action.storage_agent import get_agent, detect_array_type
 from controllers.common.config import config as common_config
 from controllers.common.csi_logger import get_stdout_logger
-from controllers.common.node_info import NodeIdInfo, Initiators
+from controllers.common.node_info import NodeIdInfo
 from controllers.servers import messages as controller_messages
 from controllers.servers.csi.decorators import csi_method
 from controllers.servers.csi.exception_handler import handle_exception, \
     build_error_response
 from controllers.servers.errors import ObjectIdError, ValidationException, InvalidNodeId
-from controllers.servers.host_definer.kubernetes_manager.manager import KubernetesManager
 
 logger = get_stdout_logger()
 
@@ -219,14 +218,6 @@ class CSIControllerServicer(csi_pb2_grpc.ControllerServicer):
 
         return csi_pb2.DeleteVolumeResponse()
 
-    def _get_node_initiators(self, node_id):
-        logger.info("debug - uriziv - 31")
-        kubernetes_manager = KubernetesManager()
-        k8s_node = kubernetes_manager.core_api.read_node(name=node_id)
-        ret_val = k8s_node.metadata.annotations
-        logger.info("debug - uriziv - 32")
-        return ret_val
-
     @csi_method(error_response_type=csi_pb2.ControllerPublishVolumeResponse, lock_request_attribute="volume_id")
     def ControllerPublishVolume(self, request, context):
         logger.info("debug - uriziv - 25")
@@ -240,10 +231,7 @@ class CSIControllerServicer(csi_pb2_grpc.ControllerServicer):
             node_id_info = NodeIdInfo(request.node_id)
             logger.info(request)
             node_name = node_id_info.node_name
-            node_initiators = self._get_node_initiators(node_name)
-            logger.info("node_initiators: %s", node_initiators)
-            # TODO(uriziv1) - init Initiators object
-            initiators = Initiators(["iscsi"], ["fc1", "fc2", "fc3"], ["nvme"])
+            initiators = utils.get_node_initiators(node_name)
 
             logger.debug("node name for this publish operation is : {0}".format(node_name))
 
@@ -288,8 +276,7 @@ class CSIControllerServicer(csi_pb2_grpc.ControllerServicer):
             volume_id = volume_id_info.ids.uid
             node_id_info = NodeIdInfo(request.node_id)
             node_name = node_id_info.node_name
-            # TODO(uriziv1) - get initiators from nodeid
-            initiators = Initiators(["iscsi"], ["fc1", "fc2", "fc3"], ["nvme"])
+            initiators = utils.get_node_initiators(node_name)
             logger.debug("node name for this unpublish operation is : {0}".format(node_name))
 
             array_connection_info = utils.get_array_connection_info_from_secrets(request.secrets,

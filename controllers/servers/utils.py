@@ -24,6 +24,8 @@ from controllers.servers.csi.controller_types import (ArrayConnectionInfo,
                                                       ObjectIdInfo,
                                                       ObjectParameters, VolumeGroupParameters, VolumeGroupIdInfo)
 from controllers.servers.errors import ObjectIdError, ValidationException, InvalidNodeId
+from controllers.common.node_info import Initiators
+from controllers.servers.host_definer.kubernetes_manager.manager import KubernetesManager
 
 logger = get_stdout_logger()
 
@@ -90,6 +92,23 @@ def _get_array_connection_info_from_system_info(secrets, system_id):
         servers_settings.PARAMETERS_ARRAY_ADDRESSES_DELIMITER)
     return ArrayConnectionInfo(array_addresses=array_addresses, user=user, password=password, system_id=system_id,
                                partition_name=partition_name, partition_vg=partition_vg, port_set=port_set)
+
+
+def get_node_initiators(node_name):
+    kubernetes_manager = KubernetesManager()
+    k8s_node = kubernetes_manager.core_api.read_node(name=node_name)
+    if k8s_node:
+        return _generate_node_initiators(k8s_node)
+    return Initiators([], [], [])
+
+
+def _generate_node_initiators(k8s_node):
+    node_initiators_raw = k8s_node.metadata.annotations.get("block.csi.ibm.com/node-ports", "{}")
+    initiators_data = json.loads(node_initiators_raw)
+    nvme_nqns = initiators_data.get("nvme", [])
+    fc_wwns = initiators_data.get("fc", [])
+    iscsi_iqns = initiators_data.get("iscsi", [])
+    return Initiators(nvme_nqns, fc_wwns, iscsi_iqns)
 
 
 def get_array_connection_info_from_secrets(secrets, topologies=None, system_id=None):
