@@ -58,9 +58,10 @@ def get_node_id_info(node_id):
 
 
 def _get_config_map_info():
-    result = {}
     cfgmap = os.environ.get('CSI_NODE_CONFIG')
-    if cfgmap:
+    if not cfgmap or cfgmap == 'null':
+        result = {}
+    else:
         result = json.loads(cfgmap)
     return result
 
