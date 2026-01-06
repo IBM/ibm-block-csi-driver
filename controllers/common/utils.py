@@ -57,12 +57,16 @@ def get_node_id_info(node_id):
     return hostname, nvme_nqn, fc_wwns, iscsi_iqn
 
 
-def _get_workers_limit_info():
-    return os.environ.get('WORKERS_LIMIT')
+def _get_config_map_info():
+    result = {}
+    cfgmap = os.environ.get('CSI_NODE_CONFIG')
+    if cfgmap:
+        result = json.loads(cfgmap)
+    return result
 
 
 def _default_callhome_metadata_aux():
-    ch_info = []
+    ch_info = {}
 
     # Disable wanings for insecure https
     #
@@ -92,7 +96,7 @@ def _default_callhome_metadata_aux():
     version_info = json.loads(req.data.decode('utf-8'))
     k8s_version = version_info.get("gitVersion", '')
     if k8s_version:
-        ch_info.append(f"k8s:{k8s_version}")
+        ch_info["k8s"] = k8s_version
 
     # To Getting OCP version is more complicated
     #
@@ -110,13 +114,11 @@ def _default_callhome_metadata_aux():
         ocp_version = ocp_match.group(1)
 
     if ocp_version:
-        ch_info.append(f"ocp:{ocp_version}")
+        ch_info["ocp"] = ocp_version
 
-    max_invocations = _get_workers_limit_info()
-    if max_invocations:
-        ch_info.append(f"max_workers:{max_invocations}")
+    ch_info["config_map"] = _get_config_map_info()
 
-    callhome_metadata = ", ".join(ch_info)
+    callhome_metadata = json.dumps(ch_info)
     return callhome_metadata
 
 
