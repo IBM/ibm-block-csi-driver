@@ -5,6 +5,7 @@ import threading
 import json
 import os
 import re
+import base64
 import urllib3
 
 from controllers.common import settings
@@ -119,7 +120,7 @@ def _default_callhome_metadata_aux():
 
     ch_info["config_map"] = _get_config_map_info()
 
-    callhome_metadata = json.dumps(ch_info)
+    callhome_metadata = base64.b64encode(json.dumps(ch_info))
     return callhome_metadata
 
 
