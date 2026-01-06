@@ -120,7 +120,9 @@ def _default_callhome_metadata_aux():
 
     ch_info["config_map"] = _get_config_map_info()
 
-    callhome_metadata = base64.b64encode(json.dumps(ch_info))
+    md_str = json.dumps(ch_info)
+
+    callhome_metadata = base64.b64encode(md_str.encode('utf-8')).decode('utf-8')
     return callhome_metadata
 
 
