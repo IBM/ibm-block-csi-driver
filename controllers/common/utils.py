@@ -6,6 +6,7 @@ import json
 import os
 import re
 import base64
+import zlib
 import platform
 
 import urllib3
@@ -69,6 +70,42 @@ def _get_config_map_info():
     return result
 
 
+def _encode_to_base64(data, max_size=1024):
+    # Convert to Compact JSON
+    #
+    json_bytes = json.dumps(data, separators=(',', ':')).encode('utf-8')
+
+    # Base64 encode
+    #
+    b64_encoded = base64.b64encode(json_bytes)
+
+    # If we are within the limit - just return
+    #
+    if len(b64_encoded) <= max_size:
+        return b64_encoded.decode('utf-8')
+
+    # We are too large, compress with zlib first with highest compression
+    #
+    compressed = zlib.compress(json_bytes, level=9)
+    b64_compressed = base64.b64encode(compressed)
+
+    # If now we are within limit, just return
+    #
+    if len(b64_compressed) <= max_size:
+        return b64_compressed.decode('utf-8')
+
+    # OK, nothing helps log error
+    #
+    logger.error("Encoded data too large: {} bytes max allowed: {} bytes "
+                 "(even after zlib compression)".format(len(b64_compressed), max_size))
+
+    # Replace user config map with error information and re-encode
+    #
+    del data["config_map"]
+    data["config_map"] = {'error': 'CONFIG_MAP_TOO_LARGE'}
+    return _encode_to_base64(data)
+
+
 def _default_callhome_metadata_aux():
     ch_info = {}
 
@@ -128,14 +165,7 @@ def _default_callhome_metadata_aux():
     #
     ch_info["config_map"] = _get_config_map_info()
 
-    # turn metadata to a json string
-    #
-    md_str = json.dumps(ch_info)
-
-    # We must encode to base64 since some tools have problems reading the
-    # metadata in JSON format
-    #
-    callhome_metadata = base64.b64encode(md_str.encode('utf-8')).decode('utf-8')
+    callhome_metadata = _encode_to_base64(ch_info)
     return callhome_metadata
 
 
