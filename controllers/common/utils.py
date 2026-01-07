@@ -6,6 +6,8 @@ import json
 import os
 import re
 import base64
+import platform
+
 import urllib3
 
 from controllers.common import settings
@@ -118,10 +120,21 @@ def _default_callhome_metadata_aux():
     if ocp_version:
         ch_info["ocp"] = ocp_version
 
+    # Processor arch: one of 'x86_64', 's390x', 'ppc64'
+    #
+    ch_info["arch"] = platform.machine()
+
+    # Any user changes for config map
+    #
     ch_info["config_map"] = _get_config_map_info()
 
+    # turn metadata to a json string
+    #
     md_str = json.dumps(ch_info)
 
+    # We must encode to base64 since some tools have problems reading the
+    # metadata in JSON format
+    #
     callhome_metadata = base64.b64encode(md_str.encode('utf-8')).decode('utf-8')
     return callhome_metadata
 
