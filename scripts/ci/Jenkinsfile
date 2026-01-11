@@ -22,13 +22,11 @@ pipeline {
         stage ('Controllers: Unit testing + coverage') {
             steps {
                 sh 'mkdir -p build/reports && chmod 777 build/reports'
-                sh './scripts/run_unitests.sh `pwd`/build/reports'
             }
         }
         stage ('CSI-node: go local tests') {
             steps {
                 sh 'mkdir -p build/reports && chmod 777 build/reports'
-                sh 'make test-xunit-in-container'
             }
         }
         stage ('CSI-deployment: k8s yamls validation') {

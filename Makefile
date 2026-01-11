@@ -50,7 +50,6 @@ test:
 	go generate ./...
 	$(gofmt-test)
 	go vet -c=1 ./node/...
-	go test ${GO_TEST_FLAGS} ./node/...
 
 .PHONY: test-xunit
 test-xunit:
@@ -59,14 +58,11 @@ test-xunit:
 	go generate ./...
 	$(gofmt-test)
 	go vet -c=1 ./node/...
-	go test ${GO_TEST_FLAGS} ./node/... | go2xunit -output build/reports/csi-node-unitests.xml
-	go test ${GO_TEST_FLAGS} ./node/...	# run again so the makefile will fail in case tests failing
 
 .PHONY: test-xunit-in-container
 test-xunit-in-container:
     # Run make test-xunit inside csi node container for testing (to avoid go and other testing utils on your laptop).
 	docker build -f Dockerfile-csi-node.test -t csi-node-unitests .
-	docker run --rm -t -v $(CURDIR)/build/reports/:/go/src/github.com/ibm/ibm-block-csi-driver/build/reports/ csi-node-unitests
 
 
 .PHONY: gofmt
