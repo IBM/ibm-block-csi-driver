@@ -62,11 +62,24 @@ def get_node_id_info(node_id):
 
 
 def _get_config_map_info():
+    result = {}
+
+    # Config map for node
+    #
     cfgmap = os.environ.get('CSI_NODE_CONFIG')
     if not cfgmap or cfgmap == 'null':
-        result = {}
+        result['csi_node_config'] = {}
     else:
-        result = json.loads(cfgmap)
+        result['csi_node_config'] = json.loads(cfgmap)
+
+    # Config map for hostdefiner
+    #
+    cfgmap = os.environ.get('CSI_HOSTDEFINER_CONFIG')
+    if not cfgmap or cfgmap == 'null':
+        result['csi_hd_config'] = {}
+    else:
+        result['csi_hd_config'] = json.loads(cfgmap)
+
     return result
 
 
