@@ -25,7 +25,8 @@ from controllers.servers.csi.controller_types import (ArrayConnectionInfo,
                                                       ObjectParameters, VolumeGroupParameters, VolumeGroupIdInfo)
 from controllers.servers.errors import ObjectIdError, ValidationException, InvalidNodeId
 from controllers.common.node_info import Initiators
-from controllers.servers.host_definer.kubernetes_manager.manager import KubernetesManager  # TODO: from kubernetes import client
+from controllers.servers.host_definer.kubernetes_manager.manager import KubernetesManager
+# TODO: from kubernetes import client
 
 logger = get_stdout_logger()
 
