@@ -23,6 +23,14 @@ class Initiators:
     fc_wwns: list = field(default_factory=list)
     iscsi_iqns: list = field(default_factory=list)
 
+    def __eq__(self, other):
+        if not isinstance(other, Initiators):
+            return False
+
+        return (self._lower(self.nvme_nqns) == self._lower(other.nvme_nqns) and
+                self._lower(self.fc_wwns) == self._lower(other.fc_wwns) and
+                self._lower(self.iscsi_iqns) == self._lower(other.iscsi_iqns))
+
     def __post_init__(self):
         self.nvme_nqns = self._filter_empty_parts(self.nvme_nqns)
         self.fc_wwns = self._filter_empty_parts(self.fc_wwns)
@@ -71,3 +79,19 @@ class Initiators:
         return other_initiators.is_array_nvme_nqn_match(self.nvme_nqns) or \
                other_initiators.is_array_wwns_match(self.fc_wwns) or \
                other_initiators.is_array_iscsi_iqns_match(self.iscsi_iqns)
+
+    def compare_by_connectivity_type(self, other, connectivity_type):
+        """
+        Compares two Initiators objects based on a specific connectivity type.
+        Returns True if the sets of initiators are identical (case-insensitive).
+        """
+        if not isinstance(other, Initiators):
+            return False
+
+        my_ports = self.get_by_connectivity_type(connectivity_type)
+        other_ports = other.get_by_connectivity_type(connectivity_type)
+
+        if my_ports is None or other_ports is None:
+            return my_ports == other_ports
+
+        return self._lower(my_ports) == self._lower(other_ports)

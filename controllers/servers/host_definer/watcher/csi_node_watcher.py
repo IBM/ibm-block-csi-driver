@@ -24,33 +24,40 @@ class CsiNodeWatcher(Watcher):
             resource_version = self._get_k8s_object_resource_version(self.csi_nodes_api.get())
             stream = self.csi_nodes_api.watch(resource_version=resource_version, timeout=5)
             for watch_event in stream:
+                logger.info("debug - uriziv - 87")
                 watch_event = self._munch(watch_event)
                 csi_node_info = self._generate_csi_node_info(watch_event.object)
+                node_initiators = self._get_node_initiators(node_name=csi_node_info.name)
+                logger.info(node_initiators)
+                logger.info("debug - uriziv - 88")
                 if (watch_event.type == settings.DELETED_EVENT) and (csi_node_info.name in NODES):
-                    self._handle_deleted_csi_node_pod(csi_node_info)
+                    logger.info("debug - uriziv - 89")
+                    self._handle_deleted_csi_node_pod(csi_node_info, node_initiators)
                 elif watch_event.type == settings.MODIFIED_EVENT:
-                    self._handle_modified_csi_node(csi_node_info)
+                    logger.info("debug - uriziv - 90")
+                    self._handle_modified_csi_node(csi_node_info, node_initiators)
 
-    def _handle_modified_csi_node(self, csi_node_info):
+    def _handle_modified_csi_node(self, csi_node_info, node_initiators):
         if self._is_new_csi_node(csi_node_info):
             self._add_node_to_nodes(csi_node_info)
             self._define_host_on_all_storages(csi_node_info.name)
         elif csi_node_info.name in NODES:
-            self._handle_deleted_csi_node_pod(csi_node_info)
+            self._handle_deleted_csi_node_pod(csi_node_info, node_initiators)
 
     def _is_new_csi_node(self, csi_node_info):
         return csi_node_info.node_id and self._is_host_can_be_defined(csi_node_info.name) and \
             csi_node_info.name not in NODES
 
-    def _handle_deleted_csi_node_pod(self, csi_node_info):
+    def _handle_deleted_csi_node_pod(self, csi_node_info, node_initiators):
         if self._is_node_has_manage_node_label(csi_node_info.name):
-            remove_host_thread = Thread(target=self._undefine_host_when_node_pod_is_deleted, args=(csi_node_info,))
+            remove_host_thread = Thread(target=self._undefine_host_when_node_pod_is_deleted,
+                                        args=(csi_node_info, node_initiators))
             remove_host_thread.start()
 
-    def _undefine_host_when_node_pod_is_deleted(self, csi_node_info):
+    def _undefine_host_when_node_pod_is_deleted(self, csi_node_info, node_initiators):
         node_name = csi_node_info.name
         if self._is_host_part_of_update(node_name):
-            self._create_definitions_when_csi_node_changed(csi_node_info)
+            self._create_definitions_when_csi_node_changed(csi_node_info, node_initiators)
         elif self._is_host_definer_can_delete_hosts() and \
                 not self._is_node_has_forbid_deletion_label(node_name):
             self._undefine_hosts(csi_node_info.name)
@@ -89,21 +96,36 @@ class CsiNodeWatcher(Watcher):
             time.sleep(0.5)
         return csi_daemon_set.metadata.name
 
-    def _create_definitions_when_csi_node_changed(self, csi_node_info):
+    def _create_definitions_when_csi_node_changed(self, csi_node_info, node_initiators):
+        logger.info("DEBUG - uriziv - 85")
         for secret_info in MANAGED_SECRETS:
             secret_name, secret_namespace = secret_info.name, secret_info.namespace
             host_definition_info = self._get_matching_host_definition_info(
                 csi_node_info.name, secret_name, secret_namespace)
             if host_definition_info:
-                if self._is_node_id_changed(host_definition_info.node_id, csi_node_info.node_id):
-                    logger.info(messages.NODE_ID_WAS_CHANGED.format(csi_node_info.name,
-                                host_definition_info.node_id, csi_node_info.node_id))
+                if self._is_node_initiators_changed(host_definition_info,
+                                                    csi_node_info,
+                                                    node_initiators):
+                    logger.info(messages.UPDATE_HOST_DEFINITION_PORTS)
                     NODES[csi_node_info.name] = self._generate_managed_node(csi_node_info)
+                    logger.info("DEBUG - uriziv - 86")
                     self._create_definition(host_definition_info)
 
-    def _is_node_id_changed(self, host_definition_node_id, csi_node_node_id):
-        return host_definition_node_id != csi_node_node_id \
-            and host_definition_node_id and csi_node_node_id
+    def _is_node_initiators_changed(self, host_definition_info, csi_node_info, node_initiators):
+        if not host_definition_info.node_id or not csi_node_info.node_id:
+            return False
+
+        node_initiators_changed = False
+        node_initiators_from_host_definition = \
+            self._get_node_initiators_from_host_definition(host_definition_info)
+        if not node_initiators.compare_by_connectivity_type(node_initiators_from_host_definition,
+                                                            host_definition_info.connectivity_type):
+            logger.info(messages.NODE_INITIATORS_WAS_CHANGED.format(
+                csi_node_info.name,
+                node_initiators_from_host_definition,
+                node_initiators))
+            node_initiators_changed = True
+        return node_initiators_changed
 
     def _undefine_hosts(self, node_name):
         for secret_info in MANAGED_SECRETS:
