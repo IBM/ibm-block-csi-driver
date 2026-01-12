@@ -114,6 +114,9 @@ class HostDefinerServicer:
             logger.info(messages.HOST_PORTS_SHOULD_BE_CHANGE.format(host, initiators))
             try:
                 logger.info("DEBUG - uriziv - 100")
+                logger.info(array_mediator)
+                logger.info(host)
+                logger.info(connectivity_type_from_host)
                 self._remove_host_ports(array_mediator, host, connectivity_type_from_host)
                 array_mediator.add_ports_to_host(host, initiators, connectivity_type_from_user)
             except Exception as ex:
