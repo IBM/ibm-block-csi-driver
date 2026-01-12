@@ -40,7 +40,7 @@ REMOVE_FINALIZER_TO_HOST_DEFINITION = 'Removing finalizer from host definition {
 FAILED_TO_REMOVE_FINALIZER = 'Failed to remove {} finalizer from node'.format(settings.CSI_IBM_FINALIZER)
 NODE_ID_WAS_CHANGED = "NodeId was changed for {} node, updating his ports in his definitions,"\
     "old NodeId [{}], new NodeId [{}]"
-NODE_INITIATORS_WAS_CHANGED = "Node initiators was changed for {} node," \
+NODE_INITIATORS_WAS_CHANGED = "Node initiators was changed for {} node, " \
     "old initiators: {}, new initiators: {}"
 UPDATE_HOST_DEFINITION_PORTS = "Updating host definition ports."
 UPDATE_HOST_DEFINITION_FIELDS_FROM_STORAGE = 'Update host definition {} host from storage fields with {}'

@@ -34,7 +34,7 @@ class HostDefinerServicer:
             with get_agent(array_connection_info, array_type).get_mediator() as array_mediator:
                 try:
                     initiators_from_host_definition = request.node_initiators_from_host_definition
-                    # TODO: Make sure it works with the new concept of "initiators_from_host_definition"
+                    # TODO: Make sure comparison works with the new concept of "initiators_from_host_definition"
                     # (which are always from one type only)
                     found_host_name = self._get_host_name(initiators_from_host_definition, array_mediator)
                     # Partition update is first one - verifies partition can be fixed (may fail if mapped)
