@@ -96,8 +96,7 @@ class HostDefinerServicer:
             raise array_errors.HostNotFoundError(host_name)
 
     def _update_host_ports(self, request, host, array_mediator, partition_name):
-        initiators = self._get_initiators_from_node_id(request.node_id_from_csi_node)
-        # TODO: Consider changing it to initiators = request.node_initiators_from_csi_node
+        initiators = request.node_initiators_from_csi_node
         connectivity_type_from_user = get_initiators_connectivity_type(initiators, request.connectivity_type_from_user)
         connectivity_type_from_host = array_mediator.get_host_connectivity_type(host)
         if self._is_protocol_switched(connectivity_type_from_user, connectivity_type_from_host):
@@ -116,18 +115,6 @@ class HostDefinerServicer:
                     self._create_host(host, array_mediator, request)
                     return
                 raise ex
-
-    def _get_initiators_from_node_id(self, node_id):
-        logger.info("DEBUG - uriziv - 43")
-        kubernetes_manager = KubernetesManager()
-        k8s_node = kubernetes_manager.core_api.read_node(name=node_id)
-        node_initiators_raw = k8s_node.metadata.annotations.get("block.csi.ibm.com/node-ports", "{}")
-        initiators_data = json.loads(node_initiators_raw)
-        nvme_nqns = initiators_data.get("nvme", [])
-        fc_wwns = initiators_data.get("fc", [])
-        iscsi_iqns = initiators_data.get("iscsi", [])
-        logger.info("DEBUG - uriziv - 44")
-        return Initiators(nvme_nqns, fc_wwns, iscsi_iqns)
 
     def _is_protocol_switched(self, connectivity_type_from_user, connectivity_type_from_host):
         return self._is_switching_from_nvme_to_scsi(connectivity_type_from_user, connectivity_type_from_host) or \
@@ -153,7 +140,7 @@ class HostDefinerServicer:
 
     def _change_host_protocol_with_chhost(self, array_mediator, host_name, connectivity_type_from_host, request):
         self._remove_host_ports(array_mediator, host_name, connectivity_type_from_host)
-        initiators = self._get_initiators_from_node_id(request.node_id_from_csi_node)
+        initiators = request.node_initiators_from_csi_node
         connectivity_type_from_user = get_initiators_connectivity_type(initiators, request.connectivity_type_from_user)
         protocol = self._get_host_protocol(connectivity_type_from_user)
         array_mediator.change_host_protocol(host_name, protocol)
@@ -178,7 +165,7 @@ class HostDefinerServicer:
         return connectivity_type == array_config.NVME_OVER_FC_CONNECTIVITY_TYPE
 
     def _create_host(self, host, array_mediator, request):
-        initiators = self._get_initiators_from_node_id(request.node_id_from_csi_node)
+        initiators = request.node_initiators_from_csi_node
         connectivity_type = get_initiators_connectivity_type(initiators, request.connectivity_type_from_user)
         array_mediator.create_host(host, initiators, connectivity_type, request.io_group,
                                    request.array_connection_info.partition_name,
