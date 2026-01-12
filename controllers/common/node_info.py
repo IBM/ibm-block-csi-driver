@@ -23,14 +23,6 @@ class Initiators:
     fc_wwns: list = field(default_factory=list)
     iscsi_iqns: list = field(default_factory=list)
 
-    def __eq__(self, other):
-        if not isinstance(other, Initiators):
-            return False
-
-        return (self._lower(self.nvme_nqns) == self._lower(other.nvme_nqns) and
-                self._lower(self.fc_wwns) == self._lower(other.fc_wwns) and
-                self._lower(self.iscsi_iqns) == self._lower(other.iscsi_iqns))
-
     def __post_init__(self):
         self.nvme_nqns = self._filter_empty_parts(self.nvme_nqns)
         self.fc_wwns = self._filter_empty_parts(self.fc_wwns)
