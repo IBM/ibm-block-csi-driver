@@ -174,7 +174,7 @@ class KubernetesManager():
         if hasattr(k8s_host_definition.spec.hostDefinition, attribute):
             return getattr(k8s_host_definition.spec.hostDefinition, attribute)
         return ''
-    
+
     def _get_attr_from_host_definition_annotations(self, k8s_host_definition, attribute):
         if hasattr(k8s_host_definition.metadata.annotations, attribute):
             return getattr(k8s_host_definition.spec.hostDefinition, attribute)
