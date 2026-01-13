@@ -50,6 +50,7 @@ class Watcher(KubernetesManager):
     def _get_host_definition_info_from_secret_and_node_name(self, node_name, secret_info):
         host_definition_info = self._get_host_definition_info_from_secret(secret_info)
         host_definition_info = self._add_name_to_host_definition_info(node_name, host_definition_info)
+        host_definition_info = self._add_node_initiators_to_host_definition_info(node_name, host_definition_info)
         return host_definition_info
 
     def _get_host_definition_info_from_secret(self, secret_info):
@@ -71,6 +72,14 @@ class Watcher(KubernetesManager):
         host_definition_info.node_name = node_name
         host_definition_info.node_id = NODES[node_name].node_id
         host_definition_info.name = self._get_host_definition_name(node_name)
+        return host_definition_info
+
+    def _add_node_initiators_to_host_definition_info(self, node_name, host_definition_info):
+        logger.info("debug - uriziv - 113")
+        host_definition_info.node_initiators = NODES[node_name].node_initiators
+        logger.info(host_definition_info)
+        logger.info(NODES)
+        logger.info("debug - uriziv - 114")
         return host_definition_info
 
     def _create_definition(self, host_definition_info):
@@ -134,9 +143,8 @@ class Watcher(KubernetesManager):
             settings.KIND: settings.HOST_DEFINITION_KIND,
             settings.METADATA: {
                 common_settings.NAME_FIELD: host_definition_info.name,
-                'annotations': {
-                    'block.csi.ibm.com/node-ports':
-                    '{"fc":[],"iscsi":["iqn.2016-04.com.open-iscsi:8bce7b6eab12"],"nvme":[]}'
+                common_settings.ANNOTATIONS_FIELD: {
+                    common_settings.NODE_INITIATORS_FIELD: host_definition_info.initiators
                     }
             },
             settings.SPEC: {
