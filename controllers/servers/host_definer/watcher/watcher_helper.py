@@ -70,16 +70,20 @@ class Watcher(KubernetesManager):
         logger.info("DEBUG - uriziv - 12")
 
     def _add_name_to_host_definition_info(self, node_name, host_definition_info):
+        logger.info("debug - uriziv - 115")
         host_definition_info.node_name = node_name
         host_definition_info.node_id = NODES[node_name].node_id
         host_definition_info.name = self._get_host_definition_name(node_name)
+        logger.info(host_definition_info)
+        logger.info(NODES[node_name].__dict__)
+        logger.info("debug - uriziv - 116")
         return host_definition_info
 
     def _add_node_initiators_to_host_definition_info(self, node_name, host_definition_info):
         logger.info("debug - uriziv - 113")
         host_definition_info.node_initiators = NODES[node_name].node_initiators
         logger.info(host_definition_info)
-        logger.info(NODES)
+        logger.info(NODES[node_name].__dict__)
         logger.info("debug - uriziv - 114")
         return host_definition_info
 
