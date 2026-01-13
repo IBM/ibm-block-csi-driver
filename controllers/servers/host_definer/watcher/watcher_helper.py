@@ -103,13 +103,19 @@ class Watcher(KubernetesManager):
         return self._ensure_definition_state(host_definition_info, self.storage_host_servicer.define_host)
 
     def _create_host_definition_if_not_exist(self, host_definition_info, response):
+        logger.info("debug - uriziv - 103")
         host_definition_manifest = self._get_host_definition_manifest(host_definition_info, response)
         current_host_definition_info_on_cluster = self._get_matching_host_definition_info(
             host_definition_info.node_name, host_definition_info.secret_name, host_definition_info.secret_namespace)
+        logger.info(host_definition_manifest)
+        logger.info(current_host_definition_info_on_cluster)
+        logger.info("debug - uriziv - 104")
         if current_host_definition_info_on_cluster:
+            logger.info("debug - uriziv - 105")
             host_definition_manifest[settings.METADATA][
                 common_settings.NAME_FIELD] = current_host_definition_info_on_cluster.name
             self._patch_host_definition(host_definition_manifest)
+            logger.info("debug - uriziv - 106")
             return current_host_definition_info_on_cluster
         else:
             logger.info(messages.CREATING_NEW_HOST_DEFINITION.format(host_definition_info.name))
@@ -125,8 +131,10 @@ class Watcher(KubernetesManager):
             settings.KIND: settings.HOST_DEFINITION_KIND,
             settings.METADATA: {
                 common_settings.NAME_FIELD: host_definition_info.name,
-                'block.csi.ibm.com/node-ports':
-                '{"fc":[],"iscsi":["iqn.2016-04.com.open-iscsi:8bce7b6eab12"],"nvme":[]}',
+                'annotations': {
+                    'block.csi.ibm.com/node-ports':
+                    '{"fc":[],"iscsi":["iqn.2016-04.com.open-iscsi:8bce7b6eab12"],"nvme":[]}'
+                    }
             },
             settings.SPEC: {
                 settings.HOST_DEFINITION_FIELD: {
