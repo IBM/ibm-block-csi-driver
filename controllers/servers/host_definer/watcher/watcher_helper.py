@@ -38,8 +38,10 @@ class Watcher(KubernetesManager):
         return MANAGED_SECRETS
 
     def _define_host_on_all_storages(self, node_name):
+        logger.info("debug - uriziv - 107")
         logger.info(messages.DEFINE_NODE_ON_ALL_MANAGED_SECRETS.format(node_name))
         for secret_info in MANAGED_SECRETS:
+            logger.info("debug - uriziv - 108")
             if secret_info.managed_storage_classes == 0:
                 continue
             host_definition_info = self._get_host_definition_info_from_secret_and_node_name(node_name, secret_info)
@@ -80,9 +82,10 @@ class Watcher(KubernetesManager):
         host_definition_info = self._update_host_definition_info(host_definition_info)
         response = self._define_host(host_definition_info)
         logger.info("response %s", response)
-        logger.info("DEBUG - uriziv - 10")
         current_host_definition_info_on_cluster = self._create_host_definition_if_not_exist(
             host_definition_info, response)
+        logger.info(current_host_definition_info_on_cluster)
+        logger.info("DEBUG - uriziv - 10")
         self._set_status_to_host_definition_after_definition(
             response.error_message, current_host_definition_info_on_cluster)
 
@@ -420,6 +423,7 @@ class Watcher(KubernetesManager):
         logger.info(messages.NEW_KUBERNETES_NODE.format(csi_node_info.name))
         self._add_manage_node_label_to_node(csi_node_info.name)
         NODES[csi_node_info.name] = self._generate_managed_node(csi_node_info)
+        logger.info(NODES)
         logger.info("DEBUG - uriziv - 80")
 
     def _add_manage_node_label_to_node(self, node_name):
