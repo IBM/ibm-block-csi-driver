@@ -138,6 +138,7 @@ class KubernetesManager():
             return []
 
     def _generate_host_definition_info(self, k8s_host_definition):
+        logger.info("debug - uriziv - 119")
         host_definition_info = HostDefinitionInfo()
         host_definition_info.name = k8s_host_definition.metadata.name
         host_definition_info.resource_version = self._get_k8s_object_resource_version(k8s_host_definition)
@@ -153,6 +154,8 @@ class KubernetesManager():
             k8s_host_definition, common_settings.HOST_DEFINITION_NODE_ID_FIELD)
         host_definition_info.connectivity_type = self._get_attr_from_host_definition(
             k8s_host_definition, settings.CONNECTIVITY_TYPE_FIELD)
+        logger.info(host_definition_info)
+        logger.info("debug - uriziv - 120")
         return host_definition_info
 
     def _get_k8s_object_resource_version(self, k8s_object):
@@ -176,10 +179,13 @@ class KubernetesManager():
                host_definition_info.secret_namespace == secret_namespace
 
     def _create_host_definition(self, host_definition_manifest):
+        logger.info("debug - uriziv - 117")
         try:
             k8s_host_definition = self.host_definitions_api.create(body=host_definition_manifest)
             logger.info(messages.CREATED_HOST_DEFINITION.format(k8s_host_definition.metadata.name))
             self._add_finalizer(k8s_host_definition.metadata.name)
+            logger.info(k8s_host_definition)
+            logger.info("debug - uriziv - 118")
             return self._generate_host_definition_info(k8s_host_definition)
         except ApiException as ex:
             if ex != 404:
