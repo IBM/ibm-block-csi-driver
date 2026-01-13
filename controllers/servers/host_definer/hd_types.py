@@ -43,6 +43,7 @@ class HostDefinitionInfo:
     secret_namespace: str = ''
     node_name: str = ''
     node_id: str = ''
+    node_initiators: str = ''
     phase: str = ''
     resource_version: str = ''
     uid: str = ''
