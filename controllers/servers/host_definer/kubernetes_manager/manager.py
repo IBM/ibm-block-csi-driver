@@ -152,6 +152,8 @@ class KubernetesManager():
             k8s_host_definition, settings.NODE_NAME_FIELD)
         host_definition_info.node_id = self._get_attr_from_host_definition(
             k8s_host_definition, common_settings.HOST_DEFINITION_NODE_ID_FIELD)
+        host_definition_info.node_initiators = self._get_attr_from_host_definition_annotations(
+            k8s_host_definition, common_settings.NODE_INITIATORS_FIELD)
         host_definition_info.connectivity_type = self._get_attr_from_host_definition(
             k8s_host_definition, settings.CONNECTIVITY_TYPE_FIELD)
         logger.info(host_definition_info)
@@ -170,6 +172,11 @@ class KubernetesManager():
 
     def _get_attr_from_host_definition(self, k8s_host_definition, attribute):
         if hasattr(k8s_host_definition.spec.hostDefinition, attribute):
+            return getattr(k8s_host_definition.spec.hostDefinition, attribute)
+        return ''
+    
+    def _get_attr_from_host_definition_annotations(self, k8s_host_definition, attribute):
+        if hasattr(k8s_host_definition.metadata.annotations, attribute):
             return getattr(k8s_host_definition.spec.hostDefinition, attribute)
         return ''
 
