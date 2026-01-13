@@ -555,7 +555,7 @@ func (n NodeUtils) UpdateNodePortsAnnotation(ctx context.Context, nodeName strin
 	patch := map[string]interface{}{
 		"metadata": map[string]interface{}{
 			"annotations": map[string]string{
-				"block.csi.ibm.com/node-ports": string(jsonBytes),
+				"block.csi.ibm.com/node-initiators": string(jsonBytes),
 			},
 		},
 	}
@@ -565,7 +565,7 @@ func (n NodeUtils) UpdateNodePortsAnnotation(ctx context.Context, nodeName strin
 		return fmt.Errorf("marshal patch: %w", err)
 	}
 
-	logger.Infof("Patching node %s with annotation block.csi.ibm.com/node-ports", nodeName)
+	logger.Infof("Patching node %s with annotation block.csi.ibm.com/node-initiators", nodeName)
 
 	_, err = client.CoreV1().Nodes().Patch(ctx, nodeName,
 		types.MergePatchType, patchBytes, patchOpts)

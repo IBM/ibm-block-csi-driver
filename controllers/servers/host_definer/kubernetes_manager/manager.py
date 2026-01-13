@@ -350,7 +350,7 @@ class KubernetesManager():
     def _generate_node_initiators(self, k8s_node):
         logger.info("DEBUG - uriziv - 71")
         logger.info(k8s_node.metadata.annotations)
-        node_initiators_raw = k8s_node.metadata.annotations.get("block.csi.ibm.com/node-ports", "{}")
+        node_initiators_raw = k8s_node.metadata.annotations.get(common_settings.NODE_INITIATORS_FIELD, "{}")
         initiators_data = json.loads(node_initiators_raw)
         nvme_nqns = initiators_data.get("nvme", [])
         fc_wwns = initiators_data.get("fc", [])
