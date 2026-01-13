@@ -23,8 +23,11 @@ VERSION = 'v1'
 HOST_DEFINITION_NODE_ID_FIELD = 'nodeId'
 NAME_FIELD = 'name'
 NAMESPACE_FIELD = 'namespace'
+ANNOTATIONS_FIELD = 'annotations'
 IO_GROUP_DELIMITER = ':'
 IO_GROUP_LABEL_PREFIX = 'hostdefiner.block.csi.ibm.com/io-group-'
+
+NODE_INITIATORS_FIELD = 'block.csi.ibm.com/node-initiators'
 
 EAR_VOLUME_FC_MAP_COUNT = "2"
 

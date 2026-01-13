@@ -104,7 +104,7 @@ def get_node_initiators(node_name):
 
 
 def _generate_node_initiators(k8s_node):
-    node_initiators_raw = k8s_node.metadata.annotations.get("block.csi.ibm.com/node-ports", "{}")
+    node_initiators_raw = k8s_node.metadata.annotations.get(settings.NODE_INITIATORS_FIELD, "{}")
     initiators_data = json.loads(node_initiators_raw)
     nvme_nqns = initiators_data.get("nvme", [])
     fc_wwns = initiators_data.get("fc", [])
