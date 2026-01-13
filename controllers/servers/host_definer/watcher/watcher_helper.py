@@ -119,6 +119,7 @@ class Watcher(KubernetesManager):
         logger.info("debug - uriziv - 101")
         logger.info(host_definition_info)
         logger.info(response)
+        logger.info("debug - uriziv - 102")
         return {
             settings.API_VERSION: settings.CSI_IBM_API_VERSION,
             settings.KIND: settings.HOST_DEFINITION_KIND,
