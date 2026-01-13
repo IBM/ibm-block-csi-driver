@@ -116,11 +116,16 @@ class Watcher(KubernetesManager):
             return self._create_host_definition(host_definition_manifest)
 
     def _get_host_definition_manifest(self, host_definition_info, response):
+        logger.info("debug - uriziv - 101")
+        logger.info(host_definition_info)
+        logger.info(response)
         return {
             settings.API_VERSION: settings.CSI_IBM_API_VERSION,
             settings.KIND: settings.HOST_DEFINITION_KIND,
             settings.METADATA: {
                 common_settings.NAME_FIELD: host_definition_info.name,
+                'block.csi.ibm.com/node-ports':
+                '{"fc":[],"iscsi":["iqn.2016-04.com.open-iscsi:8bce7b6eab12"],"nvme":[]}',
             },
             settings.SPEC: {
                 settings.HOST_DEFINITION_FIELD: {
