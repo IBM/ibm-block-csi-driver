@@ -23,8 +23,8 @@ class StorageClassWatcher(Watcher):
 
     def watch_storage_class_resources(self):
         logger.info("DEBUG - uriziv - 53")
-        logger.info("DEBUG - uriziv - 54")
         while self._loop_forever():
+            logger.info("DEBUG - uriziv - 54")
             resource_version = self._get_k8s_object_resource_version(self.storage_api.list_storage_class())
             stream = watch.Watch().stream(self.storage_api.list_storage_class,
                                           resource_version=resource_version, timeout_seconds=5)
