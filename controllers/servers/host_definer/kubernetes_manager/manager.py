@@ -177,7 +177,7 @@ class KubernetesManager():
 
     def _get_attr_from_host_definition_annotations(self, k8s_host_definition, attribute):
         if hasattr(k8s_host_definition.metadata.annotations, attribute):
-            return getattr(k8s_host_definition.spec.hostDefinition, attribute)
+            return getattr(k8s_host_definition.metadata.annotations, attribute)
         return ''
 
     def _is_host_definition_matches(self, host_definition_info, node_name, secret_name, secret_namespace):
