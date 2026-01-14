@@ -14,20 +14,16 @@ logger = get_stdout_logger()
 class HostDefinitionWatcher(Watcher):
 
     def watch_host_definitions_resources(self):
-        logger.info("Debug - uriziv - 69")
         self._watch_host_definition_with_timeout('')
+        logger.info("Debug - uriziv - 69")
         while self._loop_forever():
-            resource_version = self._get_k8s_object_resource_version(self.host_definitions_api.get())
-            # logger.info("self.host_definitions_api.get(): %s", self.host_definitions_api.get())
-            # ResourceInstance[HostDefinitionList]  #  kc get hostdefinitions.csi.ibm.com
-            logger.info(resource_version)
             logger.info("Debug - uriziv - 70")
+            resource_version = self._get_k8s_object_resource_version(self.host_definitions_api.get())
+            logger.info(resource_version)
             self._watch_host_definition_with_timeout(resource_version)
 
     def _watch_host_definition_with_timeout(self, resource_version, timeout=5):
-        logger.info("Debug - uriziv - 67")
         stream = self.host_definitions_api.watch(resource_version=resource_version, timeout=timeout)
-        logger.info("Debug - uriziv - 68")
         for watch_event in stream:
             watch_event = self._munch(watch_event)
             host_definition_info = self._generate_host_definition_info(watch_event.object)
