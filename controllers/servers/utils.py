@@ -96,19 +96,30 @@ def _get_array_connection_info_from_system_info(secrets, system_id):
 
 
 def get_node_initiators(node_name):
+    "docstring"
     kubernetes_manager = KubernetesManager()
     k8s_node = kubernetes_manager.core_api.read_node(name=node_name)
     if k8s_node:
-        return _generate_node_initiators(k8s_node)
+        return generate_node_initiators_from_k8s_node(k8s_node)
     return Initiators([], [], [])
 
 
-def _generate_node_initiators(k8s_node):
-    node_initiators_raw = k8s_node.metadata.annotations.get(settings.NODE_INITIATORS_FIELD, "{}")
-    initiators_data = json.loads(node_initiators_raw)
+def generate_node_initiators_from_k8s_node(k8s_node):
+    "docstring"
+    initiators_data = k8s_node.metadata.annotations.get(settings.NODE_INITIATORS_FIELD, "{}")
+    return generate_node_initiators_from_string_data(initiators_data)
+
+
+def generate_node_initiators_from_string_data(initiators_data):
+    "docstring"
+    logger.info("debug - uriziv - 123")
+    initiators_data = json.loads(initiators_data)
     nvme_nqns = initiators_data.get("nvme", [])
     fc_wwns = initiators_data.get("fc", [])
     iscsi_iqns = initiators_data.get("iscsi", [])
+    logger.info(initiators_data)
+    logger.info(Initiators(nvme_nqns, fc_wwns, iscsi_iqns))
+    logger.info("debug - uriziv - 124")
     return Initiators(nvme_nqns, fc_wwns, iscsi_iqns)
 
 

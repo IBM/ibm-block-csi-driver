@@ -7,7 +7,8 @@ import json
 from controllers.common.csi_logger import get_stdout_logger
 from controllers.servers.settings import SECRET_SUPPORTED_TOPOLOGIES_PARAMETER
 from controllers.servers.utils import (
-    validate_secrets, get_array_connection_info_from_secrets, get_system_info_for_topologies)
+    validate_secrets, get_array_connection_info_from_secrets,
+    get_system_info_for_topologies, generate_node_initiators_from_string_data)
 from controllers.servers.errors import ValidationException
 import controllers.servers.host_definer.messages as messages
 from controllers.servers.host_definer.kubernetes_manager.manager import KubernetesManager
@@ -393,25 +394,11 @@ class Watcher(KubernetesManager):
             return self._get_node_initiators_from_host_definition(host_definition_info)
 
     def _get_node_initiators_from_host_definition(self, host_definition_info):
-        ports = host_definition_info.ports or []
-        conn_type = host_definition_info.connectivity_type
-
-        fc_wwns = []
-        iscsi_iqns = []
-        nvme_nqns = []
-
-        if conn_type == array_config.FC_CONNECTIVITY_TYPE:
-            fc_wwns = ports
-        elif conn_type == array_config.ISCSI_CONNECTIVITY_TYPE:
-            iscsi_iqns = ports
-        elif conn_type == array_config.NVME_OVER_FC_CONNECTIVITY_TYPE:
-            nvme_nqns = ports
-
-        return Initiators(
-            nvme_nqns=nvme_nqns,
-            fc_wwns=fc_wwns,
-            iscsi_iqns=iscsi_iqns
-        )
+        logger.info("debug - uriziv - 121")
+        initiators_data = host_definition_info.node_initiators
+        logger.info(initiators_data)
+        logger.info("debug - uriziv - 122")
+        return generate_node_initiators_from_string_data(initiators_data)
 
     def _get_io_group_by_node(self, node_name):
         try:
