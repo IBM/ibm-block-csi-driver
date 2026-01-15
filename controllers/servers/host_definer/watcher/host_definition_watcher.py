@@ -108,6 +108,11 @@ class HostDefinitionWatcher(Watcher):
         self._patch_host_definition(host_definition_manifest)
 
     def _generate_host_definition_manifest(self, host_definition_name, response):
+        """
+        This method constructs the subset of the manifest required for a PATCH request,
+        To generate a full HostDefinition manifest,
+        use function: _get_host_definition_manifest in `watcher_helper.py`.
+        """
         return {
             settings.METADATA: {
                 common_settings.NAME_FIELD: host_definition_name,
