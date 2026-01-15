@@ -156,6 +156,8 @@ class KubernetesManager():
             k8s_host_definition, common_settings.NODE_INITIATORS_FIELD)
         host_definition_info.connectivity_type = self._get_attr_from_host_definition(
             k8s_host_definition, settings.CONNECTIVITY_TYPE_FIELD)
+        host_definition_info.ports = self._get_attr_from_host_definition(
+            k8s_host_definition, settings.PORTS_FIELD)
         logger.info(host_definition_info)
         logger.info("debug - uriziv - 120")
         return host_definition_info
