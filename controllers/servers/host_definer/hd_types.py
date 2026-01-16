@@ -21,7 +21,7 @@ class DefineHostRequest:
 class DefineHostResponse:
     error_message: str = ''
     connectivity_type: str = ''
-    ports: list = field(default_factory=list) # The ports
+    ports: list = field(default_factory=list)  # The ports
     # that actually found in storage (see _generate_response in host_definer_server.py)
     node_name_on_storage: str = ''
     io_group: list = field(default_factory=list)
