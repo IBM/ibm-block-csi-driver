@@ -98,7 +98,14 @@ def _get_array_connection_info_from_system_info(secrets, system_id):
 def get_node_initiators(node_name):
     "docstring"
     kubernetes_manager = KubernetesManager()
-    k8s_node = kubernetes_manager.core_api.read_node(name=node_name)
+    try:
+        k8s_node = kubernetes_manager.core_api.read_node(name=node_name)
+    except Exception as ex:
+        logger.warning(
+            f"Failed to read node {node_name}, treating as no initiators",
+            exc_info=ex,
+        )
+        return Initiators([], [], [])
     if k8s_node:
         return generate_node_initiators_from_k8s_node(k8s_node)
     return Initiators([], [], [])
