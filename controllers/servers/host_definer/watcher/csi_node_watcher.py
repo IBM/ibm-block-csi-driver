@@ -25,7 +25,10 @@ class CsiNodeWatcher(Watcher):
             stream = self.csi_nodes_api.watch(resource_version=resource_version, timeout=5)
             for watch_event in stream:
                 logger.info("debug - uriziv - 87")
+                logger.info(watch_event)
                 watch_event = self._munch(watch_event)
+                logger.info(watch_event)
+                logger.info(watch_event.type)
                 csi_node_info = self._generate_csi_node_info(watch_event.object)
                 node_initiators = self._get_node_initiators(node_name=csi_node_info.name)
                 logger.info(node_initiators)
