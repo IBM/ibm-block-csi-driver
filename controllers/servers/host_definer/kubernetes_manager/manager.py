@@ -178,8 +178,10 @@ class KubernetesManager():
         return ''
 
     def _get_attr_from_host_definition_annotations(self, k8s_host_definition, attribute):
-        if hasattr(k8s_host_definition.metadata.annotations, attribute):
-            return getattr(k8s_host_definition.metadata.annotations, attribute)
+        annotations = getattr(k8s_host_definition.metadata, "annotations", {})
+
+        if isinstance(annotations, dict):
+            return annotations.get(attribute, '')
         return ''
 
     def _is_host_definition_matches(self, host_definition_info, node_name, secret_name, secret_namespace):
@@ -365,7 +367,12 @@ class KubernetesManager():
     def _generate_node_initiators(self, k8s_node):
         # TODO(uriziv1) code dupdication. Call this function from utils
         logger.info("DEBUG - uriziv - 71")
-        node_initiators_raw = k8s_node.metadata.annotations.get(common_settings.NODE_INITIATORS_FIELD, "{}")
+
+        annotations = getattr(k8s_node.metadata, "annotations", {})
+        node_initiators_raw = annotations.get(
+            common_settings.NODE_INITIATORS_FIELD, "{}"
+        )
+
         initiators_data = json.loads(node_initiators_raw)
         nvme_nqns = initiators_data.get("nvme", [])
         fc_wwns = initiators_data.get("fc", [])

@@ -62,6 +62,7 @@ def get_fake_k8s_node_manifest(label):
         label: test_settings.TRUE_STRING,
         common_settings.IO_GROUP_LABEL_PREFIX + str(0): test_settings.TRUE_STRING,
         common_settings.IO_GROUP_LABEL_PREFIX + str(2): test_settings.TRUE_STRING}
+    node_manifest[test_settings.METADATA_FIELD].setdefault("annotations", {})
     return node_manifest
 
 
