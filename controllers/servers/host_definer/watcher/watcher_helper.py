@@ -396,6 +396,9 @@ class Watcher(KubernetesManager):
 
     def _get_node_initiators_by_node(self, host_definition_info):
         try:
+            logger.info("debug - uriziv - 129")
+            logger.info(host_definition_info)
+            logger.info("debug - uriziv - 130")
             return self._get_node_initiators(host_definition_info.node_name)
         except Exception:
             return self._get_node_initiators_from_host_definition(host_definition_info)
