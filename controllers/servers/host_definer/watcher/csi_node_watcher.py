@@ -112,7 +112,7 @@ class CsiNodeWatcher(Watcher):
                     logger.info(messages.UPDATE_HOST_DEFINITION_PORTS)
                     NODES[csi_node_info.name] = self._generate_managed_node(csi_node_info)
                     for node_i in NODES:
-                        logger.info(node_i.__dict__)
+                        logger.info(NODES[node_i].__dict__)
                     logger.info("DEBUG - uriziv - 86")
                     self._create_definition(host_definition_info)
 
