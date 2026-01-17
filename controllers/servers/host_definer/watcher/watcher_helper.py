@@ -105,9 +105,16 @@ class Watcher(KubernetesManager):
             response.error_message, current_host_definition_info_on_cluster)
 
     def _update_host_definition_info(self, host_definition_info):
+        logger.info("DEBUG - uriziv - 125")
+        logger.info(host_definition_info)
+        logger.info("DEBUG - uriziv - 126")
         host_definition_info_on_cluster = self._get_matching_host_definition_info(
             host_definition_info.node_name, host_definition_info.secret_name, host_definition_info.secret_namespace)
         if host_definition_info_on_cluster:
+            logger.info("DEBUG - uriziv - 127")
+            logger.info(host_definition_info_on_cluster)
+            logger.info(host_definition_info)
+            logger.info("DEBUG - uriziv - 128")
             host_definition_info.connectivity_type = host_definition_info_on_cluster.connectivity_type
             host_definition_info.node_id = host_definition_info_on_cluster.node_id
         return host_definition_info
