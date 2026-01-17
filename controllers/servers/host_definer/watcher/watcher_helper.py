@@ -159,7 +159,7 @@ class Watcher(KubernetesManager):
             settings.METADATA: {
                 common_settings.NAME_FIELD: host_definition_info.name,
                 common_settings.ANNOTATIONS_FIELD: {
-                    common_settings.NODE_INITIATORS_FIELD: host_definition_info.node_initiators
+                    common_settings.NODE_INITIATORS_FIELD: NODES[host_definition_info.node_name].node_initiators
                     }
             },
             settings.SPEC: {
