@@ -1,4 +1,5 @@
 from unittest.mock import Mock, patch
+from controllers.common.node_info import Initiators
 
 import controllers.tests.controller_server.host_definer.utils.test_utils as test_utils
 import controllers.tests.controller_server.host_definer.settings as test_settings
@@ -30,8 +31,16 @@ class TestWatchSecretResources(SecretWatcherBase):
         self.secret_watcher.host_definitions_api.get.return_value = \
             test_utils.get_fake_k8s_host_definitions_items('not_ready')
         self.secret_watcher.watch_secret_resources()
-        self.secret_watcher.storage_host_servicer.define_host.assert_called_once_with(
-            test_utils.get_define_request(node_id_from_host_definition=test_settings.FAKE_NODE_ID))
+        self.secret_watcher.storage_host_servicer.define_host.assert_called_once()
+        actual_request = (self.secret_watcher.storage_host_servicer.define_host.call_args[0][0])
+
+        empty_initiators = Initiators(nvme_nqns=[], fc_wwns=[], iscsi_iqns=[])
+
+        self.assertEqual(actual_request.node_id_from_host_definition, test_settings.FAKE_NODE_ID)
+        self.assertEqual(actual_request.node_id_from_csi_node, test_settings.FAKE_NODE_ID)
+        self.assertEqual(actual_request.node_initiators_from_host_definition, empty_initiators)
+        self.assertEqual(actual_request.node_initiators_from_csi_node, empty_initiators)
+        self.assertEqual(actual_request.io_group, test_settings.FAKE_STRING_IO_GROUP)
 
     def test_ignore_deleted_events(self):
         self._prepare_default_mocks_for_secret()
