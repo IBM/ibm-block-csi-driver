@@ -1,4 +1,6 @@
 from kubernetes.client.rest import ApiException
+from mock import patch
+from controllers.common.node_info import Initiators
 
 import controllers.tests.controller_server.host_definer.utils.test_utils as test_utils
 import controllers.tests.controller_server.host_definer.utils.k8s_manifests_utils as k8s_manifests_utils
@@ -7,18 +9,44 @@ import controllers.common.settings as common_settings
 from controllers.tests.controller_server.host_definer.common import BaseSetUp
 from controllers.servers.host_definer.hd_types import DefineHostResponse
 from controllers.servers.host_definer.watcher.csi_node_watcher import CsiNodeWatcher
-
+from unittest.mock import MagicMock
 
 class CsiNodeWatcherBase(BaseSetUp):
     def setUp(self):
         super().setUp()
+
+        self.mock_watch_stream = test_utils.patch(
+            "driver.controllers.servers.host_definer.watcher.csi_node_watcher.watch.Watch.stream"
+        )
+        self.mock_watch_stream.return_value = iter([])
+
+        self.patcher_get_node_initiators = patch(
+            "controllers.servers.host_definer.utils.get_node_initiators_from_node",
+            return_value=[test_settings.IQN]
+        )
+        self.mock_get_node_initiators = self.patcher_get_node_initiators.start()
+
+        self.patcher_read_node = patch(
+            "kubernetes.client.CoreV1Api.read_node",
+            return_value=MagicMock(metadata=MagicMock(annotations={}))
+        )
+        self.mock_read_node = self.patcher_read_node.start()
+
         self.csi_node_watcher = test_utils.get_class_mock(CsiNodeWatcher)
-        self.nodes_on_csi_node_watcher = test_utils.patch_nodes_global_variable(test_settings.CSI_NODE_WATCHER_PATH)
+
         self.updated_daemon_set = test_utils.get_fake_k8s_daemon_set_items(1, 1)
         self.not_updated_daemon_set = test_utils.get_fake_k8s_daemon_set_items(0, 1)
         self.deleted_daemon_set = test_utils.get_fake_k8s_daemon_set_items(0, 0)
+
+        self.nodes_on_csi_node_watcher = test_utils.patch_nodes_global_variable(test_settings.CSI_NODE_WATCHER_PATH)
         self.managed_secrets_on_csi_node_watcher = test_utils.patch_managed_secrets_global_variable(
-            test_settings.CSI_NODE_WATCHER_PATH)
+            test_settings.CSI_NODE_WATCHER_PATH
+        )
+
+    def tearDown(self):
+        super().tearDown()
+        self.patcher_get_node_initiators.stop()
+        self.patcher_read_node.stop()
 
 
 class TestAddInitialCsiNodes(CsiNodeWatcherBase):
