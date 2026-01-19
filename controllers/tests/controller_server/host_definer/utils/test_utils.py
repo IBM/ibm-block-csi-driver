@@ -220,5 +220,5 @@ def get_fake_managed_node():
     managed_node.name = test_settings.FAKE_NODE_NAME
     managed_node.node_id = test_settings.FAKE_NODE_ID
     managed_node.io_group = test_settings.FAKE_STRING_IO_GROUP
-    managed_node.node_initiators = Initiators()
+    managed_node.node_initiators = '{"nvme": [], "fc": [], "iscsi": []}'
     return managed_node
