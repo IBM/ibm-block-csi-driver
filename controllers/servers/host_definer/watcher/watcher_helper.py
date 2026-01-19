@@ -105,9 +105,16 @@ class Watcher(KubernetesManager):
             response.error_message, current_host_definition_info_on_cluster)
 
     def _update_host_definition_info(self, host_definition_info):
+        logger.info("DEBUG - uriziv - 125")
+        logger.info(host_definition_info)
+        logger.info("DEBUG - uriziv - 126")
         host_definition_info_on_cluster = self._get_matching_host_definition_info(
             host_definition_info.node_name, host_definition_info.secret_name, host_definition_info.secret_namespace)
         if host_definition_info_on_cluster:
+            logger.info("DEBUG - uriziv - 127")
+            logger.info(host_definition_info_on_cluster)
+            logger.info(host_definition_info)
+            logger.info("DEBUG - uriziv - 128")
             host_definition_info.connectivity_type = host_definition_info_on_cluster.connectivity_type
             host_definition_info.node_id = host_definition_info_on_cluster.node_id
         return host_definition_info
@@ -143,6 +150,8 @@ class Watcher(KubernetesManager):
         logger.info("debug - uriziv - 101")
         logger.info(host_definition_info)
         logger.info(response)
+        for node_i in NODES.values():
+            logger.info(node_i.__dict__)
         logger.info("debug - uriziv - 102")
         return {
             settings.API_VERSION: settings.CSI_IBM_API_VERSION,
@@ -150,7 +159,7 @@ class Watcher(KubernetesManager):
             settings.METADATA: {
                 common_settings.NAME_FIELD: host_definition_info.name,
                 common_settings.ANNOTATIONS_FIELD: {
-                    common_settings.NODE_INITIATORS_FIELD: host_definition_info.node_initiators
+                    common_settings.NODE_INITIATORS_FIELD: NODES[host_definition_info.node_name].node_initiators
                     }
             },
             settings.SPEC: {
@@ -389,6 +398,9 @@ class Watcher(KubernetesManager):
 
     def _get_node_initiators_by_node(self, host_definition_info):
         try:
+            logger.info("debug - uriziv - 129")
+            logger.info(host_definition_info)
+            logger.info("debug - uriziv - 130")
             return self._get_node_initiators(host_definition_info.node_name)
         except Exception:
             return self._get_node_initiators_from_host_definition(host_definition_info)
