@@ -8,7 +8,7 @@ import (
 )
 
 type KeyedGater struct {
-	mu    sync.Mutex
+	mu    sync.RWMutex
 	gates map[string]chan struct{}
 }
 
@@ -35,8 +35,7 @@ func (g *KeyedGater) Acquire(key string, maxRuns int, timeout time.Duration) err
 	}
 	g.mu.Unlock()
 
-	// In 2026, use a Timer instead of context.WithTimeout if you want to 
-	// reduce garbage collector pressure for high-frequency locks.
+	// Use time.NewTimer to minimize GC pressure on high-frequency calls
 	timer := time.NewTimer(timeout)
 	defer timer.Stop()
 
@@ -49,7 +48,7 @@ func (g *KeyedGater) Acquire(key string, maxRuns int, timeout time.Duration) err
 }
 
 func (g *KeyedGater) Release(key string) {
-	g.mu.RLock() // Use RLock to allow concurrent releases
+	g.mu.RLock() // Allows multiple goroutines to release different keys simultaneously
 	ch, exists := g.gates[key]
 	g.mu.RUnlock()
 
@@ -57,7 +56,7 @@ func (g *KeyedGater) Release(key string) {
 		select {
 		case <-ch:
 		default:
-			// Safety: Prevent blocking if Release is called wrongly
+			// Safety: prevents a panic if Release is called without a matching Acquire
 		}
 	}
 }

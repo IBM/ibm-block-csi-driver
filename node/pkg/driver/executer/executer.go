@@ -179,12 +179,89 @@ func (e *OsExecuter) ExecuteWithTimeoutSilently(timeoutMs int, command string, a
 	return capturedOutput, nil
 }
 
+func (e *OsExecuter) ExecuteWithTimeoutSilently(timeoutMs int, command string, args ...string) ([]byte, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(timeoutMs)*time.Millisecond)
+	defer cancel()
+
+	cmd := exec.CommandContext(ctx, command, args...)
+	
+	// WaitDelay: If the process exits but pipes stay open (D-state sub-calls),
+	// forcefully close them after 2s to unblock Wait().
+	cmd.WaitDelay = 2 * time.Second
+
+	// Combined output buffer
+	var output bytes.Buffer
+	// Limit total output to prevent OOM from chatty commands
+	limitWriter := &limitWriter{Writer: &output, Limit: DefaultMaxOutput}
+	cmd.Stdout = limitWriter
+	cmd.Stderr = limitWriter
+
+	// Using cmd.Run() is simpler when Stdout/Stderr are set; 
+	// it handles the pipe lifecycle and Wait() internally.
+	err := cmd.Start()
+	if err != nil {
+		return nil, err
+	}
+
+	// Wait for completion or timeout
+	waitErr := cmd.Wait()
+	capturedOutput := output.Bytes()
+
+	// 1. Check for Context Timeout (SIGKILL sent by Go)
+	if ctx.Err() != nil {
+		return capturedOutput, fmt.Errorf("timeout (%vms): %w", timeoutMs, ctx.Err())
+	}
+
+	// 2. Check for Kernel Hang (WaitDelay)
+	if errors.Is(waitErr, exec.ErrWaitDelay) {
+		return capturedOutput, fmt.Errorf("kernel hang detected (D-state): %w", waitErr)
+	}
+
+	// 3. Check for Non-zero Exit Codes
+	if waitErr != nil {
+		return capturedOutput, fmt.Errorf("exit error: %w", waitErr)
+	}
+
+	return capturedOutput, nil
+}
+
+// Simple helper to enforce DefaultMaxOutput without io.Pipe complexity
+type limitWriter struct {
+	io.Writer
+	Limit int64
+	curr  int64
+}
+
+func (w *limitWriter) Write(p []byte) (n int, err error) {
+	if w.curr >= w.Limit {
+		return len(p), nil // Silently drop overflow
+	}
+	toWrite := int64(len(p))
+	if w.curr+toWrite > w.Limit {
+		toWrite = w.Limit - w.curr
+	}
+	n, err = w.Writer.Write(p[:toWrite])
+	w.curr += int64(n)
+	return len(p), err // Return len(p) to avoid "short write" errors in cmd
+}
+
+
 
 
 type zombieInfo struct {
 	pid       int
 	command   string
 	startTime uint64 // Use the raw Jiffies/ClockTicks from /proc
+}
+
+// Ensure you capture the start time immediately after cmd.Start()
+func getPidStartTime(pid int) (uint64, error) {
+	data, err := os.ReadFile(fmt.Sprintf("/proc/%d/stat", pid))
+	if err != nil {
+		return 0, err
+	}
+	_, startTime, err := parseStatFile(data)
+	return startTime, err
 }
 
 func (e *Executer) markAsStuck(device string, pid int, command string) {
@@ -334,18 +411,21 @@ func isDeviceStillStuck(device string) bool {
 
 
 
-
 func isStorageWait(pid int) bool {
-    wchan, err := os.ReadFile(fmt.Sprintf("/proc/%d/wchan", pid))
-    if err != nil { return false }
-    w := string(wchan)
-    
-    return strings.Contains(w, "nfs_wait") || 
-           strings.Contains(w, "rpc_wait") || 
-           strings.Contains(w, "scsi_wait") ||
-           strings.Contains(w, "blk_mq_wait") || // Block layer mq
-           strings.Contains(w, "xfs_log_wait")   // XFS journaling stalls
+	wchan, err := os.ReadFile(fmt.Sprintf("/proc/%d/wchan", pid))
+	if err != nil { return false }
+	w := string(wchan)
+	
+	// 'io_schedule' is the generic kernel indicator of waiting for disk I/O
+	return strings.Contains(w, "nfs_wait") || 
+	       strings.Contains(w, "rpc_wait") || 
+	       strings.Contains(w, "scsi_wait") ||
+	       strings.Contains(w, "blk_mq_wait") || 
+	       strings.Contains(w, "nvme_wait") ||
+	       strings.Contains(w, "io_schedule") || // Generic I/O wait
+	       strings.Contains(w, "xfs_log_wait")
 }
+
 
 
 func parseStatFile(data []byte) (state byte, startTime uint64, err error) {
@@ -356,23 +436,20 @@ func parseStatFile(data []byte) (state byte, startTime uint64, err error) {
 		return 0, 0, fmt.Errorf("invalid stat format")
 	}
 
-	// The fields after the last ')' start with a space, then the 'state' field.
-	// Field 3 (state) is the first field after the last paren.
+	// Field 3 (State) is at index 0 after the ") "
 	afterParen := string(data[lastParen+2:])
 	fields := strings.Fields(afterParen)
 
-	// Since we skipped the first 2 fields (PID and COMM), 
-	// the original field 22 (starttime) is now at index 19.
-	// Field 3 (State) -> Index 0
-	// Field 22 (Starttime) -> Index 19
 	if len(fields) < 20 {
 		return 0, 0, fmt.Errorf("stat file too short")
 	}
 
 	state = fields[0][0]
+	// Starttime is index 19 (Field 22 - PID, COMM, STATE = 19 fields later)
 	startTime, err = strconv.ParseUint(fields[19], 10, 64)
 	return state, startTime, err
 }
+
 
 
 func (e *Executer) ExecuteWithTimeout(mSeconds int, command string, args []string) ([]byte, error) {
