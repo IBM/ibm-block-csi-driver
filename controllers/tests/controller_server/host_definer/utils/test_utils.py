@@ -2,6 +2,7 @@ from dataclasses import dataclass, field
 import func_timeout
 from munch import Munch
 from mock import patch, Mock
+from controllers.servers.host_definer.hd_types import Initiators
 
 import controllers.tests.controller_server.host_definer.utils.k8s_manifests_utils as manifest_utils
 import controllers.tests.controller_server.host_definer.settings as test_settings
@@ -214,10 +215,10 @@ def get_fake_host_io_group_id():
 def get_fake_host_io_group():
     return Munch.fromDict(manifest_utils.get_host_io_group_manifest())
 
-
 def get_fake_managed_node():
-    managed_node = Mock(spec_set=['name', 'node_id', 'io_group'])
+    managed_node = Mock(spec_set=['name', 'node_id', 'io_group', 'node_initiators'])
     managed_node.name = test_settings.FAKE_NODE_NAME
     managed_node.node_id = test_settings.FAKE_NODE_ID
     managed_node.io_group = test_settings.FAKE_STRING_IO_GROUP
+    managed_node.node_initiators = Initiators()
     return managed_node
