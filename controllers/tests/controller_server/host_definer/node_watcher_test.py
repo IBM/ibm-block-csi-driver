@@ -54,11 +54,23 @@ class TestAddInitialNodes(NodeWatcherBase):
 class TestWatchNodesResources(NodeWatcherBase):
     def setUp(self):
         super().setUp()
-        self.node_watcher._get_k8s_object_resource_version = Mock()
-        self.node_watcher._get_k8s_object_resource_version.return_value = test_settings.FAKE_RESOURCE_VERSION
-        self.nodes_stream = patch('{}.watch.Watch.stream'.format(test_settings.NODES_WATCHER_PATH)).start()
+
+        self.node_watcher._get_k8s_object_resource_version = Mock(
+            return_value=test_settings.FAKE_RESOURCE_VERSION
+        )
+
+        self.nodes_stream = patch(
+            f"{test_settings.NODES_WATCHER_PATH}.watch.Watch.stream"
+        ).start()
+
         self.node_watcher._loop_forever = Mock()
         self.node_watcher._loop_forever.side_effect = [True, False]
+
+        self.get_node_initiators_patcher = patch(
+            "controllers.servers.host_definer.utils.get_node_initiators_from_node",
+            return_value=[]
+        )
+        self.get_node_initiators_patcher.start()
 
     def test_no_call_for_unmanaged_nodes_list_when_node_is_managed_already(self):
         self._prepare_default_mocks_for_modified_event()
