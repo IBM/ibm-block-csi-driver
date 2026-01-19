@@ -62,6 +62,7 @@ func (r OsDeviceConnectivityIscsi) iscsiDiscover(portal string) error {
 	return nil
 }
 
+// TODO use update flag>
 func (r OsDeviceConnectivityIscsi) iscsiDiscover(portal string) error {
 	logger.Infof("Performing iSCSI discovery for portal: %s", portal)
 	
@@ -116,49 +117,46 @@ func (r OsDeviceConnectivityIscsi) iscsiGetRawSessions() ([]string, error) {
 	}
 
 	var results []string
+	
 	for _, s := range sessions {
+		if !strings.HasPrefix(s.Name(), "session") { continue }
+		sessionID := strings.TrimPrefix(s.Name(), "session")
 		sessionPath := filepath.Join(sysPath, s.Name())
 
-		state, _ := os.ReadFile(filepath.Join(sessionPath, "state"))
-		if strings.TrimSpace(string(state)) != "LOGGED_IN" {
-			continue
-		}
-
-		// Get Target Name
-		targetName, err := os.ReadFile(filepath.Join(sessionPath, "targetname"))
+		// 1. Verify State
+		stateBuf, err := os.ReadFile(filepath.Join(sessionPath, "state"))
 		if err != nil {
 			continue
 		}
-
-		// Get IP Address from the connection subdirectory (usually connection1:0 or similar)
-		connDirs, err := os.ReadDir(sessionPath)
-		if err != nil {
-			continue
-		}
+		stateStr := strings.TrimSpace(string(stateBuf))
 		
-		// We can discard the "session" prefix from s.Name to get the session id instead of 0 below (currently unsuable)
+		if stateStr != "LOGGED_IN" {
+			logger.Warnf("Session %s is in %s", sessionID, stateStr)
+			// Ignore other transient/failed states (REOPENING, FREE, etc.)
+			continue
+		}
 
+		// 2. Get Target Name
+		tnBuf, err := os.ReadFile(filepath.Join(sessionPath, "targetname"))
+		if err != nil { continue }
+		targetName := strings.TrimSpace(string(tnBuf))
+
+		// 3. Find Connection
+		connDirs, _ := os.ReadDir(sessionPath)
 		for _, c := range connDirs {
 			if c.IsDir() && strings.HasPrefix(c.Name(), "connection") {
-				addr, err := os.ReadFile(filepath.Join(sessionPath, c.Name(), "address"))
-				if err != nil {
-					continue
+				addrBuf, errA := os.ReadFile(filepath.Join(sessionPath, c.Name(), "address"))
+				portBuf, errP := os.ReadFile(filepath.Join(sessionPath, c.Name(), "port"))
+				
+				if errA == nil && errP == nil {
+					portal := net.JoinHostPort(
+						strings.TrimSpace(string(addrBuf)),
+						strings.TrimSpace(string(portBuf)),
+					)
+					// Format matching the parser's expectation - iscsiadm output format: "tcp: [id] ip:port targetname"
+					results = append(results, fmt.Sprintf("tcp: [%s] %s %s", sessionID, portal, targetName))
+					break 
 				}
-
-				port, err := os.ReadFile(filepath.Join(sessionPath, c.Name(), "port"))
-				if err != nil { continue }
-				
-				// Use JoinHostPort to handle IPv6 brackets automatically and correctly
-				portal := net.JoinHostPort(
-					strings.TrimSpace(string(addr)),
-					strings.TrimSpace(string(port)),
-				)
-				
-				// Format: "ignore ignore <portal> <target>"
-				// Format matching the parser's expectation - iscsiadm output format: "tcp: [id] ip:port targetname"
-				line := fmt.Sprintf("tcp: [0] %s %s", portal, strings.TrimSpace(string(targetName)))
-				results = append(results, line)
-				break // Usually one connection per session
 			}
 		}
 	}
@@ -175,7 +173,8 @@ func (r OsDeviceConnectivityIscsi) getAllSessions() (map[string]map[string]bool,
 	portalsByTarget := make(map[string]map[string]bool)
 	for _, line := range lines {
 		parts := strings.Fields(line)
-		if len(parts) < 4 {
+		// Check for "tcp" as validity in case we switch back to using iscsiadm
+		if len(parts) < 4 || !strings.HasPrefix(parts[0], "tcp") {
 			continue
 		}
 		portalInfo, targetName := parts[2], parts[3]
@@ -183,6 +182,12 @@ func (r OsDeviceConnectivityIscsi) getAllSessions() (map[string]map[string]bool,
 		if portalsByTarget[targetName] == nil {
 			portalsByTarget[targetName] = make(map[string]bool)
 		}
+
+		// TODO
+		if _, exists := portalsByTarget[targetName]; !exists {
+			portalsByTarget[targetName] = make(map[string]bool)
+		}
+		
 		portalsByTarget[targetName][portalInfo] = true
 	}
 	return portalsByTarget, nil
@@ -212,6 +217,13 @@ func (r OsDeviceConnectivityIscsi) filterLoggedIn(portalsByTarget map[string][]s
 			normalizedPortal := net.JoinHostPort(strings.ToLower(host), port)
 
 			// Check against the active sessions
+
+			// TODO
+			if activePortals, exists := loggedInPortalsByTarget[normalizedTarget]; !exists || !activePortals[normalizedPortal] {
+				// This specific portal is NOT currently logged in.
+				filteredPortalsByTarget[targetName] = append(filteredPortalsByTarget[targetName], portal)
+			}
+			
 			if !loggedInPortalsByTarget[normalizedTarget][normalizedPortal] {
 				// This portal is NOT logged in. Add it to the work list.
 				filteredPortalsByTarget[targetName] = append(filteredPortalsByTarget[targetName], portal)
@@ -220,82 +232,6 @@ func (r OsDeviceConnectivityIscsi) filterLoggedIn(portalsByTarget map[string][]s
 	}
 	return filteredPortalsByTarget, nil
 }
-
-
-func (r OsDeviceConnectivityIscsi) iscsiDiscoverAny(portals []string) bool {
-	for _, portal := range portals {
-		if err := r.iscsiDiscover(portal); err == nil {
-			return true
-		}
-	}
-	return false
-}
-
-
-func (r OsDeviceConnectivityIscsi) iscsiDiscoverAny(portals []string, targetName string) bool {
-    dbPortals := r.getStoredPortalsForTarget(targetName)
-
-    // Check if the node database is missing portals that the controller knows about
-    needsUpdate := false
-    for _, p := range portals {
-        if !contains(dbPortals, p) {
-            needsUpdate = true
-            break
-        }
-    }
-
-    if !needsUpdate {
-        logger.Debugf("Target %s is fully discovered, skipping discovery", targetName)
-        return true
-    }
-
-    // Perform an UPDATE discovery (safer than a full fresh discovery)
-    for _, portal := range portals {
-        if err := r.iscsiUpdateDiscovery(portal); err == nil {
-            return true
-        }
-    }
-    return false
-}
-
-func (r OsDeviceConnectivityIscsi) iscsiUpdateDiscovery(portal string) error {
-    // --op update ensures we only add NEW portals found at this discovery address
-    args := []string{"-m", "discoverydb", "-t", "st", "-p", portal, "--discover", "--op", "update"}
-    _, err := r.executer.ExecuteWithSafeBuffer(20000, 10*1024*1024, "iscsiadm", args...)
-    return err
-}
-
-
-func (r OsDeviceConnectivityIscsi) getStoredPortalsForTarget(targetName string) []string {
-	// 1. Locate the target directory in the iSCSI DB
-	targetPath := filepath.Join("/etc/iscsi/nodes", targetName)
-	
-	files, err := os.ReadDir(targetPath)
-	if err != nil {
-		// If directory doesn't exist, we have 0 stored portals
-		return []string{}
-	}
-
-	var storedPortals []string
-	for _, f := range files {
-		if !f.IsDir() {
-			continue
-		}
-
-		// 2. The directory name is usually "IP,PORT,TPGT" (e.g., "192.168.1.10,3260,1")
-		// We need to extract the "IP:PORT" part for comparison.
-		parts := strings.Split(f.Name(), ",")
-		if len(parts) >= 2 {
-			portal := net.JoinHostPort(parts[0], parts[1])
-			storedPortals = append(storedPortals, portal)
-		}
-	}
-
-	return storedPortals
-}
-
-
-
 
 
 func (r OsDeviceConnectivityIscsi) discoverAndLogin(portalsByTarget map[string][]string) {
@@ -346,28 +282,42 @@ func (r OsDeviceConnectivityIscsi) loadRelevantTargets(requestedTargets map[stri
 	for targetName := range requestedTargets {
 		targetPath := filepath.Join(basePath, targetName)
 		
+		db[targetName] = make(map[string]bool)
+
 		// Attempt to read the specific target directory
 		portals, err := os.ReadDir(targetPath)
 		if err != nil {
 			// Directory doesn't exist; target unknown to DB
-			db[targetName] = make(map[string]bool)
 			continue
 		}
 
-		db[targetName] = make(map[string]bool)
 		for _, p := range portals {
 			if !p.IsDir() { continue }
 			
-			// Open-iSCSI format: "192.168.1.10,3260,1"
+			// Open-iSCSI directory name format: "IP,Port,TPGT" 
+			// IPv4 Example: "192.168.1.10,3260,1"
+			// IPv6 Example: "2001:db8::1,3260,1"
+			// Using strings.Split by comma is safe because colons in IPv6 won't conflict.
 			parts := strings.Split(p.Name(), ",")
 			if len(parts) >= 2 {
-				norm := net.JoinHostPort(parts[0], parts[1])
+				// 1. Get raw IP and Port from the directory name
+				rawIP := parts[0]
+				rawPort := parts[1]
+
+				// 2. net.JoinHostPort correctly wraps IPv6 (parts[0]) in brackets 
+				// if it detects colons, resulting in "[2001:db8::1]:3260"
+				hostPort := net.JoinHostPort(rawIP, rawPort)
+
+				// 3. Normalize to ensure consistent casing and bracket formatting
+				// to match the format used in your filterLoggedIn logic.
+				norm := r.normalizePortal(hostPort)
 				db[targetName][norm] = true
 			}
 		}
 	}
 	return db
 }
+
 
 
 func (r OsDeviceConnectivityIscsi) normalizePortal(portal string) string {
@@ -389,6 +339,8 @@ func (r OsDeviceConnectivityIscsi) normalizePortal(portal string) string {
 	ip := net.ParseIP(host)
 	if ip != nil {
 		host = ip.String()
+	} else {
+		host = strings.ToLower(host)
 	}
 
 	// 4. Standardized Re-join
@@ -398,9 +350,13 @@ func (r OsDeviceConnectivityIscsi) normalizePortal(portal string) string {
 }
 
 
-ortalsByTarget map[string][]string) {
+func (r OsDeviceConnectivityIscsi) EnsureLogin(allPortalsByTarget map[string][]string) {
 	portalsByTarget, err := r.filterLoggedIn(allPortalsByTarget)
 	if err == nil {
+		if len(portalsByTarget) == 0 {
+			logger.Debug("All iSCSI portals are already logged in.")
+			return
+		}
 		r.discoverAndLogin(portalsByTarget)
 	} else {
 		logger.Errorf("Failed to filter logged in iSCSI portals: {%v}", err)
@@ -443,18 +399,6 @@ func (r OsDeviceConnectivityIscsi) parseActiveSessions() ([]activeSession, error
 			}
             continue
         }
-
-        // HostName extraction
-        hostName := filepath.Base(linkTarget)
-        // Fallback: if the link target ends in /iscsi_session/sessionX,
-        // we might need to go one level up.
-        if !strings.HasPrefix(hostName, "host") {
-            hostName = filepath.Base(filepath.Dir(linkTarget))
-        }
-
-        if !strings.HasPrefix(hostName, "host") {
-            continue
-        }
 		
 		// Robust HostName Extraction:
 		// We iterate up the path to find the directory starting with 'host'
@@ -479,19 +423,6 @@ func (r OsDeviceConnectivityIscsi) parseActiveSessions() ([]activeSession, error
 			logger.Debugf("Invalid host format: %s", hostName)
 			continue
 		}
-
-		// filepath.Base is safe here to get the 'hostX' string
-		hostName := filepath.Base(linkTarget)
-		if !strings.HasPrefix(hostName, "host") {
-			logger.Debugf("Skipping non-host device: %s", hostName)
-			continue
-		}
-
-        // 2. Extract Host Number
-        hostNum, err := strconv.Atoi(strings.TrimPrefix(hostName, "host"))
-        if err != nil {
-            continue
-        }
 
         // 3. Get Initiator IQN (Passing hostName avoids redundant lookups)
         initiatorIQN, err := r.getInitiatorIQN(sessionPath, hostName)
@@ -550,6 +481,8 @@ func (r OsDeviceConnectivityIscsi) getInitiatorIQN(sessionPath, hostName string)
     return "", fmt.Errorf("initiator IQN not found")
 }
 
+
+
 // updateHostIDs adds new active hosts that share the *source* IQN with any known host
 func (r OsDeviceConnectivityIscsi) updateHostIDs(hostIDs map[int]bool) {
     active, err := r.parseActiveSessions()
@@ -577,7 +510,7 @@ func (r OsDeviceConnectivityIscsi) updateHostIDs(hostIDs map[int]bool) {
 		normalized := strings.ToLower(s.sourceIQN)
 		if !hostIDs[s.num] && knownIqns[normalized] {
 			hostIDs[s.num] = true
-			logger.Debugf("Associated host%d with IQN %s (Multipath identified)", s.num, s.sourceIQN)
+			logger.Debugf("Multipath mapping: host%d linked to existing IQN %s", s.num, s.sourceIQN)
 		}
 	}
 }

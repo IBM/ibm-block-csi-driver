@@ -18,13 +18,16 @@ func NewKeyedGater() *KeyedGater {
 	}
 }
 
+
 // Acquire attempts to reserve a slot for a specific key with a custom timeout.
 // key: The identifier (e.g., VolumeID or "global-udev-lock")
 // maxRuns: Max concurrency for this specific key
 // timeout: How long to wait for a free slot
 func (g *KeyedGater) Acquire(key string, maxRuns int, timeout time.Duration) error {
-	// 1. Thread-safe initialization of the specific gate
 	g.mu.Lock()
+	if g.gates == nil {
+		g.gates = make(map[string]chan struct{})
+	}
 	ch, exists := g.gates[key]
 	if !exists {
 		ch = make(chan struct{}, maxRuns)
@@ -32,37 +35,29 @@ func (g *KeyedGater) Acquire(key string, maxRuns int, timeout time.Duration) err
 	}
 	g.mu.Unlock()
 
-	// 2. Create a context for the wait
-	ctx, cancel := context.WithTimeout(context.Background(), timeout)
-	defer cancel()
+	// In 2026, use a Timer instead of context.WithTimeout if you want to 
+	// reduce garbage collector pressure for high-frequency locks.
+	timer := time.NewTimer(timeout)
+	defer timer.Stop()
 
-	// 3. The Wait
 	select {
 	case ch <- struct{}{}:
-		// Successfully acquired slot
 		return nil
-	case <-ctx.Done():
-		// Wait timed out or context was cancelled
-		return fmt.Errorf("gater: timeout (%v) waiting for slot: key=%s, limit=%d", timeout, key, maxRuns)
+	case <-timer.C:
+		return fmt.Errorf("gater: timeout (%v) key=%s", timeout, key)
 	}
 }
 
-// Release frees a slot for the specific key.
 func (g *KeyedGater) Release(key string) {
-	g.mu.Lock()
-	defer g.mu.Unlock()
+	g.mu.RLock() // Use RLock to allow concurrent releases
+	ch, exists := g.gates[key]
+	g.mu.RUnlock()
 
-	if ch, exists := g.gates[key]; exists {
+	if exists {
 		select {
 		case <-ch:
-			// Slot successfully released
 		default:
-			// Safety: Release called without an active Acquire
-		}
-
-		// Optional: Cleanup empty channels to save memory
-		if len(ch) == 0 {
-			delete(g.gates, key)
+			// Safety: Prevent blocking if Release is called wrongly
 		}
 	}
 }

@@ -328,6 +328,68 @@ func (mounter *Mounter) Unmount(target string) error {
 	return nil
 }
 
+
+
+
+func (mounter *Mounter) Unmount(target string) error {
+	logger.Infof("Unmounting %s using syscall", target)
+
+	// 1. ASYNC SYNCFS: Attempt to flush but don't hang the driver
+	syncDone := make(chan struct{})
+	go func() {
+		defer close(syncDone)
+		f, err := os.OpenFile(target, os.O_RDONLY|syscall.O_NONBLOCK, 0)
+		if err == nil {
+			_ = syscall.Syncfs(int(f.Fd()))
+			f.Close()
+		}
+	}()
+
+	// Wait only 2 seconds for Syncfs; if it takes longer, the fabric is likely dead
+	select {
+	case <-syncDone:
+	case <-time.After(2 * time.Second):
+		logger.Warnf("Syncfs timed out for %s; proceeding with unmount", target)
+	}
+
+	// 2. PRIMARY UNMOUNT
+	err := syscall.Unmount(target, 0)
+	if err != nil {
+		switch err {
+		case syscall.EINVAL, syscall.ENOENT:
+			return nil // Already gone
+		case syscall.EBUSY:
+			logger.Warnf("Target %s busy, applying MNT_DETACH", target)
+			if lErr := syscall.Unmount(target, syscall.MNT_DETACH); lErr != nil {
+				return fmt.Errorf("lazy unmount failed: %w", lErr)
+			}
+		default:
+			return fmt.Errorf("unmount failed: %w", err)
+		}
+	}
+
+	// 3. VERIFICATION: Ensure the OS actually dropped the mount
+	// Crucial for 2026 CSI to prevent 'NodeUnstage' race conditions
+	if !mounter.pollMountDeleted(target, 5*time.Second) {
+		return fmt.Errorf("unmount verification failed: %s still in mountinfo", target)
+	}
+
+	return nil
+}
+
+func (mounter *Mounter) pollMountDeleted(target string, timeout time.Duration) bool {
+	expiry := time.Now().Add(timeout)
+	for time.Now().Before(expiry) {
+		// Use a native mountinfo parser to check for the target path
+		if !isMounted(target) {
+			return true
+		}
+		time.Sleep(250 * time.Millisecond)
+	}
+	return false
+}
+
+
 func GetDiskFormatNative(device string) (string, error) {
 	f, err := os.Open(device)
 	if err != nil {
@@ -397,6 +459,82 @@ func GetDiskFormatNative(device string) (string, error) {
 	return "unknown", nil
 }
 
+
+// NEWER:
+func GetDiskFormatNative(device string) (string, error) {
+	f, err := os.Open(device)
+	if err != nil {
+		return "", err
+	}
+	defer f.Close()
+
+	// 68KB is sufficient for all major signatures
+	buf := make([]byte, 68*1024)
+	if _, err := io.ReadFull(f, buf); err != nil && err != io.ErrUnexpectedEOF {
+		return "", err
+	}
+
+	// 1. XFS (Offset 0)
+	if bytes.HasPrefix(buf, []byte("XFSB")) {
+		return "xfs", nil
+	}
+
+	// 2. NTFS (Offset 0x03)
+	if len(buf) > 0x03+4 && string(buf[0x03:0x03+4]) == "NTFS" {
+		return "ntfs", nil
+	}
+
+	// 3. EXT Family (Offset 0x438)
+	if len(buf) > 0x438+2 {
+		magic := binary.LittleEndian.Uint16(buf[0x438 : 0x438+2])
+		if magic == 0xEF53 {
+			// Check for ext4-specific extent feature at offset 0x460
+			incompat := binary.LittleEndian.Uint32(buf[0x460 : 0x460+4])
+			if incompat&0x40 != 0 {
+				return "ext4", nil
+			}
+			return "ext3", nil // Fallback for older ext formats
+		}
+	}
+
+	// 4. Btrfs (Offset 0x10040)
+	if len(buf) > 0x10040+8 {
+		if string(buf[0x10040:0x10048]) == "_BHRfS_M" {
+			return "btrfs", nil
+		}
+	}
+
+	// 5. Swap (Offset 4086)
+	if len(buf) > 4086+10 && string(buf[4086:4086+10]) == "SWAPSPACE2" {
+		return "swap", nil
+	}
+
+	// 6. LVM PV (Look for LVM Physical Volume label)
+	if bytes.Contains(buf[:1024], []byte("LABELONE")) {
+		return "lvm_pv", nil
+	}
+
+	// 7. ZFS (Offset 0x2000)
+	if len(buf) > 0x2000+8 && binary.LittleEndian.Uint64(buf[0x2000:0x2008]) == 0x00bab10c {
+		return "zfs", nil
+	}
+
+	// 8. Zero Check (Verify if unformatted)
+	isZero := true
+	for _, b := range buf[:4096] {
+		if b != 0 {
+			isZero = false
+			break
+		}
+	}
+	if isZero {
+		return "", nil
+	}
+
+	return "unknown", nil
+}
+
+
 func (mounter *Mounter) MountNativeWithTimeout(source, target, fstype string, flags uintptr, data string, options []string, timeout time.Duration) error {
 	// 1. Pre-check: Is this volume already wedged?
 	if _, stuck := stuckMounts.Load(target); stuck {
@@ -431,14 +569,79 @@ func (mounter *Mounter) MountNativeWithTimeout(source, target, fstype string, fl
 	case err := <-done:
 		return err
 	case <-time.After(timeout):
-		// 4. THE ORPHAN: We "cut the rope"
-		stuckMounts.Store(target, time.Now())
+		// Use a struct to track when it became stuck
+		stuckMounts.Store(target, struct {
+			At     time.Now()
+			Source string
+		}{time.Now(), source})
 		
-		// We return a "retriable" error to K8s. 
-		// The goroutine above stays alive in the background (leaked).
-		return fmt.Errorf("mount syscall timed out after %v and is orphaned in kernel", timeout)
+		return fmt.Errorf("mount-safety: syscall timed out; orphan left behind for %s", target)	
 	}
 }
+
+
+var (
+	stuckMounts      sync.Map   // map[string]stuckInfo
+	stuckCount       int32      // Atomic counter of orphaned mounts
+	maxStuckLimit    int32 = 50 // Standard 2026 safety threshold
+)
+
+type stuckInfo struct {
+	at     time.Now
+	source string
+}
+
+func (mounter *Mounter) MountNativeWithTimeout(source, target, fstype string, options []string, timeout time.Duration) error {
+	// 1. GATER: Check global node health
+	currentStuck := atomic.LoadInt32(&stuckCount)
+	if currentStuck >= maxStuckLimit {
+		return fmt.Errorf("node-safety: refused mount; %d processes already wedged in kernel (limit %d)", currentStuck, maxStuckLimit)
+	}
+
+	// 2. IDEMPOTENCY: Is this specific target already wedged?
+	if _, stuck := stuckMounts.Load(target); stuck {
+		// Verify if it actually finished while we were waiting
+		if isMounted(target) {
+			mounter.clearStuck(target)
+			return nil
+		}
+		return fmt.Errorf("mount-safety: previous attempt for %s is still wedged", target)
+	}
+
+	done := make(chan error, 1)
+
+	go func() {
+		err := mounter.MountNative(source, target, fstype, options)
+		
+		// If the goroutine EVER returns, decrement the global counter
+		if _, wasStuck := stuckMounts.Load(target); wasStuck {
+			mounter.clearStuck(target)
+		}
+		done <- err
+	}()
+
+	select {
+	case err := <-done:
+		return err
+	case <-time.After(timeout):
+		// 3. ORPHAN: We "cut the rope"
+		stuckMounts.Store(target, stuckInfo{at: time.Now(), source: source})
+		
+		// Atomically increment the global "stuck" counter
+		newCount := atomic.AddInt32(&stuckCount, 1)
+		
+		logger.Errorf("mount-safety: syscall timed out (orphaned). Global stuck count: %d", newCount)
+		return fmt.Errorf("mount-safety: timeout after %v; process left in D-state", timeout)
+	}
+}
+
+// clearStuck ensures the counter and map stay in sync
+func (mounter *Mounter) clearStuck(target string) {
+	if _, exists := stuckMounts.LoadAndDelete(target); exists {
+		atomic.AddInt32(&stuckCount, -1)
+	}
+}
+
 
 func (mounter *Mounter) MountNative(source, target, fstype string, options []string) error {
 	// 1. Ensure target directory (or file for block) exists
@@ -467,11 +670,21 @@ func (mounter *Mounter) MountNative(source, target, fstype string, options []str
 
 	// 4. Direct Kernel Call
 	err := syscall.Mount(source, target, fstype, flags, data)
+	if err == nil && (flags&syscall.MS_BIND != 0) && (flags&syscall.MS_RDONLY != 0) {
+		// Second pass to apply Read-Only to the bind mount
+		remountFlags := flags | syscall.MS_REMOUNT
+		_ = syscall.Mount(source, target, fstype, remountFlags, data)
+	}	
 	if err != nil {
 		return fmt.Errorf("syscall.Mount(source=%s, target=%s, type=%s) failed: %w", 
             source, target, fstype, err)
+		return err
 	}
 
+	// TODO needed ??
+	_ = syscall.Mount("", target, "", syscall.MS_SHARED, "")
+	
+	// TODO Before concluding a "stuck" mount is actually stuck, verify via /proc/self/mountinfo
 	return nil
 }
 

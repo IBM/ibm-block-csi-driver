@@ -106,20 +106,79 @@ func (e *OsExecuter) ExecuteWithTimeoutSilently(timeoutMs int, command string, a
 		}
 		return capturedOutput, ctx.Err()
 	}
-
-	// 2. Process Failure Check
+	
 	if err != nil {
-		// Check if WaitDelay expired (D-state hang)
+		// exec.ErrWaitDelay specifically indicates the process stayed alive 
+		// past the SIGKILL attempt (D-state)
 		if errors.Is(err, exec.ErrWaitDelay) {
-			logger.Errorf("Command %s process hung in kernel D-state", command)
-			return capturedOutput, fmt.Errorf("process hung in kernel: %w", err)
+			return capturedOutput, fmt.Errorf("kernel-level hang detected (D-state): %w", err)
 		}
+		// Context timeout check
+		if ctx.Err() != nil {
+			return capturedOutput, ctx.Err()
+		}
+	}
+	
+	return capturedOutput, nil
+}
 
-		return capturedOutput, fmt.Errorf("command %s failed: %w", command, err)
+
+
+func (e *OsExecuter) ExecuteWithTimeoutSilently(timeoutMs int, command string, args ...string) ([]byte, error) {
+	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(timeoutMs)*time.Millisecond)
+	defer cancel()
+
+	cmd := exec.CommandContext(ctx, command, args...)
+	
+	// Vital for 2026: Protects against D-state hangs on failed fabrics
+	cmd.WaitDelay = 2 * time.Second
+
+	stdout, err := cmd.StdoutPipe()
+	if err != nil {
+		return nil, err
+	}
+	cmd.Stderr = cmd.Stdout 
+
+	if err := cmd.Start(); err != nil {
+		return nil, err
+	}
+
+	limitReader := io.LimitReader(stdout, DefaultMaxOutput)
+	var output bytes.Buffer
+	readDone := make(chan struct{})
+	
+	go func() {
+		// io.Copy will return when the pipe is closed by cmd.Wait()
+		_, _ = io.Copy(&output, limitReader)
+		close(readDone)
+	}()
+
+	// Wait for process exit or WaitDelay timeout
+	waitErr := cmd.Wait()
+	<-readDone 
+
+	capturedOutput := output.Bytes()
+
+	// Priority 1: Check if the context (timeout) was the cause
+	if ctx.Err() != nil {
+		if errors.Is(ctx.Err(), context.DeadlineExceeded) {
+			return capturedOutput, context.DeadlineExceeded
+		}
+		return capturedOutput, ctx.Err()
+	}
+
+	// Priority 2: Check for D-state (WaitDelay) or other execution errors
+	if waitErr != nil {
+		if errors.Is(waitErr, exec.ErrWaitDelay) {
+			return capturedOutput, fmt.Errorf("kernel-level hang (D-state) detected: %w", waitErr)
+		}
+		// Return the actual exit error (e.g., non-zero exit code)
+		return capturedOutput, fmt.Errorf("command failed: %w", waitErr)
 	}
 
 	return capturedOutput, nil
 }
+
 
 
 type zombieInfo struct {
