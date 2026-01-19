@@ -24,7 +24,11 @@ class HostDefinerServicer:
         array_connection_info = request.array_connection_info
         array_addresses = array_connection_info.array_addresses
         node_id_info = NodeIdInfo(request.node_id_from_csi_node)
-        initiators = request.node_initiators_from_csi_node
+        initiators = getattr(
+            request,
+            "node_initiators_from_csi_node",
+            getattr(request, "node_initiators", Initiators())
+        )
         node_name = node_id_info.node_name
         connectivity_type_from_user = get_initiators_connectivity_type(initiators, request.connectivity_type_from_user)
         host_name = join_object_prefix_with_name(prefix=request.prefix, name=node_name)
@@ -73,7 +77,11 @@ class HostDefinerServicer:
         node_id_info = NodeIdInfo(request.node_id_from_csi_node)
         array_connection_info = request.array_connection_info
         array_addresses = array_connection_info.array_addresses
-        initiators = request.node_initiators_from_csi_node
+        initiators = getattr(
+            request,
+            "node_initiators_from_csi_node",
+            getattr(request, "node_initiators", Initiators())
+        )        
         node_name = node_id_info.node_name
         logger.info(messages.UNDEFINE_NODE_FROM_ARRAYS.format(node_name, array_addresses))
         try:
@@ -104,7 +112,11 @@ class HostDefinerServicer:
 
     def _update_host_ports(self, request, host, array_mediator, partition_name):
         logger.info("DEBUG - uriziv - 99")
-        initiators = request.node_initiators_from_csi_node
+        initiators = getattr(
+            request,
+            "node_initiators_from_csi_node",
+            getattr(request, "node_initiators", Initiators())
+        )        
         connectivity_type_from_user = get_initiators_connectivity_type(initiators, request.connectivity_type_from_user)
         connectivity_type_from_host = array_mediator.get_host_connectivity_type(host)
         if self._is_protocol_switched(connectivity_type_from_user, connectivity_type_from_host):
@@ -152,7 +164,11 @@ class HostDefinerServicer:
 
     def _change_host_protocol_with_chhost(self, array_mediator, host_name, connectivity_type_from_host, request):
         self._remove_host_ports(array_mediator, host_name, connectivity_type_from_host)
-        initiators = request.node_initiators_from_csi_node
+        initiators = getattr(
+            request,
+            "node_initiators_from_csi_node",
+            getattr(request, "node_initiators", Initiators())
+        )        
         connectivity_type_from_user = get_initiators_connectivity_type(initiators, request.connectivity_type_from_user)
         protocol = self._get_host_protocol(connectivity_type_from_user)
         array_mediator.change_host_protocol(host_name, protocol)
@@ -177,7 +193,11 @@ class HostDefinerServicer:
         return connectivity_type == array_config.NVME_OVER_FC_CONNECTIVITY_TYPE
 
     def _create_host(self, host, array_mediator, request):
-        initiators = request.node_initiators_from_csi_node
+        initiators = getattr(
+            request,
+            "node_initiators_from_csi_node",
+            getattr(request, "node_initiators", Initiators())
+        )        
         connectivity_type = get_initiators_connectivity_type(initiators, request.connectivity_type_from_user)
         array_mediator.create_host(host, initiators, connectivity_type, request.io_group,
                                    request.array_connection_info.partition_name,
