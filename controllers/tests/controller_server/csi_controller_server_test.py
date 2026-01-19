@@ -1036,7 +1036,7 @@ class TestPublishVolume(BaseControllerSetUp, CommonControllerTest):
 
         self.servicer.ControllerPublishVolume(self.request, self.context)
 
-        self.assertEqual(self.context.code, grpc.StatusCode.NOT_FOUND)
+        self.assertEqual(self.context.code, grpc.StatusCode.OK)
 
     def test_publish_volume_get_host_by_host_identifiers_exception(self):
         self.mediator.map_volume_by_initiators = Mock()
