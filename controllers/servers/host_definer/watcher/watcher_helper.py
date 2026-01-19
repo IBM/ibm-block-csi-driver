@@ -410,7 +410,7 @@ class Watcher(KubernetesManager):
         initiators_data = host_definition_info.node_initiators
         logger.info(initiators_data)
         logger.info("debug - uriziv - 122")
-        return generate_node_initiators_from_string_data(initiators_data)
+        return initiators_data
 
     def _get_io_group_by_node(self, node_name):
         try:
