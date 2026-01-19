@@ -54,7 +54,7 @@ type Executer struct {
 }
 
 
-const DefaultMaxOutput = 1024 * 1024 
+const DefaultMaxOutput = 1024 * 1024
 
 //Command Category
 //	Typical Size	Recommended Limit	Why?
@@ -63,62 +63,30 @@ const DefaultMaxOutput = 1024 * 1024
 //nventory (discoverydb, scan)	1MB - 5MB	10MB	Prevents truncation on high-density nodes.
 
 
-func (e *OsExecuter) ExecuteWithTimeoutSilently(timeoutMs int, command string, args ...string) ([]byte, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(timeoutMs)*time.Millisecond)
-	defer cancel()
+type limitWriter struct {
+	io.Writer
+	Limit int64
+	curr  int64
+}
 
-	cmd := exec.CommandContext(ctx, command, args...)
-	
-	// PROTECT: Force-return if process is in D-state after timeout + 2s
-	cmd.WaitDelay = 2 * time.Second
-
-	stdout, err := cmd.StdoutPipe()
-	if err != nil {
-		return nil, err
+func (w *limitWriter) Write(p []byte) (n int, err error) {
+	if w.curr >= w.Limit {
+		return len(p), nil // Silently drop overflow
 	}
-	cmd.Stderr = cmd.Stdout 
-
-	if err := cmd.Start(); err != nil {
-		return nil, err
+	toWrite := int64(len(p))
+	if w.curr+toWrite > w.Limit {
+		toWrite = w.Limit - w.curr
 	}
+	n, err = w.Writer.Write(p[:toWrite])
+	w.curr += int64(n)
+	return len(p), err // Return len(p) to avoid "short write" errors in cmd
+}
 
-	limitReader := io.LimitReader(stdout, DefaultMaxOutput)
-	var output bytes.Buffer
-	readDone := make(chan struct{})
-	
-	go func() {
-		_, _ = io.Copy(&output, limitReader)
-		close(readDone)
-	}()
 
-	err = cmd.Wait()
-	<-readDone 
 
-	capturedOutput := output.Bytes()
 
-	// 1. Context Check (Restored explicit DeadlineExceeded logic)
-	if ctx.Err() != nil {
-		logger.Debugf("Command %s interrupted. Context: %v. Partial output: %s", command, ctx.Err(), string(capturedOutput))
-		
-		// Return specific sentinel error if it was a timeout
-		if errors.Is(ctx.Err(), context.DeadlineExceeded) {
-			return capturedOutput, context.DeadlineExceeded
-		}
-		return capturedOutput, ctx.Err()
-	}
-
-	// 2. Process Failure Check
-	if err != nil {
-		// Check if WaitDelay expired (D-state hang)
-		if errors.Is(err, exec.ErrWaitDelay) {
-			logger.Errorf("Command %s process hung in kernel D-state", command)
-			return capturedOutput, fmt.Errorf("process hung in kernel: %w", err)
-		}
-
-		return capturedOutput, fmt.Errorf("command %s failed: %w", command, err)
-	}
-
-	return capturedOutput, nil
+func (e *Executer) ExecuteWithTimeoutSilently(timeoutMs int, command string, args []string) ([]byte, error) {
+	return ExecuteWithTracking("", timeoutMs, string, args)
 }
 
 
@@ -128,10 +96,20 @@ type zombieInfo struct {
 	startTime uint64 // Use the raw Jiffies/ClockTicks from /proc
 }
 
+// Ensure you capture the start time immediately after cmd.Start()
+func (e *Executer) getPidStartTime(pid int) (uint64, error) {
+	data, err := os.ReadFile(fmt.Sprintf("/proc/%d/stat", pid))
+	if err != nil {
+		return 0, err
+	}
+	_, startTime, err := parseStatFile(data)
+	return startTime, err
+}
+
 func (e *Executer) markAsStuck(device string, pid int, command string) {
 	// Fetch the unique start time for this specific PID instance
 	startTime, _ := getPidStartTime(pid)
-	
+
 	stuckMu.Lock()
 	stuckProcesses[device] = zombieInfo{
 		pid:       pid,
@@ -145,9 +123,10 @@ func (e *Executer) markAsStuck(device string, pid int, command string) {
 
 func (e *Executer) ExecuteWithTracking(device string, timeoutMs int, command string, args []string) ([]byte, error) {
 	// 1. Pre-check: Don't spawn a new process if one is already wedged
-	if isDeviceStillStuck(device) {
+	if device != "" && isDeviceStillStuck(device) {
 		return nil, fmt.Errorf("node-safety: previous %s process is still stuck in kernel D-state for device %s", command, device)
 	}
+
 
 	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(timeoutMs)*time.Millisecond)
 	defer cancel()
@@ -157,47 +136,47 @@ func (e *Executer) ExecuteWithTracking(device string, timeoutMs int, command str
 	cmd.WaitDelay = 2 * time.Second
 
 	// We use Start() + Wait() instead of CombinedOutput() to capture the PID correctly
-	var b bytes.Buffer
-	cmd.Stdout = &b
-	cmd.Stderr = &b
+	// Combined output buffer
+	var output bytes.Buffer
+	// Limit total output to prevent OOM from chatty commands
+	limitWriter := &limitWriter{Writer: &output, Limit: DefaultMaxOutput}
+	cmd.Stdout = limitWriter
+	cmd.Stderr = limitWriter
 
-	if err := cmd.Start(); err != nil {
-		return nil, err
+    if err := cmd.Start(); err != nil {
+        return nil, fmt.Errorf("failed to start command: %w", err)
+    }
+
+    pid := cmd.Process.Pid
+    err := cmd.Wait()
+    captured := output.Bytes()
+
+    if err != nil {
+        // Check specifically for context timeout or WaitDelay expiration
+        if errors.Is(err, exec.ErrWaitDelay) || ctx.Err() != nil {
+            if device != "" {
+				e.markAsStuck(device, pid, command)
+			}
+            return captured, fmt.Errorf("process %d hung on %s: %w", pid, device, err)
+        }
+        return captured, fmt.Errorf("exit error: %w", err)
+    }
+
+    // Success: Device is healthy, clear any existing block
+	if device != "" {
+	    clearTracking(device)
 	}
-
-	pid := cmd.Process.Pid
-	err := cmd.Wait()
-	
-	if err != nil {
-		// If context timed out OR WaitDelay expired, the process is likely stuck in kernel
-		if errors.Is(err, exec.ErrWaitDelay) || (ctx.Err() != nil) {
-			e.markAsStuck(device, pid, command)
-			return nil, fmt.Errorf("node-safety: process %d stuck in kernel for device %s: %w", pid, device, err)
-		}
-		return b.Bytes(), err
-	}	
-	
-	// Success: Clean up any old tracking for this device
-	stuckMu.Lock()
-	delete(stuckProcesses, device)
-	stuckMu.Unlock()
-	
-	return b.Bytes(), nil
+    return captured, nil
 }
 
 
-
-func clearTracking(device string) {
+func (e *Executer) clearTracking(device string) {
 	stuckMu.Lock()
 	delete(stuckProcesses, device)
 	stuckMu.Unlock()
 }
 
-
-
-
-
-func isDeviceStillStuck(device string) bool {
+func (e *Executer) isDeviceStillStuck(device string) bool {
 	stuckMu.Lock()
 	info, exists := stuckProcesses[device]
 	stuckMu.Unlock()
@@ -217,6 +196,7 @@ func isDeviceStillStuck(device string) bool {
 	if err != nil {
 		return false
 	}
+
 
 	// 2. IDENTITY VERIFICATION: The "Gold Standard"
 	// If the start time differs, the PID was reused by a different process.
@@ -239,8 +219,8 @@ func isDeviceStillStuck(device string) bool {
         // 2. FALLBACK: Handle Kernel Workers (jbd2, xfsaild, dm-*)
         // These have empty cmdlines; we must verify identity via 'comm'
         // 'comm' for jbd2 often looks like: (jbd2/dm-2-8)
-        if strings.Contains(info.command, "jbd2") || 
-           strings.Contains(info.command, "xfsaild") || 
+        if strings.Contains(info.command, "jbd2") ||
+           strings.Contains(info.command, "xfsaild") ||
            strings.Contains(info.command, "dm-") {
             
             // For kernel workers, the 'device' name is often part of the 'comm' field
@@ -257,7 +237,7 @@ func isDeviceStillStuck(device string) bool {
             return false
         }
     }
-	
+
     // 3. Check State & WCHAN
     // D = Uninterruptible sleep (usually IO)
     // S = Interruptible sleep (but potentially stuck in storage RPC)
@@ -268,52 +248,49 @@ func isDeviceStillStuck(device string) bool {
         return false
     }
 
-    return true // Process is still there and still in a blocking state	
+    return true // Process is still there and still in a blocking state
+}
+
+
+func (e *Executer) isStorageWait(pid int) bool {
+	wchan, err := os.ReadFile(fmt.Sprintf("/proc/%d/wchan", pid))
+	if err != nil { return false }
+	w := string(wchan)
+
+	// 'io_schedule' is the generic kernel indicator of waiting for disk I/O
+	return strings.Contains(w, "nfs_wait") ||
+	       strings.Contains(w, "rpc_wait") ||
+	       strings.Contains(w, "scsi_wait") ||
+	       strings.Contains(w, "blk_mq_wait") ||
+	       strings.Contains(w, "nvme_wait") ||
+	       strings.Contains(w, "io_schedule") || // Generic I/O wait
+	       strings.Contains(w, "xfs_log_wait")
 }
 
 
 
-
-
-
-func isStorageWait(pid int) bool {
-    wchan, err := os.ReadFile(fmt.Sprintf("/proc/%d/wchan", pid))
-    if err != nil { return false }
-    w := string(wchan)
-    
-    return strings.Contains(w, "nfs_wait") || 
-           strings.Contains(w, "rpc_wait") || 
-           strings.Contains(w, "scsi_wait") ||
-           strings.Contains(w, "blk_mq_wait") || // Block layer mq
-           strings.Contains(w, "xfs_log_wait")   // XFS journaling stalls
-}
-
-
-func parseStatFile(data []byte) (state byte, startTime uint64, err error) {
-	// The comm field ends at the LAST ')'. 
+func (e *Executer) parseStatFile(data []byte) (state byte, startTime uint64, err error) {
+	// The comm field ends at the LAST ')'.
 	// Everything before that is PID and COMM.
 	lastParen := bytes.LastIndex(data, []byte(")"))
 	if lastParen == -1 || len(data) <= lastParen+2 {
 		return 0, 0, fmt.Errorf("invalid stat format")
 	}
 
-	// The fields after the last ')' start with a space, then the 'state' field.
-	// Field 3 (state) is the first field after the last paren.
+	// Field 3 (State) is at index 0 after the ") "
 	afterParen := string(data[lastParen+2:])
 	fields := strings.Fields(afterParen)
 
-	// Since we skipped the first 2 fields (PID and COMM), 
-	// the original field 22 (starttime) is now at index 19.
-	// Field 3 (State) -> Index 0
-	// Field 22 (Starttime) -> Index 19
 	if len(fields) < 20 {
 		return 0, 0, fmt.Errorf("stat file too short")
 	}
 
 	state = fields[0][0]
+	// Starttime is index 19 (Field 22 - PID, COMM, STATE = 19 fields later)
 	startTime, err = strconv.ParseUint(fields[19], 10, 64)
 	return state, startTime, err
 }
+
 
 
 func (e *Executer) ExecuteWithTimeout(mSeconds int, command string, args []string) ([]byte, error) {
@@ -338,36 +315,37 @@ var (
 )
 
 const (
-	AbstractSocketPath = "\x00/org/kernel/linux/storage/multipathd"
-	StandardSocket     = "/run/multipathd.sock"
-	LegacySocket       = "/var/run/multipathd.sock"
+    // Use '@' for Go's internal abstract namespace handling
+    AbstractSocketPath = "@/org/kernel/linux/storage/multipathd"
+    StandardSocket     = "/run/multipathd.sock"
+    LegacySocket       = "/var/run/multipathd.sock"
 )
 
-// resolveSocket implements the prioritized discovery logic.
 func resolveSocket() string {
-	// 1. Env Var override is the highest priority
-	if env := os.Getenv("MULTIPATH_SOCKET_NAME"); env != "" {
-		return env
-	}
+    if env := os.Getenv("MULTIPATH_SOCKET_NAME"); env != "" {
+        return env
+    }
 
-	// 2. Abstract namespace is the most robust for containers
-	if conn, err := net.DialTimeout("unix", AbstractSocketPath, 50*time.Millisecond); err == nil {
-		conn.Close()
-		return AbstractSocketPath
-	}
+    // Try abstract first - no filesystem cleanup needed
+    if conn, err := net.DialTimeout("unix", AbstractSocketPath, 50*time.Millisecond); err == nil {
+        conn.Close()
+        return AbstractSocketPath
+    }
 
-	// 3. Standard filesystem paths
-	for _, path := range []string{StandardSocket, LegacySocket} {
-		if _, err := os.Stat(path); err == nil {
-			return path
-		}
-	}
+    // Check filesystem paths
+    for _, path := range []string{StandardSocket, LegacySocket} {
+        if conn, err := net.DialTimeout("unix", path, 50*time.Millisecond); err == nil {
+            conn.Close()
+            return path
+        }
+    }
 
-	return StandardSocket
+    return StandardSocket
 }
 
+
 // GetSocket returns the cached socket or discovers it if empty.
-func GetSocket() string {
+func (e *Executer) GetSocket() string {
 	socketMu.RLock()
 	s := cachedSocket
 	socketMu.RUnlock()
@@ -386,13 +364,13 @@ func GetSocket() string {
 }
 
 // invalidateSocket clears the cache if a connection fails.
-func invalidateSocket() {
+func (e *Executer) invalidateSocket() {
 	socketMu.Lock()
 	cachedSocket = ""
 	socketMu.Unlock()
 }
 
-func MultipathdCmd(command string) (string, error) {
+func (e *Executer) MultipathdCmd(command string) (string, error) {
 	socketPath := GetSocket()
 
 	conn, err := net.DialTimeout("unix", socketPath, 2*time.Second)
@@ -429,6 +407,7 @@ func MultipathdCmd(command string) (string, error) {
 	// Read Payload: Use io.ReadAll to avoid bufio.Scanner's 64KB limit
 	reader := io.LimitReader(conn, int64(respLen))
 	respBody, err := io.ReadAll(reader)
+
 	if err != nil {
 		return "", err
 	}

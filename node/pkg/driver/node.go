@@ -208,7 +208,7 @@ func (d *NodeService) NodeStageVolume(ctx context.Context, req *csi.NodeStageVol
 	if isMounted { // idempotent case
 		return &csi.NodeStageVolumeResponse{}, nil
 	}
-	
+
 	// TODO don't format if existingFormat is ok
 
 	err = d.formatAndMount(mpathDevice, stagingPath, fsTypeForMount, existingFormat)

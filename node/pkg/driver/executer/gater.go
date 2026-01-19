@@ -7,10 +7,16 @@ import (
 	"time"
 )
 
+type gate struct {
+	ch      chan struct{}
+	refCount int // Track active acquires to determine when to delete the key
+}
+
 type KeyedGater struct {
 	mu    sync.Mutex
-	gates map[string]chan struct{}
+	gates map[string]*gate
 }
+
 
 func NewKeyedGater() *KeyedGater {
 	return &KeyedGater{
@@ -18,51 +24,62 @@ func NewKeyedGater() *KeyedGater {
 	}
 }
 
+
 // Acquire attempts to reserve a slot for a specific key with a custom timeout.
 // key: The identifier (e.g., VolumeID or "global-udev-lock")
 // maxRuns: Max concurrency for this specific key
 // timeout: How long to wait for a free slot
 func (g *KeyedGater) Acquire(key string, maxRuns int, timeout time.Duration) error {
-	// 1. Thread-safe initialization of the specific gate
-	g.mu.Lock()
-	ch, exists := g.gates[key]
-	if !exists {
-		ch = make(chan struct{}, maxRuns)
-		g.gates[key] = ch
-	}
-	g.mu.Unlock()
+    g.mu.Lock()
+    if g.gates == nil {
+        g.gates = make(map[string]*gate)
+    }
 
-	// 2. Create a context for the wait
-	ctx, cancel := context.WithTimeout(context.Background(), timeout)
-	defer cancel()
+    gt, exists := g.gates[key]
+    if !exists {
+        gt = &gate{ch: make(chan struct{}, maxRuns)}
+        g.gates[key] = gt
+    }
+    gt.refCount++ // Increment before unlocking
+    g.mu.Unlock()
 
-	// 3. The Wait
-	select {
-	case ch <- struct{}{}:
-		// Successfully acquired slot
-		return nil
-	case <-ctx.Done():
-		// Wait timed out or context was cancelled
-		return fmt.Errorf("gater: timeout (%v) waiting for slot: key=%s, limit=%d", timeout, key, maxRuns)
-	}
+    // Using context for timeout is idiomatic in 2026
+    ctx, cancel := context.WithTimeout(context.Background(), timeout)
+    defer cancel()
+
+    select {
+    case gt.ch <- struct{}{}:
+        return nil
+    case <-ctx.Done():
+        // Cleanup: decrement refCount if we timeout
+        g.decrementRef(key)
+        return fmt.Errorf("gater: timeout (%v) key=%s", timeout, key)
+    }
 }
 
-// Release frees a slot for the specific key.
 func (g *KeyedGater) Release(key string) {
-	g.mu.Lock()
-	defer g.mu.Unlock()
+    g.mu.Lock()
+    gt, exists := g.gates[key]
+    g.mu.Unlock()
 
-	if ch, exists := g.gates[key]; exists {
-		select {
-		case <-ch:
-			// Slot successfully released
-		default:
-			// Safety: Release called without an active Acquire
-		}
+    if exists {
+        select {
+        case <-gt.ch:
+            // Successfully released a slot
+        default:
+            // Safety: Avoid panic if Release is called extra times
+        }
+        g.decrementRef(key)
+    }
+}
 
-		// Optional: Cleanup empty channels to save memory
-		if len(ch) == 0 {
-			delete(g.gates, key)
-		}
-	}
+func (g *KeyedGater) decrementRef(key string) {
+    g.mu.Lock()
+    defer g.mu.Unlock()
+    if gt, ok := g.gates[key]; ok {
+        gt.refCount--
+        if gt.refCount <= 0 {
+            delete(g.gates, key) // Reclaims memory
+        }
+    }
 }

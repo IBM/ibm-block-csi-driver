@@ -16,16 +16,22 @@
 
 package mount
 
-
 import (
+	"bufio"
+	"context"
 	"bytes"
 	"encoding/binary"
 	"fmt"
 	"io"
 	"os"
+	"path/filepath"
+	"strings"
+	"sync"
+	"sync/atomic"
 	"syscall"
 	"time"
 
+	"golang.org/x/sys/unix"
 	"github.com/ibm/ibm-block-csi-driver/node/logger"
 	"github.com/ibm/ibm-block-csi-driver/node/pkg/driver/executer"
 	mount "k8s.io/mount-utils"
@@ -33,8 +39,6 @@ import (
 
 // default mount/unmount timeout interval, 30s
 var timeout time.Duration = 30 * time.Second
-
-
 
 
 type MountState int
@@ -45,6 +49,21 @@ const (
 	StateDetached                          // Tier 3 called; kernel background cleanup
 )
 
+
+type mountSession struct {
+	target    string
+	startTime time.Time
+}
+
+type TrackedUnmount struct {
+	mu             sync.Mutex
+	FirstAttempt   time.Time
+	LastState      MountState
+	SyncDone       bool
+	SyncInProgress bool
+}
+
+
 // Map to track the current state of a mount target
 // Mounter is a warpper of mount.Mounter which has the ability to cancel
 // a comand when timeout.
@@ -52,469 +71,452 @@ type Mounter struct {
 	*mount.Mounter
 	executer executer.ExecuterInterface
 	// Key: targetPath or volumeID, Value: startTime
-	mountTracker sync.Map // map[string]MountState
-	stuckUnmounts sync.Map
+	unmountTracker sync.Map // map[string]*TrackedUnmount
+
+	stuckMounts sync.Map // Key: *mountSession, Value: bool
+	stuckCount    atomic.Int32
+	maxStuckLimit int32
 }
 
 var _ mount.Interface = &Mounter{}
 
-func New(mounterPath string) mount.Interface {
+func New(mounterPath string, limit int32) mount.Interface {
 	return &Mounter{
 		Mounter:  mount.New(mounterPath).(*mount.Mounter),
 		executer: &executer.Executer{},
+		maxStuckLimit: limit
 	}
 }
 
-func NewWithExecutor(mounterPath string, e executer.ExecuterInterface) mount.Interface {
+func NewWithExecutor(mounterPath string, e executer.ExecuterInterface, limit int32) mount.Interface {
 	return &Mounter{
 		Mounter:  mount.New(mounterPath).(*mount.Mounter),
 		executer: e,
+		maxStuckLimit: limit
 	}
 }
 
-type MountState int
-
-const (
-	StateGraceful MountState = iota // Initial attempts
-	StateForced                    // Network hang escalation
-	StateDetached                  // Final safety valve
-)
-
-type TrackedMount struct {
-	FirstAttempt time.Time
-	LastState    MountState
-}
-
-var mountTracker sync.Map // map[string]TrackedMount
 
 
 func (m *Mounter) UnmountWithTimeout(target string, timeout time.Duration) error {
 	now := time.Now()
-	
-	// 1. Load or Initialize tracking state
-	val, loaded := mountTracker.LoadOrStore(target, TrackedMount{
+
+	// 1. Initial Idempotency - Check if actually mounted
+	if !m.isMounted(target) {
+		m.unmountTracker.Delete(target)
+		return nil
+	}
+
+	// Use LoadOrStore with a pointer to TrackedUnmountunt to avoid identity races
+	val, loaded := m.unmountTracker.LoadOrStore(target, &TrackedUnmount{
 		FirstAttempt: now,
-		LastState:    StateGraceful,
+		LastState:    StateGracefulPending,
 	})
-	mInfo := val.(TrackedMount)
+	mInfo := val.(*TrackedUnmountount)
+
+	// If we just stored it (loaded == false), we use the 'now' we just created.
+	// If it was already there, we use the original FirstAttempt.
+	mInfo.mu.Lock()
 	elapsed := now.Sub(mInfo.FirstAttempt)
+	currentState := mInfo.LastState
 
-	// 2. Pre-check: If already detached, return success (Idempotency)
-	if mInfo.LastState == StateDetached {
-		return nil 
+	// Tier 0: Background Sync
+	// We do this early to try and flush data before the first unmount attempt.
+	if currentState == StateGracefulPending && !mInfo.SyncDone && !mInfo.SyncInProgress {
+		mInfo.SyncInProgress = true
+		go m.backgroundSyncfs(target)
 	}
+	mInfo.mu.Unlock()
 
-	// 3. Data Integrity Tier: Syncfs
-	// Flushes dirty buffers to disk before we attempt to break the connection.
-	// Only attempt if we aren't already in a "Force" state.
-	if mInfo.LastState == StateGraceful {
-		f, err := os.OpenFile(target, os.O_RDONLY|syscall.O_NONBLOCK, 0)
-		if err == nil {
-			_ = syscall.Syncfs(int(f.Fd())) 
-			f.Close()
+	// 2. Tiered Escalation Logic
+	var err error
+	switch {
+	case elapsed < 2*time.Minute:
+		// Attempt 1: Standard Graceful Unmount
+		err = m.tryUnmount(target, 0, timeout)
+
+	case elapsed < 4*time.Minute:
+		// Attempt 2: MNT_FORCE
+		// This is vital for network FS (NFS/SMB) that are unreachable.
+		mInfo.mu.Lock()
+		mInfo.LastState = StateForcePending
+		mInfo.mu.Unlock()
+		err = m.tryUnmount(target, syscall.MNT_FORCE, timeout)
+
+	default:
+		// Attempt 3: MNT_DETACH (Lazy Unmount)
+		// Immediately removes the mount from the namespace.
+		err = syscall.Unmount(target, syscall.MNT_DETACH)
+		if err == nil || err == syscall.EINVAL || err == syscall.ENOENT {
+			mInfo.mu.Lock()
+			mInfo.LastState = StateDetached
+			mInfo.mu.Unlock()
+			m.unmountTracker.Delete(target)
+			return nil
 		}
 	}
 
-	// 4. Helper for asynchronous unmount to protect against D-state hangs
-	tryUnmount := func(flags int) <-chan error {
-		ch := make(chan error, 1)
-		go func() {
-			ch <- syscall.Unmount(target, flags)
-		}()
-		return ch
-	}
-
-	// 5. ESCALATION LOGIC
-	// Tier 1: Graceful (0-2 Minutes) - Protects against transient blips
-	if elapsed < 2*time.Minute {
-		select {
-		case err := <-tryUnmount(0):
-			if err == nil || err == syscall.ENOENT || err == syscall.EINVAL {
-				mountTracker.Delete(target)
-				return nil
-			}
-			return fmt.Errorf("graceful unmount failed (will retry): %w", err)
-		case <-time.After(timeout):
-			return fmt.Errorf("graceful unmount timed out (waiting for retry)")
-		}
-	}
-
-	// Tier 2: Forced (2-4 Minutes) - Aggressive abort for network hangs
-	if elapsed < 4*time.Minute {
-		mountTracker.Store(target, TrackedMount{FirstAttempt: mInfo.FirstAttempt, LastState: StateForced})
-		select {
-		case err := <-tryUnmount(syscall.MNT_FORCE):
-			if err == nil || err == syscall.ENOENT || err == syscall.EINVAL {
-				mountTracker.Delete(target)
-				return nil
-			}
-			return fmt.Errorf("force unmount failed: %w", err)
-		case <-time.After(timeout):
-			return fmt.Errorf("force unmount timed out in D-state")
-		}
-	}
-
-	// Tier 3: Lazy (4+ Minutes) - The Nuclear Option
-	// Called when we are close to the K8s 6-minute "Force Detach" limit.
-	// Executed on main thread because MNT_DETACH is non-blocking.
-	err := syscall.Unmount(target, syscall.MNT_DETACH)
-	if err == nil || err == syscall.EINVAL || err == syscall.ENOENT {
-		mountTracker.Store(target, TrackedMount{FirstAttempt: mInfo.FirstAttempt, LastState: StateDetached})
-		return nil
-	}
-
-	return fmt.Errorf("all unmount tiers failed: %w", err)
-}
-
-
-
-
-
-func (m *Mounter) UnmountWithTimeout(target string, timeout time.Duration) error {
-    info, ok := mountTracker.Load(target)
-    now := time.Now()
-
-    if !ok {
-        mountTracker.Store(target, MountInfo{Start: now, Tries: 1})
-    } else {
-        mInfo := info.(MountInfo)
-        mInfo.Tries++
-        
-        // 1. Transient Zone (0-2 mins): Only try Graceful
-        if now.Sub(mInfo.Start) < 2*time.Minute {
-             return m.tryGraceful(target, timeout) 
-        }
-
-        // 2. Persistent Hang Zone (2-4 mins): Try Force
-        if now.Sub(mInfo.Start) < 4*time.Minute {
-             return m.tryForce(target, timeout)
-        }
-        
-        // 3. Last Resort Zone (>4 mins): Lazy Unmount
-        return m.escalateToLazy(target)
-    }
-}
-
-
-func (m *Mounter) UnmountWithTimeout(target string, timeout time.Duration) error {
-	// 1. STATE CHECK: Skip tiers if already detached or stuck
-	if val, ok := mountTracker.Load(target); ok {
-		state := val.(MountState)
-		
-		if state == StateDetached {
-			logger.Infof("Target %s already lazily unmounted; verifying status", target)
-			// Return nil (success) if the path is no longer a mount point
-			err := syscall.Unmount(target, syscall.MNT_DETACH)
-			if err == nil || err == syscall.EINVAL || err == syscall.ENOENT {
-				return nil 
-			}
-			return err
-		}
-		// If StateForcePending, we could either wait or retry MNT_FORCE
-	}
-
-	// Helper to execute any blocking unmount in a goroutine
-	tryUnmount := func(flags int) <-chan error {
-		ch := make(chan error, 1)
-		go func() {
-			// This call might stay trapped in D-state forever; 
-			// the channel buffer ensures the goroutine can eventually exit if it unblocks.
-			ch <- syscall.Unmount(target, flags)
-		}()
-		return ch
-	}
-
-	// Optional: Syncfs to flush data before unmounting
-	f, err := os.OpenFile(target, os.O_RDONLY|syscall.O_NONBLOCK, 0)
+	// 3. Post-Action Verification
 	if err == nil {
-        // syscall.Syncfs flushes all dirty data and metadata for the specific filesystem
-        // It's good practice to ensure Syncfs runs even if the mount is already gone
-		err = syscall.Syncfs(int(f.Fd()))
-		f.Close() // Close the file handle after the syncfs call
-		if err != nil && err != syscall.EINVAL { // EINVAL means the mount point might be invalid/gone
-			logger.Warnf("syncfs failed for %s: %v", mountPath, err)
-		}
-	} else {
-        logger.Debugf("Could not open mount path %s for syncfs: %v", mountPath, err)
-    }
-	
-
-	// TIER 1: Graceful
-	mountTracker.Store(target, StateGracefulPending)
-	select {
-	case err := <-tryUnmount(0):
-		if err == nil || err == syscall.ENOENT || err == syscall.EINVAL {
-			mountTracker.Delete(target)
+		if m.pollMountDeleted(target, 2*time.Second) {
+			m.unmountTracker.Delete(target)
 			return nil
 		}
-		if err == syscall.EBUSY {
-			return m.escalateToLazy(target) // Jump to Tier 3
-		}
-	case <-time.After(timeout):
-		// Graceful timeout; fall through to Tier 2
+		return fmt.Errorf("unmount reported success but %s still remains in mountinfo", target)
 	}
 
-	// TIER 2: Force
-	mountTracker.Store(target, StateForcePending)
-	select {
-	case err := <-tryUnmount(syscall.MNT_FORCE):
-		if err == nil {
-			mountTracker.Delete(target)
-			return nil
-		}
-	case <-time.After(timeout):
-		// Force timeout; fall through to Tier 3
-	}
-
-	// TIER 3: Lazy (Final Fallback)
-	return m.escalateToLazy(target)
-}
-
-func (m *Mounter) escalateToLazy(target string) error {
-	logger.Warnf("Escalating %s to MNT_DETACH", target)
-	err := syscall.Unmount(target, syscall.MNT_DETACH)
-	if err == nil || err == syscall.EINVAL || err == syscall.ENOENT {
-		mountTracker.Store(target, StateDetached)
-		return nil
-	}
 	return err
 }
 
-
-
-func (mounter *Mounter) Unmount(target string) error {
-	logger.Infof("Unmounting %s using syscall", target)
-
-	// Open the mount point directory (used for Syncfs FD)
-	// Note: mountPath variable needs to be accessible in this scope or passed in
+func (m *Mounter) backgroundSyncfs(target string) {
+	success := false
+	// O_NONBLOCK prevents the open itself from hanging in some kernel versions
 	f, err := os.OpenFile(target, os.O_RDONLY|syscall.O_NONBLOCK, 0)
 	if err == nil {
-        // syscall.Syncfs flushes all dirty data and metadata for the specific filesystem
-        // It's good practice to ensure Syncfs runs even if the mount is already gone
-		err = syscall.Syncfs(int(f.Fd()))
-		f.Close() // Close the file handle after the syncfs call
-		if err != nil && err != syscall.EINVAL { // EINVAL means the mount point might be invalid/gone
-			logger.Warnf("syncfs failed for %s: %v", mountPath, err)
+		// SYS_SYNCFS is more efficient than global sync() as it only flushes one FS
+		if _, _, errno := syscall.Syscall(syscall.SYS_SYNCFS, f.Fd(), 0, 0); errno == 0 {
+			success = true
 		}
-	} else {
-        logger.Debugf("Could not open mount path %s for syncfs: %v", mountPath, err)
-    }
-	
+		f.Close()
+	}
 
-	// Replace exec "umount" with syscall.Unmount
-	// The standard syscall performs the necessary kernel operations directly.
-	// You can add the MNT_DETACH flag for lazy unmounting if the simple unmount fails.
-
-    err = syscall.Unmount(target, 0)
-    if err != nil {
-        // Handle a common error for busy devices gracefully by trying lazy unmount
-		switch err {
-		case syscall.EINVAL, syscall.ENOENT:
-			// Already unmounted or target is gone - Success!
-			return nil
-		case syscall.EBUSY:
-			// SAN volumes often stay busy due to monitoring agents or logs
-			logger.Warnf("Target %s busy, forcing lazy unmount", target)
-            err = syscall.Unmount(target, syscall.MNT_DETACH)
-            if err != nil {
-                return fmt.Errorf("lazy unmount failed for %s: %w", target, err)
-            }
-            logger.Infof("Lazy unmount successful for %s", target)
-            return nil
-		}
-        return fmt.Errorf("unmount failed for %s: %w", target, err)
-    }
-
-	return nil
+	if val, ok := m.unmountTracker.Load(target); ok {
+		info := val.(*TrackedUnmount)
+		info.mu.Lock()
+		info.SyncDone = success
+		info.SyncInProgress = false
+		info.mu.Unlock()
+	}
 }
 
-func GetDiskFormatNative(device string) (string, error) {
-	f, err := os.Open(device)
+func (m *Mounter) tryUnmount(target string, flags int, timeout time.Duration) error {
+	ch := make(chan error, 1)
+	go func() { ch <- syscall.Unmount(target, flags) }()
+
+	select {
+	case err := <-ch:
+		if err == nil || err == syscall.ENOENT || err == syscall.EINVAL {
+			return nil
+		}
+		if err == syscall.EBUSY {
+			// Log this specifically: "Target is busy, waiting for K8S retry to escalate tiers"
+			return fmt.Errorf("target %s is busy: %w", target, err)
+		}
+		return err
+	case <-time.After(timeout):
+		return fmt.Errorf("unmount syscall timed out (D-state)")
+	}
+	// TODO verify disappearance
+}
+
+// isMounted checks /proc/self/mountinfo for the target path
+func (m *Mounter) isMounted(target string) bool {
+	f, err := os.Open("/proc/self/mountinfo")
+	if err != nil {
+		return false
+	}
+	defer f.Close()
+
+	// Use a 1MB buffer for nodes with many volumes
+	scanner := bufio.NewScanner(f)
+	buf := make([]byte, 1024*1024)
+	scanner.Buffer(buf, 1024*1024)
+
+	for scanner.Scan() {
+		line := scanner.Text()
+		// Fields: [0:mountID 1:parentID 2:major:minor 3:root 4:mountpoint...]
+		// We look for index 4.
+		if strings.Contains(line, target) {
+			fields := strings.Fields(line)
+			if len(fields) >= 5 && fields[4] == target {
+				return true
+			}
+		}
+	}
+	return false
+}}
+
+func (m *Mounter) pollMountDeleted(target string, timeout time.Duration) bool {
+	expiry := time.Now().Add(timeout)
+	for time.Now().Before(expiry) {
+		if !isMounted(target) {
+			return true
+		}
+		time.Sleep(250 * time.Millisecond)
+	}
+	return false
+}
+
+
+func (m *Mounter) GetDiskFormatNative(device string) (string, error) {
+	// Use O_RDONLY | O_DIRECT (optional) for raw block devices
+	f, err := os.OpenFile(device, os.O_RDONLY, 0)
 	if err != nil {
 		return "", err
 	}
 	defer f.Close()
 
-	// Increased to 68KB to capture Btrfs superblock at 64KB + offset
+	// 68KB covers Btrfs at 64KB and ZFS at 8KB/16KB
 	buf := make([]byte, 68*1024)
-	// (5) Ensure exact byte count for offset safety
-	if _, err := io.ReadFull(f, buf); err != nil && err != io.ErrUnexpectedEOF {
+	n, err := io.ReadFull(f, buf)
+	if err != nil && err != io.ErrUnexpectedEOF {
 		return "", err
 	}
+	buf = buf[:n] // Ensure we don't index past what was actually read
 
-	// (2) XFS Detection (Offset 0)
-	if bytes.HasPrefix(buf, []byte("XFSB")) {
-		// Verification: Check blocksize (log2) at offset 0x4 (usually 12 for 4096)
-		if buf[0x4] >= 9 && buf[0x4] <= 16 {
-			return "xfs", nil
+	if bytes.HasPrefix(buf, []byte("LUKS\xba\xbe")) {
+		if len(buf) >= 8 {
+			version := binary.BigEndian.Uint16(buf[6:8])
+			if version == 1 {
+				return "luks1", nil
+			} else if version == 2 {
+				return "luks2", nil
+			}
 		}
+		return "luks", nil
 	}
 
-	// (4) NTFS Detection (Offset 0x03)
-	if len(buf) > 0x03+4 && string(buf[0x03:0x03+4]) == "NTFS" {
+	// 1. XFS (Offset 0): "XFSB"
+	if bytes.HasPrefix(buf, []byte("XFSB")) {
+		return "xfs", nil
+	}
+
+	// 2. NTFS (Offset 0x03): "NTFS    "
+	if len(buf) > 0x03+4 && bytes.Equal(buf[0x03:0x03+7], []byte("NTFS   ")) {
 		return "ntfs", nil
 	}
 
-	// (1) EXT4 Detection (Offset 0x438)
+	// 3. EXT Family (Offset 0x438 = 1080 bytes)
+	// Magic 0xEF53 is shared by ext2, ext3, and ext4
 	if len(buf) > 0x438+2 {
 		magic := binary.LittleEndian.Uint16(buf[0x438 : 0x438+2])
 		if magic == 0xEF53 {
-			// Verification: Superblock state at 0x436 (1=Clean, 2=Errors)
-			state := binary.LittleEndian.Uint16(buf[0x436 : 0x436+2])
-			if state == 1 || state == 2 {
-				return "ext4", nil
+			// Offset 0x460 (1120): s_feature_incompat
+			// EXT4_FEATURE_INCOMPAT_EXTENTS = 0x0040
+			if len(buf) > 0x460+4 {
+				incompat := binary.LittleEndian.Uint32(buf[0x460 : 0x460+4])
+				if incompat&0x40 != 0 {
+					return "ext4", nil
+				}
 			}
+			return "ext3", nil
 		}
 	}
 
-	// (3) Btrfs Detection (Offset 0x10040)
-	// Superblock is at 64KiB (0x10000), Magic is at offset 0x40 within it
+	// 4. Btrfs (Offset 0x10040 = 65600 bytes)
 	if len(buf) > 0x10040+8 {
 		if string(buf[0x10040:0x10048]) == "_BHRfS_M" {
 			return "btrfs", nil
 		}
 	}
 
-	// (3) Swap Detection (Offset 4086)
+	// 5. Swap (Offset 4086 is for 4K pages)
 	if len(buf) > 4086+10 && string(buf[4086:4086+10]) == "SWAPSPACE2" {
 		return "swap", nil
 	}
 
-	// Final check: Is it unformatted or just unknown?
-	// Check the first 4KB (standard sector/page size) for any data
+	// 6. LVM PV (Offset 0x218 usually has "LVM2 001")
+	if bytes.Contains(buf[:1024], []byte("LABELONE")) && bytes.Contains(buf[:1024], []byte("LVM2")) {
+		return "lvm_pv", nil
+	}
+
+	// 7. ZFS (vdev labels at 8KB, 16KB, etc.)
+	// Magic: 0x00bab10c (Little Endian) or 0x0cb1ba00 (Big Endian)
+	for _, offset := range []int{0x2000, 0x4000} {
+		if len(buf) > offset+8 {
+			magic := binary.LittleEndian.Uint64(buf[offset : offset+8])
+			if magic == 0x00bab10c || magic == 0x0cb1ba00 {
+				return "zfs", nil
+			}
+		}
+	}
+
+	// 8. Zero Check (Verify first 4KB to confirm unformatted)
 	isZero := true
-	for _, b := range buf[:4096] {
-		if b != 0 {
+	for i := 0; i < 4096 && i < len(buf); i++ {
+		if buf[i] != 0 {
 			isZero = false
 			break
 		}
 	}
-
 	if isZero {
-		return "", nil // Definitely unformatted
+		return "", nil // Unformatted
 	}
 
 	return "unknown", nil
 }
 
-func (mounter *Mounter) MountNativeWithTimeout(source, target, fstype string, flags uintptr, data string, options []string, timeout time.Duration) error {
-	// 1. Pre-check: Is this volume already wedged?
-	if _, stuck := stuckMounts.Load(target); stuck {
-		return fmt.Errorf("mount-safety: blocking attempt; previous syscall is still wedged in kernel for %s", target)
+
+
+
+func (m *Mounter) MountNativeWithTimeout(source, target, fstype string, options []string, timeout time.Duration) error {
+	m.reapRecoveredMounts()
+
+	// 1. Safety Check: Is THIS path already stuck?
+	if m.isPathStuck(target) {
+		return fmt.Errorf("mount-safety: target %s is already wedged", target)
 	}
 
-	// If the map has an entry, it means the goroutine hasn't returned yet.
-	if _, stuck := stuckMounts.Load(target); stuck {
-		// Optional: Check if the mount actually finished in the background
-		if isMounted(target) {
-			 stuckMounts.Delete(target)
-			 return nil // Success! It finished while we weren't looking.
-		}
-		return status.Error(codes.Aborted, "previous mount effort still pending")
+	// 2. Create a unique session for THIS specific attempt
+	session := &mountSession{
+		target:    target,
+		startTime: time.Now(),
 	}
-	
 
 	done := make(chan error, 1)
-
-	// 2. Start the syscall in a goroutine
 	go func() {
-		// This thread will hang indefinitely if the kernel hangs
-		err := MountNative(source, target, fstype, options)
-		
-		// If it ever returns, cleanup the tracking
-		stuckMounts.Delete(target)
+		err := m.MountNative(source, target, fstype, options)
+		// Only clear THIS specific session
+		m.clearSession(session)
 		done <- err
 	}()
 
-	// 3. The Wait
 	select {
 	case err := <-done:
 		return err
 	case <-time.After(timeout):
-		// 4. THE ORPHAN: We "cut the rope"
-		stuckMounts.Store(target, time.Now())
-		
-		// We return a "retriable" error to K8s. 
-		// The goroutine above stays alive in the background (leaked).
-		return fmt.Errorf("mount syscall timed out after %v and is orphaned in kernel", timeout)
+		// Store the pointer. The pointer uniqueness prevents the race.
+		m.stuckMounts.Store(session, true)
+		m.stuckCount.Add(1)
+		return fmt.Errorf("mount-safety: timeout on %s", target)
 	}
 }
 
-func (mounter *Mounter) MountNative(source, target, fstype string, options []string) error {
-	// 1. Ensure target directory (or file for block) exists
-	if fstype == "bind" {
-		// For raw block, the target must be an empty file, not a directory
-		if err := m.prepareBindMountTarget(target); err != nil {
-			return err
-		}
-	} else {
-		if err := os.MkdirAll(target, 0750); err != nil {
-			return err
-		}
+func (m *Mounter) MountNative(source, target, fstype string, options []string) error {
+	// 1. Directory Preparation
+	// For 2026 VFS API, the target must exist.
+	if err := os.MkdirAll(target, 0750); err != nil {
+		return fmt.Errorf("mkdir failed: %w", err)
 	}
 
-	// 2. Parse Options into Flags
-	// Standard CSI flags usually include MS_NODEV, MS_NOSUID, etc.
-	flags, data := parseMountOptions(options)
+	flags, _ := m.parseMountOptions(options)
 
-	// 3. Handle Bind Mount vs Filesystem Mount
-	if fstype == "bind" {
-		flags |= syscall.MS_BIND
-		// For bind mounts, fstype and data are ignored by the kernel
-		fstype = ""
-		data = ""
+	// 2. Open the source tree (Clone if bind mount)
+	// OPEN_TREE_CLONE is the modern equivalent of MS_BIND
+	var treeFlags uint = unix.OPEN_TREE_CLOEXEC
+	if (flags & unix.MS_BIND) != 0 {
+		treeFlags |= unix.OPEN_TREE_CLONE | unix.AT_RECURSIVE
 	}
 
-	// 4. Direct Kernel Call
-	err := syscall.Mount(source, target, fstype, flags, data)
+	fd, err := unix.OpenTree(unix.AT_FDCWD, source, treeFlags)
 	if err != nil {
-		return fmt.Errorf("syscall.Mount(source=%s, target=%s, type=%s) failed: %w", 
-            source, target, fstype, err)
+		return fmt.Errorf("open_tree failed: %w", err)
+	}
+	defer unix.Close(fd)
+
+	// 3. Apply modern mount attributes (RO, Nosuid, etc.)
+	// This is where we fix the "Read-Only window" race.
+	attr := &unix.MountAttr{}
+	if (flags & unix.MS_RDONLY) != 0 {
+		attr.Attr_set |= unix.MOUNT_ATTR_RDONLY
+	}
+	if (flags & unix.MS_NOSUID) != 0 {
+		attr.Attr_set |= unix.MOUNT_ATTR_NOSUID
+	}
+	if (flags & unix.MS_NODEV) != 0 {
+		attr.Attr_set |= unix.MOUNT_ATTR_NODEV
+	}
+	if (flags & unix.MS_NOEXEC) != 0 {
+		attr.Attr_set |= unix.MOUNT_ATTR_NOEXEC
+	}
+
+	if attr.Attr_set != 0 {
+		// Apply attributes to the detached tree handle
+		if err := unix.MountSetattr(fd, "", unix.AT_EMPTY_PATH|unix.AT_RECURSIVE, attr); err != nil {
+			return fmt.Errorf("mount_setattr failed: %w", err)
+		}
+	}
+
+	// 4. Attach the tree to the destination (MoveMount)
+	// We use MOVE_MOUNT_F_EMPTY_PATH because fd refers directly to the tree
+	err = unix.MoveMount(fd, "", unix.AT_FDCWD, target, unix.MOVE_MOUNT_F_EMPTY_PATH)
+	if err != nil {
+		return fmt.Errorf("move_mount failed: %w", err)
 	}
 
 	return nil
 }
 
-func (mounter *Mounter)) prepareBindMountTarget(target string) error {
-	// Create parent directory
-	if err := os.MkdirAll(filepath.Dir(target), 0750); err != nil {
-		return err
-	}
-	// Create the empty file that will act as the mount point
-	f, err := os.OpenFile(target, os.O_CREATE, 0660)
-	if err != nil {
-		return err
-	}
-	return f.Close()
+func (m *Mounter) isPathStuck(target string) bool {
+	found := false
+	m.stuckMounts.Range(func(key, value any) bool {
+		if key.(*mountSession).target == target {
+			found = true
+			return false // stop iteration
+		}
+		return true
+	})
+	return found
 }
 
-func (mounter *Mounter) parseMountOptions(options []string) (uintptr, string) {
+func (m *Mounter) reapRecoveredMounts() {
+	if m.stuckCount.Load() == 0 {
+		return
+	}
+
+	foundMounts := make(map[string]struct{})
+	f, err := os.Open("/proc/self/mountinfo")
+	if err == nil {
+		defer f.Close()
+		scanner := bufio.NewScanner(f)
+		// Support for very long mountinfo files in 2026
+		buf := make([]byte, 1024*1024)
+		scanner.Buffer(buf, 1024*1024)
+
+		for scanner.Scan() {
+			fields := strings.Fields(scanner.Text())
+			if len(fields) > 4 {
+				foundMounts[fields[4]] = struct{}{}
+			}
+		}
+	}
+
+	m.stuckMounts.Range(func(key, value any) bool {
+		session := key.(*mountSession)
+
+		_, recovered := foundMounts[session.target]
+		_, statErr := os.Lstat(session.target)
+
+		if recovered || os.IsNotExist(statErr) {
+			// We use the pointer (session) to ensure we only delete
+			// the specific attempt that we just verified is recovered.
+			m.clearSession(session)
+		}
+		return true
+	})
+}
+
+func (m *Mounter) clearSession(session *mountSession) {
+	// LoadAndDelete using the pointer address ensures atomicity.
+	// If the background goroutine finishes BEFORE the timeout,
+	// LoadAndDelete fails (key not in map yet), and count doesn't drop.
+	// If it finishes AFTER, it clears exactly its own session.
+	if _, deleted := m.stuckMounts.LoadAndDelete(session); deleted {
+		m.stuckCount.Add(-1)
+	}
+}
+
+
+
+
+func (m *Mounter) clearStuck(target string) {
+	if _, deleted := m.stuckMounts.LoadAndDelete(target); deleted {
+		m.stuckCount.Add(-1)
+	}
+}
+
+func (m *Mounter) parseMountOptions(options []string) (uintptr, string) {
 	var flags uintptr
 	var data []string
-
 	for _, opt := range options {
 		switch opt {
-		case "ro":
-			flags |= syscall.MS_RDONLY
-		// adding syscall.MS_BIND and syscall.MS_RDONLY in a single call will often ignore the read-only flag.
-		// The Fix: To reliably bind-mount as read-only, you must perform two syscalls:
-        // Create the bind mount (with MS_BIND).
-        // Remount it as read-only (with MS_BIND | MS_REMOUNT | MS_RDONLY). 
-		case "nosuid":
-			flags |= syscall.MS_NOSUID
-		case "nodev":
-			flags |= syscall.MS_NODEV
-		case "noexec":
-			flags |= syscall.MS_NOEXEC
-		case "bind":
-			flags |= syscall.MS_BIND
-		// Remounting via syscall.Mount often requires passing the original mount flags along with the new ones. The kernel usually doesn't "merge" them; it replaces them.			
-		case "remount":
-			flags |= syscall.MS_REMOUNT
-		default:
-			// Options like 'noatime' or filesystem-specific ones (e.g. 'user_xattr')
-			// go into the 'data' string argument.
-			data = append(data, opt)
+		case "ro":      flags |= unix.MS_RDONLY
+		case "nosuid":  flags |= unix.MS_NOSUID
+		case "nodev":   flags |= unix.MS_NODEV
+		case "noexec":  flags |= unix.MS_NOEXEC
+		case "bind":    flags |= unix.MS_BIND
+		case "remount": flags |= unix.MS_REMOUNT
+		default:        data = append(data, opt)
 		}
 	}
 	return flags, strings.Join(data, ",")
