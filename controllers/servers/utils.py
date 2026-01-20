@@ -102,7 +102,7 @@ def get_node_initiators(node_name):
         k8s_node = kubernetes_manager.core_api.read_node(name=node_name)
     except Exception as ex:
         logger.warning(
-            f"Failed to read node {node_name}, treating as no initiators",
+            f"{servers_settings.NODE_READ_FAILURE_MSG}: {node_name}",
             exc_info=ex,
         )
         return Initiators([], [], [])

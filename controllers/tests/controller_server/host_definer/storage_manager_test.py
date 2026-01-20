@@ -36,7 +36,7 @@ class BaseSetUp(unittest.TestCase):
                 "node_id_from_host_definition",
                 "array_connection_info",
                 "io_group",
-                "node_initiators_from_csi_node",
+                common_settings.NODE_INITIATORS_FROM_CSI_NODE,
                 "node_initiators_from_host_definition",
             ]
         )

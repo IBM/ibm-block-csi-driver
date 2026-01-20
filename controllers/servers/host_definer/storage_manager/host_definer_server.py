@@ -26,7 +26,7 @@ class HostDefinerServicer:
         node_id_info = NodeIdInfo(request.node_id_from_csi_node)
         initiators = getattr(
             request,
-            "node_initiators_from_csi_node",
+            common_settings.NODE_INITIATORS_FROM_CSI_NODE,
             getattr(request, "node_initiators", Initiators())
         )
         node_name = node_id_info.node_name
@@ -79,7 +79,7 @@ class HostDefinerServicer:
         array_addresses = array_connection_info.array_addresses
         initiators = getattr(
             request,
-            "node_initiators_from_csi_node",
+            common_settings.NODE_INITIATORS_FROM_CSI_NODE,
             getattr(request, "node_initiators", Initiators())
         )        
         node_name = node_id_info.node_name
@@ -114,7 +114,7 @@ class HostDefinerServicer:
         logger.info("DEBUG - uriziv - 99")
         initiators = getattr(
             request,
-            "node_initiators_from_csi_node",
+            common_settings.NODE_INITIATORS_FROM_CSI_NODE,
             getattr(request, "node_initiators", Initiators())
         )        
         connectivity_type_from_user = get_initiators_connectivity_type(initiators, request.connectivity_type_from_user)
@@ -166,7 +166,7 @@ class HostDefinerServicer:
         self._remove_host_ports(array_mediator, host_name, connectivity_type_from_host)
         initiators = getattr(
             request,
-            "node_initiators_from_csi_node",
+            common_settings.NODE_INITIATORS_FROM_CSI_NODE,
             getattr(request, "node_initiators", Initiators())
         )        
         connectivity_type_from_user = get_initiators_connectivity_type(initiators, request.connectivity_type_from_user)
@@ -195,7 +195,7 @@ class HostDefinerServicer:
     def _create_host(self, host, array_mediator, request):
         initiators = getattr(
             request,
-            "node_initiators_from_csi_node",
+            common_settings.NODE_INITIATORS_FROM_CSI_NODE,
             getattr(request, "node_initiators", Initiators())
         )        
         connectivity_type = get_initiators_connectivity_type(initiators, request.connectivity_type_from_user)

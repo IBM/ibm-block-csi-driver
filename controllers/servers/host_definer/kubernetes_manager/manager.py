@@ -178,7 +178,7 @@ class KubernetesManager():
         return ''
 
     def _get_attr_from_host_definition_annotations(self, k8s_host_definition, attribute):
-        annotations = getattr(k8s_host_definition.metadata, "annotations", {})
+        annotations = getattr(k8s_host_definition.metadata, common_settings.ANNOTATIONS_FIELD, {})
 
         if isinstance(annotations, dict):
             return annotations.get(attribute, '')
@@ -368,7 +368,7 @@ class KubernetesManager():
         # TODO(uriziv1) code dupdication. Call this function from utils
         logger.info("DEBUG - uriziv - 71")
 
-        annotations = getattr(k8s_node.metadata, "annotations", {})
+        annotations = getattr(k8s_node.metadata, common_settings.ANNOTATIONS_FIELD, {})
         node_initiators_raw = annotations.get(
             common_settings.NODE_INITIATORS_FIELD, "{}"
         )
