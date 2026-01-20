@@ -178,11 +178,25 @@ class KubernetesManager():
         return ''
 
     def _get_attr_from_host_definition_annotations(self, k8s_host_definition, attribute):
-        annotations = getattr(k8s_host_definition.metadata, common_settings.ANNOTATIONS_FIELD, {})
+        annotations = getattr(k8s_host_definition.metadata, "annotations", {})
+        raw = annotations.get(attribute)
 
-        if isinstance(annotations, dict):
-            return annotations.get(attribute, '')
-        return ''
+        if not raw:
+            return Initiators()
+
+        if isinstance(raw, dict):
+            data = raw
+        else:
+            try:
+                data = json.loads(raw)
+            except Exception:
+                return Initiators()
+
+        return Initiators(
+            nvme_nqns=data.get("nvme", []),
+            fc_wwns=data.get("fc", []),
+            iscsi_iqns=data.get("iscsi", []),
+        )
 
     def _is_host_definition_matches(self, host_definition_info, node_name, secret_name, secret_namespace):
         return host_definition_info.node_name == node_name and \
