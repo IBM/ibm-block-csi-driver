@@ -178,25 +178,35 @@ class KubernetesManager():
         return ''
 
     def _get_attr_from_host_definition_annotations(self, k8s_host_definition, attribute):
-        annotations = getattr(k8s_host_definition.metadata, "annotations", {})
+        annotations = getattr(k8s_host_definition.metadata, common_settings.ANNOTATIONS_FIELD, {})
+
+        if not isinstance(annotations, dict):
+            if attribute == common_settings.NODE_INITIATORS_FIELD:
+                return Initiators()
+            return ''
+
         raw = annotations.get(attribute)
 
-        if not raw:
-            return Initiators()
-
-        if isinstance(raw, dict):
-            data = raw
-        else:
-            try:
-                data = json.loads(raw)
-            except Exception:
+        if raw is None:
+            if attribute == common_settings.NODE_INITIATORS_FIELD:
                 return Initiators()
+            return ''
 
-        return Initiators(
-            nvme_nqns=data.get("nvme", []),
-            fc_wwns=data.get("fc", []),
-            iscsi_iqns=data.get("iscsi", []),
-        )
+        if attribute == common_settings.NODE_INITIATORS_FIELD:
+            if isinstance(raw, dict):
+                data = raw
+            else:
+                try:
+                    data = json.loads(raw)
+                except Exception:
+                    return Initiators()
+
+            return Initiators(
+                nvme_nqns=data.get("nvme", []),
+                fc_wwns=data.get("fc", []),
+                iscsi_iqns=data.get("iscsi", []),
+            )
+        return raw
 
     def _is_host_definition_matches(self, host_definition_info, node_name, secret_name, secret_namespace):
         return host_definition_info.node_name == node_name and \
