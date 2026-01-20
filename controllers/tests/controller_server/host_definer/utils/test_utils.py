@@ -185,12 +185,24 @@ def get_array_connection_info():
         test_settings.FAKE_SECRET_USER_NAME, test_settings.FAKE_SECRET_PASSWORD)
 
 
-def get_define_request(prefix='', connectivity_type='', node_id_from_host_definition=''):
+def get_define_request(
+    prefix='',
+    connectivity_type='',
+    node_id_from_host_definition='',
+    node_id_from_csi_node=test_settings.FAKE_NODE_ID,
+    initiators_from_host_definition=Initiators(),
+    initiators_from_csi_node=Initiators(),
+):
     return DefineHostRequest(
-        prefix, connectivity_type, node_id_from_host_definition, test_settings.FAKE_NODE_ID,
-        get_array_connection_info(),
-        test_settings.FAKE_STRING_IO_GROUP)
-
+        prefix=prefix,
+        connectivity_type_from_user=connectivity_type,
+        node_id_from_host_definition=node_id_from_host_definition,
+        node_initiators_from_host_definition=initiators_from_host_definition,
+        node_id_from_csi_node=node_id_from_csi_node,
+        node_initiators_from_csi_node=initiators_from_csi_node,
+        array_connection_info=get_array_connection_info(),
+        io_group=test_settings.FAKE_STRING_IO_GROUP,
+    )
 
 def get_define_response(connectivity_type, ports):
     return DefineHostResponse(
@@ -220,5 +232,9 @@ def get_fake_managed_node():
     managed_node.name = test_settings.FAKE_NODE_NAME
     managed_node.node_id = test_settings.FAKE_NODE_ID
     managed_node.io_group = test_settings.FAKE_STRING_IO_GROUP
-    managed_node.node_initiators = '{"nvme": [], "fc": [], "iscsi": []}'
+    managed_node.node_initiators = Initiators(
+        nvme_nqns=[],
+        fc_wwns=[],
+        iscsi_iqns=[]
+    )
     return managed_node
