@@ -34,6 +34,7 @@ from controllers.tests.controller_server.common import (mock_get_agent,
 from controllers.tests.utils import ProtoBufMock
 
 CONTROLLER_SERVER_PATH = "controllers.servers.csi.csi_controller_server"
+TEST_SERVER_PATH = "controllers.servers.host_definer.kubernetes_manager.manager"
 
 
 class BaseControllerSetUp(unittest.TestCase):
@@ -1002,7 +1003,7 @@ class TestPublishVolume(BaseControllerSetUp, CommonControllerTest):
         self.mock_initiators = {'fc_wwns': [self.fc_port],
                                 'iscsi_iqns': [self.iqn],
                                 'nvme_nqns': []}
-        mock_get_node_initiators(self, CONTROLLER_SERVER_PATH)
+        mock_get_node_initiators(self, TEST_SERVER_PATH)
 
     def test_publish_volume_success(self):
         self.servicer.ControllerPublishVolume(self.request, self.context)

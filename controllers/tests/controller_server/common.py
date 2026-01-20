@@ -37,7 +37,7 @@ def mock_mediator():
 
 
 def mock_get_node_initiators(contex, server_path):
-    get_node_initiators_path = '.'.join((server_path, 'CSIControllerServicer', '_get_node_initiators'))
+    get_node_initiators_path = '.'.join((server_path, 'KubernetesManager', '_get_node_initiators'))
     get_node_initiators_patcher = patch(get_node_initiators_path,
                                         return_value=contex.mock_initiators)
     contex._get_node_initiators = get_node_initiators_patcher.start()
