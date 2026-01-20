@@ -63,169 +63,6 @@ const DefaultMaxOutput = 1024 * 1024
 //nventory (discoverydb, scan)	1MB - 5MB	10MB	Prevents truncation on high-density nodes.
 
 
-func (e *OsExecuter) ExecuteWithTimeoutSilently(timeoutMs int, command string, args ...string) ([]byte, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(timeoutMs)*time.Millisecond)
-	defer cancel()
-
-	cmd := exec.CommandContext(ctx, command, args...)
-	
-	// PROTECT: Force-return if process is in D-state after timeout + 2s
-	cmd.WaitDelay = 2 * time.Second
-
-	stdout, err := cmd.StdoutPipe()
-	if err != nil {
-		return nil, err
-	}
-	cmd.Stderr = cmd.Stdout 
-
-	if err := cmd.Start(); err != nil {
-		return nil, err
-	}
-
-	limitReader := io.LimitReader(stdout, DefaultMaxOutput)
-	var output bytes.Buffer
-	readDone := make(chan struct{})
-	
-	go func() {
-		_, _ = io.Copy(&output, limitReader)
-		close(readDone)
-	}()
-
-	err = cmd.Wait()
-	<-readDone 
-
-	capturedOutput := output.Bytes()
-
-	// 1. Context Check (Restored explicit DeadlineExceeded logic)
-	if ctx.Err() != nil {
-		logger.Debugf("Command %s interrupted. Context: %v. Partial output: %s", command, ctx.Err(), string(capturedOutput))
-		
-		// Return specific sentinel error if it was a timeout
-		if errors.Is(ctx.Err(), context.DeadlineExceeded) {
-			return capturedOutput, context.DeadlineExceeded
-		}
-		return capturedOutput, ctx.Err()
-	}
-	
-	if err != nil {
-		// exec.ErrWaitDelay specifically indicates the process stayed alive 
-		// past the SIGKILL attempt (D-state)
-		if errors.Is(err, exec.ErrWaitDelay) {
-			return capturedOutput, fmt.Errorf("kernel-level hang detected (D-state): %w", err)
-		}
-		// Context timeout check
-		if ctx.Err() != nil {
-			return capturedOutput, ctx.Err()
-		}
-	}
-	
-	return capturedOutput, nil
-}
-
-
-
-func (e *OsExecuter) ExecuteWithTimeoutSilently(timeoutMs int, command string, args ...string) ([]byte, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(timeoutMs)*time.Millisecond)
-	defer cancel()
-
-	cmd := exec.CommandContext(ctx, command, args...)
-	
-	// Vital for 2026: Protects against D-state hangs on failed fabrics
-	cmd.WaitDelay = 2 * time.Second
-
-	stdout, err := cmd.StdoutPipe()
-	if err != nil {
-		return nil, err
-	}
-	cmd.Stderr = cmd.Stdout 
-
-	if err := cmd.Start(); err != nil {
-		return nil, err
-	}
-
-	limitReader := io.LimitReader(stdout, DefaultMaxOutput)
-	var output bytes.Buffer
-	readDone := make(chan struct{})
-	
-	go func() {
-		// io.Copy will return when the pipe is closed by cmd.Wait()
-		_, _ = io.Copy(&output, limitReader)
-		close(readDone)
-	}()
-
-	// Wait for process exit or WaitDelay timeout
-	waitErr := cmd.Wait()
-	<-readDone 
-
-	capturedOutput := output.Bytes()
-
-	// Priority 1: Check if the context (timeout) was the cause
-	if ctx.Err() != nil {
-		if errors.Is(ctx.Err(), context.DeadlineExceeded) {
-			return capturedOutput, context.DeadlineExceeded
-		}
-		return capturedOutput, ctx.Err()
-	}
-
-	// Priority 2: Check for D-state (WaitDelay) or other execution errors
-	if waitErr != nil {
-		if errors.Is(waitErr, exec.ErrWaitDelay) {
-			return capturedOutput, fmt.Errorf("kernel-level hang (D-state) detected: %w", waitErr)
-		}
-		// Return the actual exit error (e.g., non-zero exit code)
-		return capturedOutput, fmt.Errorf("command failed: %w", waitErr)
-	}
-
-	return capturedOutput, nil
-}
-
-func (e *OsExecuter) ExecuteWithTimeoutSilently(timeoutMs int, command string, args ...string) ([]byte, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(timeoutMs)*time.Millisecond)
-	defer cancel()
-
-	cmd := exec.CommandContext(ctx, command, args...)
-	
-	// WaitDelay: If the process exits but pipes stay open (D-state sub-calls),
-	// forcefully close them after 2s to unblock Wait().
-	cmd.WaitDelay = 2 * time.Second
-
-	// Combined output buffer
-	var output bytes.Buffer
-	// Limit total output to prevent OOM from chatty commands
-	limitWriter := &limitWriter{Writer: &output, Limit: DefaultMaxOutput}
-	cmd.Stdout = limitWriter
-	cmd.Stderr = limitWriter
-
-	// Using cmd.Run() is simpler when Stdout/Stderr are set; 
-	// it handles the pipe lifecycle and Wait() internally.
-	err := cmd.Start()
-	if err != nil {
-		return nil, err
-	}
-
-	// Wait for completion or timeout
-	waitErr := cmd.Wait()
-	capturedOutput := output.Bytes()
-
-	// 1. Check for Context Timeout (SIGKILL sent by Go)
-	if ctx.Err() != nil {
-		return capturedOutput, fmt.Errorf("timeout (%vms): %w", timeoutMs, ctx.Err())
-	}
-
-	// 2. Check for Kernel Hang (WaitDelay)
-	if errors.Is(waitErr, exec.ErrWaitDelay) {
-		return capturedOutput, fmt.Errorf("kernel hang detected (D-state): %w", waitErr)
-	}
-
-	// 3. Check for Non-zero Exit Codes
-	if waitErr != nil {
-		return capturedOutput, fmt.Errorf("exit error: %w", waitErr)
-	}
-
-	return capturedOutput, nil
-}
-
-// Simple helper to enforce DefaultMaxOutput without io.Pipe complexity
 type limitWriter struct {
 	io.Writer
 	Limit int64
@@ -278,13 +115,17 @@ func (e *Executer) markAsStuck(device string, pid int, command string) {
 }
 
 
+func (e *Executer) ExecuteWithTimeoutSilently(timeoutMs int, command string, args []string) ([]byte, error) {
+	return ExecuteWithTracking("", timeoutMs, string, args)
+}
 
 func (e *Executer) ExecuteWithTracking(device string, timeoutMs int, command string, args []string) ([]byte, error) {
 	// 1. Pre-check: Don't spawn a new process if one is already wedged
-	if isDeviceStillStuck(device) {
+	if device != "" && isDeviceStillStuck(device) {
 		return nil, fmt.Errorf("node-safety: previous %s process is still stuck in kernel D-state for device %s", command, device)
 	}
-
+	
+	
 	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(timeoutMs)*time.Millisecond)
 	defer cancel()
 
@@ -293,33 +134,40 @@ func (e *Executer) ExecuteWithTracking(device string, timeoutMs int, command str
 	cmd.WaitDelay = 2 * time.Second
 
 	// We use Start() + Wait() instead of CombinedOutput() to capture the PID correctly
-	var b bytes.Buffer
-	cmd.Stdout = &b
-	cmd.Stderr = &b
+	// Combined output buffer
+	var output bytes.Buffer
+	// Limit total output to prevent OOM from chatty commands
+	limitWriter := &limitWriter{Writer: &output, Limit: DefaultMaxOutput}
+	cmd.Stdout = limitWriter
+	cmd.Stderr = limitWriter
+	
+    if err := cmd.Start(); err != nil {
+        return nil, fmt.Errorf("failed to start command: %w", err)
+    }	
+	
+    pid := cmd.Process.Pid
+    err := cmd.Wait()
+    captured := output.Bytes()
 
-	if err := cmd.Start(); err != nil {
-		return nil, err
+    if err != nil {
+        // Check specifically for context timeout or WaitDelay expiration
+        if errors.Is(err, exec.ErrWaitDelay) || ctx.Err() != nil {
+            if device != "" {
+				e.markAsStuck(device, pid, command)
+			}
+            return captured, fmt.Errorf("process %d hung on %s: %w", pid, device, err)
+        }
+        return captured, fmt.Errorf("exit error: %w", err)
+    }
+
+    // Success: Device is healthy, clear any existing block
+	if device != "" {
+	    clearTracking(device)
 	}
-
-	pid := cmd.Process.Pid
-	err := cmd.Wait()
-	
-	if err != nil {
-		// If context timed out OR WaitDelay expired, the process is likely stuck in kernel
-		if errors.Is(err, exec.ErrWaitDelay) || (ctx.Err() != nil) {
-			e.markAsStuck(device, pid, command)
-			return nil, fmt.Errorf("node-safety: process %d stuck in kernel for device %s: %w", pid, device, err)
-		}
-		return b.Bytes(), err
-	}	
-	
-	// Success: Clean up any old tracking for this device
-	stuckMu.Lock()
-	delete(stuckProcesses, device)
-	stuckMu.Unlock()
-	
-	return b.Bytes(), nil
+    return captured, nil
 }
+
+
 
 
 
@@ -353,6 +201,7 @@ func isDeviceStillStuck(device string) bool {
 	if err != nil {
 		return false
 	}
+	
 
 	// 2. IDENTITY VERIFICATION: The "Gold Standard"
 	// If the start time differs, the PID was reused by a different process.
@@ -474,33 +323,34 @@ var (
 )
 
 const (
-	AbstractSocketPath = "\x00/org/kernel/linux/storage/multipathd"
-	StandardSocket     = "/run/multipathd.sock"
-	LegacySocket       = "/var/run/multipathd.sock"
+    // Use '@' for Go's internal abstract namespace handling
+    AbstractSocketPath = "@/org/kernel/linux/storage/multipathd"
+    StandardSocket     = "/run/multipathd.sock"
+    LegacySocket       = "/var/run/multipathd.sock"
 )
 
-// resolveSocket implements the prioritized discovery logic.
 func resolveSocket() string {
-	// 1. Env Var override is the highest priority
-	if env := os.Getenv("MULTIPATH_SOCKET_NAME"); env != "" {
-		return env
-	}
+    if env := os.Getenv("MULTIPATH_SOCKET_NAME"); env != "" {
+        return env
+    }
 
-	// 2. Abstract namespace is the most robust for containers
-	if conn, err := net.DialTimeout("unix", AbstractSocketPath, 50*time.Millisecond); err == nil {
-		conn.Close()
-		return AbstractSocketPath
-	}
+    // Try abstract first - no filesystem cleanup needed
+    if conn, err := net.DialTimeout("unix", AbstractSocketPath, 50*time.Millisecond); err == nil {
+        conn.Close()
+        return AbstractSocketPath
+    }
 
-	// 3. Standard filesystem paths
-	for _, path := range []string{StandardSocket, LegacySocket} {
-		if _, err := os.Stat(path); err == nil {
-			return path
-		}
-	}
+    // Check filesystem paths
+    for _, path := range []string{StandardSocket, LegacySocket} {
+        if conn, err := net.DialTimeout("unix", path, 50*time.Millisecond); err == nil {
+            conn.Close()
+            return path
+        }
+    }
 
-	return StandardSocket
+    return StandardSocket
 }
+
 
 // GetSocket returns the cached socket or discovers it if empty.
 func GetSocket() string {
@@ -565,6 +415,7 @@ func MultipathdCmd(command string) (string, error) {
 	// Read Payload: Use io.ReadAll to avoid bufio.Scanner's 64KB limit
 	reader := io.LimitReader(conn, int64(respLen))
 	respBody, err := io.ReadAll(reader)
+
 	if err != nil {
 		return "", err
 	}
