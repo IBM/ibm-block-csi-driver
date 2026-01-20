@@ -126,8 +126,9 @@ class TestDefineHost(BaseSetUp):
 
     def _prepare_define_host_update_ports_without_delete_host(self, host_connectivity_type):
         self.mediator.get_host_connectivity_ports.return_value = [settings.IQN]
-        self.request.node_id_from_csi_node = '{};;{};'.format(HOST_NAME, settings.WWPN)
+        self.request.node_id_from_csi_node = HOST_NAME
         self.request.connectivity_type_from_user = array_settings.FC_CONNECTIVITY_TYPE
+        self.request.node_initiators_from_csi_node = Initiators(fc_wwns=[settings.WWPN])
         self._prepare_define_host_update_ports(host_connectivity_type,
                                                Initiators(fc_wwns=[settings.WWPN]))
 
