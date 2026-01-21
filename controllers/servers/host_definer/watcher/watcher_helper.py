@@ -81,6 +81,7 @@ class Watcher(KubernetesManager):
         return host_definition_info
 
     def _add_node_initiators_to_host_definition_info(self, node_name, host_definition_info):
+        # TODO(uriziv): Should I check if node type is ManagedNode before calling this fucntion?
         logger.info("debug - uriziv - 113")
         host_definition_info.node_initiators = NODES[node_name].node_initiators
         logger.info(host_definition_info)
@@ -117,6 +118,7 @@ class Watcher(KubernetesManager):
             logger.info("DEBUG - uriziv - 128")
             host_definition_info.connectivity_type = host_definition_info_on_cluster.connectivity_type
             host_definition_info.node_id = host_definition_info_on_cluster.node_id
+            # TODO(uriziv): Update here (?) host_definition_info.node_iinitators.
         return host_definition_info
 
     def _define_host(self, host_definition_info):
@@ -401,6 +403,7 @@ class Watcher(KubernetesManager):
             logger.info("debug - uriziv - 129")
             logger.info(host_definition_info)
             logger.info("debug - uriziv - 130")
+            # TODO(uriziv1): replace _get_node_initiators with NODES[host_definition_info.node_name].node_initiators
             return self._get_node_initiators(host_definition_info.node_name)
         except Exception:
             return self._get_node_initiators_from_host_definition(host_definition_info)

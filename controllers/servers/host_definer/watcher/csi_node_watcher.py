@@ -110,6 +110,7 @@ class CsiNodeWatcher(Watcher):
                                                     csi_node_info,
                                                     node_initiators):
                     logger.info(messages.UPDATE_HOST_DEFINITION_PORTS)
+                    # TODO(uriziv): Need to update here (?) host_definition_info.node_initiators
                     NODES[csi_node_info.name] = self._generate_managed_node(csi_node_info)
                     for node_i in NODES.values():
                         logger.info(node_i.__dict__)
