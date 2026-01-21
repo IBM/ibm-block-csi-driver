@@ -42,7 +42,6 @@ def string_to_array(str_val, separator):
     return res
 
 
-
 def _get_config_map_info():
     result = {}
 
