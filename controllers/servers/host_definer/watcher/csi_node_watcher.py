@@ -51,8 +51,7 @@ class CsiNodeWatcher(Watcher):
 
     def _handle_deleted_csi_node_pod(self, csi_node_info):
         if self._is_node_has_manage_node_label(csi_node_info.name):
-            remove_host_thread = Thread(target=self._undefine_host_when_node_pod_is_deleted,
-                                        args=(csi_node_info))
+            remove_host_thread = Thread(target=self._undefine_host_when_node_pod_is_deleted, args=(csi_node_info,))
             remove_host_thread.start()
 
     def _undefine_host_when_node_pod_is_deleted(self, csi_node_info):
