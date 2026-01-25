@@ -18,13 +18,13 @@ package mount
 
 import (
 	"bufio"
-	"context"
 	"bytes"
 	"encoding/binary"
 	"fmt"
 	"io"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"sync"
 	"sync/atomic"
@@ -32,7 +32,6 @@ import (
 	"time"
 
 	"golang.org/x/sys/unix"
-	"github.com/ibm/ibm-block-csi-driver/node/logger"
 	"github.com/ibm/ibm-block-csi-driver/node/pkg/driver/executer"
 	mount "k8s.io/mount-utils"
 )
@@ -84,7 +83,7 @@ func New(mounterPath string, limit int32) mount.Interface {
 	return &Mounter{
 		Mounter:  mount.New(mounterPath).(*mount.Mounter),
 		executer: &executer.Executer{},
-		maxStuckLimit: limit
+		maxStuckLimit: limit,
 	}
 }
 
@@ -92,7 +91,7 @@ func NewWithExecutor(mounterPath string, e executer.ExecuterInterface, limit int
 	return &Mounter{
 		Mounter:  mount.New(mounterPath).(*mount.Mounter),
 		executer: e,
-		maxStuckLimit: limit
+		maxStuckLimit: limit,
 	}
 }
 
@@ -102,17 +101,17 @@ func (m *Mounter) UnmountWithTimeout(target string, timeout time.Duration) error
 	now := time.Now()
 
 	// 1. Initial Idempotency - Check if actually mounted
-	if !m.isMounted(target) {
+	if mounted, _ := m.IsMounted(target); !mounted {
 		m.unmountTracker.Delete(target)
 		return nil
 	}
 
 	// Use LoadOrStore with a pointer to TrackedUnmountunt to avoid identity races
-	val, loaded := m.unmountTracker.LoadOrStore(target, &TrackedUnmount{
+	val, _ := m.unmountTracker.LoadOrStore(target, &TrackedUnmount{
 		FirstAttempt: now,
 		LastState:    StateGracefulPending,
 	})
-	mInfo := val.(*TrackedUnmountount)
+	mInfo := val.(*TrackedUnmount)
 
 	// If we just stored it (loaded == false), we use the 'now' we just created.
 	// If it was already there, we use the original FirstAttempt.
@@ -173,11 +172,12 @@ func (m *Mounter) backgroundSyncfs(target string) {
 	// O_NONBLOCK prevents the open itself from hanging in some kernel versions
 	f, err := os.OpenFile(target, os.O_RDONLY|syscall.O_NONBLOCK, 0)
 	if err == nil {
+		defer runtime.KeepAlive(f)
 		// SYS_SYNCFS is more efficient than global sync() as it only flushes one FS
-		if _, _, errno := syscall.Syscall(syscall.SYS_SYNCFS, f.Fd(), 0, 0); errno == 0 {
+		if err = unix.Syncfs(int(f.Fd())); err == nil {
 			success = true
 		}
-		f.Close()
+		defer f.Close()
 	}
 
 	if val, ok := m.unmountTracker.Load(target); ok {
@@ -287,7 +287,7 @@ func (m *Mounter) isMountedInProc(target string) (bool, error) {
 func (m *Mounter) pollMountDeleted(target string, timeout time.Duration) bool {
 	expiry := time.Now().Add(timeout)
 	for time.Now().Before(expiry) {
-		if !isMounted(target) {
+		if mounted, _ := m.IsMounted(target); !mounted {
 			return true
 		}
 		time.Sleep(250 * time.Millisecond)

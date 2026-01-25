@@ -28,7 +28,6 @@ type KeyedGater struct {
 
 func NewKeyedGater() *KeyedGater {
 	return &KeyedGater{
-		gates: make(map[string]chan struct{}),
 	}
 }
 
@@ -119,7 +118,7 @@ func (g *KeyedGater) ExecuteUninterruptible(
 	})
 }
 
-func (s *SemaphoreManager) baseExecute(
+func (g *KeyedGater) baseExecute(
 	resourceName string,
 	maxRunning, maxSpare int,
 	handoffTimeout time.Duration,

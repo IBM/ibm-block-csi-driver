@@ -17,7 +17,6 @@
 package executer
 
 import (
-	"bufio"
 	"bytes"
 	"context"
 	"errors"
@@ -31,6 +30,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/ibm/ibm-block-csi-driver/node/logger"
@@ -50,7 +50,26 @@ type ExecuterInterface interface { // basic host dependent functions
 	GetExitCode(err error) (int, bool)
 }
 
+type SocketLimiter struct {
+        sem          chan struct{}
+        lastFail     time.Time
+        mu           sync.RWMutex
+        failureCount atomic.Int32
+}
+
 type Executer struct {
+	stuckProcesses map[string]zombieInfo
+	stuckMu        sync.Mutex
+        cachedSocket string
+        socketMu     sync.RWMutex
+
+	sl SocketLimiter
+}
+
+func NewExecuter() * Executer {
+	return &Executer{
+		stuckProcesses: make(map[string]zombieInfo),
+	}
 }
 
 
@@ -86,7 +105,7 @@ func (w *limitWriter) Write(p []byte) (n int, err error) {
 
 
 func (e *Executer) ExecuteWithTimeoutSilently(timeoutMs int, command string, args []string) ([]byte, error) {
-	return ExecuteWithTracking("", timeoutMs, string, args)
+	return e.ExecuteWithTracking("", timeoutMs, command, args)
 }
 
 
@@ -102,28 +121,28 @@ func (e *Executer) getPidStartTime(pid int) (uint64, error) {
 	if err != nil {
 		return 0, err
 	}
-	_, startTime, err := parseStatFile(data)
+	_, startTime, err := e.parseStatFile(data)
 	return startTime, err
 }
 
 func (e *Executer) markAsStuck(device string, pid int, command string) {
 	// Fetch the unique start time for this specific PID instance
-	startTime, _ := getPidStartTime(pid)
+	startTime, _ := e.getPidStartTime(pid)
 
-	stuckMu.Lock()
-	stuckProcesses[device] = zombieInfo{
+	e.stuckMu.Lock()
+	e.stuckProcesses[device] = zombieInfo{
 		pid:       pid,
 		command:   filepath.Base(command),
 		startTime: startTime,
 	}
-	stuckMu.Unlock()
+	e.stuckMu.Unlock()
 }
 
 
 
 func (e *Executer) ExecuteWithTracking(device string, timeoutMs int, command string, args []string) ([]byte, error) {
 	// 1. Pre-check: Don't spawn a new process if one is already wedged
-	if device != "" && isDeviceStillStuck(device) {
+	if device != "" && e.isDeviceStillStuck(device) {
 		return nil, fmt.Errorf("node-safety: previous %s process is still stuck in kernel D-state for device %s", command, device)
 	}
 
@@ -164,22 +183,22 @@ func (e *Executer) ExecuteWithTracking(device string, timeoutMs int, command str
 
     // Success: Device is healthy, clear any existing block
 	if device != "" {
-	    clearTracking(device)
+	    e.clearTracking(device)
 	}
     return captured, nil
 }
 
 
 func (e *Executer) clearTracking(device string) {
-	stuckMu.Lock()
-	delete(stuckProcesses, device)
-	stuckMu.Unlock()
+	e.stuckMu.Lock()
+	delete(e.stuckProcesses, device)
+	e.stuckMu.Unlock()
 }
 
 func (e *Executer) isDeviceStillStuck(device string) bool {
-	stuckMu.Lock()
-	info, exists := stuckProcesses[device]
-	stuckMu.Unlock()
+	e.stuckMu.Lock()
+	info, exists := e.stuckProcesses[device]
+	e.stuckMu.Unlock()
 
 	if !exists {
 		return false
@@ -188,11 +207,11 @@ func (e *Executer) isDeviceStillStuck(device string) bool {
 	// 1. Read raw data to handle parentheses safely
 	statData, err := os.ReadFile(fmt.Sprintf("/proc/%d/stat", info.pid))
 	if err != nil {
-		clearTracking(device) // PID no longer exists
+		e.clearTracking(device) // PID no longer exists
 		return false
 	}
 
-	state, currentStart, err := parseStatFile(statData)
+	state, currentStart, err := e.parseStatFile(statData)
 	if err != nil {
 		return false
 	}
@@ -202,7 +221,7 @@ func (e *Executer) isDeviceStillStuck(device string) bool {
 	// If the start time differs, the PID was reused by a different process.
 	if currentStart != info.startTime {
 		logger.Debugf("PID %d was reused (old start: %d, new start: %d)", info.pid, info.startTime, currentStart)
-		clearTracking(device)
+		e.clearTracking(device)
 		return false
 	}
 
@@ -212,7 +231,7 @@ func (e *Executer) isDeviceStillStuck(device string) bool {
         // Standard user-space process (iscsiadm, multipath, etc.)
         cleanCmd := bytes.ReplaceAll(cmdline, []byte{0}, []byte{' '})
         if !strings.Contains(string(cleanCmd), device) {
-            clearTracking(device)
+            e.clearTracking(device)
             return false
         }
     } else {
@@ -222,18 +241,18 @@ func (e *Executer) isDeviceStillStuck(device string) bool {
         if strings.Contains(info.command, "jbd2") ||
            strings.Contains(info.command, "xfsaild") ||
            strings.Contains(info.command, "dm-") {
-            
+
             // For kernel workers, the 'device' name is often part of the 'comm' field
             // e.g., 'jbd2/sda1' or 'xfsaild/dm-0'
             if !strings.Contains(info.command, filepath.Base(device)) {
                  // Command doesn't match our target device
-                 clearTracking(device)
+                 e.clearTracking(device)
                  return false
             }
-            logger.Warnf("Kernel worker %s is stuck for device %s", info.command, device)
+            logger.Warningf("Kernel worker %s is stuck for device %s", info.command, device)
         } else {
             // Unidentified process with empty cmdline (could be a zombie user task)
-            clearTracking(device)
+            e.clearTracking(device)
             return false
         }
     }
@@ -241,10 +260,10 @@ func (e *Executer) isDeviceStillStuck(device string) bool {
     // 3. Check State & WCHAN
     // D = Uninterruptible sleep (usually IO)
     // S = Interruptible sleep (but potentially stuck in storage RPC)
-    isStuck := (state == 'D' || (state == 'S' && isStorageWait(info.pid)))
+    isStuck := (state == 'D' || (state == 'S' && e.isStorageWait(info.pid)))
 
     if !isStuck {
-        clearTracking(device)
+        e.clearTracking(device)
         return false
     }
 
@@ -309,11 +328,6 @@ func (e *Executer) ExecuteWithTimeout(mSeconds int, command string, args []strin
 	return out, err
 }
 
-var (
-	cachedSocket string
-	socketMu     sync.RWMutex
-)
-
 const (
     // Use '@' for Go's internal abstract namespace handling
     AbstractSocketPath = "@/org/kernel/linux/storage/multipathd"
@@ -346,37 +360,37 @@ func resolveSocket() string {
 
 // GetSocket returns the cached socket or discovers it if empty.
 func (e *Executer) GetSocket() string {
-	socketMu.RLock()
-	s := cachedSocket
-	socketMu.RUnlock()
+	e.socketMu.RLock()
+	s := e.cachedSocket
+	e.socketMu.RUnlock()
 
 	if s != "" {
 		return s
 	}
 
-	socketMu.Lock()
-	defer socketMu.Unlock()
+	e.socketMu.Lock()
+	defer e.socketMu.Unlock()
 	// Double-check to prevent race
-	if cachedSocket == "" {
-		cachedSocket = resolveSocket()
+	if e.cachedSocket == "" {
+		e.cachedSocket = resolveSocket()
 	}
-	return cachedSocket
+	return e.cachedSocket
 }
 
 // invalidateSocket clears the cache if a connection fails.
 func (e *Executer) invalidateSocket() {
-	socketMu.Lock()
-	cachedSocket = ""
-	socketMu.Unlock()
+	e.socketMu.Lock()
+	e.cachedSocket = ""
+	e.socketMu.Unlock()
 }
 
 func (e *Executer) MultipathdCmd(command string) (string, error) {
-	socketPath := GetSocket()
+	socketPath := e.GetSocket()
 
 	conn, err := net.DialTimeout("unix", socketPath, 2*time.Second)
 	if err != nil {
-		invalidateSocket()
-		socketPath = GetSocket()
+		e.invalidateSocket()
+		socketPath = e.GetSocket()
 		conn, err = net.DialTimeout("unix", socketPath, 2*time.Second)
 		if err != nil {
 			return "", fmt.Errorf("multipathd unreachable: %w", err)
@@ -482,27 +496,19 @@ func TimeoutWrapper(timeout time.Duration, action func() error) error {
 	}
 }
 
-
-type SocketLimiter struct {
-	sem          chan struct{}
-	lastFail     time.Time
-	mu           sync.RWMutex
-	failureCount atomic.Int32
-}
-
 func (e *Executer) MultipathdCmdLimiter(ctx context.Context, action func() error) error {
 	// 1. Fail-Fast Check
-	sl.mu.RLock()
-	if time.Since(sl.lastFail) < 30*time.Second && sl.failureCount.Load() > 3 {
-		sl.mu.RUnlock()
+	e.sl.mu.RLock()
+	if time.Since(e.sl.lastFail) < 30*time.Second && e.sl.failureCount.Load() > 3 {
+		e.sl.mu.RUnlock()
 		return fmt.Errorf("multipathd-safety: daemon is currently unresponsive; skipping")
 	}
-	sl.mu.RUnlock()
+	e.sl.mu.RUnlock()
 
 	// 2. Acquire Semaphore
 	select {
-	case sl.sem <- struct{}{}:
-		defer func() { <-sl.sem }()
+	case e.sl.sem <- struct{}{}:
+		defer func() { <-e.sl.sem }()
 	case <-ctx.Done():
 		return ctx.Err()
 	}
@@ -511,12 +517,12 @@ func (e *Executer) MultipathdCmdLimiter(ctx context.Context, action func() error
 	err := action()
 
 	if err != nil && strings.Contains(err.Error(), "timeout") {
-		sl.mu.Lock()
-		sl.lastFail = time.Now()
-		sl.failureCount.Add(1)
-		sl.mu.Unlock()
+		e.sl.mu.Lock()
+		e.sl.lastFail = time.Now()
+		e.sl.failureCount.Add(1)
+		e.sl.mu.Unlock()
 	} else if err == nil {
-		sl.failureCount.Store(0) // Reset on success
+		e.sl.failureCount.Store(0) // Reset on success
 	}
 
 	return err
