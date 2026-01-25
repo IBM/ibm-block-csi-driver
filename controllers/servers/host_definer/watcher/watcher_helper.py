@@ -402,11 +402,12 @@ class Watcher(KubernetesManager):
         try:
             logger.info("debug - uriziv - 129")
             logger.info(host_definition_info)
+            for node_i in NODES.values():
+                logger.info(node_i.__dict__)
             logger.info("debug - uriziv - 130")
-            # TODO(uriziv1): replace _get_node_initiators with NODES[host_definition_info.node_name].node_initiators
-            return self._get_node_initiators(host_definition_info.node_name)
+            return NODES[host_definition_info.node_name].node_initiators
         except Exception:
-            return self._get_node_initiators_from_host_definition(host_definition_info)
+            return host_definition_info.node_initiators
 
     def _get_node_initiators_from_host_definition(self, host_definition_info):
         logger.info("debug - uriziv - 121")

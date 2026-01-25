@@ -346,12 +346,6 @@ class KubernetesManager():
             return self._generate_node_info(k8s_node)
         return NodeInfo('', {})
 
-    def _get_node_initiators(self, node_name):
-        k8s_node = self._read_node(node_name)
-        if k8s_node:
-            return self._generate_node_initiators(k8s_node)
-        return Initiators([], [], [])
-
     def _read_node(self, node_name):
         try:
             logger.info(messages.READ_NODE.format(node_name))
