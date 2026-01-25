@@ -16,7 +16,6 @@
 
 package device_connectivity
 
-
 import (
 	"bufio"
 	"context"
@@ -24,6 +23,7 @@ import (
 	"errors"
 	"fmt"
 	"io/ioutil"
+	"net"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -258,6 +258,244 @@ const (
 	DM_NOFLUSH_FLAG    = 1 << 8  // Critical: do not hang on dead paths, Equivalent to --noflush: drops pending I/O on remove
 	DM_DEFERRED_REMOVE = 1 << 17 // Standard for CSI Unstage
 )
+
+
+func (r *OsDeviceConnectivityHelperScsiGeneric) TeardownVolume(target string, mpathName string, slaves []string) error {
+	// --- PHASE 1: UNMOUNT ESCALATION ---
+	if r.Mounter.isMounted(target) {
+		r.Mounter.UnmountWithTimeout(target, 20)
+		if err := r.Mounter.UnmountWithTimeout(target, 20); err != nil {
+			return fmt.Errorf("unmount phase failed: %w", err)
+		}
+	}
+
+	// --- PHASE 2: DM FLUSH & DELETION ---
+	// 1. Flush Virtual Cache (Best Effort)
+	_ = c.flushBlockDevice(fmt.Sprintf("/dev/mapper/%s", mpathName))
+
+	// 2. Multipathd Deletion
+	err := c.multipathdAction("del map " + mpathName)
+	if err != nil {
+		if strings.Contains(err.Error(), "map in use") {
+			// Zombie process exists; schedule for later
+			_ = c.deferredRemove(mpathName)
+		} else if strings.Contains(err.Error(), "timeout") {
+			// --- PHASE 3: EMERGENCY BREAK ---
+			// Kernel is in D-state; force fail the queue to unblock the daemon
+			_ = c.multipathdAction("disablequeueing map " + mpathName)
+			// Retry delete once queue is broken
+			_ = c.multipathdAction("del map " + mpathName)
+		}
+	}
+
+	// --- PHASE 4: PHYSICAL CLEANUP ---
+	for _, slave := range slaves {
+		devPath := fmt.Sprintf("/dev/%s", slave)
+		// 1. Flush Physical Path
+		_ = c.flushBlockDevice(devPath)
+		// 2. Sever the Path
+		_ = os.WriteFile(fmt.Sprintf("/sys/block/%s/device/delete", slave), []byte("1"), 0200)
+	}
+
+	return nil
+}
+
+// deferredRemove sets the DM_DEFERRED_REMOVE flag via direct IOCTL
+func (r *OsDeviceConnectivityHelperScsiGeneric) deferredRemove(name string) error {
+	err := o.ExecuteDmIoctl(DM_DEV_REMOVE, dmName, DM_DEFERRED_REMOVE)
+
+	if errno != 0 && errno != syscall.ENXIO {
+		return errno
+	}
+	return nil
+}
+
+func (r *OsDeviceConnectivityHelperScsiGeneric) flushBlockDevice(path string) error {
+	f, err := os.OpenFile(path, os.O_RDONLY, 0)
+	if err != nil {
+		return err
+	}
+	defer f.Close()
+	// BLKFLSBUF = 0x1261
+	_, _, errno := syscall.Syscall(syscall.SYS_IOCTL, f.Fd(), 0x1261, 0)
+	if errno != 0 {
+		return errno
+	}
+	return nil
+}
+
+
+
+
+
+
+
+
+// PreScanAndCleanup looks for zombie mounts or DM devices matching the WWID/Alias
+func ((r *OsDeviceConnectivityHelperScsiGeneric) PreScanAndCleanup(targetPath string, wwid string) {
+	// 1. Check for Rogue Mounts
+	// If the directory exists and is a mount point, but shouldn't be
+	if c.isMounted(targetPath) {
+		// Immediately Lazy Unmount to clear the path for the new mount
+		_ = syscall.Unmount(targetPath, syscall.MNT_DETACH)
+		_ = os.RemoveAll(targetPath)
+	} else {
+		_ = os.RemoveAll(targetPath)
+	}
+
+	// 2. Check for Rogue DM Devices
+	// Search /dev/mapper for any device matching the WWID
+	dmName := c.findDMByWWID(wwid)
+	if dmName != "" {
+		// Rogue DM found: Perform Emergency Teardown
+		_ = c.multipathdAction("disablequeueing map " + dmName)
+		err := c.multipathdAction("del map " + dmName)
+		if err != nil {
+			// If still busy, use the Deferred Remove IOCTL
+			_ = c.deferredRemove(dmName)
+		}
+	}
+}
+
+// findDMByWWID helper to map a WWID to a /dev/mapper name (e.g., mpatha)
+func ((r *OsDeviceConnectivityHelperScsiGeneric) findDMByWWID(wwid string) string {
+	files, err := os.ReadDir("/dev/mapper")
+	if err != nil {
+		return ""
+	}
+
+	for _, file := range files {
+		name := file.Name()
+		if name == "control" {
+			continue
+		}
+		// In 2026, we check the WWID via sysfs for the DM device
+		content, err := os.ReadFile(fmt.Sprintf("/sys/block/%s/dm/uuid", name))
+		if err == nil && strings.Contains(string(content), wwid) {
+			return name
+		}
+	}
+	return ""
+}
+
+
+func ((r *OsDeviceConnectivityHelperScsiGeneric) multipathdAction(cmd string) error {
+	response, err := r.Executer.MultipathdCmd(cmd)
+
+	// 5. Parse Response Content
+	// Multipathd returns "ok" or "map deleted" on success.
+	// It returns "fail [reason]" on logical errors.
+	if strings.HasPrefix(response, "fail") {
+		// Identify specific failure types
+		if strings.Contains(response, "map in use") {
+			return fmt.Errorf("map in use") // Caller should use deferredRemove
+		}
+		if strings.Contains(response, "not found") {
+			return nil // Already deleted, treat as success
+		}
+		return fmt.Errorf("multipathd command failed: %s", response)
+	}
+
+	return nil // Success
+}
+
+
+
+
+
+
+
+
+
+func ((r *OsDeviceConnectivityHelperScsiGeneric) RogueCleanup(targetPath string, expectedWWID string) error {
+	// 1. Check Mountpoint
+	if c.isMounted(targetPath) {
+		currentUUID := c.getMountUUID(targetPath)
+
+		if currentUUID == expectedWWID {
+			// CASE 1: Same volume, previous attempt failed.
+			// Clear it immediately to allow the new attempt to start fresh.
+			_ = syscall.Unmount(targetPath, syscall.MNT_DETACH)
+			_ = os.Remove(targetPath)
+
+			dmName := c.findDMByWWID(expectedWWID)
+			if dmName != "" {
+				_ = c.multipathdAction("disablequeueing map " + dmName)
+				_ = c.multipathdAction("del map " + dmName)
+			}
+		} else {
+			// CASE 2: Different volume occupying our path!
+			// Detach to free the path, but DON'T touch the block device.
+			_ = syscall.Unmount(targetPath, syscall.MNT_DETACH)
+			return fmt.Errorf("security-safety: path %s occupied by unexpected WWID %s", targetPath, currentUUID)
+		}
+	}
+	return nil
+}
+
+
+
+
+
+
+
+
+
+func ((r *OsDeviceConnectivityHelperScsiGeneric) ParallelPathTeardown(slaves []string) {
+	// Semaphore to limit concurrency to 10
+	sem := make(chan struct{}, 10)
+	var wg sync.WaitGroup
+
+	for _, slave := range slaves {
+		wg.Add(1)
+		go func(s string) {
+			defer wg.Done()
+
+			// Acquire semaphore slot
+			sem <- struct{}{}
+			defer func() { <-sem }()
+
+			devPath := fmt.Sprintf("/dev/%s", s)
+
+			// 1. Flush Physical Path (Wrapped in Timeout)
+			_ = TimeoutWrapper("path_flush", 5*time.Second, func() error {
+				return c.flushBlockDevice(devPath)
+			})
+
+			// 2. Sever the Path
+			// Sysfs writes are generally fast but can hang if the HBA is wedged
+			_ = TimeoutWrapper("path_delete", 5*time.Second, func() error {
+				return os.WriteFile(fmt.Sprintf("/sys/block/%s/device/delete", s), []byte("1"), 0200)
+			})
+		}(slave)
+	}
+
+	wg.Wait()
+}
+
+
+
+// Pattern for Semaphore + TimeoutWrapper
+func ((r *OsDeviceConnectivityHelperScsiGeneric) SafeFlush(path string) error {
+	c.limiter.Mount <- struct{}{} // Acquire
+
+	err := TimeoutWrapper(5*time.Second, func() error {
+		defer func() { <-c.limiter.Mount }() // Release when kernel returns
+		return c.flushBlockDevice(path)
+	})
+
+	if err != nil && strings.Contains(err.Error(), "kernel hang") {
+		c.limiter.StuckOps.Add(1)
+		// We DO NOT release the semaphore here.
+		// We let the "hanging" goroutine hold the slot until it finally finishes
+		// to prevent spawning more workers than the kernel can handle.
+	}
+	return err
+}
+
+
+
+
 
 
 func (o *OsDeviceConnectivityHelperScsiGeneric) DestroyDmSequence(dmName string, isForce bool) error {
@@ -569,26 +807,6 @@ func (r OsDeviceConnectivityHelperScsiGeneric) FlushMultipathDevice(mpathDevice 
 
 
 
-// IsDeviceMounted checks if the specific DM device is still in use as a mount point
-func (o *OsDeviceConnectivityHelperScsiGeneric) IsDeviceMounted(dmName string) (bool, error) {
-    file, err := os.Open("/proc/self/mountinfo")
-    if err != nil {
-        return false, err
-    }
-    defer file.Close()
-
-    scanner := bufio.NewScanner(file)
-    for scanner.Scan() {
-        line := scanner.Text()
-        // Format: [id] [parent] [major:minor] [root] [mountpoint] [options] ...
-        if strings.Contains(line, dmName) {
-            return true, nil
-        }
-    }
-    return false, scanner.Err()
-}
-
-
 // GetDMOpenCount returns the number of active openers for a DM device
 func (o *OsDeviceConnectivityHelperScsiGeneric) GetDMOpenCount(dmName string) (int, error) {
     // dmsetup info -c --noheadings -o open <name>
@@ -728,20 +946,6 @@ func normalizeLun(lunStr string) string {
 
 	// If it's already a decimal string, return it as-is
 	return lunStr
-}
-
-func (m *Mounter) IsStaged(targetPath string) (bool, error) {
-    // 1. Check if the directory exists
-    notMnt, err := m.IsLikelyNotMountPoint(targetPath)
-    if err != nil {
-        if os.IsNotExist(err) {
-            return false, nil // Not staged if path doesn't exist
-        }
-        return false, err
-    }
-
-    // 2. If it is a mount point, it is staged
-    return !notMnt, nil
 }
 
 func (r *OsDeviceConnectivityHelperScsiGeneric) VerifyStagingMount(stagingPath string, expectedSerial string) error {

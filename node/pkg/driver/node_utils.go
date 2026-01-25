@@ -560,67 +560,64 @@ func (n NodeUtils) GetTopologyLabels(ctx context.Context, nodeName string) (map[
 }
 
 func (n NodeUtils) IsBlock(devicePath string) (bool, error) {
-	var stat unix.Stat_t
-	err := unix.Stat(devicePath, &stat)
+	//var stat unix.Stat_t
+	//err := unix.Stat(devicePath, &stat)
+	//if err != nil {
+	//	return false, err
+	//}
+	//return (stat.Mode & unix.S_IFMT) == unix.S_IFBLK, nil
+
+	info, err := os.Stat(path)
 	if err != nil {
-		return false, err
+		return nil, fmt.Errorf("failed to stat path %s: %w", path, err)
 	}
-	return (stat.Mode & unix.S_IFMT) == unix.S_IFBLK, nil
+
+	// Case 1: Raw Block Device
+	return info.Mode()&os.ModeDevice != 0, nil
 }
 
+// getFilesystemStats uses statfs syscall
 func (d NodeUtils) GetFileSystemVolumeStats(path string) (VolumeStatistics, error) {
-	statfs := &unix.Statfs_t{}
-	err := unix.Statfs(path, statfs)
-	if err != nil {
-		return VolumeStatistics{}, err
+	var stat unix.Statfs_t
+	if err := unix.Statfs(path, &stat); err != nil {
+		return nil, fmt.Errorf("statfs failed: %w", err)
 	}
 
-	availableBytes := int64(statfs.Bavail) * int64(statfs.Bsize)
-	totalBytes := int64(statfs.Blocks) * int64(statfs.Bsize)
-	usedBytes := (int64(statfs.Blocks) - int64(statfs.Bfree)) * int64(statfs.Bsize)
-
-	totalInodes := int64(statfs.Files)
-	availableInodes := int64(statfs.Ffree)
-	usedInodes := totalInodes - availableInodes
-
 	volumeStats := VolumeStatistics{
-		AvailableBytes: availableBytes,
-		TotalBytes:     totalBytes,
-		UsedBytes:      usedBytes,
+		AvailableBytes: int64(stat.Bavail) * int64(stat.Bsize),
+		TotalBytes:     int64(stat.Blocks) * int64(stat.Bsize),
+		UsedBytes:      (int64(stat.Blocks) - int64(stat.Bfree)) * int64(stat.Bsize),
 
-		AvailableInodes: availableInodes,
-		TotalInodes:     totalInodes,
-		UsedInodes:      usedInodes,
+		AvailableInodes: int64(stat.Ffree), // Inodes available to unprivileged user
+		TotalInodes:     int64(stat.Files),
+		UsedInodes:      nt64(stat.Files) - int64(stat.Ffree),
 	}
 
 	return volumeStats, nil
 }
+
 
 func (d NodeUtils) GetBlockVolumeStats(volumeId string) (VolumeStatistics, error) {
-	volumeUuid := d.GetVolumeUuid(volumeId)
-	mpathDevice, err := d.osDeviceConnectivityHelper.GetMpathDevice(volumeUuid)
+	f, err := os.Open(devicePath)
 	if err != nil {
-		return VolumeStatistics{}, err
+		return nil, err
 	}
+	defer f.Close()
 
-	args := []string{"--getsize64", mpathDevice}
-	out, err := d.Executer.ExecuteWithTimeoutSilently(device_connectivity.TimeOutBlockDevCmd, BlockDevCmd, args)
+	// BLKGETSIZE64 returns the size in bytes (uint64)
+	size, err := unix.IoctlGetUint64(int(f.Fd()), unix.BLKGETSIZE64)
 	if err != nil {
-		return VolumeStatistics{}, err
+		return nil, fmt.Errorf("ioctl BLKGETSIZE64 failed: %w", err)
 	}
 
-	strOut := strings.TrimSpace(string(out))
-	sizeInBytes, err := strconv.ParseInt(strOut, 10, 64)
-	if err != nil {
-		return VolumeStatistics{}, err
-	}
-
-	volumeStats := VolumeStatistics{
-		TotalBytes: sizeInBytes,
-	}
-
-	return volumeStats, nil
+	return &VolumeStats{
+		Capacity:  int64(size),
+		Available: int64(size), // Raw blocks are fully available
+		Used:      0,            // Usage tracking requires a filesystem
+	}, nil
 }
+
+
 
 
 func (d NodeUtils) GetVolumeUuid(volumeId string) string {

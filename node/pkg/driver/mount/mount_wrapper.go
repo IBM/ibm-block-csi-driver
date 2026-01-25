@@ -209,32 +209,80 @@ func (m *Mounter) tryUnmount(target string, flags int, timeout time.Duration) er
 	// TODO verify disappearance
 }
 
-// isMounted checks /proc/self/mountinfo for the target path
-func (m *Mounter) isMounted(target string) bool {
+// IsMounted check with heuristics to avoid unnecessary procfs scans.
+func (m *Mounter) IsMounted(target string) (bool, error) {
+	// 1. Tier 0: Check if path exists
+	stat, err := os.Lstat(target)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return false, nil // Path doesn't exist, cannot be mounted
+		}
+		return false, err
+	}
+
+	// 2. Tier 1: Device ID Heuristic (ProbablyNotMountPoint logic)
+	// Compare the Device ID of the target with its parent.
+	parentStat, err := os.Lstat(filepath.Dir(strings.TrimSuffix(target, "/")))
+	if err == nil {
+		if stat.Sys().(*syscall.Stat_t).Dev != parentStat.Sys().(*syscall.Stat_t).Dev {
+			// Device IDs differ: This is DEFINITELY a mount point (standard or cross-device)
+			return true, nil
+		}
+	}
+
+	// 3. Tier 2: Ambiguity Handling (The "Bind Mount" Problem)
+	// If Device IDs are the same, it could be a Bind Mount or just a normal directory.
+	// In 2026, we MUST scan mountinfo to be certain.
+	return m.isMountedInProc(target)
+}
+
+
+//func (m *Mounter) IsStaged(targetPath string) (bool, error) {
+//    // 1. Check if the directory exists
+//    notMnt, err := m.IsLikelyNotMountPoint(targetPath)
+//    if err != nil {
+//        if os.IsNotExist(err) {
+//            return false, nil // Not staged if path doesn't exist
+//        }
+//        return false, err
+//    }
+
+    // 2. If it is a mount point, it is staged
+//    return !notMnt, nil
+//}
+
+
+
+// isMountedInProc is the Single Source of Truth fallback
+func (m *Mounter) isMountedInProc(target string) (bool, error) {
 	f, err := os.Open("/proc/self/mountinfo")
 	if err != nil {
-		return false
+		return false, err
 	}
 	defer f.Close()
 
-	// Use a 1MB buffer for nodes with many volumes
+	// Optimized scanning with large buffer for 2026 density
 	scanner := bufio.NewScanner(f)
 	buf := make([]byte, 1024*1024)
 	scanner.Buffer(buf, 1024*1024)
 
+	// Clean target for exact comparison
+	targetClean := filepath.Clean(target)
+
 	for scanner.Scan() {
 		line := scanner.Text()
-		// Fields: [0:mountID 1:parentID 2:major:minor 3:root 4:mountpoint...]
-		// We look for index 4.
-		if strings.Contains(line, target) {
-			fields := strings.Fields(line)
-			if len(fields) >= 5 && fields[4] == target {
-				return true
-			}
+		// Performance optimization: Avoid Fields() on lines that don't match the path
+		if !strings.Contains(line, targetClean) {
+			continue
+		}
+
+		fields := strings.Fields(line)
+		if len(fields) >= 5 && fields[4] == targetClean {
+			return true, nil
 		}
 	}
-	return false
-}}
+	return false, nil
+}
 
 func (m *Mounter) pollMountDeleted(target string, timeout time.Duration) bool {
 	expiry := time.Now().Add(timeout)

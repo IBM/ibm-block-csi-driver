@@ -412,9 +412,18 @@ func (e *Executer) MultipathdCmd(command string) (string, error) {
 		return "", err
 	}
 
-	return string(respBody), nil
-}
+	response := string(respBody)
 
+	// Multipathd returns "ok" or "map deleted" on success.
+	// It returns "fail [reason]" on logical errors.
+	if strings.HasPrefix(response, "fail") {
+		// Identify specific failure types
+		if strings.Contains(response, "fail") {
+			return "", fmt.Errorf("multipathd error: %s", response)
+		}
+	}
+	return response, nil
+}
 
 
 func (e *Executer) OsOpenFile(name string, flag int, perm os.FileMode) (*os.File, error) {
@@ -451,4 +460,64 @@ func (e *Executer) GetExitCode(err error) (int, bool) {
 		return exitError.ExitCode(), true
 	}
 	return 0, false
+}
+
+func TimeoutWrapper(timeout time.Duration, action func() error) error {
+	// MUST be a buffered channel of size 1
+	ch := make(chan error, 1)
+
+	go func() {
+		// This might hang forever in the kernel
+		ch <- action()
+	}()
+
+	select {
+	case err := <-ch:
+		return err
+	case <-time.After(timeout):
+		// We "kill" the operation by simply moving on.
+		// The goroutine above is LEAKED. It stays in D-state
+		// until the kernel wakes up, but our CSI driver continues.
+		return fmt.Errorf("timeout: abandoning hanging goroutine")
+	}
+}
+
+
+type SocketLimiter struct {
+	sem          chan struct{}
+	lastFail     time.Time
+	mu           sync.RWMutex
+	failureCount atomic.Int32
+}
+
+func (e *Executer) MultipathdCmdLimiter(ctx context.Context, action func() error) error {
+	// 1. Fail-Fast Check
+	sl.mu.RLock()
+	if time.Since(sl.lastFail) < 30*time.Second && sl.failureCount.Load() > 3 {
+		sl.mu.RUnlock()
+		return fmt.Errorf("multipathd-safety: daemon is currently unresponsive; skipping")
+	}
+	sl.mu.RUnlock()
+
+	// 2. Acquire Semaphore
+	select {
+	case sl.sem <- struct{}{}:
+		defer func() { <-sl.sem }()
+	case <-ctx.Done():
+		return ctx.Err()
+	}
+
+	// 3. Execute with Timeout
+	err := action()
+
+	if err != nil && strings.Contains(err.Error(), "timeout") {
+		sl.mu.Lock()
+		sl.lastFail = time.Now()
+		sl.failureCount.Add(1)
+		sl.mu.Unlock()
+	} else if err == nil {
+		sl.failureCount.Store(0) // Reset on success
+	}
+
+	return err
 }
