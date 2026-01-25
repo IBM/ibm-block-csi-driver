@@ -14,15 +14,6 @@ pipeline {
         label  "${env.AGENT_LABEL}"
     }
     stages {
-        stage('Debug Jenkins Environment') {
-            steps {
-                script {
-                    sh 'echo "Current PATH: $PATH"'
-                    sh 'which git || echo "git not found in PATH"'
-                    sh 'git --version || echo "git command failed"'
-                }
-            }
-        }
         stage ('Controllers: static code analysis') {
             steps {
                 sh './scripts/run_static_code_analysis.sh'
