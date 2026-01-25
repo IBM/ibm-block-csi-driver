@@ -27,10 +27,7 @@ from controllers.tests.common.test_settings import (CLONE_VOLUME_NAME,
                                                     NAME_PREFIX, INTERNAL_SNAPSHOT_ID, SOURCE_VOLUME_ID,
                                                     SECRET_MANAGEMENT_ADDRESS_KEY, SECRET_PASSWORD_KEY,
                                                     SECRET_USERNAME_KEY, SECRET)
-from controllers.tests.controller_server.common import (mock_get_agent,
-                                                        mock_array_type,
-                                                        mock_mediator,
-                                                        mock_get_node_initiators)
+from controllers.tests.controller_server.common import mock_get_agent, mock_array_type, mock_mediator
 from controllers.tests.utils import ProtoBufMock
 
 CONTROLLER_SERVER_PATH = "controllers.servers.csi.csi_controller_server"
@@ -998,11 +995,6 @@ class TestPublishVolume(BaseControllerSetUp, CommonControllerTest):
         self.request.readonly = False
 
         self.request.volume_capability = utils.get_mock_volume_capability()
-
-        self.mock_initiators = {'fc_wwns': [self.fc_port],
-                                'iscsi_iqns': [self.iqn],
-                                'nvme_nqns': []}
-        mock_get_node_initiators(self, CONTROLLER_SERVER_PATH)
 
     def test_publish_volume_success(self):
         self.servicer.ControllerPublishVolume(self.request, self.context)

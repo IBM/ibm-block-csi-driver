@@ -34,11 +34,3 @@ def mock_mediator():
     mediator.max_object_name_length = 63
     mediator.max_object_prefix_length = 20
     return mediator
-
-
-def mock_get_node_initiators(contex, server_path):
-    get_node_initiators_path = '.'.join((server_path, 'CSIControllerServicer', '_get_node_initiators'))
-    get_node_initiators_patcher = patch(get_node_initiators_path,
-                                        return_value=contex.mock_initiators)
-    contex._get_node_initiators = get_node_initiators_patcher.start()
-    contex.addCleanup(get_node_initiators_patcher.stop)
