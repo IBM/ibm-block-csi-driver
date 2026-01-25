@@ -7,8 +7,7 @@ import json
 from controllers.common.csi_logger import get_stdout_logger
 from controllers.servers.settings import SECRET_SUPPORTED_TOPOLOGIES_PARAMETER
 from controllers.servers.utils import (
-    validate_secrets, get_array_connection_info_from_secrets,
-    get_system_info_for_topologies, generate_node_initiators_from_string_data)
+    validate_secrets, get_array_connection_info_from_secrets, get_system_info_for_topologies)
 from controllers.servers.errors import ValidationException
 import controllers.servers.host_definer.messages as messages
 from controllers.servers.host_definer.kubernetes_manager.manager import KubernetesManager
@@ -318,8 +317,7 @@ class Watcher(KubernetesManager):
             request, host_definition_info.secret_name, host_definition_info.secret_namespace, node_info.labels)
         if request:
             request.node_id_from_host_definition = host_definition_info.node_id
-            request.node_initiators_from_host_definition = \
-                self._get_node_initiators_from_host_definition(host_definition_info)
+            request.node_initiators_from_host_definition = host_definition_info.node_initiators
             request.node_id_from_csi_node = self._get_node_id_by_node(host_definition_info)
             request.node_initiators_from_csi_node = self._get_node_initiators_by_node(host_definition_info)
             request.io_group = self._get_io_group_by_node(host_definition_info.node_name)
@@ -408,13 +406,6 @@ class Watcher(KubernetesManager):
             return NODES[host_definition_info.node_name].node_initiators
         except Exception:
             return host_definition_info.node_initiators
-
-    def _get_node_initiators_from_host_definition(self, host_definition_info):
-        logger.info("debug - uriziv - 121")
-        initiators_data = host_definition_info.node_initiators
-        logger.info(initiators_data)
-        logger.info("debug - uriziv - 122")
-        return generate_node_initiators_from_string_data(initiators_data)
 
     def _get_io_group_by_node(self, node_name):
         try:
