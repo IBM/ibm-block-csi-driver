@@ -14,6 +14,7 @@ import controllers.common.settings as common_settings
 from controllers.servers.host_definer.hd_types import (
     CsiNodeInfo, PodInfo, NodeInfo, StorageClassInfo, HostDefinitionInfo)
 from controllers.common.node_info import Initiators
+from controllers.servers.host_definer import utils
 
 logger = get_stdout_logger()
 
@@ -111,6 +112,7 @@ class KubernetesManager():
         csi_node_info = CsiNodeInfo()
         csi_node_info.name = k8s_csi_node.metadata.name
         csi_node_info.node_id = self._get_node_id_from_k8s_csi_node(k8s_csi_node)
+        csi_node_info.node_initiators = utils.get_node_initiators_from_node(csi_node_info.name)
         return csi_node_info
 
     def _get_node_id_from_k8s_csi_node(self, k8s_csi_node):

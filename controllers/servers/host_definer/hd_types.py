@@ -57,6 +57,7 @@ class HostDefinitionInfo:
 class CsiNodeInfo:
     name: str = ''
     node_id: str = ''
+    node_initiators: str = ''
 
 
 @dataclass
@@ -82,5 +83,5 @@ class ManagedNode:
     def __init__(self, csi_node_info, labels):
         self.name = csi_node_info.name
         self.node_id = csi_node_info.node_id
-        self.node_initiators = utils.get_node_initiators_from_node(csi_node_info.name)
+        self.node_initiators = csi_node_info.node_initiators
         self.io_group = utils.generate_io_group_from_labels(labels)
