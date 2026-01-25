@@ -13,7 +13,6 @@ from controllers.servers.host_definer import settings
 import controllers.common.settings as common_settings
 from controllers.servers.host_definer.hd_types import (
     CsiNodeInfo, PodInfo, NodeInfo, StorageClassInfo, HostDefinitionInfo)
-from controllers.common.node_info import NodeIdInfo
 from controllers.common.node_info import Initiators
 
 logger = get_stdout_logger()
