@@ -13,8 +13,7 @@ from controllers.servers.host_definer import settings
 import controllers.common.settings as common_settings
 from controllers.servers.host_definer.hd_types import (
     CsiNodeInfo, PodInfo, NodeInfo, StorageClassInfo, HostDefinitionInfo)
-from controllers.common.node_info import Initiators
-from controllers.servers.host_definer import utils
+from controllers.servers import utils as controllers_utils
 
 logger = get_stdout_logger()
 
@@ -112,7 +111,7 @@ class KubernetesManager():
         csi_node_info = CsiNodeInfo()
         csi_node_info.name = k8s_csi_node.metadata.name
         csi_node_info.node_id = self._get_node_id_from_k8s_csi_node(k8s_csi_node)
-        csi_node_info.node_initiators = utils.get_node_initiators_from_node(csi_node_info.name)
+        csi_node_info.node_initiators = controllers_utils.get_node_initiators_data(csi_node_info.name)
         return csi_node_info
 
     def _get_node_id_from_k8s_csi_node(self, k8s_csi_node):
@@ -358,15 +357,11 @@ class KubernetesManager():
         return NodeInfo(k8s_node.metadata.name, k8s_node.metadata.labels)
 
     def _generate_node_initiators(self, k8s_node):
-        # TODO(uriziv1) code dupdication. Call this function from utils
         logger.info("DEBUG - uriziv - 71")
-        node_initiators_raw = k8s_node.metadata.annotations.get(common_settings.NODE_INITIATORS_FIELD, "{}")
-        initiators_data = json.loads(node_initiators_raw)
-        nvme_nqns = initiators_data.get("nvme", [])
-        fc_wwns = initiators_data.get("fc", [])
-        iscsi_iqns = initiators_data.get("iscsi", [])
-        logger.info("DEBUG - uriziv - 72")
-        return Initiators(nvme_nqns, fc_wwns, iscsi_iqns)
+        initiators = controllers_utils.get_node_initiators_from_k8s_node(k8s_node)
+        logger.info(initiators)
+        logger.info("DEBUG - uriziv - 71")
+        return initiators
 
     def _get_csi_daemon_set(self):
         try:
