@@ -123,6 +123,13 @@ def generate_node_initiators_from_string_data(initiators_data):
     logger.info("debug - uriziv - 124")
     return Initiators(nvme_nqns, fc_wwns, iscsi_iqns)
 
+def get_node_initiators_from_k8s_node(k8s_node):
+    "docstring"
+    node_annotations = k8s_node.metadata.annotations
+    initiators_data = node_annotations.get(settings.NODE_INITIATORS_FIELD, "{}")
+    initiators = generate_node_initiators_from_string_data(initiators_data)
+    return initiators
+
 def get_node_initiators(node_name):
     "docstring"
     initiators_data = get_node_initiators_data(node_name)
