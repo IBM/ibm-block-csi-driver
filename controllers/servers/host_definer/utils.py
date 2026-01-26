@@ -1,10 +1,8 @@
-"""docstring"""
 import controllers.servers.host_definer.settings as host_definer_settings
 import controllers.common.settings as common_settings
 
 
 def generate_io_group_from_labels(labels):
-    """docstring"""
     io_group = ''
     for io_group_index in range(host_definer_settings.POSSIBLE_NUMBER_OF_IO_GROUP):
         label_content = labels.get(common_settings.IO_GROUP_LABEL_PREFIX + str(io_group_index))
