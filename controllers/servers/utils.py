@@ -108,6 +108,7 @@ def get_node_initiators_data(node_name):
         initiators_data = node_annotations.get(settings.NODE_INITIATORS_FIELD, "{}")
     return initiators_data
 
+
 def generate_node_initiators_from_string_data(initiators_data):
     """
     Return value example:
@@ -123,6 +124,7 @@ def generate_node_initiators_from_string_data(initiators_data):
     logger.info("debug - uriziv - 124")
     return Initiators(nvme_nqns, fc_wwns, iscsi_iqns)
 
+
 def get_node_initiators_from_k8s_node(k8s_node):
     "docstring"
     node_annotations = k8s_node.metadata.annotations
@@ -130,11 +132,13 @@ def get_node_initiators_from_k8s_node(k8s_node):
     initiators = generate_node_initiators_from_string_data(initiators_data)
     return initiators
 
+
 def get_node_initiators(node_name):
     "docstring"
     initiators_data = get_node_initiators_data(node_name)
     initiators = generate_node_initiators_from_string_data(initiators_data)
     return initiators
+
 
 def get_array_connection_info_from_secrets(secrets, topologies=None, system_id=None):
     system_info, system_id = _get_system_info_from_secrets(secrets, topologies, system_id)

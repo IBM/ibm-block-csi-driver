@@ -1,7 +1,7 @@
+"docstring"
 import ast
 import datetime
 import base64
-import json
 
 from kubernetes import client, config, dynamic
 from kubernetes.client import api_client
@@ -19,6 +19,7 @@ logger = get_stdout_logger()
 
 
 class KubernetesManager():
+    """docstring"""
     def __init__(self):
         self._load_cluster_configuration()
         self.dynamic_client = self._get_dynamic_client()
