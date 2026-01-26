@@ -16,8 +16,6 @@ import controllers.common.settings as common_settings
 from controllers.servers.host_definer.hd_types import (
     DefineHostRequest, DefineHostResponse, HostDefinitionInfo, SecretInfo, ManagedNode)
 from controllers.servers.host_definer.storage_manager.host_definer_server import HostDefinerServicer
-from controllers.common.node_info import Initiators
-from controllers.array_action import settings as array_config
 
 MANAGED_SECRETS = []
 NODES = {}
@@ -30,11 +28,11 @@ class Watcher(KubernetesManager):
         self.storage_host_servicer = HostDefinerServicer()
 
     def get_nodes_var(self):
-        """docstring"""
+        """This function is for DEBUG and should be removed"""
         return NODES
 
     def get_managed_secrets_var(self):
-        """docstring"""
+        """This function is for DEBUG and should be removed"""
         return MANAGED_SECRETS
 
     def _define_host_on_all_storages(self, node_name):
