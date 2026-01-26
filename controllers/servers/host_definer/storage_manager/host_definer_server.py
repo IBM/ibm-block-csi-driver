@@ -71,9 +71,9 @@ class HostDefinerServicer:
 
     def undefine_host(self, request):
         node_id_info = NodeIdInfo(request.node_id_from_csi_node)
+        initiators = generate_node_initiators_from_string_data(request.node_initiators_from_csi_node)
         array_connection_info = request.array_connection_info
         array_addresses = array_connection_info.array_addresses
-        initiators = generate_node_initiators_from_string_data(request.node_initiators_from_csi_node)
         node_name = node_id_info.node_name
         logger.info(messages.UNDEFINE_NODE_FROM_ARRAYS.format(node_name, array_addresses))
         try:
