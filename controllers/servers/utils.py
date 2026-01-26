@@ -95,23 +95,24 @@ def _get_array_connection_info_from_system_info(secrets, system_id):
                                partition_name=partition_name, partition_vg=partition_vg, port_set=port_set)
 
 
-def get_node_initiators(node_name):
-    "docstring"
+def get_node_initiators_data(node_name):
+    """
+    Return value example:
+    '{"fc":[],"iscsi":["iqn.2016-04.com.open-iscsi:8bce7b6eab12"],"nvme":[]}'
+    """
+    initiators_data = ''
     kubernetes_manager = KubernetesManager()
     k8s_node = kubernetes_manager.core_api.read_node(name=node_name)
     if k8s_node:
-        return generate_node_initiators_from_k8s_node(k8s_node)
-    return Initiators([], [], [])
-
-
-def generate_node_initiators_from_k8s_node(k8s_node):
-    "docstring"
-    initiators_data = k8s_node.metadata.annotations.get(settings.NODE_INITIATORS_FIELD, "{}")
-    return generate_node_initiators_from_string_data(initiators_data)
-
+        node_annotations = k8s_node.metadata.annotations
+        initiators_data = node_annotations.get(settings.NODE_INITIATORS_FIELD, "{}")
+    return initiators_data
 
 def generate_node_initiators_from_string_data(initiators_data):
-    "docstring"
+    """
+    Return value example:
+    Initiators(nvme_nqns=[], fc_wwns=[], iscsi_iqns=['iqn.2016-04.com.open-iscsi:8bce7b6eab12'])
+    """
     logger.info("debug - uriziv - 123")
     initiators_data = json.loads(initiators_data)
     nvme_nqns = initiators_data.get("nvme", [])
@@ -122,6 +123,11 @@ def generate_node_initiators_from_string_data(initiators_data):
     logger.info("debug - uriziv - 124")
     return Initiators(nvme_nqns, fc_wwns, iscsi_iqns)
 
+def get_node_initiators(node_name):
+    "docstring"
+    initiators_data = get_node_initiators_data(node_name)
+    initiators = generate_node_initiators_from_string_data(initiators_data)
+    return initiators
 
 def get_array_connection_info_from_secrets(secrets, topologies=None, system_id=None):
     system_info, system_id = _get_system_info_from_secrets(secrets, topologies, system_id)
