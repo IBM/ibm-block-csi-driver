@@ -232,7 +232,7 @@ class HostDefinerServicer:
 
     def _validate_host(self, host, initiators):
         if host.initiators not in initiators:
-            error_message = messages.HOST_FOUND_WITH_DIFFERENT_INITIATOR.format(host, initiators)
+            error_message = messages.HOST_FOUND_WITH_DIFFERENT_INITIATOR.format(host, host.initiators)
             logger.exception(error_message)
             return DefineHostResponse(error_message=str(error_message))
         return DefineHostResponse()
