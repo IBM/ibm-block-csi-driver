@@ -25,8 +25,8 @@ class HostDefinerServicer:
         array_connection_info = request.array_connection_info
         array_addresses = array_connection_info.array_addresses
         node_id_info = NodeIdInfo(request.node_id_from_csi_node)
-        initiators = generate_node_initiators_from_string_data(request.node_initiators_from_csi_node)
         node_name = node_id_info.node_name
+        initiators = generate_node_initiators_from_string_data(request.node_initiators_from_csi_node)
         connectivity_type_from_user = get_initiators_connectivity_type(initiators, request.connectivity_type_from_user)
         host_name = join_object_prefix_with_name(prefix=request.prefix, name=node_name)
         logger.info(messages.DEFINE_NODE_ON_ARRAYS.format(node_name, array_addresses))
