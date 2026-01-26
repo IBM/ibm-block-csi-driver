@@ -55,6 +55,12 @@ class HostDefinitionInfo:
 
 @dataclass
 class CsiNodeInfo:
+    """
+    class to store CsiNodeInfo.
+    Typically - name and node_id can be extracted from csinode manifest
+    node_initiators should be extracted from the node annotations.
+    (See function: _generate_csi_node_info)
+    """
     name: str = ''
     node_id: str = ''
     node_initiators: str = ''
