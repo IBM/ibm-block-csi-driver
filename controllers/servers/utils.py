@@ -561,13 +561,16 @@ def validate_delete_volume_request(request):
 
 
 def _validate_node_id(node_id):
+    """
+    In the past, this function validated that node_id format is:
+    'node_name;nvme0;fc0:fc1:fc2:fc3;iscsi0'
+    Since CSI-5997, node_id contains only node_name.
+    Hence, we only validate it's type.
+    """
     logger.debug("validating node id: %s", node_id)
 
-    # In the past we used ';' (config.parameters.node_id_info.delimiter) to
-    # seperate vlues inside node_id. We don't use it any more.
-    # Currently node id is just the node name and config.parameters.node_id_info.delimiter
-    # is not in use.
-    # For now - no special validations are needed here.
+    if not isinstance(node_id, str) or len(node_id < 1):
+        raise InvalidNodeId(node_id)
 
     logger.debug("node id validation finished")
 
