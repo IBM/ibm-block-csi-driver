@@ -3,6 +3,7 @@ import json
 import re
 from hashlib import sha256
 from operator import eq
+from kubernetes import client
 
 import base58
 from csi_general import csi_pb2, volumegroup_pb2
@@ -25,8 +26,6 @@ from controllers.servers.csi.controller_types import (ArrayConnectionInfo,
                                                       ObjectParameters, VolumeGroupParameters, VolumeGroupIdInfo)
 from controllers.servers.errors import ObjectIdError, ValidationException, InvalidNodeId
 from controllers.common.node_info import Initiators
-from controllers.servers.host_definer.kubernetes_manager.manager import KubernetesManager
-# TODO: from kubernetes import client
 
 logger = get_stdout_logger()
 
@@ -101,8 +100,8 @@ def get_node_initiators_data(node_name):
     '{"fc":[],"iscsi":["iqn.2016-04.com.open-iscsi:8bce7b6eab12"],"nvme":[]}'
     """
     initiators_data = ''
-    kubernetes_manager = KubernetesManager()
-    k8s_node = kubernetes_manager.core_api.read_node(name=node_name)
+    core_api = client.CoreV1Api()
+    k8s_node = core_api.read_node(name=node_name)
     if k8s_node:
         node_annotations = k8s_node.metadata.annotations
         initiators_data = node_annotations.get(settings.NODE_INITIATORS_FIELD, "{}")
