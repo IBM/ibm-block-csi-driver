@@ -1,3 +1,6 @@
+
+{{site.data.keyword.attribute-definition-list}}
+
 # What's new in 1.13.0
 
 IBM® block storage CSI driver 1.13.0 adds support for:
@@ -14,8 +17,4 @@ For information about the resolved issues in version 1.13.0, see [1.13.0](change
 If you have any configuration changes that you want saved over upgrade, notice the following.{: attention}
 
 For configuration persistancy over upgrade, a config map procedure was added:
-Prior to upgrading to IBM® block storage CSI driver 1.13.0 (or above) from releases before 1.13.0, please create a configmap with your existing changes, for example:
-`kubectl create configmap ibm-csi-hostdefiner-config --from-literal=portSet=portset64`
-If you have more than one configuration change, you can add more `--from-literal=key=value` at the end of the above line. This configuration will be saved over upgrade.
-
-More info regarding this configmap in [Configuring the host definer](content/configuration/configuring_hostdefiner.md)
+Prior to upgrading to IBM® block storage CSI driver 1.13.0 (or above) from releases before 1.13.0, please create a configmap with your existing changes. Please refer to [Configuring the host definer](../configuration/configuring_hostdefiner.md)
