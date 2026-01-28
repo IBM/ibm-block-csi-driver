@@ -34,8 +34,7 @@ from controllers.tests.controller_server.common import (mock_get_agent,
 from controllers.tests.utils import ProtoBufMock
 
 CONTROLLER_SERVER_PATH = "controllers.servers.csi.csi_controller_server"
-TEST_SERVER_PATH = "controllers.servers.host_definer.kubernetes_manager.manager"
-
+TEST_SERVER_PATH = "controllers.servers.utils"
 
 class BaseControllerSetUp(unittest.TestCase):
 
@@ -995,7 +994,7 @@ class TestPublishVolume(BaseControllerSetUp, CommonControllerTest):
         self.request.volume_id = "{}:wwn1".format(arr_type)
         self.iqn = "iqn.1994-05.com.redhat:686358c930fe"
         self.fc_port = "500143802426baf4"
-        self.request.node_id = "{};;{};{}".format(self.hostname, self.fc_port, self.iqn)
+        self.request.node_id = self.hostname
         self.request.readonly = False
 
         self.request.volume_capability = utils.get_mock_volume_capability()
@@ -1146,7 +1145,14 @@ class TestUnpublishVolume(BaseControllerSetUp, CommonControllerTest):
 
         arr_type = XIVArrayMediator.array_type
         self.request.volume_id = "{}:wwn1".format(arr_type)
-        self.request.node_id = "hostname;iqn1;500143802426baf4"
+        self.request.node_id = self.hostname
+        self.iqn = "iqn.1994-05.com.redhat:686358c930fe"
+        self.fc_port = "500143802426baf4"
+        self.mock_initiators = {'fc_wwns': [self.fc_port],
+                                'iscsi_iqns': [self.iqn],
+                                'nvme_nqns': []}
+        mock_get_node_initiators(self, TEST_SERVER_PATH)
+
 
     def test_unpublish_volume_success(self):
         self.servicer.ControllerUnpublishVolume(self.request, self.context)

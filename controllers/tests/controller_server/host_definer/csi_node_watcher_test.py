@@ -1,6 +1,4 @@
 from kubernetes.client.rest import ApiException
-from mock import patch
-from controllers.common.node_info import Initiators
 
 import controllers.tests.controller_server.host_definer.utils.test_utils as test_utils
 import controllers.tests.controller_server.host_definer.utils.k8s_manifests_utils as k8s_manifests_utils
@@ -9,7 +7,6 @@ import controllers.common.settings as common_settings
 from controllers.tests.controller_server.host_definer.common import BaseSetUp
 from controllers.servers.host_definer.hd_types import DefineHostResponse
 from controllers.servers.host_definer.watcher.csi_node_watcher import CsiNodeWatcher
-from unittest.mock import MagicMock
 
 class CsiNodeWatcherBase(BaseSetUp):
     def setUp(self):
@@ -181,8 +178,8 @@ class TestWatchCsiNodesResources(CsiNodeWatcherBase):
         self.csi_node_watcher.csi_nodes_api.watch.return_value = iter(
             [test_utils.get_fake_csi_node_watch_event(test_settings.DELETED_EVENT_TYPE)])
         self.csi_node_watcher.core_api.read_node.side_effect = [
-            self.k8s_node_with_manage_node_label,
-            self.k8s_node_with_manage_node_label, self.k8s_node_with_manage_node_label, self.k8s_node_with_manage_node_label]
+            self.k8s_node_with_manage_node_label, self.k8s_node_with_manage_node_label,
+            self.k8s_node_with_manage_node_label, self.k8s_node_with_manage_node_label]
         self.csi_node_watcher.apps_api.list_daemon_set_for_all_namespaces.return_value = self.deleted_daemon_set
         self.csi_node_watcher.core_api.list_pod_for_all_namespaces.return_value = test_utils.get_empty_k8s_pods()
         self.os.getenv.return_value = test_settings.TRUE_STRING

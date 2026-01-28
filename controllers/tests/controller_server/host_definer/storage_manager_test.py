@@ -1,4 +1,5 @@
 import unittest
+import json
 from mock import Mock, MagicMock
 
 from controllers.array_action.array_action_types import Host
@@ -15,6 +16,12 @@ import controllers.common.settings as common_settings
 
 HOST_DEFINER_SERVER_PATH = "controllers.servers.host_definer.storage_manager.host_definer_server"
 
+def initiators_to_json(initiators: Initiators) -> str:
+    return json.dumps({
+        "nvme": initiators.nvme_nqns or [],
+        "fc": initiators.fc_wwns or [],
+        "iscsi": initiators.iscsi_iqns or [],
+    })
 
 class BaseSetUp(unittest.TestCase):
 
@@ -48,8 +55,8 @@ class BaseSetUp(unittest.TestCase):
         self.request.array_connection_info = get_array_connection_info_from_secrets(SECRET)
         self.request.io_group = array_settings.DUMMY_MULTIPLE_IO_GROUP_STRING
 
-        self.request.node_initiators_from_csi_node = Initiators(iscsi_iqns=[settings.IQN])
-        self.request.node_initiators_from_host_definition = Initiators()
+        self.request.node_initiators_from_csi_node = initiators_to_json(Initiators(iscsi_iqns=[settings.IQN]))
+        self.request.node_initiators_from_host_definition = initiators_to_json(Initiators())
 
 
 class TestDefineHost(BaseSetUp):
@@ -128,7 +135,7 @@ class TestDefineHost(BaseSetUp):
         self.mediator.get_host_connectivity_ports.return_value = [settings.IQN]
         self.request.node_id_from_csi_node = HOST_NAME
         self.request.connectivity_type_from_user = array_settings.FC_CONNECTIVITY_TYPE
-        self.request.node_initiators_from_csi_node = Initiators(fc_wwns=[settings.WWPN])
+        self.request.node_initiators_from_csi_node = initiators_to_json(Initiators(fc_wwns=[settings.WWPN]))
         self._prepare_define_host_update_ports(host_connectivity_type,
                                                Initiators(fc_wwns=[settings.WWPN]))
 

@@ -1,7 +1,7 @@
 from dataclasses import dataclass, field
 from controllers.servers.csi.controller_types import ArrayConnectionInfo
 from controllers.servers.host_definer import utils
-
+from controllers.common.node_info import Initiators
 
 @dataclass
 class DefineHostRequest:

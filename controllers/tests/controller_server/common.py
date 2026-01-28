@@ -1,6 +1,5 @@
 from mock.mock import patch, Mock
 
-
 def mock_get_agent(contex, server_path):
     contex.storage_agent.get_mediator.return_value.__enter__.return_value = contex.mediator
     get_agent_path = '.'.join((server_path, 'get_agent'))
@@ -37,7 +36,7 @@ def mock_mediator():
 
 
 def mock_get_node_initiators(contex, server_path):
-    get_node_initiators_path = '.'.join((server_path, 'KubernetesManager', '_get_node_initiators'))
+    get_node_initiators_path = '.'.join((server_path, 'get_node_initiators'))
     get_node_initiators_patcher = patch(get_node_initiators_path,
                                         return_value=contex.mock_initiators)
     contex._get_node_initiators = get_node_initiators_patcher.start()

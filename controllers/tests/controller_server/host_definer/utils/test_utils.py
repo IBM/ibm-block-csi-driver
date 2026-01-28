@@ -11,6 +11,7 @@ from controllers.servers.host_definer.kubernetes_manager.manager import Kubernet
 from controllers.servers.host_definer.hd_types import DefineHostRequest, DefineHostResponse
 from controllers.servers.csi.controller_types import ArrayConnectionInfo
 
+EMPTY_INITIATORS_STR='{ "nvme": [], "fc": [], "iscsi": [] }'
 
 @dataclass
 class K8sResourceItems():
@@ -190,8 +191,8 @@ def get_define_request(
     connectivity_type='',
     node_id_from_host_definition='',
     node_id_from_csi_node=test_settings.FAKE_NODE_ID,
-    initiators_from_host_definition=Initiators(),
-    initiators_from_csi_node=Initiators(),
+    initiators_from_host_definition=EMPTY_INITIATORS_STR,
+    initiators_from_csi_node=EMPTY_INITIATORS_STR,
 ):
     return DefineHostRequest(
         prefix=prefix,
@@ -232,9 +233,5 @@ def get_fake_managed_node():
     managed_node.name = test_settings.FAKE_NODE_NAME
     managed_node.node_id = test_settings.FAKE_NODE_ID
     managed_node.io_group = test_settings.FAKE_STRING_IO_GROUP
-    managed_node.node_initiators = Initiators(
-        nvme_nqns=[],
-        fc_wwns=[],
-        iscsi_iqns=[]
-    )
+    managed_node.node_initiators = EMPTY_INITIATORS_STR
     return managed_node

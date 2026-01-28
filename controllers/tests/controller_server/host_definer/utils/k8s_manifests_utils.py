@@ -104,7 +104,8 @@ def _get_metadata_manifest():
     return {
         test_settings.METADATA_FIELD: {
             test_settings.METADATA_RESOURCE_VERSION_FIELD: test_settings.FAKE_RESOURCE_VERSION,
-            test_settings.METADATA_UID_FIELD: test_settings.FAKE_UID
+            test_settings.METADATA_UID_FIELD: test_settings.FAKE_UID,
+            common_settings.ANNOTATIONS_FIELD: {}
         }}
 
 

@@ -1,5 +1,4 @@
 from unittest.mock import Mock, patch
-from controllers.common.node_info import Initiators
 
 import controllers.tests.controller_server.host_definer.utils.test_utils as test_utils
 import controllers.tests.controller_server.host_definer.settings as test_settings
