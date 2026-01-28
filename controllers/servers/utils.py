@@ -569,7 +569,7 @@ def _validate_node_id(node_id):
     """
     logger.debug("validating node id: %s", node_id)
 
-    if not isinstance(node_id, str) or len(node_id < 1):
+    if not isinstance(node_id, str) or len(node_id) < 1:
         raise InvalidNodeId(node_id)
 
     logger.debug("node id validation finished")
