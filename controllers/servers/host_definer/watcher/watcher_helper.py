@@ -151,7 +151,7 @@ class Watcher(KubernetesManager):
             logger.info(current_host_definition_info_on_cluster)
             logger.info("debug - uriziv - 106")
             # END DEBUG 106 <<<<<
-            return current_host_definition_info_on_cluster
+            return current_host_definition_info_on_cluster  # See CSI-6058
         else:
             logger.info("debug - uriziv - 131")
             logger.info(messages.CREATING_NEW_HOST_DEFINITION.format(host_definition_info.name))
