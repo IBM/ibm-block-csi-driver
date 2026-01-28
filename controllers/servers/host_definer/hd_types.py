@@ -1,7 +1,6 @@
 from dataclasses import dataclass, field
 from controllers.servers.csi.controller_types import ArrayConnectionInfo
 from controllers.servers.host_definer import utils
-from controllers.common.node_info import Initiators
 
 
 @dataclass
@@ -9,9 +8,9 @@ class DefineHostRequest:
     prefix: str = ''
     connectivity_type_from_user: str = ''
     node_id_from_host_definition: str = ''
-    node_initiators_from_host_definition: Initiators = Initiators(nvme_nqns=[], fc_wwns=[], iscsi_iqns=[])
+    node_initiators_from_host_definition: str = ''
     node_id_from_csi_node: str = ''
-    node_initiators_from_csi_node: Initiators = Initiators(nvme_nqns=[], fc_wwns=[], iscsi_iqns=[])
+    node_initiators_from_csi_node: str = ''
     array_connection_info: ArrayConnectionInfo = ArrayConnectionInfo(array_addresses='', user='', password='',
                                                                      partition_name='', partition_vg='', port_set='')
     io_group: str = ''
@@ -55,8 +54,15 @@ class HostDefinitionInfo:
 
 @dataclass
 class CsiNodeInfo:
+    """
+    class to store CsiNodeInfo.
+    Typically - name and node_id can be extracted from csinode manifest
+    node_initiators should be extracted from the node annotations.
+    (See function: _generate_csi_node_info)
+    """
     name: str = ''
     node_id: str = ''
+    node_initiators: str = ''
 
 
 @dataclass
@@ -82,5 +88,5 @@ class ManagedNode:
     def __init__(self, csi_node_info, labels):
         self.name = csi_node_info.name
         self.node_id = csi_node_info.node_id
-        self.node_initiators = utils.get_node_initiators_from_node(csi_node_info.name)
+        self.node_initiators = csi_node_info.node_initiators
         self.io_group = utils.generate_io_group_from_labels(labels)

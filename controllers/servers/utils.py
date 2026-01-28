@@ -3,6 +3,7 @@ import json
 import re
 from hashlib import sha256
 from operator import eq
+from kubernetes import client
 
 import base58
 from csi_general import csi_pb2, volumegroup_pb2
@@ -25,8 +26,6 @@ from controllers.servers.csi.controller_types import (ArrayConnectionInfo,
                                                       ObjectParameters, VolumeGroupParameters, VolumeGroupIdInfo)
 from controllers.servers.errors import ObjectIdError, ValidationException, InvalidNodeId
 from controllers.common.node_info import Initiators
-from controllers.servers.host_definer.kubernetes_manager.manager import KubernetesManager
-# TODO: from kubernetes import client
 
 logger = get_stdout_logger()
 
@@ -95,30 +94,25 @@ def _get_array_connection_info_from_system_info(secrets, system_id):
                                partition_name=partition_name, partition_vg=partition_vg, port_set=port_set)
 
 
-def get_node_initiators(node_name):
-    "docstring"
-    kubernetes_manager = KubernetesManager()
-    try:
-        k8s_node = kubernetes_manager.core_api.read_node(name=node_name)
-    except Exception as ex:
-        logger.warning(
-            f"{servers_settings.NODE_READ_FAILURE_MSG}: {node_name}",
-            exc_info=ex,
-        )
-        return Initiators([], [], [])
+def get_node_initiators_data(node_name):
+    """
+    Return value example:
+    '{"fc":[],"iscsi":["iqn.2016-04.com.open-iscsi:8bce7b6eab12"],"nvme":[]}'
+    """
+    initiators_data = ''
+    core_api = client.CoreV1Api()
+    k8s_node = core_api.read_node(name=node_name)
     if k8s_node:
-        return generate_node_initiators_from_k8s_node(k8s_node)
-    return Initiators([], [], [])
-
-
-def generate_node_initiators_from_k8s_node(k8s_node):
-    "docstring"
-    initiators_data = k8s_node.metadata.annotations.get(settings.NODE_INITIATORS_FIELD, "{}")
-    return generate_node_initiators_from_string_data(initiators_data)
+        node_annotations = k8s_node.metadata.annotations
+        initiators_data = node_annotations.get(settings.NODE_INITIATORS_FIELD, "{}")
+    return initiators_data
 
 
 def generate_node_initiators_from_string_data(initiators_data):
-    "docstring"
+    """
+    Return value example:
+    Initiators(nvme_nqns=[], fc_wwns=[], iscsi_iqns=['iqn.2016-04.com.open-iscsi:8bce7b6eab12'])
+    """
     logger.info("debug - uriziv - 123")
     initiators_data = json.loads(initiators_data)
     nvme_nqns = initiators_data.get("nvme", [])
@@ -128,6 +122,21 @@ def generate_node_initiators_from_string_data(initiators_data):
     logger.info(Initiators(nvme_nqns, fc_wwns, iscsi_iqns))
     logger.info("debug - uriziv - 124")
     return Initiators(nvme_nqns, fc_wwns, iscsi_iqns)
+
+
+def get_node_initiators_from_k8s_node(k8s_node):
+    "docstring"
+    node_annotations = k8s_node.metadata.annotations
+    initiators_data = node_annotations.get(settings.NODE_INITIATORS_FIELD, "{}")
+    initiators = generate_node_initiators_from_string_data(initiators_data)
+    return initiators
+
+
+def get_node_initiators(node_name):
+    "docstring"
+    initiators_data = get_node_initiators_data(node_name)
+    initiators = generate_node_initiators_from_string_data(initiators_data)
+    return initiators
 
 
 def get_array_connection_info_from_secrets(secrets, topologies=None, system_id=None):
@@ -552,13 +561,16 @@ def validate_delete_volume_request(request):
 
 
 def _validate_node_id(node_id):
+    """
+    In the past, this function validated that node_id format is:
+    'node_name;nvme0;fc0:fc1:fc2:fc3;iscsi0'
+    Since CSI-5997, node_id contains only node_name.
+    Hence, we only validate it's type.
+    """
     logger.debug("validating node id: %s", node_id)
 
-    # In the past we used ';' (config.parameters.node_id_info.delimiter) to
-    # seperate vlues inside node_id. We don't use it any more.
-    # Currently node id is just the node name and config.parameters.node_id_info.delimiter
-    # is not in use.
-    # For now - no special validations are needed here.
+    if not isinstance(node_id, str) or len(node_id < 1):
+        raise InvalidNodeId(node_id)
 
     logger.debug("node id validation finished")
 

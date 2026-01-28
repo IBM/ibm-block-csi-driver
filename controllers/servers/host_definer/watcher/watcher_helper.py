@@ -7,8 +7,7 @@ import json
 from controllers.common.csi_logger import get_stdout_logger
 from controllers.servers.settings import SECRET_SUPPORTED_TOPOLOGIES_PARAMETER
 from controllers.servers.utils import (
-    validate_secrets, get_array_connection_info_from_secrets,
-    get_system_info_for_topologies, generate_node_initiators_from_string_data)
+    validate_secrets, get_array_connection_info_from_secrets, get_system_info_for_topologies)
 from controllers.servers.errors import ValidationException
 import controllers.servers.host_definer.messages as messages
 from controllers.servers.host_definer.kubernetes_manager.manager import KubernetesManager
@@ -17,8 +16,6 @@ import controllers.common.settings as common_settings
 from controllers.servers.host_definer.hd_types import (
     DefineHostRequest, DefineHostResponse, HostDefinitionInfo, SecretInfo, ManagedNode)
 from controllers.servers.host_definer.storage_manager.host_definer_server import HostDefinerServicer
-from controllers.common.node_info import Initiators
-from controllers.array_action import settings as array_config
 
 MANAGED_SECRETS = []
 NODES = {}
@@ -31,11 +28,11 @@ class Watcher(KubernetesManager):
         self.storage_host_servicer = HostDefinerServicer()
 
     def get_nodes_var(self):
-        """docstring"""
+        """This function is for DEBUG and should be removed"""
         return NODES
 
     def get_managed_secrets_var(self):
-        """docstring"""
+        """This function is for DEBUG and should be removed"""
         return MANAGED_SECRETS
 
     def _define_host_on_all_storages(self, node_name):
@@ -81,6 +78,7 @@ class Watcher(KubernetesManager):
         return host_definition_info
 
     def _add_node_initiators_to_host_definition_info(self, node_name, host_definition_info):
+        # TODO(uriziv): Should I check if node type is ManagedNode before calling this fucntion?
         logger.info("debug - uriziv - 113")
         host_definition_info.node_initiators = NODES[node_name].node_initiators
         logger.info(host_definition_info)
@@ -117,6 +115,8 @@ class Watcher(KubernetesManager):
             logger.info("DEBUG - uriziv - 128")
             host_definition_info.connectivity_type = host_definition_info_on_cluster.connectivity_type
             host_definition_info.node_id = host_definition_info_on_cluster.node_id
+            # TODO(uriziv): Make sure next line is correct (regression passed also without that)
+            host_definition_info.node_initiators = host_definition_info_on_cluster.node_initiators
         return host_definition_info
 
     def _define_host(self, host_definition_info):
@@ -316,8 +316,7 @@ class Watcher(KubernetesManager):
             request, host_definition_info.secret_name, host_definition_info.secret_namespace, node_info.labels)
         if request:
             request.node_id_from_host_definition = host_definition_info.node_id
-            request.node_initiators_from_host_definition = \
-                self._get_node_initiators_from_host_definition(host_definition_info)
+            request.node_initiators_from_host_definition = host_definition_info.node_initiators
             request.node_id_from_csi_node = self._get_node_id_by_node(host_definition_info)
             request.node_initiators_from_csi_node = self._get_node_initiators_by_node(host_definition_info)
             request.io_group = self._get_io_group_by_node(host_definition_info.node_name)
@@ -400,17 +399,12 @@ class Watcher(KubernetesManager):
         try:
             logger.info("debug - uriziv - 129")
             logger.info(host_definition_info)
+            for node_i in NODES.values():
+                logger.info(node_i.__dict__)
             logger.info("debug - uriziv - 130")
-            return self._get_node_initiators(host_definition_info.node_name)
+            return NODES[host_definition_info.node_name].node_initiators
         except Exception:
-            return self._get_node_initiators_from_host_definition(host_definition_info)
-
-    def _get_node_initiators_from_host_definition(self, host_definition_info):
-        logger.info("debug - uriziv - 121")
-        initiators_data = host_definition_info.node_initiators
-        logger.info(initiators_data)
-        logger.info("debug - uriziv - 122")
-        return initiators_data
+            return host_definition_info.node_initiators
 
     def _get_io_group_by_node(self, node_name):
         try:

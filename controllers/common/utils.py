@@ -5,6 +5,10 @@ import threading
 import json
 import os
 import re
+import base64
+import zlib
+import platform
+
 import urllib3
 
 from controllers.common.csi_logger import get_stdout_logger
@@ -38,12 +42,66 @@ def string_to_array(str_val, separator):
     return res
 
 
-def _get_workers_limit_info():
-    return os.environ.get('WORKERS_LIMIT')
+def _get_config_map_info():
+    result = {}
+
+    # Config map for node
+    #
+    cfgmap = os.environ.get('CSI_NODE_CONFIG')
+    if not cfgmap or cfgmap == 'null':
+        result['csi_node_config'] = {}
+    else:
+        result['csi_node_config'] = json.loads(cfgmap)
+
+    # Config map for hostdefiner
+    #
+    cfgmap = os.environ.get('CSI_HOSTDEFINER_CONFIG')
+    if not cfgmap or cfgmap == 'null':
+        result['csi_hd_config'] = {}
+    else:
+        result['csi_hd_config'] = json.loads(cfgmap)
+
+    return result
+
+
+def _encode_to_base64(data, max_size=1024):
+    # Convert to Compact JSON
+    #
+    json_bytes = json.dumps(data, separators=(',', ':')).encode('utf-8')
+
+    # Base64 encode
+    #
+    b64_encoded = base64.b64encode(json_bytes)
+
+    # If we are within the limit - just return
+    #
+    if len(b64_encoded) <= max_size:
+        return b64_encoded.decode('utf-8')
+
+    # We are too large, compress with zlib first with highest compression
+    #
+    compressed = zlib.compress(json_bytes, level=9)
+    b64_compressed = base64.b64encode(compressed)
+
+    # If now we are within limit, just return
+    #
+    if len(b64_compressed) <= max_size:
+        return b64_compressed.decode('utf-8')
+
+    # OK, nothing helps log error
+    #
+    logger.error("Encoded data too large: {} bytes max allowed: {} bytes "
+                 "(even after zlib compression)".format(len(b64_compressed), max_size))
+
+    # Replace user config map with error information and re-encode
+    #
+    del data["config_map"]
+    data["config_map"] = {'error': 'CONFIG_MAP_TOO_LARGE'}
+    return _encode_to_base64(data)
 
 
 def _default_callhome_metadata_aux():
-    ch_info = []
+    ch_info = {}
 
     # Disable wanings for insecure https
     #
@@ -73,7 +131,7 @@ def _default_callhome_metadata_aux():
     version_info = json.loads(req.data.decode('utf-8'))
     k8s_version = version_info.get("gitVersion", '')
     if k8s_version:
-        ch_info.append(f"k8s:{k8s_version}")
+        ch_info["k8s"] = k8s_version
 
     # To Getting OCP version is more complicated
     #
@@ -91,13 +149,17 @@ def _default_callhome_metadata_aux():
         ocp_version = ocp_match.group(1)
 
     if ocp_version:
-        ch_info.append(f"ocp:{ocp_version}")
+        ch_info["ocp"] = ocp_version
 
-    max_invocations = _get_workers_limit_info()
-    if max_invocations:
-        ch_info.append(f"max_workers:{max_invocations}")
+    # Processor arch: one of 'x86_64', 's390x', 'ppc64'
+    #
+    ch_info["arch"] = platform.machine()
 
-    callhome_metadata = ", ".join(ch_info)
+    # Any user changes for config map
+    #
+    ch_info["config_map"] = _get_config_map_info()
+
+    callhome_metadata = _encode_to_base64(ch_info)
     return callhome_metadata
 
 
