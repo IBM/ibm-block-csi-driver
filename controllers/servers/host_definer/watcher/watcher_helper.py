@@ -118,7 +118,6 @@ class Watcher(KubernetesManager):
             logger.info("DEBUG - uriziv - 128")
             host_definition_info.connectivity_type = host_definition_info_on_cluster.connectivity_type
             host_definition_info.node_id = host_definition_info_on_cluster.node_id
-            # TODO(uriziv): Make sure next line is correct (regression passed also without that)
             host_definition_info.node_initiators = host_definition_info_on_cluster.node_initiators
         return host_definition_info
 
