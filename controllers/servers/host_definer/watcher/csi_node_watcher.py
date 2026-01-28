@@ -117,6 +117,7 @@ class CsiNodeWatcher(Watcher):
         logger.info(host_definition_info)
         logger.info(csi_node_info)
         if not host_definition_info.node_id or not csi_node_info.node_id:
+            logger.warning("node_id is None !!!")
             return False
 
         logger.info("DEBUG - uriziv - 92")
