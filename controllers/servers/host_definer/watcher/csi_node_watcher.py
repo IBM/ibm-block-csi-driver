@@ -106,7 +106,6 @@ class CsiNodeWatcher(Watcher):
                 if self._is_node_initiators_changed(host_definition_info, csi_node_info):
                     logger.info(messages.NODE_INITIATORS_WERE_CHANGED.format(csi_node_info.name,
                                 host_definition_info.node_initiators, csi_node_info.node_initiators))
-                    logger.info(messages.UPDATE_HOST_DEFINITION_PORTS)
                     NODES[csi_node_info.name] = self._generate_managed_node(csi_node_info)
                     for node_i in NODES.values():
                         logger.info(node_i.__dict__)
