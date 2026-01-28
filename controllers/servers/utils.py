@@ -565,7 +565,7 @@ def _validate_node_id(node_id):
     In the past, this function validated that node_id format is:
     'node_name;nvme0;fc0:fc1:fc2:fc3;iscsi0'
     Since CSI-5997, node_id contains only node_name.
-    Hence, we only validate it's type.
+    Hence, we only validate type and len.
     """
     logger.debug("validating node id: %s", node_id)
 
