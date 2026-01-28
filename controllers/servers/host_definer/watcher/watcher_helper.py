@@ -142,10 +142,20 @@ class Watcher(KubernetesManager):
             host_definition_manifest[settings.METADATA][
                 common_settings.NAME_FIELD] = current_host_definition_info_on_cluster.name
             self._patch_host_definition(host_definition_manifest)
+            ### START DEBUG 106 >>>>>
+            patched_host_definition_info_on_cluster = self._get_matching_host_definition_info(
+                host_definition_info.node_name,
+                host_definition_info.secret_name,
+                host_definition_info.secret_namespace)
+            logger.info(patched_host_definition_info_on_cluster)
+            logger.info(current_host_definition_info_on_cluster)
             logger.info("debug - uriziv - 106")
+            ### END DEBUG 106 <<<<<
             return current_host_definition_info_on_cluster
         else:
+            logger.info("debug - uriziv - 131")
             logger.info(messages.CREATING_NEW_HOST_DEFINITION.format(host_definition_info.name))
+            logger.info("debug - uriziv - 132")
             return self._create_host_definition(host_definition_manifest)
 
     def _get_host_definition_manifest(self, host_definition_info, response):
@@ -262,7 +272,7 @@ class Watcher(KubernetesManager):
             host_definition, settings.SUCCESS_MESSAGE, settings.DEFINE_ACTION, settings.SUCCESSFUL_MESSAGE_TYPE)
 
     def _create_k8s_event_for_host_definition(self, host_definition_info, message, action, message_type):
-        logger.info(messages.CREATE_EVENT_FOR_HOST_DEFINITION.format(message, host_definition_info.name))
+        logger.info(messages.CREATE_EVENT_FOR_HOST_DEFINITION.format(mes/sage, host_definition_info.name))
         k8s_event = self._generate_k8s_event(host_definition_info, message, action, message_type)
         self._create_k8s_event(settings.DEFAULT_NAMESPACE, k8s_event)
 
