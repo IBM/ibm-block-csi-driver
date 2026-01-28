@@ -38,7 +38,7 @@ DELETE_HOST_DEFINITION = 'Deleting host definition {}'
 ADD_FINALIZER_TO_HOST_DEFINITION = 'Adding finalizer to host definition {}'
 REMOVE_FINALIZER_TO_HOST_DEFINITION = 'Removing finalizer from host definition {}'
 FAILED_TO_REMOVE_FINALIZER = 'Failed to remove {} finalizer from node'.format(settings.CSI_IBM_FINALIZER)
-NODE_INITIATORS_WERE_CHANGED = "Node initiators were changed for {} node, updating its ports definitions" \
+NODE_INITIATORS_WERE_CHANGED = "Node initiators were changed for {} node, updating its ports definitions, " \
     "old initiators: {}, new initiators: {}"
 UPDATE_HOST_DEFINITION_FIELDS_FROM_STORAGE = 'Update host definition {} host from storage fields with {}'
 CHECK_NODE_SHOULD_BE_MANAGED_BY_SECRET = 'Check if node {} should be managed by {} secret in {} namespace'
