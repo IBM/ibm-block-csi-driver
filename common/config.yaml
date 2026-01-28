@@ -20,8 +20,6 @@ parameters:
   object_id_info:
     delimiter: ":"
     ids_delimiter: ";"
-  node_id_info:
-    fcs_delimiter: ":"
 
 connectivity_type:
   nvme_over_fc: "nvmeofc"
