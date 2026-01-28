@@ -272,7 +272,7 @@ class Watcher(KubernetesManager):
             host_definition, settings.SUCCESS_MESSAGE, settings.DEFINE_ACTION, settings.SUCCESSFUL_MESSAGE_TYPE)
 
     def _create_k8s_event_for_host_definition(self, host_definition_info, message, action, message_type):
-        logger.info(messages.CREATE_EVENT_FOR_HOST_DEFINITION.format(mes/sage, host_definition_info.name))
+        logger.info(messages.CREATE_EVENT_FOR_HOST_DEFINITION.format(message, host_definition_info.name))
         k8s_event = self._generate_k8s_event(host_definition_info, message, action, message_type)
         self._create_k8s_event(settings.DEFAULT_NAMESPACE, k8s_event)
 
