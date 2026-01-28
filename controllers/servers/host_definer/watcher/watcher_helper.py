@@ -78,11 +78,14 @@ class Watcher(KubernetesManager):
         return host_definition_info
 
     def _add_node_initiators_to_host_definition_info(self, node_name, host_definition_info):
-        # TODO(uriziv): Should I check if node type is ManagedNode before calling this fucntion?
         logger.info("debug - uriziv - 113")
-        host_definition_info.node_initiators = NODES[node_name].node_initiators
+        node_obj = NODES[node_name]
+        if not isinstance(node_obj, ManagedNode):
+            logger.warning("Node %s is not a ManagedNode instance. This might lead to attribute errors.", node_name)
+        host_definition_info.node_initiators = node_obj.node_initiators
         logger.info(host_definition_info)
-        logger.info(NODES[node_name].__dict__)
+        logger.info(node_obj.__dict__)
+        logger.info(type(node_obj))
         logger.info("debug - uriziv - 114")
         return host_definition_info
 
