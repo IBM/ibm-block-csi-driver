@@ -81,7 +81,7 @@ class Watcher(KubernetesManager):
         logger.info("debug - uriziv - 113")
         node_obj = NODES[node_name]
         if not isinstance(node_obj, ManagedNode):
-            logger.warning("Node %s is not a ManagedNode instance. This might lead to attribute errors.", node_name)
+            logger.warning(messages.NODE_IS_NOT_MANAGED_NODE_TYPE.format(node_name))
         host_definition_info.node_initiators = node_obj.node_initiators
         logger.info(host_definition_info)
         logger.info(node_obj.__dict__)

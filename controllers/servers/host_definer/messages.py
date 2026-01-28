@@ -75,3 +75,5 @@ DEFINE_NODE_ON_SECRET = 'Defining node {} on secret {} in namespace {}'
 GENERATE_REQUEST_FOR_NODE = 'Generating define request for node {}'
 COULD_NOT_CHANGE_HOST_PROTOCOL_USING_CHHOST = "Could not change host [{}] protocol using chhost command, "\
     "changing the host protocol by deleting it and creating it again"
+NODE_IS_NOT_MANAGED_NODE_TYPE = "Node {} is not a ManagedNode instance. This might lead to attribute errors."
+NODE_ID_IS_NONE = "node_id is None !!!"
