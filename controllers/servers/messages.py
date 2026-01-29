@@ -1,6 +1,6 @@
 VALIDATION_EXCEPTION_MESSAGE = "Validation error has occurred : {0}"
 
-WRONG_ID_FORMAT_MESSAGE = "Wrong {0} id format : {1}"
+WRONG_ID_FORMAT_MESSAGE = "Wrong {0} id format or type : {1}"
 
 OBJECT_ALREADY_PROCESSING_MESSAGE = "object {0} is already processing. request cannot be completed."
 
