@@ -1,26 +1,19 @@
 from dataclasses import dataclass, field
 
-import controllers.servers.settings as servers_settings
 from controllers.array_action import settings as array_config
-from controllers.common import utils
 
 
 class NodeIdInfo:
     def __init__(self, node_id):
-        """
-        Args:
-            node_id: <node_name>,<iqn>,<wwns>
-        """
-        node_name, nvme_nqn, fc_wwns_str, iscsi_iqn = utils.get_node_id_info(node_id)
-        fc_wwns = fc_wwns_str.split(servers_settings.PARAMETERS_FC_WWN_DELIMITER)
-        self.node_name = node_name
-        self.initiators = Initiators([nvme_nqn], fc_wwns, [iscsi_iqn])
+        self.node_name = node_id
 
 
 @dataclass
 class Initiators:
     """
     Object containing node initiators (e.g. iqn, fc_wwns)
+    Usage:
+    inits = Initiators([nvme_nqn], fc_wwns, [iscsi_iqn])
     """
     nvme_nqns: list = field(default_factory=list)
     fc_wwns: list = field(default_factory=list)
