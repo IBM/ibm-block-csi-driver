@@ -60,6 +60,11 @@ KUBE_CMD=""
 WORKLOAD_POD=""
 WORKLOAD_PVC=""
 
+OUTPUT_LOCATION=""
+CREATE_ZIP=false
+CLUSTER_TIMEZONE=""
+CLUSTER_TIMEZONE_OFFSET=""
+
 readonly AVAILABLE_COMPONENTS=("logs" "events" "resources" "node-diagnostics" "storage" "workload")
 
 # Temp files for cleanup
@@ -123,6 +128,113 @@ is_openshift() {
     [[ "$KUBE_CMD" == "oc" ]]
 }
 
+detect_cluster_timezone() {
+    # Default to UTC
+    CLUSTER_TIMEZONE="UTC"
+    CLUSTER_TIMEZONE_OFFSET="+0000"
+
+    # Method 1: Detect timezone from a node
+    local sample_node
+    sample_node=$($KUBE_CMD get nodes -o jsonpath='{.items[0].metadata.name}' 2>/dev/null)
+
+    if [[ -n "$sample_node" ]]; then
+        local tz_info tmp_tz_file
+        tmp_tz_file=$(mktemp)
+        TEMP_FILES+=("$tmp_tz_file")
+
+        if is_openshift; then
+            $KUBE_CMD debug "node/$sample_node" --quiet 2>/dev/null <<'EOF' > "$tmp_tz_file" 2>&1
+chroot /host bash -c '
+if [ -f /etc/timezone ]; then
+    cat /etc/timezone
+elif [ -L /etc/localtime ]; then
+    readlink /etc/localtime | sed "s|.*/zoneinfo/||"
+else
+    timedatectl 2>/dev/null | grep "Time zone" | awk "{print \$3}"
+fi
+'
+exit
+EOF
+        else
+            $KUBE_CMD debug "node/$sample_node" \
+                --quiet \
+                --profile=sysadmin \
+                --image=registry.access.redhat.com/ubi9/ubi:latest 2>/dev/null \
+                -- chroot /host bash -c '
+if [ -f /etc/timezone ]; then
+    cat /etc/timezone
+elif [ -L /etc/localtime ]; then
+    readlink /etc/localtime | sed "s|.*/zoneinfo/||"
+else
+    timedatectl 2>/dev/null | grep "Time zone" | awk "{print \$3}"
+fi
+' > "$tmp_tz_file" 2>&1
+        fi
+
+        tz_info=$(grep -vE '^(Starting pod|Removing debug pod|$)' "$tmp_tz_file" | head -1 | xargs)
+
+        if [[ -n "$tz_info" ]] && TZ="$tz_info" date +%Z >/dev/null 2>&1; then
+            CLUSTER_TIMEZONE="$tz_info"
+            CLUSTER_TIMEZONE_OFFSET=$(TZ="$CLUSTER_TIMEZONE" date +%z)
+            log_success "Cluster timezone detected from node: $CLUSTER_TIMEZONE ($CLUSTER_TIMEZONE_OFFSET)"
+            return
+        fi
+    fi
+
+    # Method 2: Detect timezone from CSI pod (info)
+    local sample_pod sample_ns tz_from_pod
+
+    sample_pod=$($KUBE_CMD get pods --all-namespaces \
+        -l product=ibm-block-csi-driver \
+        -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || true)
+    sample_ns=$($KUBE_CMD get pods --all-namespaces \
+        -l product=ibm-block-csi-driver \
+        -o jsonpath='{.items[0].metadata.namespace}' 2>/dev/null || true)
+
+    if [[ -n "$sample_pod" && -n "$sample_ns" ]]; then
+        tz_from_pod=$($KUBE_CMD exec -n "$sample_ns" "$sample_pod" -- sh -c '
+if [ -f /etc/timezone ]; then
+    cat /etc/timezone
+elif [ -L /etc/localtime ]; then
+    readlink /etc/localtime | sed "s|.*/zoneinfo/||"
+else
+    date +%Z
+fi' 2>/dev/null | tr -d '\r\n')
+
+        if [[ -n "$tz_from_pod" ]] && TZ="$tz_from_pod" date +%Z >/dev/null 2>&1; then
+            CLUSTER_TIMEZONE="$tz_from_pod"
+            CLUSTER_TIMEZONE_OFFSET=$(TZ="$CLUSTER_TIMEZONE" date +%z)
+            log_success "Cluster timezone detected from CSI pod (informational): $CLUSTER_TIMEZONE ($CLUSTER_TIMEZONE_OFFSET)"
+            return
+        fi
+    fi
+
+    # Method 3: Any running pod (last resort)
+    sample_pod=$($KUBE_CMD get pods --all-namespaces \
+        --field-selector status.phase=Running \
+        -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || true)
+    sample_ns=$($KUBE_CMD get pods --all-namespaces \
+        --field-selector status.phase=Running \
+        -o jsonpath='{.items[0].metadata.namespace}' 2>/dev/null || true)
+
+    if [[ -n "$sample_pod" && -n "$sample_ns" ]]; then
+        tz_from_pod=$($KUBE_CMD exec -n "$sample_ns" "$sample_pod" -- date +%Z 2>/dev/null | tr -d '\r\n')
+
+        if [[ -n "$tz_from_pod" ]] && TZ="$tz_from_pod" date +%Z >/dev/null 2>&1; then
+            CLUSTER_TIMEZONE="$tz_from_pod"
+            CLUSTER_TIMEZONE_OFFSET=$(TZ="$CLUSTER_TIMEZONE" date +%z)
+            log_success "Cluster timezone detected from generic pod (informational): $CLUSTER_TIMEZONE ($CLUSTER_TIMEZONE_OFFSET)"
+            return
+        fi
+    fi
+
+    # Fallback: UTC
+    log_warning "Could not reliably detect cluster timezone, using UTC as default"
+    log_info "You can manually specify times in your local timezone for time filtering"
+    CLUSTER_TIMEZONE="UTC"
+    CLUSTER_TIMEZONE_OFFSET="+0000"
+}
+
 show_help() {
 cat << EOF
 IBM Block CSI Driver Diagnostics Collection Script
@@ -140,6 +252,21 @@ GENERAL OPTIONS
   -n, --namespace <namespace>
         Target a specific namespace
         Default: all namespaces
+
+  -o, --output <directory>
+        Specify output directory location
+        Default: current directory (.)
+        
+        The script creates the following structure:
+        <output-location>/ibm-block-csi-log-collection/YYYYMMDD-HHMMSS_<timezone>/
+        
+        Example: -o /tmp
+        Creates: /tmp/ibm-block-csi-log-collection/20250129-143022_UTC/
+
+  --zip
+        Create a compressed archive of the collected data
+        The zip file will be created in the same location as the collection directory
+        Format: ibm-block-csi-log-collection_YYYYMMDD-HHMMSS_<timezone>.tar.gz
 
 -------------------------------------------------
 COMPONENT SELECTION
@@ -164,6 +291,9 @@ COMPONENT SELECTION
 -------------------------------------------------
 TIME FILTERING (LOGS & EVENTS ONLY)
 -------------------------------------------------
+  NOTE: All time filtering uses the cluster's timezone.
+        The script automatically detects and uses the cluster timezone.
+
   --since-duration <duration>
         Collect logs/events from the last duration
         Examples: 30m, 2h, 1d
@@ -172,20 +302,22 @@ TIME FILTERING (LOGS & EVENTS ONLY)
           - Cannot be used with --start-time or --end-time
 
   --start-time <YYYY-MM-DDTHH:MM>
-        Collect logs/events starting from this time (UTC)
+        Collect logs/events starting from this time (in cluster timezone)
         Example: 2025-01-15T10:30
 
         NOTE:
           - Can be used alone
-          - If --end-time is not specified, end time defaults to now (UTC)
+          - If --end-time is not specified, end time defaults to now (cluster time)
+          - Time should be provided in the cluster's timezone
 
   --end-time <YYYY-MM-DDTHH:MM>
-        Collect logs/events up to this time (UTC)
+        Collect logs/events up to this time (in cluster timezone)
         Example: 2025-01-15T11:45
 
         NOTE:
           - Must be used together with --start-time
           - Cannot be used with --since-duration
+          - Time should be provided in the cluster's timezone
 
 -------------------------------------------------
 STORAGE SYSTEM DIAGNOSTICS (IBM FlashSystem / SVC)
@@ -235,6 +367,7 @@ LOG COLLECTION BEHAVIOR
   - Logs are collected with timestamps enabled, can be used with time filtering flags.
   - --limit-bytes can be used to cap log file size
   - Both current and previous container logs are collected when available
+  - All timestamps are in the cluster's timezone
 
 -------------------------------------------------
 EVENT COLLECTION BEHAVIOR
@@ -247,6 +380,16 @@ EVENT COLLECTION BEHAVIOR
     - CSI / storage-related
     - Warning events
   - Namespace scoping (-n) is applied ONLY for workload-related event collection
+  - All event timestamps are in the cluster's timezone
+
+-------------------------------------------------
+TIMEZONE INFORMATION
+-------------------------------------------------
+  - The script automatically detects the cluster's timezone
+  - All time-based operations use the cluster timezone
+  - Folder names include the cluster timezone (e.g., 20250129-143022_IST)
+  - Time filtering parameters should be provided in cluster timezone
+  - The detected timezone is displayed at the start of collection
 
 -------------------------------------------------
 EXAMPLES
@@ -256,49 +399,60 @@ EXAMPLES
     ./$SCRIPT_NAME
    - Skips storage & workload component
    - Uses cluster-wide scope for collection
+   - Output in current directory
 
-1) Collect ALL NON-WORKLOAD components (cluster-wide)
+1) Collect to specific location and create zip
    ./$SCRIPT_NAME \\
+     -o /var/log/diagnostics \\
+     --zip
+
+2) Collect ALL NON-WORKLOAD components (cluster-wide)
+   ./$SCRIPT_NAME \\
+     -o /tmp \\
      --storage-secret ibm-storage-secret \\
-     --storage-secret-namespace openshift-storage
+     --storage-secret-namespace openshift-storage \\
+     --zip
 
-
-2) Collect EVERYTHING INCLUDING workload (pod + pvc)
+3) Collect EVERYTHING INCLUDING workload (pod + pvc)
    ./$SCRIPT_NAME \\
      -n my-app-namespace \\
+     -o /var/log \\
      --storage-secret ibm-storage-secret \\
      --storage-secret-namespace openshift-storage \\
      --workload-pod my-app-pod \\
-     --workload-pvc data-volume-claim
+     --workload-pvc data-volume-claim \\
+     --zip
 
-3) Collect workload diagnostics for BOTH pod and PVC
+4) Collect workload diagnostics for BOTH pod and PVC
    ./$SCRIPT_NAME \\
      -n my-app-namespace \\
+     -o /tmp/diagnostics \\
      --workload-pod my-app-pod \\
      --workload-pvc data-volume-claim
 
-
-4) Collect ONLY workload diagnostics (nothing else)
+5) Collect ONLY workload diagnostics (nothing else)
    ./$SCRIPT_NAME \\
      -n my-app-namespace \\
      --only workload \\
      --workload-pod my-app-pod
 
-5) Collect CSI resources in a specific namespace
+6) Collect CSI resources in a specific namespace
    ./$SCRIPT_NAME \\
      -n openshift-storage \\
-     --only resources
+     --only resources \\
+     -o /var/log
 
-6) Collect LOGS from the last 2 hours
+7) Collect LOGS from the last 2 hours
    ./$SCRIPT_NAME \\
      --only logs \\
      --since-duration 2h
 
-7) Collect EVENTS from a specific time window
+8) Collect EVENTS from a specific time window (using cluster timezone)
    ./$SCRIPT_NAME \\
      --only events \\
      --start-time 2025-12-21T10:30 \\
      --end-time 2025-12-21T11:30
+   Note: Times are interpreted in the cluster's timezone
 EOF
 }
 
@@ -366,6 +520,7 @@ normalize_time() {
     if [[ ! "$time" =~ ^[0-9]{4}-[0-9]{2}-[0-9]{2}T[0-9]{2}:[0-9]{2}$ ]]; then
         log_error "Invalid time format: $time"
         log_error "Expected format: YYYY-MM-DDTHH:MM (e.g., 2024-01-15T10:30)"
+        log_error "Time should be in cluster timezone: $CLUSTER_TIMEZONE"
         exit 1
     fi
     
@@ -713,6 +868,14 @@ parse_arguments() {
                 TARGET_NAMESPACE="$2"
                 shift 2
                 ;;
+            -o|--output)
+                OUTPUT_LOCATION="$2"
+                shift 2
+                ;;
+            --zip)
+                CREATE_ZIP=true
+                shift
+                ;;
             --only)
                 disable_all_components
                 IFS=',' read -ra components <<< "$2"
@@ -777,6 +940,23 @@ parse_arguments() {
 # PHASE 2: VALIDATION
 # ==============================================================================
 validate_arguments() {
+    # Validate output location
+    if [[ -n "$OUTPUT_LOCATION" ]]; then
+        if [[ ! -d "$OUTPUT_LOCATION" ]]; then
+            log_error "Output location does not exist: $OUTPUT_LOCATION"
+            exit 1
+        fi
+        if [[ ! -w "$OUTPUT_LOCATION" ]]; then
+            log_error "Output location is not writable: $OUTPUT_LOCATION"
+            exit 1
+        fi
+        OUTPUT_LOCATION=$(realpath "$OUTPUT_LOCATION")
+        log_success "Output location validated: $OUTPUT_LOCATION"
+    else
+        OUTPUT_LOCATION=$(pwd)
+        # log_info "Using current directory as output location: $OUTPUT_LOCATION"
+    fi
+    
     # Validate namespace if specified
     if [[ -n "$TARGET_NAMESPACE" ]]; then
         if ! namespace_exists "$TARGET_NAMESPACE"; then
@@ -835,9 +1015,10 @@ validate_arguments() {
         exit 1
     fi
 
-    # If start-time is provided without end-time, default end-time to NOW (UTC)
+    # If start-time is provided without end-time, default end-time to NOW in cluster timezone
     if [[ -n "$USER_START_TIME" ]] && [[ -z "$USER_END_TIME" ]]; then
-        USER_END_TIME="$(date -u +%Y-%m-%dT%H:%M)"
+        # Get current time in cluster timezone format
+        USER_END_TIME="$(TZ="$CLUSTER_TIMEZONE" date +%Y-%m-%dT%H:%M)"
     fi
 
     # Normalize times using existing normalize_time()
@@ -884,15 +1065,19 @@ validate_arguments() {
             exit 1
         }
     fi
-
 }
 
 # ==============================================================================
 # PHASE 3: ENVIRONMENT SETUP
 # ==============================================================================
 setup_environment() {
-
-    BASE_OUTPUT_DIR="csi-collection-$(date -u +%Y%m%d-%H%M%S)_UTC"
+    local timestamp
+    timestamp=$(TZ="$CLUSTER_TIMEZONE" date +%Y%m%d-%H%M%S)
+    
+    local base_collection_dir="$OUTPUT_LOCATION/ibm-block-csi-log-collection"
+    mkdir -p "$base_collection_dir"
+    
+    BASE_OUTPUT_DIR="$base_collection_dir/${timestamp}_${CLUSTER_TIMEZONE}"
     mkdir -p "$BASE_OUTPUT_DIR"
 
     if [[ "$COLLECT_RESOURCES" == true ]]; then
@@ -923,7 +1108,6 @@ setup_environment() {
             "$BASE_OUTPUT_DIR/node-diagnostics/nodes" \
             "$BASE_OUTPUT_DIR/node-diagnostics/kubelet"
     fi
-
 
     if [[ "$COLLECT_STORAGE_SYSTEM" == true ]]; then
         mkdir -p "$BASE_OUTPUT_DIR/storage-system"
@@ -2447,10 +2631,10 @@ generate_summary() {
     if [[ -n "$SINCE_DURATION" ]]; then
         time_filter_info="Logs from last $SINCE_DURATION"
     elif [[ -n "$USER_START_TIME" ]]; then
-        if [[ "$USER_END_TIME" == "$(date -u +%Y-%m-%dT%H:%M)" ]]; then
-            time_filter_info="Logs from $USER_START_TIME until now (UTC)"
+        if [[ "$USER_END_TIME" == "$(TZ="$CLUSTER_TIMEZONE" date +%Y-%m-%dT%H:%M)" ]]; then
+            time_filter_info="Logs from $USER_START_TIME until now ($CLUSTER_TIMEZONE)"
         else
-            time_filter_info="Logs from $USER_START_TIME until $USER_END_TIME (UTC)"
+            time_filter_info="Logs from $USER_START_TIME until $USER_END_TIME ($CLUSTER_TIMEZONE)"
         fi
     else
         time_filter_info="No time filtering (all logs)"
@@ -2464,10 +2648,11 @@ generate_summary() {
 IBM Block CSI Driver – Diagnostics Collection Summary
 ============================================================
 
-Collected At (UTC) : $(date -u +"%Y-%m-%d %H:%M:%S")
+Collected At ($CLUSTER_TIMEZONE) : $(TZ="$CLUSTER_TIMEZONE" date +"%Y-%m-%d %H:%M:%S")
 Script Version     : $VERSION
 Cluster Type       : $cluster_type
 Cluster CLI Used   : $KUBE_CMD
+Cluster Timezone   : $CLUSTER_TIMEZONE ($CLUSTER_TIMEZONE_OFFSET)
 Target Namespace   : ${TARGET_NAMESPACE:-All namespaces}
 
 -----------------------------
@@ -2496,6 +2681,52 @@ EOF
     log_success "Collection summary generated"
 }
 
+create_archive() {
+    [[ "$CREATE_ZIP" != true ]] && return
+
+    print_section "Creating Compressed Archive"
+
+    local archive_dir
+    archive_dir=$(dirname "$BASE_OUTPUT_DIR")
+
+    local collection_dirname
+    collection_dirname=$(basename "$BASE_OUTPUT_DIR")
+
+    local archive_name="ibm-block-csi-log-collection_${collection_dirname}.tar.gz"
+    local archive_path="$archive_dir/$archive_name"
+
+    [[ -f "$archive_path" ]] && log_warning "Overwriting existing archive: $archive_path"
+
+    log_info "Creating archive: $archive_name"
+
+    if tar -czf "$archive_path" -C "$archive_dir" "$collection_dirname"; then
+        local archive_size
+        archive_size=$(du -sh "$archive_path" 2>/dev/null | awk '{print $1}')
+
+        log_success "Archive created successfully: $archive_path"
+        log_success "Archive size: $archive_size"
+
+        if [[ "$INTERACTIVE" == true ]]; then
+            echo ""
+            read -p "Remove uncompressed directory? [y/N]: " -n 1 -r
+            echo ""
+        else
+            REPLY="n"
+        fi
+
+        if [[ $REPLY =~ ^[Yy]$ ]]; then
+            rm -rf "$BASE_OUTPUT_DIR"
+            log_success "Uncompressed directory removed"
+            log_info "Final output: $archive_path"
+        else
+            log_info "Uncompressed directory retained: $BASE_OUTPUT_DIR"
+            log_info "Archive available at: $archive_path"
+        fi
+    else
+        log_error "Failed to create archive"
+        log_info "Uncompressed data available at: $BASE_OUTPUT_DIR"
+    fi
+}
 
 # ==============================================================================
 # MAIN EXECUTION
@@ -2510,8 +2741,29 @@ main() {
 
     parse_arguments "$@"
     check_prerequisites
+    detect_cluster_timezone  
     
     print_section "Collection Configuration"
+    
+    # Display cluster timezone
+    log_info "Cluster Timezone: ${GREEN}$CLUSTER_TIMEZONE ($CLUSTER_TIMEZONE_OFFSET)${NC}"
+    echo ""
+    
+    # Display output location
+    if [[ -n "$OUTPUT_LOCATION" && "$OUTPUT_LOCATION" != "$(pwd)" ]]; then
+        log_info "Output Location: ${GREEN}$OUTPUT_LOCATION${NC}"
+    else
+        log_info "Output Location: ${GREEN}Current directory ($(pwd))${NC}"
+    fi
+    echo ""
+
+    # Display archive option
+    if [[ "$CREATE_ZIP" == true ]]; then
+        log_info "Create Archive: ${GREEN}Yes${NC}"
+    else
+        log_info "Create Archive: ${YELLOW}No${NC}"
+    fi
+    echo ""
     
     # Namespace configuration
     if [[ -n "$TARGET_NAMESPACE" ]]; then
@@ -2575,9 +2827,9 @@ main() {
         log_info "Time Filter (Logs & Events): ${GREEN}Last $SINCE_DURATION${NC}"
     elif [[ -n "$USER_START_TIME" ]]; then
         if [[ -z "$USER_END_TIME" ]]; then
-            log_info "Time Filter (Logs & Events): ${GREEN}From $USER_START_TIME until now (UTC)${NC}"
+            log_info "Time Filter (Logs & Events): ${GREEN}From $USER_START_TIME until now ($CLUSTER_TIMEZONE)${NC}"
         else
-            log_info "Time Filter (Logs & Events): ${GREEN}From $USER_START_TIME until $USER_END_TIME (UTC)${NC}"
+            log_info "Time Filter (Logs & Events): ${GREEN}From $USER_START_TIME until $USER_END_TIME ($CLUSTER_TIMEZONE)${NC}"
         fi
     else
         log_info "Time Filter (Logs & Events): ${GREEN}None (all logs & events collected)${NC}"
@@ -2596,11 +2848,15 @@ main() {
     collect_storage_diagnostics
     
     generate_summary
+    create_archive
     
     print_section "Collection Complete"
-    log_info "Output directory: $(realpath "$BASE_OUTPUT_DIR")"
+    if [[ "$CREATE_ZIP" == true ]] && [[ -f "$archive_dir/$archive_name" ]]; then
+        log_info "Archive: $(realpath "$archive_dir/$archive_name")"
+    else
+        log_info "Output directory: $(realpath "$BASE_OUTPUT_DIR")"
+    fi
     echo ""
-    
 }
 
 main "$@"
