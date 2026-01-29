@@ -331,6 +331,9 @@ class Watcher(KubernetesManager):
             request.node_initiators_from_host_definition = host_definition_info.node_initiators
             request.node_id_from_csi_node = self._get_node_id_by_node(host_definition_info)
             request.node_initiators_from_csi_node = self._get_node_initiators_by_node(host_definition_info)
+            # To clarify the variable name 'node_initiators_from_csi_node' -
+            # Since CSI-5997, initiators are extracted from k8s node annoatations (not from k&s csinode nodeID).
+            # However, They are still stored at CsiNodeInfo and ManagedNode (see hd_types.py)
             request.io_group = self._get_io_group_by_node(host_definition_info.node_name)
         logger.info(request)
         logger.info("debug - uriziv - 34")
