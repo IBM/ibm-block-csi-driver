@@ -9,7 +9,7 @@ class BaseSetUp(unittest.TestCase):
     def setUp(self):
         test_utils.patch_kubernetes_manager_init()
 
-        self._mock_core_v1 = patch("controllers.servers.utils.client.CoreV1Api")
+        self._mock_core_v1 = patch("controllers.servers.host_definer.kubernetes_manager.manager.client.CoreV1Api")
         self.mock_core_v1_cls = self._mock_core_v1.start()
 
         mock_core_api = Mock()
