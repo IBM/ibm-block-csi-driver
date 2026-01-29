@@ -93,15 +93,18 @@ class CsiNodeWatcher(Watcher):
             host_definition_info = self._get_matching_host_definition_info(
                 csi_node_info.name, secret_name, secret_namespace)
             if host_definition_info:
-                if self._is_node_id_changed(host_definition_info.node_id, csi_node_info.node_id):
-                    logger.info(messages.NODE_ID_WAS_CHANGED.format(csi_node_info.name,
-                                host_definition_info.node_id, csi_node_info.node_id))
+                if self._is_node_initiators_changed(host_definition_info, csi_node_info):
+                    logger.info(messages.NODE_INITIATORS_WERE_CHANGED.format(csi_node_info.name,
+                                host_definition_info.node_initiators, csi_node_info.node_initiators))
                     NODES[csi_node_info.name] = self._generate_managed_node(csi_node_info)
                     self._create_definition(host_definition_info)
 
-    def _is_node_id_changed(self, host_definition_node_id, csi_node_node_id):
-        return host_definition_node_id != csi_node_node_id \
-            and host_definition_node_id and csi_node_node_id
+    def _is_node_initiators_changed(self, host_definition_info, csi_node_info):
+        if not host_definition_info.node_id or not csi_node_info.node_id:
+            logger.warning(messages.NODE_ID_IS_NONE)
+            return False
+
+        return host_definition_info.node_initiators != csi_node_info.node_initiators
 
     def _undefine_hosts(self, node_name):
         for secret_info in MANAGED_SECRETS:

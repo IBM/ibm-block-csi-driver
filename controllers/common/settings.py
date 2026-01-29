@@ -1,5 +1,3 @@
-from controllers.common.config import config
-
 NAME_PREFIX_SEPARATOR = "_"
 ENDPOINTS_SEPARATOR = ", "
 
@@ -11,7 +9,6 @@ ARRAY_TYPE_SVC = 'SVC'
 ARRAY_TYPE_DS8K = 'DS8K'
 ALL_ARRAY_TYPES = [ARRAY_TYPE_XIV, ARRAY_TYPE_SVC, ARRAY_TYPE_DS8K]
 
-PARAMETERS_NODE_ID_DELIMITER = config.parameters.node_id_info.delimiter
 SPACE_EFFICIENCY_THIN = "thin"
 SPACE_EFFICIENCY_COMPRESSED = "compressed"
 SPACE_EFFICIENCY_DEDUPLICATED = "deduplicated"
@@ -26,8 +23,11 @@ VERSION = 'v1'
 HOST_DEFINITION_NODE_ID_FIELD = 'nodeId'
 NAME_FIELD = 'name'
 NAMESPACE_FIELD = 'namespace'
+ANNOTATIONS_FIELD = 'annotations'
 IO_GROUP_DELIMITER = ':'
 IO_GROUP_LABEL_PREFIX = 'hostdefiner.block.csi.ibm.com/io-group-'
+
+NODE_INITIATORS_FIELD = 'block.csi.ibm.com/node-initiators'
 
 EAR_VOLUME_FC_MAP_COUNT = "2"
 
