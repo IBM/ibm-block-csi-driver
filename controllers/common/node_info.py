@@ -5,10 +5,6 @@ from controllers.array_action import settings as array_config
 
 class NodeIdInfo:
     def __init__(self, node_id):
-        """
-        Args:
-            node_id: <node_name>,<iqn>,<wwns>
-        """
         self.node_name = node_id
 
 

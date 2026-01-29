@@ -81,7 +81,7 @@ class Watcher(KubernetesManager):
         logger.info("debug - uriziv - 113")
         node_obj = NODES[node_name]
         if not isinstance(node_obj, ManagedNode):
-            logger.warning("Node %s is not a ManagedNode instance. This might lead to attribute errors.", node_name)
+            logger.warning(messages.NODE_IS_NOT_MANAGED_NODE_TYPE.format(node_name))
         host_definition_info.node_initiators = node_obj.node_initiators
         logger.info(host_definition_info)
         logger.info(node_obj.__dict__)
@@ -118,7 +118,6 @@ class Watcher(KubernetesManager):
             logger.info("DEBUG - uriziv - 128")
             host_definition_info.connectivity_type = host_definition_info_on_cluster.connectivity_type
             host_definition_info.node_id = host_definition_info_on_cluster.node_id
-            # TODO(uriziv): Make sure next line is correct (regression passed also without that)
             host_definition_info.node_initiators = host_definition_info_on_cluster.node_initiators
         return host_definition_info
 
@@ -143,10 +142,20 @@ class Watcher(KubernetesManager):
             host_definition_manifest[settings.METADATA][
                 common_settings.NAME_FIELD] = current_host_definition_info_on_cluster.name
             self._patch_host_definition(host_definition_manifest)
+            # START DEBUG 106 >>>>>
+            patched_host_definition_info_on_cluster = self._get_matching_host_definition_info(
+                host_definition_info.node_name,
+                host_definition_info.secret_name,
+                host_definition_info.secret_namespace)
+            logger.info(patched_host_definition_info_on_cluster)
+            logger.info(current_host_definition_info_on_cluster)
             logger.info("debug - uriziv - 106")
-            return current_host_definition_info_on_cluster
+            # END DEBUG 106 <<<<<
+            return current_host_definition_info_on_cluster  # See CSI-6058
         else:
+            logger.info("debug - uriziv - 131")
             logger.info(messages.CREATING_NEW_HOST_DEFINITION.format(host_definition_info.name))
+            logger.info("debug - uriziv - 132")
             return self._create_host_definition(host_definition_manifest)
 
     def _get_host_definition_manifest(self, host_definition_info, response):
@@ -322,6 +331,9 @@ class Watcher(KubernetesManager):
             request.node_initiators_from_host_definition = host_definition_info.node_initiators
             request.node_id_from_csi_node = self._get_node_id_by_node(host_definition_info)
             request.node_initiators_from_csi_node = self._get_node_initiators_by_node(host_definition_info)
+            # To clarify the variable name 'node_initiators_from_csi_node' -
+            # Since CSI-5997, initiators are extracted from k8s node annoatations (not from k&s csinode nodeID).
+            # However, They are still stored at CsiNodeInfo and ManagedNode (see hd_types.py)
             request.io_group = self._get_io_group_by_node(host_definition_info.node_name)
         logger.info(request)
         logger.info("debug - uriziv - 34")

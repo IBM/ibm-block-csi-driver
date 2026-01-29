@@ -357,13 +357,6 @@ class KubernetesManager():
     def _generate_node_info(self, k8s_node):
         return NodeInfo(k8s_node.metadata.name, k8s_node.metadata.labels)
 
-    def _generate_node_initiators(self, k8s_node):
-        logger.info("DEBUG - uriziv - 71")
-        initiators = controllers_utils.get_node_initiators_from_k8s_node(k8s_node)
-        logger.info(initiators)
-        logger.info("DEBUG - uriziv - 71")
-        return initiators
-
     def _get_csi_daemon_set(self):
         try:
             daemon_sets = self.apps_api.list_daemon_set_for_all_namespaces(label_selector=settings.DRIVER_PRODUCT_LABEL)
