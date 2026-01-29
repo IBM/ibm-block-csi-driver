@@ -114,14 +114,10 @@ def generate_node_initiators_from_string_data(initiators_data):
     Return value example:
     Initiators(nvme_nqns=[], fc_wwns=[], iscsi_iqns=['iqn.2016-04.com.open-iscsi:8bce7b6eab12'])
     """
-    logger.info("debug - uriziv - 123")
     initiators_data = json.loads(initiators_data)
     nvme_nqns = initiators_data.get("nvme", [])
     fc_wwns = initiators_data.get("fc", [])
     iscsi_iqns = initiators_data.get("iscsi", [])
-    logger.info(initiators_data)
-    logger.info(Initiators(nvme_nqns, fc_wwns, iscsi_iqns))
-    logger.info("debug - uriziv - 124")
     return Initiators(nvme_nqns, fc_wwns, iscsi_iqns)
 
 

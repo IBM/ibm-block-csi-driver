@@ -515,8 +515,6 @@ func (n NodeUtils) GetTopologyLabels(ctx context.Context, nodeName string) (map[
 func (n NodeUtils) UpdateNodePortsAnnotation(ctx context.Context, nodeName string,
 	iscsiIQN string, fcWWNs []string, nvmeNQN string) error {
 
-	logger.Info("Debug - uriziv - 21")
-
 	kubeConfig, err := rest.InClusterConfig()
 	if err != nil {
 		logger.Infof("Failed to update initiators. Unable to load in-cluster configuration.")
@@ -575,10 +573,8 @@ func (n NodeUtils) UpdateNodePortsAnnotation(ctx context.Context, nodeName strin
 		return err
 	}
 
-	logger.Infof("DEBUG - read node: %s", nodeName)
 	updatedNode, err := client.CoreV1().Nodes().Get(ctx, nodeName, getOpts)
 	logger.Infof("updatedNode: %s", updatedNode)
-	logger.Info("Debug - uriziv - 22")
 
 	return nil
 }

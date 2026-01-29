@@ -873,11 +873,6 @@ func (d *NodeService) NodeGetInfo(ctx context.Context, req *csi.NodeGetInfoReque
 		return nil, status.Error(codes.Internal, err.Error())
 	}
 
-	logger.Info("DEBUG uriziv - 1")
-	logger.Info(nodeId)
-	logger.Info(err)
-	logger.Info("DEBUG uriziv - 2")
-
 	logger.Debugf("node id is : %s", nodeId)
 
 	return &csi.NodeGetInfoResponse{
