@@ -306,6 +306,102 @@ func TestParseIscsiInitiators(t *testing.T) {
 
 }
 
+func TestGenerateNodeID(t *testing.T) {
+	testCases := []struct {
+		name      string
+		hostName  string
+		nvmeNQN   string
+		fcWWNs    []string
+		iscsiIQN  string
+		expErr    error
+		expNodeId string
+	}{
+		{name: "success all given, only nvme and fc in",
+			hostName:  hostName,
+			nvmeNQN:   nvmeNQN,
+			fcWWNs:    fcWWNs,
+			iscsiIQN:  iscsiIQN,
+			expNodeId: fmt.Sprintf("%s;%s;%s", hostName, nvmeNQN, strings.Join(fcWWNs, ":")),
+		},
+		{name: "success only iscsi port",
+			hostName:  hostName,
+			nvmeNQN:   "",
+			fcWWNs:    []string{},
+			iscsiIQN:  iscsiIQN,
+			expNodeId: fmt.Sprintf("%s;;;%s", hostName, iscsiIQN),
+		},
+		{name: "success only fc ports",
+			hostName:  hostName,
+			nvmeNQN:   "",
+			fcWWNs:    fcWWNs[:2],
+			iscsiIQN:  "",
+			expNodeId: fmt.Sprintf("%s;;%s", hostName, strings.Join(fcWWNs[:2], ":")),
+		},
+		{name: "success only nvme port",
+			hostName:  hostName,
+			nvmeNQN:   nvmeNQN,
+			fcWWNs:    []string{},
+			iscsiIQN:  "",
+			expNodeId: fmt.Sprintf("%s;%s", hostName, nvmeNQN),
+		},
+		{name: "success fc ports and iscsi port",
+			hostName:  hostName,
+			nvmeNQN:   "",
+			fcWWNs:    fcWWNs[:2],
+			iscsiIQN:  iscsiIQN,
+			expNodeId: fmt.Sprintf("%s;;%s;%s", hostName, strings.Join(fcWWNs[:2], ":"), iscsiIQN),
+		},
+		{name: "fail long hostName on nvme port",
+			hostName: longHostName,
+			nvmeNQN:  nvmeNQN,
+			fcWWNs:   []string{},
+			iscsiIQN: "",
+			expErr:   errors.New(fmt.Sprintf("could not fit any ports in node id: %s;, length limit: %d", longHostName, maxNodeIdLength)),
+		},
+		{name: "fail long hostName on fc ports",
+			hostName: longHostName,
+			nvmeNQN:  "",
+			fcWWNs:   fcWWNs[:2],
+			iscsiIQN: "",
+			expErr:   errors.New(fmt.Sprintf("could not fit any ports in node id: %s;;, length limit: %d", longHostName, maxNodeIdLength)),
+		},
+		{name: "fail long hostName on iscsi port",
+			hostName: longHostName,
+			nvmeNQN:  "",
+			fcWWNs:   []string{},
+			iscsiIQN: iscsiIQN,
+			expErr:   errors.New(fmt.Sprintf("could not fit any ports in node id: %s;;, length limit: %d", longHostName, maxNodeIdLength)),
+		},
+	}
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+
+			mockCtrl := gomock.NewController(t)
+			defer mockCtrl.Finish()
+
+			fakeExecuter := mocks.NewMockExecuterInterface(mockCtrl)
+			nodeUtils := driver.NewNodeUtils(fakeExecuter, nil, ConfigYaml, nil)
+
+			nodeId, err := nodeUtils.GenerateNodeID(tc.hostName, tc.nvmeNQN, tc.fcWWNs, tc.iscsiIQN)
+
+			if tc.expErr != nil {
+				if err == nil || err.Error() != tc.expErr.Error() {
+					t.Fatalf("Expecting err: expected %v, got %v", tc.expErr, err)
+				}
+
+			} else {
+				if err != nil {
+					t.Fatalf("err is not nil. got: %v", err)
+				}
+				if nodeId != tc.expNodeId {
+					t.Fatalf("wrong nodeId: expected %v, got %v", tc.expNodeId, nodeId)
+				}
+
+			}
+		})
+	}
+}
+
 func TestGetVolumeUuid(t *testing.T) {
 	testCases := []struct {
 		name     string

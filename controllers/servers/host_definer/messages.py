@@ -38,8 +38,8 @@ DELETE_HOST_DEFINITION = 'Deleting host definition {}'
 ADD_FINALIZER_TO_HOST_DEFINITION = 'Adding finalizer to host definition {}'
 REMOVE_FINALIZER_TO_HOST_DEFINITION = 'Removing finalizer from host definition {}'
 FAILED_TO_REMOVE_FINALIZER = 'Failed to remove {} finalizer from node'.format(settings.CSI_IBM_FINALIZER)
-NODE_INITIATORS_WERE_CHANGED = "Node initiators were changed for {} node, updating its ports definitions, " \
-    "old initiators: {}, new initiators: {}"
+NODE_ID_WAS_CHANGED = "NodeId was changed for {} node, updating his ports in his definitions,"\
+    "old NodeId [{}], new NodeId [{}]"
 UPDATE_HOST_DEFINITION_FIELDS_FROM_STORAGE = 'Update host definition {} host from storage fields with {}'
 CHECK_NODE_SHOULD_BE_MANAGED_BY_SECRET = 'Check if node {} should be managed by {} secret in {} namespace'
 NODE_SHOULD_BE_MANAGED_ON_SECRET = 'Node {} should be managed by {} secret in {} namespace'
@@ -75,5 +75,3 @@ DEFINE_NODE_ON_SECRET = 'Defining node {} on secret {} in namespace {}'
 GENERATE_REQUEST_FOR_NODE = 'Generating define request for node {}'
 COULD_NOT_CHANGE_HOST_PROTOCOL_USING_CHHOST = "Could not change host [{}] protocol using chhost command, "\
     "changing the host protocol by deleting it and creating it again"
-NODE_IS_NOT_MANAGED_NODE_TYPE = "Node {} is not a ManagedNode instance. This might lead to attribute errors."
-NODE_ID_IS_NONE = "node_id is None !!!"

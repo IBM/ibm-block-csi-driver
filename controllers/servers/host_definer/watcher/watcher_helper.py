@@ -38,7 +38,6 @@ class Watcher(KubernetesManager):
     def _get_host_definition_info_from_secret_and_node_name(self, node_name, secret_info):
         host_definition_info = self._get_host_definition_info_from_secret(secret_info)
         host_definition_info = self._add_name_to_host_definition_info(node_name, host_definition_info)
-        host_definition_info = self._add_node_initiators_to_host_definition_info(node_name, host_definition_info)
         return host_definition_info
 
     def _get_host_definition_info_from_secret(self, secret_info):
@@ -50,20 +49,12 @@ class Watcher(KubernetesManager):
     def _define_nodes(self, host_definition_info):
         for node_name, _ in NODES.items():
             host_definition_info = self._add_name_to_host_definition_info(node_name, host_definition_info)
-            host_definition_info = self._add_node_initiators_to_host_definition_info(node_name, host_definition_info)
             self._create_definition(host_definition_info)
 
     def _add_name_to_host_definition_info(self, node_name, host_definition_info):
         host_definition_info.node_name = node_name
         host_definition_info.node_id = NODES[node_name].node_id
         host_definition_info.name = self._get_host_definition_name(node_name)
-        return host_definition_info
-
-    def _add_node_initiators_to_host_definition_info(self, node_name, host_definition_info):
-        node_obj = NODES[node_name]
-        if not isinstance(node_obj, ManagedNode):
-            logger.warning(messages.NODE_IS_NOT_MANAGED_NODE_TYPE.format(node_name))
-        host_definition_info.node_initiators = node_obj.node_initiators
         return host_definition_info
 
     def _create_definition(self, host_definition_info):
@@ -84,7 +75,6 @@ class Watcher(KubernetesManager):
         if host_definition_info_on_cluster:
             host_definition_info.connectivity_type = host_definition_info_on_cluster.connectivity_type
             host_definition_info.node_id = host_definition_info_on_cluster.node_id
-            host_definition_info.node_initiators = host_definition_info_on_cluster.node_initiators
         return host_definition_info
 
     def _define_host(self, host_definition_info):
@@ -96,13 +86,11 @@ class Watcher(KubernetesManager):
         host_definition_manifest = self._get_host_definition_manifest(host_definition_info, response)
         current_host_definition_info_on_cluster = self._get_matching_host_definition_info(
             host_definition_info.node_name, host_definition_info.secret_name, host_definition_info.secret_namespace)
-        logger.info(host_definition_manifest)
-        logger.info(current_host_definition_info_on_cluster)
         if current_host_definition_info_on_cluster:
             host_definition_manifest[settings.METADATA][
                 common_settings.NAME_FIELD] = current_host_definition_info_on_cluster.name
             self._patch_host_definition(host_definition_manifest)
-            return current_host_definition_info_on_cluster  # See CSI-6058
+            return current_host_definition_info_on_cluster
         else:
             logger.info(messages.CREATING_NEW_HOST_DEFINITION.format(host_definition_info.name))
             return self._create_host_definition(host_definition_manifest)
@@ -113,9 +101,6 @@ class Watcher(KubernetesManager):
             settings.KIND: settings.HOST_DEFINITION_KIND,
             settings.METADATA: {
                 common_settings.NAME_FIELD: host_definition_info.name,
-                common_settings.ANNOTATIONS_FIELD: {
-                    common_settings.NODE_INITIATORS_FIELD: NODES[host_definition_info.node_name].node_initiators
-                    }
             },
             settings.SPEC: {
                 settings.HOST_DEFINITION_FIELD: {
@@ -253,7 +238,6 @@ class Watcher(KubernetesManager):
         return define_function(request)
 
     def _get_request_from_host_definition(self, host_definition_info):
-        logger.info(host_definition_info)
         node_name = host_definition_info.node_name
         logger.info(messages.GENERATE_REQUEST_FOR_NODE.format(node_name))
         node_info = self._get_node_info(node_name)
@@ -262,12 +246,7 @@ class Watcher(KubernetesManager):
             request, host_definition_info.secret_name, host_definition_info.secret_namespace, node_info.labels)
         if request:
             request.node_id_from_host_definition = host_definition_info.node_id
-            request.node_initiators_from_host_definition = host_definition_info.node_initiators
             request.node_id_from_csi_node = self._get_node_id_by_node(host_definition_info)
-            request.node_initiators_from_csi_node = self._get_node_initiators_by_node(host_definition_info)
-            # To clarify the variable name 'node_initiators_from_csi_node' -
-            # Since CSI-5997, initiators are extracted from k8s node annoatations (not from k&s csinode nodeID).
-            # However, They are still stored at CsiNodeInfo and ManagedNode (see hd_types.py)
             request.io_group = self._get_io_group_by_node(host_definition_info.node_name)
         return request
 
@@ -341,12 +320,6 @@ class Watcher(KubernetesManager):
             return NODES[host_definition_info.node_name].node_id
         except Exception:
             return host_definition_info.node_id
-
-    def _get_node_initiators_by_node(self, host_definition_info):
-        try:
-            return NODES[host_definition_info.node_name].node_initiators
-        except Exception:
-            return host_definition_info.node_initiators
 
     def _get_io_group_by_node(self, node_name):
         try:

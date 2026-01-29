@@ -14,7 +14,6 @@ class StorageClassWatcher(Watcher):
 
     def add_initial_storage_classes(self):
         storage_classes_info = self._get_storage_classes_info()
-        logger.info(storage_classes_info)
         for storage_class_info in storage_classes_info:
             secrets_info = self._get_secrets_info_from_storage_class_with_driver_provisioner(storage_class_info)
             self._handle_added_watch_event(secrets_info, storage_class_info.name)

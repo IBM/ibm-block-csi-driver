@@ -1,4 +1,3 @@
-"docstring"
 import ast
 import datetime
 import base64
@@ -13,13 +12,11 @@ from controllers.servers.host_definer import settings
 import controllers.common.settings as common_settings
 from controllers.servers.host_definer.hd_types import (
     CsiNodeInfo, PodInfo, NodeInfo, StorageClassInfo, HostDefinitionInfo)
-from controllers.servers import utils as controllers_utils
 
 logger = get_stdout_logger()
 
 
 class KubernetesManager():
-    """docstring"""
     def __init__(self):
         self._load_cluster_configuration()
         self.dynamic_client = self._get_dynamic_client()
@@ -112,7 +109,6 @@ class KubernetesManager():
         csi_node_info = CsiNodeInfo()
         csi_node_info.name = k8s_csi_node.metadata.name
         csi_node_info.node_id = self._get_node_id_from_k8s_csi_node(k8s_csi_node)
-        csi_node_info.node_initiators = controllers_utils.get_node_initiators_data(csi_node_info.name)
         return csi_node_info
 
     def _get_node_id_from_k8s_csi_node(self, k8s_csi_node):
@@ -152,12 +148,8 @@ class KubernetesManager():
             k8s_host_definition, settings.NODE_NAME_FIELD)
         host_definition_info.node_id = self._get_attr_from_host_definition(
             k8s_host_definition, common_settings.HOST_DEFINITION_NODE_ID_FIELD)
-        host_definition_info.node_initiators = self._get_attr_from_host_definition_annotations(
-            k8s_host_definition, common_settings.NODE_INITIATORS_FIELD)
         host_definition_info.connectivity_type = self._get_attr_from_host_definition(
             k8s_host_definition, settings.CONNECTIVITY_TYPE_FIELD)
-        host_definition_info.ports = self._get_attr_from_host_definition(
-            k8s_host_definition, settings.PORTS_FIELD)
         return host_definition_info
 
     def _get_k8s_object_resource_version(self, k8s_object):
@@ -173,11 +165,6 @@ class KubernetesManager():
     def _get_attr_from_host_definition(self, k8s_host_definition, attribute):
         if hasattr(k8s_host_definition.spec.hostDefinition, attribute):
             return getattr(k8s_host_definition.spec.hostDefinition, attribute)
-        return ''
-
-    def _get_attr_from_host_definition_annotations(self, k8s_host_definition, attribute):
-        if hasattr(k8s_host_definition.metadata.annotations, attribute):
-            return getattr(k8s_host_definition.metadata.annotations, attribute)
         return ''
 
     def _is_host_definition_matches(self, host_definition_info, node_name, secret_name, secret_namespace):

@@ -19,7 +19,6 @@ package driver
 import (
 	"bufio"
 	"context"
-	"encoding/json"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -30,7 +29,6 @@ import (
 
 	"github.com/ibm/ibm-block-csi-driver/node/pkg/driver/device_connectivity"
 	"golang.org/x/sys/unix"
-	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/errors"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -44,7 +42,6 @@ import (
 
 var (
 	getOpts          = metav1.GetOptions{}
-	patchOpts        = metav1.PatchOptions{}
 	topologyPrefixes = [...]string{"topology.block.csi.ibm.com"}
 )
 
@@ -91,8 +88,8 @@ type NodeUtilsInterface interface {
 	FormatDevice(devicePath string, fsType string)
 	IsNotMountPoint(file string) (bool, error)
 	GetPodPath(filepath string) string
+	GenerateNodeID(hostName string, nvmeNQN string, fcWWNs []string, iscsiIQN string) (string, error)
 	GetTopologyLabels(ctx context.Context, nodeName string) (map[string]string, error)
-	UpdateNodePortsAnnotation(ctx context.Context, nodeName string, iscsiIQN string, fcWWNs []string, nvmeNQN string) error
 	IsBlock(devicePath string) (bool, error)
 	GetFileSystemVolumeStats(path string) (VolumeStatistics, error)
 	GetBlockVolumeStats(volumeId string) (VolumeStatistics, error)
@@ -483,6 +480,49 @@ func (n NodeUtils) GetPodPath(origPath string) string {
 	return path.Join(PrefixChrootOfHostRoot, origPath)
 }
 
+func (n NodeUtils) GenerateNodeID(hostName string, nvmeNQN string, fcWWNs []string, iscsiIQN string) (string, error) {
+	var nodeId strings.Builder
+	nodeIdDelimiter := n.ConfigYaml.Parameters.Node_id_info.Delimiter
+	nodeIdFcDelimiter := n.ConfigYaml.Parameters.Node_id_info.Fcs_delimiter
+	nodeId.Grow(MaxNodeIdLength)
+	nodeId.WriteString(hostName)
+	nodeId.WriteString(nodeIdDelimiter)
+
+	if len(nvmeNQN) > 0 {
+		if nodeId.Len()+len(nvmeNQN)+len(nodeIdDelimiter) <= MaxNodeIdLength {
+			nodeId.WriteString(nvmeNQN)
+		} else {
+			return "", fmt.Errorf(ErrorNoPortsCouldFitInNodeId, nodeId.String(), MaxNodeIdLength)
+		}
+	}
+	nodeId.WriteString(nodeIdDelimiter)
+	if len(fcWWNs) > 0 {
+		if nodeId.Len()+len(fcWWNs[0]) <= MaxNodeIdLength {
+			nodeId.WriteString(fcWWNs[0])
+		} else if nvmeNQN == "" {
+			return "", fmt.Errorf(ErrorNoPortsCouldFitInNodeId, nodeId.String(), MaxNodeIdLength)
+		}
+
+		for _, fcPort := range fcWWNs[1:] {
+			if nodeId.Len()+len(nodeIdFcDelimiter)+len(fcPort) <= MaxNodeIdLength {
+				nodeId.WriteString(nodeIdFcDelimiter)
+				nodeId.WriteString(fcPort)
+			}
+		}
+	}
+	if len(iscsiIQN) > 0 {
+		if nodeId.Len()+len(nodeIdDelimiter)+len(iscsiIQN) <= MaxNodeIdLength {
+			nodeId.WriteString(nodeIdDelimiter)
+			nodeId.WriteString(iscsiIQN)
+		} else if len(fcWWNs) == 0 && nvmeNQN == "" {
+			return "", fmt.Errorf(ErrorNoPortsCouldFitInNodeId, nodeId.String(), MaxNodeIdLength)
+		}
+	}
+
+	finalNodeId := strings.TrimSuffix(nodeId.String(), ";")
+	return finalNodeId, nil
+}
+
 func (n NodeUtils) GetTopologyLabels(ctx context.Context, nodeName string) (map[string]string, error) {
 	kubeConfig, err := rest.InClusterConfig()
 	if err != nil {
@@ -510,73 +550,6 @@ func (n NodeUtils) GetTopologyLabels(ctx context.Context, nodeName string) (map[
 		}
 	}
 	return topologyLabels, nil
-}
-
-func (n NodeUtils) UpdateNodePortsAnnotation(ctx context.Context, nodeName string,
-	iscsiIQN string, fcWWNs []string, nvmeNQN string) error {
-
-	kubeConfig, err := rest.InClusterConfig()
-	if err != nil {
-		logger.Infof("Failed to update initiators. Unable to load in-cluster configuration.")
-		return err
-	}
-
-	client, err := kubernetes.NewForConfig(kubeConfig)
-	if err != nil {
-		logger.Infof("Failed to update initiators. Unable to create Kubernetes client.")
-		return err
-	}
-
-	portsData := map[string]interface{}{
-		"iscsi": []string{},
-		"fc":    []string{},
-		"nvme":  []string{},
-	}
-
-	if iscsiIQN != "" {
-		portsData["iscsi"] = []string{iscsiIQN}
-	}
-
-	if len(fcWWNs) > 0 {
-		portsData["fc"] = fcWWNs
-	}
-
-	if nvmeNQN != "" {
-		portsData["nvme"] = []string{nvmeNQN}
-	}
-
-	jsonBytes, err := json.Marshal(portsData)
-	if err != nil {
-		return fmt.Errorf("marshal portsData: %w", err)
-	}
-
-	patch := map[string]interface{}{
-		"metadata": map[string]interface{}{
-			"annotations": map[string]string{
-				"block.csi.ibm.com/node-initiators": string(jsonBytes),
-			},
-		},
-	}
-
-	patchBytes, err := json.Marshal(patch)
-	if err != nil {
-		return fmt.Errorf("marshal patch: %w", err)
-	}
-
-	logger.Infof("Patching node %s with annotation block.csi.ibm.com/node-initiators", nodeName)
-
-	_, err = client.CoreV1().Nodes().Patch(ctx, nodeName,
-		types.MergePatchType, patchBytes, patchOpts)
-
-	if err != nil {
-		logger.Infof("failed PATCH node ports annotation.")
-		return err
-	}
-
-	updatedNode, err := client.CoreV1().Nodes().Get(ctx, nodeName, getOpts)
-	logger.Infof("updatedNode: %s", updatedNode)
-
-	return nil
 }
 
 func (n NodeUtils) IsBlock(devicePath string) (bool, error) {
