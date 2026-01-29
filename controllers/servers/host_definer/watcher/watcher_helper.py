@@ -27,14 +27,6 @@ class Watcher(KubernetesManager):
         super().__init__()
         self.storage_host_servicer = HostDefinerServicer()
 
-    def get_nodes_var(self):
-        """This function is for DEBUG and should be removed"""
-        return NODES
-
-    def get_managed_secrets_var(self):
-        """This function is for DEBUG and should be removed"""
-        return MANAGED_SECRETS
-
     def _define_host_on_all_storages(self, node_name):
         logger.info(messages.DEFINE_NODE_ON_ALL_MANAGED_SECRETS.format(node_name))
         for secret_info in MANAGED_SECRETS:

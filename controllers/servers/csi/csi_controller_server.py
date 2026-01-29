@@ -276,10 +276,6 @@ class CSIControllerServicer(csi_pb2_grpc.ControllerServicer):
             initiators = utils.get_node_initiators(node_name)
             logger.debug("node name for this unpublish operation is : {0}".format(node_name))
 
-            logger.info(node_id_info)
-            logger.info(node_name)
-            logger.info(initiators)
-
             array_connection_info = utils.get_array_connection_info_from_secrets(request.secrets,
                                                                                  system_id=system_id)
 
