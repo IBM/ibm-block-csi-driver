@@ -233,10 +233,6 @@ class CSIControllerServicer(csi_pb2_grpc.ControllerServicer):
             node_name = node_id_info.node_name
             initiators = utils.get_node_initiators(node_name)
 
-            logger.info(node_id_info)
-            logger.info(node_name)
-            logger.info(initiators)
-
             logger.debug("node name for this publish operation is : {0}".format(node_name))
 
             array_connection_info = utils.get_array_connection_info_from_secrets(request.secrets, system_id=system_id)

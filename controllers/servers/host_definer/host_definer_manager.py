@@ -21,8 +21,6 @@ class HostDefinerManager:
         self.node_watcher = NodeWatcher()
 
     def start_host_definition(self):
-        logger.info('starting host definer')
-        logger.info("DEBUG - uriziv - 73")
         self.csi_node_watcher.add_initial_csi_nodes()
         logger.info("DEBUG - uriziv - 74")
         self.storage_class_watcher.add_initial_storage_classes()

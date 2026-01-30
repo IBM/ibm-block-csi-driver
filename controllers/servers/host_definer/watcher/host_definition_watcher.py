@@ -86,7 +86,6 @@ class HostDefinitionWatcher(Watcher):
         return settings.UNDEFINE_ACTION
 
     def _define_host_after_pending(self, host_definition_info):
-        logger.info("Debug - uriziv - 59")
         logger.info(host_definition_info)
         response = DefineHostResponse()
         if self._is_node_should_be_managed_on_secret(
@@ -97,7 +96,6 @@ class HostDefinitionWatcher(Watcher):
         else:
             self._delete_host_definition(host_definition_info.name)
         logger.info(response)
-        logger.info("Debug - uriziv - 60")
         return response
 
     def _update_host_definition_from_storage_response(self, host_definition_name, response):

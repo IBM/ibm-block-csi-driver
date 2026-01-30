@@ -35,7 +35,6 @@ class HostDefinerServicer:
             array_type = detect_array_type(array_addresses)
             with get_agent(array_connection_info, array_type).get_mediator() as array_mediator:
                 try:
-                    logger.info("DEBUG - uriziv - 94")
                     initiators_from_host_definition = \
                         generate_node_initiators_from_string_data(request.node_initiators_from_host_definition)
                     found_host_name = self._get_host_name(initiators_from_host_definition, array_mediator)
@@ -103,7 +102,6 @@ class HostDefinerServicer:
             raise array_errors.HostNotFoundError(host_name)
 
     def _update_host_ports(self, request, host, array_mediator, partition_name):
-        logger.info("DEBUG - uriziv - 99")
         initiators = generate_node_initiators_from_string_data(request.node_initiators_from_csi_node)
         connectivity_type_from_user = get_initiators_connectivity_type(initiators, request.connectivity_type_from_user)
         connectivity_type_from_host = array_mediator.get_host_connectivity_type(host)

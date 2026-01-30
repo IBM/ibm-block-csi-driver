@@ -159,8 +159,6 @@ class KubernetesManager():
             k8s_host_definition, settings.CONNECTIVITY_TYPE_FIELD)
         host_definition_info.ports = self._get_attr_from_host_definition(
             k8s_host_definition, settings.PORTS_FIELD)
-        logger.info(host_definition_info)
-        logger.info("debug - uriziv - 120")
         return host_definition_info
 
     def _get_k8s_object_resource_version(self, k8s_object):

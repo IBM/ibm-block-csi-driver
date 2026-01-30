@@ -89,6 +89,13 @@ class Watcher(KubernetesManager):
         logger.info("debug - uriziv - 114")
         return host_definition_info
 
+    def _add_node_initiators_to_host_definition_info(self, node_name, host_definition_info):
+        node_obj = NODES[node_name]
+        if not isinstance(node_obj, ManagedNode):
+            logger.warning(messages.NODE_IS_NOT_MANAGED_NODE_TYPE.format(node_name))
+        host_definition_info.node_initiators = node_obj.node_initiators
+        return host_definition_info
+
     def _create_definition(self, host_definition_info):
         if not self._is_node_should_be_managed_on_secret(
                 host_definition_info.node_name, host_definition_info.secret_name,
@@ -136,21 +143,11 @@ class Watcher(KubernetesManager):
             host_definition_info.node_name, host_definition_info.secret_name, host_definition_info.secret_namespace)
         logger.info(host_definition_manifest)
         logger.info(current_host_definition_info_on_cluster)
-        logger.info("debug - uriziv - 104")
         if current_host_definition_info_on_cluster:
             logger.info("debug - uriziv - 105")
             host_definition_manifest[settings.METADATA][
                 common_settings.NAME_FIELD] = current_host_definition_info_on_cluster.name
             self._patch_host_definition(host_definition_manifest)
-            # START DEBUG 106 >>>>>
-            patched_host_definition_info_on_cluster = self._get_matching_host_definition_info(
-                host_definition_info.node_name,
-                host_definition_info.secret_name,
-                host_definition_info.secret_namespace)
-            logger.info(patched_host_definition_info_on_cluster)
-            logger.info(current_host_definition_info_on_cluster)
-            logger.info("debug - uriziv - 106")
-            # END DEBUG 106 <<<<<
             return current_host_definition_info_on_cluster  # See CSI-6058
         else:
             logger.info("debug - uriziv - 131")
@@ -318,7 +315,6 @@ class Watcher(KubernetesManager):
         return define_function(request)
 
     def _get_request_from_host_definition(self, host_definition_info):
-        logger.info("debug - uriziv - 33")
         logger.info(host_definition_info)
         node_name = host_definition_info.node_name
         logger.info(messages.GENERATE_REQUEST_FOR_NODE.format(node_name))
@@ -412,11 +408,6 @@ class Watcher(KubernetesManager):
 
     def _get_node_initiators_by_node(self, host_definition_info):
         try:
-            logger.info("debug - uriziv - 129")
-            logger.info(host_definition_info)
-            for node_i in NODES.values():
-                logger.info(node_i.__dict__)
-            logger.info("debug - uriziv - 130")
             return NODES[host_definition_info.node_name].node_initiators
         except Exception:
             return host_definition_info.node_initiators

@@ -113,14 +113,10 @@ class CsiNodeWatcher(Watcher):
                     self._create_definition(host_definition_info)
 
     def _is_node_initiators_changed(self, host_definition_info, csi_node_info):
-        logger.info("DEBUG - uriziv - 91")
-        logger.info(host_definition_info)
-        logger.info(csi_node_info)
         if not host_definition_info.node_id or not csi_node_info.node_id:
             logger.warning(messages.NODE_ID_IS_NONE)
             return False
 
-        logger.info("DEBUG - uriziv - 92")
         return host_definition_info.node_initiators != csi_node_info.node_initiators
 
     def _undefine_hosts(self, node_name):
