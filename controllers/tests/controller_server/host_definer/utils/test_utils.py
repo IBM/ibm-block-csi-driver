@@ -11,7 +11,7 @@ from controllers.servers.host_definer.kubernetes_manager.manager import Kubernet
 from controllers.servers.host_definer.hd_types import DefineHostRequest, DefineHostResponse
 from controllers.servers.csi.controller_types import ArrayConnectionInfo
 
-EMPTY_INITIATORS_STR='{ "nvme": [], "fc": [], "iscsi": [] }'
+EMPTY_INITIATORS_STR='{"fc":[],"iscsi":[],"nvme":[]}'
 
 @dataclass
 class K8sResourceItems():

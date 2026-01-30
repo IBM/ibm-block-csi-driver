@@ -105,7 +105,9 @@ def _get_metadata_manifest():
         test_settings.METADATA_FIELD: {
             test_settings.METADATA_RESOURCE_VERSION_FIELD: test_settings.FAKE_RESOURCE_VERSION,
             test_settings.METADATA_UID_FIELD: test_settings.FAKE_UID,
-            common_settings.ANNOTATIONS_FIELD: {}
+            common_settings.ANNOTATIONS_FIELD: {
+                common_settings.NODE_INITIATORS_FIELD: '{"fc":[],"iscsi":[],"nvme":[]}'
+            }
         }}
 
 
