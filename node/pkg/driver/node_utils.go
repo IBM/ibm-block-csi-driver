@@ -515,6 +515,8 @@ func (n NodeUtils) GetTopologyLabels(ctx context.Context, nodeName string) (map[
 func (n NodeUtils) UpdateNodeInitiatorsAnnotation(ctx context.Context, nodeName string,
 	nvmeNQN string, fcWWNs []string, iscsiIQN string) error {
 
+	logger.Debugf("uriziv1 - NodeUtils details: %+v", n)
+
 	const nodeInitiatorsAnnotationKey = "block.csi.ibm.com/node-initiators"
 
 	kubeConfig, err := rest.InClusterConfig()

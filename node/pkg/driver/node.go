@@ -827,7 +827,7 @@ func (d *NodeService) NodeGetCapabilities(ctx context.Context, req *csi.NodeGetC
 func (d *NodeService) NodeGetInfo(ctx context.Context, req *csi.NodeGetInfoRequest) (*csi.NodeGetInfoResponse, error) {
 	defer logger.Exit(logger.Enter(req))
 
-	logger.Debugf("NodeService details: %+v", d)
+	logger.Debugf("uriziv1 - NodeService details: %+v", d)
 
 	var nvmeNQN string
 	var fcWWNs []string
