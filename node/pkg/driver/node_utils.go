@@ -513,68 +513,75 @@ func (n NodeUtils) GetTopologyLabels(ctx context.Context, nodeName string) (map[
 }
 
 func (n NodeUtils) UpdateNodeInitiatorsAnnotation(ctx context.Context, nodeName string,
-	iscsiIQN string, fcWWNs []string, nvmeNQN string) error {
+	nvmeNQN string, fcWWNs []string, iscsiIQN string) error {
+
+	const nodeInitiatorsAnnotationKey = "block.csi.ibm.com/node-initiators"
 
 	kubeConfig, err := rest.InClusterConfig()
 	if err != nil {
-		logger.Infof("Failed to update initiators. Unable to load in-cluster configuration.")
+		logger.Infof("failed to update initiators. Unable to load in-cluster configuration")
 		return err
 	}
 
 	client, err := kubernetes.NewForConfig(kubeConfig)
 	if err != nil {
-		logger.Infof("Failed to update initiators. Unable to create Kubernetes client.")
+		logger.Infof("failed to update initiators. Unable to create Kubernetes client")
 		return err
 	}
 
+	const (
+		TypeNVMe  = "nvme"
+		TypeFC    = "fc"
+		TypeISCSI = "iscsi"
+	)
+
 	portsData := map[string]interface{}{
-		"iscsi": []string{},
-		"fc":    []string{},
-		"nvme":  []string{},
-	}
-
-	if iscsiIQN != "" {
-		portsData["iscsi"] = []string{iscsiIQN}
-	}
-
-	if len(fcWWNs) > 0 {
-		portsData["fc"] = fcWWNs
+		TypeNVMe:  []string{},
+		TypeFC:    []string{},
+		TypeISCSI: []string{},
 	}
 
 	if nvmeNQN != "" {
-		portsData["nvme"] = []string{nvmeNQN}
+		portsData[TypeNVMe] = []string{nvmeNQN}
+	}
+
+	if len(fcWWNs) > 0 {
+		portsData[TypeFC] = fcWWNs
+	}
+
+	if iscsiIQN != "" {
+		portsData[TypeISCSI] = []string{iscsiIQN}
 	}
 
 	jsonBytes, err := json.Marshal(portsData)
 	if err != nil {
-		return fmt.Errorf("marshal portsData: %w", err)
+		logger.Infof("failed to prepare initiators JSON data")
+		return err
 	}
+
+	logger.Infof("Patching node %q: setting initiators in annotation %s to %s",
+		nodeName, nodeInitiatorsAnnotationKey, string(jsonBytes))
 
 	patch := map[string]interface{}{
 		"metadata": map[string]interface{}{
 			"annotations": map[string]string{
-				"block.csi.ibm.com/node-initiators": string(jsonBytes),
+				nodeInitiatorsAnnotationKey: string(jsonBytes),
 			},
 		},
 	}
 
 	patchBytes, err := json.Marshal(patch)
 	if err != nil {
-		return fmt.Errorf("marshal patch: %w", err)
-	}
-
-	logger.Infof("Patching node %s with annotation block.csi.ibm.com/node-initiators", nodeName)
-
-	_, err = client.CoreV1().Nodes().Patch(ctx, nodeName,
-		types.MergePatchType, patchBytes, patchOpts)
-
-	if err != nil {
-		logger.Infof("failed PATCH node ports annotation.")
+		logger.Infof("failed to format node patch request")
 		return err
 	}
 
-	updatedNode, err := client.CoreV1().Nodes().Get(ctx, nodeName, getOpts)
-	logger.Infof("updatedNode: %s", updatedNode)
+	_, err = client.CoreV1().Nodes().Patch(ctx, nodeName,
+		types.MergePatchType, patchBytes, patchOpts)
+	if err != nil {
+		logger.Infof("failed to path node initiators in annotation")
+		return err
+	}
 
 	return nil
 }
