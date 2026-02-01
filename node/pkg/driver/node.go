@@ -870,7 +870,7 @@ func (d *NodeService) NodeGetInfo(ctx context.Context, req *csi.NodeGetInfoReque
 	}
 
 	var nodeId = d.Hostname
-	err = d.NodeUtils.UpdateNodePortsAnnotation(ctx, d.Hostname, iscsiIQN, fcWWNs, nvmeNQN)
+	err = d.NodeUtils.UpdateNodeInitiatorsAnnotation(ctx, d.Hostname, iscsiIQN, fcWWNs, nvmeNQN)
 	if err != nil {
 		return nil, status.Error(codes.Internal, err.Error())
 	}

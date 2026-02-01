@@ -1468,7 +1468,7 @@ func TestNodeGetInfo(t *testing.T) {
 
 			fakeNodeutils := mocks.NewMockNodeUtilsInterface(mockCtrl)
 			d := newTestNodeService(fakeNodeutils, nil, nil)
-			fakeNodeutils.EXPECT().UpdateNodePortsAnnotation(context.TODO(), d.Hostname, tc.returnIqn, tc.returnFcs, tc.returnNqn).AnyTimes()
+			fakeNodeutils.EXPECT().UpdateNodeInitiatorsAnnotation(context.TODO(), d.Hostname, tc.returnIqn, tc.returnFcs, tc.returnNqn).AnyTimes()
 			fakeNodeutils.EXPECT().GetTopologyLabels(context.TODO(), d.Hostname).Return(topologySegments, nil)
 			fakeNodeutils.EXPECT().IsPathExists(driver.NvmeFullPath).Return(tc.nvmeExists)
 			fakeNodeutils.EXPECT().IsFCExists().Return(tc.fcExists)

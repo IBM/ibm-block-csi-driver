@@ -92,7 +92,7 @@ type NodeUtilsInterface interface {
 	IsNotMountPoint(file string) (bool, error)
 	GetPodPath(filepath string) string
 	GetTopologyLabels(ctx context.Context, nodeName string) (map[string]string, error)
-	UpdateNodePortsAnnotation(ctx context.Context, nodeName string, iscsiIQN string, fcWWNs []string, nvmeNQN string) error
+	UpdateNodeInitiatorsAnnotation(ctx context.Context, nodeName string, iscsiIQN string, fcWWNs []string, nvmeNQN string) error
 	IsBlock(devicePath string) (bool, error)
 	GetFileSystemVolumeStats(path string) (VolumeStatistics, error)
 	GetBlockVolumeStats(volumeId string) (VolumeStatistics, error)
@@ -512,7 +512,7 @@ func (n NodeUtils) GetTopologyLabels(ctx context.Context, nodeName string) (map[
 	return topologyLabels, nil
 }
 
-func (n NodeUtils) UpdateNodePortsAnnotation(ctx context.Context, nodeName string,
+func (n NodeUtils) UpdateNodeInitiatorsAnnotation(ctx context.Context, nodeName string,
 	iscsiIQN string, fcWWNs []string, nvmeNQN string) error {
 
 	kubeConfig, err := rest.InClusterConfig()
