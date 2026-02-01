@@ -215,24 +215,6 @@ func (r OsDeviceConnectivityIscsi) filterLoggedIn(portalsByTarget map[string][]s
 	return filteredPortalsByTarget, nil
 }
 
-func (r OsDeviceConnectivityIscsi) normalizePortal(portal string) string {
-    // Remove TPGT if present
-    portal = strings.Split(strings.TrimSpace(portal), ",")[0]
-
-    host, port, err := net.SplitHostPort(portal)
-    if err != nil {
-        host = portal
-        port = "3260"
-    }
-
-    if ip := net.ParseIP(host); ip != nil {
-        host = ip.String() // Canonicalize (001 -> 1, etc)
-    } else {
-        host = strings.ToLower(host)
-    }
-    return net.JoinHostPort(host, port)
-}
-
 func (r OsDeviceConnectivityIscsi) discoverAndLogin(portalsByTarget map[string][]string) {
 	// 1. Surgical Scan: Only load the DB entries for the targets we actually care about
 	dbCache := r.loadRelevantTargets(portalsByTarget)
@@ -347,7 +329,6 @@ func (r OsDeviceConnectivityIscsi) normalizePortal(portal string) string {
 	return net.JoinHostPort(host, port)
 }
 
-
 func (r OsDeviceConnectivityIscsi) EnsureLogin(allPortalsByTarget map[string][]string) {
 	portalsByTarget, err := r.filterLoggedIn(allPortalsByTarget)
 	if err == nil {
@@ -359,6 +340,11 @@ func (r OsDeviceConnectivityIscsi) EnsureLogin(allPortalsByTarget map[string][]s
 	} else {
 		logger.Errorf("Failed to filter logged in iSCSI portals: {%v}", err)
 	}
+}
+
+type activeSession struct {
+	sourceIQN string
+	hostNum int
 }
 
 func (r OsDeviceConnectivityIscsi) parseActiveSessions() ([]activeSession, error) {

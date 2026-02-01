@@ -98,7 +98,7 @@ func NewWithExecutor(mounterPath string, e executer.ExecuterInterface, limit int
 
 
 // mount.Interface
-------------------------------------------------------------------
+//------------------------------------------------------------------
 // Mount performs the actual operation using the system's mount binary.
 // It replaces the standard executer with our own that tracks stuck devices
 // and runs commands with vfork rather than fork
@@ -222,7 +222,7 @@ func (m *Mounter) parseMountInfo() ([]mount.MountPoint, error) {
 
 
 
-------------------------------------------------------------------
+//------------------------------------------------------------------
 
 
 func (m *Mounter) UnmountWithTimeout(target string, timeout time.Duration) error {

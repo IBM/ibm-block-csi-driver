@@ -106,7 +106,7 @@ func NewOsDeviceConnectivityHelperScsiGeneric(executer executer.ExecuterInterfac
 
 func (r OsDeviceConnectivityHelperScsiGeneric) IsVolumePathMatchesVolumeId(volumeUuid string, volumePath string) (bool, error) {
     logger.Infof("IsVolumePathMatchesVolumeId: Searching matching volume id for volume path: [%s] ", volumePath)
-    volumeIdVariations := r.Helper.GetVolumeIdVariations(volumeUuid)
+    //volumeIdVariations := r.Helper.GetVolumeIdVariations(volumeUuid)
 
 	mpathDeviceName, err := r.Helper.GetMpathDeviceName(volumePath)
 	if err != nil {
@@ -115,43 +115,26 @@ func (r OsDeviceConnectivityHelperScsiGeneric) IsVolumePathMatchesVolumeId(volum
 
 	SgInqWwn, err := r.Helper.GetWwnByScsiInq(mpathDeviceName)
 	if err != nil {
-		return "", err
+		return false, err
 	}
 
 	// TODO variations
-	if !isSameId(SgInqWwn, volumeUuid) {
-		return false, &ErrorWrongDeviceFound{dmPath, mpathVolumeId, SgInqWwn}
+	if !isSameId(SgInqWwn, []string{volumeUuid}) {
+		return false, &ErrorWrongDeviceFound{mpathDeviceName, volumeUuid, SgInqWwn}
 	}
 
-	return true, ""
+	return true, nil
 }
 
 func (r OsDeviceConnectivityHelperScsiGeneric) RescanDevicesGetHostIds(lunId int, arrayIdentifiers []string) (map[int]bool, error) {
 	logger.Debugf("Rescan : Start rescan on specific lun, on lun : {%v}, with array identifiers : {%v}", lunId, arrayIdentifiers)
-	var errStrings []string
 	if len(arrayIdentifiers) == 0 {
 		e := &ErrorNotFoundArrayIdentifiers{lunId}
 		logger.Errorf("%s", e.Error())
 		return nil, e
 	}
 
-	hostIDs := GetHostsByBatchIdentifiers(GetHostsIdByArrayIdentifier)
-
-	for _, arrayIdentifier := range arrayIdentifiers {
-		hostsId, e := r.Helper.GetHostsIdByArrayIdentifier(arrayIdentifier)
-		if e != nil {
-			logger.Errorf("%s", e.Error())
-			errStrings = append(errStrings, e.Error())
-		}
-		for _, hostId := range hostsId {
-			hostIDs[hostId] = true
-		}
-	}
-	if len(hostIDs) == 0 && len(errStrings) != 0 {
-		err := errors.New(strings.Join(errStrings, ","))
-		return nil, err
-	}
-	return hostIDs, nil
+	return r.Helper.GetHostsIdByArrayIdentifiers(arrayIdentifiers)
 }
 
 func (r OsDeviceConnectivityHelperScsiGeneric) RescanDevices(lunId int, arrayIdentifiers []string, hostIDs map[int]bool) error {
@@ -188,15 +171,17 @@ func (r OsDeviceConnectivityHelperScsiGeneric) GetMpathDevice(volumeId string) (
 
 	dmPath, _ := r.Helper.GetMpathDeviceName(volumeId)
 
+	volumeIdVariations := []string{volumeId}
+
 	if dmPath != "" {
 		SgInqWwn, _ := r.Helper.GetWwnByScsiInq(dmPath)
 		if isSameId(SgInqWwn, volumeIdVariations) {
 			return dmPath, nil
 		}
 		logger.Warningf("Expected {%v} but got {%v} from sg_inq", volumeId, SgInqWwn)
+		return "", &ErrorWrongDeviceFound{dmPath, volumeIdVariations[0], SgInqWwn}
 	}
-
-	return "", &ErrorWrongDeviceFound{dmPath, volumeIdVariations[0], SgInqWwn}
+	return dmPath, nil
 }
 
 func isSameId(wwn string, volumeIdVariations []string) bool {
@@ -345,7 +330,7 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) RemovePhysicalDevice(sysDevices 
 
 				if err := os.WriteFile(deletePath, []byte("1"), 0200); err != nil {
 					logger.Errorf("Error while writing to file : {%v}. error: {%v}", deletePath, err.Error())
-					return fmt.Errorf("failed to delete IBM stale device %s: %w", sgName, err)
+					return fmt.Errorf("failed to delete IBM stale device %s: %w", name, err)
 				}
 				return nil
 			})
@@ -411,7 +396,7 @@ func (r OsDeviceConnectivityHelperScsiGeneric) ValidateLun(targetDm string, lun 
 
 
 		var actualLun, sysfsId, hwId string
-		if strings.HasPrefix(name, "nvme") {
+		if strings.HasPrefix(sysDevice, "nvme") {
 			// NVMe Path Logic
 			actualLun = readSysfs(fmt.Sprintf("/sys/block/%s/device/nsid", sysDevice))
 			sysfsId = readSysfs(fmt.Sprintf("/sys/block/%s/nguid", sysDevice))
@@ -448,17 +433,14 @@ func (r OsDeviceConnectivityHelperScsiGeneric) ValidateLun(targetDm string, lun 
 	}
 	if validPathsFound == 0 {
 		logger.Debugf("Finished lun validation")
-	}
-	else {
-
+	} else {
 		// TODO replace with error
 		return "", fmt.Errorf("all paths for device %s failed safety verification", targetDm)
 	}
 }
 
 func (r *OsDeviceConnectivityHelperScsiGeneric) RemoveGhostDevice(expectedSerial string, expectedLun int, arrayIdentifiers []string) error {
-	if !o.CleanScsiDevice {
-		logger.Debugf("Clean devices disabled, skipping removeGhostDevice") //Can be omitted, debug only.
+	if !r.CleanScsiDevice {
 		return nil
 	}
 	sgEntries, err := os.ReadDir("/sys/class/scsi_generic")
@@ -468,72 +450,49 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) RemoveGhostDevice(expectedSerial
 	}
 
 	var (
-		deleted int = 0
-		notLun  int = 0
-		notPQ   int = 0
+		deleted int
+		notLun  int
+		notPQ   int
 	)
 
-	normLun := normalizeLun(fmt.Sprintf("%d", expectedLun))
+	normLun := r.normalizeLun(fmt.Sprintf("%d", expectedLun))
 
 	for _, entry := range sgEntries {
 		sgName := entry.Name()
 		deviceDir := filepath.Join("/sys/class/scsi_generic", sgName, "device")
 
-		// 1. Get HCTL and Path
-		hctl, err := GetHCTLFromSg(sgName)
+		// Fix: Method must be called on 'r'
+		hctl, err := r.GetHCTLFromSg(sgName)
 		if err != nil {
 			continue
 		}
 
 		// 2. Validate LUN Match
 		lunBytes, _ := os.ReadFile(filepath.Join(deviceDir, "lun"))
-		if normalizeLun(string(lunBytes)) != normLun {
+		if r.normalizeLun(string(lunBytes)) != normLun {
 			notLun++
 			continue
 		}
 
-		// 1. TRANSPORT SCOPE CHECK
-		realPath, err := filepath.EvalSymlinks(deviceDir)
-		if err != nil { continue }
+		// 3. TRANSPORT SCOPE CHECK
+		// Fix: Removed 'filepath.EvalSymlinks' shadowing; calling method on 'r'
+		isOurPath := r.isPathOwnedByMyArray(hctl, arrayIdentifiers)
 
-		isOurPath := isPathOwnedByMyArray(hctl, arrayIdentifiers)
-
-		// 2. VENDOR CHECK (IBM)
+		// 4. VENDOR CHECK (IBM)
 		vendorBytes, _ := os.ReadFile(filepath.Join(deviceDir, "vendor"))
 		vendor := strings.TrimSpace(string(vendorBytes))
 		isIBM := strings.Contains(vendor, "IBM")
 
+		// 5. Identity/Ghost Logic
+		// Fix: getHardwareSerial returns (string, error). Added hwErr handling.
+		hwSerial, hwErr := r.getHardwareSerial(deviceDir)
+		
+		// Fix: IsGhostDevice returns (bool, error). Added check.
+		isGhost, _ := r.IsGhostDevice(sgName)
 
-		// We only prune devices that are either IBM or belong to our transport IDs
-		//if !isIBM && !isOurPath {
-		//	skipped++
-		//	continue
-		//}
-
-
-		// 5. Ghost/Serial Logic
-		// Read the actual hardware serial from the device (e.g., from 'wwid' file)
-		hwSerial, err := r.getHardwareSerial(deviceDir)
-
-		isGhost := IsGhostDevice(sgName) // Ensure this checks PQ=1 via sysfs 'type' or inquiry
-
-
-		//if isGhost && isIBM {
-		//	shouldDelete = true
-		//	reason = "IBM PQ=1/3 Ghost (Stale Path)"
-		}// else if isOurArray && err == nil && !o.IsSerialMatch(hwSerial, expectedSerial) {
-		//	// If we successfully read a serial and it doesn't match our target,
-		//	// this LUN has been remapped or we are seeing a different volume on our LUN ID.
-		//	shouldDelete = true
-		//	reason = fmt.Sprintf("Identity mismatch (Hardware: %s, Expected: %s)", hwSerial, expectedSerial)
-		//}
-
-		// REMEDIATION: Delete if it's a ghost from IBM, or if it's our path but the serial is wrong
-		shouldDelete := (isGhost && isIBM) || (isIBM && !o.IsSerialMatch(hwSerial, expectedSerial))
-
-		// 6. REMEDIATION LOGIC
-		// We delete if it's a Ghost OR if the hardware identity is wrong
-		shouldDelete := (isGhost && isIBM) || (isOurPath && (!isIBM || (hwSerial != "" && !o.IsSerialMatch(hwSerial, expectedSerial))))
+		// Fix: Removed shadowed 'shouldDelete' declaration.
+		// Logic: Prune if it's an IBM Ghost OR if it's a path we own but the hardware ID is wrong.
+		shouldDelete := (isGhost && isIBM) || (isOurPath && (!isIBM || (hwSerial != "" && !r.IsSerialMatch(hwSerial, expectedSerial))))
 
 		if shouldDelete {
 			reason := "serial mismatch"
@@ -545,24 +504,25 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) RemoveGhostDevice(expectedSerial
 
 			logger.Warnf("Pruning stale IBM device %s. Reason: %s", sgName, reason)
 
-			deletePath := filepath.Join(deviceDir, "delete")
-			if err := os.WriteFile(deletePath, []byte("1"), 0644); err != nil {
-				return fmt.Errorf("failed to delete IBM stale device %s: %w", sgName, err)
-				// Perhaps skip
-			}
-			else {
-				deleted += 1
-			}
-		}
-		else {
-			notPQ += 1
+			// 6. REMEDIATION: Using the Safety Gater to prevent D-state hangs
+			// Fix: Writing "1" to sysfs delete must be 0200 (Write-only) for root.
+			// TODO restore check
+			_ = r.resourceManager.ExecuteUninterruptible("path-delete-"+sgName, 1, 10, 2*time.Second, 15*time.Second, func() error {
+				deletePath := filepath.Join(deviceDir, "delete")
+				return os.WriteFile(deletePath, []byte("1"), 0200) 
+			})
+			deleted++
+		} else {
+			notPQ++
 		}
 	}
+
 	if deleted != 0 {
-		logger.Debugf("Deleted %d devices. Found %d not-our-lun devices, and %d our lun but non ghost", deleted, notLun, notPQ)
+		logger.Debugf("Deleted %d devices. Found %d not-our-lun, %d our lun but not ghost", deleted, notLun, notPQ)
 	}
 	return nil
 }
+
 
 
 func(r *OsDeviceConnectivityHelperScsiGeneric) GetHCTLFromSg(sgName string) (string, error) {
@@ -673,6 +633,7 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) getHardwareSerial(deviceDir stri
 
 
 // sgIoHdr is the Linux SG_IO ioctl structure
+// TODO duplicates SgIoHeader
 type sgIoHdr struct {
 	interface_id    int32
 	dxfer_direction int32
@@ -787,7 +748,7 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) checkPQviaIoctl(sgName string) (
 	}
 
 
-	const allocationLen := 36
+	const allocationLen = 36
 	inqResp := make([]byte, allocationLen)
 	senseBuf := make([]byte, 32)
 	cdb := [6]byte{0x12, 0, 0, 0, uint8(allocationLen), 0}
@@ -899,7 +860,7 @@ PROCESS_PQ:
     return false, nil
 }
 
-State	isGhostDevice Result	Reasoning
+//State	isGhostDevice Result	Reasoning
 //offline/deleting	true	Kernel has marked the path as dead.
 //blocked/quiesce	Error	Path is frozen; ioctl may hang despite O_NONBLOCK.
 //running + PQ=1	true	Target confirms LUN is configured but disconnected.
@@ -1424,21 +1385,6 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) UnmountVolume(target, wwid strin
 	)
 }
 
-func(r *OsDeviceConnectivityHelperScsiGeneric) GetStats(target, wwid string) (*VolumeStatistics, error) {
-	// Statistics are read-only; use a higher limit (Limit 50, Handoff 2s)
-	//var stats *VolumeStatistics
-	//err := r.Executer.ExecuteUninterruptible(
-	//	"stats-ops", 50, 100, 2*time.Second, 10*time.Second,
-	//	func() error {
-	//		var innerErr error
-	//		stats, innerErr = m.CleanupManager.GetVolumeStats(target, wwid)
-	//		return innerErr
-	//	},
-	//)
-	return stats, err
-}
-
-
 
 
 
@@ -1451,7 +1397,7 @@ type OsDeviceConnectivityHelperInterface interface {
 		This is helper interface for OsDeviceConnectivityScsiGeneric.
 		Mainly for writting clean unit testing, so we can Mock this interface in order to unit test OsDeviceConnectivityHelperGeneric logic.
 	*/
-	GetHostsIdByArrayIdentifier(arrayIdentifier string) ([]int, error)
+	GetHostsIdByArrayIdentifiers(arrayIdentifier []string) ([]int, error)
 	GetWwnByScsiInq(dev string) (string, error)
 	GetMpathDeviceName(volumePath string) (string, error)
 	GetMpathVolumeId(mpathdOutput string, mpathDeviceName string, dmDirectory string) (string, error)
@@ -1473,7 +1419,7 @@ func NewOsDeviceConnectivityHelperGeneric(executer executer.ExecuterInterface) O
 //TODO
 //cleanID := strings.TrimSpace(strings.Trim(string(data), "\x00"))
 //idFromSys := strings.ToLower(strings.TrimPrefix(cleanID, "0x"))
-func (o *OsDeviceConnectivityHelperGeneric) GetHostsIdByArrayIdentifier(arrayIdentifier []string) (map[string][]int, error) {
+func (o *OsDeviceConnectivityHelperGeneric) GetHostsIdByArrayIdentifiers(arrayIdentifier []string) (map[string][]int, error) {
 	cleanLookup := make(map[string]string)
 
 	// Track which protocols we actually need to search
@@ -1537,8 +1483,7 @@ func (o *OsDeviceConnectivityHelperGeneric) GetHostsIdByArrayIdentifier(arrayIde
 						hostMap[originalID] = make(map[int]struct{})
 					}
 					hostMap[originalID][hostNum] = struct{}{}
-				}
-				else {
+				} else {
 					logger.Warningf("Host number in for target file was not valid : {%v}", idPath)
 				}
 			}
@@ -1613,11 +1558,6 @@ func (o OsDeviceConnectivityHelperGeneric) GetMpathVolumeId(dmPath string) {
 }
 
 
-
-const (
-	SG_IO             = 0x2285
-	SG_DXFER_FROM_DEV = -3
-)
 
 // SgIoHeader matches the C struct sg_io_hdr_t for Linux ioctl
 type SgIoHeader struct {

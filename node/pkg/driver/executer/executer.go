@@ -1,3 +1,4 @@
+
 /**
  * Copyright 2019 IBM Corp.
  *
@@ -31,6 +32,7 @@ import (
 	"strings"
 	"sync"
 	"sync/atomic"
+	"syscall"
 	"time"
 	utilexec "k8s.io/utils/exec"
 
@@ -62,6 +64,7 @@ type SocketLimiter struct {
 type Executer struct {
 	stuckProcesses map[string]zombieInfo
 	stuckMu        sync.Mutex
+	socketMu       sync.RWMutex
 
 	cachedSocket string
 
@@ -120,11 +123,32 @@ type zombieInfo struct {
 
 
 
+type errorCmd struct {
+	utilexec.Cmd
+	err error
+}
+
+func (e *Executer) newErrorCmd(err error) utilexec.Cmd {
+	return &errorCmd{err: err}
+}
+
+// Override all execution methods to just return the saved error
+func (e *errorCmd) Run() error { return e.err }
+func (e *errorCmd) CombinedOutput() ([]byte, error) { return nil, e.err }
+func (e *errorCmd) Output() ([]byte, error) { return nil, e.err }
+func (e *errorCmd) SetDir(dir string) {}
+func (e *errorCmd) SetStdin(in io.Reader) {}
+func (e *errorCmd) SetStdout(out io.Writer) {}
+func (e *errorCmd) SetStderr(out io.Writer) {}
+func (e *errorCmd) SetEnv(env []string) {}
+
+
+
 
 // utilexec.Interface (to allow Executer to be used by mounter)
 // ------------------------------------------------------------
 func (e *Executer) Command(cmdName string, args ...string) utilexec.Cmd {
-	return e.CommandContext(context.Background(), cmd, args...)
+	return e.CommandContext(context.Background(), cmdName, args...)
 }
 
 func (e *Executer) CommandContext(ctx context.Context, cmdName string, args ...string) utilexec.Cmd {
@@ -132,12 +156,13 @@ func (e *Executer) CommandContext(ctx context.Context, cmdName string, args ...s
     osCmd := exec.Command(cmdName, args...)
 
     // Auto-detect and resolve the real device path
-    device := extractRealDevice(cmdName, args)
+    device := e.extractRealDevice(cmdName, args)
 
 	// 2. Safety Gate: Check if this hardware is already known to be wedged
-	if device != "" && e.isStuck(device) {
+	if device != "" && e.IsDeviceStuck(device) {
 		// Return a "No-Op" command that fails immediately to prevent a driver hang
-		return e.newErrorCmd(fmt.Errorf("safety-gate: device %s (%s) is in D-state", devicePath, canonicalID))
+		// TODO
+		return e.newErrorCmd(fmt.Errorf("safety-gate: device %s (%s) is in D-state", device, device))
 	}
 
 	// CRITICAL: Use vfork to prevent memory spikes on RHEL 7 / Kernel 3.10
@@ -150,6 +175,7 @@ func (e *Executer) CommandContext(ctx context.Context, cmdName string, args ...s
         Cmd:      osCmd,
         device:   device,
         executer: e,
+	ctx: ctx,
 	}
 }
 
@@ -163,31 +189,27 @@ type executerCmd struct {
 	*exec.Cmd
 	device   string
 	executer *Executer // Reference to call markAsStuck
+	ctx      context.Context
 }
 
-func (c *executerCmd) SetStdin(in io.Reader) utilexec.Cmd {
+func (c *executerCmd) SetStdin(in io.Reader) {
 	c.Cmd.Stdin = in
-	return c
 }
 
-func (c *executerCmd) SetStdout(out io.Writer) utilexec.Cmd {
+func (c *executerCmd) SetStdout(out io.Writer) {
 	c.Cmd.Stdout = out
-	return c
 }
 
-func (c *executerCmd) SetStderr(out io.Writer) utilexec.Cmd {
+func (c *executerCmd) SetStderr(out io.Writer) {
 	c.Cmd.Stderr = out
-	return c
 }
 
-func (c *executerCmd) SetEnv(env []string) utilexec.Cmd {
+func (c *executerCmd) SetEnv(env []string) {
 	c.Cmd.Env = env
-	return c
 }
 
-func (c *executerCmd) SetDir(dir string) utilexec.Cmd {
+func (c *executerCmd) SetDir(dir string) {
 	c.Cmd.Dir = dir
-	return c
 }
 
 func (c *executerCmd) Stop() {
@@ -251,13 +273,13 @@ func (c *executerCmd) execute(captureStdoutOnly bool) ([]byte, error) {
 	if err != nil {
 		// 4. D-STATE DETECTION
 		// If the context timed out OR WaitDelay expired
-		if errors.Is(err, exec.ErrWaitDelay) || (c.Cmd.Context() != nil && c.Cmd.Context().Err() != nil) {
+		if errors.Is(err, exec.ErrWaitDelay) || (c.ctx != nil && c.ctx != nil) {
 			if c.device != "" {
 				// Mark hardware as stuck via our executer's map
 				// c.executer.stuckDevices.Store(c.canonicalID, time.Now())
 				c.executer.markAsStuck(c.device, pid, c.Cmd.Path)
 			}
-			return out, fmt.Errorf("process %d hung (D-state) on %s: %w", pid, c.devicePath, err)
+			return out, fmt.Errorf("process %d hung (D-state) on %s: %w", pid, c.device, err)
 		}
 		return out, err
 	}
@@ -280,7 +302,7 @@ var _ utilexec.Cmd = &executerCmd{}
 
 
 
-func (e *LightExecuter) getCanonicalID(path string) (string, error) {
+func (e *Executer) getCanonicalID(path string) (string, error) {
 	realPath, err := filepath.EvalSymlinks(path)
 	if err != nil {
 		return "", err
@@ -384,6 +406,59 @@ func (e *Executer) extractRealDevice(cmdName string, args []string) string {
 	major := (stat.Rdev >> 8) & 0xfff
 	minor := (stat.Rdev & 0xff) | ((stat.Rdev >> 12) & 0xfff00)
 	return fmt.Sprintf("%d:%d", major, minor)
+}
+
+func (e *Executer) getLeafFromIqn(targetIqn string) string {
+	// 1. Scan all iSCSI sessions in sysfs
+	// Path: /sys/class/iscsi_session/sessionX
+	sessions, err := os.ReadDir("/sys/class/iscsi_session")
+	if err != nil {
+		return ""
+	}
+
+	for _, s := range sessions {
+		sessionDir := filepath.Join("/sys/class/iscsi_session", s.Name())
+
+		// 2. Verify TargetName matches our IQN
+		targetNamePath := filepath.Join(sessionDir, "targetname")
+		data, err := os.ReadFile(targetNamePath)
+		if err != nil || strings.TrimSpace(string(data)) != targetIqn {
+			continue
+		}
+
+		// 3. Find the associated SCSI device (H:C:T:L)
+		// Path: /sys/class/iscsi_session/sessionX/device/targetH:C:T/H:C:T:L
+		deviceDir := filepath.Join(sessionDir, "device")
+		targets, err := os.ReadDir(deviceDir)
+		if err != nil {
+			continue
+		}
+
+		for _, t := range targets {
+			if !strings.HasPrefix(t.Name(), "target") {
+				continue
+			}
+
+			hctDir := filepath.Join(deviceDir, t.Name())
+			luns, err := os.ReadDir(hctDir)
+			if err != nil {
+				continue
+			}
+
+			for _, l := range luns {
+				// 4. Resolve the H:C:T:L to a block device (sdX)
+				// Path: .../H:C:T:L/block/sdX
+				blockPath := filepath.Join(hctDir, l.Name(), "block")
+				blockDevs, err := os.ReadDir(blockPath)
+				if err == nil && len(blockDevs) > 0 {
+					// Found it! e.g., /dev/sdb
+					return filepath.Join("/dev", blockDevs[0].Name())
+				}
+			}
+		}
+	}
+
+	return ""
 }
 
 
@@ -541,7 +616,7 @@ func (e *Executer) IsDeviceStuck(canonicalKey string) bool {
         if state == "D" {
             // Check if the process is tied to our device
             // On RHEL 7, we can check /proc/[pid]/fd or /proc/[pid]/wchan
-            if isProcessWaitingOnDevice(pid, canonicalKey) {
+            if e.isProcessWaitingOnDevice(pid, canonicalKey) {
                 return true
             }
         }
@@ -720,79 +795,9 @@ func (e *Executer) invalidateSocket() {
 
 
 func (e *Executer) MultipathdCmd(command string) (string, error) {
-	socketPath := e.GetSocket()
-
-	conn, err := net.DialTimeout("unix", socketPath, 2*time.Second)
-	if err != nil {
-		e.invalidateSocket()
-		socketPath = e.GetSocket() // Try once more after invalidating
-		conn, err = net.DialTimeout("unix", socketPath, 2*time.Second)
-		if err != nil {
-			return "", fmt.Errorf("multipathd unreachable: %w", err)
-		}
-	}
-	defer conn.Close()
-
-	// Set strict deadline for both Read and Write
-	conn.SetDeadline(time.Now().Add(5 * time.Second))
-
-	// 1. Send Command
-	// Protocol: "LENGTH(10 bytes)PAYLOAD\n"
-	payload := command + "\n"
-	header := fmt.Sprintf("%10d", len(payload))
-	if _, err := conn.Write([]byte(header + payload)); err != nil {
-		return "", fmt.Errorf("failed to send command: %w", err)
-	}
-
-	// 2. Read Response Header (10 bytes)
-	lenBuf := make([]byte, 10)
-	if _, err := io.ReadFull(conn, lenBuf); err != nil {
-		return "", fmt.Errorf("failed to read response header: %w", err)
-	}
-
-	// 3. Parse Length with extra safety
-	trimmedLen := strings.TrimSpace(string(lenBuf))
-	respLen, err := strconv.Atoi(trimmedLen)
-
-	// TODO is respLen < 0 considered error or success
-	if err != nil {
-		return "", fmt.Errorf("protocol error: invalid response length %q", trimmedLen)
-	}
-
-	// Safety check: Don't allocate more than 1MB (your DefaultMaxOutput)
-	if respLen > DefaultMaxOutput {
-		return "", fmt.Errorf("protocol error: response size %d exceeds limit", respLen)
-	}
-
-	if respLen <= 0 {
-		return "", nil
-	}
-
-	// 4. Read Body
-	// Use LimitReader to prevent reading past the protocol-defined length
-	respBody, err := io.ReadAll(io.LimitReader(conn, int64(respLen)))
-	if err != nil {
-		return "", fmt.Errorf("failed to read response body: %w", err)
-	}
-
-	response := strings.TrimSpace(string(respBody))
-
-	// 5. Logical Error Handling
-	if strings.HasPrefix(response, "fail") {
-		return "", fmt.Errorf("fail: multipathd error: %s", response)
-	}
-
-	if response == "timeout" {
-		return "", fmt.Errorf("fail: multipathd internal timeout")
-	}
-
-	return response, nil
-}
-
-func (e *Executer) MultipathdCmd(command string) (string, error) {
 	// NEW: PRE-CHECK SAFETY GATE
 	// If the command targets a specific device, check the stuck map first.
-	device := e.extractDeviceContext("multipathd", strings.Fields(command))
+	device := e.extractRealDevice("multipathd", strings.Fields(command))
 	if device != "" {
 		if canonicalID, err := e.getCanonicalID(device); err == nil && e.isDeviceStillStuck(canonicalID) {
 			return "", fmt.Errorf("safety-gate: skipping multipathd query for stuck device %s", device)
@@ -804,6 +809,11 @@ func (e *Executer) MultipathdCmd(command string) (string, error) {
 	conn, err := net.DialTimeout("unix", socketPath, 1*time.Second)
 	if err != nil {
 		e.invalidateSocket()
+//                 conn, err = net.DialTimeout("unix", socketPath, 2*time.Second)
+//                 if err != nil {
+//                         return "", fmt.Errorf("multipathd unreachable: %w", err)
+//                 }
+
 		return "", fmt.Errorf("multipathd unreachable: %w", err)
 	}
 	defer conn.Close()
@@ -858,13 +868,13 @@ func (e *Executer) MultipathdCmd(command string) (string, error) {
 func (e *Executer) SafeMultipathdCmd(command string) (string, error) {
 	// 1. Level 1: Process Check (Ultra-lightweight)
 	// If the daemon isn't running, don't even try the socket.
-	if !e.isMultipathdProcessRunning() {
+	if !e.IsMultipathdRunning() {
 		return "", fmt.Errorf("circuit-breaker: multipathd process is not running")
 	}
 
 	// 2. Level 2: D-State Safety Gate (Canonical ID Check)
 	// Check if the specific device in the command is already marked as STUCK.
-	device := e.extractDeviceContext("multipathd", strings.Fields(command))
+	device := e.extractRealDevice("multipathd", strings.Fields(command))
 	if device != "" {
 		if id, err := e.getCanonicalID(device); err == nil && e.isDeviceStillStuck(id) {
 			return "", fmt.Errorf("circuit-breaker: skipping command for stuck hardware %s", id)
@@ -874,7 +884,7 @@ func (e *Executer) SafeMultipathdCmd(command string) (string, error) {
 	// 3. Level 3: Keepalive Check (Responsive Event Loop)
 	// Only run this if it's been more than X seconds since the last success
 	// to prevent "thundering herd" overhead.
-	if err := e.verifyMultipathdResponsiveness(); err != nil {
+	if alive, err := e.IsMultipathdAlive(); !alive {
 		return "", err
 	}
 
@@ -1016,9 +1026,6 @@ type MultipathHealth struct {
 func (e *Executer) CheckMultipathdHealth() MultipathHealth {
 	// 1. Check if process exists (e.g., via pgrep or systemctl)
 	// If the binary isn't in the process list, it's definitely not running.
-	if !e.IsProcessRunning("multipathd") {
-		return MultipathHealth{IsRunning: false, Error: fmt.Errorf("multipathd process not found")}
-	}
 
 	// TODO IsMultipathdAlive-like logic follows
 
@@ -1127,7 +1134,7 @@ func (e *Executer) IsMultipathdRunning() bool {
 
 
 
-/ IsMultipathdAlive performs a liveness check by sending a no-op command.
+// IsMultipathdAlive performs a liveness check by sending a no-op command.
 // It distinguishes between "stopped" (connection refused) and "stuck" (timeout).
 func (e *Executer) IsMultipathdAlive() (bool, error) {
 	// We use 'show status' because it's a fast, read-only internal no-op.
