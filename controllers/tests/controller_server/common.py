@@ -1,5 +1,6 @@
 from mock.mock import patch, Mock
 
+
 def mock_get_agent(contex, server_path):
     contex.storage_agent.get_mediator.return_value.__enter__.return_value = contex.mediator
     get_agent_path = '.'.join((server_path, 'get_agent'))

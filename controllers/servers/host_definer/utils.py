@@ -26,6 +26,7 @@ def get_node_initiators_from_node(node_name):
 
     return Initiators([], [], [])
 
+
 def generate_node_initiators_from_k8s_node(k8s_node):
     "docstring"
     initiators_data = k8s_node.metadata.annotations.get('block.csi.ibm.com/node-initiators', "{}")
@@ -39,6 +40,7 @@ def generate_node_initiators_from_string_data(initiators_data):
     fc_wwns = initiators_data.get("fc", [])
     iscsi_iqns = initiators_data.get("iscsi", [])
     return Initiators(nvme_nqns, fc_wwns, iscsi_iqns)
+
 
 def generate_io_group_from_labels(labels):
     """docstring"""

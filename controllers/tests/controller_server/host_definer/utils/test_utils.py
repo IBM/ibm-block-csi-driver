@@ -11,7 +11,8 @@ from controllers.servers.host_definer.kubernetes_manager.manager import Kubernet
 from controllers.servers.host_definer.hd_types import DefineHostRequest, DefineHostResponse
 from controllers.servers.csi.controller_types import ArrayConnectionInfo
 
-EMPTY_INITIATORS_STR='{"fc":[],"iscsi":[],"nvme":[]}'
+EMPTY_INITIATORS_STR = '{"fc":[],"iscsi":[],"nvme":[]}'
+
 
 @dataclass
 class K8sResourceItems():
@@ -205,6 +206,7 @@ def get_define_request(
         io_group=test_settings.FAKE_STRING_IO_GROUP,
     )
 
+
 def get_define_response(connectivity_type, ports):
     return DefineHostResponse(
         '', connectivity_type, ports, HOST_NAME, get_fake_host_io_group_id(),
@@ -227,6 +229,7 @@ def get_fake_host_io_group_id():
 
 def get_fake_host_io_group():
     return Munch.fromDict(manifest_utils.get_host_io_group_manifest())
+
 
 def get_fake_managed_node():
     managed_node = Mock(spec_set=['name', 'node_id', 'io_group', 'node_initiators'])

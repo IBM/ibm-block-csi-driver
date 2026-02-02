@@ -36,6 +36,7 @@ from controllers.tests.utils import ProtoBufMock
 CONTROLLER_SERVER_PATH = "controllers.servers.csi.csi_controller_server"
 TEST_SERVER_PATH = "controllers.servers.utils"
 
+
 class BaseControllerSetUp(unittest.TestCase):
 
     def setUp(self):
@@ -1152,7 +1153,6 @@ class TestUnpublishVolume(BaseControllerSetUp, CommonControllerTest):
                                 'iscsi_iqns': [self.iqn],
                                 'nvme_nqns': []}
         mock_get_node_initiators(self, TEST_SERVER_PATH)
-
 
     def test_unpublish_volume_success(self):
         self.servicer.ControllerUnpublishVolume(self.request, self.context)

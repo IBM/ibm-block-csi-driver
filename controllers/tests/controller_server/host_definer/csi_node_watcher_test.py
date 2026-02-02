@@ -8,6 +8,7 @@ from controllers.tests.controller_server.host_definer.common import BaseSetUp
 from controllers.servers.host_definer.hd_types import DefineHostResponse
 from controllers.servers.host_definer.watcher.csi_node_watcher import CsiNodeWatcher
 
+
 class CsiNodeWatcherBase(BaseSetUp):
     def setUp(self):
         super().setUp()
@@ -19,6 +20,7 @@ class CsiNodeWatcherBase(BaseSetUp):
         self.managed_secrets_on_csi_node_watcher = test_utils.patch_managed_secrets_global_variable(
             test_settings.CSI_NODE_WATCHER_PATH
         )
+
 
 class TestAddInitialCsiNodes(CsiNodeWatcherBase):
     def test_host_not_defined_for_csi_node_without_ibm_block_provider(self):

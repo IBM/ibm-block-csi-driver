@@ -16,12 +16,14 @@ import controllers.common.settings as common_settings
 
 HOST_DEFINER_SERVER_PATH = "controllers.servers.host_definer.storage_manager.host_definer_server"
 
+
 def initiators_to_json(initiators: Initiators) -> str:
     return json.dumps({
         "nvme": initiators.nvme_nqns or [],
         "fc": initiators.fc_wwns or [],
         "iscsi": initiators.iscsi_iqns or [],
     })
+
 
 class BaseSetUp(unittest.TestCase):
 

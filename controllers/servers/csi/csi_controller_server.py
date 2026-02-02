@@ -149,7 +149,6 @@ class CSIControllerServicer(csi_pb2_grpc.ControllerServicer):
         except array_errors.VolumeAlreadyExists as ex:
             return handle_exception(ex, context, grpc.StatusCode.ALREADY_EXISTS, csi_pb2.CreateVolumeResponse)
 
-
     def _get_create_volume_response_for_existing_volume_source(self, volume, source_id, source_type, system_id,
                                                                context):
         """
