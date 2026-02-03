@@ -397,7 +397,7 @@ class TestUtils(unittest.TestCase):
     def _check_node_id_parameters(self, node_id_info):
         self.assertEqual("host-name", node_id_info.node_name)
 
-    def test_init_node_id_info(self):
+    def test_get_node_id_info(self):
         host_name = "host-name"
         node_id_info = NodeIdInfo(host_name)
         self._check_node_id_parameters(node_id_info)

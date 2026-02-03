@@ -18,8 +18,7 @@ class CsiNodeWatcherBase(BaseSetUp):
         self.not_updated_daemon_set = test_utils.get_fake_k8s_daemon_set_items(0, 1)
         self.deleted_daemon_set = test_utils.get_fake_k8s_daemon_set_items(0, 0)
         self.managed_secrets_on_csi_node_watcher = test_utils.patch_managed_secrets_global_variable(
-            test_settings.CSI_NODE_WATCHER_PATH
-        )
+            test_settings.CSI_NODE_WATCHER_PATH)
 
 
 class TestAddInitialCsiNodes(CsiNodeWatcherBase):
@@ -180,8 +179,8 @@ class TestWatchCsiNodesResources(CsiNodeWatcherBase):
         self.csi_node_watcher.csi_nodes_api.watch.return_value = iter(
             [test_utils.get_fake_csi_node_watch_event(test_settings.DELETED_EVENT_TYPE)])
         self.csi_node_watcher.core_api.read_node.side_effect = [
-            self.k8s_node_with_manage_node_label, self.k8s_node_with_manage_node_label,
-            self.k8s_node_with_manage_node_label, self.k8s_node_with_manage_node_label]
+            self.k8s_node_with_manage_node_label,
+            self.k8s_node_with_fake_label, self.k8s_node_with_fake_label]
         self.csi_node_watcher.apps_api.list_daemon_set_for_all_namespaces.return_value = self.deleted_daemon_set
         self.csi_node_watcher.core_api.list_pod_for_all_namespaces.return_value = test_utils.get_empty_k8s_pods()
         self.os.getenv.return_value = test_settings.TRUE_STRING
