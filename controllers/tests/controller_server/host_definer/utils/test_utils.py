@@ -1,16 +1,16 @@
 from dataclasses import dataclass, field
-import func_timeout
+import func_timeout, json
 from munch import Munch
 from mock import patch, Mock
 
 import controllers.tests.controller_server.host_definer.utils.k8s_manifests_utils as manifest_utils
 import controllers.tests.controller_server.host_definer.settings as test_settings
-from controllers.tests.common.test_settings import HOST_NAME, SECRET_MANAGEMENT_ADDRESS_VALUE
+from controllers.tests.common.test_settings import HOST_NAME, SECRET_MANAGEMENT_ADDRESS_VALUE, EMPTY_INITIATORS_STR
 from controllers.servers.host_definer.kubernetes_manager.manager import KubernetesManager
 from controllers.servers.host_definer.hd_types import DefineHostRequest, DefineHostResponse
 from controllers.servers.csi.controller_types import ArrayConnectionInfo
+from controllers.common.node_info import Initiators
 
-EMPTY_INITIATORS_STR = '{"fc":[],"iscsi":[],"nvme":[]}'
 
 
 @dataclass
@@ -237,3 +237,10 @@ def get_fake_managed_node():
     managed_node.io_group = test_settings.FAKE_STRING_IO_GROUP
     managed_node.node_initiators = EMPTY_INITIATORS_STR
     return managed_node
+
+def initiators_to_json(initiators: Initiators) -> str:
+    return json.dumps({
+        "nvme": initiators.nvme_nqns or [],
+        "fc": initiators.fc_wwns or [],
+        "iscsi": initiators.iscsi_iqns or [],
+    })
