@@ -18,10 +18,6 @@ logger = get_stdout_logger()
 
 class HostDefinerServicer:
     def define_host(self, request):
-        logger.info("DEBUG - uriziv - 7")
-        logger.info(type(request))  # DefineHostRequest
-        logger.info(request)
-        logger.info("DEBUG - uriziv - 8")
         array_connection_info = request.array_connection_info
         array_addresses = array_connection_info.array_addresses
         node_id_info = NodeIdInfo(request.node_id_from_csi_node)
@@ -30,7 +26,6 @@ class HostDefinerServicer:
         connectivity_type_from_user = get_initiators_connectivity_type(initiators, request.connectivity_type_from_user)
         host_name = join_object_prefix_with_name(prefix=request.prefix, name=node_name)
         logger.info(messages.DEFINE_NODE_ON_ARRAYS.format(node_name, array_addresses))
-        logger.info("DEBUG - uriziv - 93")
         try:
             array_type = detect_array_type(array_addresses)
             with get_agent(array_connection_info, array_type).get_mediator() as array_mediator:
@@ -38,18 +33,13 @@ class HostDefinerServicer:
                     initiators_from_host_definition = \
                         generate_node_initiators_from_string_data(request.node_initiators_from_host_definition)
                     found_host_name = self._get_host_name(initiators_from_host_definition, array_mediator)
-                    logger.info(found_host_name)
-                    logger.info("DEBUG - uriziv - 95")
                     # Partition update is first one - verifies partition can be fixed (may fail if mapped)
                     self._update_host_partition(request, found_host_name,
                                                 array_connection_info.partition_name, array_mediator)
-                    logger.info("DEBUG - uriziv - 96")
                     self._update_host_ports(request, found_host_name, array_mediator,
                                             array_connection_info.partition_name)
-                    logger.info("DEBUG - uriziv - 97")
                     self._update_host_io_group(request, found_host_name, array_mediator)
                     host_name = found_host_name
-                    logger.info("DEBUG - uriziv - 98")
                 except HostNotFoundError:
                     logger.debug(messages.NODE_WAS_NOT_FOUND_CREATE_NEW_HOST_DEFINITION.format(node_name, initiators))
                     try:
@@ -111,10 +101,6 @@ class HostDefinerServicer:
                                                             connectivity_type_from_host):
             logger.info(messages.HOST_PORTS_SHOULD_BE_CHANGE.format(host, initiators))
             try:
-                logger.info("DEBUG - uriziv - 100")
-                logger.info(array_mediator)
-                logger.info(host)
-                logger.info(connectivity_type_from_host)
                 self._remove_host_ports(array_mediator, host, connectivity_type_from_host)
                 array_mediator.add_ports_to_host(host, initiators, connectivity_type_from_user)
             except Exception as ex:
@@ -245,3 +231,4 @@ class HostDefinerServicer:
         logger.info(messages.HOST_CREATED.format(host_name, partition_name, management_address,
                     ports, define_host_response.io_group))
         return define_host_response
+    

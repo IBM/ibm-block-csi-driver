@@ -22,26 +22,17 @@ class HostDefinerManager:
 
     def start_host_definition(self):
         self.csi_node_watcher.add_initial_csi_nodes()
-        logger.info("DEBUG - uriziv - 74")
         self.storage_class_watcher.add_initial_storage_classes()
-        logger.info("DEBUG - uriziv - 75")
         self.node_watcher.add_initial_nodes()
-        logger.info(self.csi_node_watcher.get_nodes_var())
-        logger.info(self.csi_node_watcher.get_managed_secrets_var())
-        logger.info(self.storage_class_watcher.get_nodes_var())
-        logger.info(self.storage_class_watcher.get_managed_secrets_var())
-        logger.info("DEBUG - uriziv - 76")
         self._start_watchers()
 
     def _start_watchers(self):
-        logger.info("DEBUG - uriziv - 17")
         watchers = (
             self.csi_node_watcher.watch_csi_nodes_resources,
             self.host_definition_watcher.watch_host_definitions_resources,
             self.secret_watcher.watch_secret_resources,
             self.node_watcher.watch_nodes_resources,
             self.storage_class_watcher.watch_storage_class_resources)
-        logger.info("DEBUG - uriziv - 18")
         for watch_function in watchers:
             thread = Thread(target=watch_function,)
             thread.start()

@@ -27,19 +27,9 @@ class Watcher(KubernetesManager):
         super().__init__()
         self.storage_host_servicer = HostDefinerServicer()
 
-    def get_nodes_var(self):
-        """This function is for DEBUG and should be removed"""
-        return NODES
-
-    def get_managed_secrets_var(self):
-        """This function is for DEBUG and should be removed"""
-        return MANAGED_SECRETS
-
     def _define_host_on_all_storages(self, node_name):
-        logger.info("debug - uriziv - 107")
         logger.info(messages.DEFINE_NODE_ON_ALL_MANAGED_SECRETS.format(node_name))
         for secret_info in MANAGED_SECRETS:
-            logger.info("debug - uriziv - 108")
             if secret_info.managed_storage_classes == 0:
                 continue
             host_definition_info = self._get_host_definition_info_from_secret_and_node_name(node_name, secret_info)
@@ -52,41 +42,21 @@ class Watcher(KubernetesManager):
         return host_definition_info
 
     def _get_host_definition_info_from_secret(self, secret_info):
-        logger.info("DEBUG - uriziv - 13")
         host_definition_info = HostDefinitionInfo()
         host_definition_info.secret_name = secret_info.name
         host_definition_info.secret_namespace = secret_info.namespace
-        logger.info("DEBUG - uriziv - 14")
         return host_definition_info
 
     def _define_nodes(self, host_definition_info):
-        logger.info("DEBUG - uriziv - 11")
         for node_name, _ in NODES.items():
             host_definition_info = self._add_name_to_host_definition_info(node_name, host_definition_info)
             host_definition_info = self._add_node_initiators_to_host_definition_info(node_name, host_definition_info)
             self._create_definition(host_definition_info)
-        logger.info("DEBUG - uriziv - 12")
 
     def _add_name_to_host_definition_info(self, node_name, host_definition_info):
-        logger.info("debug - uriziv - 115")
         host_definition_info.node_name = node_name
         host_definition_info.node_id = NODES[node_name].node_id
         host_definition_info.name = self._get_host_definition_name(node_name)
-        logger.info(host_definition_info)
-        logger.info(NODES[node_name].__dict__)
-        logger.info("debug - uriziv - 116")
-        return host_definition_info
-
-    def _add_node_initiators_to_host_definition_info(self, node_name, host_definition_info):
-        logger.info("debug - uriziv - 113")
-        node_obj = NODES[node_name]
-        if not isinstance(node_obj, ManagedNode):
-            logger.warning(messages.NODE_IS_NOT_MANAGED_NODE_TYPE.format(node_name))
-        host_definition_info.node_initiators = node_obj.node_initiators
-        logger.info(host_definition_info)
-        logger.info(node_obj.__dict__)
-        logger.info(type(node_obj))
-        logger.info("debug - uriziv - 114")
         return host_definition_info
 
     def _add_node_initiators_to_host_definition_info(self, node_name, host_definition_info):
@@ -101,67 +71,43 @@ class Watcher(KubernetesManager):
                 host_definition_info.node_name, host_definition_info.secret_name,
                 host_definition_info.secret_namespace):
             return
-        logger.info("DEBUG - uriziv - 9")
         host_definition_info = self._update_host_definition_info(host_definition_info)
         response = self._define_host(host_definition_info)
-        logger.info("response %s", response)
         current_host_definition_info_on_cluster = self._create_host_definition_if_not_exist(
             host_definition_info, response)
-        logger.info(current_host_definition_info_on_cluster)
-        logger.info("DEBUG - uriziv - 10")
         self._set_status_to_host_definition_after_definition(
             response.error_message, current_host_definition_info_on_cluster)
 
     def _update_host_definition_info(self, host_definition_info):
-        logger.info("DEBUG - uriziv - 125")
-        logger.info(host_definition_info)
-        logger.info("DEBUG - uriziv - 126")
         host_definition_info_on_cluster = self._get_matching_host_definition_info(
             host_definition_info.node_name, host_definition_info.secret_name, host_definition_info.secret_namespace)
         if host_definition_info_on_cluster:
-            logger.info("DEBUG - uriziv - 127")
-            logger.info(host_definition_info_on_cluster)
-            logger.info(host_definition_info)
-            logger.info("DEBUG - uriziv - 128")
             host_definition_info.connectivity_type = host_definition_info_on_cluster.connectivity_type
             host_definition_info.node_id = host_definition_info_on_cluster.node_id
             host_definition_info.node_initiators = host_definition_info_on_cluster.node_initiators
         return host_definition_info
 
     def _define_host(self, host_definition_info):
-        logger.info("DEBUG - uriziv - 39")
-        logger.info(host_definition_info)
         logger.info(messages.DEFINE_NODE_ON_SECRET.format(host_definition_info.node_name,
                     host_definition_info.secret_name, host_definition_info.secret_namespace))
-        logger.info("DEBUG - uriziv - 40")
         return self._ensure_definition_state(host_definition_info, self.storage_host_servicer.define_host)
 
     def _create_host_definition_if_not_exist(self, host_definition_info, response):
-        logger.info("debug - uriziv - 103")
         host_definition_manifest = self._get_host_definition_manifest(host_definition_info, response)
         current_host_definition_info_on_cluster = self._get_matching_host_definition_info(
             host_definition_info.node_name, host_definition_info.secret_name, host_definition_info.secret_namespace)
         logger.info(host_definition_manifest)
         logger.info(current_host_definition_info_on_cluster)
         if current_host_definition_info_on_cluster:
-            logger.info("debug - uriziv - 105")
             host_definition_manifest[settings.METADATA][
                 common_settings.NAME_FIELD] = current_host_definition_info_on_cluster.name
             self._patch_host_definition(host_definition_manifest)
             return current_host_definition_info_on_cluster  # See CSI-6058
         else:
-            logger.info("debug - uriziv - 131")
             logger.info(messages.CREATING_NEW_HOST_DEFINITION.format(host_definition_info.name))
-            logger.info("debug - uriziv - 132")
             return self._create_host_definition(host_definition_manifest)
 
     def _get_host_definition_manifest(self, host_definition_info, response):
-        logger.info("debug - uriziv - 101")
-        logger.info(host_definition_info)
-        logger.info(response)
-        for node_i in NODES.values():
-            logger.info(node_i.__dict__)
-        logger.info("debug - uriziv - 102")
         return {
             settings.API_VERSION: settings.CSI_IBM_API_VERSION,
             settings.KIND: settings.HOST_DEFINITION_KIND,
@@ -298,20 +244,12 @@ class Watcher(KubernetesManager):
         return self._get_label_value(node_info.labels, label) == settings.TRUE_STRING
 
     def _ensure_definition_state(self, host_definition_info, define_function):
-        logger.info("debug - uriziv - 35")
-        logger.info(host_definition_info)
-        logger.info(define_function)
         request = self._get_request_from_host_definition(host_definition_info)
-        logger.info(request)
         if not request:
-            logger.info("debug - uriziv - 37")
             response = DefineHostResponse()
             response.error_message = messages.FAILED_TO_GET_SECRET_EVENT.format(
                 host_definition_info.secret_name, host_definition_info.secret_namespace)
-            logger.info(response)
-            logger.info("debug - uriziv - 38")
             return response
-        logger.info("debug - uriziv - 36")
         return define_function(request)
 
     def _get_request_from_host_definition(self, host_definition_info):
@@ -331,8 +269,6 @@ class Watcher(KubernetesManager):
             # Since CSI-5997, initiators are extracted from k8s node annoatations (not from k&s csinode nodeID).
             # However, They are still stored at CsiNodeInfo and ManagedNode (see hd_types.py)
             request.io_group = self._get_io_group_by_node(host_definition_info.node_name)
-        logger.info(request)
-        logger.info("debug - uriziv - 34")
         return request
 
     def _get_new_request(self, labels):
@@ -425,12 +361,9 @@ class Watcher(KubernetesManager):
         return ''.join(random.choices(string.ascii_lowercase + string.digits, k=20))
 
     def _add_node_to_nodes(self, csi_node_info):
-        logger.info("DEBUG - uriziv - 79")
         logger.info(messages.NEW_KUBERNETES_NODE.format(csi_node_info.name))
         self._add_manage_node_label_to_node(csi_node_info.name)
         NODES[csi_node_info.name] = self._generate_managed_node(csi_node_info)
-        logger.info(NODES)
-        logger.info("DEBUG - uriziv - 80")
 
     def _add_manage_node_label_to_node(self, node_name):
         if self._is_node_has_manage_node_label(node_name):

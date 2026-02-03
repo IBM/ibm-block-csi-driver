@@ -2,7 +2,6 @@ from dataclasses import dataclass, field
 import func_timeout
 from munch import Munch
 from mock import patch, Mock
-from controllers.servers.host_definer.hd_types import Initiators
 
 import controllers.tests.controller_server.host_definer.utils.k8s_manifests_utils as manifest_utils
 import controllers.tests.controller_server.host_definer.settings as test_settings

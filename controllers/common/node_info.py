@@ -67,19 +67,3 @@ class Initiators:
         return other_initiators.is_array_nvme_nqn_match(self.nvme_nqns) or \
                other_initiators.is_array_wwns_match(self.fc_wwns) or \
                other_initiators.is_array_iscsi_iqns_match(self.iscsi_iqns)
-
-    def compare_by_connectivity_type(self, other, connectivity_type):
-        """
-        Compares two Initiators objects based on a specific connectivity type.
-        Returns True if the sets of initiators are identical (case-insensitive).
-        """
-        if not isinstance(other, Initiators):
-            return False
-
-        my_ports = self.get_by_connectivity_type(connectivity_type)
-        other_ports = other.get_by_connectivity_type(connectivity_type)
-
-        if my_ports is None or other_ports is None:
-            return my_ports == other_ports
-
-        return self._lower(my_ports) == self._lower(other_ports)

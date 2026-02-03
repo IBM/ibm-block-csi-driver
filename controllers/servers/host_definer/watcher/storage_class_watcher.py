@@ -13,7 +13,6 @@ logger = get_stdout_logger()
 class StorageClassWatcher(Watcher):
 
     def add_initial_storage_classes(self):
-        logger.info("DEBUG - uriziv - 51")
         storage_classes_info = self._get_storage_classes_info()
         logger.info(storage_classes_info)
         for storage_class_info in storage_classes_info:
@@ -21,9 +20,7 @@ class StorageClassWatcher(Watcher):
             self._handle_added_watch_event(secrets_info, storage_class_info.name)
 
     def watch_storage_class_resources(self):
-        logger.info("DEBUG - uriziv - 53")
         while self._loop_forever():
-            logger.info("DEBUG - uriziv - 54")
             resource_version = self._get_k8s_object_resource_version(self.storage_api.list_storage_class())
             stream = watch.Watch().stream(self.storage_api.list_storage_class,
                                           resource_version=resource_version, timeout_seconds=5)
@@ -85,17 +82,13 @@ class StorageClassWatcher(Watcher):
         return list_with_secrets_info
 
     def _handle_added_watch_event(self, secrets_info, storage_class_name):
-        logger.info("DEBUG - uriziv - 49")
         logger.info(messages.NEW_STORAGE_CLASS.format(storage_class_name))
-        logger.info("DEBUG - uriziv - 50")
         for secret_info in secrets_info:
             if secret_info:
                 self._define_nodes_when_new_secret(secret_info)
 
     def _define_nodes_when_new_secret(self, secret_info):
-        logger.info("DEBUG - uriziv - 47")
         managed_secret_info, index = self._get_matching_managed_secret_info(secret_info)
-        logger.info("DEBUG - uriziv - 48")
         secret_info.managed_storage_classes = 1
         if index == -1:
             MANAGED_SECRETS.append(secret_info)
@@ -108,10 +101,8 @@ class StorageClassWatcher(Watcher):
             MANAGED_SECRETS[index] = secret_info
 
     def _define_nodes_from_secret_info(self, secret_info):
-        logger.info("DEBUG - uriziv - 45")
         logger.info(messages.NEW_MANAGED_SECRET.format(secret_info.name, secret_info.namespace))
         host_definition_info = self._get_host_definition_info_from_secret(secret_info)
-        logger.info("DEBUG - uriziv - 46")
         self._define_nodes(host_definition_info)
 
     def _handle_deleted_watch_event(self, secrets_info):

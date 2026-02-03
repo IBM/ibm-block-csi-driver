@@ -32,11 +32,9 @@ class NodeWatcher(Watcher):
 
     def watch_nodes_resources(self):
         while self._loop_forever():
-            logger.info("debug - uriziv - 109")
             resource_version = self._get_k8s_object_resource_version(self.core_api.list_node())
             stream = watch.Watch().stream(self.core_api.list_node, resource_version=resource_version, timeout_seconds=5)
             for watch_event in stream:
-                logger.info("debug - uriziv - 110")
                 watch_event = self._munch(watch_event)
                 node_name = watch_event.object.metadata.name
                 csi_node_info = self._get_csi_node_info(node_name)
@@ -56,10 +54,8 @@ class NodeWatcher(Watcher):
         return csi_node_info.node_id and not self._is_host_can_be_defined(csi_node_info.name)
 
     def _define_new_managed_node(self, watch_event, node_name, csi_node_info):
-        logger.info("debug - uriziv - 111")
         if watch_event.type == settings.MODIFIED_EVENT and \
                 self._is_node_has_new_manage_node_label(csi_node_info):
-            logger.info("debug - uriziv - 112")
             logger.info(messages.DETECTED_NEW_MANAGED_CSI_NODE.format(node_name))
             self._add_node_to_nodes(csi_node_info)
             self._define_host_on_all_storages(node_name)

@@ -12,30 +12,21 @@ logger = get_stdout_logger()
 class CsiNodeWatcher(Watcher):
 
     def add_initial_csi_nodes(self):
-        logger.info("DEBUG - uriziv - 77")
         csi_nodes_info = self._get_csi_nodes_info_with_driver()
         for csi_node_info in csi_nodes_info:
             if self._is_host_can_be_defined(csi_node_info.name):
                 self._add_node_to_nodes(csi_node_info)
-        logger.info("DEBUG - uriziv - 78")
 
     def watch_csi_nodes_resources(self):
         while self._loop_forever():
             resource_version = self._get_k8s_object_resource_version(self.csi_nodes_api.get())
             stream = self.csi_nodes_api.watch(resource_version=resource_version, timeout=5)
             for watch_event in stream:
-                logger.info("debug - uriziv - 87")
-                logger.info(watch_event)
                 watch_event = self._munch(watch_event)
-                logger.info(watch_event)
-                logger.info(watch_event.type)
                 csi_node_info = self._generate_csi_node_info(watch_event.object)
-                logger.info("debug - uriziv - 88")
                 if (watch_event.type == settings.DELETED_EVENT) and (csi_node_info.name in NODES):
-                    logger.info("debug - uriziv - 89")
                     self._handle_deleted_csi_node_pod(csi_node_info)
                 elif watch_event.type == settings.MODIFIED_EVENT:
-                    logger.info("debug - uriziv - 90")
                     self._handle_modified_csi_node(csi_node_info)
 
     def _handle_modified_csi_node(self, csi_node_info):
@@ -97,7 +88,6 @@ class CsiNodeWatcher(Watcher):
         return csi_daemon_set.metadata.name
 
     def _create_definitions_when_csi_node_changed(self, csi_node_info):
-        logger.info("DEBUG - uriziv - 85")
         for secret_info in MANAGED_SECRETS:
             secret_name, secret_namespace = secret_info.name, secret_info.namespace
             host_definition_info = self._get_matching_host_definition_info(
@@ -107,9 +97,6 @@ class CsiNodeWatcher(Watcher):
                     logger.info(messages.NODE_INITIATORS_WERE_CHANGED.format(csi_node_info.name,
                                 host_definition_info.node_initiators, csi_node_info.node_initiators))
                     NODES[csi_node_info.name] = self._generate_managed_node(csi_node_info)
-                    for node_i in NODES.values():
-                        logger.info(node_i.__dict__)
-                    logger.info("DEBUG - uriziv - 86")
                     self._create_definition(host_definition_info)
 
     def _is_node_initiators_changed(self, host_definition_info, csi_node_info):

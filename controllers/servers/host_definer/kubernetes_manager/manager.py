@@ -139,7 +139,6 @@ class KubernetesManager():
             return []
 
     def _generate_host_definition_info(self, k8s_host_definition):
-        logger.info("debug - uriziv - 119")
         host_definition_info = HostDefinitionInfo()
         host_definition_info.name = k8s_host_definition.metadata.name
         host_definition_info.resource_version = self._get_k8s_object_resource_version(k8s_host_definition)
@@ -187,13 +186,10 @@ class KubernetesManager():
                host_definition_info.secret_namespace == secret_namespace
 
     def _create_host_definition(self, host_definition_manifest):
-        logger.info("debug - uriziv - 117")
         try:
             k8s_host_definition = self.host_definitions_api.create(body=host_definition_manifest)
             logger.info(messages.CREATED_HOST_DEFINITION.format(k8s_host_definition.metadata.name))
             self._add_finalizer(k8s_host_definition.metadata.name)
-            logger.info(k8s_host_definition)
-            logger.info("debug - uriziv - 118")
             return self._generate_host_definition_info(k8s_host_definition)
         except ApiException as ex:
             if ex != 404:
