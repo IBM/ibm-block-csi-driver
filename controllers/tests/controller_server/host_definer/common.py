@@ -1,5 +1,5 @@
 import unittest
-from mock import patch
+from mock import patch, Mock
 from kubernetes.client.rest import ApiException
 
 import controllers.tests.controller_server.host_definer.utils.test_utils as test_utils
@@ -9,7 +9,19 @@ import controllers.tests.controller_server.host_definer.settings as test_setting
 class BaseSetUp(unittest.TestCase):
     def setUp(self):
         test_utils.patch_kubernetes_manager_init()
-        self.os = patch('{}.os'.format(test_settings.WATCHER_HELPER_PATH)).start()
+
+        self._mock_core_v1 = patch("controllers.servers.host_definer.kubernetes_manager.manager.client.CoreV1Api")
+        self.mock_core_v1_cls = self._mock_core_v1.start()
+
+        mock_core_api = Mock()
+        mock_core_api.read_node.return_value = Mock(
+            metadata=Mock(
+                annotations={"block.csi.ibm.com/node-initiators": '{"fc":[],"iscsi":[],"nvme":[]}'}
+                ))
+
+        self.mock_core_v1_cls.return_value = mock_core_api
+
+        self.os = patch(f"{test_settings.WATCHER_HELPER_PATH}.os").start()
         self.nodes_on_watcher_helper = test_utils.patch_nodes_global_variable(test_settings.WATCHER_HELPER_PATH)
         self.managed_secrets_on_watcher_helper = test_utils.patch_managed_secrets_global_variable(
             test_settings.WATCHER_HELPER_PATH)
@@ -18,3 +30,6 @@ class BaseSetUp(unittest.TestCase):
         self.ready_k8s_host_definitions = test_utils.get_fake_k8s_host_definitions_items(test_settings.READY_PHASE)
         self.http_resp = test_utils.get_error_http_resp()
         self.fake_api_exception = ApiException(http_resp=self.http_resp)
+
+    def tearDown(self):
+        patch.stopall()

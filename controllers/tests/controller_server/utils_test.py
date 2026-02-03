@@ -5,7 +5,6 @@ from csi_general import csi_pb2
 from mock import patch, Mock
 from munch import Munch
 
-import controllers.common.utils
 import controllers.servers.utils as utils
 from controllers.array_action.settings import (NVME_OVER_FC_CONNECTIVITY_TYPE,
                                                FC_CONNECTIVITY_TYPE,
@@ -15,7 +14,7 @@ from controllers.common.settings import SPACE_EFFICIENCY_DEDUPLICATED_COMPRESSED
     SPACE_EFFICIENCY_DEDUPLICATED, SPACE_EFFICIENCY_THIN
 from controllers.servers import settings as controller_config
 from controllers.servers.csi.csi_controller_server import CSIControllerServicer
-from controllers.servers.errors import ObjectIdError, ValidationException, InvalidNodeId
+from controllers.servers.errors import ObjectIdError, ValidationException
 from controllers.tests import utils as test_utils
 from controllers.tests.common.test_settings import DUMMY_POOL1, SECRET_USERNAME_VALUE, SECRET_PASSWORD_VALUE, ARRAY
 from controllers.tests.controller_server.csi_controller_server_test import ProtoBufMock
@@ -38,20 +37,9 @@ class TestUtils(unittest.TestCase):
         if str_in_msg:
             self.assertIn(str_in_msg, str(context.exception))
 
-    def _test_validate_node_id_validation_exception(self, node_id):
-        self._test_validation_exception(utils._validate_node_id, node_id, raised_error=InvalidNodeId)
-
     def test_validate_node_id_success(self):
-        node_id = "test-host;nqn;fc"
-        utils._validate_node_id(node_id)
-
-    def test_validate_node_id_too_long(self):
-        node_id = "test-host;nqn;fc;iqn;extra"
-        self._test_validate_node_id_validation_exception(node_id)
-
-    def test_validate_node_id_too_short(self):
         node_id = "test-host"
-        self._test_validate_node_id_validation_exception(node_id)
+        utils._validate_node_id(node_id)
 
     def _test_validate_secrets_validation_exception(self, secrets):
         self._test_validation_exception(utils.validate_secrets, secrets)
@@ -406,37 +394,13 @@ class TestUtils(unittest.TestCase):
         self._test_get_volume_id_info_validation_exception("badvolumeformat", str_in_msg="Wrong volume id format",
                                                            raised_error=ObjectIdError)
 
-    def _check_node_id_parameters(self, node_id_info, nvme_nqn, fc_wwns, iscsi_iqn):
-        nvme_nqn = [nvme_nqn] if nvme_nqn else []
-        fc_wwns = fc_wwns.split(":") if fc_wwns else []
-        iscsi_iqn = [iscsi_iqn] if iscsi_iqn else []
+    def _check_node_id_parameters(self, node_id_info):
         self.assertEqual("host-name", node_id_info.node_name)
-        self.assertEqual(nvme_nqn, node_id_info.initiators.nvme_nqns)
-        self.assertEqual(list(filter(None, fc_wwns)), node_id_info.initiators.fc_wwns)
-        self.assertEqual(iscsi_iqn, node_id_info.initiators.iscsi_iqns)
 
     def test_get_node_id_info(self):
-        self._test_validation_exception(controllers.common.utils.get_node_id_info,
-                                        "bad-node-format", str_in_msg="node", raised_error=ValueError)
         host_name = "host-name"
-        nvme_nqn = "nqn.ibm"
-        fc_wwns = "wwn1:wwn2"
-        iscsi_iqn = "iqn.ibm"
-
-        node_id_info = NodeIdInfo("{};;;{}".format(host_name, iscsi_iqn))
-        self._check_node_id_parameters(node_id_info, "", "", iscsi_iqn)
-
-        node_id_info = NodeIdInfo("{};;{};{}".format(host_name, fc_wwns, iscsi_iqn))
-        self._check_node_id_parameters(node_id_info, "", fc_wwns, iscsi_iqn)
-
-        node_id_info = NodeIdInfo("{};{};{}".format(host_name, nvme_nqn, fc_wwns))
-        self._check_node_id_parameters(node_id_info, nvme_nqn, fc_wwns, "")
-
-        node_id_info = NodeIdInfo("{};{}".format(host_name, nvme_nqn))
-        self._check_node_id_parameters(node_id_info, nvme_nqn, "", "")
-
-        node_id_info = NodeIdInfo("{};;{}".format(host_name, fc_wwns))
-        self._check_node_id_parameters(node_id_info, "", fc_wwns, "")
+        node_id_info = NodeIdInfo(host_name)
+        self._check_node_id_parameters(node_id_info)
 
     def test_choose_connectivity_types(self):
         nvme = NVME_OVER_FC_CONNECTIVITY_TYPE

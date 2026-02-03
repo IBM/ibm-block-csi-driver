@@ -1,14 +1,16 @@
 from dataclasses import dataclass, field
 import func_timeout
+import json
 from munch import Munch
 from mock import patch, Mock
 
 import controllers.tests.controller_server.host_definer.utils.k8s_manifests_utils as manifest_utils
 import controllers.tests.controller_server.host_definer.settings as test_settings
-from controllers.tests.common.test_settings import HOST_NAME, SECRET_MANAGEMENT_ADDRESS_VALUE
+from controllers.tests.common.test_settings import HOST_NAME, SECRET_MANAGEMENT_ADDRESS_VALUE, EMPTY_INITIATORS_STR
 from controllers.servers.host_definer.kubernetes_manager.manager import KubernetesManager
 from controllers.servers.host_definer.hd_types import DefineHostRequest, DefineHostResponse
 from controllers.servers.csi.controller_types import ArrayConnectionInfo
+from controllers.common.node_info import Initiators
 
 
 @dataclass
@@ -184,11 +186,24 @@ def get_array_connection_info():
         test_settings.FAKE_SECRET_USER_NAME, test_settings.FAKE_SECRET_PASSWORD)
 
 
-def get_define_request(prefix='', connectivity_type='', node_id_from_host_definition=''):
+def get_define_request(
+    prefix='',
+    connectivity_type='',
+    node_id_from_host_definition='',
+    node_id_from_csi_node=test_settings.FAKE_NODE_ID,
+    initiators_from_host_definition=EMPTY_INITIATORS_STR,
+    initiators_from_csi_node=EMPTY_INITIATORS_STR,
+):
     return DefineHostRequest(
-        prefix, connectivity_type, node_id_from_host_definition, test_settings.FAKE_NODE_ID,
-        get_array_connection_info(),
-        test_settings.FAKE_STRING_IO_GROUP)
+        prefix=prefix,
+        connectivity_type_from_user=connectivity_type,
+        node_id_from_host_definition=node_id_from_host_definition,
+        node_initiators_from_host_definition=initiators_from_host_definition,
+        node_id_from_csi_node=node_id_from_csi_node,
+        node_initiators_from_csi_node=initiators_from_csi_node,
+        array_connection_info=get_array_connection_info(),
+        io_group=test_settings.FAKE_STRING_IO_GROUP,
+    )
 
 
 def get_define_response(connectivity_type, ports):
@@ -216,8 +231,17 @@ def get_fake_host_io_group():
 
 
 def get_fake_managed_node():
-    managed_node = Mock(spec_set=['name', 'node_id', 'io_group'])
+    managed_node = Mock(spec_set=['name', 'node_id', 'io_group', 'node_initiators'])
     managed_node.name = test_settings.FAKE_NODE_NAME
     managed_node.node_id = test_settings.FAKE_NODE_ID
     managed_node.io_group = test_settings.FAKE_STRING_IO_GROUP
+    managed_node.node_initiators = EMPTY_INITIATORS_STR
     return managed_node
+
+
+def initiators_to_json(initiators: Initiators) -> str:
+    return json.dumps({
+        "nvme": initiators.nvme_nqns or [],
+        "fc": initiators.fc_wwns or [],
+        "iscsi": initiators.iscsi_iqns or [],
+    })

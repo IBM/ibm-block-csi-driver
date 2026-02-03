@@ -62,6 +62,7 @@ def get_fake_k8s_node_manifest(label):
         label: test_settings.TRUE_STRING,
         common_settings.IO_GROUP_LABEL_PREFIX + str(0): test_settings.TRUE_STRING,
         common_settings.IO_GROUP_LABEL_PREFIX + str(2): test_settings.TRUE_STRING}
+    node_manifest[test_settings.METADATA_FIELD].setdefault(common_settings.ANNOTATIONS_FIELD, {})
     return node_manifest
 
 
@@ -103,7 +104,10 @@ def _get_metadata_manifest():
     return {
         test_settings.METADATA_FIELD: {
             test_settings.METADATA_RESOURCE_VERSION_FIELD: test_settings.FAKE_RESOURCE_VERSION,
-            test_settings.METADATA_UID_FIELD: test_settings.FAKE_UID
+            test_settings.METADATA_UID_FIELD: test_settings.FAKE_UID,
+            common_settings.ANNOTATIONS_FIELD: {
+                common_settings.NODE_INITIATORS_FIELD: '{"fc":[],"iscsi":[],"nvme":[]}'
+            }
         }}
 
 
