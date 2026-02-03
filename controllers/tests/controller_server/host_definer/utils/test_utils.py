@@ -1,5 +1,6 @@
 from dataclasses import dataclass, field
-import func_timeout, json
+import func_timeout
+import json
 from munch import Munch
 from mock import patch, Mock
 
@@ -10,7 +11,6 @@ from controllers.servers.host_definer.kubernetes_manager.manager import Kubernet
 from controllers.servers.host_definer.hd_types import DefineHostRequest, DefineHostResponse
 from controllers.servers.csi.controller_types import ArrayConnectionInfo
 from controllers.common.node_info import Initiators
-
 
 
 @dataclass
@@ -237,6 +237,7 @@ def get_fake_managed_node():
     managed_node.io_group = test_settings.FAKE_STRING_IO_GROUP
     managed_node.node_initiators = EMPTY_INITIATORS_STR
     return managed_node
+
 
 def initiators_to_json(initiators: Initiators) -> str:
     return json.dumps({

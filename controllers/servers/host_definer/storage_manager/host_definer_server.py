@@ -231,4 +231,3 @@ class HostDefinerServicer:
         logger.info(messages.HOST_CREATED.format(host_name, partition_name, management_address,
                     ports, define_host_response.io_group))
         return define_host_response
-    
