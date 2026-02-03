@@ -60,3 +60,4 @@ INTERNAL_VOLUME_GROUP_ID = "internal_volume_group_id"
 REQUEST_VOLUME_GROUP_ID = ID_FORMAT.format(INTERNAL_VOLUME_GROUP_ID, VOLUME_GROUP_NAME)
 
 HOST_OBJECT_TYPE = "host"
+EMPTY_INITIATORS_STR = '{"fc":[],"iscsi":[],"nvme":[]}'
