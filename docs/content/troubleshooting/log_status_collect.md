@@ -20,6 +20,16 @@ kubectl describe -n <namespace> pod/<pod-name>
 ```
 ---
 ## Log Collection
+### Default collection
+```bash
+./ibm-block-csi-logs-collector.sh
+```
+* Collects: resources, logs, events, node-diagnostics
+* Does not collect: storage, workload
+* Scope: entire cluster
+* Output: timestamped directory created automatically
+​
+---
 
 ### Help and usage information
 ```bash
@@ -44,16 +54,6 @@ The diagnostics script collects the following components:
 ./ibm-block-csi-logs-collector.sh --list-components
 ```
 
----
-### Default collection
-```bash
-./ibm-block-csi-logs-collector.sh
-```
-* Collects: resources, logs, events, node-diagnostics
-* Does not collect: storage, workload
-* Scope: entire cluster
-* Output: timestamped directory created automatically
-​
 ---
 ### Namespace-scoped collection
 ```bash
