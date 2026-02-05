@@ -4,6 +4,7 @@ from kubernetes.client.rest import ApiException
 
 import controllers.tests.controller_server.host_definer.utils.test_utils as test_utils
 import controllers.tests.controller_server.host_definer.settings as test_settings
+import controllers.tests.common.test_settings as controller_test_settings
 
 
 class BaseSetUp(unittest.TestCase):
@@ -16,7 +17,8 @@ class BaseSetUp(unittest.TestCase):
         mock_core_api = Mock()
         mock_core_api.read_node.return_value = Mock(
             metadata=Mock(
-                annotations={"block.csi.ibm.com/node-initiators": '{"fc":[],"iscsi":[],"nvme":[]}'}
+                annotations={controller_test_settings.NODE_INITIATORS_FIELD:
+                             controller_test_settings.EMPTY_INITIATORS_STR}
                 ))
 
         self.mock_core_v1_cls.return_value = mock_core_api

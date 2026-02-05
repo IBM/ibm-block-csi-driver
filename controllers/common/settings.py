@@ -35,5 +35,3 @@ SCSI_PROTOCOL = 'scsi'
 NVME_PROTOCOL = 'nvme'
 
 FULL_IO_GROUP = '0:1:2:3'
-
-NODE_INITIATORS_FROM_CSI_NODE = "node_initiators_from_csi_node"
