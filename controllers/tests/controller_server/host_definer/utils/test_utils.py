@@ -186,13 +186,14 @@ def get_array_connection_info():
         test_settings.FAKE_SECRET_USER_NAME, test_settings.FAKE_SECRET_PASSWORD)
 
 
+# pylint: disable=too-many-arguments, too-many-positional-arguments
 def get_define_request(
     prefix='',
     connectivity_type='',
     node_id_from_host_definition='',
     node_id_from_csi_node=test_settings.FAKE_NODE_ID,
     initiators_from_host_definition=EMPTY_INITIATORS_STR,
-    initiators_from_csi_node=EMPTY_INITIATORS_STR,
+    initiators_from_csi_node=EMPTY_INITIATORS_STR
 ):
     return DefineHostRequest(
         prefix=prefix,
@@ -202,7 +203,7 @@ def get_define_request(
         node_id_from_csi_node=node_id_from_csi_node,
         node_initiators_from_csi_node=initiators_from_csi_node,
         array_connection_info=get_array_connection_info(),
-        io_group=test_settings.FAKE_STRING_IO_GROUP,
+        io_group=test_settings.FAKE_STRING_IO_GROUP
     )
 
 

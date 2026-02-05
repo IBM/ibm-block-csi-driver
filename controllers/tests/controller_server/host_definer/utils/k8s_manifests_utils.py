@@ -1,4 +1,5 @@
 import controllers.common.settings as common_settings
+import controllers.tests.common.test_settings as controller_test_settings
 import controllers.tests.controller_server.host_definer.settings as test_settings
 from controllers.servers.settings import (SECRET_ARRAY_PARAMETER,
                                           SECRET_PASSWORD_PARAMETER,
@@ -106,7 +107,7 @@ def _get_metadata_manifest():
             test_settings.METADATA_RESOURCE_VERSION_FIELD: test_settings.FAKE_RESOURCE_VERSION,
             test_settings.METADATA_UID_FIELD: test_settings.FAKE_UID,
             common_settings.ANNOTATIONS_FIELD: {
-                common_settings.NODE_INITIATORS_FIELD: '{"fc":[],"iscsi":[],"nvme":[]}'
+                common_settings.NODE_INITIATORS_FIELD: controller_test_settings.EMPTY_INITIATORS_STR
             }
         }}
 

@@ -19,7 +19,6 @@ HOST_DEFINER_SERVER_PATH = "controllers.servers.host_definer.storage_manager.hos
 class BaseSetUp(unittest.TestCase):
 
     def setUp(self):
-        super().setUp()
 
         self.servicer = HostDefinerServicer()
         mock_array_type(self, HOST_DEFINER_SERVER_PATH)
@@ -36,21 +35,22 @@ class BaseSetUp(unittest.TestCase):
                 "node_id_from_host_definition",
                 "array_connection_info",
                 "io_group",
-                common_settings.NODE_INITIATORS_FROM_CSI_NODE,
+                "node_initiators_from_csi_node",
                 "node_initiators_from_host_definition",
             ]
         )
 
         self.request.prefix = None
         self.request.connectivity_type_from_user = array_settings.ISCSI_CONNECTIVITY_TYPE
-        self.request.node_id_from_csi_node = HOST_NAME
-        self.request.node_id_from_host_definition = HOST_NAME
+        self.request.node_id_from_csi_node = settings.FAKE_NODE_ID
+        self.request.node_id_from_host_definition = settings.FAKE_NODE_ID
         self.request.array_connection_info = get_array_connection_info_from_secrets(SECRET)
         self.request.io_group = array_settings.DUMMY_MULTIPLE_IO_GROUP_STRING
 
         self.request.node_initiators_from_csi_node = test_utils.initiators_to_json(
             Initiators(iscsi_iqns=[settings.IQN]))
-        self.request.node_initiators_from_host_definition = test_utils.initiators_to_json(Initiators())
+        self.request.node_initiators_from_host_definition = test_utils.initiators_to_json(
+            Initiators(iscsi_iqns=[settings.IQN]))
 
 
 class TestDefineHost(BaseSetUp):
@@ -65,9 +65,7 @@ class TestDefineHost(BaseSetUp):
         self._prepare_define_host(is_host_exist)
         self.mediator.get_host_io_group.return_value = test_utils.get_fake_host_io_group()
         response = self.servicer.define_host(self.request)
-        self.mediator.get_host_by_host_identifiers.assert_called_once()
-        args, _ = self.mediator.get_host_by_host_identifiers.call_args
-        self.assertIsInstance(args[0], Initiators)
+        self.mediator.get_host_by_host_identifiers.assert_called_once_with(Initiators(iscsi_iqns=[settings.IQN]))
         self.assertEqual(response.error_message, '')
 
     def test_define_host_success(self):
