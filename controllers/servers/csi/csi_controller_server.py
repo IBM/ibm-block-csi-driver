@@ -142,7 +142,7 @@ class CSIControllerServicer(csi_pb2_grpc.ControllerServicer):
                 volume.source_id = source_id
 
                 response = utils.generate_csi_create_volume_response(volume, array_connection_info.system_id,
-                                                                     source_type)
+                                                                     source_type, topologies)
                 return response
         except (array_errors.InvalidArgumentError, array_errors.ExpectedSnapshotButFoundVolumeError) as ex:
             return handle_exception(ex, context, grpc.StatusCode.INVALID_ARGUMENT, csi_pb2.CreateVolumeResponse)

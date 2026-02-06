@@ -390,7 +390,7 @@ def _generate_volumes_response(new_volumes):
     return volumes
 
 
-def _generate_volume_response(new_volume, system_id=None, source_type=None):
+def _generate_volume_response(new_volume, system_id=None, source_type=None, topologies=None):
     content_source = None
     if new_volume.source_id:
         if source_type == servers_settings.SNAPSHOT_TYPE_NAME:
@@ -403,7 +403,8 @@ def _generate_volume_response(new_volume, system_id=None, source_type=None):
     return csi_pb2.Volume(
         capacity_bytes=new_volume.capacity_bytes,
         volume_id=get_volume_id(new_volume, system_id),
-        content_source=content_source)
+        content_source=content_source,
+        accessible_topology=[csi_pb2.Topology(segments=topologies)])
 
 
 def _generate_volumegroup_volume_response(new_volume, system_id=None):
@@ -418,10 +419,10 @@ def _generate_volumegroup_volume_response(new_volume, system_id=None):
         content_source=content_source)
 
 
-def generate_csi_create_volume_response(new_volume, system_id=None, source_type=None):
+def generate_csi_create_volume_response(new_volume, system_id=None, source_type=None, topologies=None):
     logger.debug("creating create volume response for volume : {0}".format(new_volume))
 
-    response = csi_pb2.CreateVolumeResponse(volume=_generate_volume_response(new_volume, system_id, source_type))
+    response = csi_pb2.CreateVolumeResponse(volume=_generate_volume_response(new_volume, system_id, source_type, topologies))
 
     logger.debug("finished creating volume response : {0}".format(response))
     return response
