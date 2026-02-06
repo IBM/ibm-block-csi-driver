@@ -389,13 +389,23 @@ func (d *NodeService) NodeUnstageVolume(ctx context.Context, req *csi.NodeUnstag
 		return nil, status.Error(codes.Internal, err.Error())
 	}
 
-	err = d.OsDeviceConnectivityHelper.FlushMultipathDevice(baseDevice)
+	isNvme, err := d.NodeUtils.IsNvmeBaseDevice(baseDevice)
 	if err != nil {
-		return nil, status.Errorf(codes.Internal, "Multipath -f command failed with error: %v", err)
+		logger.Errorf("Error while checking if device is NVMe : {%v}", err.Error())
+		return nil, status.Error(codes.Internal, err.Error())
 	}
-	err = d.OsDeviceConnectivityHelper.RemovePhysicalDevice(sysDevices)
-	if err != nil {
-		return nil, status.Errorf(codes.Internal, "Remove scsi device failed with error: %v", err)
+
+	if !isNvme {
+		err = d.OsDeviceConnectivityHelper.FlushMultipathDevice(baseDevice)
+		if err != nil {
+			return nil, status.Errorf(codes.Internal, "Multipath -f command failed with error: %v", err)
+		}
+		err = d.OsDeviceConnectivityHelper.RemovePhysicalDevice(sysDevices)
+		if err != nil {
+			return nil, status.Errorf(codes.Internal, "Remove scsi device failed with error: %v", err)
+		}
+	} else {
+		logger.Infof("NVMe volume detected: skipping multipath -f")
 	}
 
 	stageInfoPath := path.Join(stagingTargetPath, StageInfoFilename)

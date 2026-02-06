@@ -67,6 +67,7 @@ type NodeUtilsInterface interface {
 	GetVolumeUuid(volumeId string) string
 	ReadNvmeNqn() (string, error)
 	DevicesAreNvme(sysDevices []string) (bool, error)
+	IsNvmeBaseDevice(device string) (bool, error)
 	ParseFCPorts() ([]string, error)
 	ParseIscsiInitiators() (string, error)
 	GetInfoFromPublishContext(publishContext map[string]string) (string, int, map[string][]string, error)
@@ -213,6 +214,19 @@ func (n NodeUtils) DevicesAreNvme(sysDevices []string) (bool, error) {
 		}
 	}
 	return false, nil
+}
+
+func (n NodeUtils) IsNvmeBaseDevice(device string) (bool, error) {
+	subsysNqnPath := path.Join("/sys/block", device, "device/subsysnqn")
+
+	_, err := os.Stat(subsysNqnPath)
+	if err == nil {
+		return true, nil
+	}
+	if os.IsNotExist(err) {
+		return false, nil
+	}
+	return false, err
 }
 
 func getRelevantLines(rawContent *os.File) ([]string, error) {
