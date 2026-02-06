@@ -24,6 +24,8 @@ from controllers.servers.csi.controller_types import (ArrayConnectionInfo,
                                                       ObjectIdInfo,
                                                       ObjectParameters, VolumeGroupParameters, VolumeGroupIdInfo)
 from controllers.servers.errors import ObjectIdError, ValidationException, InvalidNodeId
+from controllers.common.node_info import Initiators
+from controllers.servers.host_definer.kubernetes_manager.manager import KubernetesManager
 
 logger = get_stdout_logger()
 
@@ -90,6 +92,48 @@ def _get_array_connection_info_from_system_info(secrets, system_id):
         servers_settings.PARAMETERS_ARRAY_ADDRESSES_DELIMITER)
     return ArrayConnectionInfo(array_addresses=array_addresses, user=user, password=password, system_id=system_id,
                                partition_name=partition_name, partition_vg=partition_vg, port_set=port_set)
+
+
+def get_node_initiators_data(node_name):
+    """
+    Return value example:
+    '{"fc":[],"iscsi":["iqn.2016-04.com.open-iscsi:8bce7b6eab12"],"nvme":[]}'
+    """
+    initiators_data = ''
+    kubernetes_manager = KubernetesManager()
+    core_api = kubernetes_manager.core_api
+    k8s_node = core_api.read_node(name=node_name)
+    if k8s_node:
+        node_annotations = k8s_node.metadata.annotations
+        initiators_data = node_annotations.get(settings.NODE_INITIATORS_FIELD, "{}")
+    return initiators_data
+
+
+def generate_node_initiators_from_string_data(initiators_data):
+    """
+    Return value example:
+    Initiators(nvme_nqns=[], fc_wwns=[], iscsi_iqns=['iqn.2016-04.com.open-iscsi:8bce7b6eab12'])
+    """
+    initiators_data = json.loads(initiators_data)
+    nvme_nqns = initiators_data.get("nvme", [])
+    fc_wwns = initiators_data.get("fc", [])
+    iscsi_iqns = initiators_data.get("iscsi", [])
+    return Initiators(nvme_nqns, fc_wwns, iscsi_iqns)
+
+
+def get_node_initiators_from_k8s_node(k8s_node):
+    "docstring"
+    node_annotations = k8s_node.metadata.annotations
+    initiators_data = node_annotations.get(settings.NODE_INITIATORS_FIELD, "{}")
+    initiators = generate_node_initiators_from_string_data(initiators_data)
+    return initiators
+
+
+def get_node_initiators(node_name):
+    "docstring"
+    initiators_data = get_node_initiators_data(node_name)
+    initiators = generate_node_initiators_from_string_data(initiators_data)
+    return initiators
 
 
 def get_array_connection_info_from_secrets(secrets, topologies=None, system_id=None):
@@ -514,11 +558,15 @@ def validate_delete_volume_request(request):
 
 
 def _validate_node_id(node_id):
-    logger.debug("validating node id")
+    """
+    In the past, this function validated that node_id format is:
+    'node_name;nvme0;fc0:fc1:fc2:fc3;iscsi0'
+    Since CSI-5997, node_id contains only node_name.
+    Hence, we only validate type and len.
+    """
+    logger.debug("validating node id: %s", node_id)
 
-    delimiter_count = node_id.count(settings.PARAMETERS_NODE_ID_DELIMITER)
-
-    if not 1 <= delimiter_count <= 3:
+    if not isinstance(node_id, str) or len(node_id) < 1:
         raise InvalidNodeId(node_id)
 
     logger.debug("node id validation finished")
