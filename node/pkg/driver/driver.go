@@ -128,14 +128,8 @@ type Object_id_info struct {
 	Ids_delimiter string
 }
 
-type Node_id_info struct {
-	Delimiter     string
-	Fcs_delimiter string
-}
-
 type Parameters struct {
 	Object_id_info Object_id_info
-	Node_id_info   Node_id_info
 }
 
 type Connectivity_type struct {

@@ -46,7 +46,6 @@ var ConfigYaml = driver.ConfigFile{
 	Controller: driver.Controller{Publish_context_separator: ","},
 	Parameters: driver.Parameters{
 		Object_id_info: driver.Object_id_info{Delimiter: ":", Ids_delimiter: ";"},
-		Node_id_info:   driver.Node_id_info{Delimiter: ";", Fcs_delimiter: ":"},
 	},
 	Connectivity_type: driver.Connectivity_type{Nvme_over_fc: "nvmeofc", Fc: "fc", Iscsi: "iscsi"},
 }
@@ -1393,7 +1392,7 @@ func TestNodeGetInfo(t *testing.T) {
 			name:         "empty nqn with error from node_utils, valid fcs",
 			returnNqnErr: fmt.Errorf("some error"),
 			returnFcs:    []string{"10000000c9934d9f", "10000000c9934d9h"},
-			expNodeId:    "test-host;;10000000c9934d9f:10000000c9934d9h",
+			expNodeId:    "test-host",
 			nvmeExists:   true,
 			fcExists:     true,
 			iscsiExists:  true,
@@ -1410,7 +1409,7 @@ func TestNodeGetInfo(t *testing.T) {
 			name:         "empty iqn with error from node_utils, valid fcs",
 			returnIqnErr: fmt.Errorf("some error"),
 			returnFcs:    []string{"10000000c9934d9f", "10000000c9934d9h"},
-			expNodeId:    "test-host;;10000000c9934d9f:10000000c9934d9h",
+			expNodeId:    "test-host",
 			nvmeExists:   false,
 			fcExists:     true,
 			iscsiExists:  true,
@@ -1419,7 +1418,7 @@ func TestNodeGetInfo(t *testing.T) {
 			name:        "valid iqn and fcs",
 			returnIqn:   "iqn.1994-07.com.redhat:e123456789",
 			returnFcs:   []string{"10000000c9934d9f", "10000000c9934d9h"},
-			expNodeId:   "test-host;;10000000c9934d9f:10000000c9934d9h;iqn.1994-07.com.redhat:e123456789",
+			expNodeId:   "test-host",
 			nvmeExists:  false,
 			fcExists:    true,
 			iscsiExists: true,
@@ -1429,7 +1428,7 @@ func TestNodeGetInfo(t *testing.T) {
 			returnNqn:   "nqn.2014-08.org.nvmexpress:uuid:b57708c7-5bb6-46a0-b2af-9d824bf539e1",
 			returnFcs:   []string{"10000000c9934d9f", "10000000c9934d9h"},
 			returnIqn:   "iqn.1994-07.com.redhat:e123456789",
-			expNodeId:   "test-host;nqn.2014-08.org.nvmexpress:uuid:b57708c7-5bb6-46a0-b2af-9d824bf539e1;10000000c9934d9f:10000000c9934d9h;iqn.1994-07.com.redhat:e123456789",
+			expNodeId:   "test-host",
 			nvmeExists:  true,
 			fcExists:    true,
 			iscsiExists: true,
@@ -1447,7 +1446,7 @@ func TestNodeGetInfo(t *testing.T) {
 			fcExists:    true,
 			iscsiExists: false,
 			returnFcs:   []string{"10000000c9934d9f"},
-			expNodeId:   "test-host;;10000000c9934d9f",
+			expNodeId:   "test-host",
 		},
 		{
 			name:        "fc path is inexistent",
@@ -1456,16 +1455,7 @@ func TestNodeGetInfo(t *testing.T) {
 			iscsiExists: true,
 			returnNqn:   "nqn.2014-08.org.nvmexpress:uuid:b57708c7-5bb6-46a0-b2af-9d824bf539e1",
 			returnIqn:   "iqn.1994-07.com.redhat:e123456789",
-			expNodeId:   "test-host;nqn.2014-08.org.nvmexpress:uuid:b57708c7-5bb6-46a0-b2af-9d824bf539e1;;iqn.1994-07.com.redhat:e123456789",
-		}, {
-			name:            "generate NodeID returns error",
-			returnIqn:       "iqn.1994-07.com.redhat:e123456789",
-			returnFcs:       []string{"10000000c9934d9f", "10000000c9934d9h"},
-			returnNodeIdErr: fmt.Errorf("some error"),
-			expErr:          status.Error(codes.Internal, fmt.Errorf("some error").Error()),
-			nvmeExists:      false,
-			fcExists:        true,
-			iscsiExists:     true,
+			expNodeId:   "test-host",
 		},
 	}
 	for _, tc := range testCases {
@@ -1477,6 +1467,7 @@ func TestNodeGetInfo(t *testing.T) {
 
 			fakeNodeutils := mocks.NewMockNodeUtilsInterface(mockCtrl)
 			d := newTestNodeService(fakeNodeutils, nil, nil)
+			fakeNodeutils.EXPECT().UpdateNodeInitiatorsAnnotation(context.TODO(), d.Hostname, tc.returnNqn, tc.returnFcs, tc.returnIqn).AnyTimes()
 			fakeNodeutils.EXPECT().GetTopologyLabels(context.TODO(), d.Hostname).Return(topologySegments, nil)
 			fakeNodeutils.EXPECT().IsPathExists(driver.NvmeFullPath).Return(tc.nvmeExists)
 			fakeNodeutils.EXPECT().IsFCExists().Return(tc.fcExists)
@@ -1491,10 +1482,6 @@ func TestNodeGetInfo(t *testing.T) {
 				if tc.iscsiExists {
 					fakeNodeutils.EXPECT().ParseIscsiInitiators().Return(tc.returnIqn, tc.returnIqnErr)
 				}
-			}
-
-			if tc.returnNqn != "" || len(tc.returnFcs) > 0 || tc.returnIqn != "" {
-				fakeNodeutils.EXPECT().GenerateNodeID("test-host", tc.returnNqn, tc.returnFcs, tc.returnIqn).Return(tc.expNodeId, tc.returnNodeIdErr)
 			}
 
 			expTopology := &csi.Topology{Segments: topologySegments}

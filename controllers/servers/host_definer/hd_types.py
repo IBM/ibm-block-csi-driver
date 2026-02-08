@@ -8,7 +8,9 @@ class DefineHostRequest:
     prefix: str = ''
     connectivity_type_from_user: str = ''
     node_id_from_host_definition: str = ''
+    node_initiators_from_host_definition: str = ''
     node_id_from_csi_node: str = ''
+    node_initiators_from_csi_node: str = ''
     array_connection_info: ArrayConnectionInfo = ArrayConnectionInfo(array_addresses='', user='', password='',
                                                                      partition_name='', partition_vg='', port_set='')
     io_group: str = ''
@@ -18,7 +20,8 @@ class DefineHostRequest:
 class DefineHostResponse:
     error_message: str = ''
     connectivity_type: str = ''
-    ports: list = field(default_factory=list)
+    ports: list = field(default_factory=list)  # The ports
+    # that actually found in storage (see _generate_response in host_definer_server.py)
     node_name_on_storage: str = ''
     io_group: list = field(default_factory=list)
     management_address: str = ''
@@ -40,6 +43,7 @@ class HostDefinitionInfo:
     secret_namespace: str = ''
     node_name: str = ''
     node_id: str = ''
+    node_initiators: str = ''
     phase: str = ''
     resource_version: str = ''
     uid: str = ''
@@ -50,8 +54,15 @@ class HostDefinitionInfo:
 
 @dataclass
 class CsiNodeInfo:
+    """
+    class to store CsiNodeInfo.
+    Typically - name and node_id can be extracted from csinode manifest
+    node_initiators should be extracted from the node annotations.
+    (See function: _generate_csi_node_info)
+    """
     name: str = ''
     node_id: str = ''
+    node_initiators: str = ''
 
 
 @dataclass
@@ -77,4 +88,5 @@ class ManagedNode:
     def __init__(self, csi_node_info, labels):
         self.name = csi_node_info.name
         self.node_id = csi_node_info.node_id
+        self.node_initiators = csi_node_info.node_initiators
         self.io_group = utils.generate_io_group_from_labels(labels)
