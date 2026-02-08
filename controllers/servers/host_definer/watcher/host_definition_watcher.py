@@ -78,6 +78,7 @@ class HostDefinitionWatcher(Watcher):
         return settings.UNDEFINE_ACTION
 
     def _define_host_after_pending(self, host_definition_info):
+        logger.info(host_definition_info)
         response = DefineHostResponse()
         if self._is_node_should_be_managed_on_secret(
                 host_definition_info.node_name, host_definition_info.secret_name,
@@ -86,6 +87,7 @@ class HostDefinitionWatcher(Watcher):
             self._update_host_definition_from_storage_response(host_definition_info.name, response)
         else:
             self._delete_host_definition(host_definition_info.name)
+        logger.info(response)
         return response
 
     def _update_host_definition_from_storage_response(self, host_definition_name, response):
@@ -94,6 +96,11 @@ class HostDefinitionWatcher(Watcher):
         self._patch_host_definition(host_definition_manifest)
 
     def _generate_host_definition_manifest(self, host_definition_name, response):
+        """
+        This method constructs the subset of the manifest required for a PATCH request,
+        To generate a full HostDefinition manifest,
+        use function: _get_host_definition_manifest in `watcher_helper.py`.
+        """
         return {
             settings.METADATA: {
                 common_settings.NAME_FIELD: host_definition_name,

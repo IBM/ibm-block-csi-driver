@@ -18,5 +18,3 @@ package driver
 var ErrorWhileTryingToReadPort = "Error while trying to get %s port from string: %v."
 
 var ErrorUnsupportedConnectivityType = "Unsupported connectivity type : {%v}"
-
-var ErrorNoPortsCouldFitInNodeId = "could not fit any ports in node id: %v, length limit: %d"

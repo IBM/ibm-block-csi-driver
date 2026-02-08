@@ -19,6 +19,7 @@ package driver
 import (
 	"bufio"
 	"context"
+	"encoding/json"
 	"fmt"
 	"io"
 	"io/ioutil"
@@ -29,6 +30,7 @@ import (
 
 	"github.com/ibm/ibm-block-csi-driver/node/pkg/driver/device_connectivity"
 	"golang.org/x/sys/unix"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/errors"
 
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -42,6 +44,7 @@ import (
 
 var (
 	getOpts          = metav1.GetOptions{}
+	patchOpts        = metav1.PatchOptions{}
 	topologyPrefixes = [...]string{"topology.block.csi.ibm.com"}
 )
 
@@ -88,8 +91,8 @@ type NodeUtilsInterface interface {
 	FormatDevice(devicePath string, fsType string)
 	IsNotMountPoint(file string) (bool, error)
 	GetPodPath(filepath string) string
-	GenerateNodeID(hostName string, nvmeNQN string, fcWWNs []string, iscsiIQN string) (string, error)
 	GetTopologyLabels(ctx context.Context, nodeName string) (map[string]string, error)
+	UpdateNodeInitiatorsAnnotation(ctx context.Context, nodeName string, iscsiIQN string, fcWWNs []string, nvmeNQN string) error
 	IsBlock(devicePath string) (bool, error)
 	GetFileSystemVolumeStats(path string) (VolumeStatistics, error)
 	GetBlockVolumeStats(volumeId string) (VolumeStatistics, error)
@@ -480,49 +483,6 @@ func (n NodeUtils) GetPodPath(origPath string) string {
 	return path.Join(PrefixChrootOfHostRoot, origPath)
 }
 
-func (n NodeUtils) GenerateNodeID(hostName string, nvmeNQN string, fcWWNs []string, iscsiIQN string) (string, error) {
-	var nodeId strings.Builder
-	nodeIdDelimiter := n.ConfigYaml.Parameters.Node_id_info.Delimiter
-	nodeIdFcDelimiter := n.ConfigYaml.Parameters.Node_id_info.Fcs_delimiter
-	nodeId.Grow(MaxNodeIdLength)
-	nodeId.WriteString(hostName)
-	nodeId.WriteString(nodeIdDelimiter)
-
-	if len(nvmeNQN) > 0 {
-		if nodeId.Len()+len(nvmeNQN)+len(nodeIdDelimiter) <= MaxNodeIdLength {
-			nodeId.WriteString(nvmeNQN)
-		} else {
-			return "", fmt.Errorf(ErrorNoPortsCouldFitInNodeId, nodeId.String(), MaxNodeIdLength)
-		}
-	}
-	nodeId.WriteString(nodeIdDelimiter)
-	if len(fcWWNs) > 0 {
-		if nodeId.Len()+len(fcWWNs[0]) <= MaxNodeIdLength {
-			nodeId.WriteString(fcWWNs[0])
-		} else if nvmeNQN == "" {
-			return "", fmt.Errorf(ErrorNoPortsCouldFitInNodeId, nodeId.String(), MaxNodeIdLength)
-		}
-
-		for _, fcPort := range fcWWNs[1:] {
-			if nodeId.Len()+len(nodeIdFcDelimiter)+len(fcPort) <= MaxNodeIdLength {
-				nodeId.WriteString(nodeIdFcDelimiter)
-				nodeId.WriteString(fcPort)
-			}
-		}
-	}
-	if len(iscsiIQN) > 0 {
-		if nodeId.Len()+len(nodeIdDelimiter)+len(iscsiIQN) <= MaxNodeIdLength {
-			nodeId.WriteString(nodeIdDelimiter)
-			nodeId.WriteString(iscsiIQN)
-		} else if len(fcWWNs) == 0 && nvmeNQN == "" {
-			return "", fmt.Errorf(ErrorNoPortsCouldFitInNodeId, nodeId.String(), MaxNodeIdLength)
-		}
-	}
-
-	finalNodeId := strings.TrimSuffix(nodeId.String(), ";")
-	return finalNodeId, nil
-}
-
 func (n NodeUtils) GetTopologyLabels(ctx context.Context, nodeName string) (map[string]string, error) {
 	kubeConfig, err := rest.InClusterConfig()
 	if err != nil {
@@ -550,6 +510,76 @@ func (n NodeUtils) GetTopologyLabels(ctx context.Context, nodeName string) (map[
 		}
 	}
 	return topologyLabels, nil
+}
+
+func (n NodeUtils) UpdateNodeInitiatorsAnnotation(ctx context.Context, nodeName string,
+	nvmeNQN string, fcWWNs []string, iscsiIQN string) error {
+
+	const nodeInitiatorsAnnotationKey = "block.csi.ibm.com/node-initiators"
+
+	kubeConfig, err := rest.InClusterConfig()
+	if err != nil {
+		logger.Infof("failed to update initiators. Unable to load in-cluster configuration")
+		return err
+	}
+
+	client, err := kubernetes.NewForConfig(kubeConfig)
+	if err != nil {
+		logger.Infof("failed to update initiators. Unable to create Kubernetes client")
+		return err
+	}
+
+	connectivity_type := n.ConfigYaml.Connectivity_type
+
+	portsData := map[string]interface{}{
+		connectivity_type.Nvme_over_fc: []string{},
+		connectivity_type.Fc:           []string{},
+		connectivity_type.Iscsi:        []string{},
+	}
+
+	if nvmeNQN != "" {
+		portsData[connectivity_type.Nvme_over_fc] = []string{nvmeNQN}
+	}
+
+	if len(fcWWNs) > 0 {
+		portsData[connectivity_type.Fc] = fcWWNs
+	}
+
+	if iscsiIQN != "" {
+		portsData[connectivity_type.Iscsi] = []string{iscsiIQN}
+	}
+
+	jsonBytes, err := json.Marshal(portsData)
+	if err != nil {
+		logger.Infof("failed to prepare initiators JSON data")
+		return err
+	}
+
+	logger.Infof("Patching node %q: setting initiators in annotation %s to %s",
+		nodeName, nodeInitiatorsAnnotationKey, string(jsonBytes))
+
+	patch := map[string]interface{}{
+		"metadata": map[string]interface{}{
+			"annotations": map[string]string{
+				nodeInitiatorsAnnotationKey: string(jsonBytes),
+			},
+		},
+	}
+
+	patchBytes, err := json.Marshal(patch)
+	if err != nil {
+		logger.Infof("failed to format node patch request")
+		return err
+	}
+
+	_, err = client.CoreV1().Nodes().Patch(ctx, nodeName,
+		types.MergePatchType, patchBytes, patchOpts)
+	if err != nil {
+		logger.Infof("failed to path node initiators in annotation")
+		return err
+	}
+
+	return nil
 }
 
 func (n NodeUtils) IsBlock(devicePath string) (bool, error) {

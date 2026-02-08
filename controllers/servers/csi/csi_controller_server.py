@@ -229,7 +229,7 @@ class CSIControllerServicer(csi_pb2_grpc.ControllerServicer):
             volume_id = volume_id_info.ids.uid
             node_id_info = NodeIdInfo(request.node_id)
             node_name = node_id_info.node_name
-            initiators = node_id_info.initiators
+            initiators = utils.get_node_initiators(node_name)
 
             logger.debug("node name for this publish operation is : {0}".format(node_name))
 
@@ -273,7 +273,7 @@ class CSIControllerServicer(csi_pb2_grpc.ControllerServicer):
             volume_id = volume_id_info.ids.uid
             node_id_info = NodeIdInfo(request.node_id)
             node_name = node_id_info.node_name
-            initiators = node_id_info.initiators
+            initiators = utils.get_node_initiators(node_name)
             logger.debug("node name for this unpublish operation is : {0}".format(node_name))
 
             array_connection_info = utils.get_array_connection_info_from_secrets(request.secrets,
