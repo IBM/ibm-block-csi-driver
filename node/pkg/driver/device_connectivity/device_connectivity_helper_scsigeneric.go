@@ -753,13 +753,16 @@ func (o GetDmsPathHelperGeneric) WaitForDmToExist(volumeIdVariations []string, m
     formatTemplate := strings.Join(multipathdCommandFormatArgs, mpathdSeparator)
 	args := []string{"show", "maps", "raw", "format", "\"", formatTemplate, "\""}
     logger.Debugf("Waiting for dm to exist")
+	var lastErr error
     for i := 0; i < maxRetries; i++ {
         out, err := o.executer.ExecuteWithTimeout(TimeOutMultipathdCmd, multipathdCmd, args)
         if err != nil {
-            logger.Warningf("multipathd show maps failed (attempt %d/%d), retrying: %v", i+1, maxRetries, err,)
+			lastErr = err
+            logger.Warningf("multipathd show maps failed (attempt %d/%d), retrying: %v", i+1, maxRetries, err)
             time.Sleep(time.Second * time.Duration(intervalSeconds))
             continue
         }
+		lastErr = nil
         dms := string(out)
         for _, volumeIdVariation := range volumeIdVariations {
             if strings.Contains(dms, volumeIdVariation) {
@@ -769,6 +772,11 @@ func (o GetDmsPathHelperGeneric) WaitForDmToExist(volumeIdVariations []string, m
 
         time.Sleep(time.Second * time.Duration(intervalSeconds))
     }
+
+	if lastErr != nil {
+		return "", lastErr
+	}
+
     return "", &MultipathDeviceNotFoundForVolumeError{volumeIdVariations[0]}
 }
 
