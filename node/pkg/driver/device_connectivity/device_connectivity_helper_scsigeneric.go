@@ -751,7 +751,7 @@ func convertScsiIdToNguid(scsiId string) string {
 func (o GetDmsPathHelperGeneric) WaitForDmToExist(volumeIdVariations []string, maxRetries int, intervalSeconds int,
 	multipathdCommandFormatArgs []string) (string, error) {
     formatTemplate := strings.Join(multipathdCommandFormatArgs, mpathdSeparator)
-	args := []string{"show", "maps", "raw", "format", formatTemplate}
+	args := []string{"show", "maps", "raw", "format", "\"", formatTemplate, "\""}
     logger.Debugf("Waiting for dm to exist")
     for i := 0; i < maxRetries; i++ {
         out, err := o.executer.ExecuteWithTimeout(TimeOutMultipathdCmd, multipathdCmd, args)
