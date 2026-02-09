@@ -216,17 +216,15 @@ func (n NodeUtils) DevicesAreNvme(sysDevices []string) (bool, error) {
 	return false, nil
 }
 
-func (n NodeUtils) IsNvmeBaseDevice(device string) (bool, error) {
+func (n NodeUtils) IsNvmeBaseDevice(device string) bool {
 	subsysNqnPath := path.Join("/sys/block", device, "device/subsysnqn")
 
-	_, err := os.Stat(subsysNqnPath)
-	if err == nil {
-		return true, nil
+	if _, err := os.Stat(subsysNqnPath); err == nil {
+		return true
+	} else {
+		logger.Errorf("Error while checking if device %s is NVMe: %v", device, err)
 	}
-	if os.IsNotExist(err) {
-		return false, nil
-	}
-	return false, err
+	return false
 }
 
 func getRelevantLines(rawContent *os.File) ([]string, error) {

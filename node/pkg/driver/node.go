@@ -389,11 +389,7 @@ func (d *NodeService) NodeUnstageVolume(ctx context.Context, req *csi.NodeUnstag
 		return nil, status.Error(codes.Internal, err.Error())
 	}
 
-	isNvme, err := d.NodeUtils.IsNvmeBaseDevice(baseDevice)
-	if err != nil {
-		logger.Errorf("Error while checking if device is NVMe : {%v}", err.Error())
-		return nil, status.Error(codes.Internal, err.Error())
-	}
+	isNvme := d.NodeUtils.IsNvmeBaseDevice(baseDevice)
 
 	if !isNvme {
 		err = d.OsDeviceConnectivityHelper.FlushMultipathDevice(baseDevice)
@@ -405,7 +401,7 @@ func (d *NodeService) NodeUnstageVolume(ctx context.Context, req *csi.NodeUnstag
 			return nil, status.Errorf(codes.Internal, "Remove scsi device failed with error: %v", err)
 		}
 	} else {
-		logger.Infof("NVMe volume detected: skipping multipath -f")
+		logger.Infof("NVMe device detected: skipping multipath -f")
 	}
 
 	stageInfoPath := path.Join(stagingTargetPath, StageInfoFilename)
