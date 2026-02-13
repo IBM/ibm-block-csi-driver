@@ -382,18 +382,19 @@ func (d *NodeService) NodeUnstageVolume(ctx context.Context, req *csi.NodeUnstag
 
 	baseDevice := path.Base(mpathDevice)
 
-	sysDevices, err := d.NodeUtils.GetSysDevicesFromMpath(baseDevice)
-	if err != nil {
-		logger.Errorf("Error while trying to get sys devices : {%v}", err.Error())
-		return nil, status.Error(codes.Internal, err.Error())
-	}
 
-	isNvme, err := d.NodeUtils.IsNvmeBaseDevice(baseDevice)
+	isNvme, err := d.NodeUtils.DevicesAreNvme(baseDevice)
 	if err != nil {
 		logger.Warningf("Failed to check if device %s is NVMe, assuming non-NVMe: %v", baseDevice, err)
 		isNvme = false
 	}
+
 	if !isNvme {
+		sysDevices, err := d.NodeUtils.GetSysDevicesFromMpath(baseDevice)
+		if err != nil {
+			logger.Errorf("Error while trying to get sys devices : {%v}", err.Error())
+			return nil, status.Error(codes.Internal, err.Error())
+		}
 		err = d.OsDeviceConnectivityHelper.FlushMultipathDevice(baseDevice)
 		if err != nil {
 			return nil, status.Errorf(codes.Internal, "Multipath -f command failed with error: %v", err)
@@ -748,29 +749,31 @@ func (d *NodeService) NodeExpandVolume(ctx context.Context, req *csi.NodeExpandV
 		return nil, status.Error(codes.Internal, err.Error())
 	}
 	logger.Debugf("Discovered device : {%v}", device)
-
+	
 	baseDevice := path.Base(device)
 
-	sysDevices, err := d.NodeUtils.GetSysDevicesFromMpath(baseDevice)
+	isNvme, err := d.NodeUtils.DevicesAreNvme(baseDevice)
 	if err != nil {
-		logger.Errorf("Error while trying to get sys devices : {%v}", err.Error())
-		return nil, status.Error(codes.Internal, err.Error())
+		logger.Warningf("Failed to check if device %s is NVMe, assuming non-NVMe: %v", baseDevice, err)
+		isNvme = false
 	}
 
-	devicesAreNvme, err := d.NodeUtils.DevicesAreNvme(sysDevices)
-	if err != nil {
-		logger.Errorf("Error while trying to check if sys devices are nvme devices : {%v}", err.Error())
-		return nil, status.Error(codes.Internal, err.Error())
-	}
-	if !devicesAreNvme {
+	if !isNvme {
+		sysDevices, err := d.NodeUtils.GetSysDevicesFromMpath(baseDevice)
+		if err != nil {
+			logger.Errorf("Error while trying to get sys devices : {%v}", err.Error())
+			return nil, status.Error(codes.Internal, err.Error())
+		}
 		err = d.NodeUtils.RescanPhysicalDevices(sysDevices)
 		if err != nil {
 			return nil, status.Error(codes.Internal, err.Error())
 		}
-	}
-	err = d.NodeUtils.ExpandMpathDevice(baseDevice)
-	if err != nil {
-		return nil, status.Error(codes.Internal, err.Error())
+		err = d.NodeUtils.ExpandMpathDevice(baseDevice)
+		if err != nil {
+			return nil, status.Error(codes.Internal, err.Error())
+		}
+	} else {
+		logger.Infof("Device %s is NVMe: skipping multipath rescan & expand, relying on auto-detection", baseDevice)
 	}
 
 	existingFormat, err := d.Mounter.GetDiskFormat(device)

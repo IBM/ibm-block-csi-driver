@@ -69,8 +69,7 @@ const (
 type NodeUtilsInterface interface {
 	GetVolumeUuid(volumeId string) string
 	ReadNvmeNqn() (string, error)
-	DevicesAreNvme(sysDevices []string) (bool, error)
-	IsNvmeBaseDevice(device string) (bool, error)
+	DevicesAreNvme(device string) (bool, error)
 	ParseFCPorts() ([]string, error)
 	ParseIscsiInitiators() (string, error)
 	GetInfoFromPublishContext(publishContext map[string]string) (string, int, map[string][]string, error)
@@ -195,31 +194,7 @@ func (n NodeUtils) StageInfoFileIsExist(filePath string) bool {
 	return true
 }
 
-func (n NodeUtils) DevicesAreNvme(sysDevices []string) (bool, error) {
-	args := []string{"list"}
-	out, err := n.Executer.ExecuteWithTimeout(TimeOutNvmeCmd, nvmeCmd, args)
-	if err != nil {
-		if err.Error() == "exit status 1" {
-			logger.Debugf("'nvme list' failing, likely because 'nvme' and 'nvme-core' kernel modules are not loaded. Devices are certainly not NVMe in this case")
-			return false, nil
-		}
-		outMessage := strings.TrimSpace(string(out))
-		if strings.HasSuffix(outMessage, noSuchFileOrDirectoryErrorMessage) {
-			return false, nil
-		}
-		return false, err
-	}
-	nvmeDevices := string(out)
-	for _, deviceName := range sysDevices {
-		if strings.Contains(nvmeDevices, deviceName) {
-			logger.Debugf("found device {%s} in nvme list", deviceName)
-			return true, nil
-		}
-	}
-	return false, nil
-}
-
-func (n NodeUtils) IsNvmeBaseDevice(device string) (bool, error) {
+func (n NodeUtils) DevicesAreNvme(device string) (bool, error) {
 	subsysNqnPath := path.Join("/sys/block", device, "device/subsysnqn")
 
 	if _, err := os.Stat(subsysNqnPath); err == nil {
