@@ -98,7 +98,6 @@ type NodeUtilsInterface interface {
 type NodeUtils struct {
 	Executer                   executer.ExecuterInterface
 	mounter                    mount.Interface
-	osDeviceConnectivityHelper device_connectivity.OsDeviceConnectivityHelperScsiGenericInterface
 	ConfigYaml                 ConfigFile
 }
 
@@ -107,7 +106,6 @@ func NewNodeUtils(executer executer.ExecuterInterface, mounter mount.Interface, 
 	return &NodeUtils{
 		Executer:                   executer,
 		mounter:                    mounter,
-		osDeviceConnectivityHelper: osDeviceConnectivityHelper,
 		ConfigYaml:                 configYaml,
 	}
 }
@@ -682,15 +680,14 @@ func (d NodeUtils) GetVolumeUuid(volumeId string) string {
 	}
 }
 
-func (d NodeUtils) cleanSysfsData (data) {
+func (d NodeUtils) CleanSysfsData (data) {
 	return strings.Trim(string(data), " \n\r\t\x00")
 }
 
-
-func (n *NodeUtils) GetGaterKey(devicePath string) string {
+func GetMajorMinorFromSysfs(devicePath string) (major int, minor int, error) {
     var st syscall.Stat_t
     if err := syscall.Stat(devicePath, &st); err != nil {
-        return fmt.Sprintf("stale-%s-%d", devicePath, time.Now().UnixNano())
+        return 0, 0, fmt.Sprintf("stale-%s-%d", devicePath, time.Now().UnixNano())
     }
 
     major := unix.Major(uint64(st.Rdev))
@@ -714,6 +711,12 @@ func (n *NodeUtils) GetGaterKey(devicePath string) string {
             }
         }
     }
+	return major, minor, nil
+}
+
+func GetGaterKey(devicePath string) string {
+
+	major, minor, _ := m.getMajorMinorFromSysfs(devicePath)
 
     // 2. Volume Identity (WWID) - Fetched via sysfs or ioctl
     wwid, _ := n.GetDeviceWWID(devicePath)

@@ -60,6 +60,8 @@ type OsDeviceConnectivityHelperScsiGenericInterface interface {
 type OsDeviceConnectivityHelperScsiGeneric struct {
 	Executer        executer.ExecuterInterface
 	KeyedGater		*executer.KeyedGater
+	Mounter         *mount.Mounter
+	NodeUtils       NodeUtilsInterface
 	Helper          OsDeviceConnectivityHelperInterface
 	MutexMultipathF *sync.Mutex
 	CleanScsiDevice bool
@@ -253,9 +255,12 @@ const (
 	procMountsFilePath          = "/proc/mounts"
 )
 
-func NewOsDeviceConnectivityHelperScsiGeneric(executer executer.ExecuterInterface, clean_scsi_device bool) OsDeviceConnectivityHelperScsiGenericInterface {
+func NewOsDeviceConnectivityHelperScsiGeneric(executer executer.ExecuterInterface, executer.KeyedGater *KeyedGater, mount.Mounter* Mounter, NodeUtils NodeUtils, clean_scsi_device bool) OsDeviceConnectivityHelperScsiGenericInterface {
 	return &OsDeviceConnectivityHelperScsiGeneric{
 		Executer:        executer,
+		KeyedGater:      KeyedGater,
+		Mounter:         Mounter,
+		NodeUtils:       NodeUtils,
 		Helper:          NewOsDeviceConnectivityHelperGeneric(executer),
 		MutexMultipathF: &sync.Mutex{},
 		CleanScsiDevice: clean_scsi_device,
@@ -1176,7 +1181,7 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) TeardownVolume(target string, ex
 	if len(mounts) > 0 {
 		major, minor = mounts[0].Major, mounts[0].Minor
 		for i := len(mounts) - 1; i >= 0; i-- {
-			_ = c.escalatedUnmount(target)
+			_ = r.Mounter.escalateToLazy(target)
 			_ = r.pollLayerDeleted(target, mounts[i].MountID, 5*time.Second)
 		}
 	}
@@ -1187,28 +1192,26 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) TeardownVolume(target string, ex
 	}
 
 	// Resolve Hardware
-	mpathName := r.findDMByWWID(expectedWWID)
+	mpathName := r.Helper.findDMByWWID(expectedWWID)
 	// If major/minor weren't found via mount, resolve via mpathName
 	if major == 0 && mpathName != "" {
-		major, minor = r.getMajorMinorFromSysfs(mpathName)
+		major, minor = r.NodeUtils.GetMajorMinorFromSysfs(mpathName)
 	}
 
-// Standardize on [[]string]
-slaves, err := executer.ExecuteUninterruptible[[]string](
-    r.KeyedGater,
-    fmt.Sprintf("get-slaves-%d:%d", major, minor),
-    5, 20, 1*time.Second, 5*time.Second,
-    func(ctx context.Context) ([]string, error) {
-        return r.getSlavesForDevice(major, minor)
-    },
-)
-
-
+	// Standardize on [[]string]
+	slaves, err := executer.ExecuteUninterruptible[[]string](
+		r.KeyedGater,
+		fmt.Sprintf("get-slaves-%d:%d", major, minor),
+		5, 20, 1*time.Second, 5*time.Second,
+		func(ctx context.Context) ([]string, error) {
+			return r.Helper.getSlavesForDevice(major, minor)
+		},
+	)
 
 	// --- PHASE 2: BLOCK LAYER (IDENTITY & OPENCOUNT) ---
 	if mpathName != "" {
 		// Verify OpenCount to determine removal strategy
-		openCount := r.getOpenCount(mpathName)
+		openCount := r.Help.getOpenCount(mpathName)
 
 		needDeferRemove := false
 
@@ -1319,7 +1322,7 @@ type IdentityResult struct {
 // TODO call FinalWwidPurge
 func (r *OsDeviceConnectivityHelperScsiGeneric) IdentityAwarePreScan(targetPath string, expectedWWID string) error {
 	mounts, _ := r.getMountsForPath(targetPath)
-	mpathName := r.findDMByWWID(expectedWWID)
+	mpathName := r.Helper.findDMByWWID(expectedWWID)
 	normExpected := r.normalizeWWID(expectedWWID)
 
 	// CASE 1: Path is mounted
@@ -1376,7 +1379,7 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) IdentityAwarePreScan(targetPath 
 		// Before checking OpenCount, ensure we aren't queuing I/O to a dead map
 		_ = r.multipathdAction("disablequeueing map " + mpathName)
 
-		openCount := c.getOpenCount(mpathName)
+		openCount := r.Helper.getOpenCount(mpathName)
 		if openCount == 0 {
 			// Clean fresh start
 			_ = r.multipathdAction("del map " + mpathName)
@@ -1392,7 +1395,7 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) IdentityAwarePreScan(targetPath 
 		// Stop I/O queuing to prevent D-state hangs during deletion
 		_ = r.multipathdAction("disablequeueing map " + mpathName)
 
-		openCount, err := r.GetOpenCount(mpathName)
+		openCount, err := r.Helper.GetOpenCount(mpathName)
 		if err == nil {
 			if openCount <= 0 {
 				// Clean fresh start: No one is using it
@@ -1424,7 +1427,7 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) FinalWwidPurge(expectedWWID stri
 	targetWWID := r.normalizeWWID(expectedWWID)
 
 	// 1. CLEANUP MULTIPATH LAYER
-	mpathName := r.findDMByWWID(targetWWID)
+	mpathName := r.Helper.findDMByWWID(targetWWID)
 	if mpathName != "" {
 		_, err := executer.ExecuteUninterruptible[struct{}](
 			r.KeyedGater,
@@ -1602,61 +1605,6 @@ func (r OsDeviceConnectivityHelperScsiGeneric) VerifyAndGetDmDevice(devName stri
 	return targetDm, nil
 }
 
-
-// GetOpenCount retrieves the current open count of a DM device via ioctl
-func (r *OsDeviceConnectivityHelperScsiGeneric) GetOpenCount(dmName string) (int32, error) {
-	// Standard DM control node is used for all DM-related ioctls
-	f, err := os.OpenFile("/dev/mapper/control", os.O_RDWR|syscall.O_CLOEXEC, 0)
-	if err != nil {
-		return -1, fmt.Errorf("failed to open dm control: %w", err)
-	}
-	defer f.Close()
-
-	// Initialize the DM ioctl structure with version 4 (Standard for RH7/8/9)
-	io := dmIoctl{
-		VersionMajor: 4,
-		VersionMinor: 0,
-		VersionPatch: 0,
-		DataSize:     uint32(unsafe.Sizeof(dmIoctl{})),
-	}
-
-	//io := dmIoctl{
-	//	VersionMajor: 4,
-	//	VersionMinor: 0,
-	//	VersionPatch: 0,
-	//	DataSize:     uint32(unsafe.Sizeof(dmIoctl{})),
-	//	Flags:        0,
-	//}
-
-	//io := dmIoctl{
-	//	VersionMajor: 4,
-	//	DataSize:     uint32(unsafe.Sizeof(dmIoctl{})),
-	//	DataStart:    uint32(unsafe.Sizeof(dmIoctl{})), // Standard practice
-	//}
-
-	// Ensure the name fits and copy it to the fixed-size buffer
-	copy(io.Name[:], dmName)
-
-	// Execute the ioctl directly on the control node
-	_, _, errno := unix.Syscall(
-		unix.SYS_IOCTL,
-		f.Fd(),
-		uintptr(DM_DEV_STATUS),
-		uintptr(unsafe.Pointer(&io)),
-	)
-
-	if errno != 0 {
-		// Both ENOENT and ENXIO indicate the device is already detached or missing
-		if errno == unix.ENOENT || errno == unix.ENXIO {
-			return -1, nil
-		}
-		return -1, fmt.Errorf("ioctl DM_DEV_STATUS failed for %s: %v", dmName, errno)
-	}
-
-	// The kernel updates the OpenCount field in-place
-	// TODO should we cast to int32
-	return io.OpenCount, nil
-}
 
 func (r *OsDeviceConnectivityHelperScsiGeneric) multipathdAction(cmd string) error {
 	response, err := r.Executer.MultipathdCmd(cmd)
@@ -2515,6 +2463,62 @@ func (o *OsDeviceConnectivityHelperGeneric) getWWIDByDev(major, minor int) (stri
 
 	return "", fmt.Errorf("identity-check: could not resolve WWID for device %d:%d at %s", major, minor, basePath)
 }
+
+// GetOpenCount retrieves the current open count of a DM device via ioctl
+func (o *OsDeviceConnectivityHelperGeneric) GetOpenCount(dmName string) (int32, error) {
+	// Standard DM control node is used for all DM-related ioctls
+	f, err := os.OpenFile("/dev/mapper/control", os.O_RDWR|syscall.O_CLOEXEC, 0)
+	if err != nil {
+		return -1, fmt.Errorf("failed to open dm control: %w", err)
+	}
+	defer f.Close()
+
+	// Initialize the DM ioctl structure with version 4 (Standard for RH7/8/9)
+	io := dmIoctl{
+		VersionMajor: 4,
+		VersionMinor: 0,
+		VersionPatch: 0,
+		DataSize:     uint32(unsafe.Sizeof(dmIoctl{})),
+	}
+
+	//io := dmIoctl{
+	//	VersionMajor: 4,
+	//	VersionMinor: 0,
+	//	VersionPatch: 0,
+	//	DataSize:     uint32(unsafe.Sizeof(dmIoctl{})),
+	//	Flags:        0,
+	//}
+
+	//io := dmIoctl{
+	//	VersionMajor: 4,
+	//	DataSize:     uint32(unsafe.Sizeof(dmIoctl{})),
+	//	DataStart:    uint32(unsafe.Sizeof(dmIoctl{})), // Standard practice
+	//}
+
+	// Ensure the name fits and copy it to the fixed-size buffer
+	copy(io.Name[:], dmName)
+
+	// Execute the ioctl directly on the control node
+	_, _, errno := unix.Syscall(
+		unix.SYS_IOCTL,
+		f.Fd(),
+		uintptr(DM_DEV_STATUS),
+		uintptr(unsafe.Pointer(&io)),
+	)
+
+	if errno != 0 {
+		// Both ENOENT and ENXIO indicate the device is already detached or missing
+		if errno == unix.ENOENT || errno == unix.ENXIO {
+			return -1, nil
+		}
+		return -1, fmt.Errorf("ioctl DM_DEV_STATUS failed for %s: %v", dmName, errno)
+	}
+
+	// The kernel updates the OpenCount field in-place
+	// TODO should we cast to int32
+	return io.OpenCount, nil
+}
+
 
 
 //go:generate mockgen -destination=../../../mocks/mock_GetDmsPathHelperInterface.go -package=mocks github.com/ibm/ibm-block-csi-driver/node/pkg/driver/device_connectivity GetDmsPathHelperInterface

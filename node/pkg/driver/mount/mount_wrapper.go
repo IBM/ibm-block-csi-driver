@@ -87,10 +87,11 @@ func New(mounterPath string, limit int32) mount.Interface {
 	}
 }
 
-func NewWithExecutor(mounterPath string, e executer.ExecuterInterface, limit int32) mount.Interface {
+func NewWithExecutor(mounterPath string, e *executer.ExecuterInterface, g *executer.KeyedGater, limit int32) mount.Interface {
 	return &Mounter{
 		Mounter:  mount.New(mounterPath).(*mount.Mounter),
 		executer: e,
+		KeyGater: g,
 		maxStuckLimit: limit,
 	}
 }
@@ -912,3 +913,6 @@ func unescapeMountPath(path string) string {
     return res.String()
 }
 
+func (m *Mounter) getMajorMinorFromSysfs(targetPath string) (major int, minor int, error) {
+	MountEntry entries := m.
+}
