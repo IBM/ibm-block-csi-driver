@@ -787,7 +787,7 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
             filter_value = 'name={}'.format(replication_policy_name)
             cli_replication_policy = self.client.svcinfo.lsreplicationpolicy(filtervalue=filter_value).as_single_element
             if not cli_replication_policy:
-                raise  array_errors.InvalidArgumentError("partition replication policy not found")
+                raise array_errors.InvalidArgumentError("partition replication policy not found")
             logger.info("replication_topolgy {}".format(str(cli_replication_policy.topology)))
             if cli_replication_policy.topology == "2-site-ha":
                 use_thin_clone = True
