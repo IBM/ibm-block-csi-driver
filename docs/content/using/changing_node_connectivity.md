@@ -20,6 +20,18 @@ Before you begin, if the `allowDelete` parameter is set to `false`, ensure that 
 Use the following procedure to redefine host connectivity:
 
 1. Undeploy the CSI node pod from the relevant node that the host definition is a part of.
+This can be done by editing the affinity, and not writing the relevant node:
+```
+  kubectl edit ibmblockcsis ibm-block-csi
+```
+under section spec.node.affinity.nodeAffinity.requiredDuringSchedulingIgnoredDuringExecution.nodeSelectorTerms.matchExpressions add this:
+```
+               - key: kubernetes.io/hostname
+                 operator: In
+                 values:
+                 - <node-names-we-want-to-keep-as-appear-in-kubectl-get-node>
+                 - <another-node-name-we-want-to-keep>
+```
 
 2. Verify that all HostDefinition instances of the node are deleted. The output of the following command displays all HostDefinitions that do not need to be deleted for the `<node-name>`.
 ```

@@ -1,6 +1,12 @@
+
+{{site.data.keyword.attribute-definition-list}}
+
 # Installing the host definer with GitHub
 
 The host definer for IBM® block storage CSI driver can be installed directly with GitHub.
+
+Before installing or upgrading, if one wants non-default configuration settings, a configmap must be created See [Configuring the host definer](../configuration/configuring_hostdefiner.md). The old way of setting parameters in yaml is obsolete.{: important}
+
 
 Use the following steps to install the HostDefiner custom resource, with [GitHub](https://github.com/IBM/ibm-block-csi-operator).
 
