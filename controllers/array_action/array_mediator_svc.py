@@ -748,10 +748,10 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
             raise ex
 
     def _create_cli_volume_from_vg_snapshot(self, name, pool, io_group, volume_group, vg_snapshot_id, vol_id,
-                                            space_efficiency):
+                                            space_efficiency, use_thin_clone):
         logger.info("creating volume from vg snapshot")
         cli_kwargs = {
-            'type': 'clone',
+            'type': 'thinclone' if use_thin_clone else 'clone',
             'fromsnapshotid': vg_snapshot_id,
             'pool': pool,
             'fromsourcevolume': vol_id,
@@ -774,14 +774,27 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
         if not cli_volume.volume_group_name:
             raise array_errors.InvalidArgumentError("volume group not specified")
         if self._verify_volume_group_of_partition_name(partition_name, cli_volume.volume_group_name) is False:
-            raise array_errors.InvalidArgumentError("volume group not part of partition")
+            raise array_errors.InvalidArgumentError("volume group not part of partition")a
+        use_thin_clone = False
+        filter_value = 'name={}'.format(partition_name)
+        cli_partition = self.client.svcinfo.lspartition(filtervalue=filter_value).as_single_element
+        if not cli_partition:
+            raise array_errors.InvalidArgumentError("partition not found")
+        replication_policy_name = cli_partition.replication_policy_name
+        if replication_policy_name:
+            filter_value = 'name={}'.format(replication_policy_name)
+            cli_replication_policy = self.client.svcinfo.lsreplicationpolicy(filtervalue=filter_value).as_single_element
+            if not cli_replication_policy:
+                raise  array_errors.InvalidArgumentError("partition replication policy not found")
+            if cli_replication_policy.topology == "2-site-ha":
+                use_thin_clone = True
         cli_snapshot = self._add_vg_snapshot(name, cli_volume.volume_group_name)
         try:
             if not space_efficiency:
                 space_efficiency_aliases = _get_cli_volume_space_efficiency_aliases(cli_volume)
                 space_efficiency = space_efficiency_aliases.pop()
             self._create_cli_volume_from_vg_snapshot(name, pool, io_group, volume_group, cli_snapshot.snapshot_id,
-                                                     cli_volume.id, space_efficiency)
+                                                     cli_volume.id, space_efficiency, use_thin_clone)
         finally:
             logger.info("Remove temp snapshot")
             self.client.svctask.rmsnapshot(snapshotid=cli_snapshot.snapshot_id)
