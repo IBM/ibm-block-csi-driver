@@ -774,7 +774,7 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
         if not cli_volume.volume_group_name:
             raise array_errors.InvalidArgumentError("volume group not specified")
         if self._verify_volume_group_of_partition_name(partition_name, cli_volume.volume_group_name) is False:
-            raise array_errors.InvalidArgumentError("volume group not part of partition")a
+            raise array_errors.InvalidArgumentError("volume group not part of partition")
         use_thin_clone = False
         logger.info("get partition {}".format(str(partition_name)))
         filter_value = 'name={}'.format(partition_name)
