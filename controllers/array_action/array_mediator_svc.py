@@ -760,10 +760,10 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
             raise ex
 
     def _create_cli_volume_from_vg_snapshot(self, name, pool, io_group, volume_group, vg_snapshot_name,
-                                            vol_name, vol_vg, space_efficiency):
+                                            vol_name, vol_vg, space_efficiency, use_thin_clone):
         logger.info("creating volume from vg snapshot")
         cli_kwargs = {
-            'type': 'clone',
+            'type': 'thinclone' if use_thin_clone else 'clone',
             'snapshot': vg_snapshot_name,
             'fromsourcegroup': vol_vg,  # vg where the volume we want restored is in
             'pool': pool,
@@ -772,8 +772,9 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
         }
         if io_group:
             cli_kwargs['iogrp'] = io_group
-        space_efficiency_kwargs = _get_space_efficiency_kwargs(space_efficiency)
-        cli_kwargs.update(space_efficiency_kwargs)
+        if not use_thin_clone:
+            space_efficiency_kwargs = _get_space_efficiency_kwargs(space_efficiency)
+            cli_kwargs.update(space_efficiency_kwargs)
         try:
             self.client.svctask.mkvolume(name=name, **cli_kwargs)
         except (svc_errors.CommandExecutionError, CLIFailureError) as ex:
@@ -792,6 +793,22 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
             raise array_errors.InvalidArgumentError("volume group not specified")
         if self._verify_volume_group_of_partition_name(partition_name, cli_volume.volume_group_name) is False:
             raise array_errors.InvalidArgumentError("volume group not part of partition")
+        use_thin_clone = False
+        logger.info("get partition {}".format(str(partition_name)))
+        filter_value = 'name={}'.format(partition_name)
+        cli_partition = self.client.svcinfo.lspartition(filtervalue=filter_value).as_single_element
+        if not cli_partition:
+            raise array_errors.InvalidArgumentError("partition not found")
+        replication_policy_name = cli_partition.replication_policy_name
+        logger.info("replication_policy {}".format(str(replication_policy_name)))
+        if replication_policy_name:
+            filter_value = 'name={}'.format(replication_policy_name)
+            cli_replication_policy = self.client.svcinfo.lsreplicationpolicy(filtervalue=filter_value).as_single_element
+            if not cli_replication_policy:
+                raise array_errors.InvalidArgumentError("partition replication policy not found")
+            logger.info("replication_topolgy {}".format(str(cli_replication_policy.topology)))
+            if cli_replication_policy.topology == "2-site-ha":
+                use_thin_clone = True
         cli_snapshot = self._add_vg_snapshot(name, cli_volume.volume_group_name)
         try:
             if not space_efficiency:
@@ -799,7 +816,7 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
                 space_efficiency = space_efficiency_aliases.pop()
             self._create_cli_volume_from_vg_snapshot(name, pool, io_group, volume_group, cli_snapshot.snapshot_name,
                                                      cli_volume.name, cli_volume.volume_group_name,
-                                                     space_efficiency)
+                                                     space_efficiency, use_thin_clone)
         finally:
             try:
                 logger.info("Remove temp snapshot")
