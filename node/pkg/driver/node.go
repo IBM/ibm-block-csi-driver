@@ -74,6 +74,7 @@ type NodeMounter interface {
 
 // nodeService represents the node service of CSI driver
 type NodeService struct {
+	// csi.NodeServer
 	Mounter                     NodeMounter
 	ConfigYaml                  ConfigFile
 	Hostname                    string
