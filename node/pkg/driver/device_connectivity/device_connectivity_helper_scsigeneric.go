@@ -228,13 +228,6 @@ func iowr(t, nr, size uint32) uintptr {
 
 
 
-
-
-
-
-
-
-
 const (
 	DevPath                     = "/dev"
 	DevMapperPath               = "/dev/mapper"
@@ -1211,7 +1204,7 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) TeardownVolume(target string, ex
 	// --- PHASE 2: BLOCK LAYER (IDENTITY & OPENCOUNT) ---
 	if mpathName != "" {
 		// Verify OpenCount to determine removal strategy
-		openCount := r.Help.getOpenCount(mpathName)
+		openCount := r.Helper.getOpenCount(mpathName)
 
 		needDeferRemove := false
 
@@ -1233,11 +1226,12 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) TeardownVolume(target string, ex
 
 			// 2. DELETE: Socket call (Interruptible)
 			// Note: Assuming ExecuteInterruptible also uses Generics now for consistency
-			_, err := r.KeyedGater.ExecuteInterruptible[struct{}](
+			_, err := r.KeyedGater.ExecuteUninterruptible[struct{}](
 				"mpath-socket",
 				3,
 				20,
 				10*time.Second,
+				0,
 				func(ctx context.Context) (struct{}, error) {
 					err := r.multipathdAction("del map " + mpathName)
 					return struct{}{}, err
@@ -1258,7 +1252,7 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) TeardownVolume(target string, ex
 			needDeferRemove = true
 		}
 		if needDeferRemove {
-			_ = c.multipathdAction("disablequeueing map " + mpathName)
+			_ = r.multipathdAction("disablequeueing map " + mpathName)
 			for _, s := range slaves {
 				_ = r.multipathdAction("fail path " + s)
 			}
@@ -1822,6 +1816,8 @@ type OsDeviceConnectivityHelperInterface interface {
 	GetMpathDeviceName(volumePath string) (string, error)
 	GetMpathVolumeId(mpathdOutput string, mpathDeviceName string, dmDirectory string) (string, error)
 	normalizeWWID(raw string) string
+	findDMByWWID(wwid string) string
+	getSlavesForDevice(major, minor int) ([]string, error)
 }
 
 type OsDeviceConnectivityHelperGeneric struct {
