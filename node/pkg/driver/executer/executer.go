@@ -26,7 +26,7 @@ import (
 	"io/ioutil"
 	"net"
 	"os"
-	"os/exec"
+	exec "os/exec"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -35,6 +35,7 @@ import (
 	"syscall"
 	"time"
 
+	k8sexec "k8s.io/utils/exec"
 	"github.com/ibm/ibm-block-csi-driver/node/logger"
 )
 
@@ -80,35 +81,35 @@ func NewExecuter() * Executer {
 }
 
 
-const DefaultMaxOutput = 1024 * 1024
-
 //Command Category
 //	Typical Size	Recommended Limit	Why?
 //Transaction (mount, login, remove)	< 1KB	64KB	Prevents "log spam" from eating your RAM.
 //Status (multipath -ll, iscsiadm -m node)	10KB - 1MB	2MB	Enough for typical node density.
 //nventory (discoverydb, scan)	1MB - 5MB	10MB	Prevents truncation on high-density nodes.
 
+var _ k8sexec.Interface = &Executer{}
+var _ k8sexec.Cmd = &safeCmd{}
 
 
-const DefaultMaxOutput int64 = 1024 * 1024 // 1MB limit for safety
+const DefaultMaxOutput int = 1024 * 1024 // 1MB limit for safety
 
 // limitWriter prevents chatty commands from causing OOM
 type limitWriter struct {
 	io.Writer
-	Limit int64
-	curr  int64
+	Limit int
+	curr  int
 }
 
 func (w *limitWriter) Write(p []byte) (n int, err error) {
 	if w.curr >= w.Limit {
 		return len(p), nil // Silently drop overflow
 	}
-	toWrite := int64(len(p))
+	toWrite := int(len(p))
 	if w.curr+toWrite > w.Limit {
 		toWrite = w.Limit - w.curr
 	}
 	n, err = w.Writer.Write(p[:toWrite])
-	w.curr += int64(n)
+	w.curr += int(n)
 	return len(p), err // Return len(p) to avoid "short write" errors in cmd
 }
 
@@ -118,10 +119,10 @@ type safeCmd struct {
 	name     string
 	args     []string
 	ctx      context.Context
-	executor *safeExec
+	executor *Executer
 }
 
-func (e *Executer) CommandContext(ctx context.Context, name string, args ...string) mount.Cmd {
+func (e *Executer) CommandContext(ctx context.Context, name string, args ...string) k8sexec.Cmd {
 	cmd := exec.CommandContext(ctx, name, args...)
 	// (1) Inject WaitDelay: If process exits but pipes remain open, 
 	// or if context is cancelled, Wait() will wait this long before SIGKILL.
@@ -136,55 +137,101 @@ func (e *Executer) CommandContext(ctx context.Context, name string, args ...stri
 	}
 }
 
-func (e *Executer) Command(name string, args ...string) mount.Cmd {
+func (e *Executer) Command(name string, args ...string) k8sexec.Cmd {
 	return e.CommandContext(context.Background(), name, args...)
 }
 
-func (s *Executer) CombinedOutput() ([]byte, error) {
-	// (2) Extract device from parameters
+
+
+
+
+
+
+func (s *safeCmd) Start() error {
+    device := s.extractDevice()
+    if device != "" {
+        if s.executor.IsDeviceStillStuck(device) {
+            return fmt.Errorf("node-safety: previous %s process is still stuck for device %s", s.name, device)
+        }
+    }
+
+    // Wrap Stdout if it exists, or provide a default buffer
+    if s.Cmd.Stdout != nil {
+        s.Cmd.Stdout = &limitWriter{Writer: s.Cmd.Stdout, Limit: DefaultMaxOutput}
+    } else {
+        s.Cmd.Stdout = &limitWriter{Writer: &bytes.Buffer{}, Limit: DefaultMaxOutput}
+    }
+
+    // CRITICAL: Do the same for Stderr to prevent OOM from error logs
+    if s.Cmd.Stderr != nil {
+        s.Cmd.Stderr = &limitWriter{Writer: s.Cmd.Stderr, Limit: DefaultMaxOutput}
+    } else {
+        s.Cmd.Stderr = &limitWriter{Writer: &bytes.Buffer{}, Limit: DefaultMaxOutput}
+    }
+
+    return s.Cmd.Start()
+}
+
+
+func (s *safeCmd) Wait() error {
+	err := s.Cmd.Wait()
 	device := s.extractDevice()
 
-	if device != "" {
-		// Check if the device is already blocked due to a previous hang
-		if s.executor.stuckTracker.IsDeviceStillStuck(device) {
-			return nil, fmt.Errorf("node-safety: previous %s process is still stuck in kernel D-state for device %s", s.name, device)
-		}
+	var pid int
+	if s.Cmd.Process != nil {
+		pid = s.Cmd.Process.Pid
 	}
-
-	// Setup Output Limiter
-	var output bytes.Buffer
-	lWriter := &limitWriter{Writer: &output, Limit: DefaultMaxOutput}
-	s.Cmd.Stdout = lWriter
-	s.Cmd.Stderr = lWriter
-
-	// Start the command
-	if err := s.Cmd.Start(); err != nil {
-		return nil, fmt.Errorf("failed to start command: %w", err)
-	}
-
-	pid := s.Cmd.Process.Pid
-	
-	// (3) Handle Result and WaitDelay logic
-	err := s.Cmd.Wait()
-	captured := output.Bytes()
 
 	if err != nil {
-		// Check specifically for context timeout or WaitDelay expiration
-		// exec.ErrWaitDelay indicates the process didn't exit after SIGKILL
-		if errors.Is(err, exec.ErrWaitDelay) || (s.ctx != nil && s.ctx.Err() != nil) {
+		// 3. Use s.ctx instead of s.Cmd.Context()
+		isTimeout := s.ctx != nil && s.ctx.Err() != nil
+		isWaitDelay := errors.Is(err, exec.ErrWaitDelay)
+
+		if isWaitDelay || isTimeout {
 			if device != "" {
-				s.executor.stuckTracker.MarkAsStuck(device, pid, s.name)
+				s.executor.markAsStuck(device, pid, s.name)
 			}
-			return captured, fmt.Errorf("process %d hung on %s (WaitDelay/Timeout): %w", pid, device, err)
 		}
-		return captured, fmt.Errorf("command %s failed: %w", s.name, err)
+		return err
 	}
 
-	// Success: Device is healthy, clear any existing block
+	// Success
 	if device != "" {
-		s.executor.stuckTracker.ClearTracking(device)
+		s.executor.clearTracking(device)
 	}
-	return captured, nil
+	return nil
+}
+
+// 3. High-level methods now naturally use the safe versions
+func (s *safeCmd) CombinedOutput() ([]byte, error) {
+	// Re-implementing CombinedOutput to use our safe Start/Wait
+	var b bytes.Buffer
+	s.SetStdout(&b)
+	s.SetStderr(&b)
+
+	if err := s.Start(); err != nil {
+		return nil, err
+	}
+	err := s.Wait()
+	return b.Bytes(), err
+}
+
+// Stop satisfies k8sexec.Cmd
+func (s *safeCmd) Stop() {
+	if s.Cmd.Process == nil {
+		return
+	}
+	// Attempt to kill the process
+	_ = s.Cmd.Process.Kill()
+	
+	// Optional: You could trigger your stuck logic here if 
+	// the process doesn't exit after a SIGKILL, but usually 
+	// the WaitDelay in the main Wait() call handles this better.
+}
+
+// LookPath satisfies k8sexec.Interface
+func (e *Executer) LookPath(file string) (string, error) {
+	return exec.LookPath(file)
 }
 
 func (s *safeCmd) extractDevice() string {
@@ -216,9 +263,9 @@ func (s *safeCmd) SetDir(dir string) {
 	s.Cmd.Dir = dir
 }
 
-// Satisfy mount.Exec interface
-var _ mount.Exec = &safeExec{}
-
+func (s *safeCmd) SetStdout(out io.Writer) { s.Cmd.Stdout = out }
+func (s *safeCmd) SetStderr(out io.Writer) { s.Cmd.Stderr = out }
+func (s *safeCmd) SetStdin(in io.Reader)   { s.Cmd.Stdin = in }
 
 
 func (e *Executer) ExecuteWithTimeoutSilently(timeoutMs int, command string, args []string) ([]byte, error) {

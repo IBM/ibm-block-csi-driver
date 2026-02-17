@@ -19,7 +19,6 @@ package mount
 import (
 	"bufio"
 	"context"
-	"errors"	
 	"fmt"
 	"os"
 	"path/filepath"
@@ -34,7 +33,6 @@ import (
 	"github.com/ibm/ibm-block-csi-driver/node/logger"
 	"github.com/ibm/ibm-block-csi-driver/node/pkg/driver/executer"
 	mount "k8s.io/mount-utils"
-	"k8s.io/utils/exec"
 )
 
 // default mount/unmount timeout interval, 30s
@@ -85,7 +83,7 @@ func New(mounterPath string, g *executer.KeyedGater, limit int32) mount.Interfac
 	return &Mounter{
 		Mounter:  mount.New(mounterPath).(*mount.Mounter),
 		executer: &executer.Executer{},
-		KeyGater: g,
+		KeyedGater: g,
 		maxStuckLimit: limit,
 	}
 }
@@ -94,7 +92,7 @@ func NewWithExecutor(mounterPath string, e executer.ExecuterInterface, g *execut
 	return &Mounter{
 		Mounter:  mount.New(mounterPath).(*mount.Mounter),
 		executer: e,
-		KeyGater: g,
+		KeyedGater: g,
 		maxStuckLimit: limit,
 	}
 }
@@ -130,7 +128,7 @@ func (m *Mounter) GetMountRefs(pathname string) ([]string, error) {
 // 3. OVERRIDE: Mount
 
 func (m *Mounter) Mount(source string, target string, fstype string, options []string) error {
-	return m.MountNativeWithTimeout(source, target, fstype, options, 30*time.Second) error
+	return m.MountNativeWithTimeout(source, target, fstype, options, 30*time.Second)
 }
 
 // 3. OVERRIDE: Unmount
@@ -144,7 +142,7 @@ func (m *Mounter) Unmount(target string) error {
 func (m *Mounter) List() ([]mount.MountPoint, error) {
 	// 1. Call our common low-level function that handles 
 	// octal unescaping and Major:Minor splitting.
-	rawMounts, err := GetMounts()
+	rawMounts, err := GetMounts("")
 	if err != nil {
 		return nil, err
 	}
@@ -180,16 +178,51 @@ func (m *Mounter) List() ([]mount.MountPoint, error) {
 }
 
 
-// DeviceOpened checks if a block device is currently opened by any process.
-// SafeFormatAndMount uses this to prevent formatting a device that is 
-// technically unmounted but still held open (e.g., by a disk utility).
-func (m *Mounter) DeviceOpened(pathname string) (bool, error) {
-	// The standard way to check this in Linux is attempting to open 
-	// the device with O_EXCL (Exclusive) mode.
-	// However, many implementations use 'lsblk' or check /sys/block.
-	// For a simple, safe implementation:
-	return mount.SearchForLongerMountPoints(pathname, []string{}, false)
+func (m *Mounter) SearchForLongerMountPoints(targetPath string, _ []string, _ bool) ([]mount.MountPoint, error) {
+	// 1. Get the "best" (longest) mount for this path
+	mi, err := findBestMount(targetPath)
+	if err != nil {
+		return nil, nil // No mount found is not an error here
+	}
+
+	// 2. Return it as the library's MountPoint struct
+	return []mount.MountPoint{
+		{
+			Device: mi.MountSource,
+			Path:   mi.MountPoint,
+			Type:   mi.FilesystemType,
+			Opts:   strings.Split(mi.MountOptions, ","),
+		},
+	}, nil
 }
+
+
+// DeviceOpened checks if a block device is currently opened/mounted.
+// It uses our safe, unescaped MountInfo list to avoid D-state hangs.
+func (m *Mounter) DeviceOpened(pathname string) (bool, error) {
+	// 1. Get the kernel name (e.g., /dev/sdb -> sdb)
+	devName := filepath.Base(pathname)
+
+	// 2. Get all current mounts using our safe low-level function
+	mounts, err := GetMounts("")
+	if err != nil {
+		return false, fmt.Errorf("failed to get mounts: %w", err)
+	}
+
+	// 3. Scan for any mount point using this device
+	for _, mnt := range mounts {
+		// We check both the full path and the base name for robustness
+		if mnt.MountSource == pathname || filepath.Base(mnt.MountSource) == devName {
+			return true, nil
+		}
+	}
+
+	// 4. Fallback: Check if it's held open by a process (optional/advanced)
+	// Some implementations try to open with O_EXCL, but that can be flaky.
+	// For SafeFormatAndMount, checking the mount table is the standard requirement.
+	return false, nil
+}
+
 
 // PathExists checks if the given path exists on the system.
 // This is used to ensure the mount point directory is ready.
@@ -763,7 +796,7 @@ func (m *Mounter) getLiveMounts() map[string]struct{} {
 		fields := strings.Fields(line)
 		if len(fields) >= 5 {
 			// Field 5 (index 4) is the mount point absolute path
-			found[m.unescapeProcPath(fields[4])] = struct{}{}
+			found[unescapeMountString(fields[4])] = struct{}{}
 		}
 	}
 	return found
@@ -831,7 +864,7 @@ func (m *Mounter) getMountsForPath(target string) ([]MountInfo, error) {
 		return nil, err
 	}
 
-	allMounts, err := GetMounts() // Our common low-level function
+	allMounts, err := GetMounts("") // Our common low-level function
 	if err != nil {
 		return nil, err
 	}
@@ -848,8 +881,8 @@ func (m *Mounter) getMountsForPath(target string) ([]MountInfo, error) {
 
 // Block Devices: You want the clean kernel name (e.g., sda1 instead of /dev/sda1).
 //Network Mounts: You want the remote export path (e.g., 192.168.1.10:/exports/data).
-func (m *MountParser) GetDeviceFromPath(targetPath string) (string, error) {
-	mi, err := m.findBestMount(targetPath)
+func (m *Mounter) GetDeviceFromPath(targetPath string) (string, error) {
+	mi, err := findBestMount(targetPath)
 	if err != nil {
 		return "", err
 	}
@@ -886,8 +919,9 @@ func GetMajorMinorFromSysfs(targetPath string) (int, int, error) {
 	return mi.Major, mi.Minor, nil
 }
 
+
 func findBestMount(targetPath string) (*MountInfo, error) {
-	mounts, err := GetMounts()
+	mounts, err := GetMounts("")
 	if err != nil {
 		return nil, err
 	}
@@ -923,7 +957,7 @@ type MountInfo struct {
 	SuperOptions   string
 }
 
-func GetMounts(argetPath string) ([]MountInfo, error) {
+func GetMounts(targetPath string) ([]MountInfo, error) {
 	absTarget := ""
 	if targetPath != "" {
 		absTarget, _ = filepath.Abs(targetPath)
@@ -998,7 +1032,7 @@ func parseInt(s string) int {
 	return v
 }
 
-func unescapeProcPath(path string) string {
+func unescapeMountString(path string) string {
 	if !strings.Contains(path, "\\") {
 		return path
 	}

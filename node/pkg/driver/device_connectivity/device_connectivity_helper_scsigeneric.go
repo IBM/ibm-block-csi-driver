@@ -255,7 +255,7 @@ const (
 	procMountsFilePath          = "/proc/mounts"
 )
 
-func NewOsDeviceConnectivityHelperScsiGeneric(executer executer.ExecuterInterface, executer.KeyedGater *KeyedGater, mount.Mounter* Mounter, NodeUtils NodeUtils, clean_scsi_device bool) OsDeviceConnectivityHelperScsiGenericInterface {
+func NewOsDeviceConnectivityHelperScsiGeneric(executer executer.ExecuterInterface, KeyedGater *executer.KeyedGater, Mounter *mount.Mounter, NodeUtils NodeUtils, clean_scsi_device bool) OsDeviceConnectivityHelperScsiGenericInterface {
 	return &OsDeviceConnectivityHelperScsiGeneric{
 		Executer:        executer,
 		KeyedGater:      KeyedGater,
@@ -2519,7 +2519,7 @@ func (o *OsDeviceConnectivityHelperGeneric) GetOpenCount(dmName string) (int32, 
 	return io.OpenCount, nil
 }
 
-func (o *OsDeviceConnectivityHelperGeneric) GetMajorMinorFromSysfs(devicePath string) (major int, minor int, error) {
+func (o *OsDeviceConnectivityHelperGeneric) GetMajorMinorFromSysfs(devicePath string) (major int, minor int, err error) {
     var st syscall.Stat_t
     if err := syscall.Stat(devicePath, &st); err != nil {
         return 0, 0, fmt.Sprintf("stale-%s-%d", devicePath, time.Now().UnixNano())
