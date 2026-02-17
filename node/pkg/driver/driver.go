@@ -39,6 +39,8 @@ type Driver struct {
 	srv      *grpc.Server
 	endpoint string
 	config   ConfigFile
+	// csi.UnimplementedIdentityServer
+	// csi.UnimplementedNodeServer
 }
 
 func NewDriver(endpoint string, configFilePath string, hostname string, max_invocations int, clean_scsi_device bool) (*Driver, error) {
