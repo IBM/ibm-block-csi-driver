@@ -326,7 +326,6 @@ func (d *NodeService) resolveFsTypeForMount(requestedFsType string, existingForm
 
 
 
-// Since mkfs must remain an external process, we wrap it in a Global Mutex and use your ExecuteWithTimeout logic to prevent the "Memory Explosion" and "D-state hangs."
 func (d *NodeService) formatAndMount(mpathDevice string, stagingPath string, fsTypeForMount string, existingFormat string) error {
 	if existingFormat == "" {
 			d.NodeUtils.FormatDevice(mpathDevice, fsTypeForMount)

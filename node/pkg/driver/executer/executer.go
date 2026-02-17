@@ -69,6 +69,8 @@ type Executer struct {
 	cachedSocket string
 
 	sl SocketLimiter
+	
+	waitDelay    time.Duration
 }
 
 func NewExecuter() * Executer {
@@ -87,6 +89,10 @@ const DefaultMaxOutput = 1024 * 1024
 //nventory (discoverydb, scan)	1MB - 5MB	10MB	Prevents truncation on high-density nodes.
 
 
+
+const DefaultMaxOutput int64 = 1024 * 1024 // 1MB limit for safety
+
+// limitWriter prevents chatty commands from causing OOM
 type limitWriter struct {
 	io.Writer
 	Limit int64
@@ -106,6 +112,112 @@ func (w *limitWriter) Write(p []byte) (n int, err error) {
 	return len(p), err // Return len(p) to avoid "short write" errors in cmd
 }
 
+// safeCmd wraps the standard Cmd to add device-aware safety logic
+type safeCmd struct {
+	*exec.Cmd
+	name     string
+	args     []string
+	ctx      context.Context
+	executor *safeExec
+}
+
+func (e *Executer) CommandContext(ctx context.Context, name string, args ...string) mount.Cmd {
+	cmd := exec.CommandContext(ctx, name, args...)
+	// (1) Inject WaitDelay: If process exits but pipes remain open, 
+	// or if context is cancelled, Wait() will wait this long before SIGKILL.
+	cmd.WaitDelay = e.waitDelay
+
+	return &safeCmd{
+		Cmd:      cmd,
+		name:     name,
+		args:     args,
+		ctx:      ctx,
+		executor: e,
+	}
+}
+
+func (e *Executer) Command(name string, args ...string) mount.Cmd {
+	return e.CommandContext(context.Background(), name, args...)
+}
+
+func (s *Executer) CombinedOutput() ([]byte, error) {
+	// (2) Extract device from parameters
+	device := s.extractDevice()
+
+	if device != "" {
+		// Check if the device is already blocked due to a previous hang
+		if s.executor.stuckTracker.IsDeviceStillStuck(device) {
+			return nil, fmt.Errorf("node-safety: previous %s process is still stuck in kernel D-state for device %s", s.name, device)
+		}
+	}
+
+	// Setup Output Limiter
+	var output bytes.Buffer
+	lWriter := &limitWriter{Writer: &output, Limit: DefaultMaxOutput}
+	s.Cmd.Stdout = lWriter
+	s.Cmd.Stderr = lWriter
+
+	// Start the command
+	if err := s.Cmd.Start(); err != nil {
+		return nil, fmt.Errorf("failed to start command: %w", err)
+	}
+
+	pid := s.Cmd.Process.Pid
+	
+	// (3) Handle Result and WaitDelay logic
+	err := s.Cmd.Wait()
+	captured := output.Bytes()
+
+	if err != nil {
+		// Check specifically for context timeout or WaitDelay expiration
+		// exec.ErrWaitDelay indicates the process didn't exit after SIGKILL
+		if errors.Is(err, exec.ErrWaitDelay) || (s.ctx != nil && s.ctx.Err() != nil) {
+			if device != "" {
+				s.executor.stuckTracker.MarkAsStuck(device, pid, s.name)
+			}
+			return captured, fmt.Errorf("process %d hung on %s (WaitDelay/Timeout): %w", pid, device, err)
+		}
+		return captured, fmt.Errorf("command %s failed: %w", s.name, err)
+	}
+
+	// Success: Device is healthy, clear any existing block
+	if device != "" {
+		s.executor.stuckTracker.ClearTracking(device)
+	}
+	return captured, nil
+}
+
+func (s *safeCmd) extractDevice() string {
+	for _, arg := range s.args {
+		// Standard path (/dev/sdb)
+		if strings.HasPrefix(arg, "/dev/") {
+			return arg
+		}
+		// Flag-wrapped path (--device=/dev/sdb)
+		if strings.Contains(arg, "=/dev/") {
+			parts := strings.SplitN(arg, "=", 2)
+			return parts[1]
+		}
+		// Persistent Identifiers (UUID=... or LABEL=...)
+		if strings.HasPrefix(arg, "UUID=") || strings.HasPrefix(arg, "LABEL=") {
+			return arg
+		}
+	}
+	return ""
+}
+
+// SetEnv satisfies the mount.Cmd interface
+func (s *safeCmd) SetEnv(env []string) {
+	s.Cmd.Env = env
+}
+
+// SetDir satisfies the mount.Cmd interface
+func (s *safeCmd) SetDir(dir string) {
+	s.Cmd.Dir = dir
+}
+
+// Satisfy mount.Exec interface
+var _ mount.Exec = &safeExec{}
 
 
 

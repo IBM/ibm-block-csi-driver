@@ -19,6 +19,7 @@ package mount
 import (
 	"bufio"
 	"context"
+	"errors"	
 	"fmt"
 	"os"
 	"path/filepath"
@@ -33,6 +34,7 @@ import (
 	"github.com/ibm/ibm-block-csi-driver/node/logger"
 	"github.com/ibm/ibm-block-csi-driver/node/pkg/driver/executer"
 	mount "k8s.io/mount-utils"
+	"k8s.io/utils/exec"
 )
 
 // default mount/unmount timeout interval, 30s
@@ -79,15 +81,16 @@ type Mounter struct {
 
 var _ mount.Interface = &Mounter{}
 
-func New(mounterPath string, limit int32) mount.Interface {
+func New(mounterPath string, g *executer.KeyedGater, limit int32) mount.Interface {
 	return &Mounter{
 		Mounter:  mount.New(mounterPath).(*mount.Mounter),
 		executer: &executer.Executer{},
+		KeyGater: g,
 		maxStuckLimit: limit,
 	}
 }
 
-func NewWithExecutor(mounterPath string, e *executer.ExecuterInterface, g *executer.KeyedGater, limit int32) mount.Interface {
+func NewWithExecutor(mounterPath string, e executer.ExecuterInterface, g *executer.KeyedGater, limit int32) mount.Interface {
 	return &Mounter{
 		Mounter:  mount.New(mounterPath).(*mount.Mounter),
 		executer: e,
@@ -96,16 +99,16 @@ func NewWithExecutor(mounterPath string, e *executer.ExecuterInterface, g *execu
 	}
 }
 
-
-
 // 1. OVERRIDE: IsLikelyNotMountPoint
 func (m *Mounter) IsLikelyNotMountPoint(file string) (bool, error) {
 	isMounted, err := m.isMountedInProc(file)
-	if err != nil { return true, err }
+	if err != nil {
+		return true, err
+	}
 	return !isMounted, nil
 }
 
-// 2. OVERRIDE: IsMountPoin
+
 func (m *Mounter) IsMountPoint(file string) (bool, error) {
 	return m.isMountedInProc(file)
 }
@@ -123,6 +126,95 @@ func (m *Mounter) GetMountRefs(pathname string) ([]string, error) {
 	}
 	return refs, nil
 }
+
+// 3. OVERRIDE: Mount
+
+func (m *Mounter) Mount(source string, target string, fstype string, options []string) error {
+	return m.MountNativeWithTimeout(source, target, fstype, options, 30*time.Second) error
+}
+
+// 3. OVERRIDE: Unmount
+
+func (m *Mounter) Unmount(target string) error {
+	return m.UnmountWithTimeout(target, 30*time.Second)
+}
+
+// 3. OVERRIDE: List
+// List retrieves all mount points by calling our common low-level GetMounts
+func (m *Mounter) List() ([]mount.MountPoint, error) {
+	// 1. Call our common low-level function that handles 
+	// octal unescaping and Major:Minor splitting.
+	rawMounts, err := GetMounts()
+	if err != nil {
+		return nil, err
+	}
+
+	var results []mount.MountPoint
+	for _, rm := range rawMounts {
+		// 2. Differentiate source based on your requirements
+		device := rm.MountSource
+		if strings.HasPrefix(device, "/dev/") {
+			// For block devices, return the base name (e.g., "sda1")
+			device = filepath.Base(device)
+		}
+		// Note: For NFS/CIFS, the full unescaped source is preserved in rm.MountSource
+
+		// 3. Map to the library-defined MountPoint struct
+		mp := mount.MountPoint{
+			Device: device,
+			Path:   rm.MountPoint,     // Already unescaped by our common function
+			Type:   rm.FilesystemType,
+			Opts:   strings.Split(rm.MountOptions, ","),
+		}
+
+		// 4. Merge SuperOptions (FS-specific) into the Opts slice
+		if rm.SuperOptions != "" {
+			superOpts := strings.Split(rm.SuperOptions, ",")
+			mp.Opts = append(mp.Opts, superOpts...)
+		}
+
+		results = append(results, mp)
+	}
+
+	return results, nil
+}
+
+
+// DeviceOpened checks if a block device is currently opened by any process.
+// SafeFormatAndMount uses this to prevent formatting a device that is 
+// technically unmounted but still held open (e.g., by a disk utility).
+func (m *Mounter) DeviceOpened(pathname string) (bool, error) {
+	// The standard way to check this in Linux is attempting to open 
+	// the device with O_EXCL (Exclusive) mode.
+	// However, many implementations use 'lsblk' or check /sys/block.
+	// For a simple, safe implementation:
+	return mount.SearchForLongerMountPoints(pathname, []string{}, false)
+}
+
+// PathExists checks if the given path exists on the system.
+// This is used to ensure the mount point directory is ready.
+func (m *Mounter) PathExists(pathname string) (bool, error) {
+	_, err := os.Stat(pathname)
+	if err == nil {
+		return true, nil
+	}
+	if os.IsNotExist(err) {
+		return false, nil
+	}
+	// Return the error for other cases (like permission denied)
+	return false, err
+}
+
+// MakeDir creates the target directory if it doesn't exist.
+// Often required by the SafeFormatAndMount logic flow.
+func (m *Mounter) MakeDir(pathname string) error {
+	err := os.MkdirAll(pathname, 0750)
+	if err != nil {
+		return fmt.Errorf("failed to create directory %s: %v", pathname, err)
+	}
+	return nil
+}
+
 
 func (m *Mounter) UnmountWithTimeout(target string, timeout time.Duration) error {
     now := time.Now()
@@ -731,188 +823,198 @@ func (m *Mounter) isMountedInProc(target string) (bool, error) {
 }
 
 
-func (m *Mounter) getDeviceFromMountInfo(volumePath string) (string, error) {
-	// Normalize path: absolute and cleaned
-	absTarget, _ := filepath.Abs(volumePath)
-	absTarget = filepath.Clean(absTarget)
+// getMountsForPath returns all MountInfo entries matching the target path.
+func (m *Mounter) getMountsForPath(target string) ([]MountInfo, error) {
+	// Clean the path to handle trailing slashes or relative segments.
+	targetPath, err := filepath.Abs(filepath.Clean(target))
+	if err != nil {
+		return nil, err
+	}
 
-	f, err := os.Open("/proc/self/mountinfo")
-	if err != nil { return "", err }
-	defer f.Close()
+	allMounts, err := GetMounts() // Our common low-level function
+	if err != nil {
+		return nil, err
+	}
 
-	// Use 1MB buffer for high-density nodes (avoids 'token too long' errors)
-	scanner := bufio.NewScanner(f)
-	buf := make([]byte, 1024*1024)
-	scanner.Buffer(buf, 1024*1024)
+	var matched []MountInfo
+	for _, mnt := range allMounts {
+		if mnt.MountPoint == targetPath {
+			matched = append(matched, mnt)
+		}
+	}
+	return matched, nil
+}
 
-	for scanner.Scan() {
-		line := scanner.Text()
-		// Performance optimization: skip non-candidate lines
-		if !strings.Contains(line, absTarget) { continue }
 
-		fields := strings.Fields(line)
-		if len(fields) < 7 { continue }
+// Block Devices: You want the clean kernel name (e.g., sda1 instead of /dev/sda1).
+//Network Mounts: You want the remote export path (e.g., 192.168.1.10:/exports/data).
+func (m *MountParser) GetDeviceFromPath(targetPath string) (string, error) {
+	mi, err := m.findBestMount(targetPath)
+	if err != nil {
+		return "", err
+	}
 
-		// Unescape octal-encoded paths (e.g. \040 for space)
-		mountPoint := m.unescapeProcPath(fields[4])
-		if filepath.Clean(mountPoint) != absTarget { continue }
+	source := mi.MountSource
+	fstype := mi.FilesystemType
 
-		// Locate the "-" separator to bypass variable 'optional fields'
-		for i := 6; i < len(fields); i++ {
-			if fields[i] == "-" && i+2 < len(fields) {
-				fstype := fields[i+1]
-				source := m.unescapeProcPath(fields[i+2])
+	// 1. Handle Block Devices
+	// If it's a standard /dev/ path, return just the base (e.g., "nvme0n1p3")
+	if strings.HasPrefix(source, "/dev/") {
+		return filepath.Base(source), nil
+	}
 
-				if strings.HasPrefix(source, "/dev/") {
-					return filepath.Base(source), nil
-				}
-				// Handle specific network protocols
-				switch fstype {
-				case "nfs", "nfs4", "cifs", "ceph", "glusterfs":
-					return source, nil
-				default:
-					return filepath.Base(source), nil
-				}
+	// 2. Handle Network/Pseudo Filesystems
+	// For these, the "source" is often an IP, a hostname, or a specific string
+	switch fstype {
+	case "nfs", "nfs4", "cifs", "ceph", "glusterfs", "fuse.sshfs":
+		return source, nil // Keep the full remote path/address
+	case "tmpfs", "devtmpfs":
+		return fstype, nil // Usually better to know it's RAM than "tmpfs"
+	default:
+		// Fallback: If it's not a /dev path but we don't recognize the FS,
+		// use the base name as a safe bet.
+		return filepath.Base(source), nil
+	}
+}
+
+
+func GetMajorMinorFromSysfs(targetPath string) (int, int, error) {
+	mi, err := findBestMount(targetPath)
+	if err != nil {
+		return 0, 0, err
+	}
+	return mi.Major, mi.Minor, nil
+}
+
+func findBestMount(targetPath string) (*MountInfo, error) {
+	mounts, err := GetMounts()
+	if err != nil {
+		return nil, err
+	}
+
+	var bestMatch *MountInfo
+	maxLen := -1
+	for _, m := range mounts {
+		if strings.HasPrefix(targetPath, m.MountPoint) {
+			if len(m.MountPoint) > maxLen {
+				maxLen = len(m.MountPoint)
+				bestMatch = &m
 			}
 		}
 	}
-	if err := scanner.Err(); err != nil {
-		return "", fmt.Errorf("failed to scan mountinfo: %w", err)
+
+	if bestMatch == nil {
+		return nil, fmt.Errorf("no mount found for %s", targetPath)
 	}
-	return "", fmt.Errorf("path %s not in mount table", volumePath)
+	return bestMatch, nil
 }
 
-
-func (m *Mounter) unescapeProcPath(path string) string {
-	// Fast path: most paths aren't escaped
-    if !strings.Contains(path, "\\") {
-        return path
-    }
-    var result strings.Builder
-    for i := 0; i < len(path); i++ {
-        if path[i] == '\\' && i+3 < len(path) {
-            if n, err := strconv.ParseUint(path[i+1:i+4], 8, 8); err == nil {
-                result.WriteByte(byte(n))
-                i += 3
-                continue
-            }
-        }
-        result.WriteByte(path[i])
-    }
-    return result.String()
+type MountInfo struct {
+	MountID        int
+	ParentID       int
+	Major          int    // Integer major device number
+	Minor          int    // Integer minor device number
+	Root           string
+	MountPoint     string
+	MountOptions   string
+	OptionalFields string
+	FilesystemType string
+	MountSource    string
+	SuperOptions   string
 }
 
+func GetMounts(argetPath string) ([]MountInfo, error) {
+	absTarget := ""
+	if targetPath != "" {
+		absTarget, _ = filepath.Abs(targetPath)
+		absTarget = filepath.Clean(absTarget)
+	}
 
-// MountEntry represents a simplified version of a /proc/self/mountinfo line
-type MountEntry struct {
-	MountID    int
-	ParentID   int
-	Major      int
-	Minor      int
-	Root       string
-	MountPoint string
-	Options    []string
-}
-
-// getMountsForPath returns ALL mounts found at a specific target path.
-// It is common in K8s to find multiple mounts (e.g. a bind-mount on top of a device mount).
-func (m *Mounter) getMountsForPath(targetPath string) ([]MountEntry, error) {
-	absTarget, _ := filepath.Abs(targetPath)
-	absTarget = filepath.Clean(absTarget)
-
-	// 1. Gated Open: Reading /proc can hang if unrelated mounts are wedged.
 	f, err := os.Open("/proc/self/mountinfo")
 	if err != nil {
 		return nil, err
 	}
 	defer f.Close()
 
-	var results []MountEntry
-
-	// 2. Pre-allocated Buffer:
-	// We allocate a 1MB buffer ONCE. This is large enough for the densest
-	// mountinfo lines while preventing the scanner from growing the heap
-	// dynamically for every long line it encounters.
+	var mounts []MountInfo
 	scanner := bufio.NewScanner(f)
 	const maxCapacity = 1024 * 1024 // 1MB
 	buf := make([]byte, maxCapacity)
 	scanner.Buffer(buf, maxCapacity)
 
 	for scanner.Scan() {
-		// scanner.Text() creates a string copy. For extreme memory safety
-		// on RHEL 7, we could use scanner.Bytes(), but Text() is safer
-		// for immediate parsing.
-		line := scanner.Text()
-
-		// 3. Fast Path String Check:
-		// Avoids expensive field splitting if the target isn't in the line.
-		if !strings.Contains(line, absTarget) {
+		fields := strings.Fields(scanner.Text())
+		if len(fields) < 10 {
 			continue
 		}
-
-		// Structure of /proc/self/mountinfo:
-		// 0:mountID 1:parentID 2:major:minor 3:root 4:mountpoint 5:opts 6:optional...
-
-		fields := strings.Fields(line)
-		if len(fields) < 5 {
+		
+		mountPoint := unescapeMountString(fields[4])
+		
+		if absTarget != "" && filepath.Clean(mountPoint) != absTarget {
 			continue
 		}
-
-		// 4. Proper Unescaping:
-		// Handles octal escapes (\040) safely without regex overhead.
-		mountPoint := m.unescapeProcPath(fields[4])
-		if mountPoint != absTarget {
-			continue
-		}
+		
 
 		devParts := strings.Split(fields[2], ":")
-		var major, minor int
 		if len(devParts) != 2 {
+			continue // Or handle as malformed line
+		}
+
+		major, errMajor := strconv.Atoi(devParts[0])
+		minor, errMinor := strconv.Atoi(devParts[1])
+		if errMajor != nil || errMinor != nil {
 			continue
 		}
-		major, _ = strconv.Atoi(devParts[0])
-		minor, _ = strconv.Atoi(devParts[1])
-		mountID, _ := strconv.Atoi(fields[0])
-		parentID, _ := strconv.Atoi(fields[1])
+		
+		// Find the separator "-"
+		sepIdx := -1
+		for i := 6; i < len(fields); i++ {
+			if fields[i] == "-" {
+				sepIdx = i
+				break
+			}
+		}
+		if sepIdx == -1 { continue }
 
-		results = append(results, MountEntry{
-			MountID:    mountID,
-			ParentID:   parentID,
-			Major:      major,
-			Minor:      minor,
-			Root:       fields[3],
-			MountPoint: mountPoint,
-			Options:    strings.Split(fields[5], ","),
+		// CRITICAL: Unescape Root, MountPoint, and MountSource
+		mounts = append(mounts, MountInfo{
+			MountID:        parseInt(fields[0]),
+			ParentID:       parseInt(fields[1]),
+			Major:          major,
+			Minor:          minor,
+			Root:           unescapeMountString(fields[3]),
+			MountPoint:     mountPoint,
+			MountOptions:   fields[5],
+			FilesystemType: fields[sepIdx+1],
+			MountSource:    unescapeMountString(fields[sepIdx+2]),
+			SuperOptions:   fields[sepIdx+3],
 		})
 	}
+	return mounts, scanner.Err()
+}
 
-	if err := scanner.Err(); err != nil {
-		return nil, fmt.Errorf("mountinfo scan error: %w", err)
+func parseInt(s string) int {
+	v, _ := strconv.Atoi(s)
+	return v
+}
+
+func unescapeProcPath(path string) string {
+	if !strings.Contains(path, "\\") {
+		return path
 	}
-
-	return results, nil
+	var res strings.Builder
+	res.Grow(len(path)) // Optimization: pre-allocate memory
+	for i := 0; i < len(path); i++ {
+		if path[i] == '\\' && i+3 < len(path) {
+			// Try to parse the next 3 chars as octal
+			if val, err := strconv.ParseUint(path[i+1:i+4], 8, 8); err == nil {
+				res.WriteByte(byte(val))
+				i += 3
+				continue
+			}
+		}
+		res.WriteByte(path[i])
+	}
+	return res.String()
 }
 
-func unescapeMountPath(path string) string {
-    if !strings.Contains(path, "\\") {
-        return path
-    }
-    // Replaces octal escapes (e.g. \040) with actual characters
-    // This is safer than a fixed replacer for arbitrary user paths.
-    var res strings.Builder
-    for i := 0; i < len(path); i++ {
-        if path[i] == '\\' && i+3 < len(path) {
-            if val, err := strconv.ParseUint(path[i+1:i+4], 8, 8); err == nil {
-                res.WriteByte(byte(val))
-                i += 3
-                continue
-            }
-        }
-        res.WriteByte(path[i])
-    }
-    return res.String()
-}
-
-func (m *Mounter) getMajorMinorFromSysfs(targetPath string) (major int, minor int, error) {
-	MountEntry entries := m.
-}
