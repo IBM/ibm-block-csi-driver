@@ -17,23 +17,18 @@
 package device_connectivity
 
 import (
-	"bufio"
 	"context"
 	"encoding/binary"
 	"errors"
 	"fmt"
-	"io/ioutil"
 	"math/rand/v2"
-	"net"
 	"os"
 	"path/filepath"
-	"regexp"
 	"strconv"
 	"strings"
 	"syscall"
 	"sync"
 	"time"
-	"unicode"
 	"unsafe"
 
 	"github.com/ibm/ibm-block-csi-driver/node/logger"
@@ -276,7 +271,7 @@ func (r OsDeviceConnectivityHelperScsiGeneric) IsVolumePathMatchesVolumeId(volum
 	}
 
 	if !isSameId(SgInqWwn, volumeIdVariations) {
-		return false, &ErrorWrongDeviceFound{mpathDeviceName, volumeUuid, SgInqWwn}
+		return false, &ErrorWrongDeviceFound{mpathDeviceName, volumeUuid, SgInqWwn[0]}
 	}
 
 	return true, nil
@@ -335,20 +330,32 @@ func (r OsDeviceConnectivityHelperScsiGeneric) GetMpathDevice(volumeId string) (
 			return dmPath, nil
 		}
 		logger.Warningf("Expected {%v} but got {%v} from sg_inq", volumeId, SgInqWwn)
-		return "", &ErrorWrongDeviceFound{dmPath, volumeIdVariations[0], SgInqWwn}
+		return "", &ErrorWrongDeviceFound{dmPath, volumeIdVariations[0], SgInqWwn[0]}
 	}
 	return dmPath, nil
 }
 
-func isSameId(wwn string, volumeIdVariations []string) bool {
-	wwn = strings.ToLower(wwn)
-	for _, volumeIdVariation := range volumeIdVariations {
-			if wwn == volumeIdVariation {
-					return true
-			}
-	}
-	return false
+func isSameId(wwns []string, volumeIdVariations []string) bool {
+    // Optimization: If either slice is empty, no match is possible
+    if len(wwns) == 0 || len(volumeIdVariations) == 0 {
+        return false
+    }
+
+    for _, wwn := range wwns {
+        // Normalize the current WWN once per outer loop
+        normalizedWWN := strings.ToLower(wwn)
+        
+        for _, variation := range volumeIdVariations {
+            // We assume variations are already normalized, 
+            // but if not, add strings.ToLower(variation) here.
+            if normalizedWWN == variation {
+                return true
+            }
+        }
+    }
+    return false
 }
+
 
 
 func (r OsDeviceConnectivityHelperScsiGeneric) flushDeviceBuffers(deviceName string) error {
@@ -1345,8 +1352,8 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) IdentityAwarePreScan(targetPath 
 			2*time.Second,
 			10*time.Second,
 			func(ctx context.Context) (IdentityResult, error) {
-				wwid, _ := r.getWWIDByDev(mounts[0].Major, mounts[0].Minor)
-				hw, _ := r.GetDeviceWWN(mpathName)
+				wwid, _ := r.Helper.getWWIDByDev(mounts[0].Major, mounts[0].Minor)
+				hw, _ := r.Helper.GetWwnByScsiInq(mpathName)
 
 				return IdentityResult{WWID: wwid, HW: hw}, nil
 			},
@@ -1839,7 +1846,7 @@ type OsDeviceConnectivityHelperInterface interface {
 		Mainly for writting clean unit testing, so we can Mock this interface in order to unit test OsDeviceConnectivityHelperGeneric logic.
 	*/
 	GetHostsIdByArrayIdentifiers(arrayIdentifier []string) (map[int]bool, error)
-	GetWwnByScsiInq(dev string) (string, error)
+	GetWwnByScsiInq(dev string) ([]string, error)
 	GetVolumeIdVariations(volumeUuid string) []string
 	GetMpathDeviceName(volumePath string) (string, error)
 	GetMpathVolumeId(mpathDeviceName string) ([]string, error)
@@ -2173,6 +2180,11 @@ func (o *OsDeviceConnectivityHelperGeneric) parseVPD83(data []byte) ([]string, e
 	return candidates, nil
 }
 
+func (OsDeviceConnectivityHelperGeneric) GetVolumeIdVariations(volumeUuid string) []string {
+       volumeUuidLower := strings.ToLower(volumeUuid)
+       volumeNguid := convertScsiIdToNguid(volumeUuidLower)
+       return []string{volumeUuidLower, volumeNguid}
+}
 
 func (o *OsDeviceConnectivityHelperGeneric) NormalizeDmVolumeIdentifier(filename string) string {
 	// 1. Initial cleanup
@@ -2587,7 +2599,7 @@ func (o *OsDeviceConnectivityHelperGeneric) GetMajorMinorFromSysfs(devicePath st
 
 func (o *OsDeviceConnectivityHelperGeneric) GetGaterKey(devicePath string) string {
 
-	major, minor, _ := o.getMajorMinorFromSysfs(devicePath)
+	major, minor, _ := o.GetMajorMinorFromSysfs(devicePath)
 
     // 2. Volume Identity (WWID) - Fetched via sysfs or ioctl
     wwid, _ := o.GetDeviceWWID(devicePath)
@@ -2645,11 +2657,6 @@ func (o *OsDeviceConnectivityHelperGeneric) GetWwnByNvmeSysfs(dev string) ([]str
 
 type GetDmsPathHelperInterface interface {
         WaitForDmToExist(volumeIdVariations []string, maxRetries int, intervalSeconds int) (string, error)
-        ExtractDmFieldValues(dmFilterValues []string, mpathdOutput string) map[string]bool
-        GetFullDmPath(dms map[string]bool, volumeId string) (string, error)
-        IsIndicatorMatchesFilterValues(dmFilterValues []string, dmFieldValue string) bool
-        GetMpathDeviceNameFromProcMounts(procMounts string, volumePath string) (string, error)
-        ExtractVolumeId(mpathDeviceName string, mpathdOutput string) (string, error)
 }
 
 type GetDmsPathHelperGeneric struct {
@@ -2672,10 +2679,15 @@ func NewGetDmsPathHelperGeneric(executer executer.ExecuterInterface) GetDmsPathH
 
 
 
-func (o GetDmsPathHelperGeneric) WaitForDmToExist(volumeWWID string, maxRetries int, intervalSeconds int) (string, error) {
+func (o GetDmsPathHelperGeneric) WaitForDmToExist(volumeWWID []string, maxRetries int, intervalSeconds int) (string, error) {
 	var lastCount int
 	var stableCycles int
-	norm := o.normalizeWWID(volumeWWID)
+
+norm := make([]string, len(volumeWWID))
+
+for i, wwid := range volumeWWID {
+    norm[i] = normalizeWWID(wwid)
+}
 
 	for i := 0; i < maxRetries; i++ {
 		// 1. Discovery (Resolves WWID to /dev/dm-X or /dev/nvme-subsysX)
@@ -2796,7 +2808,7 @@ func (o GetDmsPathHelperGeneric) validateAndSettle(path string) (string, error) 
 //}
 
 
-func (o GetDmsPathHelperGeneric) performDiscovery(volumeWWID string) (string, error) {
+func (o GetDmsPathHelperGeneric) performDiscovery(volumeWWID []string) (string, error) {
 	// TODO is this normalization safe
 	normalizedWWID := strings.ToLower(strings.ReplaceAll(volumeWWID, "-", ""))
 
@@ -2852,12 +2864,12 @@ func (o GetDmsPathHelperGeneric) verifyDevice(path string) (string, error) {
 // scanDMSubsystem finds the DM device using robust normalization.
 func (o GetDmsPathHelperGeneric) scanDMSubsystem(targetID string) (string, error) {
 	matches, _ := filepath.Glob("/sys/block/dm-*/dm/uuid")
-	target := o.normalizeWWID(targetID)
+	target := normalizeWWID(targetID)
 
 	for _, m := range matches {
 		if content, err := os.ReadFile(m); err == nil {
 			// normalize() strips 'mpath-', handles case, and removes newlines
-			if o.normalizeWWID(string(content)) == target {
+			if normalizeWWID(string(content)) == target {
 				// Safely get 'dm-X' regardless of path depth
 				dmName := filepath.Base(filepath.Dir(filepath.Dir(m)))
 				return filepath.Join("/dev", dmName), nil
@@ -2870,18 +2882,18 @@ func (o GetDmsPathHelperGeneric) scanDMSubsystem(targetID string) (string, error
 func (o GetDmsPathHelperGeneric) scanNVMeSubsystem(targetID string) (string, error) {
 	// 1. Find all namespaces. /sys/block/nvme*n* covers both local and remote.
 	matches, _ := filepath.Glob("/sys/block/nvme*n*")
-	target := o.normalizeWWID(targetID)
+	target := normalizeWWID(targetID)
 
 	for _, m := range matches {
 		var foundID string
 		// NGUID is preferred for NVMe-oF (FlashSystem/SVC)
 		if nguid, err := os.ReadFile(filepath.Join(m, "nguid")); err == nil {
-			foundID = o.normalizeWWID(string(nguid))
+			foundID = normalizeWWID(string(nguid))
 		}
 		// Fallback to UUID
 		if foundID != target {
 			if uuid, err := os.ReadFile(filepath.Join(m, "uuid")); err == nil {
-				foundID = o.normalizeWWID(string(uuid))
+				foundID = normalizeWWID(string(uuid))
 			}
 		}
 
@@ -2929,12 +2941,12 @@ func (o GetDmsPathHelperGeneric) scanNVMeSubsystem(targetID string) (string, err
 // scanSCSISubsystem finds raw /dev/sdX devices.
 func (o GetDmsPathHelperGeneric) scanSCSISubsystem(targetID string) (string, error) {
 	matches, _ := filepath.Glob("/sys/block/sd*/device/wwid")
-	target := normalize(targetID)
+	target := normalizeWWID(targetID)
 
 	for _, m := range matches {
 		if content, err := os.ReadFile(m); err == nil {
 			// SCSI wwid files often contain 'naa.' prefixes
-			if strings.Contains(normalize(string(content)), target) {
+			if strings.Contains(normalizeWWID(string(content)), target) {
 				// /sys/block/sdX/device/wwid -> sdX is 3 levels up from wwid,
 				// or 2 levels up from device.
 				sdName := filepath.Base(filepath.Dir(filepath.Dir(m)))
@@ -2978,3 +2990,16 @@ func (o GetDmsPathHelperGeneric) validateDMIntegrity(dmPath string) (string, err
 
     return "", fmt.Errorf("dm device %s has slaves but none are in 'running' state", dmName)
 }
+
+
+func normalizeWWID(raw string) string {
+       s := strings.ToLower(strings.TrimSpace(raw))
+       // Remove protocol-specific prefixes found in sysfs wwid files
+       prefixes := []string{"mpath-", "naa.", "uuid.", "nvme.", "t10.", "eui."}
+       for _, p := range prefixes {
+               s = strings.TrimPrefix(s, p)
+       }
+       // TODO is this true always:
+       return strings.ReplaceAll(s, "-", "")
+}
+
