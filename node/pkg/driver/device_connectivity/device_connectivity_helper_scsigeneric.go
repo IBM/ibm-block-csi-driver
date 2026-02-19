@@ -2968,37 +2968,38 @@ func (o GetDmsPathHelperGeneric) validateAndSettle(path string) (string, error) 
 
 
 func (o GetDmsPathHelperGeneric) performDiscovery(volumeWWID []string) (string, error) {
-	// TODO is this normalization safe
-	normalizedWWID := strings.ToLower(strings.ReplaceAll(volumeWWID, "-", ""))
+	normalizedWWID := make([]string, len(volumeWWIDs))
+
+    for i, wwid := range volumeWWIDs {
+		// TODO is this normalization safe
+        clean := strings.ReplaceAll(wwid, "-", "")
+        normalizedWWID[i] = strings.ToLower(clean)
+    }
 
 	// 1. STRATEGY A: DM-Multipath (SCSI or NVMe via DM)
 	// Check udev shortcut first (O(1))
-	dmPath := fmt.Sprintf("/dev/disk/by-id/dm-uuid-mpath-%s", normalizedWWID)
+	
+	dmPath := fmt.Sprintf("/dev/disk/by-id/dm-uuid-mpath-%s", normalizedWWID[0])
 	if dev, err := o.verifyDevice(dmPath); err == nil {
 		return dev, nil
 	}
 
 	// 2. STRATEGY B: Native NVMe (NVMe-oF / TCP / RDMA)
 	// Check udev shortcut: /dev/disk/by-id/nvme-<uuid>
-	nvmePath := fmt.Sprintf("/dev/disk/by-id/nvme-%s", normalizedWWID)
+	nvmePath := fmt.Sprintf("/dev/disk/by-id/nvme-%s", normalizedWWID[1])
 	if dev, err := o.verifyDevice(nvmePath); err == nil {
 		return dev, nil
 	}
 
 	// Fallback: Scan DM list in sysfs (O(N_dm))
 	// Catches cases where udev is slow or stale
-	if dev, err := o.scanDMSubsystem(normalizedWWID); err == nil {
+	if dev, err := o.scanDMSubsystem(normalizedWWID[0]); err == nil {
 		return dev, nil
 	}
 
 
 	// Fallback: Scan NVMe subsystems (O(N_nvme))
-	if dev, err := o.scanNVMeSubsystem(normalizedWWID); err == nil {
-		return dev, nil
-	}
-
-	// Fallback: Scan all SCSI blocks for WWID match
-	if dev, err := o.scanSCSISubsystem(normalizedWWID); err == nil {
+	if dev, err := o.scanNVMeSubsystem(normalizedWWID[1]); err == nil {
 		return dev, nil
 	}
 
@@ -3094,26 +3095,6 @@ func (o GetDmsPathHelperGeneric) scanNVMeSubsystem(targetID string) (string, err
 		}
 	}
 	return "", fmt.Errorf("NVMe WWID %s not found", targetID)
-}
-
-
-// scanSCSISubsystem finds raw /dev/sdX devices.
-func (o GetDmsPathHelperGeneric) scanSCSISubsystem(targetID string) (string, error) {
-	matches, _ := filepath.Glob("/sys/block/sd*/device/wwid")
-	target := normalizeWWID(targetID)
-
-	for _, m := range matches {
-		if content, err := os.ReadFile(m); err == nil {
-			// SCSI wwid files often contain 'naa.' prefixes
-			if strings.Contains(normalizeWWID(string(content)), target) {
-				// /sys/block/sdX/device/wwid -> sdX is 3 levels up from wwid,
-				// or 2 levels up from device.
-				sdName := filepath.Base(filepath.Dir(filepath.Dir(m)))
-				return filepath.Join("/dev", sdName), nil
-			}
-		}
-	}
-	return "", fmt.Errorf("scsi device not found")
 }
 
 
