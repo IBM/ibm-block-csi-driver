@@ -178,6 +178,17 @@ func (m *Mounter) List() ([]mount.MountPoint, error) {
 }
 
 
+//Unstage / Unpublish
+// check if there are any mounts inside the target path
+// longerMounts, err := mount.SearchForLongerMountPoints(targetPath, mounter)
+//if err != nil {
+//    return err
+//}
+//if len(longerMounts) > 0 {
+ //   return fmt.Errorf("cannot cleanup %s because it contains active sub-mounts: %v", targetPath, longerMounts)
+//}
+
+
 func (m *Mounter) SearchForLongerMountPoints(targetPath string, _ []string, _ bool) ([]mount.MountPoint, error) {
 	// 1. Get the "best" (longest) mount for this path
 	mi, err := findBestMount(targetPath)
