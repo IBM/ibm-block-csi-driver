@@ -22,6 +22,7 @@ import (
 
 	"github.com/ibm/ibm-block-csi-driver/node/logger"
 	"github.com/ibm/ibm-block-csi-driver/node/pkg/driver/executer"
+	"github.com/ibm/ibm-block-csi-driver/node/pkg/driver/mount"
 )
 
 const (
@@ -38,10 +39,10 @@ type OsDeviceConnectivityNvmeOFc struct {
 	HelperScsiGeneric OsDeviceConnectivityHelperScsiGenericInterface
 }
 
-func NewOsDeviceConnectivityNvmeOFc(executer executer.ExecuterInterface, clean_scsi_device bool) OsDeviceConnectivityInterface {
+func NewOsDeviceConnectivityNvmeOFc(executer executer.ExecuterInterface,  KeyedGater *executer.KeyedGater, Mounter *mount.Mounter, clean_scsi_device bool) OsDeviceConnectivityInterface {
 	return &OsDeviceConnectivityNvmeOFc{
 		Executer:          executer,
-		HelperScsiGeneric: NewOsDeviceConnectivityHelperScsiGeneric(executer, clean_scsi_device),
+		HelperScsiGeneric: NewOsDeviceConnectivityHelperScsiGeneric(executer, KeyedGater, Mounter, clean_scsi_device),
 	}
 }
 
