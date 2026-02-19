@@ -18,6 +18,7 @@ package device_connectivity
 
 import (
 	"github.com/ibm/ibm-block-csi-driver/node/pkg/driver/executer"
+	"github.com/ibm/ibm-block-csi-driver/node/pkg/driver/mount"
 )
 
 type OsDeviceConnectivityFc struct {
@@ -28,7 +29,7 @@ type OsDeviceConnectivityFc struct {
 func NewOsDeviceConnectivityFc(executer executer.ExecuterInterface, KeyedGater *executer.KeyedGater, Mounter *mount.Mounter, clean_scsi_device bool) OsDeviceConnectivityInterface {
 	return &OsDeviceConnectivityFc{
 		Executer:          executer,
-		HelperScsiGeneric: NewOsDeviceConnectivityHelperScsiGeneric(executer, KeyGater, Mounter, clean_scsi_device),
+		HelperScsiGeneric: NewOsDeviceConnectivityHelperScsiGeneric(executer, KeyedGater, Mounter, clean_scsi_device),
 	}
 }
 
