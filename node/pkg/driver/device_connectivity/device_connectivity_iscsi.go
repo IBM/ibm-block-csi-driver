@@ -17,9 +17,8 @@
 package device_connectivity
 
 import (
-	"bufio"
-	"errors"
 	"fmt"
+	"net"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -82,7 +81,7 @@ func (r OsDeviceConnectivityIscsi) iscsiLogin(targetName, portal string) {
 
 			// 24 = Login failed but session exists (often happens during transient SVC failovers)
 			if exitCode == 24 {
-				logger.Warnf("iSCSI session exists but login failed for %s. Multipath will handle recovery.", portal)
+				logger.Warningf("iSCSI session exists but login failed for %s. Multipath will handle recovery.", portal)
 				return
 			}
 		}
@@ -119,7 +118,7 @@ func (r OsDeviceConnectivityIscsi) iscsiGetRawSessions() ([]string, error) {
 		stateStr := strings.TrimSpace(string(stateBuf))
 
 		if stateStr != "LOGGED_IN" {
-			logger.Warnf("Session %s is in %s", sessionID, stateStr)
+			logger.Warningf("Session %s is in %s", sessionID, stateStr)
 			// Ignore other transient/failed states (REOPENING, FREE, etc.)
 			continue
 		}
@@ -250,7 +249,7 @@ func (r OsDeviceConnectivityIscsi) discoverAndLogin(portalsByTarget map[string][
 	// 2. Perform Logins (using 'exit 15' safe login)
 	for targetName, portals := range portalsByTarget {
 		for _, portal := range portals {
-			_ = r.iscsiLogin(targetName, portal)
+			r.iscsiLogin(targetName, portal)
 		}
 	}
 }
@@ -417,7 +416,7 @@ func (r OsDeviceConnectivityIscsi) parseActiveSessions() ([]activeSession, error
 
         sessions = append(sessions, activeSession{
             sourceIQN: initiatorIQN,
-            num:       hostNum,
+            hostNum:       hostNum,
         })
     }
     return sessions, nil
@@ -477,7 +476,7 @@ func (r OsDeviceConnectivityIscsi) updateHostIDs(hostIDs map[int]bool) {
 	// 1. Identify which Initiator IQNs belong to the hosts we already care about
 	knownIqns := make(map[string]bool)
 	for _, s := range active {
-		if hostIDs[s.num] {
+		if hostIDs[s.hostNum] {
 			knownIqns[strings.ToLower(s.sourceIQN)] = true
 		}
 	}
@@ -486,9 +485,9 @@ func (r OsDeviceConnectivityIscsi) updateHostIDs(hostIDs map[int]bool) {
 	// This captures secondary NICs/Paths for the same volume
 	for _, s := range active {
 		iqn := strings.ToLower(s.sourceIQN)
-		if knownIqns[iqn] && !hostIDs[s.num] {
-			hostIDs[s.num] = true
-			logger.Infof("Multipath discovery: host%d associated with known initiator %s", s.num, iqn)
+		if knownIqns[iqn] && !hostIDs[s.hostNum] {
+			hostIDs[s.hostNum] = true
+			logger.Infof("Multipath discovery: host%d associated with known initiator %s", s.hostNum, iqn)
 		}
 	}
 }
