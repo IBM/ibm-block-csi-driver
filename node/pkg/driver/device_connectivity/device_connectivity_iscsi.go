@@ -556,4 +556,7 @@ func (r OsDeviceConnectivityIscsi) GetBlockDeviceForSession(sessionID string) (s
     return "", fmt.Errorf("no block device found for session %s", sessionID)
 }
 
+func cleanSysfsData (data []byte) string {
+	return strings.Trim(string(data), " \n\r\t\x00")
+}
 
