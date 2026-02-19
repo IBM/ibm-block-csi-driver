@@ -272,7 +272,7 @@ func (r OsDeviceConnectivityHelperScsiGeneric) IsVolumePathMatchesVolumeId(volum
 	}
 
 	if !isSameId(SgInqWwn, volumeIdVariations) {
-		return false, &ErrorWrongDeviceFound{mpathDeviceName, volumeUuid, SgInqWwn[0]}
+		return false, &ErrorWrongDeviceFound{mpathDeviceName, volumeUuid, SgInqWwn}
 	}
 
 	return true, nil
@@ -439,7 +439,7 @@ func (r OsDeviceConnectivityHelperScsiGeneric) GetMpathDevice(volumeId string) (
 			return dmPath, nil
 		}
 		logger.Warningf("Expected {%v} but got {%v} from sg_inq", volumeId, SgInqWwn)
-		return "", &ErrorWrongDeviceFound{dmPath, volumeIdVariations[0], SgInqWwn[0]}
+		return "", &ErrorWrongDeviceFound{dmPath, volumeIdVariations[0], SgInqWwn}
 	}
 <<<<<<< HEAD
 
@@ -476,24 +476,17 @@ func (r OsDeviceConnectivityHelperScsiGeneric) GetMpathDevice(volumeId string) (
 >>>>>>> 5fe171a8 (CSI node rewrite)
 }
 
-func isSameId(wwns []string, volumeIdVariations []string) bool {
+func isSameId(wwn string, volumeIdVariations []string) bool {
     // Optimization: If either slice is empty, no match is possible
-    if len(wwns) == 0 || len(volumeIdVariations) == 0 {
-        return false
-    }
-
-    for _, wwn := range wwns {
-        // Normalize the current WWN once per outer loop
-        normalizedWWN := strings.ToLower(wwn)
+    normalizedWWN := strings.ToLower(wwn)
         
-        for _, variation := range volumeIdVariations {
-            // We assume variations are already normalized, 
-            // but if not, add strings.ToLower(variation) here.
-            if normalizedWWN == variation {
-                return true
-            }
-        }
-    }
+     for _, variation := range volumeIdVariations {
+         // We assume variations are already normalized, 
+         // but if not, add strings.ToLower(variation) here.
+         if normalizedWWN == variation {
+             return true
+         }
+     }
     return false
 }
 
@@ -1990,12 +1983,13 @@ type OsDeviceConnectivityHelperInterface interface {
 	GetWwnByScsiInq(dev string) (string, error)
 	GetVolumeIdVariations(volumeUuid string) []string
 	GetMpathDeviceName(volumePath string) (string, error)
-	GetMpathVolumeId(mpathDeviceName string) ([]string, error)
+	GetMpathVolumeId(mpathDeviceName string) (string, error)
 	normalizeWWID(raw string) string
 	findDMByWWID(wwid string) string
 	getSlavesForDevice(major, minor int) ([]string, error)
 	GetOpenCount(dmName string) (int32, error)
 	GetMajorMinorFromSysfs(devicePath string) (major int, minor int, err error)
+	getWWIDByDev(major, minor int) (string, error)
 }
 
 type OsDeviceConnectivityHelperGeneric struct {
@@ -2136,10 +2130,10 @@ func (o *OsDeviceConnectivityHelperGeneric) RescanHosts(hostIDs []int) error {
 }
 
 // TODO unused
-func (o OsDeviceConnectivityHelperGeneric) GetMpathVolumeId(dmPath string) (volId []string, err error) {
+func (o OsDeviceConnectivityHelperGeneric) GetMpathVolumeId(dmPath string) (volId string, err error) {
 	SgInqWwn, err := o.GetWwnByScsiInq(dmPath)
 	if err != nil {
-			return nil, err
+			return "", err
 	}
 	return SgInqWwn, nil
 }
@@ -2169,7 +2163,7 @@ func (o OsDeviceConnectivityHelperGeneric) GetMpathVolumeId(mpathdOutput string,
 
 func (o OsDeviceConnectivityHelperGeneric) GetWwnByScsiInq(dev string) (string, error) {
 	if o.willIoctl0x83Fail(filepath.Base(dev)) {
-		return nil, fmt.Errorf("path %s in unsafe state", dev)
+		return "", fmt.Errorf("path %s in unsafe state", dev)
 	}
 	// 1. Try O_RDONLY first (The "Clean" way)
 	fd, err := syscall.Open(dev, syscall.O_RDONLY|syscall.O_NONBLOCK, 0)
@@ -2181,7 +2175,7 @@ func (o OsDeviceConnectivityHelperGeneric) GetWwnByScsiInq(dev string) (string, 
 	}
 	if err != nil {
 		// If the device is gone/dead, we want to know immediately
-		return nil, err
+		return "", err
 	}
 	f := os.NewFile(uintptr(fd), dev)
 	defer f.Close()
@@ -2209,7 +2203,7 @@ func (o OsDeviceConnectivityHelperGeneric) GetWwnByScsiInq(dev string) (string, 
 	for i := 0; i < maxRetries; i++ {
 		_, _, errno := syscall.Syscall(syscall.SYS_IOCTL, f.Fd(), SG_IO, uintptr(unsafe.Pointer(&header)))
 		if errno != 0 {
-			return nil, fmt.Errorf("ioctl failed: %v", errno)
+			return "", fmt.Errorf("ioctl failed: %v", errno)
 		}
 
 		// Check for Busy Status (0x08) or Task Set Full (0x28)
@@ -2220,7 +2214,7 @@ func (o OsDeviceConnectivityHelperGeneric) GetWwnByScsiInq(dev string) (string, 
 
 		// 1. Check for Host/HBA Errors (No point in retrying if the cable is pulled)
 		if header.HostStatus != 0 {
-			return nil, fmt.Errorf("SCSI host error: 0x%04x", header.HostStatus)
+			return "", fmt.Errorf("SCSI host error: 0x%04x", header.HostStatus)
 		}
 
 		// 2. Check for Check Condition (0x02)
@@ -2232,7 +2226,7 @@ func (o OsDeviceConnectivityHelperGeneric) GetWwnByScsiInq(dev string) (string, 
 				logger.Infof("Unit Attention detected on %s, retrying...", dev)
 				continue // Try again, the UA is now cleared
 			}
-			return nil, fmt.Errorf("SCSI Check Condition: SenseKey 0x%02x", senseKey)
+			return "", fmt.Errorf("SCSI Check Condition: SenseKey 0x%02x", senseKey)
 		}
 
 		// 3. Status is 0 (Good) - break and process result
@@ -2240,17 +2234,17 @@ func (o OsDeviceConnectivityHelperGeneric) GetWwnByScsiInq(dev string) (string, 
 			break
 		}
 
-		return nil, fmt.Errorf("Unexpected SCSI status: 0x%02x", header.Status)
+		return "", fmt.Errorf("Unexpected SCSI status: 0x%02x", header.Status)
 	}
 
 	actualLen := int(header.DxferLen) - int(header.Resid)
 
     if actualLen < 4 {
-        return nil, fmt.Errorf("response too short")
+        return "", fmt.Errorf("response too short")
     }
 	// respBuf[1] is the Page Code. It should be 0x83.
 	if respBuf[1] != 0x83 {
-		return nil, fmt.Errorf("unexpected VPD page: 0x%02x", respBuf[1])
+		return "", fmt.Errorf("unexpected VPD page: 0x%02x", respBuf[1])
 	}
 
 	return o.parseVPD83(respBuf[:actualLen])
@@ -2284,7 +2278,7 @@ func (r *OsDeviceConnectivityHelperGeneric) willIoctl0x83Fail(sgName string) boo
 func (o *OsDeviceConnectivityHelperGeneric) parseVPD83(data []byte) (string, error) {
 	// 1. Initial boundary check
 	if len(data) < 4 {
-		return nil, fmt.Errorf("invalid VPD data: buffer too short")
+		return "", fmt.Errorf("invalid VPD data: buffer too short")
 	}
 
 	// 2. Determine the true limit based on the header vs actual bytes read
@@ -2340,7 +2334,7 @@ func (o *OsDeviceConnectivityHelperGeneric) parseVPD83(data []byte) (string, err
 	}
 
 	if len(candidates) != 1 {
-		return nil, fmt.Errorf("no Association 0 identifiers found in VPD 83")
+		return "", fmt.Errorf("no Association 0 identifiers found in VPD 83")
 	}
 	return candidates[0], nil
 }
@@ -2782,7 +2776,7 @@ func (o *OsDeviceConnectivityHelperGeneric) GetGaterKey(devicePath string) strin
 	return fmt.Sprintf("%d:%d-%s-%s", major, minor, wwid, instanceID)
 }
 
-func (o *OsDeviceConnectivityHelperGeneric) GetDeviceWWID(dev string) ([]string, error) {
+func (o *OsDeviceConnectivityHelperGeneric) GetDeviceWWID(dev string) (string, error) {
 	name := filepath.Base(dev)
 
 	if strings.HasPrefix(name, "nvme") {
@@ -2793,26 +2787,26 @@ func (o *OsDeviceConnectivityHelperGeneric) GetDeviceWWID(dev string) ([]string,
 	return o.GetWwnByScsiInq(dev)
 }
 
-func (o *OsDeviceConnectivityHelperGeneric) GetWwnByNvmeSysfs(dev string) ([]string, error) {
+func (o *OsDeviceConnectivityHelperGeneric) GetWwnByNvmeSysfs(dev string) (string, error) {
 	name := filepath.Base(dev) // e.g. nvme0n1
 	sysPath := filepath.Join("/sys/block", name)
 
 	// Check for NGUID first (Common in Enterprise Storage)
 	if nguid, err := os.ReadFile(filepath.Join(sysPath, "nguid")); err == nil {
-		return []string{o.normalizeWWID(string(nguid))}, nil
+		return o.normalizeWWID(string(nguid)), nil
 	}
 
 	// Fallback to UUID
 	if uuid, err := os.ReadFile(filepath.Join(sysPath, "uuid")); err == nil {
-		return []string{o.normalizeWWID(string(uuid))}, nil
+		return o.normalizeWWID(string(uuid)), nil
 	}
 
 	// Fallback to Serial (Note: Serial is often not globally unique enough for CSI)
 	if serial, err := os.ReadFile(filepath.Join(sysPath, "device/serial")); err == nil {
-		return []string{o.normalizeWWID(string(serial))}, nil
+		return o.normalizeWWID(string(serial)), nil
 	}
 
-	return nil, fmt.Errorf("no unique identifier found for nvme device %s", name)
+	return "", fmt.Errorf("no unique identifier found for nvme device %s", name)
 }
 
 
@@ -2889,7 +2883,7 @@ for i, wwid := range volumeWWID {
 		logger.Debugf("Attempt %d/%d: %v", i+1, maxRetries, err)
 		time.Sleep(time.Duration(intervalSeconds) * time.Second)
 	}
-	return "", &MultipathDeviceNotFoundForVolumeError{volumeWWID}
+	return "", &MultipathDeviceNotFoundForVolumeError{volumeWWID[0]}
 }
 
 func (o GetDmsPathHelperGeneric) isKernelSettled(path string) bool {
