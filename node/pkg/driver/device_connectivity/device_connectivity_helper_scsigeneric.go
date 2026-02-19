@@ -1846,7 +1846,7 @@ type OsDeviceConnectivityHelperInterface interface {
 		Mainly for writting clean unit testing, so we can Mock this interface in order to unit test OsDeviceConnectivityHelperGeneric logic.
 	*/
 	GetHostsIdByArrayIdentifiers(arrayIdentifier []string) (map[int]bool, error)
-	GetWwnByScsiInq(dev string) ([]string, error)
+	GetWwnByScsiInq(dev string) (string, error)
 	GetVolumeIdVariations(volumeUuid string) []string
 	GetMpathDeviceName(volumePath string) (string, error)
 	GetMpathVolumeId(mpathDeviceName string) ([]string, error)
@@ -2004,7 +2004,7 @@ func (o OsDeviceConnectivityHelperGeneric) GetMpathVolumeId(dmPath string) (volI
 }
 
 
-func (o OsDeviceConnectivityHelperGeneric) GetWwnByScsiInq(dev string) ([]string, error) {
+func (o OsDeviceConnectivityHelperGeneric) GetWwnByScsiInq(dev string) (string, error) {
 	if o.willIoctl0x83Fail(filepath.Base(dev)) {
 		return nil, fmt.Errorf("path %s in unsafe state", dev)
 	}
@@ -2118,7 +2118,7 @@ func (r *OsDeviceConnectivityHelperGeneric) willIoctl0x83Fail(sgName string) boo
 //deleting/cancel - kernel is actively tearing down the device structures, and attempting an ioctl here is unreliable.
 
 
-func (o *OsDeviceConnectivityHelperGeneric) parseVPD83(data []byte) ([]string, error) {
+func (o *OsDeviceConnectivityHelperGeneric) parseVPD83(data []byte) (string, error) {
 	// 1. Initial boundary check
 	if len(data) < 4 {
 		return nil, fmt.Errorf("invalid VPD data: buffer too short")
@@ -2163,10 +2163,12 @@ func (o *OsDeviceConnectivityHelperGeneric) parseVPD83(data []byte) ([]string, e
 
 			switch designatorType {
 			case 1, 2, 3: // T10, EUI-64, or NAA
-				// Prepend type for udev-style compatibility (e.g., "3" + hex_data)
-				candidates = append(candidates, fmt.Sprintf("%d%x", designatorType, idData))
+				if (designatorType == 3) {
+					// Prepend type for udev-style compatibility (e.g., "3" + hex_data)
+					candidates = append(candidates, fmt.Sprintf("%d%x", designatorType, idData))
+				}
 			case 8: // SCSI Name String
-				candidates = append(candidates, strings.ToLower(strings.TrimSpace(string(idData))))
+				// candidates = append(candidates, strings.ToLower(strings.TrimSpace(string(idData))))
 			}
 		}
 
@@ -2174,10 +2176,10 @@ func (o *OsDeviceConnectivityHelperGeneric) parseVPD83(data []byte) ([]string, e
 		cursor += 4 + length
 	}
 
-	if len(candidates) == 0 {
+	if len(candidates) != 1 {
 		return nil, fmt.Errorf("no Association 0 identifiers found in VPD 83")
 	}
-	return candidates, nil
+	return candidates[0], nil
 }
 
 func (OsDeviceConnectivityHelperGeneric) GetVolumeIdVariations(volumeUuid string) []string {
