@@ -26,7 +26,7 @@ type OsDeviceConnectivityNvmeOFc struct {
 	HelperScsiGeneric OsDeviceConnectivityHelperScsiGenericInterface
 }
 
-func NewOsDeviceConnectivityNvmeOFc(executer executer.ExecuterInterface,  KeyedGater *executer.KeyedGater, Mounter *mount.Mounter, clean_scsi_device bool) OsDeviceConnectivityInterface {
+func NewOsDeviceConnectivityNvmeOFc(executer executer.ExecuterInterface, KeyedGater *executer.KeyedGater, Mounter *mount.Mounter, clean_scsi_device bool) OsDeviceConnectivityInterface {
 	return &OsDeviceConnectivityNvmeOFc{
 		Executer:          executer,
 		HelperScsiGeneric: NewOsDeviceConnectivityHelperScsiGeneric(executer, KeyedGater, Mounter, clean_scsi_device),

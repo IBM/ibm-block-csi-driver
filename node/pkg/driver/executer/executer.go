@@ -1,4 +1,3 @@
-
 /**
  * Copyright 2019 IBM Corp.
  *
@@ -35,8 +34,8 @@ import (
 	"syscall"
 	"time"
 
-	k8sexec "k8s.io/utils/exec"
 	"github.com/ibm/ibm-block-csi-driver/node/logger"
+	k8sexec "k8s.io/utils/exec"
 )
 
 //go:generate mockgen -destination=../../../mocks/mock_executer.go -package=mocks github.com/ibm/ibm-block-csi-driver/node/pkg/driver/executer ExecuterInterface
@@ -57,10 +56,10 @@ type ExecuterInterface interface { // basic host dependent functions
 }
 
 type SocketLimiter struct {
-        sem          chan struct{}
-        lastFail     time.Time
-        mu           sync.RWMutex
-        failureCount atomic.Int32
+	sem          chan struct{}
+	lastFail     time.Time
+	mu           sync.RWMutex
+	failureCount atomic.Int32
 }
 
 type Executer struct {
@@ -71,16 +70,15 @@ type Executer struct {
 	cachedSocket string
 
 	sl SocketLimiter
-	
-	waitDelay    time.Duration
+
+	waitDelay time.Duration
 }
 
-func NewExecuter() * Executer {
+func NewExecuter() *Executer {
 	return &Executer{
 		stuckProcesses: make(map[string]zombieInfo),
 	}
 }
-
 
 //Command Category
 //	Typical Size	Recommended Limit	Why?
@@ -90,7 +88,6 @@ func NewExecuter() * Executer {
 
 var _ k8sexec.Interface = &Executer{}
 var _ k8sexec.Cmd = &safeCmd{}
-
 
 const DefaultMaxOutput int = 1024 * 1024 // 1MB limit for safety
 
@@ -125,7 +122,7 @@ type safeCmd struct {
 
 func (e *Executer) CommandContext(ctx context.Context, name string, args ...string) k8sexec.Cmd {
 	cmd := exec.CommandContext(ctx, name, args...)
-	// (1) Inject WaitDelay: If process exits but pipes remain open, 
+	// (1) Inject WaitDelay: If process exits but pipes remain open,
 	// or if context is cancelled, Wait() will wait this long before SIGKILL.
 	cmd.WaitDelay = e.waitDelay
 
@@ -142,37 +139,30 @@ func (e *Executer) Command(name string, args ...string) k8sexec.Cmd {
 	return e.CommandContext(context.Background(), name, args...)
 }
 
-
-
-
-
-
-
 func (s *safeCmd) Start() error {
-    device := s.extractDevice()
-    if device != "" {
-        if s.executor.IsDeviceStillStuck(device) {
-            return fmt.Errorf("node-safety: previous %s process is still stuck for device %s", s.name, device)
-        }
-    }
+	device := s.extractDevice()
+	if device != "" {
+		if s.executor.IsDeviceStillStuck(device) {
+			return fmt.Errorf("node-safety: previous %s process is still stuck for device %s", s.name, device)
+		}
+	}
 
-    // Wrap Stdout if it exists, or provide a default buffer
-    if s.Cmd.Stdout != nil {
-        s.Cmd.Stdout = &limitWriter{Writer: s.Cmd.Stdout, Limit: DefaultMaxOutput}
-    } else {
-        s.Cmd.Stdout = &limitWriter{Writer: &bytes.Buffer{}, Limit: DefaultMaxOutput}
-    }
+	// Wrap Stdout if it exists, or provide a default buffer
+	if s.Cmd.Stdout != nil {
+		s.Cmd.Stdout = &limitWriter{Writer: s.Cmd.Stdout, Limit: DefaultMaxOutput}
+	} else {
+		s.Cmd.Stdout = &limitWriter{Writer: &bytes.Buffer{}, Limit: DefaultMaxOutput}
+	}
 
-    // CRITICAL: Do the same for Stderr to prevent OOM from error logs
-    if s.Cmd.Stderr != nil {
-        s.Cmd.Stderr = &limitWriter{Writer: s.Cmd.Stderr, Limit: DefaultMaxOutput}
-    } else {
-        s.Cmd.Stderr = &limitWriter{Writer: &bytes.Buffer{}, Limit: DefaultMaxOutput}
-    }
+	// CRITICAL: Do the same for Stderr to prevent OOM from error logs
+	if s.Cmd.Stderr != nil {
+		s.Cmd.Stderr = &limitWriter{Writer: s.Cmd.Stderr, Limit: DefaultMaxOutput}
+	} else {
+		s.Cmd.Stderr = &limitWriter{Writer: &bytes.Buffer{}, Limit: DefaultMaxOutput}
+	}
 
-    return s.Cmd.Start()
+	return s.Cmd.Start()
 }
-
 
 func (s *safeCmd) Wait() error {
 	err := s.Cmd.Wait()
@@ -224,9 +214,9 @@ func (s *safeCmd) Stop() {
 	}
 	// Attempt to kill the process
 	_ = s.Cmd.Process.Kill()
-	
-	// Optional: You could trigger your stuck logic here if 
-	// the process doesn't exit after a SIGKILL, but usually 
+
+	// Optional: You could trigger your stuck logic here if
+	// the process doesn't exit after a SIGKILL, but usually
 	// the WaitDelay in the main Wait() call handles this better.
 }
 
@@ -268,18 +258,15 @@ func (s *safeCmd) SetStdout(out io.Writer) { s.Cmd.Stdout = out }
 func (s *safeCmd) SetStderr(out io.Writer) { s.Cmd.Stderr = out }
 func (s *safeCmd) SetStdin(in io.Reader)   { s.Cmd.Stdin = in }
 
-
 func (e *Executer) ExecuteWithTimeoutSilently(timeoutMs int, command string, args []string) ([]byte, error) {
 	return e.ExecuteWithTracking("", timeoutMs, command, args)
 }
-
 
 type zombieInfo struct {
 	pid       int
 	command   string
 	startTime uint64 // Use the raw Jiffies/ClockTicks from /proc
 }
-
 
 // Ensure you capture the start time immediately after cmd.Start()
 func (e *Executer) getPidStartTime(pid int) (uint64, error) {
@@ -304,14 +291,11 @@ func (e *Executer) markAsStuck(device string, pid int, command string) {
 	e.stuckMu.Unlock()
 }
 
-
-
 func (e *Executer) ExecuteWithTracking(device string, timeoutMs int, command string, args []string) ([]byte, error) {
 	// 1. Pre-check: Don't spawn a new process if one is already wedged
 	if device != "" && e.IsDeviceStillStuck(device) {
 		return nil, fmt.Errorf("node-safety: previous %s process is still stuck in kernel D-state for device %s", command, device)
 	}
-
 
 	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(timeoutMs)*time.Millisecond)
 	defer cancel()
@@ -328,32 +312,31 @@ func (e *Executer) ExecuteWithTracking(device string, timeoutMs int, command str
 	cmd.Stdout = limitWriter
 	cmd.Stderr = limitWriter
 
-    if err := cmd.Start(); err != nil {
-        return nil, fmt.Errorf("failed to start command: %w", err)
-    }
+	if err := cmd.Start(); err != nil {
+		return nil, fmt.Errorf("failed to start command: %w", err)
+	}
 
-    pid := cmd.Process.Pid
-    err := cmd.Wait()
-    captured := output.Bytes()
+	pid := cmd.Process.Pid
+	err := cmd.Wait()
+	captured := output.Bytes()
 
-    if err != nil {
-        // Check specifically for context timeout or WaitDelay expiration
-        if errors.Is(err, exec.ErrWaitDelay) || ctx.Err() != nil {
-            if device != "" {
+	if err != nil {
+		// Check specifically for context timeout or WaitDelay expiration
+		if errors.Is(err, exec.ErrWaitDelay) || ctx.Err() != nil {
+			if device != "" {
 				e.markAsStuck(device, pid, command)
 			}
-            return captured, fmt.Errorf("process %d hung on %s: %w", pid, device, err)
-        }
-        return captured, fmt.Errorf("exit error: %w", err)
-    }
-
-    // Success: Device is healthy, clear any existing block
-	if device != "" {
-	    e.clearTracking(device)
+			return captured, fmt.Errorf("process %d hung on %s: %w", pid, device, err)
+		}
+		return captured, fmt.Errorf("exit error: %w", err)
 	}
-    return captured, nil
-}
 
+	// Success: Device is healthy, clear any existing block
+	if device != "" {
+		e.clearTracking(device)
+	}
+	return captured, nil
+}
 
 func (e *Executer) IsDeviceStillStuck(device string) bool {
 	e.stuckMu.Lock()
@@ -438,8 +421,6 @@ func (e *Executer) clearTracking(device string) {
 	e.stuckMu.Unlock()
 }
 
-
-
 func (e *Executer) ExecuteWithTimeout(mSeconds int, command string, args []string) ([]byte, error) {
 	logger.Debugf("Executing command : {%v} with args : {%v}. and timeout : {%v} mseconds", command, args, mSeconds)
 
@@ -456,20 +437,17 @@ func (e *Executer) ExecuteWithTimeout(mSeconds int, command string, args []strin
 	return out, err
 }
 
-
-
-
 const (
-    // Use '@' for Go's internal abstract namespace handling
-    AbstractSocketPath = "\x00/org/kernel/linux/storage/multipathd"
-    StandardSocket     = "/run/multipathd.sock"
-    LegacySocket       = "/var/run/multipathd.sock"
+	// Use '@' for Go's internal abstract namespace handling
+	AbstractSocketPath = "\x00/org/kernel/linux/storage/multipathd"
+	StandardSocket     = "/run/multipathd.sock"
+	LegacySocket       = "/var/run/multipathd.sock"
 )
 
 func (e *Executer) resolveSocket() string {
 	candidates := []string{
 		"\x00/org/kernel/linux/storage/multipathd", // Use \x00 for Go abstract sockets
-		"\x00multipathd",                            // Legacy abstract
+		"\x00multipathd", // Legacy abstract
 		"/run/multipathd.sock",
 		"/var/run/multipathd.sock",
 	}
@@ -490,8 +468,6 @@ func (e *Executer) resolveSocket() string {
 	// If everything fails, return the standard path so error messages are helpful
 	return StandardSocket
 }
-
-
 
 // GetSocket returns the cached socket or discovers it if empty.
 func (e *Executer) GetSocket() string {
@@ -519,7 +495,6 @@ func (e *Executer) invalidateSocket() {
 	e.socketMu.Unlock()
 }
 
-
 func (e *Executer) MultipathdCmd(device string, command string) (string, error) {
 	// If the command targets a specific device, check the stuck map first.
 
@@ -534,10 +509,10 @@ func (e *Executer) MultipathdCmd(device string, command string) (string, error) 
 	conn, err := net.DialTimeout("unix", socketPath, 1*time.Second)
 	if err != nil {
 		e.invalidateSocket()
-//                 conn, err = net.DialTimeout("unix", socketPath, 2*time.Second)
-//                 if err != nil {
-//                         return "", fmt.Errorf("multipathd unreachable: %w", err)
-//                 }
+		//                 conn, err = net.DialTimeout("unix", socketPath, 2*time.Second)
+		//                 if err != nil {
+		//                         return "", fmt.Errorf("multipathd unreachable: %w", err)
+		//                 }
 
 		return "", fmt.Errorf("multipathd unreachable: %w", err)
 	}
@@ -609,7 +584,7 @@ func (e *Executer) SafeMultipathdCmd(device string, command string) (string, err
 }
 
 // Wrapper for MultipathdCmd that adds throttling
-//Ensure your e.sl.sem has a small capacity (usually 1 to 3). Since multipathd processes commands serially, sending 50 concurrent requests will just fill the kernel's socket backlog and trigger the very timeouts you are trying to avoid.
+// Ensure your e.sl.sem has a small capacity (usually 1 to 3). Since multipathd processes commands serially, sending 50 concurrent requests will just fill the kernel's socket backlog and trigger the very timeouts you are trying to avoid.
 func (e *Executer) MultipathdCmdLimiter(ctx context.Context, action func() error) error {
 	// 1. Fail-Fast (Circuit Breaker)
 	e.sl.mu.RLock()
@@ -651,42 +626,44 @@ func (e *Executer) MultipathdCmdLimiter(ctx context.Context, action func() error
 
 // Helper to identify if the error is a socket/timeout issue vs a logical multipath error
 func (e *Executer) isTransportError(err error) bool {
-    if err == nil {
-        return false
-    }
-    // Check if it's a native Go net timeout
-    if netErr, ok := err.(net.Error); ok && netErr.Timeout() {
-        return true
-    }
+	if err == nil {
+		return false
+	}
+	// Check if it's a native Go net timeout
+	if netErr, ok := err.(net.Error); ok && netErr.Timeout() {
+		return true
+	}
 
-    msg := strings.ToLower(err.Error())
-    return strings.Contains(msg, "timeout") ||
-           strings.Contains(msg, "unreachable") ||
-           strings.Contains(msg, "refused") ||
-           strings.Contains(msg, "no such file")
+	msg := strings.ToLower(err.Error())
+	return strings.Contains(msg, "timeout") ||
+		strings.Contains(msg, "unreachable") ||
+		strings.Contains(msg, "refused") ||
+		strings.Contains(msg, "no such file")
 }
-
 
 func (e *Executer) IsMultipathdRunning() bool {
-    // Try standard RHEL path first, then common alternatives
-    paths := []string{"/var/run/multipathd.pid", "/run/multipathd.pid", "/var/run/multipathd/multipathd.pid"}
+	// Try standard RHEL path first, then common alternatives
+	paths := []string{"/var/run/multipathd.pid", "/run/multipathd.pid", "/var/run/multipathd/multipathd.pid"}
 
-    for _, path := range paths {
-        data, err := os.ReadFile(path)
-        if err != nil { continue }
+	for _, path := range paths {
+		data, err := os.ReadFile(path)
+		if err != nil {
+			continue
+		}
 
-        pid, err := strconv.Atoi(strings.TrimSpace(string(data)))
-        if err != nil { continue }
+		pid, err := strconv.Atoi(strings.TrimSpace(string(data)))
+		if err != nil {
+			continue
+		}
 
-        process, _ := os.FindProcess(pid)
-        // Signal(0) verifies the PID is still alive and belongs to multipathd
-        if err := process.Signal(syscall.Signal(0)); err == nil {
-            return true
-        }
-    }
-    return false
+		process, _ := os.FindProcess(pid)
+		// Signal(0) verifies the PID is still alive and belongs to multipathd
+		if err := process.Signal(syscall.Signal(0)); err == nil {
+			return true
+		}
+	}
+	return false
 }
-
 
 // IsMultipathdAlive performs a liveness check by sending a no-op command.
 // It distinguishes between "stopped" (connection refused) and "stuck" (timeout).
@@ -705,8 +682,8 @@ func (e *Executer) IsMultipathdAlive() (bool, error) {
 		// TODO should we expect "timeout" string on error if not running
 		// If the error is "connection refused", the daemon is simply not running
 		if strings.Contains(err.Error(), "unreachable") ||
-		   strings.Contains(err.Error(), "refused") ||
-		   strings.Contains(err.Error(), "no such file") {
+			strings.Contains(err.Error(), "refused") ||
+			strings.Contains(err.Error(), "no such file") {
 			return false, fmt.Errorf("multipathd service is not running")
 		}
 
@@ -723,9 +700,6 @@ func (e *Executer) IsMultipathdAlive() (bool, error) {
 
 	return true, nil
 }
-
-
-
 
 func (e *Executer) OsOpenFile(name string, flag int, perm os.FileMode) (*os.File, error) {
 	return os.OpenFile(name, flag, perm)
