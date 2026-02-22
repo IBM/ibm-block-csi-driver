@@ -252,7 +252,7 @@ func NewOsDeviceConnectivityHelperScsiGeneric(executer executer.ExecuterInterfac
 		Executer:        executer,
 		KeyedGater:      KeyedGater,
 		Mounter:         Mounter,
-		Helper:          NewOsDeviceConnectivityHelperGeneric(executer),
+		Helper:          NewOsDeviceConnectivityHelperGeneric(executer, Mounter),
 		MutexMultipathF: &sync.Mutex{},
 		CleanScsiDevice: clean_scsi_device,
 	}
@@ -1178,7 +1178,7 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) TeardownVolume(target string, ex
 
 	// --- PHASE 1: VFS LAYER (UNMOUNT STACK) ---
 	mounts, _ := r.Mounter.GetMountsForPath(target)
-	var major, minor int
+	var major, minor uint32
 	if len(mounts) > 0 {
 		major, minor = mounts[0].Major, mounts[0].Minor
 		for i := len(mounts) - 1; i >= 0; i-- {
@@ -1292,7 +1292,7 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) TeardownVolume(target string, ex
 
 
 
-func (o *OsDeviceConnectivityHelperGeneric) getSlavesForDevice(major, minor int) ([]string, error) {
+func (o *OsDeviceConnectivityHelperGeneric) getSlavesForDevice(major, minor uint32) ([]string, error) {
 	slavesPath := fmt.Sprintf("/sys/dev/block/%d:%d/slaves", major, minor)
 
 	entries, err := os.ReadDir(slavesPath)
@@ -1848,21 +1848,23 @@ type OsDeviceConnectivityHelperInterface interface {
 	GetMpathVolumeId(mpathDeviceName string) (string, error)
 	normalizeWWID(raw string) string
 	findDMByWWID(wwid string) string
-	getSlavesForDevice(major, minor int) ([]string, error)
+	getSlavesForDevice(major, minor uint32) ([]string, error)
 	GetOpenCount(dmName string) (int32, error)
-	GetMajorMinorFromSysfs(devicePath string) (major int, minor int, err error)
-	getWWIDByDev(major, minor int) (string, error)
+	GetMajorMinorFromSysfs(devicePath string) (major uint32, minor uint32, err error)
+	getWWIDByDev(major, minor uint32) (string, error)
 }
 
 type OsDeviceConnectivityHelperGeneric struct {
 	Executer executer.ExecuterInterface
 	Helper   GetDmsPathHelperInterface
+	Mounter *mount.Mounter
 }
 
-func NewOsDeviceConnectivityHelperGeneric(executer executer.ExecuterInterface) OsDeviceConnectivityHelperInterface {
+func NewOsDeviceConnectivityHelperGeneric(executer executer.ExecuterInterface, Mounter *mount.Mounter) OsDeviceConnectivityHelperInterface {
 	return &OsDeviceConnectivityHelperGeneric{
 		Executer: executer,
 		Helper:   NewGetDmsPathHelperGeneric(executer),
+		Mounter: Mounter,
 	}
 }
 
@@ -2341,7 +2343,7 @@ func (o *OsDeviceConnectivityHelperGeneric) GetMpathDeviceName(volumePath string
 	}
 	
 	//deviceName, err := o.getDeviceFromMountInfo(volumePath)
-	major, minor, err = o.Mounter.GetMajorMinorFromSysfs
+	major, minor, err := mount.GetMajorMinorFromSysfs(volumePath)
 
 	if err != nil {
 		return "", err
@@ -2489,7 +2491,7 @@ func (o OsDeviceConnectivityHelperGeneric) normalizeWWID(raw string) string {
 	return strings.ReplaceAll(s, "-", "")
 }
 
-func (o *OsDeviceConnectivityHelperGeneric) getWWIDByDev(major, minor int) (string, error) {
+func (o *OsDeviceConnectivityHelperGeneric) getWWIDByDev(major, minor uint32) (string, error) {
 	basePath := fmt.Sprintf("/sys/dev/block/%d:%d", major, minor)
 
 	// Order of operations: DM -> NVMe -> SCSI
@@ -2566,14 +2568,14 @@ func (o *OsDeviceConnectivityHelperGeneric) GetOpenCount(dmName string) (int32, 
 	return io.OpenCount, nil
 }
 
-func (o *OsDeviceConnectivityHelperGeneric) GetMajorMinorFromSysfs(devicePath string) (major int, minor int, err error) {
+func (o *OsDeviceConnectivityHelperGeneric) GetMajorMinorFromSysfs(devicePath string) (major uint32, minor uint32, err error) {
     var st syscall.Stat_t
     if err := syscall.Stat(devicePath, &st); err != nil {
         return 0, 0, fmt.Errorf("stale-%s-%d", devicePath, time.Now().UnixNano())
     }
 
-    major = int(unix.Major(st.Rdev))
-    minor = int(unix.Minor(st.Rdev))
+    major = unix.Major(st.Rdev)
+    minor = unix.Minor(st.Rdev)
     name := filepath.Base(devicePath)
 
     // 1. Branch: Resolve SG to its Block sibling
@@ -2589,8 +2591,8 @@ func (o *OsDeviceConnectivityHelperGeneric) GetMajorMinorFromSysfs(devicePath st
             sdName := blockEntries[0].Name()
             var sdSt syscall.Stat_t
 	    if err := syscall.Stat(filepath.Join("/dev", sdName), &sdSt); err == nil {
-                major = int(unix.Major(sdSt.Rdev))
-                minor = int(unix.Minor(sdSt.Rdev))
+                major = unix.Major(sdSt.Rdev)
+                minor = unix.Minor(sdSt.Rdev)
             }
         }
     }
