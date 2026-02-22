@@ -60,7 +60,7 @@ func NewDriver(endpoint string, configFilePath string, hostname string, max_invo
 		Exec:      commandExecuter,
 	}
 
-	osDeviceConnectivityHelper := device_connectivity.NewOsDeviceConnectivityHelperScsiGeneric(commandExecuter, gater, mount_wrapper, clean_scsi_device)	
+	osDeviceConnectivityHelper := device_connectivity.NewOsDeviceConnectivityHelperScsiGeneric(commandExecuter, gater, mount_wrapper, clean_scsi_device)
 	nodeUtils := *NewNodeUtils(commandExecuter, gater, mounter, configFile, osDeviceConnectivityHelper)
 
 	syncLock := NewSyncLock(max_invocations, clean_scsi_device)
