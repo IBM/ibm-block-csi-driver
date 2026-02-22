@@ -79,7 +79,7 @@ type Mounter struct {
 
 var _ mount.Interface = &Mounter{}
 
-func New(mounterPath string, g *executer.KeyedGater, limit int32) mount.Interface {
+func New(mounterPath string, g *executer.KeyedGater, limit int32) *Mounter {
 	return &Mounter{
 		Mounter:  mount.New(mounterPath).(*mount.Mounter),
 		executer: &executer.Executer{},
@@ -88,7 +88,7 @@ func New(mounterPath string, g *executer.KeyedGater, limit int32) mount.Interfac
 	}
 }
 
-func NewWithExecutor(mounterPath string, e executer.ExecuterInterface, g *executer.KeyedGater, limit int32) mount.Interface {
+func NewWithExecutor(mounterPath string, e executer.ExecuterInterface, g *executer.KeyedGater, limit int32) *Mounter {
 	return &Mounter{
 		Mounter:  mount.New(mounterPath).(*mount.Mounter),
 		executer: e,

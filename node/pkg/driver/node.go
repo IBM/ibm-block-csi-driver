@@ -19,9 +19,11 @@ package driver
 import (
 	"context"
 	"fmt"
+	"os"
 	"path"
 	"reflect"
 	"strings"
+	"time"
 
 	"github.com/container-storage-interface/spec/lib/go/csi"
 	"github.com/ibm/ibm-block-csi-driver/node/goid_info"
@@ -70,6 +72,8 @@ type NodeMounter interface {
 	mount.Interface
 	FormatAndMount(source string, target string, fstype string, options []string) error
 	GetDiskFormat(disk string) (string, error)
+	UnmountWithTimeout(target string, timeout time.Duration) error
+	MountNativeWithTimeout(source, target, fstype string, options []string, timeout time.Duration) error
 }
 
 // nodeService represents the node service of CSI driver
@@ -176,7 +180,7 @@ func (d *NodeService) NodeStageVolume(ctx context.Context, req *csi.NodeStageVol
 		// we can swallow the error here, since it's just for cleanliness
 	}
 
-	mpathDevice, err := osDeviceConnectivity.GetMpathDevice(volumeUuid))
+	mpathDevice, err := osDeviceConnectivity.GetMpathDevice(volumeUuid)
 	//mpathDevice, err := osDeviceConnectivity.VerifyAndGetDmDevice(volumeUuid, lun)
 	logger.Debugf("Discovered device : {%v}", mpathDevice)
 	if err != nil {
@@ -197,7 +201,7 @@ func (d *NodeService) NodeStageVolume(ctx context.Context, req *csi.NodeStageVol
 			logger.Errorf("Error while trying to get sys devices : {%v}", err.Error())
 			return nil, status.Error(codes.Internal, err.Error())
 	}
-	err = osDeviceConnectivity.ValidateLun(lun, sysDevices)
+	err = osDeviceConnectivity.ValidateLun(mpathDevice, lun, sysDevices, volumeUuid)
 	if err != nil {
 			logger.Errorf("Error while trying to validate lun : {%v}", err.Error())
 			return nil, status.Error(codes.Internal, err.Error())
@@ -367,7 +371,7 @@ func (d *NodeService) NodeUnstageVolume(ctx context.Context, req *csi.NodeUnstag
 	logger.Debugf("Check if staging path {%s} is mounted", stagingPathWithHostPrefix)
 
 	volumeUuid := d.NodeUtils.GetVolumeUuid(volumeID)
-	err = d.OsDeviceConnectivityHelper.TeardownVolume(tstagingPathWithHostPrefix, volumeUuid)
+	err = d.OsDeviceConnectivityHelper.TeardownVolume(stagingPathWithHostPrefix, volumeUuid)
 
 	// TODO NVME additions
 	baseDevice := path.Base(mpathDevice)
@@ -418,7 +422,7 @@ func (d *NodeService) NodeUnstageVolume(ctx context.Context, req *csi.NodeUnstag
 	}
 	// TODO nvme additions end
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	err = os.Remove(stagingPathWithHostPrefix)
