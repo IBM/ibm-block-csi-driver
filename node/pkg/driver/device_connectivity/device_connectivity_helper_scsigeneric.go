@@ -2339,13 +2339,13 @@ func (o *OsDeviceConnectivityHelperGeneric) GetMpathDeviceName(volumePath string
 			return kernelName, nil
 		}
 	}
+	
+	//deviceName, err := o.getDeviceFromMountInfo(volumePath)
+	major, minor, err = o.Mounter.GetMajorMinorFromSysfs
 
-	// Tier 3: Fallback (MountInfo)
-	// deviceName, err := o.getDeviceFromMountInfo(volumePath)
-	// 
-	//if err != nil {
-	//	return "", err
-	//}
+	if err != nil {
+		return "", err
+	}
 
 	return o.ResolveToKernelName("compile")
 }
