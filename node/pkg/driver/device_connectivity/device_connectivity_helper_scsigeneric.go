@@ -53,6 +53,8 @@ type OsDeviceConnectivityHelperScsiGenericInterface interface {
 	RemoveGhostDevice(lexpectedSerial string, expectedLun int, arrayIdentifiers []string) error
 	ValidateLun(targetDm string, lun int, sysDevices []string, expectedSerial string) error
 	IsVolumePathMatchesVolumeId(volumeId string, volumePath string) (bool, error)
+	TeardownVolume(target string, expectedWWID string) error
+	IdentityAwarePreScan(targetPath string, expectedWWID string) error
 }
 
 type OsDeviceConnectivityHelperScsiGeneric struct {
@@ -542,6 +544,7 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) readSysfs(path string) string {
 }
 
 func (r *OsDeviceConnectivityHelperScsiGeneric) ValidateLun(targetDm string, expectedLun int, sysDevices []string, expectedSerial string) error {
+	// TODO expectedSerial should consider variations
 	logger.Debugf("Validating LUN {%v} on devices: {%v}", expectedLun, sysDevices)
 
 	validPathsFound := 0
@@ -2338,12 +2341,13 @@ func (o *OsDeviceConnectivityHelperGeneric) GetMpathDeviceName(volumePath string
 	}
 
 	// Tier 3: Fallback (MountInfo)
-	deviceName, err := o.getDeviceFromMountInfo(volumePath)
-	if err != nil {
-		return "", err
-	}
+	// deviceName, err := o.getDeviceFromMountInfo(volumePath)
+	// 
+	//if err != nil {
+	//	return "", err
+	//}
 
-	return o.ResolveToKernelName(deviceName)
+	return o.ResolveToKernelName("compile")
 }
 
 
@@ -2805,9 +2809,9 @@ func (o GetDmsPathHelperGeneric) validateAndSettle(path string) (string, error) 
 
 
 func (o GetDmsPathHelperGeneric) performDiscovery(volumeWWID []string) (string, error) {
-	normalizedWWID := make([]string, len(volumeWWIDs))
+	normalizedWWID := make([]string, len(volumeWWID))
 
-    for i, wwid := range volumeWWIDs {
+    for i, wwid := range volumeWWID {
 		// TODO is this normalization safe
         clean := strings.ReplaceAll(wwid, "-", "")
         normalizedWWID[i] = strings.ToLower(clean)
