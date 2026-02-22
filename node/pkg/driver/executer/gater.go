@@ -9,16 +9,14 @@ import (
 	"time"
 )
 
-
-
 type semaphoreGate struct {
-	ch      chan struct{}
+	ch       chan struct{}
 	refCount int // Track active acquires to determine when to delete the key
 }
 
 type KeyedGater struct {
 	// Keyed semaphore Acquire/Release
-	mu    sync.Mutex
+	mu             sync.Mutex
 	semaphoreGates map[string]*semaphoreGate
 
 	resources    sync.Map // map[string]*ResourcePool
@@ -27,75 +25,71 @@ type KeyedGater struct {
 	lastWarnTime atomic.Int64
 }
 
-
 func NewKeyedGater(maxGlobalLeaks int64) *KeyedGater {
-    return &KeyedGater{
-        semaphoreGates:     make(map[string]*semaphoreGate),
-        maxGlobal: maxGlobalLeaks,
-    }
+	return &KeyedGater{
+		semaphoreGates: make(map[string]*semaphoreGate),
+		maxGlobal:      maxGlobalLeaks,
+	}
 }
-
-
 
 // Acquire attempts to reserve a slot for a specific key with a custom timeout.
 // key: The identifier (e.g., VolumeID or "global-udev-lock")
 // maxRuns: Max concurrency for this specific key
 // timeout: How long to wait for a free slot
 func (g *KeyedGater) Acquire(key string, maxRuns int, timeout time.Duration) error {
-    g.mu.Lock()
-    if g.semaphoreGates == nil {
-        g.semaphoreGates = make(map[string]*semaphoreGate)
-    }
+	g.mu.Lock()
+	if g.semaphoreGates == nil {
+		g.semaphoreGates = make(map[string]*semaphoreGate)
+	}
 
-    gt, exists := g.semaphoreGates[key]
-    if !exists {
-        gt = &semaphoreGate{ch: make(chan struct{}, maxRuns)}
-        g.semaphoreGates[key] = gt
-    }
-    gt.refCount++ // Increment before unlocking
-    g.mu.Unlock()
+	gt, exists := g.semaphoreGates[key]
+	if !exists {
+		gt = &semaphoreGate{ch: make(chan struct{}, maxRuns)}
+		g.semaphoreGates[key] = gt
+	}
+	gt.refCount++ // Increment before unlocking
+	g.mu.Unlock()
 
-    // Using context for timeout is idiomatic
-    ctx, cancel := context.WithTimeout(context.Background(), timeout)
-    defer cancel()
+	// Using context for timeout is idiomatic
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	defer cancel()
 
-    select {
-    case gt.ch <- struct{}{}:
-        return nil
-    case <-ctx.Done():
-        // Cleanup: decrement refCount if we timeout
-        g.decrementRef(key)
-        return fmt.Errorf("gater: timeout (%v) key=%s", timeout, key)
-    }
+	select {
+	case gt.ch <- struct{}{}:
+		return nil
+	case <-ctx.Done():
+		// Cleanup: decrement refCount if we timeout
+		g.decrementRef(key)
+		return fmt.Errorf("gater: timeout (%v) key=%s", timeout, key)
+	}
 }
 
 func (g *KeyedGater) Release(key string) {
-    g.mu.Lock()
-    gt, exists := g.semaphoreGates[key]
-    g.mu.Unlock()
+	g.mu.Lock()
+	gt, exists := g.semaphoreGates[key]
+	g.mu.Unlock()
 
-    if exists {
-        select {
-        case <-gt.ch:
-            // Successfully released a slot
-        default:
-            // Safety: Avoid panic if Release is called extra times
-        }
-        g.decrementRef(key)
-    }
+	if exists {
+		select {
+		case <-gt.ch:
+			// Successfully released a slot
+		default:
+			// Safety: Avoid panic if Release is called extra times
+		}
+		g.decrementRef(key)
+	}
 }
 
 func (g *KeyedGater) decrementRef(key string) {
-    g.mu.Lock()
-    defer g.mu.Unlock()
-    if gt, ok := g.semaphoreGates[key]; ok {
-        gt.refCount--
-        if gt.refCount <= 0 {
-            delete(g.semaphoreGates, key) // Reclaims memory
-        }
-    }
+	g.mu.Lock()
+	defer g.mu.Unlock()
+	if gt, ok := g.semaphoreGates[key]; ok {
+		gt.refCount--
+		if gt.refCount <= 0 {
+			delete(g.semaphoreGates, key) // Reclaims memory
+		}
+	}
 }
-
 
 type Result[T any] struct {
 	Data T
@@ -142,7 +136,6 @@ func (g *KeyedGater) suicideIfLeaked() {
 		}
 	}
 }
-
 
 // ExecuteUninterruptible handles tasks that might hang in D-state (kernel).
 func ExecuteUninterruptible[T any](
@@ -203,7 +196,7 @@ func baseExecute[T any](
 			select {
 			case <-switched:
 				<-pool.spare
-				g.globalLeaked.Add(-1)		// Recovered
+				g.globalLeaked.Add(-1) // Recovered
 			default:
 				<-pool.running
 			}
@@ -247,5 +240,3 @@ func baseExecute[T any](
 		}
 	}
 }
-
-
