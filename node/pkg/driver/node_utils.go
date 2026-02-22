@@ -1,3 +1,5 @@
+//go:build linux
+
 /**
  * Copyright 2019 IBM Corp.
  *
@@ -13,8 +15,6 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-
-//go:build linux
 
 package driver
 
@@ -112,19 +112,19 @@ type NodeUtilsInterface interface {
 }
 
 type NodeUtils struct {
-	Executer                   executer.ExecuterInterface
-	KeyedGater                 *executer.KeyedGater
-	mounter                    mount.Interface
-	ConfigYaml                 ConfigFile
+	Executer   executer.ExecuterInterface
+	KeyedGater *executer.KeyedGater
+	mounter    mount.Interface
+	ConfigYaml ConfigFile
 }
 
 func NewNodeUtils(executer executer.ExecuterInterface, KeyedGater *executer.KeyedGater, mounter mount.Interface, configYaml ConfigFile,
 	osDeviceConnectivityHelper device_connectivity.OsDeviceConnectivityHelperScsiGenericInterface) *NodeUtils {
 	return &NodeUtils{
-		Executer:                   executer,
-		KeyedGater:			KeyedGater,
-		mounter:                    mounter,
-		ConfigYaml:                 configYaml,
+		Executer:   executer,
+		KeyedGater: KeyedGater,
+		mounter:    mounter,
+		ConfigYaml: configYaml,
 	}
 }
 
@@ -193,7 +193,6 @@ func (n NodeUtils) ClearStageInfoFile(filePath string) error {
 	return os.Remove(filePath)
 }
 
-
 func (n NodeUtils) GetSysDevicesFromMpath(baseDevice string) ([]string, error) {
 	// baseDevice is expected to be "dm-X" or "nvmeXnY"
 	logger.Debugf("GetSysDevicesFromMpath with param: {%v}", baseDevice)
@@ -241,7 +240,6 @@ func (n NodeUtils) GetSysDevicesFromMpath(baseDevice string) ([]string, error) {
 
 	return nil, fmt.Errorf("unsupported device type: %s", baseDevice)
 }
-
 
 func (n NodeUtils) StageInfoFileIsExist(filePath string) bool {
 	if _, err := os.Stat(filePath); err != nil {
@@ -552,25 +550,25 @@ func (n NodeUtils) RescanPhysicalDevices(sysDevices []string) error {
 
 func (n NodeUtils) FormatDevice(devicePath string, fsType string) error {
 	// TODO wrap
-    var args []string
-    if fsType == "ext4" {
-        args = []string{"-m0", "-Enodiscard,lazy_itable_init=1,lazy_journal_init=1", devicePath}
-    } else if fsType == "xfs" {
+	var args []string
+	if fsType == "ext4" {
+		args = []string{"-m0", "-Enodiscard,lazy_itable_init=1,lazy_journal_init=1", devicePath}
+	} else if fsType == "xfs" {
 		// TODO review -f
-        args = []string{"-f", "-K", devicePath} // Added -f (force) to ensure it works on raw disks
-    } else {
-        return fmt.Errorf("unsupported fsType: %v", fsType)
-    }
+		args = []string{"-f", "-K", devicePath} // Added -f (force) to ensure it works on raw disks
+	} else {
+		return fmt.Errorf("unsupported fsType: %v", fsType)
+	}
 
-    logger.Debugf("Formatting the device with fs_type = {%v}", fsType)
-    _, err := n.Executer.ExecuteWithTimeout(mkfsTimeoutMilliseconds, "mkfs."+fsType, args)
-    if err != nil {
-        return fmt.Errorf("mkfs.%s execution failed: %v", fsType, err)
-    }
+	logger.Debugf("Formatting the device with fs_type = {%v}", fsType)
+	_, err := n.Executer.ExecuteWithTimeout(mkfsTimeoutMilliseconds, "mkfs."+fsType, args)
+	if err != nil {
+		return fmt.Errorf("mkfs.%s execution failed: %v", fsType, err)
+	}
 
-    // TODO Brief pause to allow kernel to settle partition table/FS metadata
-    // time.Sleep(2 * time.Second)
-    return nil
+	// TODO Brief pause to allow kernel to settle partition table/FS metadata
+	// time.Sleep(2 * time.Second)
+	return nil
 
 }
 
@@ -684,43 +682,42 @@ func (n NodeUtils) UpdateNodeInitiatorsAnnotation(ctx context.Context, nodeName 
 }
 
 func (n NodeUtils) IsBlock(devicePath string) (bool, error) {
-    // Specify [bool] as the generic type T
-    res, err := executer.ExecuteUninterruptible[bool](
-	n.KeyedGater,
-        "is-block-"+devicePath,
-        10,              // maxRunning: 10 concurrent stat calls
-        50,              // maxSpare: budget for hung threads (D-state)
-        1*time.Second,   // handoffTimeout: move to spare if kernel blocks
-        5*time.Second,   // hardTimeout: return error to caller
-        func(ctx context.Context) (bool, error) {
-            var stat unix.Stat_t
-            // unix.Stat (syscall) can hang if the device is a stale NFS mount or ghost LUN
-            if err := unix.Stat(devicePath, &stat); err != nil {
-                return false, err
-            }
-            return (stat.Mode & unix.S_IFMT) == unix.S_IFBLK, nil
-        },
-    )
+	// Specify [bool] as the generic type T
+	res, err := executer.ExecuteUninterruptible[bool](
+		n.KeyedGater,
+		"is-block-"+devicePath,
+		10,            // maxRunning: 10 concurrent stat calls
+		50,            // maxSpare: budget for hung threads (D-state)
+		1*time.Second, // handoffTimeout: move to spare if kernel blocks
+		5*time.Second, // hardTimeout: return error to caller
+		func(ctx context.Context) (bool, error) {
+			var stat unix.Stat_t
+			// unix.Stat (syscall) can hang if the device is a stale NFS mount or ghost LUN
+			if err := unix.Stat(devicePath, &stat); err != nil {
+				return false, err
+			}
+			return (stat.Mode & unix.S_IFMT) == unix.S_IFBLK, nil
+		},
+	)
 
-    // In Go Generics, if err != nil, res will be the 'zero value' (false)
-    if err != nil {
-        return false, err
-    }
+	// In Go Generics, if err != nil, res will be the 'zero value' (false)
+	if err != nil {
+		return false, err
+	}
 
-    // No type assertion needed! 'res' is already a bool.
-    return res, nil
+	// No type assertion needed! 'res' is already a bool.
+	return res, nil
 }
-
 
 func (n NodeUtils) GetFileSystemVolumeStats(path string) (VolumeStatistics, error) {
 	// Specify [unix.Statfs_t] as the generic type T
 	stat, err := executer.ExecuteUninterruptible[unix.Statfs_t](
 		n.KeyedGater,
 		"statfs-"+path,
-		5,               // maxRunning: 5 concurrent statfs per path
-		20,              // maxSpare: budget for "zombie" threads
-		1*time.Second,   // handoffTimeout: move to spare if kernel blocks
-		5*time.Second,   // hardTimeout: return error to caller
+		5,             // maxRunning: 5 concurrent statfs per path
+		20,            // maxSpare: budget for "zombie" threads
+		1*time.Second, // handoffTimeout: move to spare if kernel blocks
+		5*time.Second, // hardTimeout: return error to caller
 		func(ctx context.Context) (unix.Statfs_t, error) {
 			var s unix.Statfs_t
 			// unix.Statfs (syscall) is highly prone to D-state hangs on RHEL 7
@@ -745,34 +742,32 @@ func (n NodeUtils) GetFileSystemVolumeStats(path string) (VolumeStatistics, erro
 	}, nil
 }
 
-
 func (d NodeUtils) GetBlockVolumeStats(devicePath string) (VolumeStatistics, error) {
-    f, err := os.OpenFile(devicePath, os.O_RDONLY, 0)
-    if err != nil {
-        return VolumeStatistics{}, fmt.Errorf("failed to open: %w", err)
-    }
-    defer f.Close()
+	f, err := os.OpenFile(devicePath, os.O_RDONLY, 0)
+	if err != nil {
+		return VolumeStatistics{}, fmt.Errorf("failed to open: %w", err)
+	}
+	defer f.Close()
 
-    var size uint64
-    // Raw syscall: (trap, fd, request, pointer)
-    _, _, errno := unix.Syscall(
-        unix.SYS_IOCTL,
-        f.Fd(),
-        unix.BLKGETSIZE64,
-        uintptr(unsafe.Pointer(&size)),
-    )
+	var size uint64
+	// Raw syscall: (trap, fd, request, pointer)
+	_, _, errno := unix.Syscall(
+		unix.SYS_IOCTL,
+		f.Fd(),
+		unix.BLKGETSIZE64,
+		uintptr(unsafe.Pointer(&size)),
+	)
 
-    if errno != 0 {
-        return VolumeStatistics{}, fmt.Errorf("ioctl BLKGETSIZE64 failed: %v", errno)
-    }
+	if errno != 0 {
+		return VolumeStatistics{}, fmt.Errorf("ioctl BLKGETSIZE64 failed: %v", errno)
+	}
 
-    return VolumeStatistics{
-        TotalBytes: int64(size),
-	//AvailableBytes: int64(size),
-	///UsedBytes:      0, // Or same as TotalBytes depending on CSI expectations
-    }, nil
+	return VolumeStatistics{
+		TotalBytes: int64(size),
+		//AvailableBytes: int64(size),
+		///UsedBytes:      0, // Or same as TotalBytes depending on CSI expectations
+	}, nil
 }
-
 
 func (d NodeUtils) GetVolumeUuid(volumeId string) string {
 	volumeIdParts := strings.Split(volumeId, d.ConfigYaml.Parameters.Object_id_info.Delimiter)
@@ -784,4 +779,3 @@ func (d NodeUtils) GetVolumeUuid(volumeId string) string {
 		return "3" + splittedIdsPart[0]
 	}
 }
-
