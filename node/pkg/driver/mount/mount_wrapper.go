@@ -921,7 +921,7 @@ func (m *Mounter) GetDeviceFromPath(targetPath string) (string, error) {
 }
 
 
-func GetMajorMinorFromSysfs(targetPath string) (int, int, error) {
+func GetMajorMinorFromSysfs(targetPath string) (uint32, uint32, error) {
 	mi, err := findBestMount(targetPath)
 	if err != nil {
 		return 0, 0, err
@@ -956,8 +956,8 @@ func findBestMount(targetPath string) (*MountInfo, error) {
 type MountInfo struct {
 	MountID        int
 	ParentID       int
-	Major          int    // Integer major device number
-	Minor          int    // Integer minor device number
+	Major          uint32    // Integer major device number
+	Minor          uint32    // Integer minor device number
 	Root           string
 	MountPoint     string
 	MountOptions   string
@@ -1024,8 +1024,8 @@ func GetMounts(targetPath string) ([]MountInfo, error) {
 		mounts = append(mounts, MountInfo{
 			MountID:        parseInt(fields[0]),
 			ParentID:       parseInt(fields[1]),
-			Major:          major,
-			Minor:          minor,
+			Major:          uint32(major),
+			Minor:          uint32(minor),
 			Root:           unescapeMountString(fields[3]),
 			MountPoint:     mountPoint,
 			MountOptions:   fields[5],

@@ -23,7 +23,6 @@ import (
 	"path"
 	"reflect"
 	"strings"
-	"time"
 
 	"github.com/container-storage-interface/spec/lib/go/csi"
 	"github.com/ibm/ibm-block-csi-driver/node/goid_info"
@@ -533,7 +532,7 @@ func (d *NodeService) publishFileSystemVolume(stagingPath string, targetPath str
 func (d *NodeService) publishRawBlockVolume(mpathDevice string, targetPath string) error {
 	options := []string{"bind"}
 	logger.Debugf("Mount the device to raw block volume. Target : {%s}, device : {%s}", targetPath, mpathDevice)
-	return d.Mounter.Mount(mpathDevice, targetPath, "", options, 20*time.Second)
+	return d.Mounter.Mount(mpathDevice, targetPath, "", options)
 }
 
 // targetPathWithHostPrefix: path of target
