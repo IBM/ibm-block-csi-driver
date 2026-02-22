@@ -31,7 +31,6 @@ import (
 	"google.golang.org/grpc"
 	yaml "gopkg.in/yaml.v2"
 	mount "k8s.io/mount-utils"
-	"k8s.io/utils/exec"
 )
 
 type Driver struct {
@@ -52,28 +51,28 @@ func NewDriver(endpoint string, configFilePath string, hostname string, max_invo
 	logger.Infof("Max invocations: %d", max_invocations)
 	logger.Infof("Clean scsi device enabled: %v", clean_scsi_device)
 
-	executer := &executer.Executer{}
-	gater := &executer.NewKeyedGater(500)
-	mount_wrapper := mountwrapper.NewWithExecutor(executer, gater)
+	commandExecuter := executer.NewExecuter()
+	gater := executer.NewKeyedGater(500)
+	mount_wrapper := mountwrapper.NewWithExecutor("", commandExecuter, gater, 500)
 
 	mounter := &mount.SafeFormatAndMount{
 		Interface: mount_wrapper,
-		Exec:      executer,
+		Exec:      commandExecuter,
 	}
-	
-	nodeUtils := *NewNodeUtils(executer, mounter, configFile)
+
+	osDeviceConnectivityHelper := device_connectivity.NewOsDeviceConnectivityHelperScsiGeneric(commandExecuter, gater, mount_wrapper, clean_scsi_device)	
+	nodeUtils := *NewNodeUtils(commandExecuter, gater, mounter, configFile, osDeviceConnectivityHelper)
 
 	syncLock := NewSyncLock(max_invocations, clean_scsi_device)
 	osDeviceConnectivityMapping := map[string]device_connectivity.OsDeviceConnectivityInterface{
-		configFile.Connectivity_type.Nvme_over_fc: device_connectivity.NewOsDeviceConnectivityNvmeOFc(executer, clean_scsi_device),
-		configFile.Connectivity_type.Fc:           device_connectivity.NewOsDeviceConnectivityFc(executer, clean_scsi_device),
-		configFile.Connectivity_type.Iscsi:        device_connectivity.NewOsDeviceConnectivityIscsi(executer, clean_scsi_device),
+		configFile.Connectivity_type.Nvme_over_fc: device_connectivity.NewOsDeviceConnectivityNvmeOFc(commandExecuter, gater, mount_wrapper, clean_scsi_device),
+		configFile.Connectivity_type.Fc:           device_connectivity.NewOsDeviceConnectivityFc(commandExecuter, gater, mount_wrapper, clean_scsi_device),
+		configFile.Connectivity_type.Iscsi:        device_connectivity.NewOsDeviceConnectivityIscsi(commandExecuter, gater, mount_wrapper, clean_scsi_device),
 	}
-	osDeviceConnectivityHelper := device_connectivity.NewOsDeviceConnectivityHelperScsiGeneric(executer, gater, mount_wrapper, nodeUtils, clean_scsi_device)
 	return &Driver{
 		endpoint:    endpoint,
 		config:      configFile,
-		NodeService: NewNodeService(configFile, hostname, nodeUtils, osDeviceConnectivityMapping, osDeviceConnectivityHelper, executer, mounter, syncLock),
+		NodeService: NewNodeService(configFile, hostname, nodeUtils, osDeviceConnectivityMapping, osDeviceConnectivityHelper, commandExecuter, mounter, syncLock),
 	}, nil
 }
 
