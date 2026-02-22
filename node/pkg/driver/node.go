@@ -165,7 +165,6 @@ func (d *NodeService) NodeStageVolume(ctx context.Context, req *csi.NodeStageVol
 		return nil, status.Error(codes.Aborted, err.Error())
 	}
 
-
 	err = osDeviceConnectivity.RescanDevices(lun, arrayInitiators)
 	if err != nil {
 		return nil, status.Error(codes.Internal, err.Error())
@@ -195,15 +194,14 @@ func (d *NodeService) NodeStageVolume(ctx context.Context, req *csi.NodeStageVol
 	baseDevice := path.Base(mpathDevice)
 	sysDevices, err := d.NodeUtils.GetSysDevicesFromMpath(baseDevice)
 	if err != nil {
-			logger.Errorf("Error while trying to get sys devices : {%v}", err.Error())
-			return nil, status.Error(codes.Internal, err.Error())
+		logger.Errorf("Error while trying to get sys devices : {%v}", err.Error())
+		return nil, status.Error(codes.Internal, err.Error())
 	}
 	err = osDeviceConnectivity.ValidateLun(mpathDevice, lun, sysDevices, volumeUuid)
 	if err != nil {
-			logger.Errorf("Error while trying to validate lun : {%v}", err.Error())
-			return nil, status.Error(codes.Internal, err.Error())
+		logger.Errorf("Error while trying to validate lun : {%v}", err.Error())
+		return nil, status.Error(codes.Internal, err.Error())
 	}
-
 
 	existingFormat, err := d.Mounter.GetDiskFormat(mpathDevice)
 	if err != nil {
@@ -323,22 +321,19 @@ func (d *NodeService) resolveFsTypeForMount(requestedFsType string, existingForm
 	return fsTypeForMount, nil
 }
 
-
-
 func (d *NodeService) formatAndMount(mpathDevice string, stagingPath string, fsTypeForMount string, existingFormat string) error {
 	if existingFormat == "" {
-			d.NodeUtils.FormatDevice(mpathDevice, fsTypeForMount)
+		d.NodeUtils.FormatDevice(mpathDevice, fsTypeForMount)
 	}
 
 	var mountOptions []string
 	if fsTypeForMount == "xfs" {
-			mountOptions = append(mountOptions, "nouuid")
+		mountOptions = append(mountOptions, "nouuid")
 	}
 
 	logger.Debugf("Mount the device with fs_type = {%v} (Create filesystem if needed)", fsTypeForMount)
 	return d.Mounter.FormatAndMount(mpathDevice, stagingPath, fsTypeForMount, mountOptions) // Passing without /host because k8s mounter uses mount\mkfs\fsck
 }
-
 
 func (d *NodeService) NodeUnstageVolume(ctx context.Context, req *csi.NodeUnstageVolumeRequest) (*csi.NodeUnstageVolumeResponse, error) {
 	defer logger.Exit(logger.Enter(req))
@@ -363,7 +358,6 @@ func (d *NodeService) NodeUnstageVolume(ctx context.Context, req *csi.NodeUnstag
 	}
 
 	stagingPathWithHostPrefix := d.NodeUtils.GetPodPath(stagingTargetPath)
-
 
 	logger.Debugf("Check if staging path {%s} is mounted", stagingPathWithHostPrefix)
 
