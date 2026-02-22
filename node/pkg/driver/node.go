@@ -73,8 +73,6 @@ type NodeMounter interface {
 	mount.Interface
 	FormatAndMount(source string, target string, fstype string, options []string) error
 	GetDiskFormat(disk string) (string, error)
-	UnmountWithTimeout(target string, timeout time.Duration) error
-	MountNativeWithTimeout(source, target, fstype string, options []string, timeout time.Duration) error
 }
 
 // nodeService represents the node service of CSI driver
@@ -483,13 +481,13 @@ func (d *NodeService) NodePublishVolume(ctx context.Context, req *csi.NodePublis
 func (d *NodeService) publishFileSystemVolume(stagingPath string, targetPath string, fsType string) error {
 	mountOptions := []string{"bind"}
 	logger.Debugf("Bind mount staging: {%v} with target: {%v}, fs_type: {%v}", stagingPath, targetPath, fsType)
-	return d.Mounter.MountNativeWithTimeout(stagingPath, targetPath, fsType, mountOptions, 20*time.Second) // Passing without /host because k8s mounter uses mount\mkfs\fsck
+	return d.Mounter.Mount(stagingPath, targetPath, fsType, mountOptions) // Passing without /host because k8s mounter uses mount\mkfs\fsck
 }
 
 func (d *NodeService) publishRawBlockVolume(mpathDevice string, targetPath string) error {
 	options := []string{"bind"}
 	logger.Debugf("Mount the device to raw block volume. Target : {%s}, device : {%s}", targetPath, mpathDevice)
-	return d.Mounter.MountNativeWithTimeout(mpathDevice, targetPath, "", options, 20*time.Second)
+	return d.Mounter.Mount(mpathDevice, targetPath, "", options, 20*time.Second)
 }
 
 // targetPathWithHostPrefix: path of target
@@ -589,7 +587,7 @@ func (d *NodeService) NodeUnpublishVolume(ctx context.Context, req *csi.NodeUnpu
 		return nil, status.Error(codes.Internal, err.Error())
 	}
 	if !isNotMounted {
-		err = d.Mounter.UnmountWithTimeout(target, 20*time.Second)
+		err = d.Mounter.Unmount(target)
 		if err != nil {
 			logger.Errorf("Unmount failed. Target : %q, err : %v", target, err.Error())
 			return nil, status.Error(codes.Internal, err.Error())
