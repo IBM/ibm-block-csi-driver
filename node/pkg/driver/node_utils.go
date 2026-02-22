@@ -14,6 +14,8 @@
  * limitations under the License.
  */
 
+//go:build linux
+
 package driver
 
 import (
@@ -22,11 +24,13 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"os"
 	"path"
+	"path/filepath"
 	"strconv"
 	"strings"
+	"time"
+	"unsafe"
 
 	"github.com/ibm/ibm-block-csi-driver/node/pkg/driver/device_connectivity"
 	"golang.org/x/sys/unix"
@@ -97,7 +101,7 @@ type NodeUtilsInterface interface {
 	ExpandFilesystem(devicePath string, volumePath string, fsType string) error
 	ExpandMpathDevice(mpathDevice string) error
 	RescanPhysicalDevices(sysDevices []string) error
-	FormatDevice(devicePath string, fsType string)
+	FormatDevice(devicePath string, fsType string) error
 	IsNotMountPoint(file string) (bool, error)
 	GetPodPath(filepath string) string
 	GetTopologyLabels(ctx context.Context, nodeName string) (map[string]string, error)
@@ -109,14 +113,16 @@ type NodeUtilsInterface interface {
 
 type NodeUtils struct {
 	Executer                   executer.ExecuterInterface
+	KeyedGater                 *executer.KeyedGater
 	mounter                    mount.Interface
 	ConfigYaml                 ConfigFile
 }
 
-func NewNodeUtils(executer executer.ExecuterInterface, mounter mount.Interface, configYaml ConfigFile,
+func NewNodeUtils(executer executer.ExecuterInterface, KeyedGater *executer.KeyedGater, mounter mount.Interface, configYaml ConfigFile,
 	osDeviceConnectivityHelper device_connectivity.OsDeviceConnectivityHelperScsiGenericInterface) *NodeUtils {
 	return &NodeUtils{
 		Executer:                   executer,
+		KeyedGater:			KeyedGater,
 		mounter:                    mounter,
 		ConfigYaml:                 configYaml,
 	}
@@ -679,7 +685,8 @@ func (n NodeUtils) UpdateNodeInitiatorsAnnotation(ctx context.Context, nodeName 
 
 func (n NodeUtils) IsBlock(devicePath string) (bool, error) {
     // Specify [bool] as the generic type T
-    res, err := n.KeyedGater.ExecuteUninterruptible[bool](
+    res, err := executer.ExecuteUninterruptible[bool](
+	n.KeyedGater,
         "is-block-"+devicePath,
         10,              // maxRunning: 10 concurrent stat calls
         50,              // maxSpare: budget for hung threads (D-state)
@@ -705,9 +712,10 @@ func (n NodeUtils) IsBlock(devicePath string) (bool, error) {
 }
 
 
-func (d NodeUtils) GetFileSystemVolumeStats(path string) (VolumeStatistics, error) {
+func (n NodeUtils) GetFileSystemVolumeStats(path string) (VolumeStatistics, error) {
 	// Specify [unix.Statfs_t] as the generic type T
-	stat, err := d.KeyedGater.ExecuteUninterruptible[unix.Statfs_t](
+	stat, err := executer.ExecuteUninterruptible[unix.Statfs_t](
+		n.KeyedGater,
 		"statfs-"+path,
 		5,               // maxRunning: 5 concurrent statfs per path
 		20,              // maxSpare: budget for "zombie" threads
@@ -723,7 +731,7 @@ func (d NodeUtils) GetFileSystemVolumeStats(path string) (VolumeStatistics, erro
 	)
 
 	if err != nil {
-		return nil, err
+		return VolumeStatistics{}, err
 	}
 
 	bsize := int64(stat.Bsize)
@@ -739,27 +747,32 @@ func (d NodeUtils) GetFileSystemVolumeStats(path string) (VolumeStatistics, erro
 
 
 func (d NodeUtils) GetBlockVolumeStats(devicePath string) (VolumeStatistics, error) {
-	// Use O_RDONLY to ensure we don't interfere with active I/O
-	f, err := os.OpenFile(devicePath, os.O_RDONLY, 0)
-	if err != nil {
-		return nil, fmt.Errorf("failed to open block device %s: %w", devicePath, err)
-	}
-	defer f.Close()
+    f, err := os.OpenFile(devicePath, os.O_RDONLY, 0)
+    if err != nil {
+        return VolumeStatistics{}, fmt.Errorf("failed to open: %w", err)
+    }
+    defer f.Close()
 
-	// BLKGETSIZE64 is stable on RHEL 7+
-	size, err := unix.IoctlGetUint64(int(f.Fd()), unix.BLKGETSIZE64)
-	if err != nil {
-		return nil, fmt.Errorf("ioctl BLKGETSIZE64 failed on %s: %w", devicePath, err)
-	}
+    var size uint64
+    // Raw syscall: (trap, fd, request, pointer)
+    _, _, errno := unix.Syscall(
+        unix.SYS_IOCTL,
+        f.Fd(),
+        unix.BLKGETSIZE64,
+        uintptr(unsafe.Pointer(&size)),
+    )
 
-	// TODO is this more compatible?
-	//var size uint64
-	//_, _, errno := unix.Syscall(unix.SYS_IOCTL, f.Fd(), unix.BLKGETSIZE64, uintptr(unsafe.Pointer(&size)))
+    if errno != 0 {
+        return VolumeStatistics{}, fmt.Errorf("ioctl BLKGETSIZE64 failed: %v", errno)
+    }
 
-	return VolumeStatistics{
-		TotalBytes:     int64(size)
-	}, nil
+    return VolumeStatistics{
+        TotalBytes: int64(size),
+	//AvailableBytes: int64(size),
+	///UsedBytes:      0, // Or same as TotalBytes depending on CSI expectations
+    }, nil
 }
+
 
 func (d NodeUtils) GetVolumeUuid(volumeId string) string {
 	volumeIdParts := strings.Split(volumeId, d.ConfigYaml.Parameters.Object_id_info.Delimiter)
@@ -770,9 +783,5 @@ func (d NodeUtils) GetVolumeUuid(volumeId string) string {
 	} else {
 		return "3" + splittedIdsPart[0]
 	}
-}
-
-func (d NodeUtils) CleanSysfsData (data) {
-	return strings.Trim(string(data), " \n\r\t\x00")
 }
 
