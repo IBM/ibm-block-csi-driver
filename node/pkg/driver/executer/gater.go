@@ -91,6 +91,105 @@ func (g *KeyedGater) decrementRef(key string) {
 	}
 }
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+func (g *KeyedGater) Acquire(key string, maxRuns int, timeout time.Duration) error {
+	g.mu.Lock()
+	gt, exists := g.semaphoreGates[key]
+	if !exists {
+		gt = &semaphoreGate{ch: make(chan struct{}, maxRuns)}
+		g.semaphoreGates[key] = gt
+	}
+	gt.refCount++
+	g.mu.Unlock()
+
+	ctx, cancel := context.WithTimeout(context.Background(), timeout)
+	defer cancel()
+
+	select {
+	case gt.ch <- struct{}{}:
+		return nil
+	case <-ctx.Done():
+		// Fix: must use atomic cleanup
+		g.Release(key) 
+		return fmt.Errorf("gater: timeout (%v) key=%s", timeout, key)
+	}
+}
+
+func (g *KeyedGater) Release(key string) {
+	g.mu.Lock()
+	defer g.mu.Unlock()
+
+	gt, exists := g.semaphoreGates[key]
+	if !exists {
+		return
+	}
+
+	// Attempt to drain a slot, but don't block if Release was 
+	// called due to an Acquire timeout before a slot was taken.
+	select {
+	case <-gt.ch:
+	default:
+	}
+
+	gt.refCount--
+	if gt.refCount <= 0 {
+		delete(g.semaphoreGates, key)
+	}
+}
+
+// decrementRef is no longer needed as a separate exported/unlocked function
+
+
+
+
+func (g *KeyedGater) Acquire(ctx context.Context, key string, maxRuns int, timeout time.Duration) error {
+	g.mu.Lock()
+	gt, exists := g.semaphoreGates[key]
+	if !exists {
+		gt = &semaphoreGate{ch: make(chan struct{}, maxRuns)}
+		g.semaphoreGates[key] = gt
+	}
+	gt.refCount++
+	g.mu.Unlock()
+
+	// REQUIREMENT 8: Respect the CSI API context + local timeout
+	// This ensures we stop waiting if either the request is canceled 
+	// OR we hit our local threshold.
+	waitCtx, cancel := context.WithTimeout(ctx, timeout)
+	defer cancel()
+
+	select {
+	case gt.ch <- struct{}{}:
+		return nil
+	case <-waitCtx.Done():
+		// Cleanup: must use the thread-safe Release fixed in Bug #1
+		g.Release(key)
+		
+		if errors.Is(waitCtx.Err(), context.DeadlineExceeded) {
+			return fmt.Errorf("gater: timeout (%v) key=%s", timeout, key)
+		}
+		return fmt.Errorf("gater: %w key=%s", waitCtx.Err(), key)
+	}
+}
+
+
+
+
+
+
+
 type Result[T any] struct {
 	Data T
 	Err  error
@@ -239,4 +338,31 @@ func baseExecute[T any](
 			return zero, fmt.Errorf("resource %s: critical saturation (spare pool full)", resourceName)
 		}
 	}
+}
+
+
+func baseExecute[T any](
+	ctx context.Context, // Requirement 8
+	g *KeyedGater,
+	resourceName string,
+    // ... other params ...
+) (T, error) {
+    // 1. Check if CSI context is already dead
+    if err := ctx.Err(); err != nil {
+        var zero T
+        return zero, err
+    }
+
+    // 2. Queue for slot (Respecting CSI Context)
+    select {
+    case pool.running <- struct{}{}:
+    case <-ctx.Done():
+        var zero T
+        return zero, ctx.Err()
+    case <-time.After(30 * time.Second):
+        var zero T
+        return zero, fmt.Errorf("queue congestion")
+    }
+    
+    // ... [Worker launch logic] ...
 }
