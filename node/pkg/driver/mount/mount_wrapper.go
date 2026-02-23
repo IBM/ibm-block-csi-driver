@@ -229,6 +229,45 @@ func (m *Mounter) DeviceOpened(pathname string) (bool, error) {
 	return false, nil
 }
 
+
+
+
+
+
+
+
+func (m *Mounter) DeviceOpened(ctx context.Context, pathname string) (bool, error) {
+	// 1. Get the actual Device ID from the host filesystem
+	var st unix.Stat_t
+	if err := unix.Stat(pathname, &st); err != nil {
+		return false, fmt.Errorf("failed to stat device %s: %w", pathname, err)
+	}
+
+	// st.Rdev contains the combined major/minor for block devices
+	targetMajor := unix.Major(st.Rdev)
+	targetMinor := unix.Minor(st.Rdev)
+
+	// 2. Get all current mounts using our safe /proc parser
+	mounts, err := m.GetMounts(ctx, "")
+	if err != nil {
+		return false, err
+	}
+
+	// 3. Precision Match: Compare Major/Minor numbers
+	for _, mnt := range mounts {
+		if mnt.Major == targetMajor && mnt.Minor == targetMinor {
+			return true, nil
+		}
+	}
+
+	return false, nil
+}
+
+
+
+
+
+
 // PathExists checks if the given path exists on the system.
 // This is used to ensure the mount point directory is ready.
 func (m *Mounter) PathExists(pathname string) (bool, error) {
@@ -338,6 +377,81 @@ func (m *Mounter) UnmountWithTimeout(target string, timeout time.Duration) error
 
 	return err
 }
+
+
+
+
+
+
+
+
+
+
+
+
+func (m *Mounter) UnmountWithTimeout(ctx context.Context, target string, timeout time.Duration) error {
+	// 1. Identify Device for the Safety Gate
+	mounts, _ := m.GetMounts(ctx, target)
+	var device string
+	if len(mounts) > 0 {
+		device = mounts[0].MountSource
+	}
+
+	// Requirement 6: Check if hardware is already wedged
+	if device != "" && m.executer.IsDeviceStillStuck(device) {
+		return fmt.Errorf("safety-gate: hardware %s is in D-state; blocking unmount to prevent thread leak", device)
+	}
+
+	// 2. Track attempt for Tiered Rescue (Requirement 7)
+	val, _ := m.unmountTracker.LoadOrStore(target, &TrackedUnmount{FirstAttempt: time.Now()})
+	tracker := val.(*TrackedUnmount)
+	
+	tracker.mu.Lock()
+	defer tracker.mu.Unlock()
+
+	elapsed := time.Since(tracker.FirstAttempt)
+	var flags int
+	
+	// Requirement 7: Progressive "Get out of stuck conditions" logic
+	switch {
+	case elapsed > 10*time.Minute:
+		flags = unix.MNT_DETACH // Final rescue
+	case elapsed > 2*time.Minute:
+		flags = unix.MNT_FORCE // Tier 2
+	default:
+		flags = 0 // Graceful
+	}
+
+	// 3. Execution via the Gater (Requirement 3 & 6)
+	// We wrap the syscall in a separate goroutine so we can return to K8s if it hangs.
+	err := executer.ExecuteUninterruptible(
+		m.KeyedGater,
+		target, 1, 1, 
+		timeout, // Handoff to spare if syscall hangs
+		timeout*2, 
+		func(wCtx context.Context) (struct{}, error) {
+			// Requirement 4: Prefer direct syscall over 'umount' process
+			err := unix.Unmount(target, flags)
+			return struct{}{}, err
+		},
+	)
+
+	if err == nil {
+		m.unmountTracker.Delete(target)
+		return nil
+	}
+
+	return fmt.Errorf("unmount-pending: %w (elapsed: %v)", err, elapsed)
+}
+
+
+
+
+
+
+
+
+
 
 type SyncResult struct {
 	Success bool
@@ -634,6 +748,79 @@ func (m *Mounter) MountNativeWithTimeout(source, target, fstype string, options 
 	}
 }
 
+
+
+
+
+
+
+
+
+
+func (m *Mounter) MountNativeWithContext(ctx context.Context, source, target, fstype string, options []string) error {
+	m.reapRecoveredMounts()
+
+	// 1. Requirement 8: Respect the incoming CSI context immediately
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+
+	// 2. Guards (Requirements 4, 6)
+	if m.IsPathStuck(target) {
+		return fmt.Errorf("mount-safety: target %s is already wedged", target)
+	}
+
+	if strings.HasPrefix(source, "/dev/") {
+		if m.executer.IsDeviceStillStuck(source) {
+			return fmt.Errorf("mount-safety: device %s is in D-state; blocking thread leak", source)
+		}
+	}
+
+	session := &mountSession{
+		target:    target,
+		startTime: time.Now(),
+	}
+
+	done := make(chan error, 1)
+	go func() {
+		// Pass the context down to the lower level
+		err := m.MountNative(ctx, source, target, fstype, options)
+		m.clearSession(session)
+		done <- err
+	}()
+
+	select {
+	case err := <-done:
+		return err
+	case <-ctx.Done():
+		// REQUIREMENT 8: The gRPC call was canceled or timed out.
+		// We abandon the goroutine and track it as "stuck".
+		m.stuckMounts.Store(session, true)
+		m.stuckCount.Add(1)
+		return fmt.Errorf("mount-safety: context canceled/timed out for %s: %w", target, ctx.Err())
+	}
+}
+
+
+
+
+
+select {
+case err := <-done:
+    return err
+case <-ctx.Done(): // Respect CSI cancellation
+    m.stuckMounts.Store(session, true)
+    m.stuckCount.Add(1)
+    return ctx.Err()
+case <-time.After(timeout):
+    m.stuckMounts.Store(session, true)
+    m.stuckCount.Add(1)
+    return fmt.Errorf("mount-safety: timeout")
+}
+
+
+
+
 func (m *Mounter) MountNative(source, target, fstype string, options []string) error {
 	// 1. Directory Preparation
 	if err := os.MkdirAll(target, 0750); err != nil {
@@ -721,6 +908,7 @@ func (m *Mounter) IsPathStuck(target string) bool {
 }
 
 func (m *Mounter) reapRecoveredMounts() {
+	// use bufio.Scanner as in GetMounts
 	if m.stuckCount.Load() == 0 {
 		return
 	}
@@ -767,6 +955,7 @@ func (m *Mounter) reapRecoveredMounts() {
 
 // The helper itself
 func (m *Mounter) getLiveMounts() map[string]struct{} {
+// TODO use unescapeMountString  (or common func)
 	found := make(map[string]struct{})
 
 	// Read directly from the kernel's mount table
@@ -843,6 +1032,11 @@ func (m *Mounter) isMountedInProc(target string) (bool, error) {
 	}
 	return len(mounts) > 0, nil
 }
+
+
+
+
+
 
 // GetMountsForPath returns all MountInfo entries matching the target path.
 func (m *Mounter) GetMountsForPath(target string) ([]MountInfo, error) {
@@ -942,6 +1136,17 @@ type MountInfo struct {
 	SuperOptions   string
 }
 
+
+type MountInfo struct {
+	Major          uint32
+	Minor          uint32
+	MountPoint     string
+	MountSource    string // Keep for logging
+	FilesystemType string
+}
+
+
+
 func GetMounts(targetPath string) ([]MountInfo, error) {
 	absTarget := ""
 	if targetPath != "" {
@@ -1036,4 +1241,106 @@ func unescapeMountString(path string) string {
 		res.WriteByte(path[i])
 	}
 	return res.String()
+}
+
+
+
+
+
+
+
+
+func (m *Mounter) GetMounts(ctx context.Context, targetPath string) ([]MountInfo, error) {
+	// Requirement 8: Fail-fast if CSI call is already canceled
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
+
+	f, err := os.Open("/proc/self/mountinfo")
+	if err != nil {
+		return nil, err
+	}
+	defer f.Close()
+
+	var mounts []MountInfo
+	scanner := bufio.NewScanner(f)
+	// Requirement 3: Prevent memory spikes on dense nodes
+	const maxCapacity = 1024 * 1024
+	scanner.Buffer(make([]byte, 64*1024), maxCapacity)
+
+	for scanner.Scan() {
+		// Periodically check context in long scans
+		select {
+		case <-ctx.Done():
+			return nil, ctx.Err()
+		default:
+		}
+
+		fields := strings.Fields(scanner.Text())
+		if len(fields) < 10 {
+			continue
+		}
+
+		// Field 4 is the MountPoint
+		mountPoint := unescapeMountString(fields[4])
+		if targetPath != "" && filepath.Clean(mountPoint) != filepath.Clean(targetPath) {
+			continue
+		}
+
+		// Requirement 5: Major:Minor is more resilient for iSCSI/NVMe than paths
+		devParts := strings.Split(fields[2], ":")
+		major, _ := strconv.Atoi(devParts[0])
+		minor, _ := strconv.Atoi(devParts[1])
+
+		// Requirement 2: Handle variable optional fields before the separator "-"
+		sepIdx := -1
+		for i := 6; i < len(fields); i++ {
+			if fields[i] == "-" {
+				sepIdx = i
+				break
+			}
+		}
+		if sepIdx == -1 {
+			continue
+		}
+
+		mounts = append(mounts, MountInfo{
+			Major:          uint32(major),
+			Minor:          uint32(minor),
+			MountPoint:     mountPoint,
+			FilesystemType: fields[sepIdx+1],
+			MountSource:    unescapeMountString(fields[sepIdx+2]),
+		})
+	}
+	return mounts, scanner.Err()
+}
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+type Mounter struct {
+    // ... existing fields ...
+    activeCtx context.Context // Temporary context for the current gRPC call
+}
+
+// In your CSI NodePublishVolume:
+func (ns *NodeServer) NodePublishVolume(ctx context.Context, req *csi.NodePublishVolumeRequest) {
+    // Create a request-scoped mounter that 'remembers' the context
+    mounter := ns.mounter.WithContext(ctx) 
+    
+    // Now when SafeFormatAndMount calls mounter.Mount(...), 
+    // your implementation uses mounter.activeCtx
+    err := ns.formatAndMount.SafeFormatAndMount(source, target, fstype, options, mounter)
 }

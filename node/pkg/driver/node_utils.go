@@ -215,6 +215,92 @@ func (n NodeUtils) GetSysDevicesFromMpath(baseDevice string) ([]string, error) {
 	return nil, fmt.Errorf("unsupported device type: %s", baseDevice)
 }
 
+
+
+func (n NodeUtils) GetSysDevicesFromMpath(ctx context.Context, baseDevice string) ([]string, error) {
+    if err := ctx.Err(); err != nil { return nil, err }
+
+    // ... DM Logic ...
+
+    if strings.HasPrefix(baseDevice, "nvme") {
+        // NVMe paths can be found by looking at the subsystem's controllers
+        // Target: /sys/block/nvme0n1/device -> ../../../nvme-subsys0/nvme0
+        link, err := os.Readlink(filepath.Join("/sys/block", baseDevice, "device"))
+        if err != nil {
+            return nil, err
+        }
+        
+        // Find the subsys directory from the link
+        subsysPath := filepath.Join("/sys/block", baseDevice, "device", "..")
+        // Scan for entries like 'nvme0', 'nvme1' in that subsys folder
+        // which represent the individual paths/controllers.
+    }
+}
+
+
+
+func (n NodeUtils) GetSysDevicesFromMpath(ctx context.Context, baseDevice string) ([]string, error) {
+	// REQUIREMENT 8: Respect CSI API Context
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
+
+	logger.Debugf("GetSysDevicesFromMpath for: %s", baseDevice)
+
+	// 1. Device Mapper (iscsi/FC multipath)
+	if strings.HasPrefix(baseDevice, "dm-") {
+		deviceSlavePath := filepath.Join("/sys", "block", baseDevice, "slaves")
+		
+		// REQUIREMENT 4: Direct sysfs scan (fork-free)
+		slaves, err := os.ReadDir(deviceSlavePath)
+		if err != nil {
+			return nil, fmt.Errorf("failed to read dm slaves: %w", err)
+		}
+
+		var slavesNames []string
+		for _, slave := range slaves {
+			// Periodically check context in case of massive LUN counts
+			if ctx.Err() != nil { return nil, ctx.Err() }
+			slavesNames = append(slavesNames, slave.Name())
+		}
+		return slavesNames, nil
+	}
+
+	// 2. NVMe Native Multipath (Requirement 5)
+	if strings.HasPrefix(baseDevice, "nvme") {
+		// Use LastIndex to safely split "nvme0n1" or "nvme-subsys0n1"
+		nIdx := strings.LastIndex(baseDevice, "n")
+		if nIdx == -1 {
+			return nil, fmt.Errorf("invalid nvme device name: %s", baseDevice)
+		}
+		nsID := baseDevice[nIdx:] // e.g., "n1"
+
+		subsysPath := filepath.Join("/sys", "block", baseDevice, "device", "subsystem")
+		controllers, err := os.ReadDir(subsysPath)
+		if err != nil {
+			return nil, fmt.Errorf("failed to read nvme subsystem: %w", err)
+		}
+
+		var pathNames []string
+		for _, ctrl := range controllers {
+			if ctx.Err() != nil { return nil, ctx.Err() }
+
+			// In NVMe, the paths are children of the controllers 
+			// named like: [controllerName][namespaceID] -> "nvme0" + "n1"
+			pathName := ctrl.Name() + nsID
+
+			// REQUIREMENT 4: Verify path exists without process invocation
+			if _, err := os.Stat(filepath.Join("/sys/block", pathName)); err == nil {
+				pathNames = append(pathNames, pathName)
+			}
+		}
+		return pathNames, nil
+	}
+
+	return nil, fmt.Errorf("unsupported device type: %s", baseDevice)
+}
+
+
 func (n NodeUtils) StageInfoFileIsExist(filePath string) bool {
 	if _, err := os.Stat(filePath); err != nil {
 		return false
@@ -448,6 +534,58 @@ func (n NodeUtils) ExpandMpathDevice(mpathDevice string) error {
 	return nil
 }
 
+
+
+
+
+
+
+
+
+
+func (n NodeUtils) ExpandMpathDevice(ctx context.Context, mpathDevice string) error {
+	// REQUIREMENT 8: Respect CSI Context
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+
+	logger.Infof("Expanding Multipath device: %s", mpathDevice)
+
+	// REQUIREMENT 6: Guard against expanding a device that is already wedged
+	if n.Executer.IsDeviceStillStuck(mpathDevice) {
+		return fmt.Errorf("expand-safety: device %s is currently stuck in D-state; aborting resize", mpathDevice)
+	}
+
+	// 1. Target Resize: 'resize map <name>'
+	// REQUIREMENT 4: Use socket instead of 'multipathd' process
+	cmd := fmt.Sprintf("resize map %s", mpathDevice)
+	_, err := n.Executer.MultipathdCmd(ctx, mpathDevice, cmd)
+	if err != nil {
+		return fmt.Errorf("multipathd resize map failed: %w", err)
+	}
+
+	// 2. REQUIREMENT 7: Avoid 'reconfigure' if possible.
+	// 'reconfigure' parses /etc/multipath.conf and reloads EVERY map on the host.
+	// On RH7, if one unrelated LUN is dead, 'reconfigure' will hang the daemon.
+	// Instead, we 'reload' only the specific map.
+	_, err = n.Executer.MultipathdCmd(ctx, mpathDevice, fmt.Sprintf("reload map %s", mpathDevice))
+	if err != nil {
+		logger.Warningf("Targeted reload failed for %s, attempting minor update: %v", mpathDevice, err)
+		// Fallback to 'reconfigure' only as a last resort, or skip if context is tight.
+	}
+
+	return nil
+}
+
+// Inside Expand logic if resize map fails:
+slaves, _ := n.GetSysDevicesFromMpath(ctx, mpathDevice)
+for _, slave := range slaves {
+    // Echo 1 to /sys/block/sdX/device/rescan (Fork-free Requirement 4)
+    _ = os.WriteFile(fmt.Sprintf("/sys/block/%s/device/rescan", slave), []byte("1"), 0644)
+}
+
+
+
 func (n NodeUtils) rescanPhysicalDevice(deviceName string) error {
 	filename := fmt.Sprintf("/sys/block/%s/device/rescan", deviceName)
 	f, err := n.Executer.OsOpenFile(filename, os.O_APPEND|os.O_WRONLY, 0200)
@@ -482,6 +620,49 @@ func (n NodeUtils) RescanPhysicalDevices(sysDevices []string) error {
 	logger.Debugf("Rescan : finish rescan on sys devices : {%v}", sysDevices)
 	return nil
 }
+
+
+
+func (n NodeUtils) RescanPhysicalDevices(ctx context.Context, sysDevices []string) error {
+	// REQUIREMENT 8: Fail-fast if gRPC call is canceled
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+
+	logger.Debugf("Rescan: Starting on devices: %v", sysDevices)
+	for _, deviceName := range sysDevices {
+		// REQUIREMENT 6: Check for D-state before touching sysfs
+		if n.Executer.IsDeviceStillStuck(deviceName) {
+			logger.Warningf("Rescan: Skipping %s as it is already marked stuck", deviceName)
+			continue
+		}
+
+		// REQUIREMENT 7: Use all possible methods (Uninterruptible Wrapper)
+		// Writing to 'rescan' can block for 30s+ if the HBA is busy.
+		_, err := executer.ExecuteUninterruptible[struct{}](
+			n.KeyedGater,
+			"rescan-"+deviceName,
+			5,              // maxRunning: concurrent rescans
+			20,             // maxSpare: budget for hung writes
+			2*time.Second,  // handoff: return to CSI if kernel blocks
+			10*time.Second, // hardTimeout: fail the specific path
+			func(wCtx context.Context) (struct{}, error) {
+				return struct{}{}, n.rescanPhysicalDevice(deviceName)
+			},
+		)
+		
+		if err != nil {
+			logger.Errorf("Rescan failed for %s: %v", deviceName, err)
+			// We continue to other devices even if one fails (Resiliency)
+		}
+	}
+	return nil
+}
+
+
+//Use os.WriteFile for brevity unless your Executer wrapper specifically requires the OsOpenFile flow for tracking. os.WriteFile is inherently safer as it handles the close even on early errors.
+
+//Missing "Rescue" Operation (7): If rescan times out repeatedly, the "rescue" is to check /sys/block/sdX/device/state. If it's blocked, you may need to trigger a link-loss reset at the HBA level (which we can discuss in the FC/iSCSI section).
 
 func (n NodeUtils) FormatDevice(devicePath string, fsType string) error {
 	// TODO wrap
@@ -617,6 +798,38 @@ func (n NodeUtils) IsBlock(devicePath string) (bool, error) {
 	return res, nil
 }
 
+
+
+func (n NodeUtils) IsBlock(ctx context.Context, devicePath string) (bool, error) {
+	// REQUIREMENT 8: Respect the CSI API context
+	if err := ctx.Err(); err != nil {
+		return false, err
+	}
+
+	res, err := executer.ExecuteUninterruptible[bool](
+		// Pass the ctx into the gater/executor
+		ctx, 
+		n.KeyedGater,
+		"is-block-"+devicePath,
+		10, 50, 
+		1*time.Second, 5*time.Second,
+		func(wCtx context.Context) (bool, error) {
+			var stat unix.Stat_t
+			// REQUIREMENT 4: Direct syscall (no 'lsblk' or 'file' process)
+			// REQUIREMENT 1: unix.Stat is stable on RHEL 7 (Kernel 3.10)
+			if err := unix.Stat(devicePath, &stat); err != nil {
+				return false, err
+			}
+			return (stat.Mode & unix.S_IFMT) == unix.S_IFBLK, nil
+		},
+	)
+
+	return res, err
+}
+
+// If this is used for Multipath or NVMe devices, the stat.Rdev field (which you aren't using here but is available) can be used to get the Major:Minor ID to verify against /proc/self/mountinfo, as we discussed in the Mounter review.
+
+
 func (n NodeUtils) GetFileSystemVolumeStats(path string) (VolumeStatistics, error) {
 	// Specify [unix.Statfs_t] as the generic type T
 	stat, err := executer.ExecuteUninterruptible[unix.Statfs_t](
@@ -650,6 +863,33 @@ func (n NodeUtils) GetFileSystemVolumeStats(path string) (VolumeStatistics, erro
 	}, nil
 }
 
+func (n NodeUtils) GetFileSystemVolumeStats(ctx context.Context, path string) (VolumeStatistics, error) {
+	// REQUIREMENT 8: Respect CSI API Context
+	if err := ctx.Err(); err != nil {
+		return VolumeStatistics{}, err
+	}
+
+	stat, err := executer.ExecuteUninterruptible[unix.Statfs_t](
+		ctx, // Propagate context
+		n.KeyedGater,
+		"statfs-"+path,
+		5, 20, 1*time.Second, 5*time.Second,
+		func(wCtx context.Context) (unix.Statfs_t, error) {
+			var s unix.Statfs_t
+			// REQUIREMENT 4: Direct syscall (avoid 'df' process)
+			// REQUIREMENT 1: unix.Statfs is stable on RHEL 7 (Kernel 3.10)
+			err := unix.Statfs(path, &s)
+			return s, err
+		},
+	)
+
+	if err != nil {
+		return VolumeStatistics{}, err
+	}
+    // ... calculations ...
+}
+
+
 func (d NodeUtils) GetBlockVolumeStats(devicePath string) (VolumeStatistics, error) {
 	f, err := os.OpenFile(devicePath, os.O_RDONLY, 0)
 	if err != nil {
@@ -676,6 +916,53 @@ func (d NodeUtils) GetBlockVolumeStats(devicePath string) (VolumeStatistics, err
 		///UsedBytes:      0, // Or same as TotalBytes depending on CSI expectations
 	}, nil
 }
+
+
+func (n NodeUtils) GetBlockVolumeStats(ctx context.Context, devicePath string) (VolumeStatistics, error) {
+	// REQUIREMENT 8: Respect CSI API Context
+	if err := ctx.Err(); err != nil {
+		return VolumeStatistics{}, err
+	}
+
+	size, err := executer.ExecuteUninterruptible[uint64](
+		ctx,
+		n.KeyedGater,
+		"block-stats-"+devicePath,
+		5, 20, 1*time.Second, 5*time.Second,
+		func(wCtx context.Context) (uint64, error) {
+			// REQUIREMENT 6: Use O_NONBLOCK to avoid hanging on the Open itself
+			f, err := os.OpenFile(devicePath, os.O_RDONLY|unix.O_NONBLOCK, 0)
+			if err != nil {
+				return 0, fmt.Errorf("failed to open device %s: %w", devicePath, err)
+			}
+			defer f.Close()
+
+			var s uint64
+			// REQUIREMENT 4: Direct ioctl (no 'blockdev --getsize64' process)
+			// REQUIREMENT 1: BLKGETSIZE64 is stable on Kernel 3.10
+			_, _, errno := unix.Syscall(
+				unix.SYS_IOCTL,
+				f.Fd(),
+				unix.BLKGETSIZE64,
+				uintptr(unsafe.Pointer(&s)),
+			)
+
+			if errno != 0 {
+				return 0, fmt.Errorf("ioctl BLKGETSIZE64 failed: %v", errno)
+			}
+			return s, nil
+		},
+	)
+
+	if err != nil {
+		return VolumeStatistics{}, err
+	}
+
+	return VolumeStatistics{
+		TotalBytes: int64(size),
+	}, nil
+}
+
 
 func (d NodeUtils) GetVolumeUuid(volumeId string) string {
 	volumeIdParts := strings.Split(volumeId, d.ConfigYaml.Parameters.Object_id_info.Delimiter)
