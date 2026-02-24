@@ -307,19 +307,16 @@ func (r OsDeviceConnectivityHelperScsiGeneric) RescanDevices(lunId int, arrayIde
 func (r OsDeviceConnectivityHelperScsiGeneric) GetMpathDevice(volumeId string) (string, error) {
 	logger.Infof("GetMpathDevice: Searching multipath devices for volume : [%s] ", volumeId)
 
-	dmPath, _ := r.Helper.GetMpathDeviceName(volumeId)
+	logger.Infof("IsVolumePathMatchesVolumeId: Searching matching volume id for volume path: [%s] ", volumeId)
+	volumeIdVariations := r.Helper.GetVolumeIdVariations(volumeId)
 
-	volumeIdVariations := []string{volumeId}
 
-	if dmPath != "" {
-		SgInqWwn, _ := r.Helper.GetWwnByScsiInq(dmPath)
-		if isSameId(SgInqWwn, volumeIdVariations) {
-			return dmPath, nil
-		}
-		logger.Warningf("Expected {%v} but got {%v} from sg_inq", volumeId, SgInqWwn)
-		return "", &ErrorWrongDeviceFound{dmPath, volumeIdVariations[0], SgInqWwn}
+	mpathdOutput, err := r.Helper.WaitForDmToExist(volumeIdVariations, WaitForMpathRetries,
+		WaitForMpathWaitIntervalSec)
+	if err != nil {
+		return "", err
 	}
-	return dmPath, nil
+	return mpathdOutput, nil
 }
 
 func isSameId(wwn string, volumeIdVariations []string) bool {
@@ -1804,6 +1801,7 @@ type OsDeviceConnectivityHelperInterface interface {
 	GetOpenCount(dmName string) (int32, error)
 	GetMajorMinorFromSysfs(devicePath string) (major uint32, minor uint32, err error)
 	getWWIDByDev(major, minor uint32) (string, error)
+	WaitForDmToExist(volumeIdVariations []string, maxRetries int, intervalSeconds int) (string, error)
 }
 
 type OsDeviceConnectivityHelperGeneric struct {
@@ -1818,6 +1816,10 @@ func NewOsDeviceConnectivityHelperGeneric(executer executer.ExecuterInterface, M
 		Helper:   NewGetDmsPathHelperGeneric(executer),
 		Mounter:  Mounter,
 	}
+}
+
+func (o *OsDeviceConnectivityHelperGeneric) WaitForDmToExist(volumeIdVariations []string, maxRetries int, intervalSeconds int) (string, error) {
+	return o.Helper.WaitForDmToExist(volumeIdVariations, maxRetries, intervalSeconds)
 }
 
 func (o *OsDeviceConnectivityHelperGeneric) GetHostsIdByArrayIdentifiers(arrayIdentifier []string) (map[int]bool, error) {
@@ -2617,15 +2619,18 @@ func (o GetDmsPathHelperGeneric) WaitForDmToExist(volumeWWID []string, maxRetrie
 
 	for i, wwid := range volumeWWID {
 		norm[i] = normalizeWWID(wwid)
+		logger.Warningf("normalized %s to %s", wwid, norm[i])
 	}
 
 	for i := 0; i < maxRetries; i++ {
 		// 1. Discovery (Resolves WWID to /dev/dm-X or /dev/nvme-subsysX)
 		path, err := o.performDiscovery(norm)
 		if err == nil {
+			logger.Warning("discovery ok")
 			// 2. KERNEL READINESS: Check if driver is suspended or initializing
 			// This is the "D-state" prevention gate.
 			if !o.isKernelSettled(path) {
+				logger.Warning("reset")
 				stableCycles = 0
 				goto retry
 			}
@@ -2639,12 +2644,14 @@ func (o GetDmsPathHelperGeneric) WaitForDmToExist(volumeWWID []string, maxRetrie
 			} else {
 				stableCycles = 0 // Reset if count is still growing
 			}
+			logger.Warningf("stable %d", stableCycles)
 
 			// Require 2 consecutive stable cycles (e.g., 2-4 seconds)
 			// to confirm multipathd isn't mid-reload.
 			if stableCycles >= 2 {
 				// 4. UDEV SETTLEMENT: The "Last Mile" gate
 				// Ensures /dev/dm-X is chmod'd and symlinks are created.
+				logger.Warning("validate settle")
 				return o.validateAndSettle(path)
 			}
 			lastCount = count
@@ -2659,6 +2666,8 @@ func (o GetDmsPathHelperGeneric) WaitForDmToExist(volumeWWID []string, maxRetrie
 
 func (o GetDmsPathHelperGeneric) isKernelSettled(path string) bool {
 	name := filepath.Base(path)
+
+	logger.Warningf("check %s", path)
 
 	// DM (iSCSI/FC): If suspended == 1, multipathd is loading a new table
 	if strings.HasPrefix(name, "dm-") {
@@ -2680,11 +2689,13 @@ func (o GetDmsPathHelperGeneric) isKernelSettled(path string) bool {
 }
 
 func (o GetDmsPathHelperGeneric) getSlaveCount(path string) int {
+	logger.Warningf("slave count for %s", path)
 	name := filepath.Base(path)
 
 	// DM: Count /sys/block/dm-X/slaves/*
 	if strings.HasPrefix(name, "dm-") {
 		entries, _ := os.ReadDir(fmt.Sprintf("/sys/block/%s/slaves", name))
+		logger.Warningf("found %d", len(entries))
 		return len(entries)
 	}
 
@@ -2709,13 +2720,16 @@ func (o GetDmsPathHelperGeneric) getSlaveCount(path string) int {
 
 func (o GetDmsPathHelperGeneric) validateAndSettle(path string) (string, error) {
 	for i := 0; i < 5; i++ {
+		logger.Warningf("open %s", path)
 		fd, err := unix.Open(path, unix.O_RDONLY|unix.O_EXCL|unix.O_NONBLOCK, 0)
 		if err == nil {
+			logger.Warning("open successful")
 			unix.Close(fd)
 			return o.validateDMIntegrity(path)
 		}
 
 		if err == unix.EBUSY {
+			logger.Warning("busy")
 			// Random jitter (10-50ms) ensures we don't sync up with
 			// multipathd's own retry loops (the "thundering herd").
 			jitter := time.Duration(10+rand.IntN(40)) * time.Millisecond
@@ -2747,12 +2761,14 @@ func (o GetDmsPathHelperGeneric) performDiscovery(volumeWWID []string) (string, 
 		// TODO is this normalization safe
 		clean := strings.ReplaceAll(wwid, "-", "")
 		normalizedWWID[i] = strings.ToLower(clean)
+		logger.Warningf("convert %s to %s", wwid, normalizedWWID[i])
 	}
 
 	// 1. STRATEGY A: DM-Multipath (SCSI or NVMe via DM)
 	// Check udev shortcut first (O(1))
 
 	dmPath := fmt.Sprintf("/dev/disk/by-id/dm-uuid-mpath-%s", normalizedWWID[0])
+	logger.Warningf("check path %s", normalizedWWID[0])
 	if dev, err := o.verifyDevice(dmPath); err == nil {
 		return dev, nil
 	}
@@ -2780,7 +2796,9 @@ func (o GetDmsPathHelperGeneric) performDiscovery(volumeWWID []string) (string, 
 
 // verifyDevice ensures the link exists and returns the canonical path
 func (o GetDmsPathHelperGeneric) verifyDevice(path string) (string, error) {
+	logger.Warningf("verify %s", path)
 	if _, err := os.Stat(path); err != nil {
+		logger.Warning("open")
 		return "", err
 	}
 	// Crucial for CSI: Resolve /dev/mapper/mpatha to /dev/dm-X
@@ -2788,6 +2806,7 @@ func (o GetDmsPathHelperGeneric) verifyDevice(path string) (string, error) {
 	if err != nil {
 		return "", err
 	}
+	logger.Warningf("eval %s", realPath)
 	return realPath, nil
 }
 
@@ -2795,11 +2814,15 @@ func (o GetDmsPathHelperGeneric) verifyDevice(path string) (string, error) {
 func (o GetDmsPathHelperGeneric) scanDMSubsystem(targetID string) (string, error) {
 	matches, _ := filepath.Glob("/sys/block/dm-*/dm/uuid")
 	target := normalizeWWID(targetID)
+	logger.Warningf("target %S norm %s", targetID, target)
 
 	for _, m := range matches {
+		logger.Warningf("check %s", m)
 		if content, err := os.ReadFile(m); err == nil {
+			logger.Warningf("found file %s", string(content))
 			// normalize() strips 'mpath-', handles case, and removes newlines
 			if normalizeWWID(string(content)) == target {
+				logger.Warning("complete match")
 				// Safely get 'dm-X' regardless of path depth
 				dmName := filepath.Base(filepath.Dir(filepath.Dir(m)))
 				return filepath.Join("/dev", dmName), nil
@@ -2882,15 +2905,19 @@ func (o GetDmsPathHelperGeneric) getWWIDByDevName(devName string) (string, error
 func (o GetDmsPathHelperGeneric) validateDMIntegrity(dmPath string) (string, error) {
 	dmName := filepath.Base(dmPath)
 	slavesPath := fmt.Sprintf("/sys/block/%s/slaves", dmName)
+	logger.Warningf("slaves path %s", slavesPath)
 
 	slaves, err := os.ReadDir(slavesPath)
 	if err != nil || len(slaves) == 0 {
+		logger.Warning("no slaves")
 		return "", fmt.Errorf("dm device %s has no active slaves", dmName)
 	}
 
 	// Optional: Check if at least one slave is 'running'
 	for _, s := range slaves {
+		logger.Warningf("check slave %s", s.Name())
 		state, _ := os.ReadFile(fmt.Sprintf("/sys/block/%s/device/state", s.Name()))
+		logger.Warningf("state %s", strings.TrimSpace(string(state)))
 		if strings.TrimSpace(string(state)) == "running" {
 			return dmPath, nil
 		}
