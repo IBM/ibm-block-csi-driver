@@ -146,35 +146,25 @@ func (d *NodeService) NodeStageVolume(ctx context.Context, req *csi.NodeStageVol
 
 	volumeUuid := d.NodeUtils.GetVolumeUuid(volumeID)
 
-	// check if already mounted
-	isMounted, err := d.isTargetMounted(stagingPathWithHostPrefix, true)
-	if err != nil {
-		logger.Debugf("Existing mount check failed {%v}", err.Error())
-		return nil, err
-	}
-	if isMounted { // idempotent case
-		return &csi.NodeStageVolumeResponse{}, nil
-	}
-
-	d.OsDeviceConnectivityHelper.IdentityAwarePreScan(stagingPathWithHostPrefix, volumeUuid)
+	//d.OsDeviceConnectivityHelper.IdentityAwarePreScan(stagingPathWithHostPrefix, volumeUuid)
 
 	osDeviceConnectivity.EnsureLogin(ipsByArrayInitiator)
 
-	err = d.OsDeviceConnectivityHelper.RemoveGhostDevice(volumeUuid, lun, arrayInitiators)
-	if err != nil {
-		return nil, status.Error(codes.Aborted, err.Error())
-	}
+	//err = d.OsDeviceConnectivityHelper.RemoveGhostDevice(volumeUuid, lun, arrayInitiators)
+	//if err != nil {
+	//	return nil, status.Error(codes.Aborted, err.Error())
+	//}
 
 	err = osDeviceConnectivity.RescanDevices(lun, arrayInitiators)
 	if err != nil {
 		return nil, status.Error(codes.Internal, err.Error())
 	}
 
-	err = d.OsDeviceConnectivityHelper.RemoveGhostDevice(volumeUuid, lun, arrayInitiators)
-	if err != nil {
-		logger.Debugf("Failed to clean ghost device for lun %d", lun)
-		// we can swallow the error here, since it's just for cleanliness
-	}
+	//err = d.OsDeviceConnectivityHelper.RemoveGhostDevice(volumeUuid, lun, arrayInitiators)
+	//if err != nil {
+	//	logger.Debugf("Failed to clean ghost device for lun %d", lun)
+	//	// we can swallow the error here, since it's just for cleanliness
+	//}
 
 	mpathDevice, err := osDeviceConnectivity.GetMpathDevice(volumeUuid)
 	//mpathDevice, err := osDeviceConnectivity.VerifyAndGetDmDevice(volumeUuid, lun)
@@ -192,16 +182,16 @@ func (d *NodeService) NodeStageVolume(ctx context.Context, req *csi.NodeStageVol
 	}
 
 	baseDevice := path.Base(mpathDevice)
-	sysDevices, err := d.NodeUtils.GetSysDevicesFromMpath(baseDevice)
+	_, err = d.NodeUtils.GetSysDevicesFromMpath(baseDevice)
 	if err != nil {
 		logger.Errorf("Error while trying to get sys devices : {%v}", err.Error())
 		return nil, status.Error(codes.Internal, err.Error())
 	}
-	err = osDeviceConnectivity.ValidateLun(mpathDevice, lun, sysDevices, volumeUuid)
-	if err != nil {
-		logger.Errorf("Error while trying to validate lun : {%v}", err.Error())
-		return nil, status.Error(codes.Internal, err.Error())
-	}
+	//err = osDeviceConnectivity.ValidateLun(mpathDevice, lun, sysDevices, volumeUuid)
+	//if err != nil {
+	//	logger.Errorf("Error while trying to validate lun : {%v}", err.Error())
+	//	return nil, status.Error(codes.Internal, err.Error())
+	//}
 
 	existingFormat, err := d.Mounter.GetDiskFormat(mpathDevice)
 	if err != nil {

@@ -183,6 +183,7 @@ func (n NodeUtils) GetSysDevicesFromMpath(baseDevice string) ([]string, error) {
 
 		var slavesNames []string
 		for _, slave := range slaves {
+			logger.Errorf("Add slave %s", slave)
 			slavesNames = append(slavesNames, slave.Name())
 		}
 		return slavesNames, nil
