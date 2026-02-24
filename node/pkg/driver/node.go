@@ -142,7 +142,7 @@ func (d *NodeService) NodeStageVolume(ctx context.Context, req *csi.NodeStageVol
 	}
 
 	stagingPath := req.GetStagingTargetPath() // e.g in k8s /var/lib/kubelet/plugins/kubernetes.io/csi/pv/pvc-21967c74-b456-11e9-b93e-005056a45d5f/globalmount
-	stagingPathWithHostPrefix := d.NodeUtils.GetPodPath(stagingPath)
+	//stagingPathWithHostPrefix := d.NodeUtils.GetPodPath(stagingPath)
 
 	volumeUuid := d.NodeUtils.GetVolumeUuid(volumeID)
 
