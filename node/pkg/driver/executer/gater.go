@@ -7,6 +7,8 @@ import (
 	"sync"
 	"sync/atomic"
 	"time"
+
+	"github.com/ibm/ibm-block-csi-driver/node/logger"
 )
 
 type semaphoreGate struct {
@@ -158,6 +160,7 @@ func baseExecute[T any](
 	hardTimeout time.Duration,
 	worker func(ctx context.Context) (T, error),
 ) (T, error) {
+	logger.Warning("baseExecute")
 	g.suicideIfLeaked()
 
 	// 1. ATOMIC INITIALIZATION
@@ -186,6 +189,7 @@ func baseExecute[T any](
 
 	// 3. WORKER LAUNCH
 	go func() {
+		logger.Warning("worker launched")
 		defer pool.activeOps.Add(-1)
 
 		// The task should check workerCtx.Err() to be "cooperative"
@@ -195,9 +199,11 @@ func baseExecute[T any](
 		once.Do(func() {
 			select {
 			case <-switched:
+				logger.Warning("Recovered")
 				<-pool.spare
 				g.globalLeaked.Add(-1) // Recovered
 			default:
+				logger.Warning("Done")
 				<-pool.running
 			}
 		})
@@ -209,8 +215,10 @@ func baseExecute[T any](
 
 	select {
 	case res := <-done:
+		logger.Warning("Done success")
 		return res.Data, res.Err
 	case <-hTimer.C:
+		logger.Warning("Timeout")
 		select {
 		case pool.spare <- struct{}{}:
 			once.Do(func() {
@@ -235,6 +243,7 @@ func baseExecute[T any](
 				return zero, fmt.Errorf("resource %s: abandoned after hard timeout %v", resourceName, hardTimeout)
 			}
 		default:
+			logger.Warning("Saturation")
 			var zero T
 			return zero, fmt.Errorf("resource %s: critical saturation (spare pool full)", resourceName)
 		}

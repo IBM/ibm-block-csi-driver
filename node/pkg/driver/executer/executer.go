@@ -136,10 +136,12 @@ func (e *Executer) CommandContext(ctx context.Context, name string, args ...stri
 }
 
 func (e *Executer) Command(name string, args ...string) k8sexec.Cmd {
+	logger.Warningf("command %s", name)
 	return e.CommandContext(context.Background(), name, args...)
 }
 
 func (s *safeCmd) Start() error {
+	logger.Warning("Start")
 	device := s.extractDevice()
 	if device != "" {
 		if s.executor.IsDeviceStillStuck(device) {
@@ -165,8 +167,10 @@ func (s *safeCmd) Start() error {
 }
 
 func (s *safeCmd) Wait() error {
+	logger.Warning("wait")
 	err := s.Cmd.Wait()
 	device := s.extractDevice()
+	logger.Warning("Wait done")
 
 	var pid int
 	if s.Cmd.Process != nil {
@@ -195,6 +199,7 @@ func (s *safeCmd) Wait() error {
 
 // 3. High-level methods now naturally use the safe versions
 func (s *safeCmd) CombinedOutput() ([]byte, error) {
+	logger.Warning("combined output")
 	// Re-implementing CombinedOutput to use our safe Start/Wait
 	var b bytes.Buffer
 	s.SetStdout(&b)
@@ -209,6 +214,7 @@ func (s *safeCmd) CombinedOutput() ([]byte, error) {
 
 // Stop satisfies k8sexec.Cmd
 func (s *safeCmd) Stop() {
+	logger.Warning("Stop")
 	if s.Cmd.Process == nil {
 		return
 	}
@@ -227,6 +233,7 @@ func (e *Executer) LookPath(file string) (string, error) {
 
 func (s *safeCmd) extractDevice() string {
 	for _, arg := range s.args {
+		logger.Warningf("Check arg %s", arg)
 		// Standard path (/dev/sdb)
 		if strings.HasPrefix(arg, "/dev/") {
 			return arg
@@ -452,14 +459,11 @@ func (e *Executer) resolveSocket() string {
 		"/var/run/multipathd.sock",
 	}
 
-	// 2. User-defined override remains top priority
-	if env := os.Getenv("MULTIPATH_SOCKET_NAME"); env != "" {
-		candidates = append([]string{env}, candidates...)
-	}
-
 	for _, path := range candidates {
+		logger.Warningf("Test candiate %s", path)
 		conn, err := net.DialTimeout("unix", path, 100*time.Millisecond)
 		if err == nil {
+			logger.Warning("Candidate found")
 			conn.Close()
 			return path
 		}
@@ -476,6 +480,7 @@ func (e *Executer) GetSocket() string {
 	e.socketMu.RUnlock()
 
 	if s != "" {
+		logger.Warningf("Cached socket %s", s)
 		return s
 	}
 
@@ -483,6 +488,7 @@ func (e *Executer) GetSocket() string {
 	defer e.socketMu.Unlock()
 	// Double-check to prevent race
 	if e.cachedSocket == "" {
+		logger.Warning("no cached")
 		e.cachedSocket = e.resolveSocket()
 	}
 	return e.cachedSocket
@@ -490,12 +496,14 @@ func (e *Executer) GetSocket() string {
 
 // invalidateSocket clears the cache if a connection fails.
 func (e *Executer) invalidateSocket() {
+	logger.Warning("invalidateSocket")
 	e.socketMu.Lock()
 	e.cachedSocket = ""
 	e.socketMu.Unlock()
 }
 
 func (e *Executer) MultipathdCmd(device string, command string) (string, error) {
+	logger.Warningf("MultpathCmd %s", command)
 	// If the command targets a specific device, check the stuck map first.
 
 	if device != "" {
@@ -525,32 +533,39 @@ func (e *Executer) MultipathdCmd(device string, command string) (string, error) 
 	payload := command + "\n"
 	header := fmt.Sprintf("%10d", len(payload))
 	if _, err := conn.Write([]byte(header + payload)); err != nil {
+		logger.Warning("fail to send")
 		return "", fmt.Errorf("failed to send: %w", err)
 	}
 
 	// Protocol Read Header
 	lenBuf := make([]byte, 10)
 	if _, err := io.ReadFull(conn, lenBuf); err != nil {
+		logger.Warning("fail to read")
 		return "", fmt.Errorf("failed to read header: %w", err)
 	}
 
 	trimmedLen := strings.TrimSpace(string(lenBuf))
 	respLen, err := strconv.Atoi(trimmedLen)
 	if err != nil || respLen <= 0 {
+		logger.Warning("invalid len")
 		return "", fmt.Errorf("protocol error: invalid resp length %q", trimmedLen)
 	}
 
 	if respLen > DefaultMaxOutput {
+		logger.Warning("exceeeds")
 		return "", fmt.Errorf("response size %d exceeds limit", respLen)
 	}
 
 	// Body Read
 	respBody, err := io.ReadAll(io.LimitReader(conn, int64(respLen)))
 	if err != nil {
+		logger.Warning("Cannot read")
 		return "", fmt.Errorf("failed to read body: %w", err)
 	}
 
 	response := strings.TrimSpace(string(respBody))
+
+	logger.Warningf("response %s", response)
 
 	// Logical Errors
 	if strings.HasPrefix(response, "fail") || response == "timeout" {

@@ -96,6 +96,7 @@ func NewWithExecutor(mounterPath string, e executer.ExecuterInterface, g *execut
 
 // 1. OVERRIDE: IsLikelyNotMountPoint
 func (m *Mounter) IsLikelyNotMountPoint(file string) (bool, error) {
+	logger.Warningf("IsLikely %s", file)
 	isMounted, err := m.isMountedInProc(file)
 	if err != nil {
 		return true, err
@@ -104,11 +105,13 @@ func (m *Mounter) IsLikelyNotMountPoint(file string) (bool, error) {
 }
 
 func (m *Mounter) IsMountPoint(file string) (bool, error) {
+	logger.Warningf("IsMountPoint %s", file)
 	return m.isMountedInProc(file)
 }
 
 // 3. OVERRIDE: GetMountRefs
 func (m *Mounter) GetMountRefs(pathname string) ([]string, error) {
+	logger.Warningf("GetMountRefs %s", pathname)
 	// Standard implementation is okay, but our inner.GetMountsForPath
 	// is safer against D-state hangs.
 	mounts, err := m.GetMountsForPath(pathname)
@@ -126,18 +129,21 @@ func (m *Mounter) GetMountRefs(pathname string) ([]string, error) {
 // 3. OVERRIDE: Mount
 
 func (m *Mounter) Mount(source string, target string, fstype string, options []string) error {
+	logger.Warningf("Mount %s %s %s", source, target, fstype)
 	return m.MountNativeWithTimeout(source, target, fstype, options, 30*time.Second)
 }
 
 // 3. OVERRIDE: Unmount
 
 func (m *Mounter) Unmount(target string) error {
+	logger.Warning("Unmount %s", target)
 	return m.UnmountWithTimeout(target, 30*time.Second)
 }
 
 // 3. OVERRIDE: List
 // List retrieves all mount points by calling our common low-level GetMounts
 func (m *Mounter) List() ([]mount.MountPoint, error) {
+	logger.Warningf("List")
 	// 1. Call our common low-level function that handles
 	// octal unescaping and Major:Minor splitting.
 	rawMounts, err := GetMounts("")
@@ -149,6 +155,7 @@ func (m *Mounter) List() ([]mount.MountPoint, error) {
 	for _, rm := range rawMounts {
 		// 2. Differentiate source based on your requirements
 		device := rm.MountSource
+		logger.Warningf("Check entry %s", device)
 		if strings.HasPrefix(device, "/dev/") {
 			// For block devices, return the base name (e.g., "sda1")
 			device = filepath.Base(device)
@@ -257,6 +264,8 @@ func (m *Mounter) UnmountWithTimeout(target string, timeout time.Duration) error
 	now := time.Now()
 	device, _ := m.getDeviceFromMount(target)
 
+	logger.Warning("Unmount 1")
+
 	// 1. THE PATIENT GATE
 	if device != "" && m.executer.IsDeviceStillStuck(device) {
 		// We do NOT call ImmediateDetach here.
@@ -267,6 +276,8 @@ func (m *Mounter) UnmountWithTimeout(target string, timeout time.Duration) error
 		// We avoid calling syscall.Unmount entirely to prevent thread leakage.
 		return fmt.Errorf("storage-wait: hardware %s is unresponsive; holding for recovery", device)
 	}
+
+	logger.Warning("Unmount 2")
 
 	// 1. Resolve Device and Perform Safety Gate Checks
 	device, _ = m.getDeviceFromMount(target)
@@ -289,11 +300,15 @@ func (m *Mounter) UnmountWithTimeout(target string, timeout time.Duration) error
 		}
 	}
 
+	logger.Warning("Unmount 3")
+
 	// 2. Idempotency Check
 	if mounted, _ := m.IsMounted(target); !mounted {
 		m.unmountTracker.Delete(target)
 		return nil
 	}
+
+	logger.Warning("Unmount 4")
 
 	// 3. Manage State Tracking
 	val, _ := m.unmountTracker.LoadOrStore(target, &TrackedUnmount{
@@ -304,6 +319,8 @@ func (m *Mounter) UnmountWithTimeout(target string, timeout time.Duration) error
 
 	mInfo.mu.Lock()
 	elapsed := now.Sub(mInfo.FirstAttempt)
+
+	logger.Warning("Unmount 5")
 
 	// Tier 0: Background Sync (Only if hardware is healthy)
 	if mInfo.LastState == StateGracefulPending && !mInfo.SyncDone && !mInfo.SyncInProgress {
@@ -329,6 +346,7 @@ func (m *Mounter) UnmountWithTimeout(target string, timeout time.Duration) error
 	}
 
 	if err == nil {
+		logger.Warning("polling")
 		if m.PollMountDeleted(target, 2*time.Second) {
 			m.unmountTracker.Delete(target)
 			return nil
@@ -344,6 +362,7 @@ type SyncResult struct {
 }
 
 func (m *Mounter) backgroundSyncfs(target string, info *TrackedUnmount) {
+	logger.Warning("sync")
 	// 1. RE-VERIFY Hardware inside Goroutine
 	device, _ := m.getDeviceFromMount(target)
 	if device != "" && m.executer.IsDeviceStillStuck(device) {
@@ -399,6 +418,7 @@ func (m *Mounter) backgroundSyncfs(target string, info *TrackedUnmount) {
 }
 
 func (m *Mounter) updateState(target string, info *TrackedUnmount, newState MountState) {
+	logger.Warningf("update statd %s %d", target, newState)
 	// info is a pointer (*TrackedUnmount)
 	info.mu.Lock()
 	defer info.mu.Unlock()
@@ -410,6 +430,7 @@ func (m *Mounter) updateState(target string, info *TrackedUnmount, newState Moun
 }
 
 func (m *Mounter) EscalateToLazy(target string) error {
+	logger.Warningf("escalate %s", target)
 	// MNT_DETACH is the "Nuclear Option": it decouples the VFS from the
 	// broken hardware immediately, allowing the Kubelet path to clear.
 	err := syscall.Unmount(target, syscall.MNT_DETACH)
@@ -423,6 +444,7 @@ func (m *Mounter) EscalateToLazy(target string) error {
 // ImmediateDetach skips all graceful tiers and immediately executes a Lazy Unmount.
 // This is used for cleanup of rogue volumes or when hardware is known to be dead.
 func (m *Mounter) ImmediateDetach(target string) error {
+	logger.Warningf("Immediate %s", target)
 	// 1. Resolve target to a session if tracking exists
 	// This ensures we clean up the tracker even if this wasn't a "timed" escalation.
 	m.unmountTracker.Delete(target)
@@ -447,6 +469,7 @@ func (m *Mounter) ImmediateDetach(target string) error {
 }
 
 func (m *Mounter) tryUnmount(target string, flags int, timeout time.Duration) error {
+	logger.Warningf("tryUnmount %s", target)
 	ch := make(chan error, 1)
 
 	// Create a session to track this specific attempt
@@ -486,6 +509,7 @@ func (m *Mounter) tryUnmount(target string, flags int, timeout time.Duration) er
 }
 
 func (m *Mounter) getDeviceFromMount(target string) (string, error) {
+	logger.Warningf("getDevice %s", target)
 	// Parse /proc/self/mountinfo to find the device source for the target
 	// This is standard for CSI mounter implementations
 	mounts, err := m.Mounter.List()
@@ -502,6 +526,7 @@ func (m *Mounter) getDeviceFromMount(target string) (string, error) {
 
 // IsMounted check with heuristics to avoid unnecessary procfs scans.
 func (m *Mounter) IsMounted(target string) (bool, error) {
+	logger.Warningf("IsMount %s", target)
 	// 1. Tier 0: Check if path exists
 	stat, err := os.Lstat(target)
 	if err != nil {
@@ -542,6 +567,7 @@ func (m *Mounter) IsMounted(target string) (bool, error) {
 //}
 
 func (m *Mounter) PollMountDeleted(target string, timeout time.Duration) bool {
+	logger.Warningf("PollMountDeleted %s", target)
 	res, err := executer.ExecuteUninterruptible[bool](
 		m.KeyedGater,
 		"mountinfo-read",
@@ -584,6 +610,7 @@ func (m *Mounter) PollMountDeleted(target string, timeout time.Duration) bool {
 }
 
 func (m *Mounter) MountNativeWithTimeout(source, target, fstype string, options []string, timeout time.Duration) error {
+	logger.Warningf("MountNative %s %s %s", source, target, fstype)
 	m.reapRecoveredMounts()
 
 	// 1. Path Guard: Is this mount point already undergoing a hung operation?
@@ -635,6 +662,7 @@ func (m *Mounter) MountNativeWithTimeout(source, target, fstype string, options 
 }
 
 func (m *Mounter) MountNative(source, target, fstype string, options []string) error {
+	logger.Warningf("MountNative %s %s %s", source, target, fstype)
 	// 1. Directory Preparation
 	if err := os.MkdirAll(target, 0750); err != nil {
 		return fmt.Errorf("mkdir failed: %w", err)
@@ -767,6 +795,7 @@ func (m *Mounter) reapRecoveredMounts() {
 
 // The helper itself
 func (m *Mounter) getLiveMounts() map[string]struct{} {
+	logger.Warning("getLiveMounts")
 	found := make(map[string]struct{})
 
 	// Read directly from the kernel's mount table
@@ -777,6 +806,7 @@ func (m *Mounter) getLiveMounts() map[string]struct{} {
 
 	lines := strings.Split(string(data), "\n")
 	for _, line := range lines {
+		logger.Warningf("line %s", line)
 		fields := strings.Fields(line)
 		if len(fields) >= 5 {
 			// Field 5 (index 4) is the mount point absolute path
@@ -837,6 +867,7 @@ func (m *Mounter) parseMountOptions(options []string) (uintptr, string) {
 
 // isMountedInProc is the Single Source of Truth
 func (m *Mounter) isMountedInProc(target string) (bool, error) {
+	logger.Warningf("isMountInProc %s", target)
 	mounts, err := m.GetMountsForPath(target)
 	if err != nil {
 		return false, err
@@ -846,6 +877,7 @@ func (m *Mounter) isMountedInProc(target string) (bool, error) {
 
 // GetMountsForPath returns all MountInfo entries matching the target path.
 func (m *Mounter) GetMountsForPath(target string) ([]MountInfo, error) {
+	logger.Warningf("GetMountForPath %s", target)
 	// Clean the path to handle trailing slashes or relative segments.
 	targetPath, err := filepath.Abs(filepath.Clean(target))
 	if err != nil {
@@ -859,6 +891,7 @@ func (m *Mounter) GetMountsForPath(target string) ([]MountInfo, error) {
 
 	var matched []MountInfo
 	for _, mnt := range allMounts {
+		logger.Warningf("mount %s", mnt)
 		if mnt.MountPoint == targetPath {
 			matched = append(matched, mnt)
 		}
@@ -869,6 +902,7 @@ func (m *Mounter) GetMountsForPath(target string) ([]MountInfo, error) {
 // Block Devices: You want the clean kernel name (e.g., sda1 instead of /dev/sda1).
 // Network Mounts: You want the remote export path (e.g., 192.168.1.10:/exports/data).
 func (m *Mounter) GetDeviceFromPath(targetPath string) (string, error) {
+	logger.Warningf("Device from path %s", targetPath)
 	mi, err := findBestMount(targetPath)
 	if err != nil {
 		return "", err
@@ -906,6 +940,7 @@ func GetMajorMinorFromSysfs(targetPath string) (uint32, uint32, error) {
 }
 
 func findBestMount(targetPath string) (*MountInfo, error) {
+	logger.Warningf("Best mount %s", targetPath)
 	mounts, err := GetMounts("")
 	if err != nil {
 		return nil, err
@@ -943,6 +978,7 @@ type MountInfo struct {
 }
 
 func GetMounts(targetPath string) ([]MountInfo, error) {
+	logger.Warningf("GetMounts %s", targetPath)
 	absTarget := ""
 	if targetPath != "" {
 		absTarget, _ = filepath.Abs(targetPath)
@@ -951,6 +987,7 @@ func GetMounts(targetPath string) ([]MountInfo, error) {
 
 	f, err := os.Open("/proc/self/mountinfo")
 	if err != nil {
+		logger.Warning("Cannot open")
 		return nil, err
 	}
 	defer f.Close()
@@ -962,7 +999,9 @@ func GetMounts(targetPath string) ([]MountInfo, error) {
 	scanner.Buffer(buf, maxCapacity)
 
 	for scanner.Scan() {
-		fields := strings.Fields(scanner.Text())
+		line := scanner.Text()
+		logger.Warningf("line %s", line)
+		fields := strings.Fields(line)
 		if len(fields) < 10 {
 			continue
 		}
@@ -996,6 +1035,8 @@ func GetMounts(targetPath string) ([]MountInfo, error) {
 			continue
 		}
 
+		logger.Warning("found mount")
+
 		// CRITICAL: Unescape Root, MountPoint, and MountSource
 		mounts = append(mounts, MountInfo{
 			MountID:        parseInt(fields[0]),
@@ -1019,6 +1060,7 @@ func parseInt(s string) int {
 }
 
 func unescapeMountString(path string) string {
+	logger.Warningf("unescapte %s", path)
 	if !strings.Contains(path, "\\") {
 		return path
 	}
