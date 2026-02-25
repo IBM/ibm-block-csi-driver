@@ -96,20 +96,30 @@ type limitWriter struct {
 	io.Writer
 	Limit int
 	curr  int
+	mu    sync.Mutex // Add this to prevent race conditions on shared buffers
 }
 
 func (w *limitWriter) Write(p []byte) (n int, err error) {
-	if w.curr >= w.Limit {
-		return len(p), nil // Silently drop overflow
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	
+	remaining := w.Limit - w.curr
+	if remaining <= 0 {
+		return len(p), nil
 	}
-	toWrite := int(len(p))
-	if w.curr+toWrite > w.Limit {
-		toWrite = w.Limit - w.curr
+	
+	writeLen := len(p)
+	if writeLen > remaining {
+		writeLen = remaining
 	}
-	n, err = w.Writer.Write(p[:toWrite])
-	w.curr += int(n)
-	return len(p), err // Return len(p) to avoid "short write" errors in cmd
+	
+	nActual, err := w.Writer.Write(p[:writeLen])
+	w.curr += nActual
+	return len(p), err 
 }
+
+
+
 
 // safeCmd wraps the standard Cmd to add device-aware safety logic
 type safeCmd struct {
@@ -142,29 +152,35 @@ func (e *Executer) Command(name string, args ...string) k8sexec.Cmd {
 
 func (s *safeCmd) Start() error {
 	logger.Warning("Start")
-	device := s.extractDevice()
-	if device != "" {
-		if s.executor.IsDeviceStillStuck(device) {
-			return fmt.Errorf("node-safety: previous %s process is still stuck for device %s", s.name, device)
-		}
-	}
 
-	// Wrap Stdout if it exists, or provide a default buffer
-	if s.Cmd.Stdout != nil {
-		s.Cmd.Stdout = &limitWriter{Writer: s.Cmd.Stdout, Limit: DefaultMaxOutput}
-	} else {
-		s.Cmd.Stdout = &limitWriter{Writer: &bytes.Buffer{}, Limit: DefaultMaxOutput}
-	}
+    device := s.extractDevice()
+    if device != "" && s.executor.IsDeviceStillStuck(device) {
+        // SafeFormatAndMount expects a real execution error or success.
+        // Returning a generic fmt.Errorf here causes the "exit status 2" log.
+	return &stuckError{device: device, name: s.name}
+    }
 
-	// CRITICAL: Do the same for Stderr to prevent OOM from error logs
-	if s.Cmd.Stderr != nil {
-		s.Cmd.Stderr = &limitWriter{Writer: s.Cmd.Stderr, Limit: DefaultMaxOutput}
-	} else {
-		s.Cmd.Stderr = &limitWriter{Writer: &bytes.Buffer{}, Limit: DefaultMaxOutput}
-	}
+    // Wrap Stdout ONLY if it isn't already a limitWriter
+    if s.Cmd.Stdout != nil {
+        if _, ok := s.Cmd.Stdout.(*limitWriter); !ok {
+            s.Cmd.Stdout = &limitWriter{Writer: s.Cmd.Stdout, Limit: DefaultMaxOutput}
+        }
+    } else {
+        s.Cmd.Stdout = &limitWriter{Writer: &bytes.Buffer{}, Limit: DefaultMaxOutput}
+    }
 
-	return s.Cmd.Start()
+    // Wrap Stderr similarly
+    if s.Cmd.Stderr != nil {
+        if _, ok := s.Cmd.Stderr.(*limitWriter); !ok {
+            s.Cmd.Stderr = &limitWriter{Writer: s.Cmd.Stderr, Limit: DefaultMaxOutput}
+        }
+    } else {
+        s.Cmd.Stderr = &limitWriter{Writer: &bytes.Buffer{}, Limit: DefaultMaxOutput}
+    }
+
+    return s.Cmd.Start()
 }
+
 
 func (s *safeCmd) Wait() error {
 	logger.Warning("wait")
@@ -197,20 +213,25 @@ func (s *safeCmd) Wait() error {
 	return nil
 }
 
-// 3. High-level methods now naturally use the safe versions
 func (s *safeCmd) CombinedOutput() ([]byte, error) {
 	logger.Warning("combined output")
-	// Re-implementing CombinedOutput to use our safe Start/Wait
-	var b bytes.Buffer
-	s.SetStdout(&b)
-	s.SetStderr(&b)
+    var b bytes.Buffer
+    // Use a single limitWriter for BOTH to track the total output limit correctly
+    lw := &limitWriter{Writer: &b, Limit: DefaultMaxOutput}
+    
+    s.Cmd.Stdout = lw
+    s.Cmd.Stderr = lw
 
-	if err := s.Start(); err != nil {
-		return nil, err
-	}
-	err := s.Wait()
-	return b.Bytes(), err
+    // Bypass the wrapping logic in Start() by marking it as already wrapped
+    // (This requires adding a check in Start() as shown in the previous response)
+    if err := s.Start(); err != nil {
+        return nil, err
+    }
+    err := s.Wait()
+    return b.Bytes(), err
 }
+
+
 
 // Stop satisfies k8sexec.Cmd
 func (s *safeCmd) Stop() {
@@ -264,6 +285,43 @@ func (s *safeCmd) SetDir(dir string) {
 func (s *safeCmd) SetStdout(out io.Writer) { s.Cmd.Stdout = out }
 func (s *safeCmd) SetStderr(out io.Writer) { s.Cmd.Stderr = out }
 func (s *safeCmd) SetStdin(in io.Reader)   { s.Cmd.Stdin = in }
+
+
+
+
+
+
+
+
+// stuckError satisfies the k8s.io/utils/exec.ExitError interface
+type stuckError struct {
+	device string
+	name   string
+}
+
+func (e *stuckError) Error() string {
+	return fmt.Sprintf("node-safety: previous %s process is still stuck for device %s", e.name, e.device)
+}
+
+func (e *stuckError) String() string {
+	return e.Error()
+}
+
+// ExitStatus is what k8sexec looks for to determine the return code.
+// Status 1 is a general failure; Status 4 is a blkid/fsck "probing error".
+// Using 1 is the safest way to signal "Command failed to run".
+func (e *stuckError) ExitStatus() int {
+	return 1 
+}
+
+func (e *stuckError) Exited() bool {
+	return true
+}
+
+
+
+
+
 
 func (e *Executer) ExecuteWithTimeoutSilently(timeoutMs int, command string, args []string) ([]byte, error) {
 	return e.ExecuteWithTracking("", timeoutMs, command, args)
@@ -336,6 +394,8 @@ func (e *Executer) ExecuteWithTracking(device string, timeoutMs int, command str
 			return captured, fmt.Errorf("process %d hung on %s: %w", pid, device, err)
 		}
 		return captured, fmt.Errorf("exit error: %w", err)
+
+		// TODO return captured, err // Keep the original error type (ExitError)
 	}
 
 	// Success: Device is healthy, clear any existing block
@@ -530,7 +590,7 @@ func (e *Executer) MultipathdCmd(device string, command string) (string, error) 
 	conn.SetDeadline(time.Now().Add(5 * time.Second))
 
 	// Protocol Write
-	payload := command + "\n"
+	payload := command + "\x00"
 	header := fmt.Sprintf("%10d", len(payload))
 	if _, err := conn.Write([]byte(header + payload)); err != nil {
 		logger.Warning("fail to send")
