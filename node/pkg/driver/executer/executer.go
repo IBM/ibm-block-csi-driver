@@ -161,26 +161,19 @@ func (s *safeCmd) Start() error {
 
     device := s.extractDevice()
     if device != "" && s.executor.IsDeviceStillStuck(device) {
+	logger.warning("stuck error")
         // SafeFormatAndMount expects a real execution error or success.
         // Returning a generic fmt.Errorf here causes the "exit status 2" log.
 	return &stuckError{device: device, name: s.name}
     }
 
     // Wrap Stdout ONLY if it isn't already a limitWriter
-    if s.Cmd.Stdout != nil {
-        if _, ok := s.Cmd.Stdout.(*limitWriter); !ok {
-            s.Cmd.Stdout = &limitWriter{Writer: s.Cmd.Stdout, Limit: DefaultMaxOutput}
-        }
-    } else {
+    if s.Cmd.Stdout == nil {
         s.Cmd.Stdout = &limitWriter{Writer: &bytes.Buffer{}, Limit: DefaultMaxOutput}
     }
 
     // Wrap Stderr similarly
-    if s.Cmd.Stderr != nil {
-        if _, ok := s.Cmd.Stderr.(*limitWriter); !ok {
-            s.Cmd.Stderr = &limitWriter{Writer: s.Cmd.Stderr, Limit: DefaultMaxOutput}
-        }
-    } else {
+    if s.Cmd.Stderr == nil {
         s.Cmd.Stderr = &limitWriter{Writer: &bytes.Buffer{}, Limit: DefaultMaxOutput}
     }
 
@@ -570,6 +563,7 @@ func (e *Executer) invalidateSocket() {
 
 func (e *Executer) MultipathdCmd(device string, command string) (string, error) {
 	logger.Warningf("MultpathCmd %s", command)
+	logger.Warningf("My UID: %d", os.Getuid())
 	// If the command targets a specific device, check the stuck map first.
 
 	if device != "" {
@@ -595,17 +589,18 @@ func (e *Executer) MultipathdCmd(device string, command string) (string, error) 
 	// Strict deadline: If multipathd doesn't answer in 5s, it's likely wedged.
 	conn.SetDeadline(time.Now().Add(5 * time.Second))
 
-    payload := command + "\n"
-    
-    // 2. Build the 10-byte header manually (right-aligned, space-padded)
-    header := []byte("          ") // 10 spaces
-    lStr := strconv.Itoa(len(payload))
-    // Copy the length string into the end of the 10-byte buffer
-    copy(header[10-len(lStr):], lStr)
+payload := command + "\n"
+lStr := strconv.Itoa(len(payload))
+// Manual padding to ensure NO hidden characters/encodings
+header := bytes.Repeat([]byte(" "), 10-len(lStr))
+header = append(header, []byte(lStr)...)
 
-    // 3. Write header and payload in ONE call
-    fullCmd := append(header, []byte(payload)...)
-    if _, err := conn.Write(fullCmd); err != nil {
+// SINGLE WRITE
+full := append(header, []byte(payload)...)
+conn.Write(full)
+
+
+    if _, err := conn.Write(full); err != nil {
 	logger.Warning("failed to send")
         return "", err
     }
@@ -613,7 +608,7 @@ func (e *Executer) MultipathdCmd(device string, command string) (string, error) 
 	// Protocol Read Header
 	lenBuf := make([]byte, 10)
 	if _, err := io.ReadFull(conn, lenBuf); err != nil {
-		logger.Warning("fail to read %w", err)
+		logger.Warningf("fail to read %v", err)
 		return "", fmt.Errorf("failed to read header: %w", err)
 	}
 
