@@ -161,7 +161,7 @@ func (s *safeCmd) Start() error {
 
     device := s.extractDevice()
     if device != "" && s.executor.IsDeviceStillStuck(device) {
-	logger.warning("stuck error")
+	logger.Warning("stuck error")
         // SafeFormatAndMount expects a real execution error or success.
         // Returning a generic fmt.Errorf here causes the "exit status 2" log.
 	return &stuckError{device: device, name: s.name}
