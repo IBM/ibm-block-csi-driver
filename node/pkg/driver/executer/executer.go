@@ -177,7 +177,15 @@ func (s *safeCmd) Start() error {
         s.Cmd.Stderr = &limitWriter{Writer: &bytes.Buffer{}, Limit: DefaultMaxOutput}
     }
 
-    return s.Cmd.Start()
+	err := s.Cmd.Start()
+
+	if err == nil {
+            logger.Warning("start")
+         } else {
+             logger.Warning("failed to start %v", err)
+}
+
+    return err
 }
 
 
@@ -190,9 +198,11 @@ func (s *safeCmd) Wait() error {
 	var pid int
 	if s.Cmd.Process != nil {
 		pid = s.Cmd.Process.Pid
+		logger.Warning("had pid")
 	}
 
 	if err != nil {
+		logger.Warningf("error %v", err)
 		// 3. Use s.ctx instead of s.Cmd.Context()
 		isTimeout := s.ctx != nil && s.ctx.Err() != nil
 		isWaitDelay := errors.Is(err, exec.ErrWaitDelay)
@@ -204,6 +214,7 @@ func (s *safeCmd) Wait() error {
 		}
 		return err
 	}
+	logger.Warning("success")
 
 	// Success
 	if device != "" {
@@ -224,9 +235,19 @@ func (s *safeCmd) CombinedOutput() ([]byte, error) {
     // Bypass the wrapping logic in Start() by marking it as already wrapped
     // (This requires adding a check in Start() as shown in the previous response)
     if err := s.Start(); err != nil {
+        logger.Warningf("failed to start %v", err)
         return nil, err
     }
     err := s.Wait()
+         if err == nil {
+             logger.Warning("wait")
+          } else {
+              logger.Warning("failed to wait %v", err)
+      }
+
+     logger.Warningf("output %s", string(b.Bytes()))
+
+
     return b.Bytes(), err
 }
 
@@ -236,6 +257,7 @@ func (s *safeCmd) CombinedOutput() ([]byte, error) {
 func (s *safeCmd) Stop() {
 	logger.Warning("Stop")
 	if s.Cmd.Process == nil {
+		logger.Warning("nothing to stop")
 		return
 	}
 	// Attempt to kill the process
@@ -562,7 +584,7 @@ func (e *Executer) invalidateSocket() {
 }
 
 func (e *Executer) MultipathdCmd(device string, command string) (string, error) {
-	logger.Warningf("MultpathCmd %s", command)
+	logger.Warningf("MultpathCmd C%sC", command)
 	logger.Warningf("My UID: %d", os.Getuid())
 	// If the command targets a specific device, check the stuck map first.
 
@@ -589,21 +611,22 @@ func (e *Executer) MultipathdCmd(device string, command string) (string, error) 
 	// Strict deadline: If multipathd doesn't answer in 5s, it's likely wedged.
 	conn.SetDeadline(time.Now().Add(5 * time.Second))
 
-payload := command + "\n"
+payload := []byte(command + "\n")
 lStr := strconv.Itoa(len(payload))
-// Manual padding to ensure NO hidden characters/encodings
-header := bytes.Repeat([]byte(" "), 10-len(lStr))
-header = append(header, []byte(lStr)...)
 
-// SINGLE WRITE
-full := append(header, []byte(payload)...)
-conn.Write(full)
+// 2. Build a FIXED 10-byte header (ASCII spaces)
+header := []byte("          ") // 10 spaces (0x20)
+copy(header[10-len(lStr):], lStr)
 
+// 3. Write Header
+if _, err := conn.Write(header); err != nil {
+    return "", err
+}
 
-    if _, err := conn.Write(full); err != nil {
-	logger.Warning("failed to send")
-        return "", err
-    }
+// 4. Write Payload
+if _, err := conn.Write(payload); err != nil {
+    return "", err
+}
 
 	// Protocol Read Header
 	lenBuf := make([]byte, 10)
