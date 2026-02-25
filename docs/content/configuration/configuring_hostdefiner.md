@@ -100,10 +100,10 @@ metadata:
       {"apiVersion":"csi.ibm.com/v1","kind":"HostDefiner","metadata":{"annotations":{},"labels":{"app.kubernetes.io/instance":"ibm-block-csi","app.kubernetes.io/manag
 ed-by":"ibm-block-csi-operator","app.kubernetes.io/name":"host-definer","release":"v1.12.5"},"name":"host-definer","namespace":"default"},"spec":{"hostDefiner":{"affi
 nity":{"nodeAffinity":{"requiredDuringSchedulingIgnoredDuringExecution":{"nodeSelectorTerms":[{"matchExpressions":[{"key":"kubernetes.io/arch","operator":"In","values
-":["amd64","s390x","ppc64le"]}]}]}}},"allowDelete":true,"connectivityType":"iscsi","dynamicNodeLabeling":true,"imagePullPolicy":"IfNotPresent","portSet":"portset64","
+":["amd64","s390x","ppc64le"]}]}]}}},"allowDelete":true,"connectivityType":"fc","dynamicNodeLabeling":true,"imagePullPolicy":"IfNotPresent","portSet":"portset64","
 prefix":"myhost","repository":"quay.io/ibmcsiblock/ibm-block-csi-host-definer","tag":"1.12.5"}}}
 ```
-then allowDelete is true, as is the default, connectivityType is iscsi - which is not default, dynamicNodeLabeling is true - which is not default, portSet is portset64 and prefix is myhost. The configmap that should be created is like this:
+then allowDelete is true, as is the default, connectivityType is fc - which is not default, dynamicNodeLabeling is true - which is not default, portSet is portset64 and prefix is myhost. The configmap that should be created is like this:
 ```
 kubectl create configmap ibm-csi-hostdefiner-config --from-literal=connectivityType=fc --from-literal=portSet=portset64 --from-literal=dynamicNodeLabeling="true" --from-literal=prefix="myhost"
 ```
