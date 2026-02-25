@@ -595,18 +595,25 @@ func (e *Executer) MultipathdCmd(device string, command string) (string, error) 
 	// Strict deadline: If multipathd doesn't answer in 5s, it's likely wedged.
 	conn.SetDeadline(time.Now().Add(5 * time.Second))
 
-	// Protocol Write
-	payload := command + "\x00"
-	header := fmt.Sprintf("%10d", len(payload))
-	if _, err := conn.Write([]byte(header + payload)); err != nil {
-		logger.Warning("fail to send")
-		return "", fmt.Errorf("failed to send: %w", err)
-	}
+    payload := command + "\n"
+    
+    // 2. Build the 10-byte header manually (right-aligned, space-padded)
+    header := []byte("          ") // 10 spaces
+    lStr := strconv.Itoa(len(payload))
+    // Copy the length string into the end of the 10-byte buffer
+    copy(header[10-len(lStr):], lStr)
+
+    // 3. Write header and payload in ONE call
+    fullCmd := append(header, []byte(payload)...)
+    if _, err := conn.Write(fullCmd); err != nil {
+	logger.Warning("failed to send")
+        return "", err
+    }
 
 	// Protocol Read Header
 	lenBuf := make([]byte, 10)
 	if _, err := io.ReadFull(conn, lenBuf); err != nil {
-		logger.Warning("fail to read")
+		logger.Warning("fail to read %w", err)
 		return "", fmt.Errorf("failed to read header: %w", err)
 	}
 
