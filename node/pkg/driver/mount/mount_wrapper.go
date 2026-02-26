@@ -680,6 +680,7 @@ func (m *Mounter) MountNative(source, target, fstype string, options []string) e
 		2*time.Second,  // handoffTimeout: move to spare pool if kernel stalls
 		20*time.Second, // hardTimeout: return error to caller
 		func(ctx context.Context) (struct{}, error) {
+			logger.Warning("Call unix mount")
 			// Classic mount syscall - Standard for RHEL 7 (Kernel 3.10)
 			// Note: mount(2) is notoriously prone to D-state hangs on stale fabrics
 			err := unix.Mount(source, target, fstype, flags, data)
