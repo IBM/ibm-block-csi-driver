@@ -598,7 +598,7 @@ func (e *Executer) invalidateSocket() {
 	e.socketMu.Unlock()
 }
 
-func (e *Executer) MultipathdCmd(device string, command string) (string, error) {
+func (e *Executer) MultipathdCmdInternal(device string, command string, socketPath string) (string, error) {
 	logger.Warningf("MultpathCmd C%sC", command)
 	logger.Warningf("My UID: %d", os.Getuid())
 	// If the command targets a specific device, check the stuck map first.
@@ -609,7 +609,6 @@ func (e *Executer) MultipathdCmd(device string, command string) (string, error) 
 		}
 	}
 
-	socketPath := e.GetSocket()
 	// Use a very short dial timeout; if the daemon is in D-state, Dial can hang.
 	conn, err := net.DialTimeout("unix", socketPath, 1*time.Second)
 	if err != nil {
@@ -695,6 +694,22 @@ if err != nil {
 	}
 
 	return response, nil
+}
+
+func (e *Executer) MultipathdCmd(device string, command string) (string, error) {
+         candidates := []string{
+                 "\x00/org/kernel/linux/storage/multipathd", // Use \x00 for Go abstract sockets
+                 "\x00multipathd", // Legacy abstract
+                 "/run/multipathd.sock",
+                 "/var/run/multipathd.sock",
+         }
+
+         for _, path := range candidates {
+                 logger.Warningf("Test candiate %s", path)
+
+	         e.MultipathdCmdInternal(device, command, path)
+         }
+	return "", nil
 }
 
 // Wrapper for MultipathdCmd that checks up + keep alive
