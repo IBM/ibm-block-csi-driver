@@ -1000,7 +1000,6 @@ func GetMounts(targetPath string) ([]MountInfo, error) {
 
 	for scanner.Scan() {
 		line := scanner.Text()
-		logger.Warningf("line %s", line)
 		fields := strings.Fields(line)
 		if len(fields) < 10 {
 			continue
@@ -1060,7 +1059,6 @@ func parseInt(s string) int {
 }
 
 func unescapeMountString(path string) string {
-	logger.Warningf("unescapte %s", path)
 	if !strings.Contains(path, "\\") {
 		return path
 	}
