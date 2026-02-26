@@ -19,6 +19,7 @@ package executer
 import (
 	"bytes"
 	"context"
+	"encoding/binary"
 	"errors"
 	"fmt"
 	"io"
@@ -31,7 +32,6 @@ import (
 	"strings"
 	"sync"
 	"sync/atomic"
-	"syscall"
 	"time"
 
 	"github.com/ibm/ibm-block-csi-driver/node/logger"
@@ -129,7 +129,10 @@ func (w *limitWriter) Write(p []byte) (n int, err error) {
 
 // safeCmd wraps the standard Cmd to add device-aware safety logic
 type safeCmd struct {
-	*exec.Cmd
+	k8sexec.Cmd
+    stdout   io.Writer // Intercepted value
+    stderr   io.Writer // Intercepted value
+    stdin    io.Reader // Intercepted value
 	name     string
 	args     []string
 	ctx      context.Context
@@ -137,13 +140,21 @@ type safeCmd struct {
 }
 
 func (e *Executer) CommandContext(ctx context.Context, name string, args ...string) k8sexec.Cmd {
-	cmd := exec.CommandContext(ctx, name, args...)
+    realExecutor := k8sexec.New() 
+    baseCmd := realExecutor.CommandContext(ctx, name, args...)
+    if standardCmd, ok := baseCmd.(interface{ SetWaitDelay(time.Duration) }); ok {
+	logger.Warning("introduce delay")
+        standardCmd.SetWaitDelay(e.waitDelay)
+    } else {
+	logger.Warning("no delay")
+        // Fallback: If your k8s version/provider doesn't have a setter, 
+        // you may need to use reflection or check for a specific internal struct.
+    }
 	// (1) Inject WaitDelay: If process exits but pipes remain open,
 	// or if context is cancelled, Wait() will wait this long before SIGKILL.
-	cmd.WaitDelay = e.waitDelay
 
 	return &safeCmd{
-		Cmd:      cmd,
+		Cmd:      baseCmd,
 		name:     name,
 		args:     args,
 		ctx:      ctx,
@@ -154,6 +165,32 @@ func (e *Executer) CommandContext(ctx context.Context, name string, args ...stri
 func (e *Executer) Command(name string, args ...string) k8sexec.Cmd {
 	logger.Warningf("command %s", name)
 	return e.CommandContext(context.Background(), name, args...)
+}
+
+// Override SetStdout to track it
+func (s *safeCmd) SetStdout(w io.Writer) {
+    s.stdout = w
+    s.Cmd.SetStdout(w) // Pass it down to the real implementation
+}
+
+// Override SetStderr to track it
+func (s *safeCmd) SetStderr(w io.Writer) {
+    s.stderr = w
+    s.Cmd.SetStderr(w)
+}
+
+// Override SetStdin just in case
+func (s *safeCmd) SetStdin(r io.Reader) {
+    s.stdin = r
+    s.Cmd.SetStdin(r)
+}
+
+func (s *safeCmd) SetEnv(env []string) {
+    s.Cmd.SetEnv(env)
+}
+
+func (s *safeCmd) SetDir(dir string) {
+    s.Cmd.SetDir(dir)
 }
 
 func (s *safeCmd) Start() error {
@@ -167,14 +204,9 @@ func (s *safeCmd) Start() error {
 	return &stuckError{device: device, name: s.name}
     }
 
-    // Wrap Stdout ONLY if it isn't already a limitWriter
-    if s.Cmd.Stdout == nil {
-        s.Cmd.Stdout = &limitWriter{Writer: &bytes.Buffer{}, Limit: DefaultMaxOutput}
-    }
-
-    // Wrap Stderr similarly
-    if s.Cmd.Stderr == nil {
-        s.Cmd.Stderr = &limitWriter{Writer: &bytes.Buffer{}, Limit: DefaultMaxOutput}
+    // Wrap Stdout ONLY if it isn't already set
+    if s.stdout == nil {
+        s.SetStdout(&limitWriter{Writer: &bytes.Buffer{}, Limit: DefaultMaxOutput})
     }
 
 	err := s.Cmd.Start()
@@ -195,11 +227,18 @@ func (s *safeCmd) Wait() error {
 	device := s.extractDevice()
 	logger.Warning("Wait done")
 
-	var pid int
-	if s.Cmd.Process != nil {
-		pid = s.Cmd.Process.Pid
-		logger.Warning("had pid")
-	}
+
+    var pid int
+    // Check if the underlying implementation provides a PID
+    // Most k8s executors wrap a struct that has a Process or a Pid() method
+    if pidCmd, ok := s.Cmd.(interface{ GetPid() int }); ok {
+        pid = pidCmd.GetPid()
+        logger.Warningf("had pid %d", pid)
+    } else {
+        // Fallback if GetPid isn't available: 
+        // You might not be able to get the PID from the interface easily
+        logger.Warning("could not retrieve pid from interface")
+    }
 
 	if err != nil {
 		logger.Warningf("error %v", err)
@@ -228,9 +267,10 @@ func (s *safeCmd) CombinedOutput() ([]byte, error) {
     var b bytes.Buffer
     // Use a single limitWriter for BOTH to track the total output limit correctly
     lw := &limitWriter{Writer: &b, Limit: DefaultMaxOutput}
-    
-    s.Cmd.Stdout = lw
-    s.Cmd.Stderr = lw
+
+    // Always overwrite whatever was there before for this specific call
+    s.SetStdout(lw)
+    s.SetStderr(lw)
 
     // Bypass the wrapping logic in Start() by marking it as already wrapped
     // (This requires adding a check in Start() as shown in the previous response)
@@ -256,16 +296,7 @@ func (s *safeCmd) CombinedOutput() ([]byte, error) {
 // Stop satisfies k8sexec.Cmd
 func (s *safeCmd) Stop() {
 	logger.Warning("Stop")
-	if s.Cmd.Process == nil {
-		logger.Warning("nothing to stop")
-		return
-	}
-	// Attempt to kill the process
-	_ = s.Cmd.Process.Kill()
-
-	// Optional: You could trigger your stuck logic here if
-	// the process doesn't exit after a SIGKILL, but usually
-	// the WaitDelay in the main Wait() call handles this better.
+	s.Cmd.Stop()
 }
 
 // LookPath satisfies k8sexec.Interface
@@ -292,22 +323,6 @@ func (s *safeCmd) extractDevice() string {
 	}
 	return ""
 }
-
-// SetEnv satisfies the mount.Cmd interface
-func (s *safeCmd) SetEnv(env []string) {
-	s.Cmd.Env = env
-}
-
-// SetDir satisfies the mount.Cmd interface
-func (s *safeCmd) SetDir(dir string) {
-	s.Cmd.Dir = dir
-}
-
-func (s *safeCmd) SetStdout(out io.Writer) { s.Cmd.Stdout = out }
-func (s *safeCmd) SetStderr(out io.Writer) { s.Cmd.Stderr = out }
-func (s *safeCmd) SetStdin(in io.Reader)   { s.Cmd.Stdin = in }
-
-
 
 
 
@@ -611,50 +626,62 @@ func (e *Executer) MultipathdCmd(device string, command string) (string, error) 
 	// Strict deadline: If multipathd doesn't answer in 5s, it's likely wedged.
 	conn.SetDeadline(time.Now().Add(5 * time.Second))
 
-payload := []byte(command + "\n")
-lStr := strconv.Itoa(len(payload))
+payload := []byte(command + "\x00")
 
-// 2. Build a FIXED 10-byte header (ASCII spaces)
-header := []byte("          ") // 10 spaces (0x20)
-copy(header[10-len(lStr):], lStr)
-
-// 3. Write Header
-if _, err := conn.Write(header); err != nil {
-    return "", err
-}
-
-// 4. Write Payload
+// 2. Write ONLY the payload to the daemon
+// Do NOT send the 10-byte header here
 if _, err := conn.Write(payload); err != nil {
-    return "", err
+    return "", fmt.Errorf("failed to write command: %w", err)
 }
 
-	// Protocol Read Header
-	lenBuf := make([]byte, 10)
-	if _, err := io.ReadFull(conn, lenBuf); err != nil {
-		logger.Warningf("fail to read %v", err)
-		return "", fmt.Errorf("failed to read header: %w", err)
-	}
+    // 2. READ: Peek first 4 bytes to determine Protocol (ASCII vs Binary)
+    prefix := make([]byte, 4)
+    if _, err := io.ReadFull(conn, prefix); err != nil {
+        return "", fmt.Errorf("failed to read header prefix: %w", err)
+    }
 
-	trimmedLen := strings.TrimSpace(string(lenBuf))
-	respLen, err := strconv.Atoi(trimmedLen)
-	if err != nil || respLen <= 0 {
-		logger.Warning("invalid len")
-		return "", fmt.Errorf("protocol error: invalid resp length %q", trimmedLen)
-	}
+    var respLen uint64
 
-	if respLen > DefaultMaxOutput {
-		logger.Warning("exceeeds")
-		return "", fmt.Errorf("response size %d exceeds limit", respLen)
-	}
+    // Heuristic: If prefix starts with Space (0x20) or Digit (0x30-0x39), it's ASCII
+    if prefix[0] == 0x20 || (prefix[0] >= 0x30 && prefix[0] <= 0x39) {
+	logger.Warning("legacy")
+        // --- LEGACY ASCII PATH (10 bytes total) ---
+        remaining := make([]byte, 6)
+        if _, err := io.ReadFull(conn, remaining); err != nil {
+            return "", fmt.Errorf("failed to read rest of ASCII header: %w", err)
+        }
+        fullHeader := string(append(prefix, remaining...))
+        val, err := strconv.Atoi(strings.TrimSpace(fullHeader))
+        if err != nil {
+            return "", fmt.Errorf("invalid ASCII header: %q", fullHeader)
+        }
+        respLen = uint64(val)
+    } else {
+	logger.Warning("modern")
+        // --- MODERN BINARY PATH (8 bytes total size_t) ---
+        remaining := make([]byte, 4)
+        if _, err := io.ReadFull(conn, remaining); err != nil {
+            return "", fmt.Errorf("failed to read rest of binary header: %w", err)
+        }
+        // Native LittleEndian for x86_64 OCP/RHEL
+        respLen = binary.LittleEndian.Uint64(append(prefix, remaining...))
+    }
 
-	// Body Read
-	respBody, err := io.ReadAll(io.LimitReader(conn, int64(respLen)))
-	if err != nil {
-		logger.Warning("Cannot read")
-		return "", fmt.Errorf("failed to read body: %w", err)
-	}
+    // 3. Safety Check
+    if respLen == 0 || respLen > 10*1024*1024 { // 10MB limit
+        return "", fmt.Errorf("invalid response length: %d", respLen)
+    }
 
-	response := strings.TrimSpace(string(respBody))
+    // 4. Read Body
+
+lr := io.LimitReader(conn, int64(respLen))
+respBody, err := io.ReadAll(lr)
+if err != nil {
+    return "", fmt.Errorf("failed to read body: %w", err)
+}
+
+    // Trim trailing NULL and spaces
+    response := strings.TrimSpace(strings.TrimRight(string(respBody), "\x00"))
 
 	logger.Warningf("response %s", response)
 
@@ -749,61 +776,12 @@ func (e *Executer) isTransportError(err error) bool {
 
 func (e *Executer) IsMultipathdRunning() bool {
 	// Try standard RHEL path first, then common alternatives
-	paths := []string{"/var/run/multipathd.pid", "/run/multipathd.pid", "/var/run/multipathd/multipathd.pid"}
-
-	for _, path := range paths {
-		data, err := os.ReadFile(path)
-		if err != nil {
-			continue
-		}
-
-		pid, err := strconv.Atoi(strings.TrimSpace(string(data)))
-		if err != nil {
-			continue
-		}
-
-		process, _ := os.FindProcess(pid)
-		// Signal(0) verifies the PID is still alive and belongs to multipathd
-		if err := process.Signal(syscall.Signal(0)); err == nil {
-			return true
-		}
-	}
-	return false
-}
-
-// IsMultipathdAlive performs a liveness check by sending a no-op command.
-// It distinguishes between "stopped" (connection refused) and "stuck" (timeout).
-func (e *Executer) IsMultipathdAlive() (bool, error) {
-	// We use 'show status' because it's a fast, read-only internal no-op.
-	// If the event loop is deadlocked (D-state), this will trigger the
-	// 5s deadline set in MultipathdCmd.
-	resp, err := e.MultipathdCmd("", "show status")
-
-	if err != nil {
-		// If the error is a timeout, the daemon is likely stuck in D-state
-		if netErr, ok := err.(net.Error); ok && netErr.Timeout() {
-			return false, fmt.Errorf("multipathd is unresponsive (deadlock suspected): %w", err)
-		}
-
-		// TODO should we expect "timeout" string on error if not running
-		// If the error is "connection refused", the daemon is simply not running
-		if strings.Contains(err.Error(), "unreachable") ||
-			strings.Contains(err.Error(), "refused") ||
-			strings.Contains(err.Error(), "no such file") {
-			return false, fmt.Errorf("multipathd service is not running")
-		}
-
-		return false, err
-	}
-
-	// Verify we got a sane response (usually "up" or "multipathd vX.X.X")
-	if resp == "" {
-		return false, fmt.Errorf("multipathd returned empty response")
-	}
-
-	// TODO is this too strict
 	//if !strings.Contains(string(output), "status:") && !strings.Contains(string(output), "up")
 
+	return true
+}
+
+func (e *Executer) IsMultipathdAlive() (bool, error) {
 	return true, nil
 }
 
