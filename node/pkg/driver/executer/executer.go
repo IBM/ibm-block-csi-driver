@@ -68,6 +68,7 @@ type Executer struct {
 	socketMu       sync.RWMutex
 
 	cachedSocket string
+	useBinaryWrite bool
 
 	sl SocketLimiter
 
@@ -547,47 +548,70 @@ const (
 	LegacySocket       = "/var/run/multipathd.sock"
 )
 
-func (e *Executer) resolveSocket() string {
-	candidates := []string{
-		"\x00/org/kernel/linux/storage/multipathd", // Use \x00 for Go abstract sockets
-		"\x00multipathd", // Legacy abstract
-		"/run/multipathd.sock",
-		"/var/run/multipathd.sock",
-	}
+// resolveSocket returns the working path and a boolean indicating if it uses the modern binary protocol.
+func (e *Executer) resolveSocket() (string, bool) {
+         candidates := []string{
+                 "\x00/org/kernel/linux/storage/multipathd",
+                 "/run/multipathd/multipathd.sock", // Common OCP file path
+                 "/run/multipathd.sock",
+                 "\x00multipathd",
+                 "/var/run/multipathd.sock",
+         }
 
-	for _, path := range candidates {
-		logger.Warningf("Test candiate %s", path)
-		conn, err := net.DialTimeout("unix", path, 100*time.Millisecond)
-		if err == nil {
-			logger.Warning("Candidate found")
-			conn.Close()
-			return path
-		}
-	}
-	// 4. Default Fallback
-	// If everything fails, return the standard path so error messages are helpful
-	return StandardSocket
+         if env := os.Getenv("MULTIPATH_SOCKET_NAME"); env != "" {
+                 candidates = append([]string{env}, candidates...)
+         }
+
+    for _, path := range candidates {
+        // --- PROBE 1: MODERN BINARY ---
+        conn, _ := net.DialTimeout("unix", path, 200*time.Millisecond)
+        payload := []byte("show status\x00")
+        binary.Write(conn, binary.LittleEndian, uint64(len(payload)))
+        conn.Write(payload)
+
+        prefix := make([]byte, 4)
+        _, err := io.ReadFull(conn, prefix)
+        if err == nil {
+            isBinary := !(prefix[0] == 0x20 || (prefix[0] >= 0x30 && prefix[0] <= 0x39))
+            conn.Close()
+            return path, isBinary
+        }
+        conn.Close()
+
+        // --- PROBE 2: LEGACY RAW (Only if Probe 1 failed) ---
+        conn, _ = net.DialTimeout("unix", path, 200*time.Millisecond)
+        conn.Write(payload) // Raw write
+        _, err = io.ReadFull(conn, prefix)
+        if err == nil {
+            conn.Close()
+            return path, false // Success with Legacy
+        }
+        conn.Close()
+    }
+    return StandardSocket, false
 }
 
-// GetSocket returns the cached socket or discovers it if empty.
-func (e *Executer) GetSocket() string {
-	e.socketMu.RLock()
-	s := e.cachedSocket
-	e.socketMu.RUnlock()
 
-	if s != "" {
-		logger.Warningf("Cached socket %s", s)
-		return s
+
+// GetSocket returns the cached socket or discovers it if empty.
+func (e *Executer) GetSocket() (string, bool) {
+	e.socketMu.RLock()
+	if e.cachedSocket != "" {
+		defer e.socketMu.RUnlock()
+		return e.cachedSocket, e.useBinaryWrite
 	}
+	e.socketMu.RUnlock()
 
 	e.socketMu.Lock()
 	defer e.socketMu.Unlock()
-	// Double-check to prevent race
+	
+	// Double check
 	if e.cachedSocket == "" {
-		logger.Warning("no cached")
-		e.cachedSocket = e.resolveSocket()
+		path, isBinary := e.resolveSocket()
+		e.cachedSocket = path
+		e.useBinaryWrite = isBinary
 	}
-	return e.cachedSocket
+	return e.cachedSocket, e.useBinaryWrite
 }
 
 // invalidateSocket clears the cache if a connection fails.
@@ -627,44 +651,41 @@ func (e *Executer) MultipathdCmdInternal(device string, command string, socketPa
 
 payload := []byte(command + "\x00")
 
+	isBinary := true
+	if isBinary {
+		// Modern OCP 4.12+ REQUIRES 8-byte binary length header
+		if err := binary.Write(conn, binary.LittleEndian, uint64(len(payload))); err != nil {
+			logger.Warning("Cannot write header")
+			return "", err
+		}
+	}
+
 // 2. Write ONLY the payload to the daemon
 // Do NOT send the 10-byte header here
 if _, err := conn.Write(payload); err != nil {
+	logger.Warning("cannot write payload")
     return "", fmt.Errorf("failed to write command: %w", err)
 }
 
-    // 2. READ: Peek first 4 bytes to determine Protocol (ASCII vs Binary)
-    prefix := make([]byte, 4)
-    if _, err := io.ReadFull(conn, prefix); err != nil {
-        return "", fmt.Errorf("failed to read header prefix: %w", err)
-    }
+	var respLen uint64
+	if isBinary {
+		// Modern: 8-byte binary header
+		header := make([]byte, 8)
+		if _, err := io.ReadFull(conn, header); err != nil {
+			logger.Warning("cannot read header")
+			return "", fmt.Errorf("binary header read failed: %w", err)
+		}
+		respLen = binary.LittleEndian.Uint64(header)
+	} else {
+		// Legacy: 10-byte ASCII header
+		header := make([]byte, 10)
+		if _, err := io.ReadFull(conn, header); err != nil {
+			return "", fmt.Errorf("ascii header read failed: %w", err)
+		}
+		val, _ := strconv.Atoi(strings.TrimSpace(string(header)))
+		respLen = uint64(val)
+	}
 
-    var respLen uint64
-
-    // Heuristic: If prefix starts with Space (0x20) or Digit (0x30-0x39), it's ASCII
-    if prefix[0] == 0x20 || (prefix[0] >= 0x30 && prefix[0] <= 0x39) {
-	logger.Warning("legacy")
-        // --- LEGACY ASCII PATH (10 bytes total) ---
-        remaining := make([]byte, 6)
-        if _, err := io.ReadFull(conn, remaining); err != nil {
-            return "", fmt.Errorf("failed to read rest of ASCII header: %w", err)
-        }
-        fullHeader := string(append(prefix, remaining...))
-        val, err := strconv.Atoi(strings.TrimSpace(fullHeader))
-        if err != nil {
-            return "", fmt.Errorf("invalid ASCII header: %q", fullHeader)
-        }
-        respLen = uint64(val)
-    } else {
-	logger.Warning("modern")
-        // --- MODERN BINARY PATH (8 bytes total size_t) ---
-        remaining := make([]byte, 4)
-        if _, err := io.ReadFull(conn, remaining); err != nil {
-            return "", fmt.Errorf("failed to read rest of binary header: %w", err)
-        }
-        // Native LittleEndian for x86_64 OCP/RHEL
-        respLen = binary.LittleEndian.Uint64(append(prefix, remaining...))
-    }
 
     // 3. Safety Check
     if respLen == 0 || respLen > 10*1024*1024 { // 10MB limit
@@ -676,6 +697,7 @@ if _, err := conn.Write(payload); err != nil {
 lr := io.LimitReader(conn, int64(respLen))
 respBody, err := io.ReadAll(lr)
 if err != nil {
+    logger.Warning("cannot read body")
     return "", fmt.Errorf("failed to read body: %w", err)
 }
 
