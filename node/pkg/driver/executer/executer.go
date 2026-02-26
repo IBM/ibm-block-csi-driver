@@ -707,7 +707,10 @@ func (e *Executer) MultipathdCmd(device string, command string) (string, error) 
          for _, path := range candidates {
                  logger.Warningf("Test candiate %s", path)
 
-	         e.MultipathdCmdInternal(device, command, path)
+	         _, err := e.MultipathdCmdInternal(device, command, path)
+		if err != nil {
+                    logger.Warningf("Fail %v ", err)
+}
          }
 	return "", nil
 }
