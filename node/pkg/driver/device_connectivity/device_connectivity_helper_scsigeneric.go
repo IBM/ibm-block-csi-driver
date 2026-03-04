@@ -1968,6 +1968,7 @@ func (o OsDeviceConnectivityHelperGeneric) GetWwnByScsiInq(dev string) (string, 
 		fd, err = syscall.Open(dev, syscall.O_RDWR|syscall.O_NONBLOCK, 0)
 	}
 	if err != nil {
+		logger.Warningf("open error %v", err)
 		// If the device is gone/dead, we want to know immediately
 		return "", err
 	}
@@ -1997,6 +1998,7 @@ func (o OsDeviceConnectivityHelperGeneric) GetWwnByScsiInq(dev string) (string, 
 	for i := 0; i < maxRetries; i++ {
 		_, _, errno := syscall.Syscall(syscall.SYS_IOCTL, f.Fd(), SG_IO, uintptr(unsafe.Pointer(&header)))
 		if errno != 0 {
+			logger.Warningf("ioctl failed %v", errno)
 			return "", fmt.Errorf("ioctl failed: %v", errno)
 		}
 
@@ -2034,10 +2036,12 @@ func (o OsDeviceConnectivityHelperGeneric) GetWwnByScsiInq(dev string) (string, 
 	actualLen := int(header.DxferLen) - int(header.Resid)
 
 	if actualLen < 4 {
+		logger.Warning("too short")
 		return "", fmt.Errorf("response too short")
 	}
 	// respBuf[1] is the Page Code. It should be 0x83.
 	if respBuf[1] != 0x83 {
+		logger.Warning("unexpected page")
 		return "", fmt.Errorf("unexpected VPD page: 0x%02x", respBuf[1])
 	}
 
@@ -2046,20 +2050,23 @@ func (o OsDeviceConnectivityHelperGeneric) GetWwnByScsiInq(dev string) (string, 
 
 func (r *OsDeviceConnectivityHelperGeneric) willIoctl0x83Fail(sgName string) bool {
 	statePath := fmt.Sprintf("/sys/class/scsi_generic/%s/device/state", sgName)
+	logger.Warningf("state %s", statePath)
 	state, err := os.ReadFile(statePath)
 	if err != nil {
-		return true
+		logger.Warningf("error %v", err)
+		return false
 	}
 
 	s := strings.TrimSpace(string(state))
+	logger.Warningf("state %s", s)
 	switch s {
 	case "running":
 		return false // Best case for success
 	case "blocked", "quiesce", "offline", "transport-offline", "deleting", "cancel":
-		return true
+		return false
 	default:
 		// Any unknown state should be treated as a failure for safety
-		return true
+		return false
 	}
 }
 
@@ -2092,6 +2099,7 @@ func (o *OsDeviceConnectivityHelperGeneric) parseVPD83(data []byte) (string, err
 
 	// 3. Iterate through designators with safety checks
 	for cursor+4 <= limit {
+		logger.Warning("iterate")
 		// Byte 1: [PIV (7) | Association (5:4) | Designator Type (3:0)]
 		designatorType := int(data[cursor+1] & 0x0F)
 		association := (data[cursor+1] >> 4) & 0x03
@@ -2110,6 +2118,7 @@ func (o *OsDeviceConnectivityHelperGeneric) parseVPD83(data []byte) (string, err
 
 		// Only Association 0 (Logical Unit) is relevant for Volume WWIDs
 		if association == 0 {
+			logger.Warningf("found assoc %d", designatorType)
 			idData := data[idStart:idEnd]
 
 			switch designatorType {

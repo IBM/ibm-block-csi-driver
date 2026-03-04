@@ -657,7 +657,7 @@ func (d NodeUtils) GetBlockVolumeStats(devicePath string) (VolumeStatistics, err
 	logger.Warning("GetBlockVolumeStats")
 	f, err := os.OpenFile(devicePath, os.O_RDONLY, 0)
 	if err != nil {
-		logger.Warning("Failed to open")
+		logger.Warning("Failed to open %v", err)
 		return VolumeStatistics{}, fmt.Errorf("failed to open: %w", err)
 	}
 	defer f.Close()
