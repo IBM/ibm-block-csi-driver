@@ -257,6 +257,8 @@ func (r OsDeviceConnectivityHelperScsiGeneric) IsVolumePathMatchesVolumeId(volum
 		return false, err
 	}
 
+	logger.Warningf("%s %s", SgInqWwn, volumeIdVariations[0])
+
 	if !isSameId(SgInqWwn, volumeIdVariations) {
 		return false, &ErrorWrongDeviceFound{mpathDeviceName, volumeUuid, SgInqWwn}
 	}
@@ -305,8 +307,6 @@ func (r OsDeviceConnectivityHelperScsiGeneric) RescanDevices(lunId int, arrayIde
 }
 
 func (r OsDeviceConnectivityHelperScsiGeneric) GetMpathDevice(volumeId string) (string, error) {
-	logger.Warning("dummy")
-	_, err := r.Executer.MultipathdCmd("", "show status")
 
 	logger.Infof("GetMpathDevice: Searching multipath devices for volume : [%s] ", volumeId)
 
@@ -1955,6 +1955,7 @@ func (o OsDeviceConnectivityHelperGeneric) GetMpathVolumeId(dmPath string) (volI
 }
 
 func (o OsDeviceConnectivityHelperGeneric) GetWwnByScsiInq(dev string) (string, error) {
+	logger.Warning("wwn inq")
 	if o.willIoctl0x83Fail(filepath.Base(dev)) {
 		return "", fmt.Errorf("path %s in unsafe state", dev)
 	}
@@ -2272,6 +2273,7 @@ func (o *OsDeviceConnectivityHelperGeneric) GetMpathDeviceName(volumePath string
 	var stat syscall.Stat_t
 	// Tier 1: Get Device ID directly from the volume path inode
 	if err := syscall.Stat(volumePath, &stat); err != nil {
+		logger.Warning("failed to stat")
 		return "", fmt.Errorf("failed to stat path %s: %w", volumePath, err)
 	}
 
@@ -2280,19 +2282,28 @@ func (o *OsDeviceConnectivityHelperGeneric) GetMpathDeviceName(volumePath string
 
 	// Tier 2: High-Speed Sysfs Resolution (The "Source of Truth")
 	if major > 0 {
+		logger.Warning("have major")
 		if kernelName, err := o.resolveIdToKernelName(major, minor); err == nil {
 			return kernelName, nil
 		}
 	}
 
-	//deviceName, err := o.getDeviceFromMountInfo(volumePath)
 	major, minor, err := mount.GetMajorMinorFromSysfs(volumePath)
 
 	if err != nil {
-		return "", err
+		logger.Warning("have major minor")
+		if kernelName, err := o.resolveIdToKernelName(major, minor); err == nil {
+			return kernelName, nil
+		}
 	}
 
-	return o.ResolveToKernelName("compile")
+	deviceName, err := mount.GetDeviceFromPath(volumePath)
+	if err != nil {
+		logger.Warning("cannot find device")
+		return "", err
+	}
+	return deviceName, nil
+
 }
 
 // resolveIdToKernelName performs the sysfs symlink resolution
@@ -2301,6 +2312,7 @@ func (o *OsDeviceConnectivityHelperGeneric) resolveIdToKernelName(major, minor u
 	sysPath := fmt.Sprintf("/sys/dev/block/%d:%d", major, minor)
 	realPath, err := os.Readlink(sysPath)
 	if err != nil {
+		logger.Warning("cannot read link %s", sysPath)
 		return "", err
 	}
 	// Resolves to e.g. "../../devices/virtual/block/dm-5" -> "dm-5"
@@ -2516,6 +2528,8 @@ func (o *OsDeviceConnectivityHelperGeneric) GetMajorMinorFromSysfs(devicePath st
 	minor = unix.Minor(st.Rdev)
 	name := filepath.Base(devicePath)
 
+	logger.Warningf("name %s", name)
+
 	// 1. Branch: Resolve SG to its Block sibling
 	if (st.Mode&syscall.S_IFMT) == syscall.S_IFCHR && strings.HasPrefix(name, "sg") {
 		// Path: /sys/class/scsi_generic/sgX/device/block/sdY
@@ -2525,6 +2539,7 @@ func (o *OsDeviceConnectivityHelperGeneric) GetMajorMinorFromSysfs(devicePath st
 		// Find the block child
 		blockEntries, _ := os.ReadDir(filepath.Join(sysPath, "block"))
 		if len(blockEntries) > 0 {
+			logger.Warning("found entries")
 			// Update to the SD device's major:minor
 			sdName := blockEntries[0].Name()
 			var sdSt syscall.Stat_t

@@ -620,6 +620,7 @@ func (n NodeUtils) IsBlock(devicePath string) (bool, error) {
 
 func (n NodeUtils) GetFileSystemVolumeStats(path string) (VolumeStatistics, error) {
 	// Specify [unix.Statfs_t] as the generic type T
+	logger.Warning("GetFileSystemVolumeStats")
 	stat, err := executer.ExecuteUninterruptible[unix.Statfs_t](
 		n.KeyedGater,
 		"statfs-"+path,
@@ -637,6 +638,7 @@ func (n NodeUtils) GetFileSystemVolumeStats(path string) (VolumeStatistics, erro
 	)
 
 	if err != nil {
+		logger.Warning("GetFileSystemVolumeStats failed")
 		return VolumeStatistics{}, err
 	}
 
@@ -652,8 +654,10 @@ func (n NodeUtils) GetFileSystemVolumeStats(path string) (VolumeStatistics, erro
 }
 
 func (d NodeUtils) GetBlockVolumeStats(devicePath string) (VolumeStatistics, error) {
+	logger.Warning("GetBlockVolumeStats")
 	f, err := os.OpenFile(devicePath, os.O_RDONLY, 0)
 	if err != nil {
+		logger.Warning("Failed to open")
 		return VolumeStatistics{}, fmt.Errorf("failed to open: %w", err)
 	}
 	defer f.Close()
@@ -668,6 +672,7 @@ func (d NodeUtils) GetBlockVolumeStats(devicePath string) (VolumeStatistics, err
 	)
 
 	if errno != 0 {
+		logger.Warning("ioctl failed")
 		return VolumeStatistics{}, fmt.Errorf("ioctl BLKGETSIZE64 failed: %v", errno)
 	}
 
