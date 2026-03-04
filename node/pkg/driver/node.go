@@ -646,7 +646,7 @@ func (d *NodeService) getVolumeStats(path string, volumeId string) (VolumeStatis
 	}
 
 	if isBlock {
-		volumeStats, err = d.NodeUtils.GetBlockVolumeStats(volumeId)
+		volumeStats, err = d.NodeUtils.GetBlockVolumeStats(path)
 		if err != nil {
 			switch err.(type) {
 			case *device_connectivity.MultipathDeviceNotFoundForVolumeError:
