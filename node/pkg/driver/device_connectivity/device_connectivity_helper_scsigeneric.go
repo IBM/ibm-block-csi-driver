@@ -1956,7 +1956,7 @@ func (o OsDeviceConnectivityHelperGeneric) GetMpathVolumeId(dmPath string) (volI
 
 func (o OsDeviceConnectivityHelperGeneric) GetWwnByScsiInq(dev string) (string, error) {
 	logger.Warning("wwn inq")
-	if o.willIoctl0x83Fail(filepath.Base(dev)) {
+	if o.willIoctl0x83Fail(dev) {
 		return "", fmt.Errorf("path %s in unsafe state", dev)
 	}
 	// 1. Try O_RDONLY first (The "Clean" way)
@@ -2048,27 +2048,93 @@ func (o OsDeviceConnectivityHelperGeneric) GetWwnByScsiInq(dev string) (string, 
 	return o.parseVPD83(respBuf[:actualLen])
 }
 
-func (r *OsDeviceConnectivityHelperGeneric) willIoctl0x83Fail(sgName string) bool {
-	statePath := fmt.Sprintf("/sys/class/scsi_generic/%s/device/state", sgName)
-	logger.Warningf("state %s", statePath)
+func (r *OsDeviceConnectivityHelperGeneric) willIoctl0x83Fail(dev string) bool {
+	// 1. Resolve symlinks (e.g., /dev/mapper/mpatha -> /dev/dm-0)
+	realPath, err := filepath.EvalSymlinks(dev)
+	if err != nil {
+		logger.Warningf("cannot result %s %v", dev, err)
+		return true // Cannot resolve, assume unsafe
+	}
+	devName := filepath.Base(realPath)
+
+	// 2. Check if it's a Device Mapper (Multipath) device
+	if strings.HasPrefix(devName, "dm-") {
+		return r.checkDMDevice(devName)
+	}
+
+	// 3. Check if it's an NVMe device
+	if strings.HasPrefix(devName, "nvme") {
+		return r.checkNVMeDevice(devName)
+	}
+
+	// 4. Default: Treat as a single-path SCSI device (sda, sdb, etc.)
+	return r.isSCSIDeviceBlocked(devName)
+}
+
+func (r *OsDeviceConnectivityHelperGeneric) isSCSIDeviceBlocked(name string) bool {
+	// Path: /sys/block/sda/device/state
+	statePath := filepath.Join("/sys/block", name, "device/state")
+	logger.Warningf("path state %s", statePath)
 	state, err := os.ReadFile(statePath)
 	if err != nil {
 		logger.Warningf("error %v", err)
-		return false
+		return true // Missing state file indicates a problem
+	}
+        s := strings.TrimSpace(string(state))
+        logger.Warningf("state %s", s)
+        switch s {
+        case "running":
+                return false // Best case for success
+        case "blocked", "quiesce", "offline", "transport-offline", "deleting", "cancel":
+                return true
+        default:
+                // Any unknown state should be treated as a failure for safety
+                return true
+        }
+}
+
+
+func (r *OsDeviceConnectivityHelperGeneric) checkDMDevice(dmName string) bool {
+	suspendedPath := filepath.Join("/sys/block", dmName, "dm/suspended")
+	data, err := os.ReadFile(suspendedPath)
+	if err != nil {
+		logger.Warningf("could not read suspension state for %s: %v", dmName, err)
+		return true // Assume blocked if we can't check
 	}
 
-	s := strings.TrimSpace(string(state))
-	logger.Warningf("state %s", s)
-	switch s {
-	case "running":
-		return false // Best case for success
-	case "blocked", "quiesce", "offline", "transport-offline", "deleting", "cancel":
-		return false
-	default:
-		// Any unknown state should be treated as a failure for safety
-		return false
+	if strings.TrimSpace(string(data)) == "1" {
+		logger.Warningf("DM device %s is SUSPENDED; ioctl will block", dmName)
+		return true
 	}
+
+	slavesPath := filepath.Join("/sys/block", dmName, "slaves")
+	slaves, err := os.ReadDir(slavesPath)
+	if err != nil || len(slaves) == 0 {
+		logger.Warningf("not slaves for %s", slavesPath)
+		return true
+	}
+
+	for _, s := range slaves {
+		// Slaves of DM are usually SCSI devices (sda, sdb)
+		if !r.isSCSIDeviceBlocked(s.Name()) {
+			return false // Found a healthy path!
+		}
+	}
+	return true // All paths blocked
 }
+
+func (r *OsDeviceConnectivityHelperGeneric) checkNVMeDevice(nvmeName string) bool {
+	// Path: /sys/block/nvme0n1/device/state
+	statePath := filepath.Join("/sys/block", nvmeName, "device/state")
+	state, err := os.ReadFile(statePath)
+	if err != nil {
+		return true
+	}
+	s := strings.TrimSpace(string(state))
+	// NVMe healthy states are typically "live"
+	return s != "live" && s != "new"
+}
+
 
 //blocked: Occurs during error recovery (e.g., a Fibre Channel rport is lost). The SCSI mid-layer queues all I/O, including SG_IO ioctls. Even with O_NONBLOCK, the ioctl call itself can block in the kernel until the timeout (dev_loss_tmo) expires.
 //quiesce: Used when a device is being suspended or during certain driver-level resets. The device is temporarily not accepting commands.
