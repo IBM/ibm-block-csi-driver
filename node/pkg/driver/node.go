@@ -354,7 +354,7 @@ func (d *NodeService) NodeUnstageVolume(ctx context.Context, req *csi.NodeUnstag
 	logger.Debugf("Check if staging path {%s} is mounted", stagingPathWithHostPrefix)
 
 	volumeUuid := d.NodeUtils.GetVolumeUuid(volumeID)
-	err = d.OsDeviceConnectivityHelper.TeardownVolume(stagingPathWithHostPrefix, volumeUuid)
+	err = d.OsDeviceConnectivityHelper.TeardownVolume(stagingTargetPath, volumeUuid)
 
 	if err != nil {
 		return nil, err

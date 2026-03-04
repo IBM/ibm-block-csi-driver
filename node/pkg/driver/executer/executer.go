@@ -105,7 +105,6 @@ func (w *limitWriter) Write(p []byte) (n int, err error) {
 	defer w.mu.Unlock()
 	
 	remaining := w.Limit - w.curr
-	logger.Warningf("Remaining %d", remaining)
 	if remaining <= 0 {
 		return len(p), nil
 	}
@@ -114,11 +113,8 @@ func (w *limitWriter) Write(p []byte) (n int, err error) {
 	if writeLen > remaining {
 		writeLen = remaining
 	}
-	logger.Warningf("Write len %d", writeLen)
 	nActual, err := w.Writer.Write(p[:writeLen])
-	logger.Warningf("Write len %d", nActual)
 	w.curr += nActual
-	logger.Warningf("pos %d", w.curr)
 	if err != nil {
 		logger.Warningf("have error")
 }

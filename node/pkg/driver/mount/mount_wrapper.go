@@ -21,6 +21,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"path"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -33,6 +34,10 @@ import (
 	"github.com/ibm/ibm-block-csi-driver/node/pkg/driver/executer"
 	"golang.org/x/sys/unix"
 	mount "k8s.io/mount-utils"
+)
+
+const (
+	PrefixChrootOfHostRoot            = "/host"
 )
 
 // default mount/unmount timeout interval, 30s
@@ -385,7 +390,7 @@ func (m *Mounter) backgroundSyncfs(target string, info *TrackedUnmount) {
 			// unix.O_NONBLOCK is critical for RHEL 7 on dead iSCSI/FC
 			// unix.O_DIRECTORY ensures we don't accidentally open a file
 			// unix.O_NONBLOCK prevents the open() itself from hanging on dead fabrics
-			fd, err := unix.Open(targetPath, unix.O_RDONLY|unix.O_NONBLOCK|unix.O_DIRECTORY, 0)
+			fd, err := unix.Open(GetPodPath(targetPath), unix.O_RDONLY|unix.O_NONBLOCK|unix.O_DIRECTORY, 0)
 			if err != nil {
 				return SyncResult{Success: false}, err
 			}
@@ -433,7 +438,7 @@ func (m *Mounter) EscalateToLazy(target string) error {
 	logger.Warningf("escalate %s", target)
 	// MNT_DETACH is the "Nuclear Option": it decouples the VFS from the
 	// broken hardware immediately, allowing the Kubelet path to clear.
-	err := syscall.Unmount(target, syscall.MNT_DETACH)
+	err := syscall.Unmount(GetPodPath(target), syscall.MNT_DETACH)
 	if err == nil || err == syscall.EINVAL || err == syscall.ENOENT {
 		m.unmountTracker.Delete(target)
 		return nil
@@ -451,7 +456,7 @@ func (m *Mounter) ImmediateDetach(target string) error {
 
 	// 2. Perform the Lazy Unmount (MNT_DETACH)
 	// On RHEL 7, this returns immediately regardless of hardware state.
-	err := syscall.Unmount(target, syscall.MNT_DETACH)
+	err := syscall.Unmount(GetPodPath(target), syscall.MNT_DETACH)
 
 	// 3. Evaluate results
 	// EINVAL/ENOENT mean it's already unmounted (Idempotent Success)
@@ -478,7 +483,7 @@ func (m *Mounter) tryUnmount(target string, flags int, timeout time.Duration) er
 
 	go func(path string, f int) {
 		// SYSCALL: May hang indefinitely in D-state
-		err := syscall.Unmount(path, f)
+		err := syscall.Unmount(GetPodPath(path), f)
 
 		// Cleanup: If we ever return, remove ourselves from the stuck tracker
 		// TODO should track with pointer? or is the existing entry enough
@@ -528,7 +533,7 @@ func (m *Mounter) getDeviceFromMount(target string) (string, error) {
 func (m *Mounter) IsMounted(target string) (bool, error) {
 	logger.Warningf("IsMount %s", target)
 	// 1. Tier 0: Check if path exists
-	stat, err := os.Lstat(target)
+	stat, err := os.Lstat(GetPodPath(target))
 	if err != nil {
 		if os.IsNotExist(err) {
 			return false, nil // Path doesn't exist, cannot be mounted
@@ -538,7 +543,7 @@ func (m *Mounter) IsMounted(target string) (bool, error) {
 
 	// 2. Tier 1: Device ID Heuristic (ProbablyNotMountPoint logic)
 	// Compare the Device ID of the target with its parent.
-	parentStat, err := os.Lstat(filepath.Dir(strings.TrimSuffix(target, "/")))
+	parentStat, err := os.Lstat(filepath.Dir(GetPodPath(strings.TrimSuffix(target, "/"))))
 	if err == nil {
 		if stat.Sys().(*syscall.Stat_t).Dev != parentStat.Sys().(*syscall.Stat_t).Dev {
 			// Device IDs differ: This is DEFINITELY a mount point (standard or cross-device)
@@ -663,12 +668,28 @@ func (m *Mounter) MountNativeWithTimeout(source, target, fstype string, options 
 
 func (m *Mounter) MountNative(source, target, fstype string, options []string) error {
 	logger.Warningf("MountNative %s %s %s", source, target, fstype)
+
 	// 1. Directory Preparation
 	if err := os.MkdirAll(target, 0750); err != nil {
 		return fmt.Errorf("mkdir failed: %w", err)
 	}
 
 	flags, data := m.parseMountOptions(options)
+
+	target = GetPodPath(target)
+
+	// Logic for the SOURCE:
+	// 1. If it's a Bind Mount, the source is an existing directory on the host.
+	// 2. If it's a standard absolute path (starts with /) but NOT a device (/dev).
+	isBind := (flags & unix.MS_BIND) != 0
+	isAbsolutePath := strings.HasPrefix(source, "/")
+	isDevice := strings.HasPrefix(source, "/dev/")
+
+	if isBind || (isAbsolutePath && !isDevice) {
+		source = GetPodPath(source)
+	}
+
+	logger.Warningf("MountNative %s %s %s", source, target, fstype)
 
 	// 2. Initial Mount (Legacy Compatibility)
 	// We use the Gater here because 'mount' is an uninterruptible syscall.
@@ -1035,8 +1056,6 @@ func GetMounts(targetPath string) ([]MountInfo, error) {
 			continue
 		}
 
-		logger.Warning("found mount")
-
 		// CRITICAL: Unescape Root, MountPoint, and MountSource
 		mounts = append(mounts, MountInfo{
 			MountID:        parseInt(fields[0]),
@@ -1078,3 +1097,9 @@ func unescapeMountString(path string) string {
 	}
 	return res.String()
 }
+
+
+func GetPodPath(origPath string) string {
+	return path.Join(PrefixChrootOfHostRoot, origPath)
+}
+
