@@ -2,6 +2,7 @@ from threading import Thread
 from time import sleep
 
 import controllers.servers.host_definer.messages as messages
+import controllers.array_action.errors as array_errors
 from controllers.common.csi_logger import get_stdout_logger
 from controllers.servers.host_definer.watcher.watcher_helper import Watcher
 from controllers.servers.host_definer.hd_types import DefineHostResponse
@@ -68,7 +69,7 @@ class HostDefinitionWatcher(Watcher):
         if phase == settings.PENDING_CREATION_PHASE:
             response = self._define_host_after_pending(host_definition_info)
         elif self._is_pending_for_deletion_need_to_be_handled(phase, host_definition_info.node_name):
-            response = self._undefine_host_after_pending(host_definition_info)
+            raise array_errors.HostNotFoundError("Pending host deleteion")
         self._handle_message_from_storage(
             host_definition_info, response.error_message, action)
 
@@ -85,7 +86,7 @@ class HostDefinitionWatcher(Watcher):
             response = self._define_host(host_definition_info)
             self._update_host_definition_from_storage_response(host_definition_info.name, response)
         else:
-            self._delete_host_definition(host_definition_info.name)
+            raise array_errors.HostNotFoundError("after pending")
         return response
 
     def _update_host_definition_from_storage_response(self, host_definition_name, response):
@@ -113,7 +114,7 @@ class HostDefinitionWatcher(Watcher):
         if self._is_node_should_be_managed_on_secret(
                 host_definition_info.node_name, host_definition_info.secret_name,
                 host_definition_info.secret_namespace):
-            response = self._undefine_host(host_definition_info)
+            raise array_errors.HostNotFoundError("after pending")
         return response
 
     def _handle_message_from_storage(self, host_definition_info, error_message, action):
@@ -125,8 +126,7 @@ class HostDefinitionWatcher(Watcher):
         elif phase == settings.PENDING_CREATION_PHASE:
             self._set_host_definition_status_to_ready(host_definition_info)
         elif self._is_pending_for_deletion_need_to_be_handled(phase, host_definition_info.node_name):
-            self._delete_host_definition(host_definition_info.name)
-            self._remove_manage_node_label(host_definition_info.node_name)
+            raise array_errors.HostNotFoundError("from storage")
 
     def _is_pending_for_deletion_need_to_be_handled(self, phase, node_name):
         return phase == settings.PENDING_DELETION_PHASE and self._is_host_can_be_undefined(node_name)

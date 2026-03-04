@@ -9,6 +9,7 @@ from controllers.servers.settings import SECRET_SUPPORTED_TOPOLOGIES_PARAMETER
 from controllers.servers.utils import (
     validate_secrets, get_array_connection_info_from_secrets, get_system_info_for_topologies)
 from controllers.servers.errors import ValidationException
+import controllers.array_action.errors as array_errors
 import controllers.servers.host_definer.messages as messages
 from controllers.servers.host_definer.kubernetes_manager.manager import KubernetesManager
 from controllers.servers.host_definer import settings
@@ -130,7 +131,7 @@ class Watcher(KubernetesManager):
         response = DefineHostResponse()
         if self._is_node_should_be_managed_on_secret(host_definition_info.node_name, host_definition_info.secret_name,
                                                      host_definition_info.secret_namespace):
-            response = self._undefine_host(host_definition_info)
+            raise array_errors.HostNotFoundError("delte request")
         self._handle_k8s_host_definition_after_undefine_action_if_exist(host_definition_info, response)
 
     def _is_node_should_be_managed_on_secret(self, node_name, secret_name, secret_namespace):
@@ -175,7 +176,7 @@ class Watcher(KubernetesManager):
     def _undefine_host(self, host_definition_info):
         logger.info(messages.UNDEFINED_HOST.format(host_definition_info.node_name,
                     host_definition_info.secret_name, host_definition_info.secret_namespace))
-        return self._ensure_definition_state(host_definition_info, self.storage_host_servicer.undefine_host)
+        raise array_errors.HostNotFoundError("undefine host")
 
     def _handle_k8s_host_definition_after_undefine_action_if_exist(self, host_definition_info, response):
         current_host_definition_info_on_cluster = self._get_matching_host_definition_info(

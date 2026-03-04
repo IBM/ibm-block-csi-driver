@@ -6,6 +6,7 @@ from controllers.servers.host_definer.watcher.watcher_helper import NODES, Watch
 from controllers.servers.host_definer import settings
 from controllers.servers.host_definer import utils
 from controllers.servers.host_definer import messages
+import controllers.array_action.errors as array_errors
 
 logger = get_stdout_logger()
 unmanaged_csi_nodes_with_driver = set()
@@ -19,8 +20,7 @@ class NodeWatcher(Watcher):
             csi_node_info = self._get_csi_node_info(node_name)
             if self._is_csi_node_pod_deleted_while_host_definer_was_down(csi_node_info):
                 logger.info(messages.CSI_NODE_POD_DELETED_WHILE_HOST_DEFINER_WAS_DOWN.format(node_name))
-                self._delete_host_definitions(node_name)
-                self._remove_manage_node_label(node_name)
+                raise array_errors.HostNotFoundError("pod modified")
 
             if self._is_unmanaged_csi_node_has_driver(csi_node_info):
                 logger.info(messages.DETECTED_UNMANAGED_CSI_NODE_WITH_IBM_BLOCK_CSI_DRIVER.format(csi_node_info.name))
@@ -62,12 +62,7 @@ class NodeWatcher(Watcher):
             unmanaged_csi_nodes_with_driver.remove(csi_node_info.name)
 
     def _delete_host_definitions(self, node_name):
-        if not self._is_host_can_be_undefined(node_name):
-            return
-        host_definitions_info = self._get_all_node_host_definitions_info(node_name)
-        for host_definition_info in host_definitions_info:
-            self._delete_definition(host_definition_info)
-        self._remove_manage_node_label(node_name)
+        raise array_errors.HostNotFoundError("delete host definitions")
 
     def _is_node_has_new_manage_node_label(self, csi_node_info):
         return not self._is_dynamic_node_labeling_allowed() and \

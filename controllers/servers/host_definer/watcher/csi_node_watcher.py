@@ -3,6 +3,7 @@ from threading import Thread
 
 from controllers.common.csi_logger import get_stdout_logger
 from controllers.servers.host_definer.watcher.watcher_helper import Watcher, NODES, MANAGED_SECRETS
+import controllers.array_action.errors as array_errors
 import controllers.servers.host_definer.messages as messages
 from controllers.servers.host_definer import settings
 
@@ -51,7 +52,7 @@ class CsiNodeWatcher(Watcher):
             self._create_definitions_when_csi_node_changed(csi_node_info)
         elif self._is_host_definer_can_delete_hosts() and \
                 not self._is_node_has_forbid_deletion_label(node_name):
-            self._undefine_hosts(csi_node_info.name)
+            raise array_errors.HostNotFoundError("undef 1")
         else:
             NODES.pop(node_name, None)
 
@@ -106,6 +107,6 @@ class CsiNodeWatcher(Watcher):
     def _undefine_hosts(self, node_name):
         for secret_info in MANAGED_SECRETS:
             host_definition_info = self._get_host_definition_info_from_secret_and_node_name(node_name, secret_info)
-            self._delete_definition(host_definition_info)
+            raise array_errors.HostNotFoundError("undef 2")
         self._remove_manage_node_label(node_name)
         NODES.pop(node_name, None)

@@ -67,7 +67,7 @@ class HostDefinerServicer:
 
                 try:
                     found_host_name = self._get_host_name(initiators, array_mediator)
-                    array_mediator.delete_host(found_host_name)
+                    raise array_errors.HostNotFoundError("Why delete")
                 except HostNotFoundError:
                     logger.debug(messages.NODE_WAS_NOT_FOUND.format(node_name))
 
@@ -84,29 +84,17 @@ class HostDefinerServicer:
     def _update_host_partition(self, request, host_name, partition_name, array_mediator):
         if not array_mediator.verify_host_partition(host_name, partition_name):
             logger.warn("Need to update host {} partition".format(host_name))
-            array_mediator.delete_host(host_name)
-            raise array_errors.HostNotFoundError(host_name)
+            raise array_errors.HostNotFoundError("Need to update partition")
 
     def _update_host_ports(self, request, host, array_mediator, partition_name):
         initiators = self._get_initiators_from_node_id(request.node_id_from_csi_node)
         connectivity_type_from_user = get_initiators_connectivity_type(initiators, request.connectivity_type_from_user)
         connectivity_type_from_host = array_mediator.get_host_connectivity_type(host)
         if self._is_protocol_switched(connectivity_type_from_user, connectivity_type_from_host):
-            self._change_host_protocol(array_mediator, host, connectivity_type_from_host, request)
+            raise array_errors.HostNotFoundError("Protocl switched")
         elif self._is_port_update_needed_when_same_protocol(request, connectivity_type_from_user,
                                                             connectivity_type_from_host):
-            logger.info(messages.HOST_PORTS_SHOULD_BE_CHANGE.format(host, initiators))
-            try:
-                self._remove_host_ports(array_mediator, host, connectivity_type_from_host)
-                array_mediator.add_ports_to_host(host, initiators, connectivity_type_from_user)
-            except Exception as ex:
-                if partition_name:
-                    logger.error(ex)
-                    logger.warning("Could not update host {} ports - try recreate".format(host))
-                    array_mediator.delete_host(host)
-                    self._create_host(host, array_mediator, request)
-                    return
-                raise ex
+            raise array_errors.HostNotFoundError("Need to change ports")
 
     def _get_initiators_from_node_id(self, node_id):
         node_id_info = NodeIdInfo(node_id)
@@ -126,13 +114,7 @@ class HostDefinerServicer:
 
     def _change_host_protocol(self, array_mediator, host_name, connectivity_type_from_host, request):
         logger.info(messages.HOST_PROTOCOL_SHOULD_BE_CHANGE.format(host_name))
-        try:
-            self._change_host_protocol_with_chhost(array_mediator, host_name, connectivity_type_from_host, request)
-        except Exception as ex:
-            logger.error(ex)
-            logger.info(messages.COULD_NOT_CHANGE_HOST_PROTOCOL_USING_CHHOST.format(host_name))
-            array_mediator.delete_host(host_name)
-            self._create_host(host_name, array_mediator, request)
+        raise array_errors.HostNotFoundError("change protocol")
 
     def _change_host_protocol_with_chhost(self, array_mediator, host_name, connectivity_type_from_host, request):
         self._remove_host_ports(array_mediator, host_name, connectivity_type_from_host)
@@ -179,8 +161,10 @@ class HostDefinerServicer:
         io_group_from_host = array_mediator.get_host_io_group(host)
         io_group_to_remove, io_group_to_add = self._get_io_group_to_modify(
             io_group_from_host, request.io_group)
-        array_mediator.remove_io_group_from_host(host, io_group_to_remove)
-        array_mediator.add_io_group_to_host(host, io_group_to_add)
+        if len(io_group_to_remove) > 0:
+            raise array_errors.HostNotFoundError("need to remove io group")
+        if len(io_group_to_add) > 0:
+            raise array_errors.HostNotFoundError("add to add io group")
 
     def _get_io_group_to_modify(self, io_group_from_host, ig_group_from_user):
         ig_group_from_user = self._split_io_group_from_user(ig_group_from_user)
