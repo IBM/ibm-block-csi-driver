@@ -931,7 +931,7 @@ func GetDeviceFromPath(targetPath string) (string, error) {
 	// 1. Handle Block Devices
 	// If it's a standard /dev/ path, return just the base (e.g., "nvme0n1p3")
 	if strings.HasPrefix(source, "/dev/") {
-		return filepath.Base(source), nil
+		return source, nil
 	}
 
 	// 2. Handle Network/Pseudo Filesystems
@@ -944,7 +944,7 @@ func GetDeviceFromPath(targetPath string) (string, error) {
 	default:
 		// Fallback: If it's not a /dev path but we don't recognize the FS,
 		// use the base name as a safe bet.
-		return filepath.Base(source), nil
+		return source, nil
 	}
 }
 

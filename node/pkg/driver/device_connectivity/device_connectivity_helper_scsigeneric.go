@@ -329,6 +329,7 @@ func isSameId(wwn string, volumeIdVariations []string) bool {
 	for _, variation := range volumeIdVariations {
 		// We assume variations are already normalized,
 		// but if not, add strings.ToLower(variation) here.
+		logger.Warningf("Check %s %s", normalizedWWN, variation)
 		if normalizedWWN == variation {
 			return true
 		}
@@ -2391,7 +2392,7 @@ func (o *OsDeviceConnectivityHelperGeneric) resolveIdToKernelName(major, minor u
 		return "", err
 	}
 	// Resolves to e.g. "../../devices/virtual/block/dm-5" -> "dm-5"
-	return filepath.Base(realPath), nil
+	return realPath, nil
 }
 
 func (o *OsDeviceConnectivityHelperGeneric) ResolveToKernelName(deviceName string) (string, error) {
@@ -2420,8 +2421,10 @@ func (o *OsDeviceConnectivityHelperGeneric) ResolveToKernelName(deviceName strin
 
 // findDMByWWID helper to map a WWID to a /dev/mapper name (e.g., mpatha)
 func (o *OsDeviceConnectivityHelperGeneric) findDMByWWID(wwid string) string {
+	logger.Warningf("Looking for %s", wwid)
 	files, err := os.ReadDir("/dev/mapper")
 	if err != nil {
+		logger.Warning("Failed to open dir")
 		return ""
 	}
 
@@ -2434,8 +2437,10 @@ func (o *OsDeviceConnectivityHelperGeneric) findDMByWWID(wwid string) string {
 		// 1. Resolve /dev/mapper/name to its kernel dm-X name
 		// Aliases like 'mpatha' are symlinks to ../dm-X
 		fullPath := filepath.Join("/dev/mapper", name)
+		logger.Warningf("eval %s", fullPath)
 		realPath, err := filepath.EvalSymlinks(fullPath)
 		if err != nil {
+			logger.Warningf("cannot eval %v", err)
 			continue
 		}
 		dmKernelName := filepath.Base(realPath) // e.g., "dm-5"
@@ -2445,6 +2450,7 @@ func (o *OsDeviceConnectivityHelperGeneric) findDMByWWID(wwid string) string {
 		uuidPath := fmt.Sprintf("/sys/block/%s/dm/uuid", dmKernelName)
 		content, err := os.ReadFile(uuidPath)
 		if err == nil {
+			logger.Warningf("Found contexnt %s", string(content))
 			// Multipath UUIDs are prefixed with 'mpath-'
 			// We use strings.Contains to handle different prefix conventions (mpath, part, etc.)
 			if strings.Contains(strings.ToLower(string(content)), strings.ToLower(wwid)) {
