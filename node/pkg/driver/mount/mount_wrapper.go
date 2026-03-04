@@ -906,32 +906,27 @@ func (m *Mounter) GetMountsForPath(target string) ([]MountInfo, error) {
 		return nil, err
 	}
 
-	allMounts, err := GetMounts("") // Our common low-level function
+	allMounts, err := GetMounts(targetPath) // Our common low-level function
 	if err != nil {
 		return nil, err
 	}
-
-	var matched []MountInfo
-	for _, mnt := range allMounts {
-		logger.Warningf("mount %s", mnt)
-		if mnt.MountPoint == targetPath {
-			matched = append(matched, mnt)
-		}
-	}
-	return matched, nil
+	return allMounts, nil
 }
 
 // Block Devices: You want the clean kernel name (e.g., sda1 instead of /dev/sda1).
 // Network Mounts: You want the remote export path (e.g., 192.168.1.10:/exports/data).
-func (m *Mounter) GetDeviceFromPath(targetPath string) (string, error) {
+func GetDeviceFromPath(targetPath string) (string, error) {
 	logger.Warningf("Device from path %s", targetPath)
 	mi, err := findBestMount(targetPath)
 	if err != nil {
+		logger.Warning("cannot find best")
 		return "", err
 	}
 
 	source := mi.MountSource
 	fstype := mi.FilesystemType
+
+	logger.Warningf("source %s type %s", source, fstype)
 
 	// 1. Handle Block Devices
 	// If it's a standard /dev/ path, return just the base (e.g., "nvme0n1p3")
@@ -971,6 +966,7 @@ func findBestMount(targetPath string) (*MountInfo, error) {
 	var bestMatch *MountInfo
 	maxLen := -1
 	for _, m := range mounts {
+		logger.Warning("evalute %s", m.MountPoint)
 		if strings.HasPrefix(targetPath, m.MountPoint) {
 			if len(m.MountPoint) > maxLen {
 				maxLen = len(m.MountPoint)
