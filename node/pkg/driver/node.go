@@ -382,11 +382,9 @@ func (d *NodeService) NodeUnstageVolume(ctx context.Context, req *csi.NodeUnstag
 
 	baseDevice := path.Base(mpathDevice)
 
-
 	isNvme, err := d.NodeUtils.DevicesAreNvme(baseDevice)
 	if err != nil {
-		logger.Warningf("Failed to check if device %s is NVMe, assuming non-NVMe: %v", baseDevice, err)
-		isNvme = false
+		return nil, status.Errorf(codes.Internal, "Failed to determine device type for %s: %v", baseDevice, err)
 	}
 
 	if !isNvme {
@@ -754,8 +752,7 @@ func (d *NodeService) NodeExpandVolume(ctx context.Context, req *csi.NodeExpandV
 
 	isNvme, err := d.NodeUtils.DevicesAreNvme(baseDevice)
 	if err != nil {
-		logger.Warningf("Failed to check if device %s is NVMe, assuming non-NVMe: %v", baseDevice, err)
-		isNvme = false
+		return nil, status.Errorf(codes.Internal, "Failed to determine device type for %s: %v", baseDevice, err)
 	}
 
 	if !isNvme {
@@ -773,7 +770,20 @@ func (d *NodeService) NodeExpandVolume(ctx context.Context, req *csi.NodeExpandV
 			return nil, status.Error(codes.Internal, err.Error())
 		}
 	} else {
-		logger.Infof("Device %s is NVMe: skipping multipath rescan & expand, relying on auto-detection", baseDevice)
+		nativeMultipath, err := d.NodeUtils.IsNativeNVMeMultipathEnabled()
+		if err != nil {
+			logger.Warningf("Failed to check native NVMe multipath state: %v, assuming enabled", err)
+			nativeMultipath = true
+		}
+		if nativeMultipath {
+			logger.Infof("Device %s is NVMe, native multipath ON: skipping mpath expand", baseDevice)
+		} else {
+			logger.Infof("Device %s is NVMe, native multipath OFF: running ExpandMpathDevice", baseDevice)
+			err = d.NodeUtils.ExpandMpathDevice(baseDevice)
+			if err != nil {
+				return nil, status.Error(codes.Internal, err.Error())
+			}
+		}
 	}
 
 	existingFormat, err := d.Mounter.GetDiskFormat(device)
