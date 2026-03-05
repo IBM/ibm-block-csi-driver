@@ -134,6 +134,7 @@ func (d *NodeService) NodeStageVolume(ctx context.Context, req *csi.NodeStageVol
 
 	arrayInitiators := d.NodeUtils.GetArrayInitiators(ipsByArrayInitiator)
 
+	fmt.Println("###### connectivityType : ", connectivityType)
 	osDeviceConnectivity, ok := d.OsDeviceConnectivityMapping[connectivityType]
 	if !ok {
 		return nil, status.Error(codes.InvalidArgument, fmt.Sprintf("Wrong connectivity type %s", connectivityType))
