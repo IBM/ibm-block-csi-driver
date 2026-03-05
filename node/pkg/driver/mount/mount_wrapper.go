@@ -966,7 +966,6 @@ func findBestMount(targetPath string) (*MountInfo, error) {
 	var bestMatch *MountInfo
 	maxLen := -1
 	for _, m := range mounts {
-		logger.Warningf("evalute %s", m.MountPoint)
 		if strings.HasPrefix(targetPath, m.MountPoint) {
 			if len(m.MountPoint) > maxLen {
 				maxLen = len(m.MountPoint)
