@@ -433,6 +433,7 @@ func (n NodeUtils) ExpandFilesystem(devicePath string, volumePath string, fsType
 	return nil
 }
 
+// TODO
 func (n NodeUtils) ExpandMpathDevice(mpathDevice string) error {
 	logger.Infof("ExpandMpathDevice: [%s] ", mpathDevice)
 	args := []string{"resize", "map", mpathDevice}
@@ -451,6 +452,7 @@ func (n NodeUtils) ExpandMpathDevice(mpathDevice string) error {
 
 func (n NodeUtils) rescanPhysicalDevice(deviceName string) error {
 	filename := fmt.Sprintf("/sys/block/%s/device/rescan", deviceName)
+	logger.Warningf("Scan %s", filename)
 	f, err := n.Executer.OsOpenFile(filename, os.O_APPEND|os.O_WRONLY, 0200)
 	if err != nil {
 		logger.Errorf("Rescan Error: could not open filename : {%v}. err : {%v}", filename, err)
