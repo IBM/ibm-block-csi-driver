@@ -559,6 +559,7 @@ func (e *Executer) resolveSocket() (string, bool) {
          }
 
     for _, path := range candidates {
+	logger.Warningf("Testing candiate %s", path)
         // --- PROBE 1: MODERN BINARY ---
         conn, _ := net.DialTimeout("unix", path, 200*time.Millisecond)
         payload := []byte("show status\x00")
@@ -568,6 +569,7 @@ func (e *Executer) resolveSocket() (string, bool) {
         prefix := make([]byte, 4)
         _, err := io.ReadFull(conn, prefix)
         if err == nil {
+		logger.Warningf("Read success %d", (int(prefix[0])))
             isBinary := !(prefix[0] == 0x20 || (prefix[0] >= 0x30 && prefix[0] <= 0x39))
             conn.Close()
             return path, isBinary
@@ -579,11 +581,13 @@ func (e *Executer) resolveSocket() (string, bool) {
         conn.Write(payload) // Raw write
         _, err = io.ReadFull(conn, prefix)
         if err == nil {
+		logger.Warning("Read 2 success")
             conn.Close()
             return path, false // Success with Legacy
         }
         conn.Close()
     }
+	logger.Warning("Use default socket")
     return StandardSocket, false
 }
 
@@ -618,7 +622,7 @@ func (e *Executer) invalidateSocket() {
 	e.socketMu.Unlock()
 }
 
-func (e *Executer) MultipathdCmdInternal(device string, command string, socketPath string) (string, error) {
+func (e *Executer) MultipathdCmd(device string, command string) (string, error) {
 	logger.Warningf("MultpathCmd C%sC", command)
 	logger.Warningf("My UID: %d", os.Getuid())
 	// If the command targets a specific device, check the stuck map first.
@@ -629,6 +633,7 @@ func (e *Executer) MultipathdCmdInternal(device string, command string, socketPa
 		}
 	}
 
+	socketPath, isBinary := e.GetSocket()
 	// Use a very short dial timeout; if the daemon is in D-state, Dial can hang.
 	conn, err := net.DialTimeout("unix", socketPath, 1*time.Second)
 	if err != nil {
@@ -647,7 +652,6 @@ func (e *Executer) MultipathdCmdInternal(device string, command string, socketPa
 
 payload := []byte(command + "\x00")
 
-	isBinary := true
 	if isBinary {
 		// Modern OCP 4.12+ REQUIRES 8-byte binary length header
 		if err := binary.Write(conn, binary.LittleEndian, uint64(len(payload))); err != nil {
@@ -712,25 +716,6 @@ if err != nil {
 	}
 
 	return response, nil
-}
-
-func (e *Executer) MultipathdCmd(device string, command string) (string, error) {
-         candidates := []string{
-                 "\x00/org/kernel/linux/storage/multipathd", // Use \x00 for Go abstract sockets
-                 "\x00multipathd", // Legacy abstract
-                 "/run/multipathd.sock",
-                 "/var/run/multipathd.sock",
-         }
-
-         for _, path := range candidates {
-                 logger.Warningf("Test candiate %s", path)
-
-	         _, err := e.MultipathdCmdInternal(device, command, path)
-		if err != nil {
-                    logger.Warningf("Fail %v ", err)
-}
-         }
-	return "", nil
 }
 
 // Wrapper for MultipathdCmd that checks up + keep alive
