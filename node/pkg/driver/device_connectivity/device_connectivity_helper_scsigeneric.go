@@ -48,6 +48,7 @@ type OsDeviceConnectivityHelperScsiGenericInterface interface {
 	RescanDevicesGetHostIds(lunId int, arrayIdentifiers []string) (map[int]bool, error)
 	RescanDevices(lunId int, arrayIdentifiers []string, hostIDs map[int]bool) error
 	GetMpathDevice(volumeId string) (string, error)
+	GetExistingMpathDevice(volumeUuid string, volumePath string) (string, error)
 	FlushMultipathDevice(mpathDevice string) error
 	RemovePhysicalDevice(sysDevices []string) error
 	RemoveGhostDevice(lexpectedSerial string, expectedLun int, arrayIdentifiers []string) error
@@ -264,6 +265,17 @@ func (r OsDeviceConnectivityHelperScsiGeneric) IsVolumePathMatchesVolumeId(volum
 	}
 
 	return true, nil
+}
+
+func (r OsDeviceConnectivityHelperScsiGeneric) GetExistingMpathDevice(volumeUuid string, volumePath string) (string, error) {
+        logger.Infof("GetExistingMpathDevice: Searching matching volume id for volume path: [%s] ", volumePath)
+        //volumeIdVariations := r.Helper.GetVolumeIdVariations(volumeUuid)
+
+        mpathDeviceName, err := r.Helper.GetMpathDeviceName(volumePath)
+        if err != nil {
+        	return "", err
+	}
+	return mpathDeviceName, nil
 }
 
 func (r OsDeviceConnectivityHelperScsiGeneric) RescanDevicesGetHostIds(lunId int, arrayIdentifiers []string) (map[int]bool, error) {

@@ -693,7 +693,11 @@ func (d *NodeService) NodeExpandVolume(ctx context.Context, req *csi.NodeExpandV
 	defer d.VolumeIdLocksMap.RemoveVolumeLock(volumeID, "NodeExpandVolume")
 
 	volumeUuid := d.NodeUtils.GetVolumeUuid(volumeID)
-	device, err := d.OsDeviceConnectivityHelper.GetMpathDevice(volumeUuid)
+
+        volumePath := req.VolumePath
+        volumePathWithHostPrefix := d.NodeUtils.GetPodPath(volumePath)
+
+	device, err := d.OsDeviceConnectivityHelper.GetExistingMpathDevice(volumeUuid, volumePathWithHostPrefix)
 	if err != nil {
 		logger.Errorf("Error while discovering the device : {%v}", err.Error())
 		return nil, status.Error(codes.Internal, err.Error())
