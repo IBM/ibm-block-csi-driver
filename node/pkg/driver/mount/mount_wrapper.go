@@ -928,6 +928,8 @@ func GetDeviceFromPath(targetPath string) (string, error) {
 
 	logger.Warningf("source %s type %s", source, fstype)
 
+	// TODO might return the alias
+
 	// 1. Handle Block Devices
 	// If it's a standard /dev/ path, return just the base (e.g., "nvme0n1p3")
 	if strings.HasPrefix(source, "/dev/") {
