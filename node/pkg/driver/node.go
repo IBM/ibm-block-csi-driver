@@ -733,6 +733,7 @@ func (d *NodeService) NodeExpandVolume(ctx context.Context, req *csi.NodeExpandV
 		logger.Errorf("Could not determine if disk {%v} is formatted, error: %v", device, err)
 		return nil, status.Error(codes.Internal, err.Error())
 	}
+	logger.Warningf("Format %s", existingFormat)
 
 	mountPointToExpand := req.GetStagingTargetPath()
 	if mountPointToExpand == "" {
