@@ -147,6 +147,21 @@ func (n NodeUtils) GetInfoFromPublishContext(publishContext map[string]string) (
 		}
 	}
 
+	if connectivityType == n.ConfigYaml.Connectivity_type.Nvme_over_fc {
+		// PUBLISH_CONTEXT_ARRAY_NVME_INITIATORS = "nn-WWNN1:pn-WWPN1,nn-WWNN2:pn-WWPN2,..."
+		// Same pattern as FC's PUBLISH_CONTEXT_ARRAY_FC_INITIATORS.
+		// key = "nn-WWNN:pn-WWPN" (array target port), value = nil (no IPs, fabric-routed).
+		nvmePorts := strings.Split(
+			publishContext[n.ConfigYaml.Controller.Publish_context_nvme_initiators],
+			publishContextSeparator)
+		for _, port := range nvmePorts {
+			port = strings.TrimSpace(port)
+			if port != "" {
+				ipsByArrayInitiator[port] = nil
+			}
+		}
+	}
+
 	logger.Debugf("PublishContext relevant info : connectivityType=%v, lun=%v, arrayInitiators=%v",
 		connectivityType, lun, ipsByArrayInitiator)
 	return connectivityType, lun, ipsByArrayInitiator, nil

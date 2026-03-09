@@ -1520,6 +1520,33 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
             logger.error("Failed to get fabrics for {0}. Reason "
                          "is: {1}".format(kwargs, ex))
             raise ex
+    
+    def _lstargetportfc(self, **kwargs):
+        try:
+            return self.client.svcinfo.lstargetportfc(**kwargs)
+        except (svc_errors.CommandExecutionError, CLIFailureError) as ex:
+            logger.error("Failed to get target port fc for {0}. Reason "
+                        "is: {1}".format(kwargs, ex))
+            raise ex
+
+    def get_nvme_target_ports(self):
+        logger.debug("Getting the connected NVMe FC target ports from array.")
+        nvme_ports = []
+        all_target_ports = self._lstargetportfc()
+        for port in all_target_ports:
+            if port.get('protocol', '') != 'nvme':
+                continue
+            if port.get('host_io_permitted', '') != 'yes':
+                continue
+            wwpn = port.get('WWPN', '')
+            wwnn = port.get('WWNN', '')
+            if not wwpn or not wwnn:
+                continue
+            # Format required by nvme CLI --traddr flag: nn-<wwnn>:pn-<wwpn>
+            # Storage returns values WWNN-WWPN
+            nvme_ports.append("nn-{}:pn-{}".format(wwnn.lower(), wwpn.lower()))
+        logger.debug("Getting NVMe FC target ports : {}".format(nvme_ports))
+        return nvme_ports
 
     def get_array_fc_wwns(self, host_name):
         logger.debug("Getting the connected fc port wwn value from array "

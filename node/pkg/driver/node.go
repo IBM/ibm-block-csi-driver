@@ -135,7 +135,7 @@ func (d *NodeService) NodeStageVolume(ctx context.Context, req *csi.NodeStageVol
 
 	arrayInitiators := d.NodeUtils.GetArrayInitiators(ipsByArrayInitiator)
 
-	fmt.Println("###### connectivityType : ", connectivityType)
+	fmt.Println("###### connectivityType in NodeStageVolume: ", connectivityType)
 	osDeviceConnectivity, ok := d.OsDeviceConnectivityMapping[connectivityType]
 	if !ok {
 		return nil, status.Error(codes.InvalidArgument, fmt.Sprintf("Wrong connectivity type %s", connectivityType))
@@ -278,11 +278,9 @@ func (d *NodeService) nodeStageVolumeRequestValidation(req *csi.NodeStageVolumeR
 		return &RequestValidationError{fmt.Sprintf("PublishContext with wrong lun id %d.", lun)}
 	}
 
-	if connectivityType != d.ConfigYaml.Connectivity_type.Nvme_over_fc {
-		if len(ipsByArrayInitiator) == 0 {
-			return &RequestValidationError{fmt.Sprintf("PublishContext with wrong arrayInitiators %v.",
-				ipsByArrayInitiator)}
-		}
+	if len(ipsByArrayInitiator) == 0 {
+		return &RequestValidationError{fmt.Sprintf("PublishContext with wrong arrayInitiators %v.",
+			ipsByArrayInitiator)}
 	}
 
 	if connectivityType == d.ConfigYaml.Connectivity_type.Iscsi {

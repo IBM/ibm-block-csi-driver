@@ -307,6 +307,21 @@ class ArrayMediator(ABC):
         raise NotImplementedError
 
     @abstractmethod
+    def get_nvme_target_ports(self):
+        """
+        This function will return the NVMe FC target port strings
+        of the storage array in format "nn-<wwnn>:pn-<wwpn>".
+        Only ports with protocol=nvme and host_io_permitted=yes are returned.
+        Args:
+            None
+        Returns:
+            list of strings: ["nn-<wwnn>:pn-<wwpn>", ...]
+        Raises:
+            None
+        """
+        raise NotImplementedError
+    
+    @abstractmethod
     def get_host_by_host_identifiers(self, initiators):
         """
         This function will find the host name by iscsi iqn or fc wwns.

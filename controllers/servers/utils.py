@@ -649,7 +649,6 @@ def choose_connectivity_type(connectivity_types):
         return ISCSI_CONNECTIVITY_TYPE
     return None
 
-
 def generate_csi_publish_volume_response(lun, connectivity_type, array_initiators):
     logger.debug("generating publish volume response for lun :{0}, connectivity : {1}".format(lun, connectivity_type))
 
@@ -672,6 +671,24 @@ def generate_csi_publish_volume_response(lun, connectivity_type, array_initiator
         array_initiators_param = common_config.controller.publish_context_array_iqn
         publish_context[array_initiators_param] = separator.join(array_initiators.keys())
 
+    elif connectivity_type == NVME_OVER_FC_CONNECTIVITY_TYPE:
+        logger.debug("Entered NVME_OVER_FC_CONNECTIVITY_TYPE branch")
+
+        logger.debug("NVMe array_initiators raw value: %s", array_initiators)
+        logger.debug("NVMe array_initiators type: %s", type(array_initiators))
+
+        # array_initiators is list of "nn-<wwnn>:pn-<wwpn>" strings
+        array_initiators_param = common_config.controller.publish_context_nvme_initiators
+
+        joined_initiators = separator.join(array_initiators)
+        logger.debug("NVMe joined initiators: %s", joined_initiators)
+
+        publish_context[array_initiators_param] = joined_initiators
+
+        logger.debug("NVMe publish_context key: %s", array_initiators_param)
+        logger.debug("NVMe publish_context value: %s", publish_context[array_initiators_param])
+
+    logger.debug("Final publish_context: %s", publish_context)
     response = csi_pb2.ControllerPublishVolumeResponse(publish_context=publish_context)
 
     logger.debug("publish volume response is :{0}".format(response))

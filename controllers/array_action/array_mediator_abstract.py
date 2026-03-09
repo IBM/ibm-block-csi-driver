@@ -21,7 +21,7 @@ class ArrayMediatorAbstract(ArrayMediator, ABC):
         self.user = user
         self.password = password
         self.endpoint = endpoint
-
+# TODO: Parth-2
     @retry(NoConnectionAvailableException, tries=11, delay=1)
     def map_volume_by_initiators(self, vol_id, initiators, exclusive_access=True):
         logger.debug("mapping volume : {0}".format(vol_id))
@@ -58,8 +58,8 @@ class ArrayMediatorAbstract(ArrayMediator, ABC):
         connectivity_type = utils.choose_connectivity_type(connectivity_types)
         array_initiators = self._get_array_initiators(host_name, connectivity_type)
 
-        if NVME_OVER_FC_CONNECTIVITY_TYPE != connectivity_type and not array_initiators:
-            logger.warning("No stroage ports reachable - fail mapping")
+        if not array_initiators:
+            logger.warning("No storage ports reachable - fail mapping")
             raise array_errors.NoIscsiTargetsFoundError(self.endpoint)
 
         try:
@@ -113,14 +113,39 @@ class ArrayMediatorAbstract(ArrayMediator, ABC):
     def _rollback_create_volume_from_source(self, volume_id):
         logger.debug("Rollback copy volume from source. Deleting volume {0}".format(volume_id))
         self.delete_volume(volume_id)
-
+    
+    # TODO: Parth-1 
     def _get_array_initiators(self, host_name, connectivity_type):
+        logger.debug("Entering _get_array_initiators")
+        logger.debug("Host name: %s", host_name)
+        logger.debug("Connectivity type: %s", connectivity_type)
+
         if NVME_OVER_FC_CONNECTIVITY_TYPE == connectivity_type:
-            array_initiators = []
+            logger.debug("Detected NVME_OVER_FC_CONNECTIVITY_TYPE")
+
+            array_initiators = self.get_nvme_target_ports()
+
+            logger.debug("NVMe target ports returned: %s", array_initiators)
+            logger.debug("NVMe target ports type: %s", type(array_initiators))
+
         elif FC_CONNECTIVITY_TYPE == connectivity_type:
+            logger.debug("Detected FC_CONNECTIVITY_TYPE")
+
             array_initiators = self.get_array_fc_wwns(host_name)
+
+            logger.debug("FC WWNs returned: %s", array_initiators)
+
         elif ISCSI_CONNECTIVITY_TYPE == connectivity_type:
+            logger.debug("Detected ISCSI_CONNECTIVITY_TYPE")
+
             array_initiators = self.get_iscsi_targets_by_iqn(host_name)
+
+            logger.debug("iSCSI targets returned: %s", array_initiators)
+
         else:
+            logger.error("Unsupported connectivity type received: %s", connectivity_type)
             raise UnsupportedConnectivityTypeError(connectivity_type)
+
+        logger.debug("Returning array initiators: %s", array_initiators)
+
         return array_initiators

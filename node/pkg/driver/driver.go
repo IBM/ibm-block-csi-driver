@@ -119,6 +119,7 @@ type Controller struct {
 	Publish_context_separator              string
 	Publish_context_array_iqn              string
 	Publish_context_fc_initiators          string
+    Publish_context_nvme_initiators        string  // ADD
 	//<array_iqn_1> : comma-separated list of iqn_1 iscsi target ips
 	//<array_iqn_2> : comma-separated list of iqn_2 iscsi target ips
 	//...
