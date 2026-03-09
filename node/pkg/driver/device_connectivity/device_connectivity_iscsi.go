@@ -55,46 +55,7 @@ func (r OsDeviceConnectivityIscsi) iscsiCmd(args ...string) (string, error) {
 	return string(out), err
 }
 
-func (r OsDeviceConnectivityIscsi) iscsiDiscover(portal string) error {
-	logger.Infof("Performing iSCSI discovery for portal: %s", portal)
-
-	// Adding --op=update ensures that if the TPGT or other parameters
-	// changed on the array, the local Open-iSCSI DB is refreshed.
-	output, err := r.iscsiCmd("-m", "discoverydb", "-t", "sendtargets", "-p", portal, "--discover", "--op=update")
-	if err != nil {
-		logger.Errorf("Failed to discover iSCSI: {%s}, error: {%s}", output, err)
-		return err
-	}
-	return nil
-}
-
-
-func (r OsDeviceConnectivityIscsi) iscsiDiscover(ctx context.Context, portal string) error {
-	logger.Infof("iSCSI discovery: %s", portal)
-
-	// REQUIREMENT 6: Gater prevents concurrent discovery to the same portal
-	// We use the portal IP as the key to isolate failures.
-	err := r.KeyedGater.Acquire(ctx, "discovery-"+portal, 1, 15*time.Second)
-	if err != nil {
-		return err
-	}
-	defer r.KeyedGater.Release("discovery-"+portal)
-
-	// REQUIREMENT 7: Use --op=update for "Rescue" of changed TPGTs
-	args := []string{"-m", "discoverydb", "-t", "sendtargets", "-p", portal, "--discover", "--op=update"}
-	output, err := r.iscsiCmd(ctx, args...)
-	
-	if err != nil {
-		// On RH7, discovery might fail if the DB is locked. 
-		// The Gater + Context ensures we don't stay stuck.
-		logger.Errorf("Discovery failed for %s: %s", portal, output)
-		return err
-	}
-	return nil
-}
-
-
-
+// TODO merge
 func (r OsDeviceConnectivityIscsi) iscsiCmd(ctx context.Context, args ...string) (string, error) {
 	// REQUIREMENT 8: Respect the gRPC Context
 	// We use your ExecuteUninterruptible or the CommandContext from Executer
@@ -104,8 +65,41 @@ func (r OsDeviceConnectivityIscsi) iscsiCmd(ctx context.Context, args ...string)
 	return string(out), err
 }
 
+func (r OsDeviceConnectivityIscsi) iscsiDiscover(ctx context.Context, portal string) error {
+	logger.Infof("Performing iSCSI discovery for portal: %s", portal)
 
-func (r OsDeviceConnectivityIscsi) iscsiLogin(targetName, portal string) {
+	// REQUIREMENT 6: Gater prevents concurrent discovery to the same portal
+	// We use the portal IP as the key to isolate failures.
+	err := r.KeyedGater.Acquire(ctx, "discovery-"+portal, 1, 15*time.Second)
+	if err != nil {
+		return err
+	}
+	defer r.KeyedGater.Release("discovery-"+portal)
+
+	// Adding --op=update ensures that if the TPGT or other parameters
+	// changed on the array, the local Open-iSCSI DB is refreshed.	
+	output, err := r.iscsiCmd("-m", "discoverydb", "-t", "sendtargets", "-p", portal, "--discover", "--op=update")
+	if err != nil {
+		// On RH7, discovery might fail if the DB is locked. 
+		// The Gater + Context ensures we don't stay stuck.	
+		logger.Errorf("Failed to discover iSCSI for %s: {%s}, error: {%s}", portal, output, err)
+		return err
+	}
+	return nil
+}
+
+
+
+func (r OsDeviceConnectivityIscsi) iscsiLogin(ctx context.Context, targetName, portal string) {
+	// REQUIREMENT 6: Gater prevents a "Thundering Herd" on a single portal
+	// We use the portal IP as the key to isolate failures.
+	err := r.KeyedGater.Acquire(ctx, "login-"+portal, 1, 30*time.Second)
+	if err != nil {
+		logger.Errorf("Gater: timed out waiting for login slot on %s", portal)
+		return
+	}
+	defer r.KeyedGater.Release("login-"+portal)
+	
 	// portal is already normalized to "host:port" via r.normalizePortal()
 	output, err := r.iscsiCmd("-m", "node", "-p", portal, "-T", targetName, "--login")
 
@@ -130,39 +124,10 @@ func (r OsDeviceConnectivityIscsi) iscsiLogin(targetName, portal string) {
 }
 
 
-func (r OsDeviceConnectivityIscsi) iscsiLogin(ctx context.Context, targetName, portal string) {
-	// REQUIREMENT 8: Respect CSI API Context
-	if err := ctx.Err(); err != nil { return }
-
-	// REQUIREMENT 6: Gater prevents a "Thundering Herd" on a single portal
-	// We use the portal IP as the key to isolate failures.
-	err := r.KeyedGater.Acquire(ctx, "login-"+portal, 1, 30*time.Second)
-	if err != nil {
-		logger.Errorf("Gater: timed out waiting for login slot on %s", portal)
-		return
-	}
-	defer r.KeyedGater.Release("login-"+portal)
-
-	// REQUIREMENT 4: Direct command invocation (iscsiadm)
-	output, err := r.iscsiCmd(ctx, "-m", "node", "-p", portal, "-T", targetName, "--login")
-
-	if err != nil {
-		if exitCode, ok := r.Executer.GetExitCode(err); ok {
-			// REQUIREMENT 7: "Already Logged In" (15) and "Session Exists" (24) are Success
-			if exitCode == 15 || exitCode == 24 {
-				logger.Debugf("iSCSI login for %s (%s) handled as success (code %d)", targetName, portal, exitCode)
-				return
-			}
-		}
-		logger.Errorf("iSCSI login failed for %s: %s", portal, output)
-	}
-}
-
-
 // iscsiGetRawSessions now reads from /sys/class/iscsi_session
 // It returns lines in the format: "tcp: [1] 192.168.1.100:3260,1 iqn.target.name"
 // matching the output of `iscsiadm -m session`
-func (r OsDeviceConnectivityIscsi) iscsiGetRawSessions() ([]string, error) {
+func (r OsDeviceConnectivityIscsi) iscsiGetRawSessions(ctx context.Context) ([]string, error) {
 	const sysPath = "/sys/class/iscsi_session"
 	sessions, err := os.ReadDir(sysPath)
 	if err != nil {
@@ -183,7 +148,7 @@ func (r OsDeviceConnectivityIscsi) iscsiGetRawSessions() ([]string, error) {
 		sessionPath := filepath.Join(sysPath, s.Name())
 
 		// 1. Quick Exit for non-logged-in sessions
-		stateBuf, err := os.ReadFile(filepath.Join(sessionPath, "state"))
+		stateBuf, err := r.readSysfs(ctx, filepath.Join(sessionPath, "state"))
 		if err != nil {
 			continue // Session likely vanished during ReadDir (common race condition)
 		}
@@ -195,7 +160,7 @@ func (r OsDeviceConnectivityIscsi) iscsiGetRawSessions() ([]string, error) {
 			continue
 		}
 
-		targetNameBuf, err := os.ReadFile(filepath.Join(sessionPath, "targetname"))
+		targetNameBuf, err := r.readSysfs(ctx, filepath.Join(sessionPath, "targetname"))
 		if err != nil {
 			continue
 		}
@@ -204,7 +169,7 @@ func (r OsDeviceConnectivityIscsi) iscsiGetRawSessions() ([]string, error) {
 		// 2. Direct Traversal (Avoids Glob overhead)
 		// Path: /sys/class/iscsi_session/sessionX/device/connectionX:S/iscsi_connection/connectionX:S/
 		devicePath := filepath.Join(sessionPath, "device")
-		connDirs, err := os.ReadDir(devicePath)
+		connDirs, err := r.readSysfs(ctx, devicePath)
 		if err != nil {
 			continue
 		}
@@ -217,8 +182,8 @@ func (r OsDeviceConnectivityIscsi) iscsiGetRawSessions() ([]string, error) {
 			// The actual attributes live inside the nested 'iscsi_connection' folder
 			attrPath := filepath.Join(devicePath, cd.Name(), "iscsi_connection", cd.Name())
 
-			addrBuf, errA := os.ReadFile(filepath.Join(attrPath, "address"))
-			portBuf, errP := os.ReadFile(filepath.Join(attrPath, "port"))
+			addrBuf, errA := r.readSysfs(ctx, filepath.Join(attrPath, "address"))
+			portBuf, errP := r.readSysfs(ctx, filepath.Join(attrPath, "port"))
 
 			if errA == nil && errP == nil {
 				portal := net.JoinHostPort(
@@ -236,64 +201,8 @@ func (r OsDeviceConnectivityIscsi) iscsiGetRawSessions() ([]string, error) {
 	return results, nil
 }
 
-
-func (r OsDeviceConnectivityIscsi) iscsiGetRawSessions(ctx context.Context) ([]string, error) {
-	// REQUIREMENT 8: Fail-fast
-	if err := ctx.Err(); err != nil {
-		return nil, err
-	}
-
-	const sysPath = "/sys/class/iscsi_session"
-	sessions, err := os.ReadDir(sysPath)
-	if err != nil {
-		if os.IsNotExist(err) { return []string{}, nil }
-		return nil, err
-	}
-
-	var results []string
-	for _, s := range sessions {
-		// REQUIREMENT 8: Check for cancellation in each loop iteration
-		select {
-		case <-ctx.Done():
-			return nil, ctx.Err()
-		default:
-		}
-
-		sessionPath := filepath.Join(sysPath, s.Name())
-
-		// REQUIREMENT 6: D-state protection (don't hang if transport is wedged)
-		state := r.readSysfs(ctx, filepath.Join(sessionPath, "state"))
-		if state != "LOGGED_IN" {
-			continue
-		}
-
-		targetName := r.readSysfs(ctx, filepath.Join(sessionPath, "targetname"))
-		if targetName == "" { continue }
-
-		devicePath := filepath.Join(sessionPath, "device")
-		connDirs, _ := os.ReadDir(devicePath)
-
-		for _, cd := range connDirs {
-			if !strings.HasPrefix(cd.Name(), "connection") { continue }
-
-			attrPath := filepath.Join(devicePath, cd.Name(), "iscsi_connection", cd.Name())
-			addr := r.readSysfs(ctx, filepath.Join(attrPath, "address"))
-			port := r.readSysfs(ctx, filepath.Join(attrPath, "port"))
-
-			if addr != "" && port != "" {
-				portal := net.JoinHostPort(addr, port)
-				// Requirement 4: Reconstruct exactly what downstream expects
-				results = append(results, fmt.Sprintf("tcp: [%s] %s %s", 
-					strings.TrimPrefix(s.Name(), "session"), portal, targetName))
-				break 
-			}
-		}
-	}
-	return results, nil
-}
-
-func (r OsDeviceConnectivityIscsi) getAllSessions() (map[string]map[string]bool, error) {
-	lines, err := r.iscsiGetRawSessions()
+func (r OsDeviceConnectivityIscsi) getAllSessions(ctx context.Context) (map[string]map[string]bool, error) {
+	lines, err := r.iscsiGetRawSessions(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -319,37 +228,8 @@ func (r OsDeviceConnectivityIscsi) getAllSessions() (map[string]map[string]bool,
 	return portalsByTarget, nil
 }
 
-
-func (r OsDeviceConnectivityIscsi) getAllSessions(ctx context.Context) (map[string]map[string]bool, error) {
-	// REQUIREMENT 8: Propagate context to the lower-level Sysfs scan
-	lines, err := r.iscsiGetRawSessions(ctx) 
-	if err != nil {
-		return nil, err
-	}
-
-	portalsByTarget := make(map[string]map[string]bool)
-	for _, line := range lines {
-		// Periodically check if the CSI call was canceled (Requirement 3: Low footprint)
-		if ctx.Err() != nil { return nil, ctx.Err() }
-
-		parts := strings.Fields(line)
-		if len(parts) < 4 || !strings.HasPrefix(parts[0], "tcp") {
-			continue
-		}
-
-		targetName := strings.ToLower(parts[3])
-		normalizedPortal := r.normalizePortal(parts[2])
-
-		if _, exists := portalsByTarget[targetName]; !exists {
-			portalsByTarget[targetName] = make(map[string]bool)
-		}
-		portalsByTarget[targetName][normalizedPortal] = true
-	}
-	return portalsByTarget, nil
-}
-
-func (r OsDeviceConnectivityIscsi) filterLoggedIn(portalsByTarget map[string][]string) (map[string][]string, error) {
-	loggedInPortalsByTarget, err := r.getAllSessions()
+func (r OsDeviceConnectivityIscsi) filterLoggedIn(ctx context.Context, portalsByTarget map[string][]string) (map[string][]string, error) {
+	loggedInPortalsByTarget, err := r.getAllSessions(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -376,39 +256,7 @@ func (r OsDeviceConnectivityIscsi) filterLoggedIn(portalsByTarget map[string][]s
 	return filteredPortalsByTarget, nil
 }
 
-func (r OsDeviceConnectivityIscsi) filterLoggedIn(ctx context.Context, portalsByTarget map[string][]string) (map[string][]string, error) {
-	// REQUIREMENT 8: Respect CSI API Context
-	if err := ctx.Err(); err != nil {
-		return nil, err
-	}
-
-	loggedInPortalsByTarget, err := r.getAllSessions(ctx) // Propagate ctx
-	if err != nil {
-		return nil, err
-	}
-
-	filteredPortalsByTarget := make(map[string][]string)
-	for targetName, portals := range portalsByTarget {
-		// Periodically check if the CSI call was canceled (Requirement 3)
-		if ctx.Err() != nil { return nil, ctx.Err() }
-
-		normalizedTarget := strings.ToLower(targetName)
-		activePortals, exists := loggedInPortalsByTarget[normalizedTarget]
-
-		for _, portal := range portals {
-			normalizedPortal := r.normalizePortal(portal)
-
-			// REQUIREMENT 7: If target doesn't exist OR this portal isn't LOGGED_IN
-			if !exists || !activePortals[normalizedPortal] {
-				filteredPortalsByTarget[targetName] = append(filteredPortalsByTarget[targetName], portal)
-			}
-		}
-	}
-	return filteredPortalsByTarget, nil
-}
-
-
-func (r OsDeviceConnectivityIscsi) discoverAndLogin(portalsByTarget map[string][]string) {
+func (r OsDeviceConnectivityIscsi) discoverAndLogin(ctx context.Context, portalsByTarget map[string][]string) {
 	// 1. Surgical Scan: Only load the DB entries for the targets we actually care about
 	dbCache := r.loadRelevantTargets(portalsByTarget)
 
@@ -422,7 +270,7 @@ func (r OsDeviceConnectivityIscsi) discoverAndLogin(portalsByTarget map[string][
 			if !dbCache[targetName][normPortal] {
 				if !discoveredPortals[normPortal] {
 					logger.Infof("Target %s portal %s missing from DB, discovering...", targetName, normPortal)
-					if err := r.iscsiDiscover(normPortal); err == nil {
+					if err := r.iscsiDiscover(ctx, normPortal); err == nil {
 						discoveredPortals[normPortal] = true
 
 						// FIX: Immediately update the DB cache.
@@ -442,39 +290,6 @@ func (r OsDeviceConnectivityIscsi) discoverAndLogin(portalsByTarget map[string][
 	// 2. Perform Logins (using 'exit 15' safe login)
 	for targetName, portals := range portalsByTarget {
 		for _, portal := range portals {
-			r.iscsiLogin(targetName, portal)
-		}
-	}
-}
-
-
-func (r OsDeviceConnectivityIscsi) discoverAndLogin(ctx context.Context, portalsByTarget map[string][]string) {
-	// REQUIREMENT 8: Check for cancellation before starting discovery
-	if ctx.Err() != nil { return }
-
-	// 1. Surgical Scan (Requirement 4: Fork-free)
-	dbCache := r.loadRelevantTargets(ctx, portalsByTarget)
-
-	for targetName, requestedPortals := range portalsByTarget {
-		for _, portal := range requestedPortals {
-			if ctx.Err() != nil { return } // Requirement 8
-
-			normPortal := r.normalizePortal(portal)
-
-			// REQUIREMENT 7: Discovery Rescue
-			if !dbCache[targetName][normPortal] {
-				// Only discover if the target/portal pair is missing from the DB
-				if err := r.iscsiDiscover(ctx, normPortal); err == nil {
-					// Update cache...
-				}
-			}
-		}
-	}
-
-	// 2. Perform Logins (Requirement 6: D-state protection)
-	for targetName, portals := range portalsByTarget {
-		for _, portal := range portals {
-			// REQUIREMENT 7: Login handles "Already Logged In" (Exit 24) internally
 			r.iscsiLogin(ctx, targetName, portal)
 		}
 	}
@@ -718,21 +533,6 @@ func (r OsDeviceConnectivityIscsi) updateHostIDs(hostIDs map[int]bool) {
 	}
 }
 
-
-
-func (r *OsDeviceConnectivityIscsi) updateHostIDs(ctx context.Context, hostIDs map[int]bool) {
-	// REQUIREMENT 8: Respect CSI API Context
-	if ctx != nil && ctx.Err() != nil { return }
-
-	active, err := r.parseActiveSessions(ctx) // Propagate ctx
-	if err != nil {
-		logger.Errorf("Failed to parse iSCSI sessions: %v", err)
-		return
-	}
-	// ... (Rest of logic) ...
-}
-
-
 func (r OsDeviceConnectivityIscsi) RescanDevices(lunId int, arrayIdentifiers []string) error {
 	hostIDs, err := r.HelperScsiGeneric.RescanDevicesGetHostIds(lunId, arrayIdentifiers)
 	if err != nil {
@@ -802,186 +602,4 @@ func (r OsDeviceConnectivityIscsi) GetBlockDeviceForSession(sessionID string) (s
 
 func cleanSysfsData(data []byte) string {
 	return strings.Trim(string(data), " \n\r\t\x00")
-}
-
-
-
-
-
-
-
-
-
-
-
-
-To fulfill Requirement (4) (fork-free) and (6/8) (resiliency and context), we will move away from iscsiadm -m session -R and implement a Netlink-based iSCSI management layer.
-On RH7 (Kernel 3.10), the scsi_transport_iscsi module communicates via AF_NETLINK using the NETLINK_ISCSI family. This allows the driver to trigger scans and manage sessions without the memory overhead or "D-state" risk of spawning the iscsiadm binary.
-
-
-const (
-	NETLINK_ISCSI = 8 // iSCSI transport family
-	
-	// iSCSI Message Types
-	ISCSI_UEVENT_SCAN_SESSION  = 1011 // Trigger a scan of a specific session
-	ISCSI_UEVENT_GET_STATS     = 1012
-)
-
-type iscsiUevent struct {
-	Type           uint32
-	Ifindex        uint32
-	TransportHandle uint64
-	// Message specific union starts here
-	MsgData [128]byte 
-}
-
-type iscsiScanSession struct {
-	SessionID uint32
-	ScanMode  uint32 // 0 for all LUNs
-}
-
-
-func (r *OsDeviceConnectivityHelperScsiGeneric) IscsiSessionRescan(ctx context.Context, sessionID uint32) error {
-	// REQUIREMENT 8: Respect CSI API Context
-	if err := ctx.Err(); err != nil {
-		return err
-	}
-
-	return executer.ExecuteUninterruptible[struct{}](
-		ctx, r.KeyedGater, fmt.Sprintf("iscsi-scan-%d", sessionID), 5, 20, 1*time.Second, 5*time.Second,
-		func(wCtx context.Context) (struct{}, error) {
-			// 1. Open Netlink Socket
-			fd, err := unix.Socket(unix.AF_NETLINK, unix.SOCK_RAW, NETLINK_ISCSI)
-			if err != nil { return struct{}{}, err }
-			defer unix.Close(fd)
-
-			// 2. Prepare the Scan Event
-			event := iscsiUevent{
-				Type: ISCSI_UEVENT_SCAN_SESSION,
-			}
-			scanData := (*iscsiScanSession)(unsafe.Pointer(&event.MsgData[0]))
-			scanData.SessionID = sessionID
-			scanData.ScanMode = 0 // Full scan
-
-			// 3. Send via Netlink (No process fork!)
-			payload := (*[unsafe.Sizeof(event)]byte)(unsafe.Pointer(&event))[:]
-			if err := unix.Sendto(fd, payload, 0, &unix.SockaddrNetlink{Family: unix.AF_NETLINK}); err != nil {
-				return struct{}{}, fmt.Errorf("netlink send failed: %w", err)
-			}
-
-			return struct{}{}, nil
-		},
-	)
-}
-
-For Discovery/Rescan, the risk is Minimal. Most high-performance storage drivers (including those for large-scale clouds) use Netlink to avoid the overhead of thousands of iscsiadm forks.
-For Login/Logout, the risk is Medium. Session establishment involves complex CHAP authentication and negotiation that is better handled by iscsiadm.
-Recommendation:
-Use iscsiadm for login (let it handle the heavy lifting of authentication).
-Use Netlink for rescan and session_stats (Requirement 4 & 3: High frequency, low footprint).
-Use Netlink for Emergency Logout (Requirement 7: Rescue
-
-
-
-
-
-
-
-
-func (r *OsDeviceConnectivityIscsi) findSessionIDForPortal(ctx context.Context, targetName, portal string) (uint32, error) {
-	// REQUIREMENT 8: Respect CSI API Context
-	if err := ctx.Err(); err != nil {
-		return 0, err
-	}
-
-	normTarget := strings.ToLower(targetName)
-	normPortal := r.normalizePortal(portal)
-
-	// REQUIREMENT 4: Direct Sysfs scan (no 'iscsiadm' fork)
-	const sysPath = "/sys/class/iscsi_session"
-	entries, err := os.ReadDir(sysPath)
-	if err != nil {
-		return 0, err
-	}
-
-	for _, entry := range entries {
-		if ctx.Err() != nil { return 0, ctx.Err() }
-		
-		sessionPath := filepath.Join(sysPath, entry.Name())
-		
-		// 1. Verify Target Name (Requirement 5)
-		sysTarget := r.readSysfs(ctx, filepath.Join(sessionPath, "targetname"))
-		if strings.ToLower(sysTarget) != normTarget {
-			continue
-		}
-
-		// 2. Verify Portal (Requirement 1: RH7 compatible traversal)
-		// Path: /sys/class/iscsi_session/sessionX/device/connectionX:0/iscsi_connection/connectionX:0/address
-		devicePath := filepath.Join(sessionPath, "device")
-		connDirs, _ := os.ReadDir(devicePath)
-		for _, cd := range connDirs {
-			if !strings.HasPrefix(cd.Name(), "connection") { continue }
-			
-			attrPath := filepath.Join(devicePath, cd.Name(), "iscsi_connection", cd.Name())
-			addr := r.readSysfs(ctx, filepath.Join(attrPath, "address"))
-			port := r.readSysfs(ctx, filepath.Join(attrPath, "port"))
-			
-			if r.normalizePortal(net.JoinHostPort(addr, port)) == normPortal {
-				// Success: Extract the 'X' from 'sessionX'
-				idStr := strings.TrimPrefix(entry.Name(), "session")
-				id, err := strconv.ParseUint(idStr, 10, 32)
-				if err == nil {
-					return uint32(id), nil
-				}
-			}
-		}
-	}
-	return 0, fmt.Errorf("session not found for portal %s", portal)
-}
-
-
-
-
-
-// Inside your NodeStage / Connect phase:
-func (r *OsDeviceConnectivityIscsi) ConnectVolume(ctx context.Context, portal string, targetName string) error {
-    // 1. Logic to Login (if needed) ...
-    
-    // 2. INTEGRATION CASE 1: Primary Discovery Trigger
-    sessionID, err := r.findSessionIDForPortal(ctx, targetName, portal)
-    if err == nil {
-        // REQUIREMENT 4 & 8: Targeted Netlink Rescan (Fork-free)
-        _ = r.IscsiSessionRescan(ctx, sessionID)
-    }
-
-    // 3. Wait for settlement...
-    _, err = r.WaitForDmToExist(ctx, wwids, 15, 2)
-    return err
-}
-
-
-// Inside WaitForDmToExist or validateDMIntegrity:
-if size == 0 {
-    // INTEGRATION CASE 2: The "Ghost" Capacity Rescue
-    logger.Warningf("Device %s has 0 capacity, triggering session rescan rescue", dmPath)
-    sessionID, _ := r.findSessionIDForPortal(ctx, targetName, portal)
-    _ = r.IscsiSessionRescan(ctx, sessionID)
-}
-
-
-
-
-// Inside ValidateLun:
-if !r.IsSerialMatch(sysfsId, hwId) {
-    // INTEGRATION CASE 3: Identity Split Rescue
-    logger.Errorf("Identity Split on %s. Deleting stale path and rescanning.", deviceName)
-    
-    // 1. Delete the stale kernel device
-    _ = os.WriteFile(fmt.Sprintf("/sys/block/%s/device/delete", deviceName), []byte("1"), 0200)
-    
-    // 2. Trigger rescan to rediscover the correct LUN on this session
-    sessionID, _ := r.findSessionIDForPortal(ctx, targetName, portal)
-    _ = r.IscsiSessionRescan(ctx, sessionID)
-    
-    return fmt.Errorf("identity-split: rescue initiated for %s", deviceName)
 }

@@ -362,7 +362,7 @@ func (d *NodeService) NodeUnstageVolume(ctx context.Context, req *csi.NodeUnstag
 	logger.Debugf("Check if staging path {%s} is mounted", stagingPathWithHostPrefix)
 
 	volumeUuid := d.NodeUtils.GetVolumeUuid(volumeID)
-	err = d.OsDeviceConnectivityHelper.TeardownVolume(stagingPathWithHostPrefix, volumeUuid)
+	err = d.OsDeviceConnectivityHelper.TeardownVolume(stagingTargetPath, volumeUuid)
 
 	// TODO NVME additions
 	baseDevice := path.Base(mpathDevice)
@@ -702,7 +702,7 @@ func (d *NodeService) getVolumeStats(path string, volumeId string) (VolumeStatis
 	}
 
 	if isBlock {
-		volumeStats, err = d.NodeUtils.GetBlockVolumeStats(volumeId)
+		volumeStats, err = d.NodeUtils.GetBlockVolumeStats(path)
 		if err != nil {
 			switch err.(type) {
 			case *device_connectivity.MultipathDeviceNotFoundForVolumeError:
@@ -749,7 +749,10 @@ func (d *NodeService) NodeExpandVolume(ctx context.Context, req *csi.NodeExpandV
 	defer d.VolumeIdLocksMap.RemoveVolumeLock(volumeID, "NodeExpandVolume")
 
 	volumeUuid := d.NodeUtils.GetVolumeUuid(volumeID)
-	device, err := d.OsDeviceConnectivityHelper.GetMpathDevice(volumeUuid)
+    volumePath := req.VolumePath
+    volumePathWithHostPrefix := d.NodeUtils.GetPodPath(volumePath)
+
+    device, err := d.OsDeviceConnectivityHelper.GetExistingMpathDevice(volumeUuid, volumePathWithHostPrefix)
 	if err != nil {
 		logger.Errorf("Error while discovering the device : {%v}", err.Error())
 		return nil, status.Error(codes.Internal, err.Error())
@@ -934,141 +937,4 @@ func isValidVolumeCapabilitiesAccessMode(volCaps []*csi.VolumeCapability) bool {
 
 	return foundAll
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-Failure Scenario	Internal Error	CSI gRPC Code	K8s Behavior
-Gater Timeout	context.DeadlineExceeded	DeadlineExceeded	Fast Retry: K8s will try again in the next sync loop.
-Identity Collision	WWID Mismatch	Aborted	Stop: Prevents mounting the wrong data; requires manual/controller intervention.
-D-State Hang	Abandoned Worker	Internal	Backoff: Signals a node-level issue.
-Rescue Success	MNT_DETACH / DEFERRED	OK (or Success)	Continue: K8s sees the path is clear for the next step.
-
-
-
-
-import (
-	"google.golang.org/grpc/codes"
-	"google.golang.org/grpc/status"
-)
-
-func (r *OsDeviceConnectivityHelperScsiGeneric) ToCsiError(err error, contextMsg string) error {
-	if err == nil {
-		return nil
-	}
-
-	// 1. Handle Context/Gater Timeouts (Requirement 8)
-	if errors.Is(err, context.DeadlineExceeded) || strings.Contains(err.Error(), "gater: timeout") {
-		return status.Errorf(codes.DeadlineExceeded, "%s: operation timed out in kernel/gater: %v", contextMsg, err)
-	}
-
-	// 2. Handle Identity Collisions (Requirement 7 - Rescue)
-	if strings.Contains(err.Error(), "Identity Split") || strings.Contains(err.Error(), "collision") {
-		// Use Aborted so K8s doesn't immediately "hammer" the failing LUN
-		return status.Errorf(codes.Aborted, "%s: critical identity mismatch: %v", contextMsg, err)
-	}
-
-	// 3. Handle Resource Exhaustion (Requirement 3 - Footprint)
-	if strings.Contains(err.Error(), "saturation") || strings.Contains(err.Error(), "leak") {
-		return status.Errorf(codes.ResourceExhausted, "%s: node thread/leak limit reached: %v", contextMsg, err)
-	}
-
-	// Default to Internal for unknown D-state hangs (Requirement 6)
-	return status.Errorf(codes.Internal, "%s: %v", contextMsg, err)
-}
-
-
-
-func (ns *NodeServer) NodeUnstageVolume(ctx context.Context, req *csi.NodeUnstageVolumeRequest) (*csi.NodeUnstageVolumeResponse, error) {
-    err := ns.connectivity.TeardownVolume(ctx, req.GetStagingTargetPath(), req.GetVolumeId())
-    if err != nil {
-        // Requirement 7: If Teardown triggered a Rescue, we return the translated error
-        return nil, ns.connectivity.ToCsiError(err, "failed to unstage volume")
-    }
-    return &csi.NodeUnstageVolumeResponse{}, nil
-}
-
-
-
-
-
-Rescue Outcome	Internal Error State	CSI gRPC Code	K8s Reconciler Behavior
-Gater Handoff	Worker moved to spare pool	codes.DeadlineExceeded	Retry: K8s keeps the request active and retries shortly.
-Identity Collision	WWID mismatch in Pre-Scan	codes.FailedPrecondition	Stop: Prevents data corruption; won't retry until manual fix.
-Successful Lazy	MNT_DETACH triggered	codes.OK	Success: K8s assumes path is clear for the next volume.
-Deferred Remove	DM_DEFERRED_REMOVE set	codes.OK	Success: K8s proceeds; kernel cleans up in background.
-Error Target Swap	I/O Hammer active	codes.Aborted	Backoff: Tells K8s the node is struggling, please wait.
-
-
-
-
-func (r *OsDeviceConnectivityHelperScsiGeneric) ToCsiError(ctx context.Context, err error, action string) error {
-	if err == nil {
-		return nil
-	}
-
-	// 1. Requirement 8: Handle Context Cancellations
-	if errors.Is(err, context.Canceled) {
-		return status.Error(codes.Canceled, action+": request canceled by orchestrator")
-	}
-
-	// 2. Requirement 6: Handle Gater "Abandoned" threads
-	if strings.Contains(err.Error(), "abandoned") || errors.Is(err, context.DeadlineExceeded) {
-		// We return DeadlineExceeded so K8s retries the NodeStage/Unstage
-		return status.Errorf(codes.DeadlineExceeded, "%s: kernel thread hung, rescue initiated: %v", action, err)
-	}
-
-	// 3. Requirement 7: Handle Identity Rescue
-	if strings.Contains(err.Error(), "collision") || strings.Contains(err.Error(), "Identity Split") {
-		return status.Errorf(codes.FailedPrecondition, "%s: security block - volume identity mismatch: %v", action, err)
-	}
-
-	// 4. Requirement 3: Resource Limits
-	if strings.Contains(err.Error(), "saturation") {
-		return status.Errorf(codes.ResourceExhausted, "%s: node-level concurrency limit reached", action)
-	}
-
-	return status.Errorf(codes.Internal, "%s: unexpected failure: %v", action, err)
-}
-
-
-
-if strings.Contains(err.Error(), "collision") || strings.Contains(err.Error(), "identity mismatch") {
-    // REQUIREMENT 7: Block the mount to prevent data corruption
-    return status.Error(codes.FailedPrecondition, "CSI Safety Check: Volume identity mismatch. Manual intervention required.")
-}
-
-if strings.Contains(err.Error(), "multipathd unreachable") {
-    // REQUIREMENT 4: Precondition for discovery is missing
-    return status.Error(codes.FailedPrecondition, "Host Requirement: multipathd is not running or socket is missing.")
-}
-
-
-
-
-
-if strings.Contains(err.Error(), "device-settle") {
-    // REQUIREMENT 7: Contention detected. Abort this attempt so K8s retries later.
-    return status.Error(codes.Aborted, "device is busy with system tasks (udev/multipathd); retrying")
-}
-
-if strings.Contains(err.Error(), "integrity") || strings.Contains(err.Error(), "Identity Split") {
-    // REQUIREMENT 2 & 5: Security violation. Stop all retries.
-    return status.Error(codes.FailedPrecondition, "CSI Identity Block: settled device WWID mismatch")
-}
-
 
