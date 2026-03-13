@@ -188,6 +188,13 @@ func (r OsDeviceConnectivityHelperScsiGeneric) GetMpathDevice(volumeId string) (
 	dmPath, _ := r.Helper.GetDmsPath(volumeIdVariations)
 
 	if dmPath != "" {
+        // NVMe DM devices (both native and non-native) don't support SG_IO ioctl.
+        // EUI/NGUID match from multipathd already identifies the volume correctly.
+        if isNvmeDmDevice(dmPath) {
+            logger.Debugf("NVMe device detected %s, skipping sg_inq validation", dmPath)
+            return dmPath, nil
+        }
+
 		SgInqWwn, _ := r.Helper.GetWwnByScsiInq(dmPath)
 		if isSameId(SgInqWwn, volumeIdVariations) {
 			return dmPath, nil
@@ -207,6 +214,12 @@ func (r OsDeviceConnectivityHelperScsiGeneric) GetMpathDevice(volumeId string) (
 
 	if dmPath == "" {
 		return "", &MultipathDeviceNotFoundForVolumeError{volumeId}
+	}
+
+    // Same NVMe check after reload
+    if isNvmeDmDevice(dmPath) {
+        logger.Debugf("NVMe device detected %s after reload, skipping sg_inq", dmPath)
+        return dmPath, nil
 	}
 
 	SgInqWwn, err := r.Helper.GetWwnByScsiInq(dmPath)
@@ -538,6 +551,12 @@ func (o OsDeviceConnectivityHelperGeneric) GetMpathVolumeId(mpathdOutput string,
 	}
 	dmPath := filepath.Join(dmDirectory, filepath.Base(strings.TrimSpace(mpathDeviceName)))
 
+    // NVMe DM devices don't support SG_IO ioctl → sg_inq exits with code 75.
+    // EUI/NGUID from multipathd already identifies the volume — skip sg_inq.
+    if isNvmeDmDevice(dmPath) {
+        return mpathVolumeId, nil
+    }
+
 	SgInqWwn, err := o.GetWwnByScsiInq(dmPath)
 	if err != nil {
 		return "", err
@@ -546,6 +565,39 @@ func (o OsDeviceConnectivityHelperGeneric) GetMpathVolumeId(mpathdOutput string,
 		return mpathVolumeId, nil
 	}
 	return "", &ErrorWrongDeviceFound{dmPath, mpathVolumeId, SgInqWwn}
+}
+
+// isNvmeDmDevice returns true if the DM device's slaves are NVMe namespaces.
+// Handles both /dev/dm-X and /dev/mapper/mpathX paths.
+func isNvmeDmDevice(dmPath string) bool {
+
+    baseDevice := filepath.Base(dmPath)
+    slavesPath := filepath.Join("/sys/block", baseDevice, "slaves")
+
+    entries, err := os.ReadDir(slavesPath)
+    if err != nil {
+        // /dev/mapper/mpathX is a symlink → resolve to /dev/dm-X
+        resolvedPath, resolveErr := filepath.EvalSymlinks(dmPath)
+        if resolveErr != nil {
+            return false
+        }
+
+        baseDevice = filepath.Base(resolvedPath)
+        slavesPath = filepath.Join("/sys/block", baseDevice, "slaves")
+
+        entries, err = os.ReadDir(slavesPath)
+        if err != nil {
+            return false
+        }
+    }
+
+    for _, entry := range entries {
+        if strings.HasPrefix(entry.Name(), "nvme") {
+            return true
+        }
+    }
+
+    return false
 }
 
 func (o OsDeviceConnectivityHelperGeneric) GetWwnByScsiInq(dev string) (string, error) {
