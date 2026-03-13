@@ -48,6 +48,14 @@ var (
 	topologyPrefixes = [...]string{"topology.block.csi.ibm.com"}
 )
 
+type NvmeType string
+
+const (
+    NVMeNative    NvmeType = "native"
+    NVMeNonNative NvmeType = "non-native"
+    NotNVMe       NvmeType = "non-nvme"
+)
+
 const (
 	// In the Dockerfile of the node, specific commands (e.g: multipath, mount...) from the host mounted inside the container in /host directory.
 	// Command lines inside the container will show /host prefix.
@@ -70,7 +78,7 @@ type NodeUtilsInterface interface {
 	GetVolumeUuid(volumeId string) string
 	ReadNvmeNqn() (string, error)
 	IsNativeNVMeMultipathEnabled() (bool, error)
-	DevicesAreNvme(device string) (bool, error)
+	DevicesAreNvme(device string) (NvmeType, error)
 	ParseFCPorts() ([]string, error)
 	ParseIscsiInitiators() (string, error)
 	GetInfoFromPublishContext(publishContext map[string]string) (string, int, map[string][]string, error)
@@ -222,7 +230,7 @@ func (n NodeUtils) IsNativeNVMeMultipathEnabled() (bool, error) {
     return val == "Y" , nil
 }
 
-func (n NodeUtils) DevicesAreNvme(device string) (bool, error) {
+func (n NodeUtils) DevicesAreNvme(device string) (NvmeType, error) {
 
     nativeMultipath, err := n.IsNativeNVMeMultipathEnabled()
     if err != nil {
@@ -231,45 +239,44 @@ func (n NodeUtils) DevicesAreNvme(device string) (bool, error) {
 
     if nativeMultipath {
         // CHECK 1: Native NVMe multipath ON
-        // device is nvme0n1 directly → subsysnqn exists in sysfs
         subsysNqnPath := path.Join("/sys/block", device, "device/subsysnqn")
         _, err := os.Stat(subsysNqnPath)
         if err == nil {
-            return true, nil
+            return NVMeNative, nil
         }
         if os.IsNotExist(err) {
-            return false, nil
+            return NotNVMe, nil
         }
-
-        return false, fmt.Errorf("unable to determine if device %s is NVMe: %w", device, err)
+        return NotNVMe, fmt.Errorf("unable to determine if device %s is NVMe: %w", device, err)
     }
 
-    // CHECK 2: Native multipath OFF → device is dm-X, check its slaves via nvme list
+    // CHECK 2: Native multipath OFF → non-native NVMe?
     args := []string{"list"}
     out, err := n.Executer.ExecuteWithTimeout(TimeOutNvmeCmd, nvmeCmd, args)
     if err != nil {
         if err.Error() == "exit status 1" {
             logger.Debugf("'nvme list' failing, nvme/nvme-core modules not loaded. Not NVMe.")
-            return false, nil
+            return NotNVMe, nil
         }
         outMessage := strings.TrimSpace(string(out))
         if strings.HasSuffix(outMessage, noSuchFileOrDirectoryErrorMessage) {
-            return false, nil
+            return NotNVMe, nil
         }
-        return false, err
+        return NotNVMe, err
     }
+
     nvmeListOutput := string(out)
     slaves, err := n.GetSysDevicesFromMpath(device)
     if err == nil {
         for _, slave := range slaves {
             if strings.Contains(nvmeListOutput, slave) {
-                logger.Debugf("found slave device {%s} in nvme list", slave)
-                return true, nil
+                return NVMeNonNative, nil
             }
         }
-        return false, nil
+        return NotNVMe, nil
     }
-    return false, fmt.Errorf("unable to determine if device %s is NVMe", device)
+
+    return NotNVMe, fmt.Errorf("unable to determine if device %s is NVMe", device)
 }
 
 func getRelevantLines(rawContent *os.File) ([]string, error) {

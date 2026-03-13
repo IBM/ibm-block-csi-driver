@@ -19,7 +19,6 @@ package device_connectivity
 import (
     "fmt"
     "strings"
-    "time"
 
     "github.com/ibm/ibm-block-csi-driver/node/logger"
     "github.com/ibm/ibm-block-csi-driver/node/pkg/driver/executer"
@@ -27,13 +26,11 @@ import (
 
 const (
     nvmeCmdTimeout           = 30 * 1000 // milliseconds
-    nvmeConnectRetries       = 3
     nvmeTransportFC          = "fc"
     nvmeDiscoveryNqn         = "nqn.2014-08.org.nvmexpress.discovery"
 	FCPortPath = "/sys/class/fc_host/host*/port_name"
 )
 
-var nvmeConnectRetryInterval = 2 * time.Second
 
 type OsDeviceConnectivityNvmeOFc struct {
     Executer          executer.ExecuterInterface
@@ -69,20 +66,22 @@ func (r OsDeviceConnectivityNvmeOFc) EnsureLogin(ipsByArrayInitiator map[string]
     }
     logger.Debugf("NVMe-oFC EnsureLogin: host FC ports: %v", hostPorts)
 
-    // Check which NQNs are already live — idempotency, same as iSCSI's filterLoggedIn.
-    existingNqns, err := r.getConnectedSubsystems()
-    if err != nil {
-        logger.Warningf("NVMe-oFC EnsureLogin: could not check existing connections, proceeding anyway: %v", err)
-        existingNqns = map[string]bool{}
-    }
-    logger.Debugf("NVMe-oFC EnsureLogin: already live NQNs: %v", existingNqns)
+    // livePaths contains all currently live (traddr, host_traddr) pairs.
+    // Per-path check — NQN alone is insufficient because all paths to the
+    // same subsystem share one NQN. Deduplicating by NQN would skip valid
+    // additional paths and leave multipathd with fewer legs than available.
+    livePaths := r.getLivePathPairs()
+    logger.Debugf("NVMe-oFC EnsureLogin: live path pairs: %v", livePaths)
 
     for arrayTargetPort := range ipsByArrayInitiator {
-        // arrayTargetPort = "nn-5005076810003F8C:pn-50050768101B3F8C"
-        // This is exactly like iSCSI's targetName loop over portalsByTarget.
         for _, hostPort := range hostPorts {
-            // hostPort = "nn-0x2000f4e9d456d851:pn-0x2100f4e9d456d851"
-            // This is the host-side equivalent of iSCSI's portal IP.
+            pathKey := arrayTargetPort + "|" + hostPort
+            if livePaths[pathKey] {
+                logger.Debugf("NVMe-oFC: path already live target=%s host=%s, skipping",
+                    arrayTargetPort, hostPort)
+                continue
+            }
+
             subNqn, err := r.discoverSubNqn(arrayTargetPort, hostPort)
             if err != nil {
                 logger.Debugf("NVMe-oFC: discover error target=%s host=%s: %v",
@@ -90,15 +89,8 @@ func (r OsDeviceConnectivityNvmeOFc) EnsureLogin(ipsByArrayInitiator map[string]
                 continue
             }
             if subNqn == "" {
-                // No path between this host port and this array port — normal for some pairs.
                 logger.Debugf("NVMe-oFC: no subnqn found target=%s host=%s, skipping",
                     arrayTargetPort, hostPort)
-                continue
-            }
-
-            if existingNqns[subNqn] {
-                // Already connected and live — same as iSCSI's filterLoggedIn skipping.
-                logger.Debugf("NVMe-oFC: already live NQN=%s, skipping connect", subNqn)
                 continue
             }
 
@@ -107,6 +99,53 @@ func (r OsDeviceConnectivityNvmeOFc) EnsureLogin(ipsByArrayInitiator map[string]
             r.nvmeConnect(arrayTargetPort, hostPort, subNqn)
         }
     }
+}
+
+// getLivePathPairs parses nvme list-subsys and returns a set of
+// "traddr|host_traddr" strings for all currently live paths.
+//
+// Path line format:
+//   +- nvme0 fc traddr=nn-5005...:pn-5005...,host_traddr=nn-2000...:pn-2100... live
+func (r OsDeviceConnectivityNvmeOFc) getLivePathPairs() map[string]bool {
+    args := []string{"list-subsys"}
+    out, err := r.Executer.ExecuteWithTimeout(nvmeCmdTimeout, "nvme", args)
+    if err != nil {
+        logger.Warningf("NVMe-oFC getLivePathPairs: nvme list-subsys failed: %v", err)
+        return map[string]bool{}
+    }
+
+    livePaths := map[string]bool{}
+    for _, line := range strings.Split(string(out), "\n") {
+        trimmed := strings.TrimSpace(line)
+        if !strings.HasPrefix(trimmed, "+-") || !strings.Contains(trimmed, " live") {
+            continue
+        }
+        // Extract traddr value: "nn-5005...:pn-5005..."
+        traddr := extractNvmeField(trimmed, "traddr=")
+        hostTraddr := extractNvmeField(trimmed, "host_traddr=")
+        if traddr != "" && hostTraddr != "" {
+            livePaths[traddr+"|"+hostTraddr] = true
+        }
+    }
+    return livePaths
+}
+
+// extractNvmeField extracts a field value from an nvme list-subsys path line.
+// e.g. extractNvmeField(line, "traddr=") on:
+//   "+- nvme0 fc traddr=nn-5005...:pn-5005...,host_traddr=nn-2000...:pn-2100... live"
+// returns "nn-5005...:pn-5005..."
+func extractNvmeField(line, field string) string {
+    idx := strings.Index(line, field)
+    if idx < 0 {
+        return ""
+    }
+    rest := line[idx+len(field):]
+    // value ends at next comma or space
+    end := strings.IndexAny(rest, ", ")
+    if end < 0 {
+        return rest
+    }
+    return rest[:end]
 }
 
 // discoverSubNqn runs nvme discover for one (arrayTargetPort, hostPort) pair
@@ -170,69 +209,13 @@ func (r OsDeviceConnectivityNvmeOFc) nvmeConnect(arrayTargetPort, hostPort, subN
         "--host-traddr=" + hostPort,
         "--nqn=" + subNqn,
     }
-
-    for attempt := 1; attempt <= nvmeConnectRetries; attempt++ {
-        out, err := r.Executer.ExecuteWithTimeout(nvmeCmdTimeout, "nvme", args)
-        if err == nil {
-            logger.Infof("NVMe-oFC: connected NQN=%s target=%s (attempt %d)",
-                subNqn, arrayTargetPort, attempt)
-            return
-        }
-        logger.Warningf("NVMe-oFC: connect attempt %d/%d failed NQN=%s target=%s host=%s: %v output=%s",
-            attempt, nvmeConnectRetries, subNqn, arrayTargetPort, hostPort, err, string(out))
-        if attempt < nvmeConnectRetries {
-            time.Sleep(nvmeConnectRetryInterval)
-        }
-    }
-    logger.Errorf("NVMe-oFC: all %d connect attempts failed NQN=%s target=%s host=%s",
-        nvmeConnectRetries, subNqn, arrayTargetPort, hostPort)
-}
-
-// getConnectedSubsystems runs nvme list-subsys and returns the set of NQNs
-// that have at least one live path.
-//
-// Analogous to iSCSI's getAllSessions() which parses iscsiadm -m session output.
-// Used for idempotency — skip NQNs already connected, just like iSCSI's filterLoggedIn.
-//
-// nvme list-subsys output format:
-//   nvme-subsys1 - NQN=nqn.1986-03.com.ibm:nvme:2145.000002043F20D9BC
-//                  hostnqn=nqn.2014-08.org.nvmexpress:uuid:...
-//   \
-//    +- nvme1 fc traddr=nn-...:pn-...,host_traddr=nn-...:pn-... live
-func (r OsDeviceConnectivityNvmeOFc) getConnectedSubsystems() (map[string]bool, error) {
-    args := []string{"list-subsys"}
     out, err := r.Executer.ExecuteWithTimeout(nvmeCmdTimeout, "nvme", args)
     if err != nil {
-        return nil, fmt.Errorf("nvme list-subsys failed: %w", err)
+        logger.Errorf("NVMe-oFC: connect failed NQN=%s target=%s host=%s: %v output=%s",
+            subNqn, arrayTargetPort, hostPort, err, string(out))
+        return
     }
-
-    liveNqns := make(map[string]bool)
-    currentNqn := ""
-
-    for _, line := range strings.Split(string(out), "\n") {
-        trimmed := strings.TrimSpace(line)
-
-        // NQN line: "nvme-subsys1 - NQN=nqn.1986-03.com.ibm:nvme:2145.xxx"
-        if idx := strings.Index(trimmed, "NQN="); idx >= 0 {
-            rest := trimmed[idx+4:] // everything after "NQN="
-            // The NQN is the first whitespace-delimited token
-            fields := strings.Fields(rest)
-            if len(fields) > 0 {
-                currentNqn = fields[0]
-            }
-            continue
-        }
-
-        // Path line: "+- nvme1 fc traddr=...,host_traddr=... live"
-        // "live" appears at end of line when path is active.
-        if strings.HasPrefix(trimmed, "+-") && strings.Contains(trimmed, " live") {
-            if currentNqn != "" && currentNqn != nvmeDiscoveryNqn {
-                liveNqns[currentNqn] = true
-            }
-        }
-    }
-
-    return liveNqns, nil
+    logger.Infof("NVMe-oFC: connected NQN=%s target=%s host=%s", subNqn, arrayTargetPort, hostPort)
 }
 
 // getHostFCPorts reads /sys/class/fc_host/hostN/node_name and port_name for

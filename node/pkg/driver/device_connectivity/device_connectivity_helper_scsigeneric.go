@@ -182,42 +182,85 @@ func (r OsDeviceConnectivityHelperScsiGeneric) RescanDevices(lunId int, arrayIde
 }
 
 func (r OsDeviceConnectivityHelperScsiGeneric) GetMpathDevice(volumeId string) (string, error) {
-	logger.Infof("GetMpathDevice: Searching multipath devices for volume : [%s] ", volumeId)
+    logger.Infof("parth: GetMpathDevice start - Searching multipath devices for volume [%s]", volumeId)
 
-	volumeIdVariations := r.Helper.GetVolumeIdVariations(volumeId)
-	dmPath, _ := r.Helper.GetDmsPath(volumeIdVariations)
+    volumeIdVariations := r.Helper.GetVolumeIdVariations(volumeId)
+    logger.Debugf("parth: volumeIdVariations=%v", volumeIdVariations)
 
-	if dmPath != "" {
-		SgInqWwn, _ := r.Helper.GetWwnByScsiInq(dmPath)
-		if isSameId(SgInqWwn, volumeIdVariations) {
-			return dmPath, nil
-		}
-		logger.Warningf("Expected {%v} but got {%v} from sg_inq", volumeId, SgInqWwn)
-	}
+    dmPath, _ := r.Helper.GetDmsPath(volumeIdVariations)
+    logger.Debugf("parth: Initial dmPath from GetDmsPath=%s", dmPath)
 
-	if err := r.Helper.ReloadMultipath(); err != nil {
-		return "", err
-	}
+    if dmPath != "" {
 
-	dmPath, err := r.Helper.GetDmsPath(volumeIdVariations)
+        logger.Debugf("parth: Found dmPath=%s before multipath reload", dmPath)
 
-	if err != nil {
-		return "", err
-	}
+        // NVMe DM devices (both native and non-native) don't support SG_IO ioctl.
+        // EUI/NGUID match from multipathd already identifies the volume correctly.
+        if isNvmeDmDevice(dmPath) {
+            logger.Debugf("parth: NVMe device detected %s, skipping sg_inq validation", dmPath)
+            return dmPath, nil
+        }
 
-	if dmPath == "" {
-		return "", &MultipathDeviceNotFoundForVolumeError{volumeId}
-	}
+        logger.Debugf("parth: Running sg_inq validation for dmPath=%s", dmPath)
 
-	SgInqWwn, err := r.Helper.GetWwnByScsiInq(dmPath)
-	if err != nil {
-		return "", err
-	}
-	if isSameId(SgInqWwn, volumeIdVariations) {
-		return dmPath, nil
-	}
-	// To make sure we found the right WWN, if not raise error instead of using wrong mpath
-	return "", &ErrorWrongDeviceFound{dmPath, volumeIdVariations[0], SgInqWwn}
+        SgInqWwn, _ := r.Helper.GetWwnByScsiInq(dmPath)
+        logger.Debugf("parth: sg_inq returned WWN=%s", SgInqWwn)
+
+        if isSameId(SgInqWwn, volumeIdVariations) {
+            logger.Debugf("parth: sg_inq WWN matches volumeId variations")
+            return dmPath, nil
+        }
+
+        logger.Warningf("parth: Expected {%v} but got {%v} from sg_inq", volumeId, SgInqWwn)
+    }
+
+    logger.Debugf("parth: Reloading multipath configuration")
+
+    if err := r.Helper.ReloadMultipath(); err != nil {
+        logger.Errorf("parth: ReloadMultipath failed error=%v", err)
+        return "", err
+    }
+
+    logger.Debugf("parth: Multipath reload completed")
+
+    dmPath, err := r.Helper.GetDmsPath(volumeIdVariations)
+    if err != nil {
+        logger.Errorf("parth: GetDmsPath failed after reload error=%v", err)
+        return "", err
+    }
+
+    logger.Debugf("parth: dmPath after multipath reload=%s", dmPath)
+
+    if dmPath == "" {
+        logger.Errorf("parth: No multipath device found for volumeId=%s", volumeId)
+        return "", &MultipathDeviceNotFoundForVolumeError{volumeId}
+    }
+
+    // Same NVMe check after reload
+    if isNvmeDmDevice(dmPath) {
+        logger.Debugf("parth: NVMe device detected %s after reload, skipping sg_inq", dmPath)
+        return dmPath, nil
+    }
+
+    logger.Debugf("parth: Running sg_inq validation after reload for dmPath=%s", dmPath)
+
+    SgInqWwn, err := r.Helper.GetWwnByScsiInq(dmPath)
+    if err != nil {
+        logger.Errorf("parth: GetWwnByScsiInq failed for dmPath=%s error=%v", dmPath, err)
+        return "", err
+    }
+
+    logger.Debugf("parth: sg_inq returned WWN=%s after reload", SgInqWwn)
+
+    if isSameId(SgInqWwn, volumeIdVariations) {
+        logger.Debugf("parth: sg_inq WWN matches volumeId variations after reload")
+        return dmPath, nil
+    }
+
+    logger.Errorf("parth: Wrong device found dmPath=%s expected=%s actual=%s",
+        dmPath, volumeIdVariations[0], SgInqWwn)
+
+    return "", &ErrorWrongDeviceFound{dmPath, volumeIdVariations[0], SgInqWwn}
 }
 
 func isSameId(wwn string, volumeIdVariations []string) bool {
@@ -530,22 +573,97 @@ func (o OsDeviceConnectivityHelperGeneric) GetHostsIdByArrayIdentifier(arrayIden
 }
 
 func (o OsDeviceConnectivityHelperGeneric) GetMpathVolumeId(mpathdOutput string, mpathDeviceName string,
-	dmDirectory string) (string, error) {
+    dmDirectory string) (string, error) {
 
-	mpathVolumeId, err := o.Helper.ExtractVolumeId(mpathDeviceName, mpathdOutput)
-	if err != nil {
-		return "", err
-	}
-	dmPath := filepath.Join(dmDirectory, filepath.Base(strings.TrimSpace(mpathDeviceName)))
+    logger.Debugf("parth: Start GetMpathVolumeId device=%s dmDirectory=%s", mpathDeviceName, dmDirectory)
 
-	SgInqWwn, err := o.GetWwnByScsiInq(dmPath)
-	if err != nil {
-		return "", err
-	}
-	if o.IsAnyVariationInMpathVolumeId(mpathVolumeId, []string{SgInqWwn}) {
-		return mpathVolumeId, nil
-	}
-	return "", &ErrorWrongDeviceFound{dmPath, mpathVolumeId, SgInqWwn}
+    mpathVolumeId, err := o.Helper.ExtractVolumeId(mpathDeviceName, mpathdOutput)
+    if err != nil {
+        logger.Debugf("parth: ExtractVolumeId failed device=%s error=%v", mpathDeviceName, err)
+        return "", err
+    }
+
+    logger.Debugf("parth: Extracted mpathVolumeId=%s", mpathVolumeId)
+
+    dmPath := filepath.Join(dmDirectory, filepath.Base(strings.TrimSpace(mpathDeviceName)))
+    logger.Debugf("parth: Computed dmPath=%s", dmPath)
+
+    // NVMe DM devices don't support SG_IO ioctl → sg_inq exits with code 75.
+    // EUI/NGUID from multipathd already identifies the volume — skip sg_inq.
+    if isNvmeDmDevice(dmPath) {
+        logger.Debugf("parth: NVMe DM device detected %s, skipping sg_inq", dmPath)
+        return mpathVolumeId, nil
+    }
+
+    logger.Debugf("parth: Running sg_inq check for %s", dmPath)
+
+    SgInqWwn, err := o.GetWwnByScsiInq(dmPath)
+    if err != nil {
+        logger.Debugf("parth: GetWwnByScsiInq failed for %s error=%v", dmPath, err)
+        return "", err
+    }
+
+    logger.Debugf("parth: sg_inq returned WWN=%s", SgInqWwn)
+
+    if o.IsAnyVariationInMpathVolumeId(mpathVolumeId, []string{SgInqWwn}) {
+        logger.Debugf("parth: WWN matches mpathVolumeId=%s", mpathVolumeId)
+        return mpathVolumeId, nil
+    }
+
+    logger.Debugf("parth: Wrong device found dmPath=%s expected=%s actual=%s",
+        dmPath, mpathVolumeId, SgInqWwn)
+
+    return "", &ErrorWrongDeviceFound{dmPath, mpathVolumeId, SgInqWwn}
+}
+
+
+// isNvmeDmDevice returns true if the DM device's slaves are NVMe namespaces.
+// Handles both /dev/dm-X and /dev/mapper/mpathX paths.
+func isNvmeDmDevice(dmPath string) bool {
+
+    logger.Debugf("parth: Checking NVMe DM device for path=%s", dmPath)
+
+    baseDevice := filepath.Base(dmPath)
+    slavesPath := filepath.Join("/sys/block", baseDevice, "slaves")
+
+    logger.Debugf("parth: Checking slavesPath=%s", slavesPath)
+
+    entries, err := os.ReadDir(slavesPath)
+    if err != nil {
+
+        logger.Debugf("parth: Failed reading slavesPath=%s error=%v, resolving symlink", slavesPath, err)
+
+        // /dev/mapper/mpathX is a symlink → resolve to /dev/dm-X
+        resolvedPath, resolveErr := filepath.EvalSymlinks(dmPath)
+        if resolveErr != nil {
+            logger.Debugf("parth: Failed resolving symlink for %s error=%v", dmPath, resolveErr)
+            return false
+        }
+
+        logger.Debugf("parth: Resolved dmPath=%s", resolvedPath)
+
+        baseDevice = filepath.Base(resolvedPath)
+        slavesPath = filepath.Join("/sys/block", baseDevice, "slaves")
+
+        logger.Debugf("parth: Retrying slavesPath=%s", slavesPath)
+
+        entries, err = os.ReadDir(slavesPath)
+        if err != nil {
+            logger.Debugf("parth: Failed reading slavesPath again=%s error=%v", slavesPath, err)
+            return false
+        }
+    }
+
+    for _, entry := range entries {
+        logger.Debugf("parth: Found slave device=%s", entry.Name())
+        if strings.HasPrefix(entry.Name(), "nvme") {
+            logger.Debugf("parth: NVMe slave detected=%s", entry.Name())
+            return true
+        }
+    }
+
+    logger.Debugf("parth: No NVMe slaves found for %s", dmPath)
+    return false
 }
 
 func (o OsDeviceConnectivityHelperGeneric) GetWwnByScsiInq(dev string) (string, error) {
