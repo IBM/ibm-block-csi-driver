@@ -48,6 +48,14 @@ var (
 	topologyPrefixes = [...]string{"topology.block.csi.ibm.com"}
 )
 
+type NvmeType string
+
+const (
+    NVMeNative    NvmeType = "native"
+    NVMeNonNative NvmeType = "non-native"
+    NotNVMe       NvmeType = "non-nvme"
+)
+
 const (
 	// In the Dockerfile of the node, specific commands (e.g: multipath, mount...) from the host mounted inside the container in /host directory.
 	// Command lines inside the container will show /host prefix.
@@ -69,7 +77,8 @@ const (
 type NodeUtilsInterface interface {
 	GetVolumeUuid(volumeId string) string
 	ReadNvmeNqn() (string, error)
-	DevicesAreNvme(sysDevices []string) (bool, error)
+	IsNativeNVMeMultipathEnabled() (bool, error)
+	DevicesAreNvme(device string) (NvmeType, error)
 	ParseFCPorts() ([]string, error)
 	ParseIscsiInitiators() (string, error)
 	GetInfoFromPublishContext(publishContext map[string]string) (string, int, map[string][]string, error)
@@ -146,6 +155,20 @@ func (n NodeUtils) GetInfoFromPublishContext(publishContext map[string]string) (
 		}
 	}
 
+	if connectivityType == n.ConfigYaml.Connectivity_type.Nvme_over_fc {
+		// PUBLISH_CONTEXT_ARRAY_NVME_INITIATORS = "nn-WWNN1:pn-WWPN1,nn-WWNN2:pn-WWPN2,..."
+		// key = "nn-WWNN:pn-WWPN" (array target port), value = nil (no IPs, fabric-routed).
+		nvmePorts := strings.Split(
+			publishContext[n.ConfigYaml.Controller.Publish_context_nvme_initiators],
+			publishContextSeparator)
+		for _, port := range nvmePorts {
+			port = strings.TrimSpace(port)
+			if port != "" {
+				ipsByArrayInitiator[port] = nil
+			}
+		}
+	}
+
 	logger.Debugf("PublishContext relevant info : connectivityType=%v, lun=%v, arrayInitiators=%v",
 		connectivityType, lun, ipsByArrayInitiator)
 	return connectivityType, lun, ipsByArrayInitiator, nil
@@ -194,28 +217,67 @@ func (n NodeUtils) StageInfoFileIsExist(filePath string) bool {
 	return true
 }
 
-func (n NodeUtils) DevicesAreNvme(sysDevices []string) (bool, error) {
-	args := []string{"list"}
-	out, err := n.Executer.ExecuteWithTimeout(TimeOutNvmeCmd, nvmeCmd, args)
-	if err != nil {
-		if err.Error() == "exit status 1" {
-			logger.Debugf("'nvme list' failing, likely because 'nvme' and 'nvme-core' kernel modules are not loaded. Devices are certainly not NVMe in this case")
-			return false, nil
-		}
-		outMessage := strings.TrimSpace(string(out))
-		if strings.HasSuffix(outMessage, noSuchFileOrDirectoryErrorMessage) {
-			return false, nil
-		}
-		return false, err
-	}
-	nvmeDevices := string(out)
-	for _, deviceName := range sysDevices {
-		if strings.Contains(nvmeDevices, deviceName) {
-			logger.Debugf("found device {%s} in nvme list", deviceName)
-			return true, nil
-		}
-	}
-	return false, nil
+func (n NodeUtils) IsNativeNVMeMultipathEnabled() (bool, error) {
+    data, err := os.ReadFile("/sys/module/nvme_core/parameters/multipath")
+    if err != nil {
+        if os.IsNotExist(err) {
+            return false, nil
+        }
+        return false, fmt.Errorf("failed to read nvme_core multipath param: %w", err)
+    }
+    val := strings.TrimSpace(string(data))
+    return val == "Y" , nil
+}
+
+func (n NodeUtils) DevicesAreNvme(device string) (NvmeType, error) {
+
+    nativeMultipath, err := n.IsNativeNVMeMultipathEnabled()
+    if err != nil {
+        logger.Warningf("Failed to read nvme_core multipath param, will try all checks: %v", err)
+    }
+
+    if nativeMultipath {
+        // CHECK 1: Native NVMe multipath ON
+        subsysNqnPath := path.Join("/sys/block", device, "device/subsysnqn")
+        _, err := os.Stat(subsysNqnPath)
+        if err == nil {
+			logger.Infof("Current node is configured with NVMe native multipath for device %s", device)
+            return NVMeNative, nil
+        }
+        if os.IsNotExist(err) {
+            return NotNVMe, nil
+        }
+        return NotNVMe, fmt.Errorf("unable to determine if device %s is NVMe: %w", device, err)
+    }
+
+    // CHECK 2: Native multipath OFF → non-native NVMe?
+    args := []string{"list"}
+    out, err := n.Executer.ExecuteWithTimeout(TimeOutNvmeCmd, nvmeCmd, args)
+    if err != nil {
+        if err.Error() == "exit status 1" {
+            logger.Debugf("'nvme list' failing, nvme/nvme-core modules not loaded. Not NVMe.")
+            return NotNVMe, nil
+        }
+        outMessage := strings.TrimSpace(string(out))
+        if strings.HasSuffix(outMessage, noSuchFileOrDirectoryErrorMessage) {
+            return NotNVMe, nil
+        }
+        return NotNVMe, err
+    }
+
+    nvmeListOutput := string(out)
+    slaves, err := n.GetSysDevicesFromMpath(device)
+    if err == nil {
+        for _, slave := range slaves {
+            if strings.Contains(nvmeListOutput, slave) {
+				logger.Infof("Current node is configured with NVMe non-native multipath for device %s", device)
+                return NVMeNonNative, nil
+            }
+        }
+        return NotNVMe, nil
+    }
+
+    return NotNVMe, fmt.Errorf("unable to determine if device %s is NVMe", device)
 }
 
 func getRelevantLines(rawContent *os.File) ([]string, error) {
