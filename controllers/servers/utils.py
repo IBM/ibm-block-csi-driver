@@ -672,6 +672,12 @@ def generate_csi_publish_volume_response(lun, connectivity_type, array_initiator
         array_initiators_param = common_config.controller.publish_context_array_iqn
         publish_context[array_initiators_param] = separator.join(array_initiators.keys())
 
+    elif connectivity_type == NVME_OVER_FC_CONNECTIVITY_TYPE:
+        array_initiators_param = common_config.controller.publish_context_nvme_initiators
+        joined_initiators = separator.join(array_initiators)
+        publish_context[array_initiators_param] = joined_initiators
+
+    logger.debug("Final publish_context: %s", publish_context)
     response = csi_pb2.ControllerPublishVolumeResponse(publish_context=publish_context)
 
     logger.debug("publish volume response is :{0}".format(response))
