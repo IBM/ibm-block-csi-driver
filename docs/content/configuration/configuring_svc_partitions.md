@@ -18,7 +18,7 @@ The host definer currently doesn't support secret update to stop using a partiti
 High Hvailability Partitions:
 - Note if volume is mapped when the peer system is down - multipath devices won't be created for the down system.
 - It is strongly advised to install the utility that fascilitates auto rescan of devices in case of failover.
-https://github.com/IBM/oss-rescan-storage-linux-udeva
+https://github.com/IBM/oss-rescan-storage-linux-udev
 - Snapshots aren't supported yet in IBM Storage Virtualize® (9.1.0.1).
 
 
