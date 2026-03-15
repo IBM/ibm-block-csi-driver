@@ -392,7 +392,7 @@ func (d *NodeService) NodeUnstageVolume(ctx context.Context, req *csi.NodeUnstag
 		logger.Infof("Device %s is native NVMe: skipping multipath -f and SCSI device cleanup", baseDevice)
 
 	case NVMeNonNative:
-		// DM-multipath over NVMe: flush mpath only, do NOT remove NVMe namespaces
+		// DM-multipath over NVMe: flush mpath only.
 		err = d.OsDeviceConnectivityHelper.FlushMultipathDevice(baseDevice)
 		if err != nil {
 			return nil, status.Errorf(codes.Internal, "Multipath -f command failed for device %s: %v", baseDevice, err)
