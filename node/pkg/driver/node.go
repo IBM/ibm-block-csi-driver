@@ -107,116 +107,166 @@ func NewNodeService(configYaml ConfigFile, hostname string, nodeUtils NodeUtilsI
 		VolumeIdLocksMap:            syncLock,
 	}
 }
-
 func (d *NodeService) NodeStageVolume(ctx context.Context, req *csi.NodeStageVolumeRequest) (*csi.NodeStageVolumeResponse, error) {
-	defer logger.Exit(logger.Enter(req))
 
+	logger.Infof("parth NodeStageVolume: START request=%+v", req)
+
+	// 1. Request validation
 	err := d.nodeStageVolumeRequestValidation(req)
 	if err != nil {
+		logger.Errorf("parth NodeStageVolume: request validation failed error=[%v]", err)
 		switch err.(type) {
 		case *RequestValidationError:
+			logger.Infof("parth NodeStageVolume: END with InvalidArgument error")
 			return nil, status.Error(codes.InvalidArgument, err.Error())
 		default:
+			logger.Infof("parth NodeStageVolume: END with Internal error")
 			return nil, status.Error(codes.Internal, err.Error())
 		}
 	}
+	logger.Infof("parth NodeStageVolume: request validation passed")
 
+	// 2. Get connectivity info
 	connectivityType, lun, ipsByArrayInitiator, err := d.NodeUtils.GetInfoFromPublishContext(req.PublishContext)
 	if err != nil {
+		logger.Errorf("parth NodeStageVolume: GetInfoFromPublishContext failed error=[%v]", err)
+		logger.Infof("parth NodeStageVolume: END with Internal error")
 		return nil, status.Error(codes.Internal, err.Error())
 	}
 	volumeID := req.VolumeId
+	logger.Infof("parth NodeStageVolume: connectivityType=[%s] lun=[%d] volumeID=[%s] ipsByArrayInitiator=%v",
+		connectivityType, lun, volumeID, ipsByArrayInitiator)
+
+	// 3. Volume locks
 	err = d.VolumeIdLocksMap.AddVolumeAndLunLock(volumeID, lun, "NodeStageVolume")
 	if err != nil {
-		logger.Errorf("Another operation is being performed on volume : {%s}", volumeID)
+		logger.Errorf("parth NodeStageVolume: volume lock failed for volumeID=[%s] error=[%v]", volumeID, err)
+		logger.Infof("parth NodeStageVolume: END with Aborted error")
 		return nil, status.Error(codes.Aborted, err.Error())
 	}
 	defer d.VolumeIdLocksMap.RemoveVolumeAndLunLock(volumeID, lun, "NodeStageVolume")
+	logger.Infof("parth NodeStageVolume: volume lock acquired for volumeID=[%s] lun=[%d]", volumeID, lun)
 
+	// 4. Array initiators
 	arrayInitiators := d.NodeUtils.GetArrayInitiators(ipsByArrayInitiator)
+	logger.Infof("parth NodeStageVolume: arrayInitiators=%v", arrayInitiators)
 
-	fmt.Println("###### connectivityType in NodeStageVolume: ", connectivityType)
+	// 5. OS device connectivity
 	osDeviceConnectivity, ok := d.OsDeviceConnectivityMapping[connectivityType]
 	if !ok {
+		logger.Errorf("parth NodeStageVolume: wrong connectivity type=[%s]", connectivityType)
+		logger.Infof("parth NodeStageVolume: END with InvalidArgument error")
 		return nil, status.Error(codes.InvalidArgument, fmt.Sprintf("Wrong connectivity type %s", connectivityType))
 	}
 
+	logger.Infof("parth NodeStageVolume: ensuring login for initiators=%v", ipsByArrayInitiator)
 	osDeviceConnectivity.EnsureLogin(ipsByArrayInitiator)
 
+	// 6. Remove ghost devices before scan
 	err = d.OsDeviceConnectivityHelper.RemoveGhostDevice(lun)
 	if err != nil {
-		return nil, status.Error(codes.Aborted, err.Error())
+		logger.Warningf("parth NodeStageVolume: RemoveGhostDevice before rescan failed lun=[%d] error=[%v]", lun, err)
 	}
 
+	// 7. Rescan devices
 	err = osDeviceConnectivity.RescanDevices(lun, arrayInitiators)
 	if err != nil {
+		logger.Errorf("parth NodeStageVolume: RescanDevices failed lun=[%d] error=[%v]", lun, err)
+		logger.Infof("parth NodeStageVolume: END with Internal error")
 		return nil, status.Error(codes.Internal, err.Error())
 	}
 
+	// 8. Remove ghost devices after rescan (best effort)
 	err = d.OsDeviceConnectivityHelper.RemoveGhostDevice(lun)
 	if err != nil {
-		logger.Debugf("Failed to clean ghost device for lun %d", lun)
-		// we can swallow the error here, since it's just for cleanliness
+		logger.Debugf("parth NodeStageVolume: RemoveGhostDevice after rescan failed lun=[%d] error=[%v]", lun, err)
 	}
 
+	// 9. Discover multipath device
 	volumeUuid := d.NodeUtils.GetVolumeUuid(volumeID)
+	logger.Infof("parth NodeStageVolume: volumeUuid=[%s]", volumeUuid)
+
 	mpathDevice, err := osDeviceConnectivity.GetMpathDevice(volumeUuid)
-	logger.Debugf("Discovered device : {%v}", mpathDevice)
+	logger.Infof("parth NodeStageVolume: discovered mpathDevice=[%s]", mpathDevice)
 	if err != nil {
-		logger.Errorf("Error while discovering the device : {%v}", err.Error())
+		logger.Errorf("parth NodeStageVolume: GetMpathDevice failed error=[%v]", err)
+		logger.Infof("parth NodeStageVolume: END with Internal error")
 		return nil, status.Error(codes.Internal, err.Error())
 	}
 
+	// 10. Volume capability handling
 	volumeCap := req.GetVolumeCapability()
 	switch volumeCap.GetAccessType().(type) {
 	case *csi.VolumeCapability_Block:
-		logger.Debugf("NodeStageVolume Finished: multipath device [%s] is ready to be mounted by NodePublishVolume API", mpathDevice)
+		logger.Infof("parth NodeStageVolume: Block volume type, mpathDevice ready for NodePublishVolume API")
+		logger.Infof("parth NodeStageVolume: END successfully")
 		return &csi.NodeStageVolumeResponse{}, nil
 	}
+
+	// 11. Filesystem handling for mount
 	baseDevice := path.Base(mpathDevice)
+	logger.Infof("parth NodeStageVolume: baseDevice=[%s]", baseDevice)
+
 	sysDevices, err := d.NodeUtils.GetSysDevicesFromMpath(baseDevice)
 	if err != nil {
-		logger.Errorf("Error while trying to get sys devices : {%v}", err.Error())
+		logger.Errorf("parth NodeStageVolume: GetSysDevicesFromMpath failed error=[%v]", err)
+		logger.Infof("parth NodeStageVolume: END with Internal error")
 		return nil, status.Error(codes.Internal, err.Error())
 	}
+	logger.Infof("parth NodeStageVolume: sysDevices=%v", sysDevices)
+
 	err = osDeviceConnectivity.ValidateLun(lun, sysDevices)
 	if err != nil {
-		logger.Errorf("Error while trying to validate lun : {%v}", err.Error())
+		logger.Errorf("parth NodeStageVolume: ValidateLun failed lun=[%d] error=[%v]", lun, err)
+		logger.Infof("parth NodeStageVolume: END with Internal error")
 		return nil, status.Error(codes.Internal, err.Error())
 	}
 
 	existingFormat, err := d.Mounter.GetDiskFormat(mpathDevice)
 	if err != nil {
-		logger.Errorf("Could not determine if disk {%v} is formatted, error: %v", mpathDevice, err)
+		logger.Errorf("parth NodeStageVolume: GetDiskFormat failed mpathDevice=[%s] error=[%v]", mpathDevice, err)
+		logger.Infof("parth NodeStageVolume: END with Internal error")
 		return nil, status.Error(codes.Internal, err.Error())
 	}
+	logger.Infof("parth NodeStageVolume: existingFormat=[%s]", existingFormat)
 
 	requestedFsType := volumeCap.GetMount().FsType
 	fsTypeForMount, err := d.resolveFsTypeForMount(requestedFsType, existingFormat)
 	if err != nil {
-		logger.Errorf("Error while resolving type of filesystem to mount : {%v}", err.Error())
+		logger.Errorf("parth NodeStageVolume: resolveFsTypeForMount failed error=[%v]", err)
+		logger.Infof("parth NodeStageVolume: END with Internal error")
 		return nil, err
 	}
+	logger.Infof("parth NodeStageVolume: fsTypeForMount=[%s] requestedFsType=[%s]", fsTypeForMount, requestedFsType)
 
-	stagingPath := req.GetStagingTargetPath() // e.g in k8s /var/lib/kubelet/plugins/kubernetes.io/csi/pv/pvc-21967c74-b456-11e9-b93e-005056a45d5f/globalmount
+	// 12. Staging path handling
+	stagingPath := req.GetStagingTargetPath()
 	stagingPathWithHostPrefix := d.NodeUtils.GetPodPath(stagingPath)
+	logger.Infof("parth NodeStageVolume: stagingPath=[%s] stagingPathWithHostPrefix=[%s]", stagingPath, stagingPathWithHostPrefix)
 
 	// check if already mounted
 	isMounted, err := d.isTargetMounted(stagingPathWithHostPrefix, true)
 	if err != nil {
-		logger.Debugf("Existing mount check failed {%v}", err.Error())
+		logger.Errorf("parth NodeStageVolume: isTargetMounted failed error=[%v]", err)
+		logger.Infof("parth NodeStageVolume: END with Internal error")
 		return nil, err
 	}
-	if isMounted { // idempotent case
+	if isMounted {
+		logger.Infof("parth NodeStageVolume: target already mounted → idempotent case")
+		logger.Infof("parth NodeStageVolume: END successfully")
 		return &csi.NodeStageVolumeResponse{}, nil
 	}
 
+	// 13. Format and mount
 	err = d.formatAndMount(mpathDevice, stagingPath, fsTypeForMount, existingFormat)
 	if err != nil {
+		logger.Errorf("parth NodeStageVolume: formatAndMount failed error=[%v]", err)
+		logger.Infof("parth NodeStageVolume: END with Internal error")
 		return nil, status.Error(codes.Internal, err.Error())
 	}
 
-	logger.Debugf("NodeStageVolume Finished: staging path [%s] is ready to be mounted by NodePublishVolume API", stagingPath)
+	logger.Infof("parth NodeStageVolume: staging path [%s] is ready to be mounted by NodePublishVolume API", stagingPath)
+	logger.Infof("parth NodeStageVolume: END successfully")
 	return &csi.NodeStageVolumeResponse{}, nil
 }
 
@@ -329,106 +379,150 @@ func (d *NodeService) formatAndMount(mpathDevice string, stagingPath string, fsT
 	logger.Debugf("Mount the device with fs_type = {%v} (Create filesystem if needed)", fsTypeForMount)
 	return d.Mounter.FormatAndMount(mpathDevice, stagingPath, fsTypeForMount, mountOptions) // Passing without /host because k8s mounter uses mount\mkfs\fsck
 }
-
 func (d *NodeService) NodeUnstageVolume(ctx context.Context, req *csi.NodeUnstageVolumeRequest) (*csi.NodeUnstageVolumeResponse, error) {
-	defer logger.Exit(logger.Enter(req))
-	volumeID := req.GetVolumeId()
 
+	logger.Infof("parth NodeUnstageVolume: START request=%+v", req)
+
+	volumeID := req.GetVolumeId()
 	if len(volumeID) == 0 {
-		logger.Errorf("Volume ID not provided")
+		logger.Errorf("parth NodeUnstageVolume: Volume ID not provided")
+		logger.Infof("parth NodeUnstageVolume: END with InvalidArgument")
 		return nil, status.Error(codes.InvalidArgument, "Volume ID not provided")
 	}
+	logger.Infof("parth NodeUnstageVolume: volumeID=[%s]", volumeID)
 
+	// Volume lock
 	err := d.VolumeIdLocksMap.AddVolumeLock(volumeID, "NodeUnstageVolume")
 	if err != nil {
-		logger.Errorf("Another operation is being performed on volume : {%s}", volumeID)
+		logger.Errorf("parth NodeUnstageVolume: Another operation is being performed on volume [%s]", volumeID)
+		logger.Infof("parth NodeUnstageVolume: END with Aborted")
 		return nil, status.Error(codes.Aborted, err.Error())
 	}
 	defer d.VolumeIdLocksMap.RemoveVolumeLock(volumeID, "NodeUnstageVolume")
+	logger.Infof("parth NodeUnstageVolume: acquired volume lock for volumeID=[%s]", volumeID)
 
+	// Staging path
 	stagingTargetPath := req.GetStagingTargetPath()
 	if len(stagingTargetPath) == 0 {
-		logger.Errorf("Staging target not provided")
+		logger.Errorf("parth NodeUnstageVolume: Staging target not provided")
+		logger.Infof("parth NodeUnstageVolume: END with InvalidArgument")
 		return nil, status.Error(codes.InvalidArgument, "Staging target not provided")
 	}
-
 	stagingPathWithHostPrefix := d.NodeUtils.GetPodPath(stagingTargetPath)
-	logger.Debugf("Check if staging path {%s} is mounted", stagingPathWithHostPrefix)
+	logger.Infof("parth NodeUnstageVolume: stagingTargetPath=[%s] stagingPathWithHostPrefix=[%s]", stagingTargetPath, stagingPathWithHostPrefix)
+
+	// Check if mounted
 	isNotMounted, err := d.NodeUtils.IsNotMountPoint(stagingPathWithHostPrefix)
 	if err != nil {
-		logger.Warningf("Failed to check if (%s), is mounted", stagingPathWithHostPrefix)
+		logger.Warningf("parth NodeUnstageVolume: IsNotMountPoint failed for [%s] error=[%v]", stagingPathWithHostPrefix, err)
+		logger.Infof("parth NodeUnstageVolume: END with Internal error")
 		return nil, status.Error(codes.Internal, err.Error())
 	}
+
 	if !isNotMounted {
+		logger.Infof("parth NodeUnstageVolume: path is mounted, unmounting [%s]", stagingTargetPath)
 		err = d.Mounter.Unmount(stagingTargetPath)
 		if err != nil {
-			logger.Errorf("Unmount failed. Target : %q, err : %v", stagingTargetPath, err.Error())
+			logger.Errorf("parth NodeUnstageVolume: Unmount failed Target=[%s] error=[%v]", stagingTargetPath, err)
+			logger.Infof("parth NodeUnstageVolume: END with Internal error")
 			return nil, status.Error(codes.Internal, err.Error())
 		}
+	} else {
+		logger.Infof("parth NodeUnstageVolume: path is not mounted, skipping unmount")
 	}
 
+	// Discover multipath device
 	volumeUuid := d.NodeUtils.GetVolumeUuid(volumeID)
+	logger.Infof("parth NodeUnstageVolume: volumeUuid=[%s]", volumeUuid)
+
 	mpathDevice, err := d.OsDeviceConnectivityHelper.GetMpathDevice(volumeUuid)
 	if err != nil {
 		switch err.(type) {
 		case *device_connectivity.MultipathDeviceNotFoundForVolumeError:
+			logger.Infof("parth NodeUnstageVolume: no multipath device found, treating as idempotent")
+			logger.Infof("parth NodeUnstageVolume: END successfully")
 			return &csi.NodeUnstageVolumeResponse{}, nil
 		default:
-			logger.Errorf("Error while discovering the device : {%v}", err.Error())
+			logger.Errorf("parth NodeUnstageVolume: GetMpathDevice failed error=[%v]", err)
+			logger.Infof("parth NodeUnstageVolume: END with Internal error")
 			return nil, status.Error(codes.Internal, err.Error())
 		}
 	}
-	logger.Debugf("Discovered device : {%v}", mpathDevice)
+	logger.Infof("parth NodeUnstageVolume: discovered mpathDevice=[%s]", mpathDevice)
 
 	baseDevice := path.Base(mpathDevice)
+	logger.Infof("parth NodeUnstageVolume: baseDevice=[%s]", baseDevice)
 
+	// NVMe type check
 	nvmeType, err := d.NodeUtils.DevicesAreNvme(baseDevice)
 	if err != nil {
+		logger.Errorf("parth NodeUnstageVolume: DevicesAreNvme failed for device [%s] error=[%v]", baseDevice, err)
+		logger.Infof("parth NodeUnstageVolume: END with Internal error")
 		return nil, status.Errorf(codes.Internal, "Failed to determine device type for %s: %v", baseDevice, err)
 	}
+	logger.Infof("parth NodeUnstageVolume: nvmeType=[%v]", nvmeType)
 
+	// Handle NVMe / SCSI cleanup
 	switch nvmeType {
 	case NVMeNative:
-		// Native NVMe multipath: kernel manages everything, skip all cleanup
-		logger.Infof("Device %s is native NVMe: skipping multipath -f and SCSI device cleanup", baseDevice)
+		logger.Infof("parth NodeUnstageVolume: native NVMe device [%s], skipping multipath flush and SCSI cleanup", baseDevice)
 
 	case NVMeNonNative:
-		// DM-multipath over NVMe: flush mpath only, do NOT remove NVMe namespaces
+		logger.Infof("parth NodeUnstageVolume: non-native NVMe device [%s], flushing multipath", baseDevice)
 		err = d.OsDeviceConnectivityHelper.FlushMultipathDevice(baseDevice)
 		if err != nil {
+			logger.Errorf("parth NodeUnstageVolume: FlushMultipathDevice failed device [%s] error=[%v]", baseDevice, err)
+			logger.Infof("parth NodeUnstageVolume: END with Internal error")
 			return nil, status.Errorf(codes.Internal, "Multipath -f command failed for device %s: %v", baseDevice, err)
 		}
-		logger.Infof("Device %s is non-native NVMe: flushed multipath, skipping physical device removal", baseDevice)
 
 	case NotNVMe:
-		// SCSI (FC or iSCSI): flush mpath + delete sdX devices
+		logger.Infof("parth NodeUnstageVolume: SCSI device [%s], flushing multipath and removing physical devices", baseDevice)
 		sysDevices, err := d.NodeUtils.GetSysDevicesFromMpath(baseDevice)
 		if err != nil {
-			logger.Errorf("Error while trying to get sys devices for device %s: {%v}", baseDevice, err)
+			logger.Errorf("parth NodeUnstageVolume: GetSysDevicesFromMpath failed device [%s] error=[%v]", baseDevice, err)
+			logger.Infof("parth NodeUnstageVolume: END with Internal error")
 			return nil, status.Error(codes.Internal, err.Error())
 		}
+		logger.Infof("parth NodeUnstageVolume: sysDevices=%v", sysDevices)
+
 		err = d.OsDeviceConnectivityHelper.FlushMultipathDevice(baseDevice)
 		if err != nil {
+			logger.Errorf("parth NodeUnstageVolume: FlushMultipathDevice failed device [%s] error=[%v]", baseDevice, err)
+			logger.Infof("parth NodeUnstageVolume: END with Internal error")
 			return nil, status.Errorf(codes.Internal, "Multipath -f command failed for device %s: %v", baseDevice, err)
 		}
+
 		err = d.OsDeviceConnectivityHelper.RemovePhysicalDevice(sysDevices)
 		if err != nil {
+			logger.Errorf("parth NodeUnstageVolume: RemovePhysicalDevice failed sysDevices=%v error=[%v]", sysDevices, err)
+			logger.Infof("parth NodeUnstageVolume: END with Internal error")
 			return nil, status.Errorf(codes.Internal, "Remove SCSI device failed for device %s: %v", baseDevice, err)
 		}
 
 	default:
+		logger.Errorf("parth NodeUnstageVolume: Unknown NVMe type [%v] for device [%s]", nvmeType, baseDevice)
+		logger.Infof("parth NodeUnstageVolume: END with Internal error")
 		return nil, status.Errorf(codes.Internal, "Unknown NVMe type for device %s", baseDevice)
 	}
 
+	// Clear stage info file
 	stageInfoPath := path.Join(stagingTargetPath, StageInfoFilename)
+	logger.Infof("parth NodeUnstageVolume: stageInfoPath=[%s]", stageInfoPath)
+
 	if d.NodeUtils.StageInfoFileIsExist(stageInfoPath) {
+		logger.Infof("parth NodeUnstageVolume: StageInfo file exists, clearing")
 		if err := d.NodeUtils.ClearStageInfoFile(stageInfoPath); err != nil {
+			logger.Errorf("parth NodeUnstageVolume: ClearStageInfoFile failed error=[%v]", err)
+			logger.Infof("parth NodeUnstageVolume: END with Internal error")
 			return nil, status.Errorf(codes.Internal, "Fail to clear the stage info file: error %v", err)
 		}
+	} else {
+		logger.Infof("parth NodeUnstageVolume: StageInfo file does not exist, skipping")
 	}
 
-	logger.Debugf("NodeUnStageVolume Finished: multipath device removed from host")
-
+	logger.Infof("parth NodeUnstageVolume: multipath device cleanup finished successfully")
+	logger.Infof("parth NodeUnstageVolume: END successfully")
 	return &csi.NodeUnstageVolumeResponse{}, nil
 }
 
@@ -702,125 +796,191 @@ func (d *NodeService) nodeGetVolumeStatsRequestValidation(volumeId string, volum
 }
 
 func (d *NodeService) getVolumeStats(path string, volumeId string) (VolumeStatistics, error) {
+	logger.Infof("parth getVolumeStats: START path=[%s] volumeId=[%s]", path, volumeId)
+
 	var volumeStats VolumeStatistics
+
+	// 1. Check if path is a block device
 	isBlock, err := d.NodeUtils.IsBlock(path)
 	if err != nil {
+		logger.Errorf("parth getVolumeStats: IsBlock failed path=[%s] error=[%v]", path, err)
+		logger.Infof("parth getVolumeStats: END with Internal error")
 		return VolumeStatistics{}, status.Errorf(codes.Internal, "Failed to determine if %q is block device: %s", path, err)
 	}
+	logger.Infof("parth getVolumeStats: path=[%s] isBlock=[%v]", path, isBlock)
 
 	if isBlock {
+		// 2a. Block device stats
 		volumeStats, err = d.NodeUtils.GetBlockVolumeStats(volumeId)
 		if err != nil {
 			switch err.(type) {
 			case *device_connectivity.MultipathDeviceNotFoundForVolumeError:
+				logger.Warningf("parth getVolumeStats: Multipath device not found for volumeId=[%s]", volumeId)
+				logger.Infof("parth getVolumeStats: END with NotFound")
 				return VolumeStatistics{}, status.Errorf(codes.NotFound, "Multipath device of volume id %q does not exist", volumeId)
 			default:
+				logger.Errorf("parth getVolumeStats: GetBlockVolumeStats failed volumeId=[%s] error=[%v]", volumeId, err)
+				logger.Infof("parth getVolumeStats: END with Internal error")
 				return VolumeStatistics{}, status.Errorf(codes.Internal, "Error while discovering the device : %s", err)
 			}
 		}
+		logger.Infof("parth getVolumeStats: Block device stats for volumeId=[%s] stats=%+v", volumeId, volumeStats)
+
 	} else {
+		// 2b. Filesystem stats
 		volumeUuid := d.NodeUtils.GetVolumeUuid(volumeId)
+		logger.Infof("parth getVolumeStats: volumeUuid=[%s] for volumeId=[%s]", volumeUuid, volumeId)
+
 		isVolumePathMatchesVolumeId, err := d.OsDeviceConnectivityHelper.IsVolumePathMatchesVolumeId(volumeUuid, path)
 		if err != nil {
+			logger.Errorf("parth getVolumeStats: IsVolumePathMatchesVolumeId failed volumeUuid=[%s] path=[%s] error=[%v]", volumeUuid, path, err)
+			logger.Infof("parth getVolumeStats: END with Internal error")
 			return VolumeStatistics{}, status.Errorf(codes.Internal,
 				"Failed to determine if volume id [%q], is accessible on volume path [%q], error: %s",
 				volumeId, path, err)
 		}
+		logger.Infof("parth getVolumeStats: isVolumePathMatchesVolumeId=[%v] path=[%s] volumeUuid=[%s]", isVolumePathMatchesVolumeId, path, volumeUuid)
+
 		if !isVolumePathMatchesVolumeId {
+			logger.Warningf("parth getVolumeStats: volume id [%s] is not accessible on path [%s]", volumeId, path)
+			logger.Infof("parth getVolumeStats: END with NotFound")
 			return VolumeStatistics{}, status.Errorf(codes.NotFound,
 				"Volume id [%q] is not accessible on volume path [%q]", volumeId, path)
 		}
+
 		volumeStats, err = d.NodeUtils.GetFileSystemVolumeStats(path)
 		if err != nil {
+			logger.Errorf("parth getVolumeStats: GetFileSystemVolumeStats failed path=[%s] error=[%v]", path, err)
+			logger.Infof("parth getVolumeStats: END with Internal error")
 			return VolumeStatistics{}, status.Errorf(codes.Internal, "Failed to get statistics: %s", err)
 		}
+		logger.Infof("parth getVolumeStats: Filesystem stats for path=[%s] stats=%+v", path, volumeStats)
 	}
+
+	logger.Infof("parth getVolumeStats: END successfully path=[%s] volumeId=[%s] stats=%+v", path, volumeId, volumeStats)
 	return volumeStats, nil
 }
 
 func (d *NodeService) NodeExpandVolume(ctx context.Context, req *csi.NodeExpandVolumeRequest) (*csi.NodeExpandVolumeResponse, error) {
-	defer logger.Exit(logger.Enter(req))
 
+	logger.Infof("parth NodeExpandVolume: START request=%+v", req)
+
+	// 1. Request validation
 	err := d.nodeExpandVolumeRequestValidation(req)
 	if err != nil {
+		logger.Errorf("parth NodeExpandVolume: request validation failed error=[%v]", err)
+		logger.Infof("parth NodeExpandVolume: END with error")
 		return nil, err
 	}
+	logger.Infof("parth NodeExpandVolume: request validation passed")
 
+	// 2. Volume lock
 	volumeID := req.GetVolumeId()
+	logger.Infof("parth NodeExpandVolume: volumeID=[%s]", volumeID)
 
 	err = d.VolumeIdLocksMap.AddVolumeLock(volumeID, "NodeExpandVolume")
 	if err != nil {
-		logger.Errorf("Another operation is being performed on volume : {%s}", volumeID)
+		logger.Errorf("parth NodeExpandVolume: volume lock failed, another operation ongoing volumeID=[%s]", volumeID)
+		logger.Infof("parth NodeExpandVolume: END with Aborted error")
 		return nil, status.Error(codes.Aborted, err.Error())
 	}
 	defer d.VolumeIdLocksMap.RemoveVolumeLock(volumeID, "NodeExpandVolume")
+	logger.Infof("parth NodeExpandVolume: acquired volume lock for volumeID=[%s]", volumeID)
 
+	// 3. Discover multipath device
 	volumeUuid := d.NodeUtils.GetVolumeUuid(volumeID)
+	logger.Infof("parth NodeExpandVolume: volumeUuid=[%s]", volumeUuid)
+
 	device, err := d.OsDeviceConnectivityHelper.GetMpathDevice(volumeUuid)
 	if err != nil {
-		logger.Errorf("Error while discovering the device : {%v}", err.Error())
+		logger.Errorf("parth NodeExpandVolume: GetMpathDevice failed error=[%v]", err)
+		logger.Infof("parth NodeExpandVolume: END with Internal error")
 		return nil, status.Error(codes.Internal, err.Error())
 	}
-	logger.Debugf("Discovered device : {%v}", device)
-	
-	baseDevice := path.Base(device)
+	logger.Infof("parth NodeExpandVolume: discovered mpathDevice=[%s]", device)
 
+	baseDevice := path.Base(device)
+	logger.Infof("parth NodeExpandVolume: baseDevice=[%s]", baseDevice)
+
+	// 4. Determine device type
 	nvmeType, err := d.NodeUtils.DevicesAreNvme(baseDevice)
 	if err != nil {
+		logger.Errorf("parth NodeExpandVolume: DevicesAreNvme failed for device [%s] error=[%v]", baseDevice, err)
+		logger.Infof("parth NodeExpandVolume: END with Internal error")
 		return nil, status.Errorf(codes.Internal, "Failed to determine device type for %s: %v", baseDevice, err)
 	}
+	logger.Infof("parth NodeExpandVolume: nvmeType=[%v]", nvmeType)
 
+	// 5. Handle NVMe/SCSI paths
 	switch nvmeType {
 	case NVMeNative:
-		// Native NVMe → skip multipath/rescan
-		logger.Infof("Device %s is native NVMe: skipping multipath expand/rescan", baseDevice)
+		logger.Infof("parth NodeExpandVolume: native NVMe [%s], skipping multipath/rescan", baseDevice)
 
 	case NVMeNonNative:
-		// Non-native NVMe → skip rescan, only expand multipath
-		logger.Infof("Device %s is non-native NVMe: skipping rescan, running ExpandMpathDevice", baseDevice)
+		logger.Infof("parth NodeExpandVolume: non-native NVMe [%s], expanding multipath only", baseDevice)
 		err = d.NodeUtils.ExpandMpathDevice(baseDevice)
 		if err != nil {
+			logger.Errorf("parth NodeExpandVolume: ExpandMpathDevice failed for [%s] error=[%v]", baseDevice, err)
+			logger.Infof("parth NodeExpandVolume: END with Internal error")
 			return nil, status.Error(codes.Internal, err.Error())
 		}
 
 	case NotNVMe:
-		// Non-NVMe → rescan physical devices + expand multipath
+		logger.Infof("parth NodeExpandVolume: SCSI device [%s], rescanning physical devices and expanding multipath", baseDevice)
+
 		sysDevices, err := d.NodeUtils.GetSysDevicesFromMpath(baseDevice)
 		if err != nil {
-			logger.Errorf("Error getting sys devices for %s: %v", baseDevice, err)
+			logger.Errorf("parth NodeExpandVolume: GetSysDevicesFromMpath failed device [%s] error=[%v]", baseDevice, err)
+			logger.Infof("parth NodeExpandVolume: END with Internal error")
 			return nil, status.Error(codes.Internal, err.Error())
 		}
+		logger.Infof("parth NodeExpandVolume: sysDevices=%v", sysDevices)
 
 		err = d.NodeUtils.RescanPhysicalDevices(sysDevices)
 		if err != nil {
+			logger.Errorf("parth NodeExpandVolume: RescanPhysicalDevices failed sysDevices=%v error=[%v]", sysDevices, err)
+			logger.Infof("parth NodeExpandVolume: END with Internal error")
 			return nil, status.Error(codes.Internal, err.Error())
 		}
 
 		err = d.NodeUtils.ExpandMpathDevice(baseDevice)
 		if err != nil {
+			logger.Errorf("parth NodeExpandVolume: ExpandMpathDevice failed for [%s] error=[%v]", baseDevice, err)
+			logger.Infof("parth NodeExpandVolume: END with Internal error")
 			return nil, status.Error(codes.Internal, err.Error())
 		}
 
 	default:
+		logger.Errorf("parth NodeExpandVolume: Unknown NVMe type [%v] for device [%s]", nvmeType, baseDevice)
+		logger.Infof("parth NodeExpandVolume: END with Internal error")
 		return nil, status.Errorf(codes.Internal, "Unknown NVMe type for device %s", baseDevice)
 	}
 
+	// 6. Filesystem expansion
 	existingFormat, err := d.Mounter.GetDiskFormat(device)
 	if err != nil {
-		logger.Errorf("Could not determine if disk {%v} is formatted, error: %v", device, err)
+		logger.Errorf("parth NodeExpandVolume: GetDiskFormat failed for device [%s] error=[%v]", device, err)
+		logger.Infof("parth NodeExpandVolume: END with Internal error")
 		return nil, status.Error(codes.Internal, err.Error())
 	}
+	logger.Infof("parth NodeExpandVolume: existingFormat=[%s] for device [%s]", existingFormat, device)
 
 	mountPointToExpand := req.GetStagingTargetPath()
 	if mountPointToExpand == "" {
 		mountPointToExpand = req.GetVolumePath()
 	}
+	logger.Infof("parth NodeExpandVolume: mountPointToExpand=[%s]", mountPointToExpand)
 
 	err = d.NodeUtils.ExpandFilesystem(device, mountPointToExpand, existingFormat)
 	if err != nil {
-		logger.Errorf("Could not resize {%v} file system of {%v} , error: %v", existingFormat, device, err)
+		logger.Errorf("parth NodeExpandVolume: ExpandFilesystem failed for device [%s] mountPoint=[%s] existingFormat=[%s] error=[%v]",
+			device, mountPointToExpand, existingFormat, err)
+		logger.Infof("parth NodeExpandVolume: END with Internal error")
 		return nil, status.Error(codes.Internal, err.Error())
 	}
+
+	logger.Infof("parth NodeExpandVolume: volume [%s] expanded successfully on device [%s] mountPoint=[%s]", volumeID, device, mountPointToExpand)
+	logger.Infof("parth NodeExpandVolume: END successfully")
 
 	return &csi.NodeExpandVolumeResponse{}, nil
 }

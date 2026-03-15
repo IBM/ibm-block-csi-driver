@@ -25,12 +25,24 @@ import (
 )
 
 const (
-    nvmeCmdTimeout           = 30 * 1000 // milliseconds
-    nvmeTransportFC          = "fc"
-    nvmeDiscoveryNqn         = "nqn.2014-08.org.nvmexpress.discovery"
-	FCPortPath = "/sys/class/fc_host/host*/port_name"
-)
+    nvmeCmdTimeout  = 30 * 1000
+    nvmeTransportFC = "fc"
+    nvmeDiscoveryNqn = "nqn.2014-08.org.nvmexpress.discovery"
+    FCPortPath = "/sys/class/fc_host/host*/port_name"
 
+    // nvmeTargetPathCount is the desired number of live NVMe-oFC paths per
+    // subsystem. EnsureLogin connects paths until this count is reached.
+    // Minimum for redundancy is 2 (one per array node, one per HBA).
+    // Developers can raise this for more path redundancy.
+    nvmeTargetPathCount = 3
+
+    // nvmeMinPathsForNonNativeDmMultipath is the minimum number of live paths
+    // required when multipathd find_multipaths is "on" and NVMe non-native
+    // multipath is in use. With find_multipaths on, multipathd only creates a
+    // dm device when >= 2 paths exist. With 1 path, no dm device is created
+    // and GetMpathDevice will fail.
+    nvmeMinPathsForNonNativeDmMultipath = 2
+)
 
 type OsDeviceConnectivityNvmeOFc struct {
     Executer          executer.ExecuterInterface
@@ -52,53 +64,133 @@ func NewOsDeviceConnectivityNvmeOFc(executer executer.ExecuterInterface, clean_s
 //
 // For each array target port, we try every local host FC port as --host-traddr.
 func (r OsDeviceConnectivityNvmeOFc) EnsureLogin(ipsByArrayInitiator map[string][]string) {
+    logger.Infof("parth EnsureLogin: START ipsByArrayInitiator=%v", ipsByArrayInitiator)
+
     if len(ipsByArrayInitiator) == 0 {
-        logger.Warningf("NVMe-oFC EnsureLogin: no array target ports in publish context, skipping")
+        logger.Warningf("parth EnsureLogin: no array target ports, skipping")
+        logger.Infof("parth EnsureLogin: END no targets")
         return
     }
 
-    // Read host-side FC port pairs from sysfs.
-    // We need both node_name and port_name to form --host-traddr=nn-X:pn-Y.
     hostPorts, err := r.getHostFCPorts()
     if err != nil || len(hostPorts) == 0 {
-        logger.Errorf("NVMe-oFC EnsureLogin: failed to read host FC ports: %v", err)
+        logger.Errorf("parth EnsureLogin: failed to read host FC ports: %v", err)
+        logger.Infof("parth EnsureLogin: END with error")
         return
     }
-    logger.Debugf("NVMe-oFC EnsureLogin: host FC ports: %v", hostPorts)
+    logger.Infof("parth EnsureLogin: host FC ports=%v", hostPorts)
 
-    // livePaths contains all currently live (traddr, host_traddr) pairs.
-    // Per-path check — NQN alone is insufficient because all paths to the
-    // same subsystem share one NQN. Deduplicating by NQN would skip valid
-    // additional paths and leave multipathd with fewer legs than available.
     livePaths := r.getLivePathPairs()
-    logger.Debugf("NVMe-oFC EnsureLogin: live path pairs: %v", livePaths)
+    logger.Infof("parth EnsureLogin: live path pairs=%v", livePaths)
 
+    currentPaths := countLivePathsForSubsystem(livePaths, ipsByArrayInitiator)
+    logger.Infof("parth EnsureLogin: current live paths=%d target=%d",
+        currentPaths, nvmeTargetPathCount)
+
+    connectedPaths := currentPaths
     for arrayTargetPort := range ipsByArrayInitiator {
+        if connectedPaths >= nvmeTargetPathCount {
+            logger.Infof("parth EnsureLogin: reached target path count, stopping")
+            break
+        }
+
         for _, hostPort := range hostPorts {
+            if connectedPaths >= nvmeTargetPathCount {
+                break
+            }
+
             pathKey := arrayTargetPort + "|" + hostPort
             if livePaths[pathKey] {
-                logger.Debugf("NVMe-oFC: path already live target=%s host=%s, skipping",
+                logger.Infof("parth EnsureLogin: path already live target=%s host=%s, skipping",
                     arrayTargetPort, hostPort)
                 continue
             }
 
             subNqn, err := r.discoverSubNqn(arrayTargetPort, hostPort)
             if err != nil {
-                logger.Debugf("NVMe-oFC: discover error target=%s host=%s: %v",
+                logger.Errorf("parth EnsureLogin: discoverSubNqn failed target=%s host=%s error=%v",
                     arrayTargetPort, hostPort, err)
                 continue
             }
+
             if subNqn == "" {
-                logger.Debugf("NVMe-oFC: no subnqn found target=%s host=%s, skipping",
+                logger.Infof("parth EnsureLogin: no subnqn found target=%s host=%s, skipping",
                     arrayTargetPort, hostPort)
                 continue
             }
 
-            logger.Infof("NVMe-oFC: connecting NQN=%s target=%s host=%s",
-                subNqn, arrayTargetPort, hostPort)
+            logger.Infof("parth EnsureLogin: connecting NQN=%s target=%s host=%s", subNqn, arrayTargetPort, hostPort)
             r.nvmeConnect(arrayTargetPort, hostPort, subNqn)
+            connectedPaths++
         }
     }
+
+    finalLivePaths := r.getLivePathPairs()
+    finalPathCount := countLivePathsForSubsystem(finalLivePaths, ipsByArrayInitiator)
+    logger.Infof("parth EnsureLogin: final live path count=%d target=%d", finalPathCount, nvmeTargetPathCount)
+
+    if finalPathCount == 0 {
+        logger.Errorf("parth EnsureLogin: FATAL: 0 live paths, NodeStageVolume will fail")
+    } else if finalPathCount < nvmeTargetPathCount {
+        logger.Warningf("parth EnsureLogin: reduced redundancy final=%d target=%d", finalPathCount, nvmeTargetPathCount)
+    }
+
+    logger.Infof("parth EnsureLogin: END")
+}
+
+// countLivePathsForSubsystem counts how many entries in livePaths have a
+// traddr matching one of the array target ports for this subsystem.
+// livePaths keys are "traddr|host_traddr" from getLivePathPairs.
+// ipsByArrayInitiator keys are the array target ports from PublishContext.
+func countLivePathsForSubsystem(livePaths map[string]bool, ipsByArrayInitiator map[string][]string) int {
+    count := 0
+    for pathKey := range livePaths {
+        // pathKey = "nn-5005...:pn-5005...|nn-2000...:pn-2100..."
+        parts := strings.SplitN(pathKey, "|", 2)
+        if len(parts) != 2 {
+            continue
+        }
+        traddr := parts[0]
+        if _, ok := ipsByArrayInitiator[traddr]; ok {
+            count++
+        }
+    }
+    return count
+}
+
+// isFindMultipathsOn queries multipathd for its effective configuration and
+// returns true if find_multipaths is set to "yes" or "on".
+// This is used to detect the configuration that prevents dm device creation
+// with a single NVMe path in non-native multipath mode.
+func (r OsDeviceConnectivityNvmeOFc) isFindMultipathsOn() (bool, error) {
+    logger.Infof("parth isFindMultipathsOn: START")
+
+    out, err := r.Executer.ExecuteWithTimeout(TimeOutMultipathdCmd, multipathdCmd, []string{"show", "config"})
+    if err != nil {
+        logger.Errorf("parth isFindMultipathsOn: multipathd show config failed: %v", err)
+        logger.Infof("parth isFindMultipathsOn: END with error")
+        return false, fmt.Errorf("multipathd show config failed: %w", err)
+    }
+
+    for _, line := range strings.Split(string(out), "\n") {
+        trimmed := strings.TrimSpace(line)
+        if !strings.HasPrefix(trimmed, "find_multipaths") {
+            continue
+        }
+        fields := strings.Fields(trimmed)
+        if len(fields) < 2 {
+            continue
+        }
+        val := strings.ToLower(fields[1])
+        result := val == "yes" || val == "on"
+        logger.Infof("parth isFindMultipathsOn: found find_multipaths=%s result=%v", val, result)
+        logger.Infof("parth isFindMultipathsOn: END")
+        return result, nil
+    }
+
+    logger.Infof("parth isFindMultipathsOn: not found in config, default=false")
+    logger.Infof("parth isFindMultipathsOn: END")
+    return false, nil
 }
 
 // getLivePathPairs parses nvme list-subsys and returns a set of
@@ -107,10 +199,13 @@ func (r OsDeviceConnectivityNvmeOFc) EnsureLogin(ipsByArrayInitiator map[string]
 // Path line format:
 //   +- nvme0 fc traddr=nn-5005...:pn-5005...,host_traddr=nn-2000...:pn-2100... live
 func (r OsDeviceConnectivityNvmeOFc) getLivePathPairs() map[string]bool {
+    logger.Infof("parth getLivePathPairs: START")
+
     args := []string{"list-subsys"}
     out, err := r.Executer.ExecuteWithTimeout(nvmeCmdTimeout, "nvme", args)
     if err != nil {
-        logger.Warningf("NVMe-oFC getLivePathPairs: nvme list-subsys failed: %v", err)
+        logger.Errorf("parth getLivePathPairs: nvme list-subsys failed: %v", err)
+        logger.Infof("parth getLivePathPairs: END with empty result")
         return map[string]bool{}
     }
 
@@ -120,13 +215,16 @@ func (r OsDeviceConnectivityNvmeOFc) getLivePathPairs() map[string]bool {
         if !strings.HasPrefix(trimmed, "+-") || !strings.Contains(trimmed, " live") {
             continue
         }
-        // Extract traddr value: "nn-5005...:pn-5005..."
+
         traddr := extractNvmeField(trimmed, "traddr=")
         hostTraddr := extractNvmeField(trimmed, "host_traddr=")
         if traddr != "" && hostTraddr != "" {
             livePaths[traddr+"|"+hostTraddr] = true
+            logger.Infof("parth getLivePathPairs: found live path traddr=%s hostTraddr=%s", traddr, hostTraddr)
         }
     }
+
+    logger.Infof("parth getLivePathPairs: END livePaths=%v", livePaths)
     return livePaths
 }
 
@@ -152,6 +250,8 @@ func extractNvmeField(line, field string) string {
 // and returns the storage subsystem NQN.
 // Command: nvme discover --transport=fc --traddr=<arrayTargetPort> --host-traddr=<hostPort>
 func (r OsDeviceConnectivityNvmeOFc) discoverSubNqn(arrayTargetPort, hostPort string) (string, error) {
+    logger.Infof("parth discoverSubNqn: START target=%s host=%s", arrayTargetPort, hostPort)
+
     args := []string{
         "discover",
         "--transport=" + nvmeTransportFC,
@@ -161,14 +261,15 @@ func (r OsDeviceConnectivityNvmeOFc) discoverSubNqn(arrayTargetPort, hostPort st
 
     out, err := r.Executer.ExecuteWithTimeout(nvmeCmdTimeout, "nvme", args)
     if err != nil {
-        // Failure on a specific port pair is normal when there's no fabric path.
-        // Not an error worth propagating — just means no path here.
-        logger.Debugf("NVMe-oFC: nvme discover failed (no path?) target=%s host=%s: %v",
+        logger.Infof("parth discoverSubNqn: nvme discover failed (no path?) target=%s host=%s error=%v",
             arrayTargetPort, hostPort, err)
+        logger.Infof("parth discoverSubNqn: END no NQN found")
         return "", nil
     }
 
-    return parseSubNqnFromDiscoverOutput(string(out)), nil
+    subNqn := parseSubNqnFromDiscoverOutput(string(out))
+    logger.Infof("parth discoverSubNqn: END subNqn=%s target=%s host=%s", subNqn, arrayTargetPort, hostPort)
+    return subNqn, nil
 }
 
 // parseSubNqnFromDiscoverOutput extracts subnqn from nvme discover output.
@@ -202,6 +303,8 @@ func parseSubNqnFromDiscoverOutput(output string) string {
 // Command: nvme connect --transport=fc --traddr=<arrayTargetPort>
 //           --host-traddr=<hostPort> --nqn=<subNqn>
 func (r OsDeviceConnectivityNvmeOFc) nvmeConnect(arrayTargetPort, hostPort, subNqn string) {
+    logger.Infof("parth nvmeConnect: START NQN=%s target=%s host=%s", subNqn, arrayTargetPort, hostPort)
+
     args := []string{
         "connect",
         "--transport=" + nvmeTransportFC,
@@ -209,13 +312,17 @@ func (r OsDeviceConnectivityNvmeOFc) nvmeConnect(arrayTargetPort, hostPort, subN
         "--host-traddr=" + hostPort,
         "--nqn=" + subNqn,
     }
+
     out, err := r.Executer.ExecuteWithTimeout(nvmeCmdTimeout, "nvme", args)
     if err != nil {
-        logger.Errorf("NVMe-oFC: connect failed NQN=%s target=%s host=%s: %v output=%s",
+        logger.Errorf("parth nvmeConnect: connect failed NQN=%s target=%s host=%s error=%v output=%s",
             subNqn, arrayTargetPort, hostPort, err, string(out))
+        logger.Infof("parth nvmeConnect: END with error")
         return
     }
-    logger.Infof("NVMe-oFC: connected NQN=%s target=%s host=%s", subNqn, arrayTargetPort, hostPort)
+
+    logger.Infof("parth nvmeConnect: connected NQN=%s target=%s host=%s", subNqn, arrayTargetPort, hostPort)
+    logger.Infof("parth nvmeConnect: END")
 }
 
 // getHostFCPorts reads /sys/class/fc_host/hostN/node_name and port_name for
@@ -223,71 +330,127 @@ func (r OsDeviceConnectivityNvmeOFc) nvmeConnect(arrayTargetPort, hostPort, subN
 //
 // These are passed as --host-traddr to nvme discover and nvme connect.
 func (r OsDeviceConnectivityNvmeOFc) getHostFCPorts() ([]string, error) {
+    logger.Infof("parth getHostFCPorts: START")
+
     portPaths, err := r.Executer.FilepathGlob(FCPortPath)
     if err != nil {
-        return nil, fmt.Errorf("NVMe-oFC: glob %s failed: %w", FCPortPath, err)
+        logger.Errorf("parth getHostFCPorts: glob %s failed: %v", FCPortPath, err)
+        logger.Infof("parth getHostFCPorts: END with error")
+        return nil, fmt.Errorf("glob %s failed: %w", FCPortPath, err)
     }
+
     if len(portPaths) == 0 {
-        return nil, fmt.Errorf("NVMe-oFC: no FC host ports found under /sys/class/fc_host")
+        logger.Errorf("parth getHostFCPorts: no FC host ports found")
+        logger.Infof("parth getHostFCPorts: END with error")
+        return nil, fmt.Errorf("no FC host ports found under /sys/class/fc_host")
     }
 
     var hostPorts []string
     for _, portPath := range portPaths {
-        // portPath = "/sys/class/fc_host/hostN/port_name"
-        // nodePath = "/sys/class/fc_host/hostN/node_name"
         hostDir := portPath[:strings.LastIndex(portPath, "/")]
         nodePath := hostDir + "/node_name"
 
         portBytes, err := r.Executer.IoutilReadFile(portPath)
         if err != nil {
-            logger.Warningf("NVMe-oFC: cannot read %s: %v", portPath, err)
+            logger.Warningf("parth getHostFCPorts: cannot read port %s: %v", portPath, err)
             continue
         }
         nodeBytes, err := r.Executer.IoutilReadFile(nodePath)
         if err != nil {
-            logger.Warningf("NVMe-oFC: cannot read %s: %v", nodePath, err)
+            logger.Warningf("parth getHostFCPorts: cannot read node %s: %v", nodePath, err)
             continue
         }
 
-        // nvme CLI expects: nn-2000f4e9d456d851:pn-2100f4e9d456d851 (no 0x)
         portName := strings.TrimPrefix(strings.TrimSpace(string(portBytes)), "0x")
         nodeName := strings.TrimPrefix(strings.TrimSpace(string(nodeBytes)), "0x")
 
         if portName == "" || nodeName == "" {
-            logger.Warningf("NVMe-oFC: empty port/node name at %s, skipping", hostDir)
+            logger.Warningf("parth getHostFCPorts: empty port/node name at %s, skipping", hostDir)
             continue
         }
 
-        // Result: "nn-2000f4e9d456d851:pn-2100f4e9d456d851"
-        hostPorts = append(hostPorts, fmt.Sprintf("nn-%s:pn-%s", nodeName, portName))
+        hostPort := fmt.Sprintf("nn-%s:pn-%s", nodeName, portName)
+        hostPorts = append(hostPorts, hostPort)
+        logger.Infof("parth getHostFCPorts: found hostPort=%s", hostPort)
     }
 
     if len(hostPorts) == 0 {
-        return nil, fmt.Errorf("NVMe-oFC: no valid host FC port pairs could be read from sysfs")
+        logger.Errorf("parth getHostFCPorts: no valid host FC port pairs could be read")
+        logger.Infof("parth getHostFCPorts: END with error")
+        return nil, fmt.Errorf("no valid host FC port pairs could be read from sysfs")
     }
+
+    logger.Infof("parth getHostFCPorts: END hostPorts=%v", hostPorts)
     return hostPorts, nil
 }
 
 func (r OsDeviceConnectivityNvmeOFc) RescanDevices(_ int, _ []string) error {
-	return nil
+    logger.Infof("parth RescanDevices: START (no-op)")
+    logger.Infof("parth RescanDevices: END")
+    return nil
 }
 
 func (r OsDeviceConnectivityNvmeOFc) GetMpathDevice(volumeId string) (string, error) {
-	return r.HelperScsiGeneric.GetMpathDevice(volumeId)
+    logger.Infof("parth GetMpathDevice: START volumeId=%s", volumeId)
+
+    mpathDevice, err := r.HelperScsiGeneric.GetMpathDevice(volumeId)
+    if err != nil {
+        logger.Errorf("parth GetMpathDevice: GetMpathDevice failed volumeId=%s error=%v", volumeId, err)
+        logger.Infof("parth GetMpathDevice: END with error")
+        return "", err
+    }
+
+    logger.Infof("parth GetMpathDevice: extracted mpathDevice=%s", mpathDevice)
+    logger.Infof("parth GetMpathDevice: END")
+    return mpathDevice, nil
 }
 
 func (r OsDeviceConnectivityNvmeOFc) FlushMultipathDevice(mpathDevice string) error {
-	return r.HelperScsiGeneric.FlushMultipathDevice(mpathDevice)
+    logger.Infof("parth FlushMultipathDevice: START mpathDevice=%s", mpathDevice)
+
+    err := r.HelperScsiGeneric.FlushMultipathDevice(mpathDevice)
+    if err != nil {
+        logger.Errorf("parth FlushMultipathDevice: FlushMultipathDevice failed mpathDevice=%s error=%v",
+            mpathDevice, err)
+        logger.Infof("parth FlushMultipathDevice: END with error")
+        return err
+    }
+
+    logger.Infof("parth FlushMultipathDevice: END")
+    return nil
 }
 
 func (r OsDeviceConnectivityNvmeOFc) RemovePhysicalDevice(sysDevices []string) error {
-	return r.HelperScsiGeneric.RemovePhysicalDevice(sysDevices)
+    logger.Infof("parth RemovePhysicalDevice: START sysDevices=%v", sysDevices)
+
+    err := r.HelperScsiGeneric.RemovePhysicalDevice(sysDevices)
+    if err != nil {
+        logger.Errorf("parth RemovePhysicalDevice: RemovePhysicalDevice failed sysDevices=%v error=%v",
+            sysDevices, err)
+        logger.Infof("parth RemovePhysicalDevice: END with error")
+        return err
+    }
+
+    logger.Infof("parth RemovePhysicalDevice: END")
+    return nil
 }
 
 func (r OsDeviceConnectivityNvmeOFc) RemoveGhostDevice(lun int) error {
-	return r.HelperScsiGeneric.RemoveGhostDevice(lun)
+    logger.Infof("parth RemoveGhostDevice: START lun=%d", lun)
+
+    err := r.HelperScsiGeneric.RemoveGhostDevice(lun)
+    if err != nil {
+        logger.Errorf("parth RemoveGhostDevice: RemoveGhostDevice failed lun=%d error=%v", lun, err)
+        logger.Infof("parth RemoveGhostDevice: END with error")
+        return err
+    }
+
+    logger.Infof("parth RemoveGhostDevice: END")
+    return nil
 }
 
 func (r OsDeviceConnectivityNvmeOFc) ValidateLun(_ int, _ []string) error {
-	return nil
+    logger.Infof("parth ValidateLun: START (no-op)")
+    logger.Infof("parth ValidateLun: END")
+    return nil
 }

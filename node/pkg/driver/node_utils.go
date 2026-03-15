@@ -191,30 +191,47 @@ func (n NodeUtils) ClearStageInfoFile(filePath string) error {
 }
 
 func (n NodeUtils) GetSysDevicesFromMpath(baseDevice string) ([]string, error) {
-	// this will return the 	/sys/block/dm-3/slaves/
-	logger.Debugf("GetSysDevicesFromMpath with param : {%v}", baseDevice)
+
+	logger.Infof("parth GetSysDevicesFromMpath: START baseDevice=[%s]", baseDevice)
+
+	// this will return the /sys/block/dm-3/slaves/
 	deviceSlavePath := path.Join("/sys", "block", baseDevice, "slaves")
-	logger.Debugf("looking in path : {%v}", deviceSlavePath)
+	logger.Infof("parth GetSysDevicesFromMpath: computed deviceSlavePath=[%s]", deviceSlavePath)
+
 	slaves, err := ioutil.ReadDir(deviceSlavePath)
 	if err != nil {
-		logger.Errorf("an error occured while looking for device slaves : {%v}", err.Error())
+		logger.Errorf("parth GetSysDevicesFromMpath: failed reading device slaves path=[%s] error=[%v]", deviceSlavePath, err)
+		logger.Infof("parth GetSysDevicesFromMpath: END with error")
 		return nil, err
 	}
 
-	logger.Debugf("found slaves : {%v}", slaves)
+	logger.Infof("parth GetSysDevicesFromMpath: found slaves entries=[%v]", slaves)
 
 	var slavesNames []string
 	for _, slave := range slaves {
+		logger.Infof("parth GetSysDevicesFromMpath: processing slave=[%s]", slave.Name())
 		slavesNames = append(slavesNames, slave.Name())
 	}
+
+	logger.Infof("parth GetSysDevicesFromMpath: final slavesNames=[%v]", slavesNames)
+	logger.Infof("parth GetSysDevicesFromMpath: END returning slavesNames")
 
 	return slavesNames, nil
 }
 
 func (n NodeUtils) StageInfoFileIsExist(filePath string) bool {
+
+	logger.Infof("parth StageInfoFileIsExist: START filePath=[%s]", filePath)
+
 	if _, err := os.Stat(filePath); err != nil {
+		logger.Infof("parth StageInfoFileIsExist: file does not exist filePath=[%s] error=[%v]", filePath, err)
+		logger.Infof("parth StageInfoFileIsExist: END returning [false]")
 		return false
 	}
+
+	logger.Infof("parth StageInfoFileIsExist: file exists filePath=[%s]")
+	logger.Infof("parth StageInfoFileIsExist: END returning [true]")
+
 	return true
 }
 
@@ -229,54 +246,94 @@ func (n NodeUtils) IsNativeNVMeMultipathEnabled() (bool, error) {
     val := strings.TrimSpace(string(data))
     return val == "Y" , nil
 }
-
 func (n NodeUtils) DevicesAreNvme(device string) (NvmeType, error) {
 
-    nativeMultipath, err := n.IsNativeNVMeMultipathEnabled()
-    if err != nil {
-        logger.Warningf("Failed to read nvme_core multipath param, will try all checks: %v", err)
-    }
+	logger.Infof("parth DevicesAreNvme: START device=[%s]", device)
 
-    if nativeMultipath {
-        // CHECK 1: Native NVMe multipath ON
-        subsysNqnPath := path.Join("/sys/block", device, "device/subsysnqn")
-        _, err := os.Stat(subsysNqnPath)
-        if err == nil {
-            return NVMeNative, nil
-        }
-        if os.IsNotExist(err) {
-            return NotNVMe, nil
-        }
-        return NotNVMe, fmt.Errorf("unable to determine if device %s is NVMe: %w", device, err)
-    }
+	nativeMultipath, err := n.IsNativeNVMeMultipathEnabled()
+	if err != nil {
+		logger.Warningf("parth DevicesAreNvme: failed reading nvme_core multipath param error=[%v], will try all checks", err)
+	}
+	logger.Infof("parth DevicesAreNvme: nativeMultipath=[%v]", nativeMultipath)
 
-    // CHECK 2: Native multipath OFF → non-native NVMe?
-    args := []string{"list"}
-    out, err := n.Executer.ExecuteWithTimeout(TimeOutNvmeCmd, nvmeCmd, args)
-    if err != nil {
-        if err.Error() == "exit status 1" {
-            logger.Debugf("'nvme list' failing, nvme/nvme-core modules not loaded. Not NVMe.")
-            return NotNVMe, nil
-        }
-        outMessage := strings.TrimSpace(string(out))
-        if strings.HasSuffix(outMessage, noSuchFileOrDirectoryErrorMessage) {
-            return NotNVMe, nil
-        }
-        return NotNVMe, err
-    }
+	if nativeMultipath {
+		logger.Infof("parth DevicesAreNvme: CHECK1 native NVMe multipath enabled")
 
-    nvmeListOutput := string(out)
-    slaves, err := n.GetSysDevicesFromMpath(device)
-    if err == nil {
-        for _, slave := range slaves {
-            if strings.Contains(nvmeListOutput, slave) {
-                return NVMeNonNative, nil
-            }
-        }
-        return NotNVMe, nil
-    }
+		subsysNqnPath := path.Join("/sys/block", device, "device/subsysnqn")
+		logger.Infof("parth DevicesAreNvme: computed subsysNqnPath=[%s]", subsysNqnPath)
 
-    return NotNVMe, fmt.Errorf("unable to determine if device %s is NVMe", device)
+		_, err := os.Stat(subsysNqnPath)
+		if err == nil {
+			logger.Infof("parth DevicesAreNvme: NVMe native device detected device=[%s]", device)
+			logger.Infof("parth DevicesAreNvme: END returning NVMeNative")
+			return NVMeNative, nil
+		}
+
+		logger.Infof("parth DevicesAreNvme: os.Stat error=[%v]", err)
+		if os.IsNotExist(err) {
+			logger.Infof("parth DevicesAreNvme: subsysNqnPath not found → Not NVMe")
+			logger.Infof("parth DevicesAreNvme: END returning NotNVMe")
+			return NotNVMe, nil
+		}
+
+		logger.Errorf("parth DevicesAreNvme: stat failed for subsysNqnPath=[%s] error=[%v]", subsysNqnPath, err)
+		logger.Infof("parth DevicesAreNvme: END with error")
+		return NotNVMe, fmt.Errorf("unable to determine if device %s is NVMe: %w", device, err)
+	}
+
+	logger.Infof("parth DevicesAreNvme: CHECK2 native multipath disabled → checking non-native NVMe")
+
+	args := []string{"list"}
+	logger.Infof("parth DevicesAreNvme: executing command [%s %v]", nvmeCmd, args)
+
+	out, err := n.Executer.ExecuteWithTimeout(TimeOutNvmeCmd, nvmeCmd, args)
+	logger.Infof("parth DevicesAreNvme: raw nvme command output=[%s]", string(out))
+
+	if err != nil {
+		logger.Warningf("parth DevicesAreNvme: nvme list command failed error=[%v]", err)
+
+		outMessage := strings.TrimSpace(string(out))
+		logger.Infof("parth DevicesAreNvme: trimmed nvme output=[%s]", outMessage)
+
+		if err.Error() == "exit status 1" {
+			logger.Infof("parth DevicesAreNvme: nvme modules not loaded → Not NVMe")
+			logger.Infof("parth DevicesAreNvme: END returning NotNVMe")
+			return NotNVMe, nil
+		}
+
+		if strings.HasSuffix(outMessage, noSuchFileOrDirectoryErrorMessage) {
+			logger.Infof("parth DevicesAreNvme: nvme device directory missing → Not NVMe")
+			logger.Infof("parth DevicesAreNvme: END returning NotNVMe")
+			return NotNVMe, nil
+		}
+
+		logger.Infof("parth DevicesAreNvme: END with error")
+		return NotNVMe, err
+	}
+
+	nvmeListOutput := string(out)
+	logger.Infof("parth DevicesAreNvme: nvmeListOutput captured length=%d", len(nvmeListOutput))
+
+	slaves, err := n.GetSysDevicesFromMpath(device)
+	logger.Infof("parth DevicesAreNvme: GetSysDevicesFromMpath returned slaves=%v err=%v", slaves, err)
+
+	if err == nil {
+		for _, slave := range slaves {
+			logger.Infof("parth DevicesAreNvme: checking slave=[%s] in nvmeListOutput", slave)
+			if strings.Contains(nvmeListOutput, slave) {
+				logger.Infof("parth DevicesAreNvme: NVMe non-native device detected slave=[%s]", slave)
+				logger.Infof("parth DevicesAreNvme: END returning NVMeNonNative")
+				return NVMeNonNative, nil
+			}
+		}
+		logger.Infof("parth DevicesAreNvme: no slave matched in nvme list → Not NVMe")
+		logger.Infof("parth DevicesAreNvme: END returning NotNVMe")
+		return NotNVMe, nil
+	}
+
+	logger.Errorf("parth DevicesAreNvme: failed to get sys devices for device=[%s] error=[%v]", device, err)
+	logger.Infof("parth DevicesAreNvme: END with error")
+	return NotNVMe, fmt.Errorf("unable to determine if device %s is NVMe", device)
 }
 
 func getRelevantLines(rawContent *os.File) ([]string, error) {
