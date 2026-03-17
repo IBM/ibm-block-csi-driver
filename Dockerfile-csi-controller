@@ -33,6 +33,11 @@ RUN pip3 install .
 
 FROM registry.access.redhat.com/ubi9/python-39:1-1773319596
 
+# Addition due to quay.io security scan. We don't use setuptools and pip at
+# runtime
+#
+RUN pip3 install wheel==0.46.2 pip==26.0.1 setuptools==78.1.1
+
 ARG VERSION=1.13.1
 ARG BUILD_NUMBER=0
 
@@ -55,11 +60,6 @@ COPY ./LICENSE /licenses/
 
 USER root
 RUN chmod +x /driver/controllers/scripts/entrypoint.sh
-
-# Addition due to quay.io security scan. We don't use setuptools and pip at
-# runtime
-#
-RUN pip3 install pip==26.0.1 setuptools==74.1.3
 
 USER default
 WORKDIR /driver
