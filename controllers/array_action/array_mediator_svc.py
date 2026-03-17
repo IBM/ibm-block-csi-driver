@@ -463,11 +463,15 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
                 raise array_errors.InvalidArgumentError(ex.my_message)
             raise ex
 
+    def _format_cli_args(self, cli_kwargs):
+        return ' '.join(f'-{v} {k}' for k, v in cli_kwargs.items())
+
     def _chvolumegroup(self, id_or_name, **cli_kwargs):
         try:
             self.client.svctask.chvolumegroup(object_id=id_or_name, **cli_kwargs)
         except (svc_errors.CommandExecutionError, CLIFailureError) as ex:
-            logger.debug("Error running chvolumegroup -object_id {} {}".format(id_or_name, cli_kwargs))
+            logger.debug("Error running chvolumegroup -object_id {} {}".format(id_or_name,
+                                                                               self._format_cli_args(cli_kwargs)))
             if is_warning_message(ex.my_message):
                 logger.warning(
                     "exception encountered while changing volume group '{}': {}".format(cli_kwargs, ex.my_message))
@@ -492,7 +496,8 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
         try:
             self.client.svctask.chvolumegroupreplication(object_id=id_or_name, **cli_kwargs)
         except (svc_errors.CommandExecutionError, CLIFailureError) as ex:
-            logger.debug("Error running chvolumegroupreplication -object_id {} {}".format(id_or_name, cli_kwargs))
+            logger.debug("Error running chvolumegroupreplication -object_id {} {}".
+                         format(id_or_name, self._format_cli_args(cli_kwargs)))
             if is_warning_message(ex.my_message):
                 logger.warning(
                     "exception encountered while changing volume parameters '{}': {}".format(cli_kwargs, ex.my_message))
@@ -690,7 +695,7 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
                                                       volume_group, name, size)
             self.client.svctask.mkvolume(**cli_kwargs)
         except (svc_errors.CommandExecutionError, CLIFailureError) as ex:
-            logger.debug("Error running mkvolume {}".format(cli_kwargs))
+            logger.debug("Error running mkvolume {}".format(self._format_cli_args(cli_kwargs)))
             if is_warning_message(ex.my_message):
                 logger.warning("exception encountered during creation of volume {0}: {1}".format(name,
                                                                                                  ex.my_message))
@@ -772,7 +777,7 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
         try:
             self.client.svctask.mkvolume(name=name, **cli_kwargs)
         except (svc_errors.CommandExecutionError, CLIFailureError) as ex:
-            logger.debug("Error running mkvolume -name {} {}".format(name, cli_kwargs))
+            logger.debug("Error running mkvolume -name {} {}".format(name, self._format_cli_args(cli_kwargs)))
             raise ex
 
     def _create_cli_volume_from_volume(self, name, pool, io_group, volume_group, source_id):
@@ -1410,7 +1415,7 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
                 cli_kwargs.update({'scsi': lun})
             self.client.svctask.mkvdiskhostmap(**cli_kwargs)
         except (svc_errors.CommandExecutionError, CLIFailureError) as ex:
-            logger.debug("Error running mkvdiskhostmap {}".format(cli_kwargs))
+            logger.debug("Error running mkvdiskhostmap {}".format(self._format_cli_args(cli_kwargs)))
             if is_warning_message(ex.my_message):
                 logger.warning("exception encountered during volume {0} mapping to host {1}: {2}".format(volume_name,
                                                                                                          host_name,
@@ -1444,7 +1449,7 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
         try:
             self.client.svctask.rmvdiskhostmap(**cli_kwargs)
         except (svc_errors.CommandExecutionError, CLIFailureError) as ex:
-            logger.debug("Error running rmvdiskhostmap {}".format(cli_kwargs))
+            logger.debug("Error running rmvdiskhostmap {}".format(self._format_cli_args(cli_kwargs)))
             if is_warning_message(ex.my_message):
                 logger.warning("exception encountered during volume {0}"
                                " unmapping from host {1}: {2}".format(volume_name,
@@ -1711,7 +1716,7 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
             svc_response = self.client.svctask.mkrcrelationship(**kwargs)
             return self._get_id_from_response(svc_response)
         except (svc_errors.CommandExecutionError, CLIFailureError) as ex:
-            logger.debug("Error running mkrcrelationship {}".format(kwargs))
+            logger.debug("Error running mkrcrelationship {}".format(self._format_cli_args(kwargs)))
             if is_warning_message(ex.my_message):
                 logger.warning("exception encountered during creation of rcrelationship for volume id {0} "
                                "with volume id {1} of system {2}: {3}".format(master_cli_volume_id,
@@ -1735,7 +1740,7 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
             kwargs = build_start_replication_kwargs(rcrelationship_id, primary_endpoint_type, force)
             self.client.svctask.startrcrelationship(**kwargs)
         except (svc_errors.CommandExecutionError, CLIFailureError) as ex:
-            logger.debug("Error running startrcrelationship {}".format(kwargs))
+            logger.debug("Error running startrcrelationship {}".format(self._format_cli_args(kwargs)))
             if is_warning_message(ex.my_message):
                 logger.warning("exception encountered while starting rcrelationship '{}': {}".format(rcrelationship_id,
                                                                                                      ex.my_message))
@@ -1774,7 +1779,7 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
         try:
             self.client.svctask.stoprcrelationship(**kwargs)
         except (svc_errors.CommandExecutionError, CLIFailureError) as ex:
-            logger.debug("Error running stoprcrelationship {}".format(kwargs))
+            logger.debug("Error running stoprcrelationship {}".format(self._format_cli_args(kwargs)))
             if is_warning_message(ex.my_message):
                 logger.warning("exception encountered while stopping"
                                " rcrelationship '{0}': {1}".format(rcrelationship_id,
@@ -1910,7 +1915,7 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
         try:
             return self.client.svctask.addsnapshot(**kwargs)
         except (svc_errors.CommandExecutionError, CLIFailureError) as ex:
-            logger.debug("Error running addsnapshot {}".format(kwargs))
+            logger.debug("Error running addsnapshot {}".format(self._format_cli_args(kwargs)))
             if is_warning_message(ex.my_message):
                 logger.warning("exception encountered while creating snapshot '{}': {}".format(name,
                                                                                                ex.my_message))
@@ -1987,7 +1992,7 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
             svc_response = self.client.svctask.mkvolumegroup(name=name, **cli_kwargs)
             return self._get_id_from_response(svc_response)
         except (svc_errors.CommandExecutionError, CLIFailureError) as ex:
-            logger.debug("Error running mkvolumegroup -name {} {}".format(name, cli_kwargs))
+            logger.debug("Error running mkvolumegroup -name {} {}".format(name, self._format_cli_args(cli_kwargs)))
             if is_warning_message(ex.my_message):
                 logger.warning(
                     "exception encountered during creation of volume group and volume {0}: {1}".format(name,
@@ -2040,7 +2045,7 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
                 self.client.svctask.chvdisk(vdisk_id=cli_volume_name, **kwargs)
         except (svc_errors.CommandExecutionError, CLIFailureError) as ex:
             logger.debug("Error running {} -vdisk_id {} {}".format(
-                "chvolume" if partition_name else "chvdisk", cli_volume_name, kwargs))
+                "chvolume" if partition_name else "chvdisk", cli_volume_name, self._format_cli_args(kwargs)))
             if is_warning_message(ex.my_message):
                 logger.warning(
                     "exception encountered while changing volume parameters '{}': {}".format(kwargs, ex.my_message))
@@ -2090,7 +2095,7 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
             self.client.svctask.mkhost(**cli_kwargs)
             return 200
         except (svc_errors.CommandExecutionError, CLIFailureError) as ex:
-            logger.debug("Error running mkhost {}".format(cli_kwargs))
+            logger.debug("Error running mkhost {}".format(self._format_cli_args(cli_kwargs)))
             self._raise_invalid_io_group(io_group, ex.my_message)
             if OBJ_ALREADY_EXIST in ex.my_message:
                 raise array_errors.HostAlreadyExists(host_name, self.endpoint)
@@ -2158,7 +2163,7 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
         try:
             self.client.svctask.addhostport(**cli_kwargs)
         except (svc_errors.CommandExecutionError, CLIFailureError) as ex:
-            logger.debug("Error running addhostport {}".format(cli_kwargs))
+            logger.debug("Error running addhostport {}".format(self._format_cli_args(cli_kwargs)))
             if not self._is_port_invalid(ex.my_message):
                 if is_warning_message(ex.my_message):
                     logger.warning("exception encountered during adding port {} to host {} : {}".format(
@@ -2178,7 +2183,7 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
         try:
             self.client.svctask.rmhostport(**cli_kwargs)
         except (svc_errors.CommandExecutionError, CLIFailureError) as ex:
-            logger.debug("Error running rmhostport {}".format(cli_kwargs))
+            logger.debug("Error running rmhostport {}".format(self._format_cli_args(cli_kwargs)))
             if not self._is_port_invalid(ex.my_message):
                 if is_warning_message(ex.my_message):
                     logger.warning("exception encountered during removing port {} from host {} : {}".format(
@@ -2226,7 +2231,8 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
         try:
             self.client.svctask.addhostiogrp(object_id=host_name, **cli_kwargs)
         except (svc_errors.CommandExecutionError, CLIFailureError) as ex:
-            logger.debug("Error running addhostiogrp -object_id {} {}".format(host_name, cli_kwargs))
+            logger.debug("Error running addhostiogrp -object_id {} {}".format(host_name,
+                                                                              self._format_cli_args(cli_kwargs)))
             self._raise_io_group_error(host_name, io_group, ex.my_message)
             if is_warning_message(ex.my_message):
                 logger.warning("exception encountered during adding io_group {}, to host {} : {}".format(
@@ -2245,7 +2251,8 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
         try:
             self.client.svctask.rmhostiogrp(object_id=host_name, **cli_kwargs)
         except (svc_errors.CommandExecutionError, CLIFailureError) as ex:
-            logger.debug("Error running rmhostiogrp -object_id {} {}".format(host_name, cli_kwargs))
+            logger.debug("Error running rmhostiogrp -object_id {} {}".format(host_name,
+                                                                             self._format_cli_args(cli_kwargs)))
             self._raise_io_group_error(host_name, io_group, ex.my_message)
             if is_warning_message(ex.my_message):
                 logger.warning("exception encountered during removing io_group {}, from host {} : {}".format(
@@ -2304,7 +2311,7 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
         try:
             self.client.svctask.chhost(**cli_kwargs)
         except (svc_errors.CommandExecutionError, CLIFailureError) as ex:
-            logger.debug("Error running chhost {}".format(cli_kwargs))
+            logger.debug("Error running chhost {}".format(self._format_cli_args(cli_kwargs)))
             self._raise_error_when_host_not_found(host_name, ex.my_message)
             self._raise_unsupported_parameter_error(ex.my_message, 'protocol')
             self._raise_error_when_cannot_change_host_protocol_because_of_mapped_ports(ex.my_message, host_name)
@@ -2446,7 +2453,8 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
         try:
             self.client.svctask.registerplugin(name='{}'.format(plugin_name), **cli_kwargs)
         except Exception as ex:
-            logger.debug("Error running registerplugin -name {} {}".format(plugin_name, cli_kwargs))
+            logger.debug("Error running registerplugin -name {} {}".format(plugin_name,
+                                                                           self._format_cli_args(cli_kwargs)))
             logger.error("exception encountered during"
                          "registering {} plugin using {} unique key with [{}] metadata: {}".format(
                              plugin_name, unique_key, metadata, ex))
