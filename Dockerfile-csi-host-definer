@@ -40,6 +40,11 @@ COPY ./common /driver/common
 COPY ./controllers/ /driver/controllers/
 COPY ./LICENSE /licenses/
 
+# Addition due to quay.io security scan. We don't use setuptools and pip at
+# runtime
+#
+RUN pip3 install pip==26.0.1 setuptools==74.1.3
+
 WORKDIR /driver/controllers/servers/host_definer/
 ENV PYTHONPATH=/driver
 
