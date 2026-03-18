@@ -76,6 +76,11 @@ type Executer struct {
 	waitDelay time.Duration
 }
 
+type ExecuterBridge struct {
+	ctx context.Context	*apiCtx
+	e *Executer
+}
+
 func NewExecuter() *Executer {
 	return &Executer{
 		stuckProcesses: make(map[string]zombieInfo),
@@ -88,7 +93,7 @@ func NewExecuter() *Executer {
 //Status (multipath -ll, iscsiadm -m node)	10KB - 1MB	2MB	Enough for typical node density.
 //nventory (discoverydb, scan)	1MB - 5MB	10MB	Prevents truncation on high-density nodes.
 
-var _ k8sexec.Interface = &Executer{}
+var _ k8sexec.Interface = &ExecuterBridge{}
 var _ k8sexec.Cmd = &safeCmd{}
 
 const DefaultMaxOutput int = 1024 * 1024 // 1MB limit for safety
@@ -123,19 +128,26 @@ func (w *limitWriter) Write(p []byte) (n int, err error) {
 }
 
 
-// safeCmd wraps the standard Cmd to add device-aware safety logic
 type safeCmd struct {
-	k8sexec.Cmd
-	stdout   io.Writer // Intercepted value
-	stderr   io.Writer // Intercepted value
-	stdin    io.Reader // Intercepted value
-	name     string
-	args     []string
-	ctx      context.Context
-	executor *Executer
+    k8sexec.Cmd
+    name     string
+    args     []string
+    executor *Executer
+    ctx      context.Context
+    stdout   io.Writer
+    stderr   io.Writer
+		//stdin    io.Reader // Intercepted value
+
+    pid      int // Store the PID once we have it
 }
 
-func (e *Executer) CommandContext(ctx context.Context, name string, args ...string) k8sexec.Cmd {
+
+// LookPath satisfies k8sexec.Interface
+func (e *ExecuterBridge) LookPath(file string) (string, error) {
+	return exec.LookPath(file)
+}
+
+func (e *ExecuterBridge) CommandContext(ctx context.Context, name string, args ...string) k8sexec.Cmd {
     realExecutor := k8sexec.New()
     baseCmd := realExecutor.CommandContext(ctx, name, args...)
 
@@ -148,15 +160,116 @@ func (e *Executer) CommandContext(ctx context.Context, name string, args ...stri
         }
 }
 
-func (e *Executer) Command(name string, args ...string) k8sexec.Cmd {
+func (e *ExecuterBridge) Command(name string, args ...string) k8sexec.Cmd {
 		// TODO
         logger.Warningf("command %s", name)
         return e.CommandContext(context.Background(), name, args...)
 }
 
-func (e *Executer) LookPath(file string) (string, error) {
-        return exec.LookPath(file)
+
+// PidProvider allows us to safely extract a PID from a k8sexec.Cmd 
+// without using reflection on private fields.
+type PidProvider interface {
+    GetPid() int
 }
+
+type CmdExtension interface {
+    GetPid() int
+    SetWaitDelay(td time.Duration)
+}
+
+
+// GetPid satisfies our custom PidProvider interface
+func (s *safeCmd) GetPid() int {
+    return s.pid
+}
+
+func (s *safeCmd) SetWaitDelay(td time.Duration) {
+    // We must use the same "check-and-cast" logic to reach the underlying struct
+    if realCmd, ok := s.Cmd.(interface{ SetWaitDelay(time.Duration) }); ok {
+        realCmd.SetWaitDelay(td)
+    }
+}
+
+func (s *safeCmd) Start() error {
+    // 1. Pre-check: Is the device stuck?
+    device := s.extractDevice()
+    if device != "" && s.executor.IsDeviceStillStuck(device) {
+        return &stuckError{device: device, name: s.name}
+    }
+	
+	s.SetWaitDelay(5 * time.Second)
+
+    // 2. Setup logging buffers (Standardize your TODO: wrap both)
+    if s.stdout == nil {
+        s.stdout = &limitWriter{Writer: &bytes.Buffer{}, Limit: DefaultMaxOutput}
+        s.Cmd.SetStdout(s.stdout)
+    }
+    if s.stderr == nil {
+        s.stderr = &limitWriter{Writer: &bytes.Buffer{}, Limit: DefaultMaxOutput}
+        s.Cmd.SetStderr(s.stderr)
+    }
+
+    // 3. Start the process
+    if err := s.Cmd.Start(); err != nil {
+        return err // CRITICAL: Do not return nil here
+    }
+
+    // 4. Capture the PID immediately after Start
+    // If your executor creates a real os/exec.Cmd, it will be available now.
+    if realCmd, ok := s.Cmd.(interface{ GetPid() int }); ok {
+        s.pid = realCmd.GetPid()
+    }
+
+	//TODO which version
+    // Capture PID for tracking
+    if pidProvider, ok := s.Cmd.(PidProvider); ok {
+        s.pid = pidProvider.GetPid()
+    }
+	
+
+    return nil
+}
+
+func (s *safeCmd) Wait() error {
+    err := s.Cmd.Wait()
+    device := s.extractDevice()
+
+    if err != nil {
+        // Check for timeout or WaitDelay issues
+        isTimeout := s.ctx != nil && s.ctx.Err() != nil
+        isWaitDelay := errors.Is(err, exec.ErrWaitDelay)
+
+        if (isWaitDelay || isTimeout) && device != "" {
+            // We use s.pid which we captured during Start()
+            s.executor.markAsStuck(device, s.pid, s.name)
+        }
+        return err
+    }
+
+    // Success: clear any "stuck" status for this device
+    if device != "" {
+        s.executor.clearTracking(device)
+    }
+    return nil
+}
+
+func (s *safeCmd) Stop() {
+    // Standard cleanup
+    s.Cmd.Stop()
+    
+    // If the process is still hanging around, we can use our captured PID
+    if s.pid > 0 {
+        if proc, err := os.FindProcess(s.pid); err == nil {
+            _ = proc.Kill()
+        }
+    }
+}
+
+
+
+///////////////////////////////////
+
 
 // Override SetStdout to track it
 func (s *safeCmd) SetStdout(w io.Writer) {
@@ -209,7 +322,7 @@ func (s *safeCmd) Start() error {
         err := s.Cmd.Start()
 		
 		if err != nil {
-			return nil
+			return err
 		}
 		
 		    // 3. NOW you can extract the PID
@@ -274,6 +387,20 @@ func (s *safeCmd) Stop() {
 }
 
 
+// Stop satisfies k8sexec.Cmd
+func (s *safeCmd) Stop() {
+	if s.Cmd.Process == nil {
+		return
+	}
+	// Attempt to kill the process
+	_ = s.Cmd.Process.Kill()
+
+	// Optional: You could trigger your stuck logic here if
+	// the process doesn't exit after a SIGKILL, but usually
+	// the WaitDelay in the main Wait() call handles this better.
+}
+
+
 func (s *safeCmd) CombinedOutput() ([]byte, error) {
     var b bytes.Buffer
     // Use a single limitWriter for BOTH to track the total output limit correctly
@@ -294,24 +421,6 @@ func (s *safeCmd) CombinedOutput() ([]byte, error) {
     return b.Bytes(), err
 }
 
-
-// Stop satisfies k8sexec.Cmd
-func (s *safeCmd) Stop() {
-	if s.Cmd.Process == nil {
-		return
-	}
-	// Attempt to kill the process
-	_ = s.Cmd.Process.Kill()
-
-	// Optional: You could trigger your stuck logic here if
-	// the process doesn't exit after a SIGKILL, but usually
-	// the WaitDelay in the main Wait() call handles this better.
-}
-
-// LookPath satisfies k8sexec.Interface
-func (e *Executer) LookPath(file string) (string, error) {
-	return exec.LookPath(file)
-}
 
 func (s *safeCmd) extractDevice() string {
     for _, arg := range s.args {
@@ -685,6 +794,7 @@ func (e *Executer) invalidateSocket() {
 	e.socketMu.Unlock()
 }
 
+// TODO make sure this cannot hang
 func (e *Executer) MultipathdCmd(ctx context.Context, device string, command string) (string, error) {
 	// If the command targets a specific device, check the stuck map first.
 
