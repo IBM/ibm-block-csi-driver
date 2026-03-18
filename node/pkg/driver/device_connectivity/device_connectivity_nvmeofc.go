@@ -103,10 +103,11 @@ func (r OsDeviceConnectivityNvmeOFc) EnsureLogin(ipsByArrayInitiator map[string]
 			}
 
 			logger.Infof("NVMe-oFC EnsureLogin: connecting NQN=%s target=%s host=%s",
-				subNqn, arrayTargetPort, hostPort)
-			r.nvmeConnect(arrayTargetPort, hostPort, subNqn)
-			connectedPaths++
-		}
+                subNqn, arrayTargetPort, hostPort)
+            if r.nvmeConnect(arrayTargetPort, hostPort, subNqn) {
+                connectedPaths++
+            }
+        }
 	}
 
 	// Re-read to get kernel-confirmed final count (nvmeConnect may have failed silently).
@@ -271,7 +272,7 @@ func parseSubNqnFromDiscoverOutput(output string) string {
 }
 
 // nvmeConnect runs "nvme connect" for one (arrayTargetPort, hostPort, subNqn) combination.
-func (r OsDeviceConnectivityNvmeOFc) nvmeConnect(arrayTargetPort, hostPort, subNqn string) {
+func (r OsDeviceConnectivityNvmeOFc) nvmeConnect(arrayTargetPort, hostPort, subNqn string) bool {
 	args := []string{
 		"connect",
 		"--transport=" + nvmeTransportFC,
@@ -283,9 +284,10 @@ func (r OsDeviceConnectivityNvmeOFc) nvmeConnect(arrayTargetPort, hostPort, subN
 	if err != nil {
 		logger.Errorf("NVMe-oFC nvmeConnect: failed NQN=%s target=%s host=%s: %v output=%s",
 			subNqn, arrayTargetPort, hostPort, err, string(out))
-		return
+		return false
 	}
 	logger.Infof("NVMe-oFC nvmeConnect: connected NQN=%s target=%s host=%s", subNqn, arrayTargetPort, hostPort)
+	return true
 }
 
 // getHostFCPorts reads node_name and port_name for every FC host adapter from sysfs
