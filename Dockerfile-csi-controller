@@ -36,8 +36,11 @@ FROM registry.access.redhat.com/ubi9/python-39:1-1773319596
 # Addition due to quay.io security scan. We don't use setuptools and pip at
 # runtime
 #
+USER root
+RUN rpm -e --nodeps python3-pip python3-setuptools
 RUN pip3 install wheel==0.46.2 pip==26.0.1 setuptools==78.1.1
 
+USER default
 ARG VERSION=1.13.1
 ARG BUILD_NUMBER=0
 
