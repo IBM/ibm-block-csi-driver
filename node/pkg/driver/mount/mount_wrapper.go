@@ -916,10 +916,9 @@ func (m *Mounter) GetMountsForPath(target string) ([]MountInfo, error) {
 // Block Devices: You want the clean kernel name (e.g., sda1 instead of /dev/sda1).
 // Network Mounts: You want the remote export path (e.g., 192.168.1.10:/exports/data).
 func GetDeviceFromPath(targetPath string) (string, error) {
-	logger.Warningf("Device from path %s", targetPath)
 	mi, err := findBestMount(targetPath)
 	if err != nil {
-		logger.Warning("cannot find best")
+		logger.Warningf("Failed to find mount for %s: %v", targetPath, err)
 		return "", err
 	}
 
@@ -928,27 +927,54 @@ func GetDeviceFromPath(targetPath string) (string, error) {
 
 	logger.Warningf("source %s type %s", source, fstype)
 
-	// TODO might return the alias
-
-	// 1. Handle Block Devices
-	// If it's a standard /dev/ path, return just the base (e.g., "nvme0n1p3")
-	if strings.HasPrefix(source, "/dev/") {
-		return source, nil
-	}
-
-	// 2. Handle Network/Pseudo Filesystems
-	// For these, the "source" is often an IP, a hostname, or a specific string
+	// 1. Skip network/pseudo filesystems (no normalization needed)
 	switch fstype {
-	case "nfs", "nfs4", "cifs", "ceph", "glusterfs", "fuse.sshfs":
-		return source, nil // Keep the full remote path/address
-	case "tmpfs", "devtmpfs":
-		return fstype, nil // Usually better to know it's RAM than "tmpfs"
-	default:
-		// Fallback: If it's not a /dev path but we don't recognize the FS,
-		// use the base name as a safe bet.
+	case "nfs", "nfs4", "cifs", "ceph", "glusterfs", "fuse.sshfs", "tmpfs", "devtmpfs":
+		logger.Infof("Skipping normalization for network/pseudo FS: %s (type %s)", source, fstype)
 		return source, nil
 	}
+
+	// 2. Determine the full candidate path (handle aliases like "sda1" or "mpatha")
+	var fullPath string
+	if strings.HasPrefix(source, "/dev/") {
+		fullPath = source
+	} else {
+		// Check common locations for aliases (RHEL 7 / LVM / Multipath)
+		candidates := []string{
+			filepath.Join("/dev", source),        // e.g. sda1 -> /dev/sda1
+			filepath.Join("/dev/mapper", source), // e.g. mpatha -> /dev/mapper/mpatha
+			filepath.Join("/dev/mpath", source),  // older multipath paths
+		}
+
+		for _, c := range candidates {
+			if _, err := os.Stat(c); err == nil {
+				fullPath = c
+				logger.Infof("Resolved alias '%s' to candidate path: %s", source, fullPath)
+				break
+			}
+		}
+	}
+
+	// If we couldn't find a /dev path, fall back to original source
+	if fullPath == "" {
+		logger.Warningf("Could not find /dev entry for source: %s", source)
+		fullPath = source
+	}
+
+	// 3. Resolve Symlinks (maps /dev/mapper/mpatha -> /dev/dm-0)
+	finalPath, err := filepath.EvalSymlinks(fullPath)
+	if err != nil {
+		logger.Warningf("EvalSymlinks failed for %s: %v. Using candidate path.", fullPath, err)
+		return fullPath, nil
+	}
+
+	if finalPath != source {
+		logger.Infof("Device mapping: [Source: %s] -> [Candidate: %s] -> [Final: %s]", source, fullPath, finalPath)
+	}
+
+	return finalPath, nil
 }
+
 
 func GetMajorMinorFromSysfs(targetPath string) (uint32, uint32, error) {
 	mi, err := findBestMount(targetPath)
