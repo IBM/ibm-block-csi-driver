@@ -727,7 +727,7 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
     def change_host_protocol(self, host_name, protocol):
         raise NotImplementedError
 
-    def get_nvme_target_ports(self, host_name):
+    def get_nvme_target_ports(self):
         raise NotImplementedError
 
     def register_plugin(self, unique_key,  metadata):

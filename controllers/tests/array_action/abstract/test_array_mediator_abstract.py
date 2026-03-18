@@ -48,6 +48,7 @@ class BaseMediatorAbstractSetUp(unittest.TestCase):
 
         self.mediator.get_host_by_host_identifiers.return_value = (common_settings.HOST_NAME, self.connectivity_type)
         self.mediator.get_array_fc_wwns.return_value = self.fc_ports
+        self.mediator.get_nvme_target_ports.return_value = []
         self.mediator.map_volume.return_value = self.lun_id
         self.hostname = common_settings.HOST_NAME
         self.iqn = array_settings.DUMMY_NODE1_IQN
@@ -224,10 +225,12 @@ class TestMapVolumeByInitiators(BaseMediatorAbstractSetUp):
     def test_map_volume_by_initiators_with_connectivity_type_nvme(self):
         self.mediator.get_host_by_host_identifiers.return_value = self.hostname, [
             array_settings.NVME_OVER_FC_CONNECTIVITY_TYPE]
-
+        self.mediator.get_nvme_target_ports = Mock()
+        self.mediator.get_nvme_target_ports.return_value = [array_settings.DUMMY_NVME_NQN1]
         response = self.mediator.map_volume_by_initiators('', self.initiators)
 
-        self.assertEqual(response, (array_settings.DUMMY_LUN_ID, array_settings.NVME_OVER_FC_CONNECTIVITY_TYPE, []))
+        self.assertEqual(response, (array_settings.DUMMY_LUN_ID, array_settings.NVME_OVER_FC_CONNECTIVITY_TYPE,
+                                    [array_settings.DUMMY_NVME_NQN1]))
 
     def test_map_volume_by_initiators_with_connectivity_unsupported_type(self):
         self.mediator.get_host_by_host_identifiers.return_value = self.hostname, [

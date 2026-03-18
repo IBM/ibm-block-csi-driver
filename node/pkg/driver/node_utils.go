@@ -51,9 +51,9 @@ var (
 type NvmeType string
 
 const (
-    NVMeNative    NvmeType = "native"
-    NVMeNonNative NvmeType = "non-native"
-    NotNVMe       NvmeType = "non-nvme"
+	NVMeNative    NvmeType = "native"
+	NVMeNonNative NvmeType = "non-native"
+	NotNVMe       NvmeType = "non-nvme"
 )
 
 const (
@@ -218,66 +218,66 @@ func (n NodeUtils) StageInfoFileIsExist(filePath string) bool {
 }
 
 func (n NodeUtils) IsNativeNVMeMultipathEnabled() (bool, error) {
-    data, err := os.ReadFile("/sys/module/nvme_core/parameters/multipath")
-    if err != nil {
-        if os.IsNotExist(err) {
-            return false, nil
-        }
-        return false, fmt.Errorf("failed to read nvme_core multipath param: %w", err)
-    }
-    val := strings.TrimSpace(string(data))
-    return val == "Y" , nil
+	data, err := os.ReadFile("/sys/module/nvme_core/parameters/multipath")
+	if err != nil {
+		if os.IsNotExist(err) {
+			return false, nil
+		}
+		return false, fmt.Errorf("failed to read nvme_core multipath param: %w", err)
+	}
+	val := strings.TrimSpace(string(data))
+	return val == "Y", nil
 }
 
 func (n NodeUtils) DevicesAreNvme(device string) (NvmeType, error) {
 
-    nativeMultipath, err := n.IsNativeNVMeMultipathEnabled()
-    if err != nil {
-        logger.Warningf("Failed to read nvme_core multipath param, will try all checks: %v", err)
-    }
+	nativeMultipath, err := n.IsNativeNVMeMultipathEnabled()
+	if err != nil {
+		logger.Warningf("Failed to read nvme_core multipath param, will try all checks: %v", err)
+	}
 
-    if nativeMultipath {
-        // CHECK 1: Native NVMe multipath ON
-        subsysNqnPath := path.Join("/sys/block", device, "device/subsysnqn")
-        _, err := os.Stat(subsysNqnPath)
-        if err == nil {
+	if nativeMultipath {
+		// CHECK 1: Native NVMe multipath ON
+		subsysNqnPath := path.Join("/sys/block", device, "device/subsysnqn")
+		_, err := os.Stat(subsysNqnPath)
+		if err == nil {
 			logger.Infof("Current node is configured with NVMe native multipath for device %s", device)
-            return NVMeNative, nil
-        }
-        if os.IsNotExist(err) {
-            return NotNVMe, nil
-        }
-        return NotNVMe, fmt.Errorf("unable to determine if device %s is NVMe: %w", device, err)
-    }
+			return NVMeNative, nil
+		}
+		if os.IsNotExist(err) {
+			return NotNVMe, nil
+		}
+		return NotNVMe, fmt.Errorf("unable to determine if device %s is NVMe: %w", device, err)
+	}
 
-    // CHECK 2: Native multipath OFF → non-native NVMe?
-    args := []string{"list"}
-    out, err := n.Executer.ExecuteWithTimeout(TimeOutNvmeCmd, nvmeCmd, args)
-    if err != nil {
-        if err.Error() == "exit status 1" {
-            logger.Debugf("'nvme list' failing, nvme/nvme-core modules not loaded. Not NVMe.")
-            return NotNVMe, nil
-        }
-        outMessage := strings.TrimSpace(string(out))
-        if strings.HasSuffix(outMessage, noSuchFileOrDirectoryErrorMessage) {
-            return NotNVMe, nil
-        }
-        return NotNVMe, err
-    }
+	// CHECK 2: Native multipath OFF → non-native NVMe?
+	args := []string{"list"}
+	out, err := n.Executer.ExecuteWithTimeout(TimeOutNvmeCmd, nvmeCmd, args)
+	if err != nil {
+		if err.Error() == "exit status 1" {
+			logger.Debugf("'nvme list' failing, nvme/nvme-core modules not loaded. Not NVMe.")
+			return NotNVMe, nil
+		}
+		outMessage := strings.TrimSpace(string(out))
+		if strings.HasSuffix(outMessage, noSuchFileOrDirectoryErrorMessage) {
+			return NotNVMe, nil
+		}
+		return NotNVMe, err
+	}
 
-    nvmeListOutput := string(out)
-    slaves, err := n.GetSysDevicesFromMpath(device)
-    if err == nil {
-        for _, slave := range slaves {
-            if strings.Contains(nvmeListOutput, slave) {
+	nvmeListOutput := string(out)
+	slaves, err := n.GetSysDevicesFromMpath(device)
+	if err == nil {
+		for _, slave := range slaves {
+			if strings.Contains(nvmeListOutput, slave) {
 				logger.Infof("Current node is configured with NVMe non-native multipath for device %s", device)
-                return NVMeNonNative, nil
-            }
-        }
-        return NotNVMe, nil
-    }
+				return NVMeNonNative, nil
+			}
+		}
+		return NotNVMe, nil
+	}
 
-    return NotNVMe, fmt.Errorf("unable to determine if device %s is NVMe", device)
+	return NotNVMe, fmt.Errorf("unable to determine if device %s is NVMe", device)
 }
 
 func getRelevantLines(rawContent *os.File) ([]string, error) {

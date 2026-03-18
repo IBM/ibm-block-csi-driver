@@ -3,6 +3,7 @@ import func_timeout
 import json
 from munch import Munch
 from mock import patch, Mock
+import time
 
 import controllers.tests.controller_server.host_definer.utils.k8s_manifests_utils as manifest_utils
 import controllers.tests.controller_server.host_definer.settings as test_settings
@@ -241,3 +242,12 @@ def initiators_to_json(initiators: Initiators) -> str:
         "fc": initiators.fc_wwns or [],
         "iscsi": initiators.iscsi_iqns or [],
     })
+
+
+def wait_until_called(mock, timeout=5, interval=0.1):
+    start = time.time()
+    while time.time() - start < timeout:
+        if mock.called:
+            return
+        time.sleep(interval)
+    raise TimeoutError("Mock was never called within {} seconds".format(timeout))

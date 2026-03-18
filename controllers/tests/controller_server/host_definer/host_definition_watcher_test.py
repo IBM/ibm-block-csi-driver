@@ -65,9 +65,12 @@ class TestWatchHostDefinitionsResources(HostDefinitionWatcherBase):
 
     def test_pending_creation_that_managed_to_be_created(self):
         self._prepare_default_mocks_for_pending_creation()
+        self.host_definition_watcher.host_definitions_api.get.return_value = self.ready_k8s_host_definitions
         self.host_definition_watcher._loop_forever = Mock()
         self.host_definition_watcher._loop_forever.side_effect = [True, False]
+        test_utils.patch_pending_variables()
         test_utils.run_function_with_timeout(self.host_definition_watcher.watch_host_definitions_resources, 0.5)
+        test_utils.wait_until_called(self.host_definition_watcher.custom_object_api.patch_cluster_custom_object_status)
         self.host_definition_watcher.custom_object_api.patch_cluster_custom_object_status.assert_called_once_with(
             common_settings.CSI_IBM_GROUP, common_settings.VERSION,
             common_settings.HOST_DEFINITION_PLURAL, test_settings.FAKE_NODE_NAME,

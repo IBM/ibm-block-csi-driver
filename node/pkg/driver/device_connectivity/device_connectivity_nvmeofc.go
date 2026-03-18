@@ -17,19 +17,19 @@
 package device_connectivity
 
 import (
-    "fmt"
-    "strings"
+	"fmt"
+	"strings"
 
 	"github.com/ibm/ibm-block-csi-driver/node/logger"
 	"github.com/ibm/ibm-block-csi-driver/node/pkg/driver/executer"
 )
 
 const (
-    nvmeCmdTimeout   = 10 * 1000
-    nvmeTransportFC  = "fc"
-    nvmeDiscoveryNqn = "nqn.2014-08.org.nvmexpress.discovery"
-	FCPortPath       = "/sys/class/fc_host/host*/port_name"
-	nvmeTargetPathCount = 3
+	nvmeCmdTimeout                      = 10 * 1000
+	nvmeTransportFC                     = "fc"
+	nvmeDiscoveryNqn                    = "nqn.2014-08.org.nvmexpress.discovery"
+	FCPortPath                          = "/sys/class/fc_host/host*/port_name"
+	nvmeTargetPathCount                 = 3
 	nvmeMinPathsForNonNativeDmMultipath = 2
 )
 
@@ -103,11 +103,11 @@ func (r OsDeviceConnectivityNvmeOFc) EnsureLogin(ipsByArrayInitiator map[string]
 			}
 
 			logger.Infof("NVMe-oFC EnsureLogin: connecting NQN=%s target=%s host=%s",
-                subNqn, arrayTargetPort, hostPort)
-            if r.nvmeConnect(arrayTargetPort, hostPort, subNqn) {
-                connectedPaths++
-            }
-        }
+				subNqn, arrayTargetPort, hostPort)
+			if r.nvmeConnect(arrayTargetPort, hostPort, subNqn) {
+				connectedPaths++
+			}
+		}
 	}
 
 	// Re-read to get kernel-confirmed final count (nvmeConnect may have failed silently).

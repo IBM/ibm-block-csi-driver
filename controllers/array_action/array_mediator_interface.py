@@ -320,7 +320,7 @@ class ArrayMediator(ABC):
             None
         """
         raise NotImplementedError
-    
+
     @abstractmethod
     def get_host_by_host_identifiers(self, initiators):
         """

@@ -1552,7 +1552,7 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
             return self.client.svcinfo.lstargetportfc(**kwargs)
         except (svc_errors.CommandExecutionError, CLIFailureError) as ex:
             logger.error("Failed to get target port fc for {0}. Reason "
-                        "is: {1}".format(kwargs, ex))
+                         "is: {1}".format(kwargs, ex))
             raise ex
 
     def get_nvme_target_ports(self):
