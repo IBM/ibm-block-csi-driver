@@ -69,7 +69,8 @@ const (
 type NodeUtilsInterface interface {
 	GetVolumeUuid(volumeId string) string
 	ReadNvmeNqn() (string, error)
-	DevicesAreNvme(sysDevices []string) (bool, error)
+	IsNativeNVMeMultipathEnabled() (bool, error)
+	DevicesAreNvme(device string) (bool, error)
 	ParseFCPorts() ([]string, error)
 	ParseIscsiInitiators() (string, error)
 	GetInfoFromPublishContext(publishContext map[string]string) (string, int, map[string][]string, error)
@@ -194,28 +195,66 @@ func (n NodeUtils) StageInfoFileIsExist(filePath string) bool {
 	return true
 }
 
-func (n NodeUtils) DevicesAreNvme(sysDevices []string) (bool, error) {
-	args := []string{"list"}
-	out, err := n.Executer.ExecuteWithTimeout(TimeOutNvmeCmd, nvmeCmd, args)
-	if err != nil {
-		if err.Error() == "exit status 1" {
-			logger.Debugf("'nvme list' failing, likely because 'nvme' and 'nvme-core' kernel modules are not loaded. Devices are certainly not NVMe in this case")
-			return false, nil
-		}
-		outMessage := strings.TrimSpace(string(out))
-		if strings.HasSuffix(outMessage, noSuchFileOrDirectoryErrorMessage) {
-			return false, nil
-		}
-		return false, err
-	}
-	nvmeDevices := string(out)
-	for _, deviceName := range sysDevices {
-		if strings.Contains(nvmeDevices, deviceName) {
-			logger.Debugf("found device {%s} in nvme list", deviceName)
-			return true, nil
-		}
-	}
-	return false, nil
+func (n NodeUtils) IsNativeNVMeMultipathEnabled() (bool, error) {
+    data, err := os.ReadFile("/sys/module/nvme_core/parameters/multipath")
+    if err != nil {
+        if os.IsNotExist(err) {
+            return false, nil
+        }
+        return false, fmt.Errorf("failed to read nvme_core multipath param: %w", err)
+    }
+    val := strings.TrimSpace(string(data))
+    return val == "Y" , nil
+}
+
+func (n NodeUtils) DevicesAreNvme(device string) (bool, error) {
+
+    nativeMultipath, err := n.IsNativeNVMeMultipathEnabled()
+    if err != nil {
+        logger.Warningf("Failed to read nvme_core multipath param, will try all checks: %v", err)
+    }
+
+    if nativeMultipath {
+        // CHECK 1: Native NVMe multipath ON
+        // device is nvme0n1 directly → subsysnqn exists in sysfs
+        subsysNqnPath := path.Join("/sys/block", device, "device/subsysnqn")
+        _, err := os.Stat(subsysNqnPath)
+        if err == nil {
+            return true, nil
+        }
+        if os.IsNotExist(err) {
+            return false, nil
+        }
+
+        return false, fmt.Errorf("unable to determine if device %s is NVMe: %w", device, err)
+    }
+
+    // CHECK 2: Native multipath OFF → device is dm-X, check its slaves via nvme list
+    args := []string{"list"}
+    out, err := n.Executer.ExecuteWithTimeout(TimeOutNvmeCmd, nvmeCmd, args)
+    if err != nil {
+        if err.Error() == "exit status 1" {
+            logger.Debugf("'nvme list' failing, nvme/nvme-core modules not loaded. Not NVMe.")
+            return false, nil
+        }
+        outMessage := strings.TrimSpace(string(out))
+        if strings.HasSuffix(outMessage, noSuchFileOrDirectoryErrorMessage) {
+            return false, nil
+        }
+        return false, err
+    }
+    nvmeListOutput := string(out)
+    slaves, err := n.GetSysDevicesFromMpath(device)
+    if err == nil {
+        for _, slave := range slaves {
+            if strings.Contains(nvmeListOutput, slave) {
+                logger.Debugf("found slave device {%s} in nvme list", slave)
+                return true, nil
+            }
+        }
+        return false, nil
+    }
+    return false, fmt.Errorf("unable to determine if device %s is NVMe", device)
 }
 
 func getRelevantLines(rawContent *os.File) ([]string, error) {

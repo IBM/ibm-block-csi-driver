@@ -750,24 +750,34 @@ func convertScsiIdToNguid(scsiId string) string {
 
 func (o GetDmsPathHelperGeneric) WaitForDmToExist(volumeIdVariations []string, maxRetries int, intervalSeconds int,
 	multipathdCommandFormatArgs []string) (string, error) {
-	formatTemplate := strings.Join(multipathdCommandFormatArgs, mpathdSeparator)
+    formatTemplate := strings.Join(multipathdCommandFormatArgs, mpathdSeparator)
 	args := []string{"show", "maps", "raw", "format", "\"", formatTemplate, "\""}
-	logger.Debugf("Waiting for dm to exist")
-	for i := 0; i < maxRetries; i++ {
-		out, err := o.executer.ExecuteWithTimeout(TimeOutMultipathdCmd, multipathdCmd, args)
-		if err != nil {
-			return "", err
-		}
-		dms := string(out)
-		for _, volumeIdVariation := range volumeIdVariations {
-			if strings.Contains(dms, volumeIdVariation) {
-				return dms, nil
-			}
-		}
+    logger.Debugf("Waiting for dm to exist")
+	var lastErr error
+    for i := 0; i < maxRetries; i++ {
+        out, err := o.executer.ExecuteWithTimeout(TimeOutMultipathdCmd, multipathdCmd, args)
+        if err != nil {
+			lastErr = err
+            logger.Warningf("multipathd show maps failed (attempt %d/%d), retrying: %v", i+1, maxRetries, err)
+            time.Sleep(time.Second * time.Duration(intervalSeconds))
+            continue
+        }
+		lastErr = nil
+        dms := string(out)
+        for _, volumeIdVariation := range volumeIdVariations {
+            if strings.Contains(dms, volumeIdVariation) {
+                return dms, nil
+            }
+        }
 
-		time.Sleep(time.Second * time.Duration(intervalSeconds))
+        time.Sleep(time.Second * time.Duration(intervalSeconds))
+    }
+
+	if lastErr != nil {
+		return "", lastErr
 	}
-	return "", &MultipathDeviceNotFoundForVolumeError{volumeIdVariations[0]}
+
+    return "", &MultipathDeviceNotFoundForVolumeError{volumeIdVariations[0]}
 }
 
 func (o GetDmsPathHelperGeneric) ExtractDmFieldValues(dmFilterValues []string, mpathdOutput string) map[string]bool {

@@ -17,6 +17,10 @@
 package device_connectivity
 
 import (
+	"fmt"
+	"time"
+
+	"github.com/ibm/ibm-block-csi-driver/node/logger"
 	"github.com/ibm/ibm-block-csi-driver/node/pkg/driver/executer"
 )
 
@@ -33,9 +37,43 @@ func NewOsDeviceConnectivityNvmeOFc(executer executer.ExecuterInterface, clean_s
 }
 
 func (r OsDeviceConnectivityNvmeOFc) EnsureLogin(_ map[string][]string) {
+	fmt.Println("##### inside EnsureLogin")
+
+	const maxRetries = 25
+	const sleepSeconds = 5
+
+	for i := 1; i <= maxRetries; i++ {
+		out, err := r.Executer.ExecuteWithTimeout(
+			int(IscsiCmdTimeout.Seconds()*1000),
+			"nvme",
+			[]string{
+				"connect",
+				"--transport=fc",
+				"--traddr=nn-5005076810003F64:pn-50050768101A3F64",
+				"--host-traddr=nn-2000f4e9d456d850:pn-2100f4e9d456d850",
+				"--nqn=nqn.1986-03.com.ibm:nvme:2145.000002043D607F18",
+			},
+		)
+		if err == nil {
+			// Success, break out of loop
+			fmt.Printf("Login successful on attempt %d\n", i)
+			break
+		} else {
+			// Failed, log and retry after sleep
+			logger.Errorf("Attempt %d: Failed to discover nvme: {%s}, error: {%s}", i, out, err)
+			if i < maxRetries {
+				time.Sleep(sleepSeconds * time.Second)
+			} else {
+				// Last attempt failed
+				logger.Errorf("All %d attempts failed for NVMe discovery", maxRetries)
+			}
+		}
+
+	}
 }
 
 func (r OsDeviceConnectivityNvmeOFc) RescanDevices(_ int, _ []string) error {
+	fmt.Println("##### inside RescanDevices")
 	return nil
 }
 
