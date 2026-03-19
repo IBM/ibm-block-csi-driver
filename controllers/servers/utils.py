@@ -887,7 +887,7 @@ def get_object_final_name(volume_parameters, name, array_mediator, object_type):
 
 
 def get_replication_object_type_and_id_info(request):
-    object_id = request.volume_id
+    object_id = request.volume_id  # this must be UID
     object_type = servers_settings.VOLUME_TYPE_NAME
 
     replication_source = request.replication_source
@@ -903,7 +903,9 @@ def get_replication_object_type_and_id_info(request):
             logger.error(messages.UNSUPPORTED_REPLICATION_SOURCE_TYPE_MESSAGE)
             raise ValidationException(messages.UNSUPPORTED_REPLICATION_SOURCE_TYPE_MESSAGE)
     object_id_info = get_object_id_info(object_id, object_type)
-    return object_type, object_id_info
+    object_id_ret = object_id_info.ids.internal_id if object_type == servers_settings.VOLUME_TYPE_NAME \
+        else object_id_info.ids.name
+    return object_type, object_id_info, object_id_ret
 
 
 def is_call_home_enabled():

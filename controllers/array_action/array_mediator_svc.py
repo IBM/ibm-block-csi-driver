@@ -579,9 +579,9 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
     def _change_volume_size(self, cli_volume, size_in_bytes):
         volume_name = cli_volume.name
         try:
-            self.client.svctask.chvolume(size=size_in_bytes, unit='b', vdisk_id=cli_volume.id)
+            self.client.svctask.chvolume(size=size_in_bytes, unit='b', vdisk_id=volume_name)
         except (svc_errors.CommandExecutionError, CLIFailureError) as ex:
-            logger.debug("Error running chvolume -size {} -unit b -vdisk_id {}".format(size_in_bytes, cli_volume.id))
+            logger.debug("Error running chvolume -size {} -unit b -vdisk_id {}".format(size_in_bytes, volume_name))
             if is_warning_message(ex.my_message):
                 logger.warning("exception encountered during volume expansion of {}: {}".format(volume_name,
                                                                                                 ex.my_message))
@@ -739,30 +739,31 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
         cli_kwargs = build_create_volume_in_volume_group_kwargs(pool, io_group, source_id)
         self._mkvolumegroup(name, **cli_kwargs)
 
-    def _fix_creation_side_effects(self, name, cli_volume_id, volume_group):
-        self._change_volume_group(None, cli_volume_id, volume_group)
+    def _fix_creation_side_effects(self, name, cli_volume_name, volume_group):
+        self._change_volume_group(None, cli_volume_name, volume_group)
         self._rmvolumegroup(name)
-        self._rename_volume(cli_volume_id, name)
+        self._rename_volume(cli_volume_name, name)
 
     def _create_cli_volume_from_snapshot(self, name, pool, io_group, volume_group, source_id):
         logger.info("creating volume from snapshot")
         self._create_volume_in_volume_group(name, pool, io_group, source_id)
-        cli_volume_id = self._get_cli_volume_id_from_volume_group("volume_group_name", name)
+        cli_volume_name = self._get_cli_volume_name_from_volume_group("volume_group_name", name)
         try:
-            self._fix_creation_side_effects(name, cli_volume_id, volume_group)
+            self._fix_creation_side_effects(name, cli_volume_name, volume_group)
         except (svc_errors.CommandExecutionError, CLIFailureError, array_errors.VolumeAlreadyExists) as ex:
-            self._rollback_create_volume_from_snapshot(cli_volume_id, name)
+            self._rollback_create_volume_from_snapshot(cli_volume_name, name)
             raise ex
 
-    def _create_cli_volume_from_vg_snapshot(self, name, pool, io_group, volume_group, vg_snapshot_id, vol_id,
-                                            space_efficiency):
+    def _create_cli_volume_from_vg_snapshot(self, name, pool, io_group, volume_group, vg_snapshot_name,
+                                            vol_name, vol_vg, space_efficiency):
         logger.info("creating volume from vg snapshot")
         cli_kwargs = {
             'type': 'clone',
-            'fromsnapshotid': vg_snapshot_id,
+            'snapshot': vg_snapshot_name,
+            'fromsourcegroup': vol_vg,  # vg where the volume we want restored is in
             'pool': pool,
-            'fromsourcevolume': vol_id,
-            'volumegroup': volume_group
+            'fromsourcevolume': vol_name,  # volume we want restored
+            'volumegroup': volume_group  # vg where we want the restored volume to be in
         }
         if io_group:
             cli_kwargs['iogrp'] = io_group
@@ -791,14 +792,17 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
             if not space_efficiency:
                 space_efficiency_aliases = _get_cli_volume_space_efficiency_aliases(cli_volume)
                 space_efficiency = space_efficiency_aliases.pop()
-            self._create_cli_volume_from_vg_snapshot(name, pool, io_group, volume_group, cli_snapshot.snapshot_id,
-                                                     cli_volume.id, space_efficiency)
+            self._create_cli_volume_from_vg_snapshot(name, pool, io_group, volume_group, cli_snapshot.snapshot_name,
+                                                     cli_volume.name, cli_volume.volume_group_name,
+                                                     space_efficiency)
         finally:
             try:
                 logger.info("Remove temp snapshot")
-                self.client.svctask.rmsnapshot(snapshotid=cli_snapshot.snapshot_id)
+                self.client.svctask.rmsnapshot(
+                             snapshot=cli_snapshot.snapshot_name, volumegroup=cli_volume.volume_group_name)
             except (svc_errors.CommandExecutionError, CLIFailureError) as ex:
-                logger.debug("Error running rmsnapshot -snapshotid {}".format(cli_snapshot.snapshot_id))
+                logger.debug("Error running rmsnapshot -snapshot {} -volumegroup {}".format(
+                             cli_snapshot.snapshot_name, cli_volume.volume_group_name))
                 raise ex
         logger.info("creating volume from snapshot - success")
 
@@ -1971,11 +1975,10 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
         return cli_snapshot
 
     def _add_vg_snapshot(self, snapshot_name, volume_group):
-        svc_response = self._addvgsnapshot(snapshot_name, volume_group)
-        snapshot_id = self._get_id_from_response(svc_response)
-        cli_snapshot = self._get_cli_snapshot_by_id(snapshot_id)
+        self._addvgsnapshot(snapshot_name, volume_group)
+        cli_snapshot = self._get_cli_snapshot_by_name(snapshot_name)
         if cli_snapshot is None:
-            raise array_errors.ObjectNotFoundError(snapshot_id)
+            raise array_errors.ObjectNotFoundError(snapshot_name)
         return cli_snapshot
 
     def _mkvolumegroup(self, name, **cli_kwargs):
@@ -2001,22 +2004,22 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
                 raise ex
         return None
 
-    def _get_cli_volume_id_from_volume_group(self, filter, filter_parameter):
+    def _get_cli_volume_name_from_volume_group(self, filter, filter_parameter):
         filter_value = '{}={}'.format(filter, filter_parameter)
         cli_volume = self._lsvdisk_single_element(filtervalue=filter_value)
-        return cli_volume.id
+        return cli_volume.name
 
     def _rollback_create_volume_from_snapshot(self, cli_volume_id, volume_group_name):
         self._rmvolume(cli_volume_id)
         self._rmvolumegroup(volume_group_name)
 
-    def _change_volume_group(self, partition_name, cli_volume_id, volume_group=None):
+    def _change_volume_group(self, partition_name, cli_volume_name, volume_group_name=None):
         cli_kwargs = {}
-        if volume_group:
-            cli_kwargs['volumegroup'] = volume_group
+        if volume_group_name:
+            cli_kwargs['volumegroup'] = volume_group_name
         else:
             cli_kwargs['novolumegroup'] = True
-        self._chvdisk(partition_name, cli_volume_id, **cli_kwargs)
+        self._chvdisk(partition_name, cli_volume_name, **cli_kwargs)
 
     def _change_volume_group_policy(self, id_or_name, replication_policy=None):
         cli_kwargs = {}
@@ -2026,18 +2029,18 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
             cli_kwargs['noreplicationpolicy'] = True
         self._chvolumegroup(id_or_name, **cli_kwargs)
 
-    def _rename_volume(self, cli_volume_id, name):
-        self._chvdisk(None, cli_volume_id, name=name)
+    def _rename_volume(self, cli_volume_name, name):
+        self._chvdisk(None, cli_volume_name, name=name)
 
-    def _chvdisk(self, partition_name, cli_volume_id, **kwargs):
+    def _chvdisk(self, partition_name, cli_volume_name, **kwargs):
         try:
             if partition_name:
-                self.client.svctask.chvolume(vdisk_id=cli_volume_id, **kwargs)
+                self.client.svctask.chvolume(vdisk_id=cli_volume_name, **kwargs)
             else:
-                self.client.svctask.chvdisk(vdisk_id=cli_volume_id, **kwargs)
+                self.client.svctask.chvdisk(vdisk_id=cli_volume_name, **kwargs)
         except (svc_errors.CommandExecutionError, CLIFailureError) as ex:
             logger.debug("Error running {} -vdisk_id {} {}".format(
-                "chvolume" if partition_name else "chvdisk", cli_volume_id, kwargs))
+                "chvolume" if partition_name else "chvdisk", cli_volume_name, kwargs))
             if is_warning_message(ex.my_message):
                 logger.warning(
                     "exception encountered while changing volume parameters '{}': {}".format(kwargs, ex.my_message))
@@ -2370,8 +2373,8 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
 
     @register_csi_plugin()
     def create_volume_group(self, name, partition_name):
-        volume_group_id = self._create_volume_group(name, partition_name)
-        cli_volume_group = self._lsvolumegroup(volume_group_id)
+        self._create_volume_group(name, partition_name)
+        cli_volume_group = self._lsvolumegroup(name)
         return self._generate_volume_group_response(cli_volume_group)
 
     def get_volume_group(self, volume_group_id):
@@ -2396,15 +2399,15 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
         cli_volume = self._get_cli_volume(volume_name)
         if not partition_name and cli_volume.volume_group_name and cli_volume.volume_group_name != volume_group_id:
             raise array_errors.VolumeAlreadyInVolumeGroup(volume_id, cli_volume.volume_group_name)
-        self._change_volume_group(partition_name, cli_volume.id, volume_group_id)
+        self._change_volume_group(partition_name, cli_volume.name, volume_group_id)
 
     @register_csi_plugin()
     def remove_volume_from_volume_group(self, volume_id, partition_name, partition_vg):
         cli_volume = self._get_cli_volume_by_wwn(volume_id, not_exist_err=True)
         if partition_name:
-            self._change_volume_group(partition_name, cli_volume.id, partition_vg)
+            self._change_volume_group(partition_name, cli_volume.name, partition_vg)
         else:
-            self._change_volume_group(partition_name, cli_volume.id, None)
+            self._change_volume_group(partition_name, cli_volume.name, None)
 
     def register_plugin(self, unique_key,  metadata):
         if is_call_home_enabled() and self._is_registerplugin_supported() \

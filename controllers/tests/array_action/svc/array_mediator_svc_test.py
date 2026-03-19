@@ -503,8 +503,8 @@ class TestArrayMediatorSVC(unittest.TestCase):
                                                                  fromsnapshotid=common_settings.INTERNAL_SNAPSHOT_ID,
                                                                  pool=common_settings.DUMMY_POOL1,
                                                                  name=common_settings.VOLUME_NAME)
-        remove_from_volumegroup_call = call(vdisk_id=common_settings.INTERNAL_VOLUME_ID, novolumegroup=True)
-        rename_call = call(vdisk_id=common_settings.INTERNAL_VOLUME_ID, name=common_settings.VOLUME_NAME)
+        remove_from_volumegroup_call = call(vdisk_id=common_settings.SOURCE_VOLUME_NAME, novolumegroup=True)
+        rename_call = call(vdisk_id=common_settings.SOURCE_VOLUME_NAME, name=common_settings.VOLUME_NAME)
         self.svc.client.svctask.chvdisk.assert_has_calls([remove_from_volumegroup_call, rename_call])
         self.svc.client.svctask.rmvolumegroup.assert_called_with(object_id=common_settings.VOLUME_NAME)
 
@@ -526,7 +526,7 @@ class TestArrayMediatorSVC(unittest.TestCase):
                                    self._mock_source_ids(common_settings.INTERNAL_SNAPSHOT_ID),
                                    common_settings.SNAPSHOT_OBJECT_TYPE,
                                    is_virt_snap_func=True)
-        self.svc.client.svctask.rmvolume.assert_called_with(vdisk_id=common_settings.INTERNAL_VOLUME_ID)
+        self.svc.client.svctask.rmvolume.assert_called_with(vdisk_id=common_settings.SOURCE_VOLUME_NAME)
         self.svc.client.svctask.rmvolumegroup.assert_called_with(object_id=common_settings.VOLUME_NAME)
 
     def test_create_volume_with_empty_string_space_efficiency_success(self):
@@ -2451,7 +2451,7 @@ class TestArrayMediatorSVC(unittest.TestCase):
 
         self.svc.create_volume_group(common_settings.VOLUME_GROUP_NAME, None)
 
-        self.svc.client.svcinfo.lsvolumegroup.assert_called_once_with(object_id=1)
+        self.svc.client.svcinfo.lsvolumegroup.assert_called_once_with(object_id=common_settings.VOLUME_GROUP_NAME)
         self.svc.client.svctask.mkvolumegroup.assert_called_once_with(name=common_settings.VOLUME_GROUP_NAME)
 
     def test_get_volume_group_success(self):
@@ -2493,7 +2493,7 @@ class TestArrayMediatorSVC(unittest.TestCase):
 
         self.svc.add_volume_to_volume_group(common_settings.INTERNAL_VOLUME_GROUP_ID, common_settings.VOLUME_UID, None)
 
-        self.svc.client.svctask.chvdisk.assert_called_once_with(vdisk_id=common_settings.INTERNAL_VOLUME_ID,
+        self.svc.client.svctask.chvdisk.assert_called_once_with(vdisk_id=cli_volume.name,
                                                                 volumegroup=common_settings.INTERNAL_VOLUME_GROUP_ID)
 
     def test_add_volume_to_volume_group_already_in_volume_group_failed(self):
@@ -2511,7 +2511,7 @@ class TestArrayMediatorSVC(unittest.TestCase):
         self.svc.client.svcinfo.lsvdisk.return_value = Mock(as_single_element=cli_volume)
         self.svc.remove_volume_from_volume_group(common_settings.VOLUME_UID, None, None)
 
-        self.svc.client.svctask.chvdisk.assert_called_once_with(vdisk_id=common_settings.INTERNAL_VOLUME_ID,
+        self.svc.client.svctask.chvdisk.assert_called_once_with(vdisk_id=cli_volume.name,
                                                                 novolumegroup=True)
 
     @patch('{}.is_call_home_enabled'.format('controllers.array_action.array_mediator_svc'))

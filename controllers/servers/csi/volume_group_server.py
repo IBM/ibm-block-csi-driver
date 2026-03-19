@@ -87,10 +87,10 @@ class VolumeGroupControllerServicer(volumegroup_pb2_grpc.ControllerServicer):
         return volumegroup_pb2.DeleteVolumeGroupResponse()
 
     def _add_volumes_missing_from_group(self, array_mediator, volume_ids_in_request, volume_ids_in_volume_group,
-                                        volume_group_id, partition_name):
+                                        volume_group_name, partition_name):
         for volume_id in volume_ids_in_request:
             if not self._is_volume_id_in_volume_group(volume_id, volume_ids_in_volume_group):
-                array_mediator.add_volume_to_volume_group(volume_group_id, volume_id, partition_name)
+                array_mediator.add_volume_to_volume_group(volume_group_name, volume_id, partition_name)
 
     def _is_volume_id_in_volume_group(self, volume_id, volume_ids_in_volume_group):
         return volume_id in volume_ids_in_volume_group \
@@ -103,6 +103,7 @@ class VolumeGroupControllerServicer(volumegroup_pb2_grpc.ControllerServicer):
             for volume_id_in_request in volume_ids_in_request:
                 if self._is_volume_id_in_request(volume_id, volume_id_in_request):
                     is_volume_id_in_request = True
+                    break
             if not is_volume_id_in_request:
                 array_mediator.remove_volume_from_volume_group(volume_id, partition_name, partition_vg)
 
@@ -123,7 +124,7 @@ class VolumeGroupControllerServicer(volumegroup_pb2_grpc.ControllerServicer):
         return volume_ids_in_request
 
     def _get_volume_ids_from_volume_group(self, volumes):
-        return [volume.id for volume in volumes]
+        return [volume.id for volume in volumes]  # these are vdisk Uids
 
     @csi_method(error_response_type=volumegroup_pb2.ModifyVolumeGroupMembershipResponse,
                 lock_request_attribute="volume_group_id")
