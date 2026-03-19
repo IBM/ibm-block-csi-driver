@@ -221,6 +221,11 @@ func TestGetMpathDevice(t *testing.T) {
 			defer mockCtrl.Finish()
 
 			fakeExecuter := mocks.NewMockExecuterInterface(mockCtrl)
+			fakeExecuter.EXPECT().ExecuteWithTimeout(
+				device_connectivity.TimeOutMultipathCmd,
+				"nvme",
+				[]string{"list"},
+			).Return([]byte(""), nil).AnyTimes()
 			fake_helper := mocks.NewMockOsDeviceConnectivityHelperInterface(mockCtrl)
 			fake_mutex := &sync.Mutex{}
 			volumeIdVariations := []string{volumeUuid, volumeNguid}
