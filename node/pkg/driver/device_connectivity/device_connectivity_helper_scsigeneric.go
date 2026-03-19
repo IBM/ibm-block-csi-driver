@@ -88,6 +88,7 @@ const (
 	WwnOuiEnd                   = 7
 	WwnVendorIdentifierEnd      = 16
 	procMountsFilePath          = "/proc/mounts"
+	nvmeCoreMultipathParamPath  = "/sys/module/nvme_core/parameters/multipath"
 )
 
 func NewOsDeviceConnectivityHelperScsiGeneric(executer executer.ExecuterInterface, clean_scsi_device bool) OsDeviceConnectivityHelperScsiGenericInterface {
@@ -181,6 +182,89 @@ func (r OsDeviceConnectivityHelperScsiGeneric) RescanDevices(lunId int, arrayIde
 	return nil
 }
 
+func isNvmeCoreMultipathEnabled() (bool, error) {
+	data, err := os.ReadFile(nvmeCoreMultipathParamPath)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return false, nil
+		}
+		return false, fmt.Errorf("failed to read nvme_core multipath param: %w", err)
+	}
+	return strings.TrimSpace(string(data)) == "Y", nil
+}
+
+func isNativeNvmeDevice(dmPath string) bool {
+	baseDevice := filepath.Base(dmPath)
+	subsysNqnPath := filepath.Join("/sys/block", baseDevice, "device/subsysnqn")
+	_, err := os.Stat(subsysNqnPath)
+	return err == nil
+}
+
+func isNonNativeNvmeDevice(dmPath string, executer executer.ExecuterInterface) bool {
+	logger.Debugf("isNonNativeNvmeDevice: checking path=%s", dmPath)
+
+	// Resolve symlink if /dev/mapper/mpathX
+	baseDevice := filepath.Base(dmPath)
+	resolvedPath, err := filepath.EvalSymlinks(dmPath)
+	if err == nil && resolvedPath != dmPath {
+		baseDevice = filepath.Base(resolvedPath)
+		logger.Debugf("isNonNativeNvmeDevice: resolved symlink to %s", resolvedPath)
+	}
+
+	// Get slaves from sysfs
+	slavesPath := filepath.Join("/sys/block", baseDevice, "slaves")
+	entries, err := os.ReadDir(slavesPath)
+	if err != nil {
+		logger.Debugf("isNonNativeNvmeDevice: cannot read slaves for %s: %v", dmPath, err)
+		return false
+	}
+	if len(entries) == 0 {
+		return false
+	}
+
+	// Run nvme list
+	out, err := executer.ExecuteWithTimeout(TimeOutMultipathCmd, "nvme", []string{"list"})
+	if err != nil {
+		outMessage := strings.TrimSpace(string(out))
+		if err.Error() == "exit status 1" || strings.HasSuffix(outMessage, "No such file or directory") {
+			return false
+		}
+		logger.Debugf("isNonNativeNvmeDevice: nvme list failed for %s: %v", dmPath, err)
+		return false
+	}
+
+	nvmeListOutput := string(out)
+
+	// Cross-check: any slave name in nvme list output → non-native NVMe
+	for _, entry := range entries {
+		if strings.Contains(nvmeListOutput, entry.Name()) {
+			logger.Debugf("isNonNativeNvmeDevice: slave [%s] confirmed in nvme list → non-native NVMe", entry.Name())
+			return true
+		}
+	}
+
+	return false
+}
+
+func isNvmeDevice(dmPath string, executer executer.ExecuterInterface) bool {
+	nativeMpath, err := isNvmeCoreMultipathEnabled()
+
+	if err != nil {
+		logger.Warningf("isNvmeDevice: could not read nvme_core param: %v, trying both checks", err)
+		return isNativeNvmeDevice(dmPath) || isNonNativeNvmeDevice(dmPath, executer)
+	}
+
+	if nativeMpath {
+		result := isNativeNvmeDevice(dmPath)
+		logger.Debugf("isNvmeDevice: nativeMpath=Y subsysnqn check [%s] → %v", dmPath, result)
+		return result
+	}
+
+	result := isNonNativeNvmeDevice(dmPath, executer)
+	logger.Debugf("isNvmeDevice: nativeMpath=N slaves+nvmelist check [%s] → %v", dmPath, result)
+	return result
+}
+
 func (r OsDeviceConnectivityHelperScsiGeneric) GetMpathDevice(volumeId string) (string, error) {
 	logger.Infof("GetMpathDevice: Searching multipath devices for volume : [%s] ", volumeId)
 
@@ -188,6 +272,13 @@ func (r OsDeviceConnectivityHelperScsiGeneric) GetMpathDevice(volumeId string) (
 	dmPath, _ := r.Helper.GetDmsPath(volumeIdVariations)
 
 	if dmPath != "" {
+		// NVMe DM devices (non-native) don't support SG_IO ioctl.
+		// EUI/NGUID match from multipathd already identifies the volume correctly.
+		if isNvmeDevice(dmPath, r.Executer) {
+			logger.Debugf("NVMe device detected %s, skipping sg_inq validation", dmPath)
+			return dmPath, nil
+		}
+
 		SgInqWwn, _ := r.Helper.GetWwnByScsiInq(dmPath)
 		if isSameId(SgInqWwn, volumeIdVariations) {
 			return dmPath, nil
@@ -207,6 +298,11 @@ func (r OsDeviceConnectivityHelperScsiGeneric) GetMpathDevice(volumeId string) (
 
 	if dmPath == "" {
 		return "", &MultipathDeviceNotFoundForVolumeError{volumeId}
+	}
+
+	if isNvmeDevice(dmPath, r.Executer) {
+		logger.Debugf("NVMe device detected %s after reload, skipping sg_inq", dmPath)
+		return dmPath, nil
 	}
 
 	SgInqWwn, err := r.Helper.GetWwnByScsiInq(dmPath)
@@ -537,6 +633,10 @@ func (o OsDeviceConnectivityHelperGeneric) GetMpathVolumeId(mpathdOutput string,
 		return "", err
 	}
 	dmPath := filepath.Join(dmDirectory, filepath.Base(strings.TrimSpace(mpathDeviceName)))
+
+	if isNvmeDevice(dmPath, o.Executer) {
+		return mpathVolumeId, nil
+	}
 
 	SgInqWwn, err := o.GetWwnByScsiInq(dmPath)
 	if err != nil {

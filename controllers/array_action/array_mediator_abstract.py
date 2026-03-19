@@ -58,8 +58,8 @@ class ArrayMediatorAbstract(ArrayMediator, ABC):
         connectivity_type = utils.choose_connectivity_type(connectivity_types)
         array_initiators = self._get_array_initiators(host_name, connectivity_type)
 
-        if NVME_OVER_FC_CONNECTIVITY_TYPE != connectivity_type and not array_initiators:
-            logger.warning("No stroage ports reachable - fail mapping")
+        if not array_initiators:
+            logger.warning("No storage ports reachable - fail mapping")
             raise array_errors.NoIscsiTargetsFoundError(self.endpoint)
 
         try:
@@ -116,11 +116,13 @@ class ArrayMediatorAbstract(ArrayMediator, ABC):
 
     def _get_array_initiators(self, host_name, connectivity_type):
         if NVME_OVER_FC_CONNECTIVITY_TYPE == connectivity_type:
-            array_initiators = []
+            array_initiators = self.get_nvme_target_ports()
         elif FC_CONNECTIVITY_TYPE == connectivity_type:
             array_initiators = self.get_array_fc_wwns(host_name)
         elif ISCSI_CONNECTIVITY_TYPE == connectivity_type:
             array_initiators = self.get_iscsi_targets_by_iqn(host_name)
         else:
+            logger.error("Unsupported connectivity type received in _get_array_initiators: %s", connectivity_type)
             raise UnsupportedConnectivityTypeError(connectivity_type)
+        logger.debug("Returning array initiators: %s", array_initiators)
         return array_initiators
