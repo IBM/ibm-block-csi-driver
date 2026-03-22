@@ -2157,6 +2157,8 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
     def create_host(self, host_name, initiators, connectivity_type, io_group, partition_name=None, port_set=None):
         ports = get_connectivity_type_ports(initiators, connectivity_type)
         if partition_name:
+            if io_group:
+                raise array_errors.UnSupportedParameterThroughPartition("iogrp")
             good_ports = []
             for port in ports:
                 status_code = self._mkhost(host_name, connectivity_type, port, io_group, partition_name, port_set)

@@ -85,5 +85,7 @@ IO_GROUP_IS_NOT_VALID = "IO group {} is not valid"
 
 UNSUPPORTED_PARAMETER = "The parameter {} is not a supported parameter"
 
+UNSUPPORTED_PARAMETER_THROUGH_PARTITION = "The parameter {} is not supported when connected through partition ip"
+
 CANNOT_CHANGE_HOST_PROTOCOL_BECAUSE_OF_MAPPED_PORTS = "The host protocol cannot be changed"\
     " because the host {} has ports configured."

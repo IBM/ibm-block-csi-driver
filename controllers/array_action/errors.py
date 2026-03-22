@@ -312,6 +312,13 @@ class UnSupportedParameter(BaseArrayActionException):
         self.message = messages.UNSUPPORTED_PARAMETER.format(parameter)
 
 
+class UnSupportedParameterThroughPartition(BaseArrayActionException):
+
+    def __init__(self, parameter):
+        super().__init__()
+        self.message = messages.UNSUPPORTED_PARAMETER_THROUGH_PARTITION.format(parameter)
+
+
 class CannotChangeHostProtocolBecauseOfMappedPorts(BaseArrayActionException):
 
     def __init__(self, host_name):
