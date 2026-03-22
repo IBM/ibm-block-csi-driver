@@ -374,6 +374,7 @@ class ArrayMediator(ABC):
             HostAlreadyExists
             NoPortIsValid
             IoGroupIsInValid
+            UnSupportedParameterThroughPartition
         """
         raise NotImplementedError
 

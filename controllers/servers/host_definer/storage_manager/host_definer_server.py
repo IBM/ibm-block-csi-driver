@@ -38,7 +38,8 @@ class HostDefinerServicer:
                                                 array_connection_info.partition_name, array_mediator)
                     self._update_host_ports(request, found_host_name, array_mediator,
                                             array_connection_info.partition_name)
-                    self._update_host_io_group(request, found_host_name, array_mediator)
+                    if not array_connection_info.partition_name:
+                        self._update_host_io_group(request, found_host_name, array_mediator)
                     host_name = found_host_name
                 except HostNotFoundError:
                     logger.debug(messages.NODE_WAS_NOT_FOUND_CREATE_NEW_HOST_DEFINITION.format(node_name, initiators))
@@ -226,7 +227,10 @@ class HostDefinerServicer:
                                                   management_address=management_address)
         ports = array_mediator.get_host_connectivity_ports(host_name, connectivity_type)
         define_host_response.ports = ports
-        io_group_ids = array_mediator.get_host_io_group(host_name).id
+        if partition_name:
+            io_group_ids = common_settings.FULL_IO_GROUP.split(common_settings.IO_GROUP_DELIMITER)
+        else:
+            io_group_ids = array_mediator.get_host_io_group(host_name).id
         define_host_response.io_group = [int(io_group_id) for io_group_id in io_group_ids]
         logger.info(messages.HOST_CREATED.format(host_name, partition_name, management_address,
                     ports, define_host_response.io_group))
