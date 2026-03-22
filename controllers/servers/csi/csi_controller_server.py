@@ -211,7 +211,7 @@ class CSIControllerServicer(csi_pb2_grpc.ControllerServicer):
 
             try:
                 logger.debug("Deleting volume {0}".format(volume_id))
-                array_mediator.delete_volume(volume_id)
+                array_mediator.delete_volume(volume_id, array_connection_info.partition_name)
 
             except array_errors.ObjectNotFoundError as ex:
                 logger.debug("volume was not found during deletion: {0}".format(ex))

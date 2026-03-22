@@ -930,9 +930,9 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
                 raise ex
 
     @register_csi_plugin()
-    def delete_volume(self, volume_id):
+    def delete_volume(self, volume_id, partition_name=None):
         logger.info("Deleting volume with id : {0}".format(volume_id))
-        self._delete_volume(volume_id)
+        self._delete_volume(volume_id, is_partition=partition_name is not None)
         logger.info("Finished volume deletion. id : {0}".format(volume_id))
 
     def get_snapshot(self, volume_id, snapshot_name, pool, is_virt_snap_func):
@@ -1081,19 +1081,20 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
     def _is_in_remote_copy_relationship(self, fcmap):
         return fcmap.rc_controlled == YES
 
-    def _delete_volume(self, volume_id, is_snapshot=False):
+    def _delete_volume(self, volume_id, is_snapshot=False, is_partition=False):
         cli_volume = self._get_cli_volume_by_wwn(volume_id, not_exist_err=True)
         object_name = cli_volume.name
-        if is_snapshot and not cli_volume.FC_id:
-            raise array_errors.ObjectNotFoundError(object_name)
-        fcmap_as_target = self._get_fcmap_as_target_if_exists(object_name)
-        if is_snapshot and not fcmap_as_target:
-            raise array_errors.ObjectNotFoundError(object_name)
-        fcmaps_as_source = self._get_fcmaps_as_source_if_exist(object_name)
-        if fcmaps_as_source:
-            self._safe_delete_fcmaps(object_name, fcmaps_as_source)
-        if fcmap_as_target:
-            self._safe_stop_and_delete_fcmap(fcmap_as_target)
+        if not is_partition:
+            if is_snapshot and not cli_volume.FC_id:
+                raise array_errors.ObjectNotFoundError(object_name)
+            fcmap_as_target = self._get_fcmap_as_target_if_exists(object_name)
+            if is_snapshot and not fcmap_as_target:
+                raise array_errors.ObjectNotFoundError(object_name)
+            fcmaps_as_source = self._get_fcmaps_as_source_if_exist(object_name)
+            if fcmaps_as_source:
+                self._safe_delete_fcmaps(object_name, fcmaps_as_source)
+            if fcmap_as_target:
+                self._safe_stop_and_delete_fcmap(fcmap_as_target)
         self._rmvolume(object_name)
 
     def _delete_unstarted_fcmap_if_exists(self, target_volume_name):
@@ -1207,11 +1208,11 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
             vol_partition = self._get_partition_name_of_cli_volume(cli_volume)
             if vol_partition != partition_name:
                 raise array_errors.InvalidArgumentError("volume group not part of partition")
-            self._delete_volume(snapshot_id)
+            self._delete_volume(snapshot_id, is_partition=True)
         elif self._is_addsnapshot_supported() and not snapshot_id:
             self._rmsnapshot(internal_snapshot_id)
         else:
-            self._delete_volume(snapshot_id, is_snapshot=True)
+            self._delete_volume(snapshot_id, is_snapshot=True, is_partition=False)
         logger.info("Finished snapshot deletion. id : {0}".format(snapshot_id))
 
     def _get_host_ports(self, host, attribute_name):
