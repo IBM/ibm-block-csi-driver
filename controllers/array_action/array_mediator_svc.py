@@ -333,9 +333,13 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
     @property
     def _system_info(self):
         if self._cluster is None:
-            for cluster in self.client.svcinfo.lssystem():
-                if cluster.location == 'local':
-                    self._cluster = cluster
+            try:
+                for cluster in self.client.svcinfo.lssystem():
+                    if cluster.location == 'local':
+                        self._cluster = cluster
+            except (svc_errors.CommandExecutionError, CLIFailureError) as ex:
+                logger.debug("Error running lssystem")
+                raise ex
         return self._cluster
 
     @property
@@ -464,7 +468,7 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
             raise ex
 
     def _format_cli_args(self, cli_kwargs):
-        return ' '.join(f'-{v} {k}' for k, v in cli_kwargs.items())
+        return ' '.join(f'-{k} {v}' for k, v in cli_kwargs.items())
 
     def _chvolumegroup(self, id_or_name, **cli_kwargs):
         try:
@@ -625,7 +629,11 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
             endpoint_type : 'source' or 'target'
         """
         filter_value = '{0}_vdisk_name={1}'.format(endpoint_type, volume_name)
-        return self.client.svcinfo.lsfcmap(filtervalue=filter_value).as_list
+        try:
+            return self.client.svcinfo.lsfcmap(filtervalue=filter_value).as_list
+        except (svc_errors.CommandExecutionError, CLIFailureError) as ex:
+            logger.debug("Error running lsfcmap -filtervalue {}".format(filter_value))
+            raise ex
 
     def validate_supported_space_efficiency(self, space_efficiency):
         logger.debug("validate_supported_space_efficiency for "
@@ -796,14 +804,23 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
         use_thin_clone = False
         logger.info("get partition {}".format(str(partition_name)))
         filter_value = 'name={}'.format(partition_name)
-        cli_partition = self.client.svcinfo.lspartition(filtervalue=filter_value).as_single_element
+        try:
+            cli_partition = self.client.svcinfo.lspartition(filtervalue=filter_value).as_single_element
+        except (svc_errors.CommandExecutionError, CLIFailureError) as ex:
+            logger.debug("Error running lspartition -filtervalue {}".format(filter_value))
+            raise ex
         if not cli_partition:
             raise array_errors.InvalidArgumentError("partition not found")
         replication_policy_name = cli_partition.replication_policy_name
         logger.info("replication_policy {}".format(str(replication_policy_name)))
         if replication_policy_name:
             filter_value = 'name={}'.format(replication_policy_name)
-            cli_replication_policy = self.client.svcinfo.lsreplicationpolicy(filtervalue=filter_value).as_single_element
+            try:
+                cli_replication_policy = self.client.svcinfo.lsreplicationpolicy(
+                    filtervalue=filter_value).as_single_element
+            except (svc_errors.CommandExecutionError, CLIFailureError) as ex:
+                logger.debug("Error running lsreplicationpolicy -filtervalue {}".format(filter_value))
+                raise ex
             if not cli_replication_policy:
                 raise array_errors.InvalidArgumentError("partition replication policy not found")
             logger.info("replication_topolgy {}".format(str(cli_replication_policy.topology)))
@@ -1106,7 +1123,11 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
 
     def _get_pool_site(self, pool):
         filter_value = 'name={}'.format(pool)
-        cli_pool = self.client.svcinfo.lsmdiskgrp(filtervalue=filter_value).as_single_element
+        try:
+            cli_pool = self.client.svcinfo.lsmdiskgrp(filtervalue=filter_value).as_single_element
+        except (svc_errors.CommandExecutionError, CLIFailureError) as ex:
+            logger.debug("Error running lsmdiskgrp -filtervalue {}".format(filter_value))
+            raise ex
         if cli_pool:
             return cli_pool.site_name
         raise array_errors.PoolDoesNotExist(pool, self.endpoint)
@@ -1310,7 +1331,11 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
 
     def _get_detailed_hosts_list(self):
         logger.debug("Getting detailed hosts list on array {0}".format(self.endpoint))
-        hosts_list = self.client.svcinfo.lshost()
+        try:
+            hosts_list = self.client.svcinfo.lshost()
+        except (svc_errors.CommandExecutionError, CLIFailureError) as ex:
+            logger.debug("Error running lshost")
+            raise ex
         if not hosts_list:
             return []
 
@@ -1328,7 +1353,11 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
         return writer.getvalue()
 
     def _get_cli_host(self, id_or_name):
-        cli_host = self.client.svcinfo.lshost(object_id=id_or_name).as_single_element
+        try:
+            cli_host = self.client.svcinfo.lshost(object_id=id_or_name).as_single_element
+        except (svc_errors.CommandExecutionError, CLIFailureError) as ex:
+            logger.debug("Error running lshost {}".format(id_or_name))
+            raise ex
         if not cli_host:
             raise array_errors.HostNotFoundError(id_or_name)
         return cli_host
@@ -1488,7 +1517,11 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
 
     def _get_array_iqns_by_node_id(self):
         logger.debug("Getting array nodes id and iscsi name")
-        nodes_list = self.client.svcinfo.lsnode()
+        try:
+            nodes_list = self.client.svcinfo.lsnode()
+        except (svc_errors.CommandExecutionError, CLIFailureError) as ex:
+            logger.debug("Error running lsnode")
+            raise ex
         array_iqns_by_id = {node.id: node.iscsi_name for node in nodes_list
                             if node.status.lower() == "online"}
         logger.debug("Found iqns by node id: {}".format(array_iqns_by_id))
@@ -1652,7 +1685,11 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
                            volume_group_id=volume_group_id)
 
     def _lsrcrelationship(self, filter_value):
-        return self.client.svcinfo.lsrcrelationship(filtervalue=filter_value)
+        try:
+            return self.client.svcinfo.lsrcrelationship(filtervalue=filter_value)
+        except (svc_errors.CommandExecutionError, CLIFailureError) as ex:
+            logger.debug("Error running lsrcrelationship -filtervalue {}".format(filter_value))
+            raise ex
 
     def _get_rcrelationship_by_name(self, replication_name, not_exist_error=True):
         filter_value = 'RC_rel_name={0}'.format(replication_name)
