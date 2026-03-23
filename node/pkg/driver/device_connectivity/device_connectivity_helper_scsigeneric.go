@@ -1878,7 +1878,7 @@ func (o *OsDeviceConnectivityHelperGeneric) GetHostsIdByArrayIdentifiers(arrayId
 	for _, group := range groups {
 		entries, err := os.ReadDir(group.root)
 		if err != nil {
-			logger.Warningf("Could not read target name from file : {%v}, error : {%v}", idPath, err)
+			logger.Warningf("Could not read target name from file : {%v}, error : {%v}", group.root, err)
 			continue // Path doesn't exist or is empty
 		}
 
@@ -2954,27 +2954,6 @@ func (o GetDmsPathHelperGeneric) verifyDevice(path string) (string, error) {
 }
 
 // scanDMSubsystem finds the DM device using robust normalization.
-func (o GetDmsPathHelperGeneric) scanDMSubsystem(targetID string) (string, error) {
-	matches, _ := filepath.Glob("/sys/block/dm-*/dm/uuid")
-	target := normalizeWWID(targetID)
-	logger.Warningf("target %s norm %s", targetID, target)
-
-	for _, m := range matches {
-		logger.Warningf("check %s", m)
-		if content, err := os.ReadFile(m); err == nil {
-			logger.Warningf("found file %s", string(content))
-			// normalize() strips 'mpath-', handles case, and removes newlines
-			if normalizeWWID(string(content)) == target {
-				logger.Warning("complete match")
-				// Safely get 'dm-X' regardless of path depth
-				dmName := filepath.Base(filepath.Dir(filepath.Dir(m)))
-				return filepath.Join("/dev", dmName), nil
-			}
-		}
-	}
-	return "", fmt.Errorf("dm device not found")
-}
-
 func (o GetDmsPathHelperGeneric) scanDMSubsystem(targetID string) (string, error) {
 	// 1. Glob all DM UUIDs
 	matches, err := filepath.Glob("/sys/block/dm-*/dm/uuid")
