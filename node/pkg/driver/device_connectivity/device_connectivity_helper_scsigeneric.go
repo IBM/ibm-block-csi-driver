@@ -1923,7 +1923,6 @@ func (o *OsDeviceConnectivityHelperGeneric) GetHostsIdByArrayIdentifiers(arrayId
 				if err == nil {
 					logger.Debugf("portState path (%s) was found. Adding host ID {%v} to the id list", idPath, hostNum)
 					activeHosts[hostNum] = true
-				}
 				} else {
 					logger.Warningf("Host number in for target file was not valid : {%v}", idPath)
 				}
@@ -3098,7 +3097,6 @@ func (o GetDmsPathHelperGeneric) validateDMIntegrity(dmPath string) (string, err
 	return "", fmt.Errorf("dm device %s has slaves but none are in 'running' state", dmName)
 }
 
-func normalizeWWID(raw string) string {
 func normalizeWWID(raw string) string {
 	// 1. Lowercase and clean whitespace/newlines
 	s := strings.ToLower(strings.TrimSpace(raw))
