@@ -2145,7 +2145,7 @@ func (o *OsDeviceConnectivityHelperGeneric) GetHostsIdByArrayIdentifiers(arrayId
 	var hasIscsi, hasFC, hasNVMe bool
 
 	for _, id := range arrayIdentifier {
-		logger.Debugf("Check if any match is relevant for storage target (%s)", id)
+		// Standardize: lowercase, no 0x prefix, no spaces
 		clean := strings.ToLower(strings.TrimPrefix(strings.TrimSpace(id), "0x"))
 		cleanLookup[clean] = true
 
@@ -2153,59 +2153,80 @@ func (o *OsDeviceConnectivityHelperGeneric) GetHostsIdByArrayIdentifiers(arrayId
 			hasIscsi = true
 		} else if strings.HasPrefix(clean, "nqn.") {
 			hasNVMe = true
-		} else if len(clean) == 16 {
+		} else if len(clean) == 16 { // WWN for Fibre Channel
 			hasFC = true
 		}
 	}
 
 	activeHosts := make(map[int]bool)
 
-	// Protocol Search Configuration
 	type searchGroup struct {
-		root   string
-		suffix string
+		root     string // e.g., /sys/class/iscsi_session
+		filename string // e.g., targetname
+		protocol string
 	}
+
 	var groups []searchGroup
 	if hasIscsi {
-		groups = append(groups, searchGroup{"/sys/class/iscsi_host", "targetname"})
+		groups = append(groups, searchGroup{"/sys/class/iscsi_session", "targetname", "iscsi"})
 	}
 	if hasFC {
-		groups = append(groups, searchGroup{"/sys/class/fc_remote_ports", "port_name"})
+		groups = append(groups, searchGroup{"/sys/class/fc_remote_ports", "port_name", "fc"})
 	}
 	if hasNVMe {
-		// Correct path for established NVMe connections
-		groups = append(groups, searchGroup{"/sys/class/nvme", "subsysnqn"})
+		groups = append(groups, searchGroup{"/sys/class/nvme", "subsysnqn", "nvme"})
 	}
 
 	for _, group := range groups {
 		entries, err := os.ReadDir(group.root)
 		if err != nil {
-			continue
+			logger.Warningf("Could not read target name from file : {%v}, error : {%v}", idPath, err)
+			continue // Path doesn't exist or is empty
 		}
 
 		for _, entry := range entries {
-			idPath := filepath.Join(group.root, entry.Name(), group.suffix)
+			// Construct path to the identifier (IQN/WWN/NQN)
+			idPath := filepath.Join(group.root, entry.Name(), group.filename)
 			data, err := os.ReadFile(idPath)
 			// data := o.readSysfs(ctx, idPath)
 			if err != nil {
-				logger.Warningf("Could not read target name from file : {%v}, error : {%v}", idPath, err)
 				continue
 			}
 
 			idFromSys := strings.ToLower(strings.TrimPrefix(strings.TrimSpace(string(data)), "0x"))
 
 			if cleanLookup[idFromSys] {
-				// Special Case: NVMe controllers don't use "hostX" naming directly
-				if strings.HasPrefix(entry.Name(), "nvme") {
-					// TODO is this NVME over TCP
-					// Logic to map nvmeX to hostY if required for scans
-					continue
+				var hostNameToExtract string
+
+				switch group.protocol {
+				case "iscsi":
+					// /sys/class/iscsi_session/sessionX/device -> link to .../hostY/iscsi_host/hostY
+					// We need to find the "hostY" part of the path
+					devicePath := filepath.Join(group.root, entry.Name(), "device")
+					realPath, err := filepath.EvalSymlinks(devicePath)
+					if err != nil {
+						continue
+					}
+					// Extract host number from path (e.g., .../host4/iscsi_host/host4)
+					hostNameToExtract = o.parseHostFromPath(realPath)
+
+				case "fc":
+					// /sys/class/fc_remote_ports/rport-X:Y-Z/ -> hostX is the prefix of the entry name
+					// Usually rport-4:0-0 means host4
+					hostNameToExtract = entry.Name()
+
+				case "nvme":
+					// NVMe uses controllers (nvme0, nvme1). 
+					// If your scanner needs a SCSI host ID, NVMe doesn't strictly have one.
+					// We return the controller index as a "Host ID" for tracking.
+					hostNameToExtract = entry.Name()
 				}
 
-				hostNum, err := o.extractHostNumber(entry.Name())
+				hostNum, err := o.extractHostNumber(hostNameToExtract)
 				if err == nil {
 					logger.Debugf("portState path (%s) was found. Adding host ID {%v} to the id list", idPath, hostNum)
 					activeHosts[hostNum] = true
+				}
 				} else {
 					logger.Warningf("Host number in for target file was not valid : {%v}", idPath)
 				}
@@ -2215,6 +2236,18 @@ func (o *OsDeviceConnectivityHelperGeneric) GetHostsIdByArrayIdentifiers(arrayId
 
 	return activeHosts, nil
 }
+
+// Helper to find "hostX" in a long sysfs path string
+func (o *OsDeviceConnectivityHelperGeneric) parseHostFromPath(path string) string {
+	parts := strings.Split(path, "/")
+	for _, p := range parts {
+		if strings.HasPrefix(p, "host") {
+			return p
+		}
+	}
+	return ""
+}
+
 
 // TODO perhaps strengthen prefix check
 func (o *OsDeviceConnectivityHelperGeneric) extractHostNumber(entryName string) (int, error) {
@@ -3261,18 +3294,16 @@ func (o GetDmsPathHelperGeneric) getSlaveCount(path string) int {
 		return len(entries)
 	}
 
+	// NVMe: Count controllers in the subsystem
 	if strings.HasPrefix(name, "nvme") {
-		// TODO is this correct Native NVMe heads (nvmeXnY) are virtual heads; they don't have 'slaves' dirs.
-		// if strings.HasPrefix(name, "nvme") {
-		//	return 1
-		// }
-
-		// NVMe: Count /sys/block/nvme-subsysXnY/device/nvmeX links
-		entries, _ := os.ReadDir(fmt.Sprintf("/sys/block/%s/device", name))
+		// Native NVMe Multipath devices usually look like nvme-subsys0n1
+		// Their paths are controllers (nvme0, nvme1) linked in the subsystem dir
+		subsysDir := fmt.Sprintf("/sys/block/%s/device", name)
+		entries, _ := os.ReadDir(subsysDir)
 		count := 0
 		for _, e := range entries {
-			if strings.HasPrefix(e.Name(), "nvme") {
-				count++
+			if strings.HasPrefix(e.Name(), "nvme") && !strings.Contains(e.Name(), "n") {
+				count++ // Count 'nvme0', skip 'nvme0n1'
 			}
 		}
 		return count
@@ -3365,6 +3396,7 @@ func (o GetDmsPathHelperGeneric) verifyDevice(path string) (string, error) {
 func (o GetDmsPathHelperGeneric) scanDMSubsystem(targetID string) (string, error) {
 	matches, _ := filepath.Glob("/sys/block/dm-*/dm/uuid")
 	target := normalizeWWID(targetID)
+	logger.Warningf("target %s norm %s", targetID, target)
 
 	for _, m := range matches {
 		if content, err := os.ReadFile(m); err == nil {
@@ -3379,63 +3411,91 @@ func (o GetDmsPathHelperGeneric) scanDMSubsystem(targetID string) (string, error
 	return "", fmt.Errorf("dm device not found")
 }
 
+func (o GetDmsPathHelperGeneric) scanDMSubsystem(targetID string) (string, error) {
+	// 1. Glob all DM UUIDs
+	matches, err := filepath.Glob("/sys/block/dm-*/dm/uuid")
+	if err != nil {
+		logger.Warning("No matches")
+		return "", err
+	}
+
+	target := normalizeWWID(targetID)
+	logger.Debugf("Scanning DM subsystem for target: %s", target)
+
+	for _, m := range matches {
+		logger.Warningf("check %s", m)
+		content, err := os.ReadFile(m)
+		if err != nil {
+			continue
+		}
+
+		// 2. Normalize the content (strips 'mpath-', 'uuid-', whitespace, and lowercase)
+		foundUUID := normalizeWWID(string(content))
+		
+		logger.Warningf("found file %s", foundUUID)
+		
+		if foundUUID == target {
+			// 3. Extract 'dm-X' from /sys/block/dm-X/dm/uuid
+			// We go up two levels from the file to get the block device folder
+			parts := strings.Split(m, "/")
+			if len(parts) < 4 {
+				continue
+			}
+			dmName := parts[3] // The "dm-X" part
+
+			devPath := filepath.Join("/dev", dmName)
+			logger.Warningf("Found DM match: %s for WWID %s", devPath, targetID)
+			return devPath, nil
+		}
+	}
+
+	return "", fmt.Errorf("dm device not found for WWID %s", targetID)
+}
+
+
 func (o GetDmsPathHelperGeneric) scanNVMeSubsystem(targetID string) (string, error) {
-	// 1. Find all namespaces. /sys/block/nvme*n* covers both local and remote.
+	// Find all namespaces (n1, n2...)
 	matches, _ := filepath.Glob("/sys/block/nvme*n*")
 	target := normalizeWWID(targetID)
 
 	for _, m := range matches {
 		var foundID string
-		// NGUID is preferred for NVMe-oF (FlashSystem/SVC)
-		if nguid, err := os.ReadFile(filepath.Join(m, "nguid")); err == nil {
-			foundID = normalizeWWID(string(nguid))
+		// 1. Check NGUID (FlashSystem/SVC standard) then UUID
+		if data, err := os.ReadFile(filepath.Join(m, "nguid")); err == nil {
+			foundID = normalizeWWID(string(data))
 		}
-		// Fallback to UUID
 		if foundID != target {
-			if uuid, err := os.ReadFile(filepath.Join(m, "uuid")); err == nil {
-				foundID = normalizeWWID(string(uuid))
+			if data, err := os.ReadFile(filepath.Join(m, "uuid")); err == nil {
+				foundID = normalizeWWID(string(data))
 			}
 		}
 
 		if foundID == target {
-			// 2. CHECK FOR MULTIPATH HEAD
-			// If /sys/block/nvmeXnY/multipath exists, this is a private path.
-			// We MUST find and return the shared head node instead.
-			if _, err := os.Stat(filepath.Join(m, "multipath")); err == nil {
-				subsysPath := filepath.Join(m, "subsystem")
-				if subsys, err := os.Readlink(subsysPath); err == nil {
-					headName := filepath.Base(subsys) // e.g., "nvme-subsys0"
-
-					// Find the head node (e.g., /dev/nvme-subsys0n1)
-					// The namespace ID 'n1' matches between path and head.
-					parts := strings.Split(filepath.Base(m), "n")
-					if len(parts) > 1 {
-						headNode := fmt.Sprintf("/dev/%sn%s", headName, parts[1])
-						if _, err := os.Stat(headNode); err == nil {
-							return headNode, nil
-						}
+			name := filepath.Base(m)
+			// 2. CHECK: Is this a "Private Path" or the "Multipath Head"?
+			// If 'subsystem' folder exists and name is 'nvmeXnY', it's likely a path.
+			// Native Multipath heads are usually named 'nvme-subsysXnY'
+			if !strings.Contains(name, "subsys") {
+				// This is a private path (e.g. nvme0n1). 
+				// Find the head (e.g. nvme-subsys0n1) so we return the multipath device.
+				if link, err := os.Readlink(filepath.Join(m, "subsystem")); err == nil {
+					// The subsystem link points to /sys/class/nvme-subsystem/nvme-subsys0
+					// We append the namespace suffix 'n1' to the subsys name
+					subsysName := filepath.Base(link)
+					nsSuffix := name[strings.LastIndex(name, "n"):] // e.g. "n1"
+					headDevice := subsysName + nsSuffix
+					
+					if _, err := os.Stat(filepath.Join("/dev", headDevice)); err == nil {
+						return filepath.Join("/dev", headDevice), nil
 					}
-
-					// TODO is this better or less reliable than the split method to get the heade node
-					//	Search for the shared head node
-					//	headPattern := fmt.Sprintf("/dev/%sn*", subsysName)
-					//	heads, _ := filepath.Glob(headPattern)
-					//	for _, h := range heads {
-					//		// Verify this head node is actually a block device
-					//		if _, err := os.Stat(h); err == nil {
-					//			logger.Infof("Found NVMe multipath head for %s: %s", devName, h)
-					//			return h, nil
-					//		}
-					//	}
-
 				}
 			}
-			// 3. Return the direct node if not multipathed
-			return filepath.Join("/dev", filepath.Base(m)), nil
+			return filepath.Join("/dev", name), nil
 		}
 	}
-	return "", fmt.Errorf("NVMe WWID %s not found", targetID)
+	return "", fmt.Errorf("nvme device not found")
 }
+
 
 func (o GetDmsPathHelperGeneric) getWWIDByDevName(devName string) (string, error) {
 	// Modern Linux kernels (4.x+) expose the WWID in sysfs for SCSI devices
@@ -3471,12 +3531,31 @@ func (o GetDmsPathHelperGeneric) validateDMIntegrity(dmPath string) (string, err
 }
 
 func normalizeWWID(raw string) string {
+func normalizeWWID(raw string) string {
+	// 1. Lowercase and clean whitespace/newlines
 	s := strings.ToLower(strings.TrimSpace(raw))
-	// Remove protocol-specific prefixes found in sysfs wwid files
-	prefixes := []string{"mpath-", "naa.", "uuid.", "nvme.", "t10.", "eui."}
-	for _, p := range prefixes {
-		s = strings.TrimPrefix(s, p)
+
+	// 2. Multi-pass prefix stripping 
+	// (Required because dm-uuid can look like "uuid-mpath-3600...")
+	prefixes := []string{"uuid-", "mpath-", "naa.", "uuid.", "nvme.", "t10.", "eui."}
+	
+	changed := true
+	for changed {
+		changed = false
+		for _, p := range prefixes {
+			if strings.HasPrefix(s, p) {
+				s = strings.TrimPrefix(s, p)
+				changed = true
+			}
+		}
 	}
-	// TODO is this true always:
-	return strings.ReplaceAll(s, "-", "")
+
+	// 3. Character Cleanup
+	// Only strip hyphens if your Array API provides IDs without them.
+	// Most CSI drivers strip: hyphens, dots, and "0x"
+	s = strings.ReplaceAll(s, "-", "")
+	s = strings.ReplaceAll(s, ".", "")
+	s = strings.TrimPrefix(s, "0x")
+
+	return s
 }
