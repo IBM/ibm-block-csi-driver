@@ -178,12 +178,25 @@ func (r OsDeviceConnectivityIscsi) iscsiGetRawSessions(ctx context.Context) ([]s
 			if !strings.HasPrefix(cd.Name(), "connection") {
 				continue
 			}
-
-			// The actual attributes live inside the nested 'iscsi_connection' folder
+			
+			// 2. The standard path: /device/connectionX:S/iscsi_connection/connectionX:S/
+			// We use cd.Name() for both levels to ensure they match dynamically.
 			attrPath := filepath.Join(devicePath, cd.Name(), "iscsi_connection", cd.Name())
 
 			addrBuf, errA := r.readSysfs(ctx, filepath.Join(attrPath, "address"))
 			portBuf, errP := r.readSysfs(ctx, filepath.Join(attrPath, "port"))
+
+			// 3. Safety Check: Does the attrPath actually exist? 
+			// (Some hardware offload cards change this structure)
+			if _, err := os.Stat(attrPath); os.IsNotExist(err) {
+				// Fallback: Check if attributes are directly in the connection folder 
+				// (Older kernels or specific transports)
+				logger.Warning("subdir not found")
+				attrPath = filepath.Join(devicePath, cd.Name())
+			}			
+
+			addrBuf, errA := os.ReadFile(filepath.Join(attrPath, "address"))
+			portBuf, errP := os.ReadFile(filepath.Join(attrPath, "port"))
 
 			if errA == nil && errP == nil {
 				portal := net.JoinHostPort(
