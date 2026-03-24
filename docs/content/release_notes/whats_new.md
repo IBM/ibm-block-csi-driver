@@ -4,10 +4,13 @@
 
 IBM® block storage CSI driver 1.13.1 adds support for:
 
-- IBM Storage Virtualize® partitions, including Policy Based High Availability (PBHA) on partitions, over host FC only.
-- IBM Storage Virtualize® - option to define secret-specific port set
+- IBM Storage Virtualize® partitions PBHA with iscsi host
+- Support of NVMe over FC hosts
+- Extended support to RedHat OpenShift® 4.21
+- Extended support to Kubernetes 1.35
+- More info in callhome
 
-**General availability date:** December 2025
+**General availability date:** March 2026
 
 ## Miscellaneous resolved issues
 

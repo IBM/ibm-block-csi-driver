@@ -21,8 +21,7 @@ Some storage system types do not support High availability (HA).{: attention}
 
 ## IBM Storage Virtualize® partitions and high availability partitions (PBHA) limitations
 
-- Snapshots aren't supported yet in HA (IBM Storage Virtualize® 9.1.0.1)
-- iSCSI connectivity (from cluster to storage) isn't supported in PBHA (can be used with other partition types)
+- HA Snapshots are support starting IBM Storage Virtualize® version 9.1.1.
 - Some features aren't supported for partitions, please refer to the docuemntation for details. For example - as of time of this release (1.13.1) IO groups are not supported and shouldn't be used.
 
 ## HyperSwap volume limitations
@@ -39,10 +38,6 @@ When conducting volume cloning, both volumes must use stretched topology.
 ## I/O group limitations
 
 I/O group configuration is only supported for use with IBM Storage Virtualize® family storage systems.
-
-## NVMe®/FC usage limitations
-
-As of this document's publication date, NVMe/FC is not supported for this release.{: restriction}
 
 For other limitations with your storage system, see the following section within your IBM Storage Virtualize® product documentation on [IBM Documentation](https://www.ibm.com/docs/en/): **Configuring** > **Host attachment** > **NVMe over Fibre Channel host attachments** > **FC-NVMe limitations and SAN configuration guidelines**.
 

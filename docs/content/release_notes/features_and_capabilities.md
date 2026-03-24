@@ -24,3 +24,4 @@
 | ReadWriteMany (RWX) access mode       | 1.12.0             | Allows multiple pods to read/write to the same volume simultaneously                            |
 | Call Home                              | 1.12.2             | Sends diagnostic data to IBM for proactive support and issue resolution                         |
 | PBHA (Policy-based High Availability) over host FC connectivity | 1.13.0             | Extends replication policies to automate high availability                                      |
+| PBHA (Policy-based High Availability) over host iSCSI connectivity | 1.13.1| Extends replication policies to automate high availability|
