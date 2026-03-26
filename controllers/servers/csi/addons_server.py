@@ -21,7 +21,8 @@ class ReplicationControllerServicer(pb2_grpc.ControllerServicer):
         replication_type = utils.get_addons_replication_type(request)
         utils.validate_addons_request(request, replication_type)
 
-        object_type, object_id_info, object_id = utils.get_replication_object_type_and_id_info(request)
+        object_type, object_id_info = utils.get_replication_object_type_and_id_info(request)
+        object_id = object_id_info.ids.internal_id
 
         error_message = self._validate_replication_object(object_type, replication_type)
         if error_message:
@@ -55,7 +56,8 @@ class ReplicationControllerServicer(pb2_grpc.ControllerServicer):
         replication_type = utils.get_addons_replication_type(request)
         utils.validate_addons_request(request, replication_type)
 
-        object_type, object_id_info, object_id = utils.get_replication_object_type_and_id_info(request)
+        object_type, object_id_info = utils.get_replication_object_type_and_id_info(request)
+        object_id = object_id_info.ids.internal_id
 
         error_message = self._validate_replication_object(object_type, replication_type)
         if error_message:
@@ -99,7 +101,8 @@ class ReplicationControllerServicer(pb2_grpc.ControllerServicer):
         replication_type = utils.get_addons_replication_type(request)
         utils.validate_addons_request(request, replication_type)
 
-        object_type, object_id_info, object_id = utils.get_replication_object_type_and_id_info(request)
+        object_type, object_id_info = utils.get_replication_object_type_and_id_info(request)
+        object_id = object_id_info.ids.internal_id
 
         error_message = self._validate_replication_object(object_type, replication_type)
         if error_message:
@@ -138,7 +141,8 @@ class ReplicationControllerServicer(pb2_grpc.ControllerServicer):
         replication_type = utils.get_addons_replication_type(request)
         utils.validate_addons_request(request, replication_type)
 
-        object_type, object_id_info, object_id = utils.get_replication_object_type_and_id_info(request)
+        object_type, object_id_info = utils.get_replication_object_type_and_id_info(request)
+        object_id = object_id_info.ids.internal_id
 
         error_message = self._validate_replication_object(object_type, replication_type)
         if error_message:
