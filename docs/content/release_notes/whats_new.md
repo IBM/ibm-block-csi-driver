@@ -1,8 +1,8 @@
 {{site.data.keyword.attribute-definition-list}}
 
-# What's new in 1.13.1
+# What's new in 1.14.0
 
-IBM® block storage CSI driver 1.13.1 adds support for:
+IBM® block storage CSI driver 1.14.0 adds support for:
 
 - IBM Storage Virtualize® partitions PBHA with iscsi host
 - Support of NVMe over FC hosts
@@ -14,7 +14,7 @@ IBM® block storage CSI driver 1.13.1 adds support for:
 
 ## Miscellaneous resolved issues
 
-For information about the resolved issues in version 1.13.1, see [1.13.1](changelog_1.13.1.md).
+For information about the resolved issues in version 1.14.0, see [1.14.0](changelog_1.14.0.md).
 
 If you have any configuration changes that you want saved over upgrade, notice the following.{: attention}
 

@@ -1,5 +1,5 @@
 {{site.data.keyword.attribute-definition-list}}
-​
+
 ## Detecting errors and log collection
 - Use the IBM® Block CSI Driver diagnostics collection script to gather logs, events, Kubernetes/OpenShift resources, node diagnostics, storage system data, and workload context for problem determination.
 - The script works on both Kubernetes and Red Hat® OpenShift® clusters and automatically selects the appropriate CLI (kubectl or oc). No additional configuration is required. {: tip}
@@ -24,12 +24,12 @@ kubectl describe -n <namespace> pod/<pod-name>
 ```bash
 ./ibm-block-csi-logs-collector.sh
 ```
-The script can be found here: https://github.com/IBM/ibm-block-csi-driver/tree/release-1.13.1/scripts/ibm-block-csi-logs-collector.sh
+The script can be found here: https://github.com/IBM/ibm-block-csi-driver/tree/release-1.14.0/scripts/ibm-block-csi-logs-collector.sh
 * Collects: resources, logs, events, node-diagnostics
 * Does not collect: storage, workload
 * Scope: entire cluster
 * Output: timestamped directory created automatically
-​
+
 ---
 
 ### Help and usage information
@@ -71,7 +71,7 @@ The diagnostics script collects the following components:
 ```
 - Specifies where the log collection directory should be created
 - The script creates: <directory-path>/ibm-block-csi-log-collection/YYYYMMDD-HHMMSS_<timezone>/
-- If not specified, output is collected in the current directory 
+- If not specified, output is collected in the current directory
 
 ---
 ### Creating compressed archive
@@ -100,10 +100,10 @@ The diagnostics script collects the following components:
 **Note**:
 - Both flags are mandatory
 - If either flag is missing, storage system diagnostics are skipped
-​
+
 ---
 ### Workload-specific diagnostics
-- Workload diagnostics are automatically enabled when a workload target (Pod and/or PVC) is specified.​ 
+- Workload diagnostics are automatically enabled when a workload target (Pod and/or PVC) is specified.
 - `--namespace (-n)` is mandatory for all workload collection.
 #### Pod-based workload
 ```bash
