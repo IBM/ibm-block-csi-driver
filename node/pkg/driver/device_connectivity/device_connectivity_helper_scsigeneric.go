@@ -3217,45 +3217,57 @@ func (o GetDmsPathHelperGeneric) WaitForDmToExist(ctx context.Context, volumeWWI
 	if err := ctx.Err(); err != nil {
 		return "", err
 	}
+	var lastCount int
+	var lastRo string
+	var stableCycles int
 
 	norm := make([]string, len(volumeWWID))
 	for i, wwid := range volumeWWID {
-		norm[i] = normalizeWWID(wwid)
+			norm[i] = normalizeWWID(wwid)
+			logger.Warningf("normalized %s to %s", wwid, norm[i])
 	}
 
-	var lastCount int
-	var stableCycles int
-	ticker := time.NewTicker(time.Duration(intervalSeconds) * time.Second)
-	defer ticker.Stop()
-
 	for i := 0; i < maxRetries; i++ {
-		select {
-		case <-ctx.Done():
-			return "", ctx.Err()
-		case <-ticker.C:
-			path, err := o.performDiscovery(ctx, norm) // Pass context
+			path, err := o.performDiscovery(norm)
 			if err == nil {
-				// REQUIREMENT 6: Check for D-state (suspended maps)
-				if !o.isKernelSettled(ctx, path) {
-					stableCycles = 0
-					continue
-				}
+					// 1. KERNEL STATE: Check if DM is suspended or NVMe is not live
+					if !o.isKernelSettled(path) {
+							logger.Warning("reset")
+							stableCycles = 0
+							goto retry
+					}
 
-				// REQUIREMENT 5: Stabilization check for Multipath/NVMe
-				count := o.getSlaveCount(ctx, path)
-				if count > 0 && count == lastCount {
-					stableCycles++
-				} else {
-					stableCycles = 0
-				}
+					logger.Warningf("stable %d", stableCycles)
 
-				if stableCycles >= 2 {
-					// REQUIREMENT 7: The "Last Mile" Settle (O_EXCL check)
-					return o.validateAndSettle(ctx, path)
-				}
-				lastCount = count
+					// 2. FINGERPRINT STABILIZATION:
+					// Ensure path count AND Read-Only status are consistent.
+					count := o.getSlaveCount(path)
+					ro := o.getRoStatus(path)
+
+					logger.Warningf("ro %s", ro)
+
+					if count > 0 && count == lastCount && ro == lastRo {
+							stableCycles++
+					} else {
+							stableCycles = 0 // Reset if anything is still moving
+					}
+
+					// 3. SETTLEMENT: IO Quiescence
+					if stableCycles >= 2 {
+							logger.Warning("validate settle")
+							// Final check: Is the device quiet (no in-flight IO)?
+							if err := o.safeSettle(path); err == nil {
+									return o.validateDMIntegrity(path)
+							}
+					}
+
+					lastCount = count
+					lastRo = ro
 			}
-		}
+
+	retry:
+			logger.Debugf("Attempt %d/%d: %v", i+1, maxRetries, err)
+			time.Sleep(time.Duration(intervalSeconds) * time.Second)
 	}
 	return "", &MultipathDeviceNotFoundForVolumeError{volumeWWID[0]}
 }
@@ -3265,23 +3277,68 @@ func (o GetDmsPathHelperGeneric) WaitForDmToExist(ctx context.Context, volumeWWI
 func (o GetDmsPathHelperGeneric) isKernelSettled(path string) bool {
 	name := filepath.Base(path)
 
-	// DM (iSCSI/FC): If suspended == 1, multipathd is loading a new table
+	logger.Warningf("check %s", path)
+
+	// 1. Check Read-Only flag (Generic for DM and NVMe)
+	// Some devices start 'ro=1' during initialization. We want '0'.
+	ro, err := os.ReadFile(fmt.Sprintf("/sys/block/%s/ro", name))
+	if err == nil && strings.TrimSpace(string(ro)) != "0" {
+		logger.Warningf("ro flag check failed %s", path)
+		return false
+	}
+
+	// 2. DM Specific: Check suspended state
+	// If suspended == 1, multipathd is loading a new table
 	if strings.HasPrefix(name, "dm-") {
 		suspended, err := os.ReadFile(fmt.Sprintf("/sys/block/%s/dm/suspended", name))
+		// If we can't read it, assume not settled yet
 		return err == nil && strings.TrimSpace(string(suspended)) == "0"
 	}
 
-	// NVMe: Check if the subsystem head is 'live'
+	// 3. NVMe Specific: Check if the subsystem/namespace is 'live'
 	if strings.HasPrefix(name, "nvme") {
-		state, err := os.ReadFile(fmt.Sprintf("/sys/block/%s/device/state", name))
-		// If file doesn't exist, it's a subsys node; check for existence as 'live'
+		statePath := fmt.Sprintf("/sys/block/%s/device/state", name)
+		state, err := os.ReadFile(statePath)
 		if err != nil {
-			return true
+			// On some kernels/nodes, 'state' file doesn't exist.
+			// If missing, we treat existence as settled.
+			return os.IsNotExist(err)
 		}
 		return strings.TrimSpace(string(state)) == "live"
 	}
 
 	return true
+}
+
+func (o GetDmsPathHelperGeneric) getRoStatus(path string) string {
+	data, err := os.ReadFile(fmt.Sprintf("/sys/block/%s/ro", filepath.Base(path)))
+	if err != nil {
+		return "unknown"
+	}
+	return strings.TrimSpace(string(data))
+}
+
+func (o GetDmsPathHelperGeneric) safeSettle(path string) error {
+	name := filepath.Base(path)
+	for i := 0; i < 5; i++ {
+		// Field 11 in /sys/block/dm-X/stat is "ios_in_flight"
+		// If 0, multipathd and udev are likely finished with their reloads.
+		data, err := os.ReadFile(fmt.Sprintf("/sys/block/%s/stat", name))
+		if err == nil {
+			fields := strings.Fields(string(data))
+			if len(fields) >= 11 && fields[10] == "0" {
+				// Verify access without O_EXCL to avoid racing with multipathd
+				f, err := os.Open(path)
+				if err == nil {
+					f.Close()
+					return nil
+				}
+			}
+		}
+		// Jitter prevents syncing with multipathd's internal retry timers
+		time.Sleep(time.Duration(100+rand.Intn(200)) * time.Millisecond)
+	}
+	return fmt.Errorf("device %s remains busy or unstable", path)
 }
 
 func (o GetDmsPathHelperGeneric) getSlaveCount(path string) int {
