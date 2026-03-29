@@ -2784,6 +2784,8 @@ func (o GetDmsPathHelperGeneric) WaitForDmToExist(volumeWWID []string, maxRetrie
 			count := o.getSlaveCount(path)
 			ro := o.getRoStatus(path)
 
+			logger.Warningf("ro %s", ro)
+
 			if count > 0 && count == lastCount && ro == lastRo {
 				stableCycles++
 			} else {
@@ -2857,15 +2859,21 @@ func (o GetDmsPathHelperGeneric) getRoStatus(path string) string {
 func (o GetDmsPathHelperGeneric) safeSettle(path string) error {
 	name := filepath.Base(path)
 	for i := 0; i < 5; i++ {
+		logger.Warningf("safeSettle %d", i)
 		// Field 11 in /sys/block/dm-X/stat is "ios_in_flight"
 		// If 0, multipathd and udev are likely finished with their reloads.
 		data, err := os.ReadFile(fmt.Sprintf("/sys/block/%s/stat", name))
 		if err == nil {
 			fields := strings.Fields(string(data))
+			logger.Warning("length %d", int(len(fields)))
+			if len(fields) >= 11 {
+				logger.Warning("in fligh %s", fields[10])
+			}
 			if len(fields) >= 11 && fields[10] == "0" {
 				// Verify access without O_EXCL to avoid racing with multipathd
 				f, err := os.Open(path)
 				if err == nil {
+					logger.Warning("Successful open")
 					f.Close()
 					return nil
 				}
