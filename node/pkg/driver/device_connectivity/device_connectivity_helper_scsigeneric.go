@@ -3217,61 +3217,60 @@ func (o GetDmsPathHelperGeneric) WaitForDmToExist(ctx context.Context, volumeWWI
 	if err := ctx.Err(); err != nil {
 		return "", err
 	}
-	var lastCount int
-	var lastRo string
-	var stableCycles int
+        var lastCount int
+        var lastRo string
+        var stableCycles int
 
-	norm := make([]string, len(volumeWWID))
-	for i, wwid := range volumeWWID {
-			norm[i] = normalizeWWID(wwid)
-			logger.Warningf("normalized %s to %s", wwid, norm[i])
-	}
+        norm := make([]string, len(volumeWWID))
+        for i, wwid := range volumeWWID {
+                norm[i] = normalizeWWID(wwid)
+                logger.Warningf("normalized %s to %s", wwid, norm[i])
+        }
 
-	for i := 0; i < maxRetries; i++ {
-			path, err := o.performDiscovery(norm)
-			if err == nil {
-					// 1. KERNEL STATE: Check if DM is suspended or NVMe is not live
-					if !o.isKernelSettled(path) {
-							logger.Warning("reset")
-							stableCycles = 0
-							goto retry
-					}
+        for i := 0; i < maxRetries; i++ {
+                path, err := o.performDiscovery(norm)
+                if err == nil {
+                        // 1. KERNEL STATE: Check if DM is suspended or NVMe is not live
+                        if !o.isKernelSettled(path) {
+                                logger.Warning("reset")
+                                stableCycles = 0
+                                goto retry
+                        }
 
-					logger.Warningf("stable %d", stableCycles)
+                        logger.Warningf("stable %d", stableCycles)
 
-					// 2. FINGERPRINT STABILIZATION:
-					// Ensure path count AND Read-Only status are consistent.
-					count := o.getSlaveCount(path)
-					ro := o.getRoStatus(path)
+                        // 2. FINGERPRINT STABILIZATION:
+                        // Ensure path count AND Read-Only status are consistent.
+                        count := o.getSlaveCount(path)
+                        ro := o.getRoStatus(path)
 
-					logger.Warningf("ro %s", ro)
+                        logger.Warningf("ro %s", ro)
 
-					if count > 0 && count == lastCount && ro == lastRo {
-							stableCycles++
-					} else {
-							stableCycles = 0 // Reset if anything is still moving
-					}
+                        if count > 0 && count == lastCount && ro == lastRo {
+                                stableCycles++
+                        } else {
+                                stableCycles = 0 // Reset if anything is still moving
+                        }
 
-					// 3. SETTLEMENT: IO Quiescence
-					if stableCycles >= 2 {
-							logger.Warning("validate settle")
-							// Final check: Is the device quiet (no in-flight IO)?
-							if err := o.safeSettle(path); err == nil {
-									return o.validateDMIntegrity(path)
-							}
-					}
+                        // 3. SETTLEMENT: IO Quiescence
+                        if stableCycles >= 2 {
+                                logger.Warning("validate settle")
+                                // Final check: Is the device quiet (no in-flight IO)?
+                                if err := o.safeSettle(path); err == nil {
+                                        return o.validateDMIntegrity(path)
+                                }
+                        }
 
-					lastCount = count
-					lastRo = ro
-			}
+                        lastCount = count
+                        lastRo = ro
+                }
 
-	retry:
-			logger.Debugf("Attempt %d/%d: %v", i+1, maxRetries, err)
-			time.Sleep(time.Duration(intervalSeconds) * time.Second)
-	}
-	return "", &MultipathDeviceNotFoundForVolumeError{volumeWWID[0]}
+        retry:
+                logger.Debugf("Attempt %d/%d: %v", i+1, maxRetries, err)
+                time.Sleep(time.Duration(intervalSeconds) * time.Second)
+        }
+        return "", &MultipathDeviceNotFoundForVolumeError{volumeWWID[0]}
 }
-
 
 
 func (o GetDmsPathHelperGeneric) isKernelSettled(path string) bool {
@@ -3321,15 +3320,21 @@ func (o GetDmsPathHelperGeneric) getRoStatus(path string) string {
 func (o GetDmsPathHelperGeneric) safeSettle(path string) error {
 	name := filepath.Base(path)
 	for i := 0; i < 5; i++ {
+		logger.Warningf("safeSettle %d", i)
 		// Field 11 in /sys/block/dm-X/stat is "ios_in_flight"
 		// If 0, multipathd and udev are likely finished with their reloads.
 		data, err := os.ReadFile(fmt.Sprintf("/sys/block/%s/stat", name))
 		if err == nil {
 			fields := strings.Fields(string(data))
+			logger.Warning("length %d", int(len(fields)))
+			if len(fields) >= 11 {
+				logger.Warning("in fligh %s", fields[10])
+			}
 			if len(fields) >= 11 && fields[10] == "0" {
 				// Verify access without O_EXCL to avoid racing with multipathd
 				f, err := os.Open(path)
 				if err == nil {
+					logger.Warning("Successful open")
 					f.Close()
 					return nil
 				}
