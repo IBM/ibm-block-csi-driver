@@ -3336,7 +3336,7 @@ func (o GetDmsPathHelperGeneric) safeSettle(path string) error {
 			}
 		}
 		// Jitter prevents syncing with multipathd's internal retry timers
-		time.Sleep(time.Duration(100+rand.Intn(200)) * time.Millisecond)
+		time.Sleep(time.Duration(100+rand.IntN(200)) * time.Millisecond)
 	}
 	return fmt.Errorf("device %s remains busy or unstable", path)
 }
