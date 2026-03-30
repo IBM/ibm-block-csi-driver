@@ -2857,33 +2857,39 @@ func (o GetDmsPathHelperGeneric) getRoStatus(path string) string {
 }
 
 func (o GetDmsPathHelperGeneric) safeSettle(path string) error {
-	name := filepath.Base(path)
-	for i := 0; i < 5; i++ {
+    name := filepath.Base(path)
+    
+    for i := 0; i < 10; i++ { // Increase retries for slow udev
 		logger.Warningf("safeSettle %d", i)
-		// Field 11 in /sys/block/dm-X/stat is "ios_in_flight"
-		// If 0, multipathd and udev are likely finished with their reloads.
-		data, err := os.ReadFile(fmt.Sprintf("/sys/block/%s/stat", name))
-		if err == nil {
-			fields := strings.Fields(string(data))
-			logger.Warning("length %d", int(len(fields)))
-			if len(fields) >= 11 {
-				logger.Warning("in fligh %s", fields[10])
-			}
-			if len(fields) >= 11 && fields[10] == "0" {
-				// Verify access without O_EXCL to avoid racing with multipathd
-				f, err := os.Open(path)
-				if err == nil {
-					logger.Warning("Successful open")
-					f.Close()
-					return nil
-				}
-			}
-		}
-		// Jitter prevents syncing with multipathd's internal retry timers
-		time.Sleep(time.Duration(100+rand.IntN(200)) * time.Millisecond)
-	}
-	return fmt.Errorf("device %s remains busy or unstable", path)
+        // 1. Check suspended state (The "Gold Standard" for DM stability)
+        // If suspended is 1, multipathd is currently reconfiguring the map.
+        suspended, err := os.ReadFile(fmt.Sprintf("/sys/block/%s/dm/suspended", name))
+		logger.Warningf("suspended %s", string(suspended))
+        if err == nil && strings.TrimSpace(string(suspended)) == "0" {
+			logger.Warningf("successful open suspended %s", string(suspended))
+            // 2. Instead of checking in-flight IO, verify we can perform a small read.
+            // This forces the block layer to actually exercise the path.
+            f, err := os.OpenFile(path, os.O_RDONLY, 0)
+            if err == nil {
+				logger.Warning("successful open")
+                // Read the first 512 bytes to ensure the plumbing is actually working
+                buf := make([]byte, 512)
+                _, readErr := f.Read(buf)
+                f.Close()
+                
+                if readErr == nil {
+                    logger.Warningf("Settlement reached: %s is live and readable", path)
+                    return nil
+                }
+            }
+        }
+        
+        // Use a slightly longer, jittered sleep to let udev/multipathd finish
+        time.Sleep(time.Duration(200+rand.IntN(300)) * time.Millisecond)
+    }
+    return fmt.Errorf("device %s failed to settle after 10 attempts", path)
 }
+
 
 func (o GetDmsPathHelperGeneric) getSlaveCount(path string) int {
 	logger.Warningf("slave count for %s", path)
@@ -2911,31 +2917,6 @@ func (o GetDmsPathHelperGeneric) getSlaveCount(path string) int {
 		return count
 	}
 	return 1
-}
-
-
-
-func (o GetDmsPathHelperGeneric) validateAndSettle(path string) (string, error) {
-	for i := 0; i < 5; i++ {
-		logger.Warningf("open %s", path)
-		fd, err := unix.Open(path, unix.O_RDONLY|unix.O_EXCL|unix.O_NONBLOCK, 0)
-		if err == nil {
-			logger.Warning("open successful")
-			unix.Close(fd)
-			return o.validateDMIntegrity(path)
-		}
-
-		if err == unix.EBUSY {
-			logger.Warning("busy")
-			// Random jitter (10-50ms) ensures we don't sync up with
-			// multipathd's own retry loops (the "thundering herd").
-			jitter := time.Duration(10+rand.IntN(40)) * time.Millisecond
-			time.Sleep(jitter)
-			continue
-		}
-		return "", err
-	}
-	return "", fmt.Errorf("device %s remains busy (settlement timeout)", path)
 }
 
 // FetchDeviceByWWID executes discovery under a global lock to prevent sysfs thrashing.
