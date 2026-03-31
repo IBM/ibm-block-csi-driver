@@ -2754,8 +2754,6 @@ func convertScsiIdToNguid(scsiId string) string {
 	return finalNguid
 }
 
-
-
 func (o GetDmsPathHelperGeneric) WaitForDmToExist(volumeWWID []string, maxRetries int, intervalSeconds int) (string, error) {
 	var lastCount int
 	var lastRo string
@@ -2768,37 +2766,32 @@ func (o GetDmsPathHelperGeneric) WaitForDmToExist(volumeWWID []string, maxRetrie
 	}
 
 	for i := 0; i < maxRetries; i++ {
+		// 1. DISCOVERY: Find the device path (handles SCSI and NVMe)
 		path, err := o.performDiscovery(norm)
 		if err == nil {
-			// 1. KERNEL STATE: Check if DM is suspended or NVMe is not live
-			if !o.isKernelSettled(path) {
-				logger.Warning("reset")
+			// 2. SETTLEMENT: Kernel + Udev + Data Path (RHEL 7+ compatible)
+			if errSettle := o.emulatedSettle(path); errSettle != nil {
+				logger.Warningf("Device %s found but not settled: %v", path, errSettle)
 				stableCycles = 0
 				goto retry
 			}
 
-			logger.Warningf("stable %d", stableCycles)
-
-			// 2. FINGERPRINT STABILIZATION:
-			// Ensure path count AND Read-Only status are consistent.
+			// 3. TOPOLOGY STABILITY: Check path count and RO status
 			count := o.getSlaveCount(path)
 			ro := o.getRoStatus(path)
-
-			logger.Warningf("ro %s", ro)
+			
+			logger.Warningf("ro %s count %d", ro, count)
 
 			if count > 0 && count == lastCount && ro == lastRo {
 				stableCycles++
 			} else {
-				stableCycles = 0 // Reset if anything is still moving
+				stableCycles = 0 // Reset if multipathd is still adding paths
 			}
 
-			// 3. SETTLEMENT: IO Quiescence
+			// 4. FINAL VALIDATION: Return only when topology is stable
 			if stableCycles >= 2 {
-				logger.Warning("validate settle")
-				// Final check: Is the device quiet (no in-flight IO)?
-				if err := o.safeSettle(path); err == nil {
-					return o.validateDMIntegrity(path)
-				}
+				logger.Warningf("Device %s is stable and settled", path)
+				return o.validateDMIntegrity(path)
 			}
 
 			lastCount = count
@@ -2812,41 +2805,6 @@ func (o GetDmsPathHelperGeneric) WaitForDmToExist(volumeWWID []string, maxRetrie
 	return "", &MultipathDeviceNotFoundForVolumeError{volumeWWID[0]}
 }
 
-func (o GetDmsPathHelperGeneric) isKernelSettled(path string) bool {
-	name := filepath.Base(path)
-
-	logger.Warningf("check %s", path)
-
-	// 1. Check Read-Only flag (Generic for DM and NVMe)
-	// Some devices start 'ro=1' during initialization. We want '0'.
-	ro, err := os.ReadFile(fmt.Sprintf("/sys/block/%s/ro", name))
-	if err == nil && strings.TrimSpace(string(ro)) != "0" {
-		logger.Warningf("ro flag check failed %s", path)
-		return false
-	}
-
-	// 2. DM Specific: Check suspended state
-	// If suspended == 1, multipathd is loading a new table
-	if strings.HasPrefix(name, "dm-") {
-		suspended, err := os.ReadFile(fmt.Sprintf("/sys/block/%s/dm/suspended", name))
-		// If we can't read it, assume not settled yet
-		return err == nil && strings.TrimSpace(string(suspended)) == "0"
-	}
-
-	// 3. NVMe Specific: Check if the subsystem/namespace is 'live'
-	if strings.HasPrefix(name, "nvme") {
-		statePath := fmt.Sprintf("/sys/block/%s/device/state", name)
-		state, err := os.ReadFile(statePath)
-		if err != nil {
-			// On some kernels/nodes, 'state' file doesn't exist.
-			// If missing, we treat existence as settled.
-			return os.IsNotExist(err)
-		}
-		return strings.TrimSpace(string(state)) == "live"
-	}
-
-	return true
-}
 
 func (o GetDmsPathHelperGeneric) getRoStatus(path string) string {
 	data, err := os.ReadFile(fmt.Sprintf("/sys/block/%s/ro", filepath.Base(path)))
@@ -2856,38 +2814,79 @@ func (o GetDmsPathHelperGeneric) getRoStatus(path string) string {
 	return strings.TrimSpace(string(data))
 }
 
-func (o GetDmsPathHelperGeneric) safeSettle(path string) error {
-    name := filepath.Base(path)
-    
-    for i := 0; i < 10; i++ { // Increase retries for slow udev
-		logger.Warningf("safeSettle %d", i)
-        // 1. Check suspended state (The "Gold Standard" for DM stability)
-        // If suspended is 1, multipathd is currently reconfiguring the map.
-        suspended, err := os.ReadFile(fmt.Sprintf("/sys/block/%s/dm/suspended", name))
-		logger.Warningf("suspended %s", string(suspended))
-        if err == nil && strings.TrimSpace(string(suspended)) == "0" {
-			logger.Warningf("successful open suspended %s", string(suspended))
-            // 2. Instead of checking in-flight IO, verify we can perform a small read.
-            // This forces the block layer to actually exercise the path.
-            f, err := os.OpenFile(path, os.O_RDONLY, 0)
-            if err == nil {
-				logger.Warning("successful open")
-                // Read the first 512 bytes to ensure the plumbing is actually working
-                buf := make([]byte, 512)
-                _, readErr := f.Read(buf)
-                f.Close()
-                
-                if readErr == nil {
-                    logger.Warningf("Settlement reached: %s is live and readable", path)
-                    return nil
-                }
+func (o GetDmsPathHelperGeneric) emulatedSettle(path string) error {
+	name := filepath.Base(path)
+
+	for i := 0; i < 15; i++ {
+		// Check Read-Only flag (Generic)
+		ro, err := os.ReadFile(fmt.Sprintf("/sys/block/%s/ro", name))
+		logger.Warningf("ro %s", ro)
+		if err == nil && strings.TrimSpace(string(ro)) != "0" {
+			goto next
+		}
+
+		// DM Specific: Check suspended state
+		if strings.HasPrefix(name, "dm-") {
+			suspended, err := os.ReadFile(fmt.Sprintf("/sys/block/%s/dm/suspended", name))
+			if err != nil || strings.TrimSpace(string(suspended)) != "0" {
+				goto next
+			}
+		}
+
+		// NVMe Specific: Check if 'live'
+		if strings.HasPrefix(name, "nvme") {
+			state, err := os.ReadFile(fmt.Sprintf("/sys/block/%s/device/state", name))
+			// If missing (older kernels), treat as settled
+			if err == nil && strings.TrimSpace(string(state)) != "live" {
+				goto next
+			}
+		}
+
+		// 2. USERSPACE SETTLE (udev database check)
+		// This handles RHEL 7 legacy (/dev/.udev/db) and modern (/run/udev/data)
+		if err := o.waitForUdev(path); err == nil {
+			// 3. DATA PATH POKE (The "Safe Open")
+			// Verifies we can actually touch the device without O_EXCL
+			f, err := os.Open(path)
+			if err == nil {
+				logger.Warning("Successful open")
+				f.Close()
+				return nil // CONVERGED
+			}
+		}
+
+	next:
+		time.Sleep(200 * time.Millisecond)
+	}
+	return fmt.Errorf("device %s failed to settle after exhaustive checks", path)
+}
+
+
+
+func (o GetDmsPathHelperGeneric) waitForUdev(path string) error {
+    var stat unix.Stat_t
+    if err := unix.Stat(path, &stat); err != nil {
+		logger.Warning("Cannot stat")
+        return err
+    }
+
+    major, minor := unix.Major(stat.Rdev), unix.Minor(stat.Rdev)
+    // Check both modern and legacy udev database locations
+    udevPaths := []string{
+        fmt.Sprintf("/run/udev/data/b%d:%d", major, minor), // Modern (RHEL 8+, Ubuntu 16+)
+        fmt.Sprintf("/dev/.udev/db/b%d:%d", major, minor), // Legacy (RHEL 7/6, Debian 8)
+    }
+
+    for i := 0; i < 20; i++ {
+        for _, uPath := range udevPaths {
+            if _, err := os.Stat(uPath); err == nil {
+				logger.Warning("settled")
+                return nil // udev is settled
             }
         }
-        
-        // Use a slightly longer, jittered sleep to let udev/multipathd finish
-        time.Sleep(time.Duration(200+rand.IntN(300)) * time.Millisecond)
+        time.Sleep(100 * time.Millisecond)
     }
-    return fmt.Errorf("device %s failed to settle after 10 attempts", path)
+    return fmt.Errorf("udev database timeout for %s", path)
 }
 
 
@@ -3031,14 +3030,16 @@ func (o GetDmsPathHelperGeneric) scanDMSubsystem(targetID string) (string, error
 }
 
 
+
 func (o GetDmsPathHelperGeneric) scanNVMeSubsystem(targetID string) (string, error) {
-	// Find all namespaces (n1, n2...)
 	matches, _ := filepath.Glob("/sys/block/nvme*n*")
 	target := normalizeWWID(targetID)
 
 	for _, m := range matches {
+		name := filepath.Base(m)
 		var foundID string
-		// 1. Check NGUID (FlashSystem/SVC standard) then UUID
+		
+		// 1. Identification
 		if data, err := os.ReadFile(filepath.Join(m, "nguid")); err == nil {
 			foundID = normalizeWWID(string(data))
 		}
@@ -3049,26 +3050,41 @@ func (o GetDmsPathHelperGeneric) scanNVMeSubsystem(targetID string) (string, err
 		}
 
 		if foundID == target {
-			name := filepath.Base(m)
-			// 2. CHECK: Is this a "Private Path" or the "Multipath Head"?
-			// If 'subsystem' folder exists and name is 'nvmeXnY', it's likely a path.
-			// Native Multipath heads are usually named 'nvme-subsysXnY'
-			if !strings.Contains(name, "subsys") {
-				// This is a private path (e.g. nvme0n1). 
-				// Find the head (e.g. nvme-subsys0n1) so we return the multipath device.
-				if link, err := os.Readlink(filepath.Join(m, "subsystem")); err == nil {
-					// The subsystem link points to /sys/class/nvme-subsystem/nvme-subsys0
-					// We append the namespace suffix 'n1' to the subsys name
-					subsysName := filepath.Base(link)
-					nsSuffix := name[strings.LastIndex(name, "n"):] // e.g. "n1"
-					headDevice := subsysName + nsSuffix
-					
-					if _, err := os.Stat(filepath.Join("/dev", headDevice)); err == nil {
-						return filepath.Join("/dev", headDevice), nil
+			// 2. LEGACY CHECK: Is this NVMe path swallowed by Device Mapper?
+			// Check /sys/block/nvmeXnY/holders/ for a "dm-X" entry
+			holders, _ := os.ReadDir(filepath.Join(m, "holders"))
+			for _, h := range holders {
+				if strings.HasPrefix(h.Name(), "dm-") {
+					dmPath := filepath.Join("/dev", h.Name())
+					logger.Warningf("Legacy NVMe: Found DM holder %s for %s", dmPath, name)
+					if err := o.waitForUdev(dmPath); err == nil {
+						return dmPath, nil
 					}
 				}
 			}
-			return filepath.Join("/dev", name), nil
+
+			// 3. MODERN CHECK: Native NVMe Multipath Head
+			subsysPath := filepath.Join(m, "subsystem")
+			if link, err := os.Readlink(subsysPath); err == nil {
+				subsysName := filepath.Base(link)
+				// If the subsystem is "nvme-subsystem" (generic), it's likely a head already
+				// If it's a specific controller, we map to the subsys head
+				if !strings.Contains(name, "subsys") {
+					nsSuffix := name[strings.LastIndex(name, "n"):]
+					headDevice := subsysName + nsSuffix
+					finalDev := filepath.Join("/dev", headDevice)
+					
+					if err := o.waitForUdev(finalDev); err == nil {
+						return finalDev, nil
+					}
+				}
+			}
+
+			// 4. FALLBACK: Direct Device
+			finalDev := filepath.Join("/dev", name)
+			if err := o.waitForUdev(finalDev); err == nil {
+				return finalDev, nil
+			}
 		}
 	}
 	return "", fmt.Errorf("nvme device not found")
@@ -3085,30 +3101,47 @@ func (o GetDmsPathHelperGeneric) getWWIDByDevName(devName string) (string, error
 	return strings.TrimSpace(string(data)), nil
 }
 
-// TODO NVMe
-// TODO integrate in the main discovery loop (slaves count)
-func (o GetDmsPathHelperGeneric) validateDMIntegrity(dmPath string) (string, error) {
+func (o GetDmsPathHelperGeneric) validateDMIntegrity(dmPath string, targetWWIDs []string) (string, error) {
 	dmName := filepath.Base(dmPath)
-	slavesPath := fmt.Sprintf("/sys/block/%s/slaves", dmName)
-	logger.Warningf("slaves path %s", slavesPath)
-
-	slaves, err := os.ReadDir(slavesPath)
-	if err != nil || len(slaves) == 0 {
-		logger.Warning("no slaves")
-		return "", fmt.Errorf("dm device %s has no active slaves", dmName)
+	
+	// 1. IDENTITY CHECK: Does this DM device match our WWID?
+	// /sys/block/dm-X/dm/uuid contains the mpath-WWID string
+	uuidContent, err := os.ReadFile(fmt.Sprintf("/sys/block/%s/dm/uuid", dmName))
+	if err == nil {
+		foundUUID := normalizeWWID(string(uuidContent))
+		match := false
+		for _, target := range targetWWIDs {
+			if foundUUID == normalizeWWID(target) {
+				match = true
+				break
+			}
+		}
+		if !match {
+			return "", fmt.Errorf("integrity fail: dm %s belongs to %s, not %v", dmName, foundUUID, targetWWIDs)
+		}
 	}
 
-	// Optional: Check if at least one slave is 'running'
+	// 2. PATH CHECK: Are there slaves?
+	slavesPath := fmt.Sprintf("/sys/block/%s/slaves", dmName)
+	slaves, err := os.ReadDir(slavesPath)
+	if err != nil || len(slaves) == 0 {
+		return "", fmt.Errorf("dm device %s has no slaves", dmName)
+	}
+
+	// 3. STATE CHECK: Is at least one path usable?
 	for _, s := range slaves {
-		logger.Warningf("check slave %s", s.Name())
-		state, _ := os.ReadFile(fmt.Sprintf("/sys/block/%s/device/state", s.Name()))
-		logger.Warningf("state %s", strings.TrimSpace(string(state)))
-		if strings.TrimSpace(string(state)) == "running" {
+		statePath := fmt.Sprintf("/sys/block/%s/device/state", s.Name())
+		stateData, err := os.ReadFile(statePath)
+		if err != nil { continue }
+		
+		status := strings.TrimSpace(string(stateData))
+		// Handle both SCSI ("running") and NVMe ("live")
+		if status == "running" || status == "live" {
 			return dmPath, nil
 		}
 	}
 
-	return "", fmt.Errorf("dm device %s has slaves but none are in 'running' state", dmName)
+	return "", fmt.Errorf("dm device %s has slaves but none are running/live", dmName)
 }
 
 func normalizeWWID(raw string) string {
