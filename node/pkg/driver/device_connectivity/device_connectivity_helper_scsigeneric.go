@@ -21,7 +21,6 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
-	"math/rand/v2"
 	"os"
 	"path/filepath"
 	"strconv"
@@ -2791,7 +2790,7 @@ func (o GetDmsPathHelperGeneric) WaitForDmToExist(volumeWWID []string, maxRetrie
 			// 4. FINAL VALIDATION: Return only when topology is stable
 			if stableCycles >= 2 {
 				logger.Warningf("Device %s is stable and settled", path)
-				return o.validateDMIntegrity(path)
+				return o.validateDMIntegrity(path, volumeWWID)
 			}
 
 			lastCount = count
@@ -3111,6 +3110,7 @@ func (o GetDmsPathHelperGeneric) validateDMIntegrity(dmPath string, targetWWIDs 
 		foundUUID := normalizeWWID(string(uuidContent))
 		match := false
 		for _, target := range targetWWIDs {
+			logger.Warningf("Compare %s %s", foundUUID, normalizeWWID(target))
 			if foundUUID == normalizeWWID(target) {
 				match = true
 				break
