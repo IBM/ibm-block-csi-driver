@@ -1,7 +1,7 @@
 #!/bin/bash -e
 set -x
 
-CSI_VERSION="v1.9.0"
+CSI_VERSION="v1.12.0"
 ADDONS_VERSION="v0.2.0"
 VG_VERSION="v0.9.3"
 PB2_DIR="csi_general"

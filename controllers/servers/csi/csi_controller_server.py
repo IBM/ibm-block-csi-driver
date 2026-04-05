@@ -436,6 +436,14 @@ class CSIControllerServicer(csi_pb2_grpc.ControllerServicer):
 
         return csi_pb2.DeleteSnapshotResponse()
 
+    @csi_method(error_response_type=csi_pb2.ListSnapshotsResponse)
+    def ListSnapshots(self, request, context):
+        raise NotImplementedError()
+    
+    @csi_method(error_response_type=csi_pb2.GetSnapshotResponse)
+    def GetSnapshot(self, request, context):
+        raise NotImplementedError()
+
     @csi_method(error_response_type=csi_pb2.GetCapacityResponse)
     def GetCapacity(self, request, context):
         raise NotImplementedError()
@@ -495,6 +503,14 @@ class CSIControllerServicer(csi_pb2_grpc.ControllerServicer):
         except array_errors.ObjectIsStillInUseError as ex:
             return handle_exception(ex, context, grpc.StatusCode.INTERNAL,
                                     csi_pb2.ControllerExpandVolumeResponse)
+
+    @csi_method(error_response_type=csi_pb2.ControllerGetVolumeResponse)
+    def ControllerGetVolume(self, request, context):
+        raise NotImplementedError()
+    
+    @csi_method(error_response_type=csi_pb2.ControllerModifyVolumeResponse)
+    def ControllerModifyVolume(self, request, context):
+        raise NotImplementedError()
 
     def _get_controller_service_capability(self, capability_name):
         types = csi_pb2.ControllerServiceCapability.RPC.Type
