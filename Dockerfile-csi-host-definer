@@ -1,4 +1,4 @@
-FROM registry.access.redhat.com/ubi9/python-39:1-1774352792 AS builder
+FROM registry.access.redhat.com/ubi9/python-39:1-1774968736 AS builder
 
 USER root
 RUN if [[ "$(uname -m)" != "x86"* ]]; then yum install -y rust-toolset; fi
@@ -18,7 +18,7 @@ RUN chmod +x csi_pb2.sh
 RUN ./csi_pb2.sh
 RUN pip3 install .
 
-FROM registry.access.redhat.com/ubi9/python-39:1-1774352792
+FROM registry.access.redhat.com/ubi9/python-39:1-1774968736
 
 ARG VERSION=1.13.1
 ARG BUILD_NUMBER=0
