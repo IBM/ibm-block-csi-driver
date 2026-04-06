@@ -453,10 +453,10 @@ def _generate_volume_response(new_volume, system_id=None, source_type=None):
 def _generate_volumegroup_volume_response(new_volume, system_id=None):
     content_source = None
     if new_volume.source_id:
-        volume_source = volumegroup_pb2.VgVolumeContentSource.VolumeSource(volume_id=new_volume.source_id)
-        content_source = volumegroup_pb2.VgVolumeContentSource(volume=volume_source)
+        volume_source = csi_pb2.VolumeContentSource.VolumeSource(volume_id=new_volume.source_id)
+        content_source = csi_pb2.VolumeContentSource(volume=volume_source)
 
-    return volumegroup_pb2.VgVolume(
+    return csi_pb2.Volume(
         capacity_bytes=new_volume.capacity_bytes,
         volume_id=get_volume_id(new_volume, system_id),
         content_source=content_source)
@@ -476,7 +476,7 @@ def generate_csi_create_volume_group_response(volume_group):
 
     response = volumegroup_pb2.CreateVolumeGroupResponse(volume_group=volumegroup_pb2.VolumeGroup(
         volume_group_id=get_volume_group_id(volume_group, None),
-        volumes=[]))
+        volumes=_generate_volumes_response(volume_group.volumes)))
     logger.debug("finished creating volume group response : {0}".format(response))
 
     return response

@@ -39,6 +39,16 @@ class VolumeGroupControllerServicer(volumegroup_pb2_grpc.ControllerServicer):
                         "volume group was not found. creating a new volume group")
                     volume_group = array_mediator.create_volume_group(volume_group_final_name,
                                                                       array_connection_info.partition_name)
+                    if request.volume_ids:
+                        logger.debug("adding volumes to new volume group: {}".format(request.volume_ids))
+                        volume_ids_in_request = self._get_volume_ids_from_request(request.volume_ids)
+                        for volume_id in volume_ids_in_request:
+                            array_mediator.add_volume_to_volume_group(
+                                volume_group_final_name,
+                                volume_id,
+                                array_connection_info.partition_name
+                            )
+                        volume_group = array_mediator.get_volume_group(volume_group_final_name)
                 else:
                     logger.debug("volume group found : {}".format(volume_group))
 
@@ -129,6 +139,8 @@ class VolumeGroupControllerServicer(volumegroup_pb2_grpc.ControllerServicer):
     @csi_method(error_response_type=volumegroup_pb2.ModifyVolumeGroupMembershipResponse,
                 lock_request_attribute="volume_group_id")
     def ModifyVolumeGroupMembership(self, request, context):
+        # NOTE: request.parameters (map<string, string> parameters) is available in the volumegroup proto API.
+        # BlockCSI does not currently use this field; volume group modification is driven by volume_ids only.
         secrets = request.secrets
         utils.validate_modify_volume_group_request(request)
 
