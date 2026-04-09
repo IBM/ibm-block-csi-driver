@@ -40,30 +40,72 @@ class VolumeGroupControllerServicer(volumegroup_pb2_grpc.ControllerServicer):
                     volume_group = array_mediator.create_volume_group(volume_group_final_name,
                                                                       array_connection_info.partition_name)
                     if request.volume_ids:
-                        logger.debug("adding volumes to new volume group: {}".format(request.volume_ids))
                         volume_ids_in_request = self._get_volume_ids_from_request(request.volume_ids)
-                        for volume_id in volume_ids_in_request:
-                            array_mediator.add_volume_to_volume_group(
-                                volume_group_final_name,
-                                volume_id,
-                                array_connection_info.partition_name
-                            )
+                        self._add_volumes_to_group(array_mediator, volume_group_final_name,
+                                                volume_ids_in_request,
+                                                array_connection_info.partition_name)
                         volume_group = array_mediator.get_volume_group(volume_group_final_name)
                 else:
                     logger.debug("volume group found : {}".format(volume_group))
 
                     array_mediator.verify_volume_group_partition(volume_group, array_connection_info.partition_name)
 
-                    if len(volume_group.volumes) > 0:
-                        message = "Volume group {} is not empty".format(volume_group.name)
-                        return build_error_response(message, context, grpc.StatusCode.ALREADY_EXISTS,
-                                                    volumegroup_pb2.CreateVolumeGroupResponse)
+                    if request.volume_ids:
+                        volume_group = self._handle_existing_group_with_volume_ids(
+                            array_mediator, volume_group, volume_group_final_name,
+                            request.volume_ids, array_connection_info.partition_name)
+                    else:
+                        if len(volume_group.volumes) > 0:
+                            message = "volume group {} is not empty".format(volume_group.name)
+                            return build_error_response(message, context, grpc.StatusCode.ALREADY_EXISTS,
+                                                        volumegroup_pb2.CreateVolumeGroupResponse)
 
                 response = utils.generate_csi_create_volume_group_response(volume_group)
                 return response
         except array_errors.VolumeGroupAlreadyExists as ex:
             return handle_exception(ex, context, grpc.StatusCode.ALREADY_EXISTS,
                                     volumegroup_pb2.CreateVolumeGroupResponse)
+
+    def _add_volumes_to_group(self, array_mediator, volume_group_name, volume_ids, partition_name):
+        logger.debug("adding volumes {} to group {}".format(volume_ids, volume_group_name))
+        for volume_id in volume_ids:
+            try:
+                array_mediator.add_volume_to_volume_group(volume_group_name, volume_id, partition_name)
+            except array_errors.VolumeAlreadyInVolumeGroup as ex:
+                # volume is in a different volume group
+                logger.error("failed to add volume {} to group {}: {}".format(
+                    volume_id, volume_group_name, ex))
+                raise
+            except Exception as ex:
+                logger.error("failed to add volume {} to group {}: {}".format(
+                    volume_id, volume_group_name, ex))
+                raise
+
+    def _handle_existing_group_with_volume_ids(self, array_mediator, volume_group, volume_group_name, 
+                                            requested_volume_ids, partition_name):
+        volume_ids_in_request = self._get_volume_ids_from_request(requested_volume_ids)
+        volume_ids_in_group = self._get_volume_ids_from_volume_group(volume_group.volumes)
+
+        missing_volume_ids = [
+            vid for vid in volume_ids_in_request
+            if not self._is_volume_id_in_volume_group(vid, volume_ids_in_group)
+        ]
+
+        if missing_volume_ids:
+            logger.debug(
+                "existing volume group with volumes detected: '%s' has partial volumes, adding missing volumes: %s",
+                volume_group_name, missing_volume_ids
+            )
+            self._add_volumes_to_group(array_mediator, volume_group_name,
+                                    missing_volume_ids, partition_name)
+        else:
+            logger.debug(
+                "existing volume group with volumes detected: all requested volumes "
+                "are already present in '%s', no action needed",
+                volume_group_name
+            )
+
+        return array_mediator.get_volume_group(volume_group_name)
 
     @csi_method(error_response_type=volumegroup_pb2.DeleteVolumeGroupResponse, lock_request_attribute="volume_group_id")
     def DeleteVolumeGroup(self, request, _):
