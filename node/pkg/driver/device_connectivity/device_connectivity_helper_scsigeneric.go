@@ -2959,8 +2959,7 @@ func (o GetDmsPathHelperGeneric) performDiscovery(volumeWWID []string) (string, 
 	files, err := os.ReadDir("/dev/disk/by-id")
 	if err != nil {
 		logger.Warningf("failed to read /dev/disk/by-id: %w", err)
-	}
-	else {
+	} else {
 		for _, f := range files {
 				filename := strings.ToLower(f.Name())
 
@@ -2980,7 +2979,6 @@ func (o GetDmsPathHelperGeneric) performDiscovery(volumeWWID []string) (string, 
 				}
 			}	
 		}
-	}
 	
 
 	// 2. STRATEGY B: Native NVMe (NVMe-oF / TCP / RDMA)
@@ -3018,7 +3016,7 @@ func (o GetDmsPathHelperGeneric) verifyDevice(path string) (string, error) {
 	logger.Debugf("Resolved %s to %s", path, realPath)
 
 	// 2. Stat the final, real path
-	info, err := os.Stat(realPath)
+	//info, err := os.Stat(realPath)
 	if err != nil {
 		logger.Warningf("Failed to stat resolved path %s: %v", realPath, err)
 		return "", err
