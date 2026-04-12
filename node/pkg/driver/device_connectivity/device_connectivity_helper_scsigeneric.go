@@ -2963,6 +2963,8 @@ func (o GetDmsPathHelperGeneric) performDiscovery(volumeWWID []string) (string, 
 		for _, f := range files {
 				filename := strings.ToLower(f.Name())
 
+				logger.Warningf("Test filename %s", filename)
+
 				// CRUCIAL FIX: Ensure the target is at the end or bounded
 				// This prevents WWID "123" matching "12345"
 				if strings.HasSuffix(filename, normalizedWWID[0]) || 
