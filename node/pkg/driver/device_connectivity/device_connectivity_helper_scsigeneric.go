@@ -215,7 +215,7 @@ func iowr(t, nr, size uint32) uintptr {
 const (
 	DevPath                     = "/dev"
 	DevMapperPath               = "/dev/mapper"
-	WaitForMpathRetries         = 5
+	WaitForMpathRetries         = 15
 	WaitForMpathWaitIntervalSec = 1
 	FcHostSysfsPath             = "/sys/class/fc_remote_ports/rport-*/port_name"
 	IscsiHostRexExPath          = "/sys/class/iscsi_host/host*/device/session*/iscsi_session/session*/targetname"
@@ -2942,12 +2942,46 @@ func (o GetDmsPathHelperGeneric) performDiscovery(volumeWWID []string) (string, 
 
 	// 1. STRATEGY A: DM-Multipath (SCSI or NVMe via DM)
 	// Check udev shortcut first (O(1))
-
-	dmPath := fmt.Sprintf("/dev/disk/by-id/dm-uuid-mpath-%s", normalizedWWID[0])
-	logger.Warningf("check path %s", normalizedWWID[0])
-	if dev, err := o.verifyDevice(dmPath); err == nil {
-		return dev, nil
+	
+	//dmPatterns := []string{
+	//	"/dev/disk/by-id/dm-uuid-mpath-%s",
+	//	"/dev/disk/by-id/dm-uuid-mpath-mpath-%s", // Some udev rules double up
+	//}
+	
+	//for _, pattern := range dmPatterns {
+	//	path := fmt.Sprintf(pattern, normalizedWWID[0])
+	//	logger.Warningf("check path %s", path)
+	//	if dev, err := o.verifyDevice(path); err == nil {
+	//		return dev, nil
+	//	}
+	//}
+	
+	files, err := os.ReadDir("/dev/disk/by-id")
+	if err != nil {
+		logger.Warningf("failed to read /dev/disk/by-id: %w", err)
 	}
+	else {
+		for _, f := range files {
+				filename := strings.ToLower(f.Name())
+
+				// CRUCIAL FIX: Ensure the target is at the end or bounded
+				// This prevents WWID "123" matching "12345"
+				if strings.HasSuffix(filename, normalizedWWID[0]) || 
+				   strings.Contains(filename, "-"+normalizedWWID[0]+"-") || 
+				   strings.Contains(filename, "."+normalizedWWID[0]+".") {
+					
+					fullPath := filepath.Join("/dev/disk/by-id", f.Name())
+					
+					// Use your existing (and now hardened!) verifyDevice
+					if dev, err := o.verifyDevice(fullPath); err == nil {
+						logger.Warningf("Found match via by-id scan: %s -> %s", fullPath, dev)
+						return dev, nil
+					}
+				}
+			}	
+		}
+	}
+	
 
 	// 2. STRATEGY B: Native NVMe (NVMe-oF / TCP / RDMA)
 	// Check udev shortcut: /dev/disk/by-id/nvme-<uuid>
@@ -2972,19 +3006,35 @@ func (o GetDmsPathHelperGeneric) performDiscovery(volumeWWID []string) (string, 
 
 // verifyDevice ensures the link exists and returns the canonical path
 func (o GetDmsPathHelperGeneric) verifyDevice(path string) (string, error) {
-	logger.Warningf("verify %s", path)
-	if _, err := os.Stat(path); err != nil {
-		logger.Warning("open")
-		return "", err
-	}
+	logger.Debugf("Verifying device path: %s", path)
+
+	// 1. Resolve symlinks first (handles dead/broken symlinks gracefully)
 	// Crucial for CSI: Resolve /dev/mapper/mpatha to /dev/dm-X
 	realPath, err := filepath.EvalSymlinks(path)
 	if err != nil {
+		logger.Warningf("Failed to evaluate symlink for %s: %v", path, err)
 		return "", err
 	}
-	logger.Warningf("eval %s", realPath)
+	logger.Debugf("Resolved %s to %s", path, realPath)
+
+	// 2. Stat the final, real path
+	info, err := os.Stat(realPath)
+	if err != nil {
+		logger.Warningf("Failed to stat resolved path %s: %v", realPath, err)
+		return "", err
+	}
+
+	// 3. CRUCIAL FIX: Verify it is actually a block device
+	// This prevents accidentally returning directories or control files to kubelet
+	//if info.Mode()&os.ModeDevice == 0 {
+	//	logger.Warningf("Path %s exists but is NOT a block device (Mode: %v)", realPath, info.Mode())
+	//	return "", fmt.Errorf("path %s is not a block device", realPath)
+	//}
+
+	logger.Warningf("Successfully verified block device: %s", realPath)
 	return realPath, nil
 }
+
 
 // scanDMSubsystem finds the DM device using robust normalization.
 func (o GetDmsPathHelperGeneric) scanDMSubsystem(targetID string) (string, error) {
@@ -3011,13 +3061,22 @@ func (o GetDmsPathHelperGeneric) scanDMSubsystem(targetID string) (string, error
 		logger.Warningf("found file %s", foundUUID)
 		
 		if foundUUID == target {
+		
+			dmDir := filepath.Dir(filepath.Dir(m))
+			dmName := filepath.Base(dmDir) // Safely extracts "dm-X"
+
+			//if !strings.HasPrefix(dmName, "dm-") {
+			//	continue // Guard against unexpected sysfs layouts
+			//}
+
+			//devPath := filepath.Join("/dev", dmName)		
 			// 3. Extract 'dm-X' from /sys/block/dm-X/dm/uuid
 			// We go up two levels from the file to get the block device folder
-			parts := strings.Split(m, "/")
-			if len(parts) < 4 {
-				continue
-			}
-			dmName := parts[3] // The "dm-X" part
+			//parts := strings.Split(m, "/")
+			//if len(parts) < 4 {
+			//	continue
+			//}
+			//dmName := parts[3] // The "dm-X" part
 
 			devPath := filepath.Join("/dev", dmName)
 			logger.Warningf("Found DM match: %s for WWID %s", devPath, targetID)
@@ -3033,7 +3092,7 @@ func (o GetDmsPathHelperGeneric) scanDMSubsystem(targetID string) (string, error
 func (o GetDmsPathHelperGeneric) scanNVMeSubsystem(targetID string) (string, error) {
 	matches, _ := filepath.Glob("/sys/block/nvme*n*")
 	target := normalizeWWID(targetID)
-
+	
 	for _, m := range matches {
 		name := filepath.Base(m)
 		var foundID string
@@ -3144,6 +3203,7 @@ func (o GetDmsPathHelperGeneric) validateDMIntegrity(dmPath string, targetWWIDs 
 	return "", fmt.Errorf("dm device %s has slaves but none are running/live", dmName)
 }
 
+// The Problem: You are stripping all hyphens (-) from the WWID. While this is fine for some SCSI WWIDs, NVMe standard UUIDs use hyphens as part of their spec 
 func normalizeWWID(raw string) string {
 	// 1. Lowercase and clean whitespace/newlines
 	s := strings.ToLower(strings.TrimSpace(raw))
