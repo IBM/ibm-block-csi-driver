@@ -145,7 +145,7 @@ def build_create_host_kwargs(host_name, connectivity_type, port, io_group, parti
     cli_kwargs = {'name': host_name}
     cli_kwargs = _add_port_to_command_kwargs(connectivity_type, port, cli_kwargs)
     if connectivity_type == array_settings.NVME_OVER_FC_CONNECTIVITY_TYPE:
-        cli_kwargs['protocol'] = 'nvme'
+        cli_kwargs['protocol'] = 'fcnvme'
 
     if io_group:
         cli_kwargs['iogrp'] = io_group
