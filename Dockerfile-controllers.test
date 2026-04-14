@@ -26,6 +26,12 @@ COPY controllers/servers/csi/requirements.txt ./csi_requirements.txt
 COPY controllers/servers/host_definer/requirements.txt ./host_definer_requirements.txt
 # avoid default- boringssl lib, since it does not support z systems
 ENV GRPC_PYTHON_BUILD_SYSTEM_OPENSSL=True
+# Use pre-built wheels when available to speed up build on non-x86 platforms
+ENV PIP_PREFER_BINARY=1
+# Optimization: Install grpcio and grpcio-tools separately with increased timeout and retries
+# This helps on slower zLinux systems and uses cached wheels when available
+RUN pip3 install --timeout=300 --retries=5 grpcio==1.74.0 grpcio-tools==1.74.0
+# Install remaining requirements
 RUN pip3 install -r ./csi_requirements.txt -r ./host_definer_requirements.txt
 
 USER root
@@ -36,7 +42,8 @@ RUN pip3 install .
 
 # Requires to run local testing
 COPY controllers/tests/requirements.txt ./requirements-tests.txt
-RUN pip3 install -r ./requirements-tests.txt
+# Install test requirements with timeout optimization
+RUN pip3 install --timeout=300 -r ./requirements-tests.txt
 
 FROM registry.access.redhat.com/ubi9/python-39:1-1774968736
 
