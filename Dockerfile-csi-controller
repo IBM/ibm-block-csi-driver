@@ -15,7 +15,7 @@
 FROM registry.access.redhat.com/ubi9/python-39:1-1774968736 AS builder
 
 USER root
-RUN if [[ "$(uname -m)" != "x86"* ]]; then yum install -y rust-toolset; fi
+RUN if [[ "$(uname -m)" != "x86"* ]]; then yum install -y rust-toolset gcc python3-devel; fi
 
 USER default
 ENV PIP_DISABLE_PIP_VERSION_CHECK=1
@@ -23,7 +23,11 @@ WORKDIR /tmp
 COPY controllers/servers/csi/requirements.txt .
 # avoid default boringssl lib, since it does not support z systems
 ENV GRPC_PYTHON_BUILD_SYSTEM_OPENSSL=True
-RUN pip3 install -r ./requirements.txt
+# Use pre-built wheels when available to speed up build on non-x86 platforms
+ENV PIP_PREFER_BINARY=1
+# Enable pip caching to reuse downloaded/built packages across builds
+RUN --mount=type=cache,target=/root/.cache/pip \
+    pip3 install --timeout=300 --retries=5 -r ./requirements.txt
 
 USER root
 COPY controllers/scripts/csi_general .
