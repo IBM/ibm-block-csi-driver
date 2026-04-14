@@ -11,7 +11,7 @@
         * [Lifecycle and support matrix](content/release_notes/lifecycle_support_matrix.md)
         * [Features and Capabilities](content/release_notes/features_and_capabilities.md)
     * [Change log](content/release_notes/change_log.md)
-        * [1.13.1 (March 2026)](content/release_notes/changelog_1.13.1.md)
+        * [1.13.1 (April 2026)](content/release_notes/changelog_1.13.1.md)
         * [1.13.0 (December 2025)](content/release_notes/changelog_1.13.0.md)
         * [1.12.5 (August 2025)](content/release_notes/changelog_1.12.5.md)
         * [1.12.4 (June 2025)](content/release_notes/changelog_1.12.4.md)
