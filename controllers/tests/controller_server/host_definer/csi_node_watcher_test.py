@@ -139,6 +139,8 @@ class TestWatchCsiNodesResources(CsiNodeWatcherBase):
         self.csi_node_watcher.csi_nodes_api.get.return_value = test_utils.get_fake_k8s_csi_node(
             test_settings.FAKE_CSI_PROVISIONER)
         self.csi_node_watcher.host_definitions_api.get.return_value = test_utils.get_empty_k8s_host_definitions()
+        # Override daemon set to return deleted state immediately to avoid infinite loop
+        self.csi_node_watcher.apps_api.list_daemon_set_for_all_namespaces.return_value = self.deleted_daemon_set
         test_utils.run_function_with_timeout(self.csi_node_watcher.watch_csi_nodes_resources, 0.5)
         self.assertEqual(0, len(self.nodes_on_csi_node_watcher))
         self.csi_node_watcher.core_api.patch_node.assert_called_once_with(
