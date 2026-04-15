@@ -31,6 +31,9 @@ COPY controllers/servers/csi/requirements.txt ./csi_requirements.txt
 COPY controllers/servers/host_definer/requirements.txt ./host_definer_requirements.txt
 # avoid default- boringssl lib, since it does not support z systems
 ENV GRPC_PYTHON_BUILD_SYSTEM_OPENSSL=True
+# Force pure Python implementation of protobuf on s390x to avoid segfaults
+# The C++ implementation has known issues on zLinux architecture
+ENV PROTOCOL_BUFFERS_PYTHON_IMPLEMENTATION=python
 # Use pre-built wheels when available to speed up build on non-x86 platforms
 ENV PIP_PREFER_BINARY=1
 # Enable pip caching to reuse downloaded/built packages across builds
@@ -65,5 +68,7 @@ RUN chown -R appuser:appuser /driver /opt/app-root
 USER appuser
 WORKDIR /driver
 ENV PYTHONPATH=/driver
+# Force pure Python implementation of protobuf to avoid segfaults on s390x
+ENV PROTOCOL_BUFFERS_PYTHON_IMPLEMENTATION=python
 
 ENTRYPOINT ["/driver/controllers/scripts/entrypoint-test.sh"]
