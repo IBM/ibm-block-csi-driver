@@ -18,7 +18,12 @@
 
 FROM registry.access.redhat.com/ubi9/python-39:1-1774968736 AS builder
 USER root
-RUN if [[ "$(uname -m)" != "x86"* ]]; then yum install -y rust-toolset; fi
+# Install build dependencies for s390x and other non-x86 architectures
+# gcc and python3-devel are needed for building C extensions like coverage
+RUN if [[ "$(uname -m)" != "x86"* ]]; then \
+    yum install -y rust-toolset gcc python3-devel && \
+    yum clean all; \
+    fi
 USER default
 ENV PIP_DISABLE_PIP_VERSION_CHECK=1
 WORKDIR /tmp
@@ -44,8 +49,9 @@ RUN pip3 install .
 # Requires to run local testing
 COPY controllers/tests/requirements.txt ./requirements-tests.txt
 # Install test requirements with timeout optimization and cache mount
+# Force rebuild of coverage with C extensions for s390x architecture
 RUN --mount=type=cache,target=/root/.cache/pip \
-    pip3 install --timeout=300 -r ./requirements-tests.txt
+    pip3 install --timeout=300 --no-binary coverage -r ./requirements-tests.txt
 
 FROM registry.access.redhat.com/ubi9/python-39:1-1774968736
 
