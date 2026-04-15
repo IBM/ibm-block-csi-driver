@@ -109,7 +109,7 @@ class TestWatchCsiNodesResources(CsiNodeWatcherBase):
             [test_utils.get_fake_csi_node_watch_event(test_settings.DELETED_EVENT_TYPE)])
         self.csi_node_watcher.core_api.read_node.return_value = self.k8s_node_with_manage_node_label
         self.csi_node_watcher.apps_api.list_daemon_set_for_all_namespaces.side_effect = [
-            self.not_updated_daemon_set, self.updated_daemon_set]
+            self.not_updated_daemon_set, self.updated_daemon_set, self.updated_daemon_set]
         self.csi_node_watcher.core_api.list_pod_for_all_namespaces.return_value = test_utils.get_fake_k8s_pods_items()
 
     def test_delete_host_definition(self):
