@@ -47,16 +47,18 @@ if [ "${CONTAINER_CMD}" = "podman" ]; then
     # Podman build doesn't support --volume, use BuildKit cache mount instead
     # But we need to ensure the cache persists, so we'll use a different approach
     # Mount the volume's actual path
+    # Use /opt/app-root/.cache/pip because the build runs as uid 1001 (default user)
     VOLUME_PATH=$(${CONTAINER_CMD} volume inspect ${VOLUME_NAME} --format '{{.Mountpoint}}')
     ${CONTAINER_CMD} build \
-        --volume ${VOLUME_PATH}:/root/.cache/pip:Z \
+        --volume ${VOLUME_PATH}:/opt/app-root/.cache/pip:Z \
         -f ${DOCKERFILE} \
         -t ${IMAGE_NAME} \
         .
 else
     # Docker supports volume names directly
+    # Use /opt/app-root/.cache/pip because the build runs as uid 1001 (default user)
     ${CONTAINER_CMD} build \
-        --volume ${VOLUME_NAME}:/root/.cache/pip \
+        --volume ${VOLUME_NAME}:/opt/app-root/.cache/pip \
         -f ${DOCKERFILE} \
         -t ${IMAGE_NAME} \
         .

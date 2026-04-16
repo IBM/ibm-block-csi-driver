@@ -22,7 +22,7 @@ RUN make -C /usr/local/go/src/github.com/kubernetes-csi/csi-test
 COPY ./scripts/csi_test /usr/local/go/src/github.com/kubernetes-csi/csi-test/ibm-driver
 
 RUN groupadd -g 9999 appuser && \
-    useradd -r -u 9999 -g appuser appuser
+    useradd -u 9999 -g appuser appuser
 RUN chown -R appuser:appuser /usr/local/go/src/github.com/kubernetes-csi/csi-test
 
 USER appuser

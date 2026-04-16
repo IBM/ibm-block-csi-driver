@@ -58,7 +58,7 @@ COPY ./common /driver/common
 COPY ./controllers/ /driver/controllers/
 USER root
 RUN groupadd -g 9999 appuser && \
-    useradd -r -u 9999 -g appuser appuser
+    useradd -u 9999 -g appuser appuser
 RUN chown -R appuser:appuser /driver /opt/app-root
 USER appuser
 WORKDIR /driver
