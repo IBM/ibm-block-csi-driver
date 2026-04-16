@@ -6,6 +6,7 @@ IBM® block storage CSI driver 1.13.1 adds support for:
 
 - IBM Storage Virtualize® partitions PBHA for both FC and iSCSI hosts
 - Support of NVMe over FC hosts
+- Support of snapshots in IBM Storage Virtualize® PBHA (Partitions in Policy Based High Availability)
 - Extended support to RedHat OpenShift® 4.21
 - Extended support to Kubernetes 1.35
 - More info in callhome

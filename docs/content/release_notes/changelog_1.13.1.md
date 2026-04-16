@@ -7,6 +7,7 @@ As of this document's publication date, the IBM Power® and zLinux® architectur
 
 IBM® Block Storage CSI driver 1.13.1 added new support and enhancements.
 - IBM Storage Virtualize® partitions PBHA for both FC and iSCSI hosts
+- Support of snapshots in IBM Storage Virtualize® PBHA (Partitions in Policy Based High Availability)
 - Support of NVMe over FC hosts
 - Extended support to RedHat OpenShift® 4.21
 - Extended support to Kubernetes 1.35
