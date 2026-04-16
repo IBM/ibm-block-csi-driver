@@ -16,11 +16,16 @@ pipeline {
     stages {
         stage ('Controllers: static code analysis') {
             steps {
+                // Uses scripts/build_controllers_test.sh which creates persistent pip cache volumes
+                // This significantly speeds up builds on non-x86 platforms (s390x, ppc64le)
+                // where grpcio must be compiled from source (~30 min without cache)
                 sh './scripts/run_static_code_analysis.sh'
             }
         }
         stage ('Controllers: Unit testing + coverage') {
             steps {
+                // Uses scripts/build_controllers_test.sh with architecture-specific pip cache
+                // Cache volume name format: pip-cache-{arch} (e.g., pip-cache-s390x)
                 sh 'mkdir -p build/reports && chmod 777 build/reports'
                 sh './scripts/run_unitests.sh `pwd`/build/reports'
             }
