@@ -1,5 +1,9 @@
 #!/bin/bash -xe
 
+# Enable BuildKit for Docker to support cache mounts
+# This significantly speeds up builds on non-x86 platforms (s390x, ppc64le)
+export DOCKER_BUILDKIT=1
+
 # Validations
 MANDATORY_ENVS="IMAGE_VERSION BUILD_NUMBER DOCKER_REGISTRY CSI_NODE_IMAGE CSI_CONTROLLER_IMAGE CSI_HOST_DEFINER_IMAGE GIT_BRANCH"
 for envi in $MANDATORY_ENVS; do
