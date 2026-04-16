@@ -10,11 +10,16 @@ class NodeWatcherBase(BaseSetUp):
     def setUp(self):
         super().setUp()
         self.node_watcher = test_utils.get_class_mock(NodeWatcher)
-        self.unmanaged_csi_nodes_with_driver = patch(
-            '{}.unmanaged_csi_nodes_with_driver'.format(test_settings.NODES_WATCHER_PATH), set()).start()
+        self._unmanaged_csi_nodes_patcher = patch(
+            '{}.unmanaged_csi_nodes_with_driver'.format(test_settings.NODES_WATCHER_PATH), set())
+        self.unmanaged_csi_nodes_with_driver = self._unmanaged_csi_nodes_patcher.start()
         self.expected_unmanaged_csi_nodes_with_driver = set()
         self.expected_unmanaged_csi_nodes_with_driver.add(test_settings.FAKE_NODE_NAME)
         self.nodes_on_node_watcher = test_utils.patch_nodes_global_variable(test_settings.NODES_WATCHER_PATH)
+
+    def tearDown(self):
+        self._unmanaged_csi_nodes_patcher.stop()
+        super().tearDown()
 
 
 class TestAddInitialNodes(NodeWatcherBase):

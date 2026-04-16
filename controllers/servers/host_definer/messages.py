@@ -77,3 +77,4 @@ COULD_NOT_CHANGE_HOST_PROTOCOL_USING_CHHOST = "Could not change host [{}] protoc
     "changing the host protocol by deleting it and creating it again"
 NODE_IS_NOT_MANAGED_NODE_TYPE = "Node {} is not a ManagedNode instance. This might lead to attribute errors."
 NODE_ID_IS_NONE = "node_id is None !!!"
+FAILED_TO_UNDEFINE_HOST_WHEN_NODE_POD_DELETED = "Failed to undefine host for node {} when pod was deleted, got: {}"
