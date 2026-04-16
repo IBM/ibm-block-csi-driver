@@ -41,11 +41,26 @@ fi
 
 # Build with persistent pip cache volume
 echo "Building ${IMAGE_NAME} with persistent pip cache..."
-${CONTAINER_CMD} build \
-    --volume ${VOLUME_NAME}:/root/.cache/pip:Z \
-    -f ${DOCKERFILE} \
-    -t ${IMAGE_NAME} \
-    .
+
+# Different syntax for podman vs docker volume mounts during build
+if [ "${CONTAINER_CMD}" = "podman" ]; then
+    # Podman build doesn't support --volume, use BuildKit cache mount instead
+    # But we need to ensure the cache persists, so we'll use a different approach
+    # Mount the volume's actual path
+    VOLUME_PATH=$(${CONTAINER_CMD} volume inspect ${VOLUME_NAME} --format '{{.Mountpoint}}')
+    ${CONTAINER_CMD} build \
+        --volume ${VOLUME_PATH}:/root/.cache/pip:Z \
+        -f ${DOCKERFILE} \
+        -t ${IMAGE_NAME} \
+        .
+else
+    # Docker supports volume names directly
+    ${CONTAINER_CMD} build \
+        --volume ${VOLUME_NAME}:/root/.cache/pip \
+        -f ${DOCKERFILE} \
+        -t ${IMAGE_NAME} \
+        .
+fi
 
 echo "Build completed successfully!"
 echo "Pip cache persisted in volume: ${VOLUME_NAME}"
