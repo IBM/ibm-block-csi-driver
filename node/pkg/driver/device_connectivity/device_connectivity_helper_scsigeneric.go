@@ -2373,7 +2373,6 @@ func (o *OsDeviceConnectivityHelperGeneric) GetWwnByScsiInq(ctx context.Context,
 }
 
 func (o OsDeviceConnectivityHelperGeneric) GetWwnByScsiInqInternal(dev string) (string, error) {
->>>>>>> 1b686cef (gen 2)
 	if o.willIoctl0x83Fail(dev) {
 		return "", fmt.Errorf("path %s in unsafe state", dev)
 	}
