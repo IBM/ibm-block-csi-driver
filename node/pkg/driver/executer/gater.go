@@ -2,6 +2,7 @@ package executer
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"sync"
@@ -141,6 +142,7 @@ func (g *KeyedGater) suicideIfLeaked() {
 
 // ExecuteUninterruptible handles tasks that might hang in D-state (kernel).
 func ExecuteUninterruptible[T any](
+	ctx context.Context,
 	g *KeyedGater,
 	resourceName string,
 	maxRunning, maxSpare int,
@@ -149,7 +151,7 @@ func ExecuteUninterruptible[T any](
 	worker func(ctx context.Context) (T, error),
 ) (T, error) {
 	// This delegates to the generic logic
-	return baseExecute(g, resourceName, maxRunning, maxSpare, handoffTimeout, hardTimeout, worker)
+	return baseExecute(ctx, g, resourceName, maxRunning, maxSpare, handoffTimeout, hardTimeout, worker)
 }
 
 func baseExecute[T any](
