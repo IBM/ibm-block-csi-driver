@@ -130,27 +130,29 @@ func (w *limitWriter) Write(p []byte) (n int, err error) {
 
 
 type safeCmd struct {
-    k8sexec.Cmd
-    name     string
-    args     []string
-    executor *Executer
-    ctx      context.Context
-    stdout   io.Writer
-    stderr   io.Writer
-		//stdin    io.Reader // Intercepted value
-
-    pid      int // Store the PID once we have it
-}
-
-
-// LookPath satisfies k8sexec.Interface
-func (e *Executer) LookPath(file string) (string, error) {
-	return exec.LookPath(file)
+        k8sexec.Cmd
+    stdout   io.Writer // Intercepted value
+    stderr   io.Writer // Intercepted value
+    stdin    io.Reader // Intercepted value
+        name     string
+        args     []string
+        ctx      context.Context
+        executor *Executer
 }
 
 func (e *Executer) CommandContext(ctx context.Context, name string, args ...string) k8sexec.Cmd {
     realExecutor := k8sexec.New()
     baseCmd := realExecutor.CommandContext(ctx, name, args...)
+    if standardCmd, ok := baseCmd.(interface{ SetWaitDelay(time.Duration) }); ok {
+        logger.Warning("introduce delay")
+        standardCmd.SetWaitDelay(e.waitDelay)
+    } else {
+        logger.Warning("no delay")
+        // Fallback: If your k8s version/provider doesn't have a setter,
+        // you may need to use reflection or check for a specific internal struct.
+    }
+        // (1) Inject WaitDelay: If process exits but pipes remain open,
+        // or if context is cancelled, Wait() will wait this long before SIGKILL.
 
         return &safeCmd{
                 Cmd:      baseCmd,
@@ -162,115 +164,9 @@ func (e *Executer) CommandContext(ctx context.Context, name string, args ...stri
 }
 
 func (e *Executer) Command(name string, args ...string) k8sexec.Cmd {
-		// TODO
         logger.Warningf("command %s", name)
         return e.CommandContext(context.Background(), name, args...)
 }
-
-
-// PidProvider allows us to safely extract a PID from a k8sexec.Cmd 
-// without using reflection on private fields.
-type PidProvider interface {
-    GetPid() int
-}
-
-type CmdExtension interface {
-    GetPid() int
-    SetWaitDelay(td time.Duration)
-}
-
-
-// GetPid satisfies our custom PidProvider interface
-func (s *safeCmd) GetPid() int {
-    return s.pid
-}
-
-func (s *safeCmd) SetWaitDelay(td time.Duration) {
-    // We must use the same "check-and-cast" logic to reach the underlying struct
-    if realCmd, ok := s.Cmd.(interface{ SetWaitDelay(time.Duration) }); ok {
-        realCmd.SetWaitDelay(td)
-    }
-}
-
-func (s *safeCmd) Start() error {
-    // 1. Pre-check: Is the device stuck?
-    device := s.extractDevice()
-    if device != "" && s.executor.IsDeviceStillStuck(device) {
-        return &stuckError{device: device, name: s.name}
-    }
-	
-	s.SetWaitDelay(5 * time.Second)
-
-    // 2. Setup logging buffers (Standardize your TODO: wrap both)
-    if s.stdout == nil {
-        s.stdout = &limitWriter{Writer: &bytes.Buffer{}, Limit: DefaultMaxOutput}
-        s.Cmd.SetStdout(s.stdout)
-    }
-    if s.stderr == nil {
-        s.stderr = &limitWriter{Writer: &bytes.Buffer{}, Limit: DefaultMaxOutput}
-        s.Cmd.SetStderr(s.stderr)
-    }
-
-    // 3. Start the process
-    if err := s.Cmd.Start(); err != nil {
-        return err // CRITICAL: Do not return nil here
-    }
-
-    // 4. Capture the PID immediately after Start
-    // If your executor creates a real os/exec.Cmd, it will be available now.
-    if realCmd, ok := s.Cmd.(interface{ GetPid() int }); ok {
-        s.pid = realCmd.GetPid()
-    }
-
-	//TODO which version
-    // Capture PID for tracking
-    if pidProvider, ok := s.Cmd.(PidProvider); ok {
-        s.pid = pidProvider.GetPid()
-    }
-	
-
-    return nil
-}
-
-func (s *safeCmd) Wait() error {
-    err := s.Cmd.Wait()
-    device := s.extractDevice()
-
-    if err != nil {
-        // Check for timeout or WaitDelay issues
-        isTimeout := s.ctx != nil && s.ctx.Err() != nil
-        isWaitDelay := errors.Is(err, exec.ErrWaitDelay)
-
-        if (isWaitDelay || isTimeout) && device != "" {
-            // We use s.pid which we captured during Start()
-            s.executor.markAsStuck(device, s.pid, s.name)
-        }
-        return err
-    }
-
-    // Success: clear any "stuck" status for this device
-    if device != "" {
-        s.executor.clearTracking(device)
-    }
-    return nil
-}
-
-func (s *safeCmd) Stop() {
-    // Standard cleanup
-    s.Cmd.Stop()
-    
-    // If the process is still hanging around, we can use our captured PID
-    if s.pid > 0 {
-        if proc, err := os.FindProcess(s.pid); err == nil {
-            _ = proc.Kill()
-        }
-    }
-}
-
-
-
-///////////////////////////////////
-
 
 // Override SetStdout to track it
 func (s *safeCmd) SetStdout(w io.Writer) {
@@ -290,6 +186,7 @@ func (s *safeCmd) SetStdin(r io.Reader) {
     s.Cmd.SetStdin(r)
 }
 
+
 func (s *safeCmd) SetEnv(env []string) {
     s.Cmd.SetEnv(env)
 }
@@ -299,10 +196,7 @@ func (s *safeCmd) SetDir(dir string) {
 }
 
 func (s *safeCmd) Start() error {
-
-    if realCmd, ok := s.Cmd.(*os/exec.Cmd); ok {
-		applyWaitDelay(realCmd)
-    }
+        logger.Warning("Start")
 
     device := s.extractDevice()
     if device != "" && s.executor.IsDeviceStillStuck(device) {
@@ -316,38 +210,21 @@ func (s *safeCmd) Start() error {
     if s.stdout == nil {
         s.SetStdout(&limitWriter{Writer: &bytes.Buffer{}, Limit: DefaultMaxOutput})
     }
-	// TODO why only Stdout
-	
-	
 
         err := s.Cmd.Start()
-		
-		if err != nil {
-			return err
-		}
-		
-		    // 3. NOW you can extract the PID
-    if realCmd, ok := s.Cmd.(*os/exec.Cmd); ok && realCmd.Process != nil {
-        pid := realCmd.Process.Pid
-        // Log it or store it for tracking
-        fmt.Printf("CSI Mount Process Started: PID %d\n", pid)
-    }
 
-
-    return nil
-}
-
-func applyWaitDelay(cmd *os/exec.Cmd) {
-    const maxDelay = 5 * time.Second
-    if cmd.WaitDelay <= 0 || cmd.WaitDelay > maxDelay {
-        cmd.WaitDelay = maxDelay
-    }
+        if err == nil {
+            logger.Warning("start")
+         } else {
+             logger.Warning("failed to start %v", err)
 }
 
 
 func (s *safeCmd) Wait() error {
+        logger.Warning("wait")
         err := s.Cmd.Wait()
         device := s.extractDevice()
+        logger.Warning("Wait done")
 
 
     var pid int
@@ -355,6 +232,7 @@ func (s *safeCmd) Wait() error {
     // Most k8s executors wrap a struct that has a Process or a Pid() method
     if pidCmd, ok := s.Cmd.(interface{ GetPid() int }); ok {
         pid = pidCmd.GetPid()
+        logger.Warningf("had pid %d", pid)
     } else {
         // Fallback if GetPid isn't available:
         // You might not be able to get the PID from the interface easily
@@ -374,6 +252,7 @@ func (s *safeCmd) Wait() error {
                 }
                 return err
         }
+        logger.Warning("success")
 
         // Success
         if device != "" {
@@ -383,26 +262,8 @@ func (s *safeCmd) Wait() error {
 }
 
 
-func (s *safeCmd) Stop() {
-        s.Cmd.Stop()
-}
-
-
-// Stop satisfies k8sexec.Cmd
-func (s *safeCmd) Stop() {
-	if s.Cmd.Process == nil {
-		return
-	}
-	// Attempt to kill the process
-	_ = s.Cmd.Process.Kill()
-
-	// Optional: You could trigger your stuck logic here if
-	// the process doesn't exit after a SIGKILL, but usually
-	// the WaitDelay in the main Wait() call handles this better.
-}
-
-
 func (s *safeCmd) CombinedOutput() ([]byte, error) {
+        logger.Warning("combined output")
     var b bytes.Buffer
     // Use a single limitWriter for BOTH to track the total output limit correctly
     lw := &limitWriter{Writer: &b, Limit: DefaultMaxOutput}
@@ -418,36 +279,51 @@ func (s *safeCmd) CombinedOutput() ([]byte, error) {
         return nil, err
     }
     err := s.Wait()
+         if err == nil {
+             logger.Warning("wait")
+          } else {
+              logger.Warning("failed to wait %v", err)
+      }
+
+     logger.Warningf("output %s", string(b.Bytes()))
+
 
     return b.Bytes(), err
 }
 
 
-func (s *safeCmd) extractDevice() string {
-    for _, arg := range s.args {
-        // Prioritize actual block device paths
-        if strings.HasPrefix(arg, "/dev/sd") || 
-           strings.HasPrefix(arg, "/dev/nvme") || 
-           strings.HasPrefix(arg, "/dev/mapper/") ||
-           strings.HasPrefix(arg, "/dev/dm-") {
-            return arg
-        }
-		// Flag-wrapped path (--device=/dev/sdb)
-		if strings.Contains(arg, "=/dev/sd") ||
-		   strings.Contains(arg, "=/dev/nvme") ||
-		   strings.Contains(arg, "=/dev/mapper") ||
-		   strings.Contains(arg, "=/dev/dm-") {
-			parts := strings.SplitN(arg, "=", 2)
-			return parts[1]
-		}
-		
-        // Fallback to your existing logic for UUID/Label
-        if strings.HasPrefix(arg, "UUID=") || strings.HasPrefix(arg, "LABEL=") {
-            return arg
-        }
-    }
-    return ""
+
+// Stop satisfies k8sexec.Cmd
+func (s *safeCmd) Stop() {
+        logger.Warning("Stop")
+        s.Cmd.Stop()
 }
+
+// LookPath satisfies k8sexec.Interface
+func (e *Executer) LookPath(file string) (string, error) {
+        return exec.LookPath(file)
+}
+
+func (s *safeCmd) extractDevice() string {
+        for _, arg := range s.args {
+                logger.Warningf("Check arg %s", arg)
+                // Standard path (/dev/sdb)
+                if strings.HasPrefix(arg, "/dev/") {
+                        return arg
+                }
+                // Flag-wrapped path (--device=/dev/sdb)
+                if strings.Contains(arg, "=/dev/") {
+                        parts := strings.SplitN(arg, "=", 2)
+                        return parts[1]
+                }
+                // Persistent Identifiers (UUID=... or LABEL=...)
+                if strings.HasPrefix(arg, "UUID=") || strings.HasPrefix(arg, "LABEL=") {
+                        return arg
+                }
+        }
+        return ""
+}
+
 
 
 // stuckError satisfies the k8s.io/utils/exec.ExitError interface
@@ -629,6 +505,28 @@ func (e *Executer) IsDeviceStillStuck(device string) bool {
 	return false
 }
 
+
+// Simpler check, pid based only
+//func (e *Executer) IsDeviceStillStuck(device string) bool {
+//	e.stuckMu.Lock()
+//	info, exists := e.stuckProcesses[device]
+//	e.stuckMu.Unlock()
+
+//	if !exists {
+//		return false
+//	}
+
+//	// Verify if the process is STILL the same instance
+//	currentStartTime, err := e.getPidStartTime(info.pid)
+//	if err != nil || currentStartTime != info.startTime {
+//		// Process is gone or PID was reused: Cleanup the "Stuck" state
+//		e.clearTracking(device)
+//		return false
+//	}
+
+//	return true // Process is genuinely still hanging in the kernel
+//}
+
 func (e *Executer) commMatches(current, target string) bool {
 	if current == target {
 		return true
@@ -654,27 +552,6 @@ func (e *Executer) parseStatFile(data []byte) (state byte, startTime uint64, err
 
 	startTime, err := strconv.ParseUint(fields[19], 10, 64)
 	return fields[2], startTime, err
-}
-
-// Simpler check, pid based only
-func (e *Executer) IsDeviceStillStuck(device string) bool {
-	e.stuckMu.Lock()
-	info, exists := e.stuckProcesses[device]
-	e.stuckMu.Unlock()
-
-	if !exists {
-		return false
-	}
-
-	// Verify if the process is STILL the same instance
-	currentStartTime, err := e.getPidStartTime(info.pid)
-	if err != nil || currentStartTime != info.startTime {
-		// Process is gone or PID was reused: Cleanup the "Stuck" state
-		e.clearTracking(device)
-		return false
-	}
-
-	return true // Process is genuinely still hanging in the kernel
 }
 
 func (e *Executer) clearTracking(device string) {
@@ -1078,11 +955,52 @@ func (e *Executer) IsMultipathdAlive() (bool, error) {
 	if err == nil {
 		pid, _ := strconv.Atoi(strings.TrimSpace(string(pidData)))
 		if err := syscall.Kill(pid, 0); err == nil {
-			return true, nil
+			return e.sendMultipathProbe()
+			// TODO is this good enough or should we send a probe CLI: return e.sendMultipathProbe()
 		}
 	}
 
 	return false, fmt.Errorf("multipathd socket not responding")
+}
+	
+func (e *Executer) sendMultipathProbe() (bool, error) {
+	resp, err := e.MultipathdCmd("", "show status")
+	
+	
+	// TODO is this a better CLI for testing liveliness
+	//resp, err := e.MultipathdCmd("", "show daemon") 
+    //if err != nil {
+     //   return false, err
+    //}
+    //return strings.Contains(resp, "pid"), nil
+
+	if err != nil {
+		// If the error is a timeout, the daemon is likely stuck in D-state
+		if netErr, ok := err.(net.Error); ok && netErr.Timeout() {
+			return false, fmt.Errorf("multipathd is unresponsive (deadlock suspected): %w", err)
+		}
+
+		// TODO should we expect "timeout" string on error if not running
+		// If the error is "connection refused", the daemon is simply not running
+		if strings.Contains(err.Error(), "unreachable") ||
+			strings.Contains(err.Error(), "refused") ||
+			strings.Contains(err.Error(), "no such file") {
+			return false, fmt.Errorf("multipathd service is not running")
+		}
+
+		return false, err
+	}
+
+	// Verify we got a sane response (usually "up" or "multipathd vX.X.X")
+	if resp == "" {
+		return false, fmt.Errorf("multipathd returned empty response")
+	}
+
+	// TODO is this too strict
+	//if !strings.Contains(string(output), "status:") && !strings.Contains(string(output), "up")
+
+	return true, nil
+	
 }
 
 
