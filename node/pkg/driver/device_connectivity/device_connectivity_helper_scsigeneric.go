@@ -1328,7 +1328,7 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) TeardownVolume(ctx context.Conte
 	// TODO if error - should be exit?
 	if err == nil && isMounted {
 		// UnmountWithTimeout already handles Tiered Escalation (Graceful -> Force -> Lazy)
-		if err := r.Mounter.UnmountWithContext(ctx, target); err != nil {
+		if err := r.Mounter.UnmountWithTimeout(ctx, target, time.Duration(30)*time.Second); err != nil {
 			return fmt.Errorf("unmount phase failed: %w", err)
 		}
 		// TODO perhaps if called from error context - use escalate unmount immediately, e.g.
@@ -1418,6 +1418,45 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) TeardownVolume(ctx context.Conte
 	return nil
 }
 
+func (r *OsDeviceConnectivityHelperScsiGeneric) dmIoctlLoadTable(ctx context.Context, name string, table string) error {
+	return executer.ExecuteUninterruptible[struct{}](
+		ctx, r.KeyedGater, "dm-load-"+name, 1, 10, 1*time.Second, 5*time.Second,
+		func(wCtx context.Context) (struct{}, error) {
+			f, err := os.OpenFile(DM_IOCTL_CONTROL, os.O_RDWR, 0)
+			if err != nil { return struct{}{}, err }
+			defer f.Close()
+
+			// The buffer needs to hold: dmIoctl + dmTargetSpec + table string
+			// We round up the size for alignment
+			targetString := table + "\x00"
+			payloadSize := uint32(unsafe.Sizeof(dmIoctl{}) + unsafe.Sizeof(dmTargetSpec{}) + uintptr(len(targetString)))
+			buf := make([]byte, payloadSize)
+
+			// 1. Setup Header (dmIoctl)
+			header := (*dmIoctl)(unsafe.Pointer(&buf[0]))
+			header.version = [3]uint32{4, 0, 0}
+			header.dataSize = payloadSize
+			header.targetCount = 1
+			copy(header.name[:], name)
+
+			// 2. Setup Target Spec (dmTargetSpec)
+			// Offset is immediately after the header
+			spec := (*dmTargetSpec)(unsafe.Pointer(&buf[unsafe.Sizeof(dmIoctl{})]))
+			spec.length = 0 // You'll need to parse 'size' from table string if you want exactness, 
+			                // but for 'error' target, the kernel just needs the string.
+			spec.next = uint32(unsafe.Sizeof(dmTargetSpec{}) + uintptr(len(targetString)))
+			copy(spec.targetType[:], "error")
+
+			// 3. Copy table string after the spec
+			copy(buf[unsafe.Sizeof(dmIoctl{})+unsafe.Sizeof(dmTargetSpec{}):], targetString)
+
+			_, _, errno := unix.Syscall(unix.SYS_IOCTL, f.Fd(), DM_TABLE_LOAD, uintptr(unsafe.Pointer(&buf[0])))
+			if errno != 0 { return struct{}{}, errno }
+			
+			return struct{}{}, nil
+		},
+	)
+}
 
 // Requirement 7: Replace a hung table with an error target to unblock the kernel
 func (r *OsDeviceConnectivityHelperScsiGeneric) dmIoctlLoadErrorTarget(ctx context.Context, name string) error {
@@ -2325,36 +2364,13 @@ func (o *OsDeviceConnectivityHelperGeneric) RescanHosts(ctx context.Context, hos
 
 
 
-// TODO unused
+// TODO unused (has nvme sensitive implementation in 1.13.1)
 func (o OsDeviceConnectivityHelperGeneric) GetMpathVolumeId(dmPath string) (volId string, err error) {
 	SgInqWwn, err := o.GetWwnByScsiInq(dmPath)
 	if err != nil {
 		return "", err
 	}
 	return SgInqWwn, nil
-}
-
-func (o OsDeviceConnectivityHelperGeneric) GetMpathVolumeId(mpathdOutput string, mpathDeviceName string,
-	dmDirectory string) (string, error) {
-
-	mpathVolumeId, err := o.Helper.ExtractVolumeId(mpathDeviceName, mpathdOutput)
-	if err != nil {
-		return "", err
-	}
-	dmPath := filepath.Join(dmDirectory, filepath.Base(strings.TrimSpace(mpathDeviceName)))
-
-	if isNvmeDevice(dmPath, o.Executer) {
-		return mpathVolumeId, nil
-	}
-
-	SgInqWwn, err := o.GetWwnByScsiInq(dmPath)
-	if err != nil {
-		return "", err
-	}
-	if o.IsAnyVariationInMpathVolumeId(mpathVolumeId, []string{SgInqWwn}) {
-		return mpathVolumeId, nil
-	}
-	return "", &ErrorWrongDeviceFound{dmPath, mpathVolumeId, SgInqWwn}
 }
 
 func (o *OsDeviceConnectivityHelperGeneric) GetWwnByScsiInq(ctx context.Context, dev string) (string, error) {
@@ -2982,91 +2998,6 @@ func (o *OsDeviceConnectivityHelperGeneric) GetOpenCount(ctx context.Context, dm
 
 
 // TODO there's also a version in mount_wrapper.go - GetMajorMinorFromSysfs
-func (o *OsDeviceConnectivityHelperGeneric) GetMajorMinorFromSysfs(devicePath string) (major uint32, minor uint32, err error) {
-	var st syscall.Stat_t
-	if err := syscall.Stat(devicePath, &st); err != nil {
-		return 0, 0, fmt.Errorf("stale-%s-%d", devicePath, time.Now().UnixNano())
-	}
-
-	major = unix.Major(st.Rdev)
-	minor = unix.Minor(st.Rdev)
-	name := filepath.Base(devicePath)
-
-	// 1. Branch: Resolve SG to its Block sibling
-	if (st.Mode&syscall.S_IFMT) == syscall.S_IFCHR && strings.HasPrefix(name, "sg") {
-		// Path: /sys/class/scsi_generic/sgX/device/block/sdY
-		// Or simpler: /sys/class/scsi_generic/sgX/device points to the shared SCSI object
-		sysPath := fmt.Sprintf("/sys/class/scsi_generic/%s/device", name)
-
-		// Find the block child
-		blockEntries, err := os.ReadDir(filepath.Join(sysPath, "block"))
-		if err == nil && len(blockEntries) > 0 {
-			// Update to the SD device's major:minor
-			sdName := blockEntries[0].Name()
-			
-			ueventPath := fmt.Sprintf("/sys/class/scsi_generic/%s/device/block/%s/uevent", name, sdName)
-			
-			// REQUIREMENT 4: Direct sysfs read of MAJOR/MINOR attributes
-			data := o.readSysfs(ctx, ueventPath)			// trim
-			if data != "" {
-				major, minor = o.parseUeventMajorMinor(data)
-			}
-			
-			// TODO is this better than stat of the sd name
-			//var sdSt syscall.Stat_t
-			//if err := syscall.Stat(filepath.Join("/dev", sdName), &sdSt); err == nil {
-			//	major = unix.Major(sdSt.Rdev)
-			//	minor = unix.Minor(sdSt.Rdev)
-			//}
-		}
-	}
-	return major, minor, nil
-}
-// Ensure your uevent parser looks for MAJOR=X and MINOR=Y lines. This is a very robust "Source of Truth" that doesn't depend on the availability of /dev nodes, 
-
-// parseUeventMajorMinor parses the MAJOR and MINOR values from a sysfs uevent file.
-// Format is usually:
-// MAJOR=8
-// MINOR=16
-// DEVNAME=sdb
-func (o *OsDeviceConnectivityHelperGeneric) parseUeventMajorMinor(data string) (major uint32, minor uint32) {
-	scanner := bufio.NewScanner(strings.NewReader(data))
-	for scanner.Scan() {
-		line := scanner.Text()
-		parts := strings.SplitN(line, "=", 2)
-		if len(parts) != 2 {
-			continue
-		}
-
-		key := parts[0]
-		value := parts[1]
-
-		switch key {
-		case "MAJOR":
-			if v, err := strconv.ParseUint(value, 10, 32); err == nil {
-				major = uint32(v)
-			}
-		case "MINOR":
-			if v, err := strconv.ParseUint(value, 10, 32); err == nil {
-				minor = uint32(v)
-			}
-		}
-	}
-	return major, minor
-}
-
-
-
-
-
-
-
-
-
-
-
-
-
 func (o *OsDeviceConnectivityHelperGeneric) GetMajorMinorFromSysfs(ctx context.Context, devicePath string) (major uint32, minor uint32, err error) {
 	var st syscall.Stat_t
 	if err := syscall.Stat(devicePath, &st); err != nil {
@@ -3089,15 +3020,32 @@ func (o *OsDeviceConnectivityHelperGeneric) GetMajorMinorFromSysfs(ctx context.C
 			ueventPath := filepath.Join(sysPath, "block", sdName, "uevent")
 			
 			// Use the helper to read from sysfs
-			data := o.readSysfs(ctx, ueventPath)
+			data := o.readSysfs(ueventPath)
 			if data != "" {
 				major, minor = o.parseUeventMajorMinor(data)
 			}
+			// TODO is this better than stat of the sd name
+			//var sdSt syscall.Stat_t
+			//if err := syscall.Stat(filepath.Join("/dev", sdName), &sdSt); err == nil {
+			//	major = unix.Major(sdSt.Rdev)
+			//	minor = unix.Minor(sdSt.Rdev)
+			//}
+			
 		}
 	}
 	return major, minor, nil
 }
 
+
+
+
+// Ensure your uevent parser looks for MAJOR=X and MINOR=Y lines. This is a very robust "Source of Truth" that doesn't depend on the availability of /dev nodes, 
+
+// parseUeventMajorMinor parses the MAJOR and MINOR values from a sysfs uevent file.
+// Format is usually:
+// MAJOR=8
+// MINOR=16
+// DEVNAME=sdb
 func (o *OsDeviceConnectivityHelperGeneric) parseUeventMajorMinor(data string) (major uint32, minor uint32) {
 	scanner := bufio.NewScanner(strings.NewReader(data))
 	for scanner.Scan() {
@@ -3124,11 +3072,6 @@ func (o *OsDeviceConnectivityHelperGeneric) parseUeventMajorMinor(data string) (
 	}
 	return major, minor
 }
-
-
-
-
-
 
 
 //In GetDeviceWWID, you call GetWwnByScsiInq.
