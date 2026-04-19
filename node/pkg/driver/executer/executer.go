@@ -53,7 +53,7 @@ type ExecuterInterface interface { // basic host dependent functions
 	GetExitCode(err error) (int, bool)
 	IsDeviceStillStuck(device string) bool
 	IsMultipathdAlive(ctx context.Context) (bool, error)
-	MultipathdCmd(device string, command string) (string, error)
+	MultipathdCmd(ctx context.Context, device string, command string) (string, error)
 }
 
 
@@ -699,7 +699,7 @@ func (e *Executer) MultipathdCmd(ctx context.Context, device string, command str
 	// conn, err := net.DialTimeout("unix", socketPath, 1*time.Second)
     dialer := net.Dialer{}
     // Requirement 8: Dial obeys the CSI context
-    conn, err := dialer.DialContext(ctx, "unix", e.GetSocket())
+    conn, err := dialer.DialContext(ctx, "unix", socketPath)
 	
 	if err != nil {
 		// e.invalidateSocket()
@@ -797,7 +797,7 @@ func (e *Executer) MultipathdCmd(ctx context.Context, device string, command str
 }
 
 // Wrapper for MultipathdCmd that checks up + keep alive
-func (e *Executer) SafeMultipathdCmd(device string, command string) (string, error) {
+func (e *Executer) SafeMultipathdCmd(ctx context.Context, device string, command string) (string, error) {
 	// 1. Level 1: Process Check (Ultra-lightweight)
 	// If the daemon isn't running, don't even try the socket.
 	if !e.IsMultipathdRunning() {
@@ -813,7 +813,7 @@ func (e *Executer) SafeMultipathdCmd(device string, command string) (string, err
 	}
 
 	// 4. Level 4: Execution
-	return e.MultipathdCmd(device, command)
+	return e.MultipathdCmd(ctx, device, command)
 }
 
 // Wrapper for MultipathdCmd that adds throttling
@@ -824,7 +824,7 @@ func (e *Executer) MultipathdCmdLimiter(ctx context.Context, device string, comm
 	// If we've failed recently and frequently, don't even try.
 	if e.sl.failureCount.Load() > 3 && time.Since(e.sl.lastFail) < 30*time.Second {
 		e.sl.mu.RUnlock()
-		return fmt.Errorf("multipathd-safety: circuit breaker open (last failure: %v)", e.sl.lastFail)
+		return "", fmt.Errorf("multipathd-safety: circuit breaker open (last failure: %v)", e.sl.lastFail)
 	}
 	e.sl.mu.RUnlock()
 
@@ -837,7 +837,7 @@ func (e *Executer) MultipathdCmdLimiter(ctx context.Context, device string, comm
 	}
 
 	// 3. Execute
-	err := SafeMultipathdCmd(device, string)
+	output, err := e.SafeMultipathdCmd(ctx, device, string)
 
 	// 4. Update Circuit State
 	if err != nil {
@@ -852,9 +852,10 @@ func (e *Executer) MultipathdCmdLimiter(ctx context.Context, device string, comm
 	} else {
 		// Reset failure count on success
 		e.sl.failureCount.Store(0)
+		return output, nil
 	}
 
-	return err
+	return "", err
 }
 
 // Helper to identify if the error is a socket/timeout issue vs a logical multipath error
@@ -899,51 +900,6 @@ func (e *Executer) IsMultipathdRunning() bool {
 	return false
 }
 
-// IsMultipathdAlive performs a liveness check by sending a no-op command.
-// It distinguishes between "stopped" (connection refused) and "stuck" (timeout).
-func (e *Executer) IsMultipathdAlive() (bool, error) {
-	// We use 'show status' because it's a fast, read-only internal no-op.
-	// If the event loop is deadlocked (D-state), this will trigger the
-	// 5s deadline set in MultipathdCmd.
-	resp, err := e.MultipathdCmd("", "show status")
-	
-	
-	// TODO is this a better CLI for testing liveliness
-	//resp, err := e.MultipathdCmd("", "show daemon") 
-    //if err != nil {
-     //   return false, err
-    //}
-    //return strings.Contains(resp, "pid"), nil
-
-	if err != nil {
-		// If the error is a timeout, the daemon is likely stuck in D-state
-		if netErr, ok := err.(net.Error); ok && netErr.Timeout() {
-			return false, fmt.Errorf("multipathd is unresponsive (deadlock suspected): %w", err)
-		}
-
-		// TODO should we expect "timeout" string on error if not running
-		// If the error is "connection refused", the daemon is simply not running
-		if strings.Contains(err.Error(), "unreachable") ||
-			strings.Contains(err.Error(), "refused") ||
-			strings.Contains(err.Error(), "no such file") {
-			return false, fmt.Errorf("multipathd service is not running")
-		}
-
-		return false, err
-	}
-
-	// Verify we got a sane response (usually "up" or "multipathd vX.X.X")
-	if resp == "" {
-		return false, fmt.Errorf("multipathd returned empty response")
-	}
-
-	// TODO is this too strict
-	//if !strings.Contains(string(output), "status:") && !strings.Contains(string(output), "up")
-
-	return true, nil
-}
-
-
 // TODO this looks for the socket
 // Is it possible that in RH7 - the socket is not accessible but process is alive?
 // How do we communicate with it in this case?
@@ -975,7 +931,9 @@ func (e *Executer) IsMultipathdAlive() (bool, error) {
 
 	return false, fmt.Errorf("multipathd socket not responding")
 }
-	
+
+// IsMultipathdAlive performs a liveness check by sending a no-op command.
+// It distinguishes between "stopped" (connection refused) and "stuck" (timeout).	
 func (e *Executer) sendMultipathProbe() (bool, error) {
 	resp, err := e.MultipathdCmd("", "show status")
 	
