@@ -1426,37 +1426,45 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) dmIoctlLoadTable(ctx context.Con
 			if err != nil { return struct{}{}, err }
 			defer f.Close()
 
-			// The buffer needs to hold: dmIoctl + dmTargetSpec + table string
-			// We round up the size for alignment
-			targetString := table + "\x00"
-			payloadSize := uint32(unsafe.Sizeof(dmIoctl{}) + unsafe.Sizeof(dmTargetSpec{}) + uintptr(len(targetString)))
-			buf := make([]byte, payloadSize)
+			// Parse sector length from table: "0 12345 error"
+			var start, length uint64
+			fmt.Sscanf(table, "%d %d", &start, &length)
 
-			// 1. Setup Header (dmIoctl)
-			header := (*dmIoctl)(unsafe.Pointer(&buf[0]))
+			targetString := table + "\x00"
+			// Ensure we align the payload for the kernel
+			headerSize := uint32(unsafe.Sizeof(dmIoctl{}))
+			specSize := uint32(unsafe.Sizeof(dmTargetSpec{}))
+			payloadSize := headerSize + specSize + uint32(len(targetString))
+			
+			buf := make([]byte, payloadSize)
+			dataPtr := unsafe.Pointer(&buf[0])
+
+			// 1. Header
+			header := (*dmIoctl)(dataPtr)
 			header.version = [3]uint32{4, 0, 0}
 			header.dataSize = payloadSize
 			header.targetCount = 1
 			copy(header.name[:], name)
 
-			// 2. Setup Target Spec (dmTargetSpec)
-			// Offset is immediately after the header
-			spec := (*dmTargetSpec)(unsafe.Pointer(&buf[unsafe.Sizeof(dmIoctl{})]))
-			spec.length = 0 // You'll need to parse 'size' from table string if you want exactness, 
-			                // but for 'error' target, the kernel just needs the string.
-			spec.next = uint32(unsafe.Sizeof(dmTargetSpec{}) + uintptr(len(targetString)))
+			// 2. Spec
+			spec := (*dmTargetSpec)(unsafe.Add(dataPtr, uintptr(headerSize)))
+			spec.sectorStart = start
+			spec.length = length // REQUIRED: Kernel validates this
+			spec.targetType = [16]byte{}
 			copy(spec.targetType[:], "error")
+			spec.next = specSize + uint32(len(targetString))
 
-			// 3. Copy table string after the spec
-			copy(buf[unsafe.Sizeof(dmIoctl{})+unsafe.Sizeof(dmTargetSpec{}):], targetString)
+			// 3. Table String
+			copy(buf[headerSize+specSize:], targetString)
 
-			_, _, errno := unix.Syscall(unix.SYS_IOCTL, f.Fd(), DM_TABLE_LOAD, uintptr(unsafe.Pointer(&buf[0])))
+			_, _, errno := unix.Syscall(unix.SYS_IOCTL, f.Fd(), DM_TABLE_LOAD, uintptr(dataPtr))
 			if errno != 0 { return struct{}{}, errno }
-			
+
 			return struct{}{}, nil
 		},
 	)
 }
+
 
 // Requirement 7: Replace a hung table with an error target to unblock the kernel
 func (r *OsDeviceConnectivityHelperScsiGeneric) dmIoctlLoadErrorTarget(ctx context.Context, name string) error {
