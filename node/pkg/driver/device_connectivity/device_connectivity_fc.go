@@ -37,6 +37,39 @@ func (r OsDeviceConnectivityFc) EnsureLogin(_ map[string][]string) {
 	// FC doesn't require login
 }
 
+func (r OsDeviceConnectivityFc) updateFCHostIDs(hostIDs map[int]bool) {
+    // Map host numbers to their physical PCI anchor
+    // host0 -> 0000:04:00.0, host1 -> 0000:04:00.0
+    pciMap := make(map[int]string)
+    
+    hosts, _ := filepath.Glob("/sys/class/fc_host/host*")
+    for _, h := range hosts {
+        hostNum, _ := strconv.Atoi(strings.TrimPrefix(filepath.Base(h), "host"))
+        
+        // Req 4: Use os.Readlink to follow the 'device' symlink
+        if link, err := os.Readlink(filepath.Join(h, "device")); err == nil {
+            pciMap[hostNum] = filepath.Base(link)
+        }
+    }
+
+    // Capture the PCI addresses already in our "active" set
+    targetHardware := make(map[string]bool)
+    for id := range hostIDs {
+        if pci, exists := pciMap[id]; exists {
+            targetHardware[pci] = true
+        }
+    }
+
+    // Add siblings: If we're scanning one "slice" of a PCI device, scan them all
+    for id, pci := range pciMap {
+        if targetHardware[pci] && !hostIDs[id] {
+            hostIDs[id] = true
+            logger.Infof("FC Sibling: associated host%d with shared HBA %s", id, pci)
+        }
+    }
+}
+
+
 func (r OsDeviceConnectivityFc) RescanDevices(lunId int, arrayIdentifiers []string) error {
 	hostIDs, err := r.HelperScsiGeneric.RescanDevicesGetHostIds(lunId, arrayIdentifiers)
 	if err != nil {
