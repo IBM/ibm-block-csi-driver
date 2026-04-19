@@ -17,6 +17,7 @@
 package device_connectivity
 
 import (
+	"context"
 	"fmt"
 	"net"
 	"os"
@@ -51,17 +52,8 @@ func NewOsDeviceConnectivityIscsi(executer executer.ExecuterInterface, KeyedGate
 // TOOD can HANG
 // TODO consider gater
 func (r OsDeviceConnectivityIscsi) iscsiCmd(args ...string) (string, error) {
+	// TODO
 	out, err := r.Executer.ExecuteWithTimeout(int(IscsiCmdTimeout.Seconds()*1000), "iscsiadm", args)
-	return string(out), err
-}
-
-// TODO merge
-func (r OsDeviceConnectivityIscsi) iscsiCmd(ctx context.Context, args ...string) (string, error) {
-	// REQUIREMENT 8: Respect the gRPC Context
-	// We use your ExecuteUninterruptible or the CommandContext from Executer
-	cmd := r.Executer.CommandContext(ctx, "iscsiadm", args...)
-	
-	out, err := cmd.CombinedOutput()
 	return string(out), err
 }
 

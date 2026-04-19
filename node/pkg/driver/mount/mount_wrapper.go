@@ -79,7 +79,7 @@ type Mounter struct {
 	maxStuckLimit int32
 }
 
--var _ mount.Interface = &Mounter{}
+var _ mount.Interface = &Mounter{}
 //type MounterBridge struct {
 //	*mount.Mounter
 //	ctx context.Context	*apiCtx
@@ -109,7 +109,7 @@ func NewWithExecutor(mounterPath string, e executer.ExecuterInterface, g *execut
 // NOT REPLACED: UnmountWithForce, MountSensitiveWithoutSystemd, MountSensitiveWithoutSystemdWithMountFlags, CanSafelySkipMountPointCheck
 
 // 1. OVERRIDE: IsLikelyNotMountPoint
-func (b *Mounter) IsLikelyNotMountPoint(file string) (bool, error) {
+func (m *Mounter) IsLikelyNotMountPoint(file string) (bool, error) {
 	isMounted, err := m.isMountedInProc(file)
 	if err != nil {
 		return true, err
@@ -118,12 +118,12 @@ func (b *Mounter) IsLikelyNotMountPoint(file string) (bool, error) {
 }
 
 // 3. OVERRIDE: IsMountPoint
-func (b *Mounter) IsMountPoint(file string) (bool, error) {
+func (m *Mounter) IsMountPoint(file string) (bool, error) {
 	return m.isMountedInProc(file)
 }
 
 // 3. OVERRIDE: GetMountRefs
-func (b *Mounter) GetMountRefs(pathname string) ([]string, error) {
+func (m *Mounter) GetMountRefs(pathname string) ([]string, error) {
 	// Standard implementation is okay, but our inner.GetMountsForPath
 	// is safer against D-state hangs.
 	mounts, err := m.GetMountsForPath(pathname)
@@ -140,19 +140,21 @@ func (b *Mounter) GetMountRefs(pathname string) ([]string, error) {
 
 // 3. OVERRIDE: Mount
 
-func (b *Mounter) Mount(source string, target string, fstype string, options []string) error {
-	return m.MountNativeWithTimeout(source, target, fstype, options, 30*time.Second)
+func (m *Mounter) Mount(source string, target string, fstype string, options []string) error {
+	ctx, _ := context.WithTimeout(context.Background(), time.Duration(30)*time.Second)
+	return m.MountNative(ctx, source, target, fstype, options)
 }
 
 // 3. OVERRIDE: Unmount
 
-func (b *Mounter) Unmount(target string) error {
-	return m.UnmountWithTimeout(target, 30*time.Second)
+func (m *Mounter) Unmount(target string) error {
+	ctx := context.Background()
+	return m.UnmountWithTimeout(ctx, target, 30*time.Second)
 }
 
 // 3. OVERRIDE: List
 // List retrieves all mount points by calling our common low-level GetMounts
-func (b *Mounter) List() ([]mount.MountPoint, error) {
+func (m *Mounter) List() ([]mount.MountPoint, error) {
 	// 1. Call our common low-level function that handles
 	// octal unescaping and Major:Minor splitting.
 	rawMounts, err := GetMounts("")
@@ -190,15 +192,16 @@ func (b *Mounter) List() ([]mount.MountPoint, error) {
 	return results, nil
 }
 
-func (b *Mounter) MountSensitive(source, target, fstype string, options, sensitiveOptions []string) error {
+func (m *Mounter) MountSensitive(source, target, fstype string, options, sensitiveOptions []string) error {
     // 1. Log only the safe stuff
-    klog.V(4).Infof("Mounting %s to %s with options %v", source, target, options)
+    //klog.V(4).Infof("Mounting %s to %s with options %v", source, target, options)
+    logger.Infof("Mounting %s to %s with options %v", source, target, options)
 
     // 2. Combine them for the actual system call
     allOptions := append(options, sensitiveOptions...)
     
     // 3. Your existing logic to translate flags and call unix.Mount
-    flags, data := m.translateFlags(allOptions)
+    flags, data := m.parseMountOptions(allOptions)
     return unix.Mount(source, target, fstype, flags, data)
 }
 
@@ -236,7 +239,7 @@ func (m *Mounter) DeviceOpened(ctx context.Context, pathname string) (bool, erro
 	targetMinor := unix.Minor(st.Rdev)
 
 	// 2. Get all current mounts using our safe /proc parser
-	mounts, err := m.GetMounts(ctx, "")
+	mounts, err := GetMounts("")
 	if err != nil {
 		return false, err
 	}
@@ -309,7 +312,7 @@ func (m *Mounter) UnmountWithTimeout(ctx context.Context, target string, timeout
 		isNVMe := strings.HasPrefix(filepath.Base(device), "nvme")
 
 		if isDM || isNVMe {
-			if _, err := m.executer.IsMultipathdAlive(); err != nil && strings.Contains(err.Error(), "deadlock") {
+			if _, err := m.executer.IsMultipathdAlive(ctx); err != nil && strings.Contains(err.Error(), "deadlock") {
 				return fmt.Errorf("safety-gate: multipathd deadlock; unmount aborted to prevent hang")
 			}
 		}
@@ -334,7 +337,7 @@ func (m *Mounter) UnmountWithTimeout(ctx context.Context, target string, timeout
 	// Tier 0: Background Sync (Only if hardware is healthy)
 	if mInfo.LastState == StateGracefulPending && !mInfo.SyncDone && !mInfo.SyncInProgress {
 		mInfo.SyncInProgress = true
-		go m.backgroundSyncfs(target, mInfo)
+		go m.backgroundSyncfs(ctx, target, mInfo)
 	}
 	mInfo.mu.Unlock()
 
@@ -350,12 +353,12 @@ func (m *Mounter) UnmountWithTimeout(ctx context.Context, target string, timeout
 		err = m.tryUnmount(target, syscall.MNT_FORCE, timeout)
 
 	default:
-		err = m.ImmediateDetach(target)
+		err = m.ImmediateDetach(ctx, target)
 		//return m.escalateToLazy(target)
 	}
 
 	if err == nil {
-		if m.PollMountDeleted(target, 2*time.Second) {
+		if m.PollMountDeleted(ctx, target, 2*time.Second) {
 			m.unmountTracker.Delete(target)
 			return nil
 		}
@@ -409,7 +412,7 @@ type SyncResult struct {
 	Success bool
 }
 
-func (m *Mounter) backgroundSyncfs(target string, info *TrackedUnmount) {
+func (m *Mounter) backgroundSyncfs(ctx context.Context, target string, info *TrackedUnmount) {
 	// 1. RE-VERIFY Hardware inside Goroutine
 	device, _ := m.getDeviceFromMount(target)
 	if device != "" && m.executer.IsDeviceStillStuck(device) {
@@ -422,6 +425,7 @@ func (m *Mounter) backgroundSyncfs(target string, info *TrackedUnmount) {
 
 	// Use the generic SyncResult we defined earlier
 	res, err := executer.ExecuteUninterruptible[SyncResult](
+		ctx,
 		m.KeyedGater,
 		"syncfs-"+targetPath,
 		1, // maxRunning: 1 sync per path
@@ -488,7 +492,7 @@ func (m *Mounter) EscalateToLazy(target string) error {
 
 // ImmediateDetach skips all graceful tiers and immediately executes a Lazy Unmount.
 // This is used for cleanup of rogue volumes or when hardware is known to be dead.
-func (m *Mounter) ImmediateDetach(target string) error {
+func (m *Mounter) ImmediateDetach(ctx context.Context, target string) error {
 	// 1. Resolve target to a session if tracking exists
 	// This ensures we clean up the tracker even if this wasn't a "timed" escalation.
 	m.unmountTracker.Delete(target)
@@ -503,7 +507,7 @@ func (m *Mounter) ImmediateDetach(target string) error {
 		logger.Infof("ImmediateDetach: %s successfully detached", target)
 
 		// 4. Verify disappearance from mountinfo (Source of Truth)
-		if m.PollMountDeleted(target, 5*time.Second) {
+		if m.PollMountDeleted(ctx, target, 5*time.Second) {
 			return nil
 		}
 		return fmt.Errorf("detach reported success but %s still in mountinfo", target)
@@ -556,8 +560,9 @@ func (m *Mounter) IsMounted(target string) (bool, error) {
 	return m.isMountedInProc(target)
 }
 
-func (m *Mounter) PollMountDeleted(target string, timeout time.Duration) bool {
+func (m *Mounter) PollMountDeleted(ctx context.Context, target string, timeout time.Duration) bool {
 	res, err := executer.ExecuteUninterruptible[bool](
+		ctx,
 		m.KeyedGater,
 		"mountinfo-read",
 		5,  // maxRunning: limit concurrent mountinfo scans to 5
@@ -600,7 +605,7 @@ func (m *Mounter) PollMountDeleted(target string, timeout time.Duration) bool {
 
 // Wrapper for MountNative the handles tracking of stuck mounts
 func (m *Mounter) MountNativeWithContext(ctx context.Context, source, target, fstype string, options []string) error {
-	m.reapRecoveredMounts()
+	m.reapRecoveredMounts(ctx)
 
 	// 1. Requirement 8: Respect the incoming CSI context immediately
 	if err := ctx.Err(); err != nil {
@@ -622,7 +627,7 @@ func (m *Mounter) MountNativeWithContext(ctx context.Context, source, target, fs
 		// Check for Multipath health (if applicable)
 		if strings.HasPrefix(filepath.Base(source), "dm-") {
 			// We use our circuit-broken limiter to check liveness
-			if _, err := m.executer.IsMultipathdAlive(); err != nil {
+			if _, err := m.executer.IsMultipathdAlive(ctx); err != nil {
 				if strings.Contains(err.Error(), "deadlock") {
 					return fmt.Errorf("mount-safety: multipathd deadlock detected; blocking mount on %s", source)
 				}
@@ -655,7 +660,7 @@ func (m *Mounter) MountNativeWithContext(ctx context.Context, source, target, fs
 	}
 }
 
-func (m *Mounter) MountNative(source, target, fstype string, options []string) error {
+func (m *Mounter) MountNative(ctx context.Context, source, target, fstype string, options []string) error {
 	// 1. Directory Preparation
 	if err := os.MkdirAll(target, 0750); err != nil {
 		return fmt.Errorf("mkdir failed: %w", err)
@@ -680,6 +685,7 @@ func (m *Mounter) MountNative(source, target, fstype string, options []string) e
 	// 2. Initial Mount (Legacy Compatibility)
 	// We use the Gater here because 'mount' is an uninterruptible syscall.
 	_, err := executer.ExecuteUninterruptible[struct{}](
+		ctx,
 		m.KeyedGater,
 		"mount-"+target,
 		10,             // maxRunning: Limit concurrent mounts to 10
@@ -706,6 +712,7 @@ func (m *Mounter) MountNative(source, target, fstype string, options []string) e
 	if (flags & (unix.MS_BIND | unix.MS_RDONLY | unix.MS_SHARED | unix.MS_PRIVATE | unix.MS_SLAVE)) != 0 {
 		remountFlags := flags | unix.MS_REMOUNT
 		_, err := executer.ExecuteUninterruptible[struct{}](
+			ctx,
 			m.KeyedGater,
 			"remount-"+target,
 			5,              // maxRunning: lower concurrency for remounts
@@ -755,7 +762,7 @@ func (m *Mounter) IsPathStuck(target string) bool {
 	return found
 }
 
-func (m *Mounter) reapRecoveredMounts() {
+func (m *Mounter) reapRecoveredMounts(ctx context.Context) {
 	// use bufio.Scanner as in GetMounts
 	if m.stuckCount.Load() == 0 {
 		return
@@ -776,6 +783,7 @@ func (m *Mounter) reapRecoveredMounts() {
 		// Check B: Is the directory gone?
 		// We use a Gater to prevent Lstat from hanging on a dead parent filesystem.
 		_, err := executer.ExecuteUninterruptible[os.FileInfo](
+			ctx,
 			m.KeyedGater,
 			"reap-stat-"+session.target,
 			1,             // maxRunning: Only 1 reaper check per specific target
@@ -809,9 +817,8 @@ func (m *Mounter) getLiveMounts() map[string]struct{} {
 		return found
 	}
 
-	var results []mount.MountPoint
 	for _, rm := range rawMounts {
-		found[unescapeMountString(rm.MountPoint] = struct{}{}
+		found[unescapeMountString(rm.MountPoint)] = struct{}{}
 	}
 	return found
 }

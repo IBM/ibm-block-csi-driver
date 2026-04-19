@@ -41,8 +41,8 @@ import (
 
 //go:generate mockgen -destination=../../../mocks/mock_executer.go -package=mocks github.com/ibm/ibm-block-csi-driver/node/pkg/driver/executer ExecuterInterface
 type ExecuterInterface interface { // basic host dependent functions
-	ExecuteWithTimeout(ctx context.Context, mSeconds int, command string, args []string) ([]byte, error)
-	ExecuteWithTimeoutSilently(ctx context.Context, mSeconds int, command string, args []string) ([]byte, error)
+	ExecuteWithTimeout(mSeconds int, command string, args []string) ([]byte, error)
+	ExecuteWithTimeoutSilently(mSeconds int, command string, args []string) ([]byte, error)
 	OsOpenFile(name string, flag int, perm os.FileMode) (*os.File, error)
 	OsReadlink(name string) (string, error)
 	FilepathGlob(pattern string) (matches []string, err error)
@@ -807,7 +807,7 @@ func (e *Executer) SafeMultipathdCmd(ctx context.Context, device string, command
 	// 2. Level 2: Keepalive Check (Responsive Event Loop)
 	// Only run this if it's been more than X seconds since the last success
 	// to prevent "thundering herd" overhead.
-	if alive, err := e.IsMultipathdAlive(); !alive {
+	if alive, err := e.IsMultipathdAlive(ctx); !alive {
 		// Why is this needed - why not rely on the command itself
 		return "", err
 	}

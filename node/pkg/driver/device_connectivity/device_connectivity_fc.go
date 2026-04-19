@@ -18,7 +18,13 @@ package device_connectivity
 
 import (
 	"github.com/ibm/ibm-block-csi-driver/node/pkg/driver/executer"
+	"github.com/ibm/ibm-block-csi-driver/node/logger"
 	"github.com/ibm/ibm-block-csi-driver/node/pkg/driver/mount"
+
+	"path/filepath"
+	"strconv"
+	"strings"
+	"os"
 )
 
 type OsDeviceConnectivityFc struct {
