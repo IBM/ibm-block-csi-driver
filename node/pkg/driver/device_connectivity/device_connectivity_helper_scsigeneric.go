@@ -1434,10 +1434,10 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) dmIoctlLoadErrorTarget(ctx conte
 
 
 func (r *OsDeviceConnectivityHelperScsiGeneric) dmIoctlCall(ctx context.Context, name string, op uintptr, flags uint32) error {
-	return executer.ExecuteUninterruptible[struct{}](
-		ctx, r.KeyedGater, "dm-ioctl-"+name, 1, 10, 1*time.Second, 5*time.Second,
-		func(wCtx context.Context) (struct{}{}, error) {
-			f, err := os.OpenFile(DM_IOCTL_CONTROL, os.O_RDWR, 0)
+         return executer.ExecuteUninterruptible[struct{}](
+                 ctx, r.KeyedGater, "dm-ioctl-"+name, 1, 10, 1*time.Second, 5*time.Second,
+                 func(wCtx context.Context) (struct{}, error) { // Fixed here
+                        f, err := os.OpenFile(DM_IOCTL_CONTROL, os.O_RDWR, 0)
 			if err != nil { return struct{}{}, err }
 			defer f.Close()
 
@@ -2307,8 +2307,7 @@ func (o *OsDeviceConnectivityHelperGeneric) RescanHosts(ctx context.Context, hos
 		if err != nil {
 			logger.Errorf("Rescan failed for host %d: %v", id, err)
 			errs = append(errs, err)
-		}
-		else {
+		} else {
 				logger.Infof("Successfully triggered rescan for host %d", id)
 		}
 	}
@@ -2910,7 +2909,7 @@ func (o *OsDeviceConnectivityHelperGeneric) getWWIDByDev(major, minor uint32) (s
 }
 
 
-OpenCount retrieves the current open count of a DM device via ioctl
+//OpenCount retrieves the current open count of a DM device via ioctl
 func (o *OsDeviceConnectivityHelperGeneric) GetOpenCount(ctx context.Context, dmName string) (int32, error) {
 	// REQUIREMENT 8: Respect CSI API Context
 	if err := ctx.Err(); err != nil {
