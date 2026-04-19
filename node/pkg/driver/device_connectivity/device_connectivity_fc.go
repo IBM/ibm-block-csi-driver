@@ -91,18 +91,18 @@ func (r OsDeviceConnectivityFc) GetMpathDevice(volumeId string) (string, error) 
 	return r.HelperScsiGeneric.GetMpathDevice(volumeId)
 }
 
-func (r OsDeviceConnectivityFc) FlushMultipathDevice(mpathDevice string) error {
-	return r.HelperScsiGeneric.FlushMultipathDevice(mpathDevice)
+func (r OsDeviceConnectivityFc) FlushMultipathDevice(ctx context.Context, mpathDevice string) error {
+	return r.HelperScsiGeneric.FlushMultipathDevice(ctx, mpathDevice)
 }
 
-func (r OsDeviceConnectivityFc) RemovePhysicalDevice(sysDevices []string) error {
-	return r.HelperScsiGeneric.RemovePhysicalDevice(sysDevices)
+func (r OsDeviceConnectivityFc) RemovePhysicalDevice(ctx context.Context, sysDevices []string) error {
+	return r.HelperScsiGeneric.RemovePhysicalDevice(ctx, sysDevices)
 }
 
-func (r OsDeviceConnectivityFc) RemoveGhostDevice(expectedSerial string, expectedLun int, arrayIdentifiers []string) error {
-	return r.HelperScsiGeneric.RemoveGhostDevice(expectedSerial, expectedLun, arrayIdentifiers)
+func (r OsDeviceConnectivityFc) RemoveGhostDevice(ctx context.Context, expectedSerial string, expectedLun int, arrayIdentifiers []string) error {
+	return r.HelperScsiGeneric.RemoveGhostDevice(ctx, expectedSerial, expectedLun, arrayIdentifiers)
 }
 
-func (r OsDeviceConnectivityFc) ValidateLun(targetDm string, lun int, sysDevices []string, expectedSerial string) error {
-	return r.HelperScsiGeneric.ValidateLun(targetDm, lun, sysDevices, expectedSerial)
+func (r OsDeviceConnectivityFc) ValidateLun(ctx context.Context, targetDm string, lun int, sysDevices []string, expectedSerial string) error {
+	return r.HelperScsiGeneric.ValidateLun(ctx, targetDm, lun, sysDevices, expectedSerial)
 }
