@@ -5,7 +5,7 @@ from controllers.common.csi_logger import get_stdout_logger
 from controllers.servers.host_definer.watcher.watcher_helper import Watcher, NODES, MANAGED_SECRETS
 import controllers.servers.host_definer.messages as messages
 from controllers.servers.host_definer import settings
-
+from controllers.servers.utils import are_initiators_equal
 logger = get_stdout_logger()
 
 
@@ -104,7 +104,10 @@ class CsiNodeWatcher(Watcher):
             logger.warning(messages.NODE_ID_IS_NONE)
             return False
 
-        return host_definition_info.node_initiators != csi_node_info.node_initiators
+        return not are_initiators_equal(
+            host_definition_info.node_initiators,
+            csi_node_info.node_initiators,
+        )
 
     def _undefine_hosts(self, node_name):
         for secret_info in MANAGED_SECRETS:

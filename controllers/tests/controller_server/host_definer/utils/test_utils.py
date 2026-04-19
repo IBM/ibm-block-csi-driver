@@ -241,7 +241,7 @@ def initiators_to_json(initiators: Initiators) -> str:
         "nvmeofc": initiators.nvme_nqns or [],
         "fc": initiators.fc_wwns or [],
         "iscsi": initiators.iscsi_iqns or [],
-    })
+    }, separators=(',', ':'))
 
 
 def wait_until_called(mock, timeout=5, interval=0.1):
