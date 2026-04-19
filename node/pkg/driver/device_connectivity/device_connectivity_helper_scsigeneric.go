@@ -1323,14 +1323,18 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) TeardownVolume(ctx context.Conte
 		return err
 	}
 
-	// --- PHASE 1: UNMOUNT (Tiered Rescue via Escalation) ---
+	// --- PHASE 1: UNMOUNT ---
 	isMounted, err := r.Mounter.IsMounted(target)
-	// TODO if error - should be exit?
+	if err != nil {
+		logger.Errorf("teardown: could not verify mount status for %s: %v. Proceeding to hardware cleanup.", target, err)
+	}
 	if err == nil && isMounted {
-		// UnmountWithTimeout already handles Tiered Escalation (Graceful -> Force -> Lazy)
-		if err := r.Mounter.UnmountWithTimeout(ctx, target, time.Duration(30)*time.Second); err != nil {
-			return fmt.Errorf("unmount phase failed: %w", err)
+		if err := r.Mounter.UnmountWithTimeout(ctx, target, 30*time.Second); err != nil {
+			// If graceful/force/lazy all failed, we have a zombie mount. 
+			// We proceed anyway to try and break the underlying device.
+			logger.Warningf("unmount failed, proceeding to hardware rescue: %v", err)
 		}
+		
 		// TODO perhaps if called from error context - use escalate unmount immediately, e.g.
 		//for i := len(mounts) - 1; i >= 0; i-- {
 		//		_ = r.Mounter.EscalateToLazy(target)
@@ -1341,8 +1345,9 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) TeardownVolume(ctx context.Conte
 		//if !r.Mounter.PollMountDeleted(target, 10*time.Second) {
 		//	return fmt.Errorf("teardown: mountinfo not clean for %s", target)
 		//}
-
+		
 	}
+	
 
 	// TODO first try to resolve major/minor via mount - this is fallback
 	// Resolve Hardware
@@ -1354,51 +1359,36 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) TeardownVolume(ctx context.Conte
 
 	// --- PHASE 2: BLOCK LAYER (Identity & OpenCount) ---
 	if mpathName != "" {
+	
 		openCount, _ := r.Helper.GetOpenCount(mpathName)
 		
 		// TODO should we ignore the error rom GetOpenCount (perhaps return the error)
 		
 		if openCount > 0 {
-			logger.Warningf("Device %s is still busy (openCount=%d). Triggering DM Rescue.", mpathName, openCount)
+			logger.Warningf("Device %s is busy (openCount=%d). Triggering DM Rescue.", mpathName, openCount)
 			
-			// REQUIREMENT 7: The "Hammer" Rescue Methods
-			// 1. Disable queueing so I/O doesn't block the kernel indefinitely
 			_ = r.multipathdAction(ctx, "disablequeueing map "+mpathName)
 			
-			// TODO shouldn't we execute _ = r.multipathdAction("fail path " + s) for each path
-			
-			// TODO are the following steps (until DM_DEV_RESUME) safe?
-			
-			// 2. Force Suspend with 'nolockfs' to stop new I/O without hanging on VFS
+			// Rescue Sequence: Swap hung device for a "Fail Fast" error device
 			_ = r.dmIoctlCall(ctx, mpathName, DM_DEV_SUSPEND, DM_SKIP_LOCKFS_FLAG)
 
-			// 3. Swap to Error Target: This fails all pending I/O, waking up "D" state processes
-			size, _ := r.Helper.GetBlockDeviceSize(mpathName)
-			errorTable := fmt.Sprintf("0 %d error", size)
-			_ = r.dmIoctlLoadTable(ctx, mpathName, errorTable)
-			
-			// 4. Resume to trigger the Error Target fail-fast
-			_ = r.dmIoctlCall(ctx, mpathName, DM_DEV_RESUME, 0)
+			sizeStr := r.readSysfs(ctx, fmt.Sprintf("/sys/class/block/%s/size", mpathName))
+			errorTable := fmt.Sprintf("0 %s error", strings.TrimSpace(sizeStr))
 
-			// 5. Final Move: Deferred Remove (Kernel will delete it the moment openCount hits 0)
-			_ = r.dmIoctlCall(ctx, mpathName, DM_DEV_REMOVE, DM_DEFERRED_REMOVE)
+			_ = r.dmIoctlLoadTable(ctx, mpathName, errorTable)
+			_ = r.dmIoctlCall(ctx, mpathName, DM_DEV_RESUME, 0)
+			
+			// Deferred remove allows kernel to cleanup once the 'error' target wakes up processes
+			_ = r.dmIoctlCall(ctx, mpathName, DM_DEV_REMOVE, DM_DEFERRED_REMOVE)			
 		} else {
-			// TODO should be execute this flush. If so if only for the opencount==0 case
+			// Clean path: Flush and delete
 			_, _ = executer.ExecuteUninterruptible[struct{}](
-				ctx,
-				r.KeyedGater,
-				"flush-"+mpathName, // Specific key prevents one stuck mpath from blocking others
-				10,
-				50,
-				5*time.Second,
-				30*time.Second,
-				func(ctx context.Context) (struct{}, error) {
-					err := r.flushDeviceBuffers(ctx, fmt.Sprintf("/dev/mapper/%s", mpathName))
+				ctx, r.KeyedGater, "flush-"+mpathName, 10, 50, 5*time.Second, 30*time.Second,
+				func(wCtx context.Context) (struct{}, error) {
+					err := r.flushDeviceBuffers(wCtx, fmt.Sprintf("/dev/mapper/%s", mpathName))
 					return struct{}{}, err
 				},
 			)
-		
-			// Clean Removal (TODO verify cannot hang)
 			_ = r.multipathdAction(ctx, "del map "+mpathName)
 		}
 	}
@@ -1418,13 +1408,15 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) TeardownVolume(ctx context.Conte
 	return nil
 }
 
+
 func (r *OsDeviceConnectivityHelperScsiGeneric) dmIoctlLoadTable(ctx context.Context, name string, table string) error {
-	return executer.ExecuteUninterruptible[struct{}](
-		ctx, r.KeyedGater, "dm-load-"+name, 1, 10, 1*time.Second, 5*time.Second,
-		func(wCtx context.Context) (struct{}, error) {
-			f, err := os.OpenFile(DM_IOCTL_CONTROL, os.O_RDWR, 0)
-			if err != nil { return struct{}{}, err }
-			defer f.Close()
+    // 1. Capture the tuple, return only the error
+    _, err := executer.ExecuteUninterruptible[struct{}](
+        ctx, r.KeyedGater, "dm-load-"+name, 1, 10, 1*time.Second, 5*time.Second,
+        func(wCtx context.Context) (struct{}, error) {
+            f, err := os.OpenFile(DM_IOCTL_CONTROL, os.O_RDWR, 0)
+            if err != nil { return struct{}{}, err }
+            defer f.Close()
 
 			// Parse sector length from table: "0 12345 error"
 			var start, length uint64
@@ -1457,12 +1449,12 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) dmIoctlLoadTable(ctx context.Con
 			// 3. Table String
 			copy(buf[headerSize+specSize:], targetString)
 
-			_, _, errno := unix.Syscall(unix.SYS_IOCTL, f.Fd(), DM_TABLE_LOAD, uintptr(dataPtr))
-			if errno != 0 { return struct{}{}, errno }
-
-			return struct{}{}, nil
-		},
-	)
+            _, _, errno := unix.Syscall(unix.SYS_IOCTL, f.Fd(), DM_TABLE_LOAD, uintptr(dataPtr))
+            if errno != 0 { return struct{}{}, errno }
+            return struct{}{}, nil
+        },
+    )
+    return err // Return just the error to match function signature
 }
 
 
