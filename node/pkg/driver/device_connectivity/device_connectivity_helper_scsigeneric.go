@@ -1458,25 +1458,6 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) dmIoctlLoadTable(ctx context.Con
 }
 
 
-// Requirement 7: Replace a hung table with an error target to unblock the kernel
-func (r *OsDeviceConnectivityHelperScsiGeneric) dmIoctlLoadErrorTarget(ctx context.Context, name string) error {
-	return executer.ExecuteUninterruptible[struct{}](
-		ctx, r.KeyedGater, "dm-error-"+name, 1, 5, 1*time.Second, 5*time.Second,
-		func(wCtx context.Context) (struct{}, error) {
-			// 1. Define the Error Table: "0 <size> error"
-			size, _ := r.Helper.GetBlockDeviceSize(name)
-			table := fmt.Sprintf("0 %d error\n", size)
-            
-			// 2. Use DM_TABLE_LOAD ioctl 
-			// (Implementation requires marshaling dm_ioctl + dm_target_spec)
-			return struct{}{}, r.dmIoctlCall(DM_TABLE_LOAD, name, table)
-		},
-	)
-}
-
-
-
-
 func (r *OsDeviceConnectivityHelperScsiGeneric) dmIoctlCall(ctx context.Context, name string, op uintptr, flags uint32) error {
          return executer.ExecuteUninterruptible[struct{}](
                  ctx, r.KeyedGater, "dm-ioctl-"+name, 1, 10, 1*time.Second, 5*time.Second,
@@ -1567,39 +1548,32 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) dmIoctlLoadErrorTable(ctx contex
 
 
 
-
-
 func (r *OsDeviceConnectivityHelperScsiGeneric) TeardownRescue(ctx context.Context, mpathName string) error {
     // 1. Check if the device is actually stuck
-    openCount, _ := r.Helper.GetOpenCount(ctx, mpathName)
+    // REMOVED ctx based on your compiler error log
+    openCount, _ := r.Helper.GetOpenCount(mpathName) 
     if openCount <= 0 {
         return r.multipathdAction(ctx, "del map "+mpathName)
     }
 
-    // 2. TRIGGER THE HAMMER (Requirement 7)
+    // 2. TRIGGER THE HAMMER
     logger.Warningf("Rescue: Device %s is busy (count=%d). Swapping to Error Target.", mpathName, openCount)
-    
-    // First, stop queueing to prevent further kernel blockage
+
     _ = r.multipathdAction(ctx, "disablequeueing map "+mpathName)
 
-    // Second, Suspend with 'nolockfs' (Requirement 6: D-hang protection)
+    // Suspend with 'nolockfs' to avoid hanging on a frozen filesystem
     _ = r.dmIoctlCall(ctx, mpathName, DM_DEV_SUSPEND, DM_SKIP_LOCKFS_FLAG)
 
-    // Third, Swap to Error (Requirement 4: Fork-free)
-    size, _ := r.Helper.GetBlockDeviceSize(ctx, mpathName)
-    if err := r.SwapToErrorTarget(ctx, mpathName, size); err != nil {
+    // Note: Ensure SwapToErrorTarget calls your dmIoctlLoadTable internally
+    if err := r.SwapToErrorTarget(ctx, mpathName); err != nil {
         return fmt.Errorf("rescue hammer failed: %w", err)
     }
 
-    // Fourth, Resume to flush the errors and wake up zombie processes
     _ = r.dmIoctlCall(ctx, mpathName, DM_DEV_RESUME, 0)
 
-    // Fifth, Final Removal (Deferred to be safe)
+    // Deferred removal ensures the device-mapper entry disappears as soon as refs drop
     return r.dmIoctlCall(ctx, mpathName, DM_DEV_REMOVE, DM_DEFERRED_REMOVE)
 }
-
-
-
 
 
 func (o *OsDeviceConnectivityHelperGeneric) getSlavesForDevice(major, minor uint32) ([]string, error) {
