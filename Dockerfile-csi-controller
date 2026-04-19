@@ -25,11 +25,10 @@ COPY controllers/servers/csi/requirements.txt .
 ENV GRPC_PYTHON_BUILD_SYSTEM_OPENSSL=True
 # Use pre-built wheels when available to speed up build on non-x86 platforms
 ENV PIP_PREFER_BINARY=1
-# Use BuildKit cache mount to persist pip cache across builds
+# Pip cache is mounted via volume at /opt/app-root/.cache/pip during build
 # This significantly speeds up builds on non-x86 platforms (s390x, ppc64le)
 # where grpcio must be compiled from source (~30 min without cache)
-RUN --mount=type=cache,target=/opt/app-root/.cache/pip,uid=1001 \
-    pip3 install --timeout=300 --retries=5 -r ./requirements.txt
+RUN pip3 install --timeout=300 --retries=5 -r ./requirements.txt
 
 USER root
 COPY controllers/scripts/csi_general .

@@ -1,9 +1,5 @@
 #!/bin/bash -xe
 
-# Enable BuildKit for Docker to support cache mounts
-# This significantly speeds up builds on non-x86 platforms (s390x, ppc64le)
-export DOCKER_BUILDKIT=1
-
 # Validations
 MANDATORY_ENVS="IMAGE_VERSION BUILD_NUMBER DOCKER_REGISTRY CSI_NODE_IMAGE CSI_CONTROLLER_IMAGE CSI_HOST_DEFINER_IMAGE GIT_BRANCH"
 for envi in $MANDATORY_ENVS; do
@@ -20,6 +16,31 @@ specific_tag="${IMAGE_VERSION}_b${BUILD_NUMBER}_${branch}"
 images_file=$1
 [ -n "$images_file" ] && printf "" > $images_file || :
 
+# Setup pip cache volume (same as used in test stages)
+ARCH=$(uname -m)
+VOLUME_NAME="pip-cache-${ARCH}"
+
+# Detect container runtime
+if command -v podman &> /dev/null; then
+    CONTAINER_CMD="podman"
+elif command -v docker &> /dev/null; then
+    CONTAINER_CMD="docker"
+else
+    echo "Error: Neither podman nor docker found"
+    exit 1
+fi
+
+# Create persistent volume if it doesn't exist
+if [ "${CONTAINER_CMD}" = "podman" ]; then
+    ${CONTAINER_CMD} volume create ${VOLUME_NAME} 2>/dev/null || true
+else
+    if ! ${CONTAINER_CMD} volume inspect ${VOLUME_NAME} &> /dev/null; then
+        ${CONTAINER_CMD} volume create ${VOLUME_NAME}
+    fi
+fi
+
+echo "Using pip cache volume: ${VOLUME_NAME}"
+
 build_and_push (){
     repository=$1
     dockerfile=$2
@@ -30,7 +51,14 @@ build_and_push (){
     [ "$is_tag_latest" = "true" ] && taglatestflag="-t ${tag_latest}"
 
     echo "Build and push ${driver_type} image"
-    docker build -t $tag_specific $taglatestflag -f $dockerfile --build-arg VERSION="${IMAGE_VERSION}" --build-arg BUILD_NUMBER="${BUILD_NUMBER}" .
+    # Use volume mount for pip cache to speed up builds on non-x86 platforms
+    # Mount at /opt/app-root/.cache/pip (pip cache location for uid 1001)
+    docker build --volume ${VOLUME_NAME}:/opt/app-root/.cache/pip \
+        -t $tag_specific $taglatestflag \
+        -f $dockerfile \
+        --build-arg VERSION="${IMAGE_VERSION}" \
+        --build-arg BUILD_NUMBER="${BUILD_NUMBER}" \
+        .
     docker push $tag_specific
     [ "$is_tag_latest" = "true" ] && docker push $tag_latest || :
     [ -n "$images_file" ] && printf "${tag_specific}\n" >> $images_file || :
