@@ -68,6 +68,7 @@ type TrackedUnmount struct {
 // Mounter is a warpper of mount.Mounter which has the ability to cancel
 // a comand when timeout.
 type Mounter struct {
+	*mount.Mounter
 	executer   executer.ExecuterInterface
 	KeyedGater *executer.KeyedGater
 	// Key: targetPath or volumeID, Value: startTime
@@ -78,13 +79,14 @@ type Mounter struct {
 	maxStuckLimit int32
 }
 
-type MounterBridge struct {
-	*mount.Mounter
-	ctx context.Context	*apiCtx
-	m *Mounter
-}
+-var _ mount.Interface = &Mounter{}
+//type MounterBridge struct {
+//	*mount.Mounter
+//	ctx context.Context	*apiCtx
+//	m *Mounter
+//}
 
-var _ mount.Interface = &MounterBridge{}
+//var _ mount.Interface = &MounterBridge{}
 
 func New(mounterPath string, g *executer.KeyedGater, limit int32) *Mounter {
 	return &Mounter{
@@ -107,7 +109,7 @@ func NewWithExecutor(mounterPath string, e executer.ExecuterInterface, g *execut
 // NOT REPLACED: UnmountWithForce, MountSensitiveWithoutSystemd, MountSensitiveWithoutSystemdWithMountFlags, CanSafelySkipMountPointCheck
 
 // 1. OVERRIDE: IsLikelyNotMountPoint
-func (b *MounterBridge) IsLikelyNotMountPoint(file string) (bool, error) {
+func (b *Mounter) IsLikelyNotMountPoint(file string) (bool, error) {
 	isMounted, err := m.isMountedInProc(file)
 	if err != nil {
 		return true, err
@@ -116,12 +118,12 @@ func (b *MounterBridge) IsLikelyNotMountPoint(file string) (bool, error) {
 }
 
 // 3. OVERRIDE: IsMountPoint
-func (b *MounterBridge) IsMountPoint(file string) (bool, error) {
+func (b *Mounter) IsMountPoint(file string) (bool, error) {
 	return m.isMountedInProc(file)
 }
 
 // 3. OVERRIDE: GetMountRefs
-func (b *MounterBridge) GetMountRefs(pathname string) ([]string, error) {
+func (b *Mounter) GetMountRefs(pathname string) ([]string, error) {
 	// Standard implementation is okay, but our inner.GetMountsForPath
 	// is safer against D-state hangs.
 	mounts, err := m.GetMountsForPath(pathname)
@@ -138,19 +140,19 @@ func (b *MounterBridge) GetMountRefs(pathname string) ([]string, error) {
 
 // 3. OVERRIDE: Mount
 
-func (b *MounterBridge) Mount(source string, target string, fstype string, options []string) error {
+func (b *Mounter) Mount(source string, target string, fstype string, options []string) error {
 	return m.MountNativeWithTimeout(source, target, fstype, options, 30*time.Second)
 }
 
 // 3. OVERRIDE: Unmount
 
-func (b *MounterBridge) Unmount(target string) error {
+func (b *Mounter) Unmount(target string) error {
 	return m.UnmountWithTimeout(target, 30*time.Second)
 }
 
 // 3. OVERRIDE: List
 // List retrieves all mount points by calling our common low-level GetMounts
-func (b *MounterBridge) List() ([]mount.MountPoint, error) {
+func (b *Mounter) List() ([]mount.MountPoint, error) {
 	// 1. Call our common low-level function that handles
 	// octal unescaping and Major:Minor splitting.
 	rawMounts, err := GetMounts("")
@@ -188,7 +190,7 @@ func (b *MounterBridge) List() ([]mount.MountPoint, error) {
 	return results, nil
 }
 
-func (b *MounterBridge) MountSensitive(source, target, fstype string, options, sensitiveOptions []string) error {
+func (b *Mounter) MountSensitive(source, target, fstype string, options, sensitiveOptions []string) error {
     // 1. Log only the safe stuff
     klog.V(4).Infof("Mounting %s to %s with options %v", source, target, options)
 
