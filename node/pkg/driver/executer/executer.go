@@ -30,6 +30,7 @@ import (
 	"path/filepath"
 	"strconv"
 	"strings"
+	"syscall"
 	"sync"
 	"sync/atomic"
 	"time"
@@ -217,9 +218,10 @@ func (s *safeCmd) Start() error {
             logger.Warning("start")
          } else {
              logger.Warning("failed to start %v", err)
-	}
 }
 
+    return err
+}
 
 func (s *safeCmd) Wait() error {
         logger.Warning("wait")
@@ -463,8 +465,8 @@ func (e *Executer) IsDeviceStillStuck(device string) bool {
 		return false
 	}
 	
-    if state == "Z" {
-        p, _ := os.FindProcess(pid)
+    if state == 'Z' {
+        p, _ := os.FindProcess(info.pid)
         // ProcessState will contain the exit code after this
 		
 		// TODO Protect it with timer?
@@ -537,23 +539,33 @@ func (e *Executer) commMatches(current, target string) bool {
 }
 
 func (e *Executer) parseStatFile(data []byte) (state byte, startTime uint64, err error) {
-	// The process name is in parentheses (e.g. "(iscsiadm)") and can contain spaces.
-	// We must find the LAST closing parenthesis to find field #2 (state).
-	lastParen := bytes.LastIndexByte(data, ')')
-	if lastParen == -1 || lastParen+2 >= len(data) {
-		return 0, 0, fmt.Errorf("invalid proc stat format")
-	}
+    // 1. Find the last closing parenthesis to handle process names with spaces/parens.
+    lastParen := bytes.LastIndexByte(data, ')')
+    if lastParen == -1 || lastParen+2 >= len(data) {
+        return 0, 0, fmt.Errorf("invalid proc stat format")
+    }
 
-	// Fields after the closing parenthesis are space-separated.
-	// Field 22 (starttime) is index 19 after the ") " (which is field 2).
-	fields := strings.Fields(string(data[lastParen+2:]))
-	if len(fields) < 20 {
-		return 0, 0, fmt.Errorf("proc stat too short")
-	}
+    // 2. data[lastParen+2:] starts exactly at the 'State' field.
+    // Example: "S 1234 5678..."
+    statPart := string(data[lastParen+2:])
+    fields := strings.Fields(statPart)
 
-	startTime, err := strconv.ParseUint(fields[19], 10, 64)
-	return fields[2], startTime, err
+    // 3. Validate we have enough fields to reach starttime (Field 22).
+    // If Fields[0] is State, then Field 22 is at index 19.
+    if len(fields) < 20 {
+        return 0, 0, fmt.Errorf("proc stat too short: got %d fields", len(fields))
+    }
+
+    // 4. Extract the single byte for state.
+    if len(fields[0]) > 0 {
+        state = fields[0][0]
+    }
+
+    // 5. Parse starttime (Field 22).
+    startTime, err = strconv.ParseUint(fields[19], 10, 64)
+    return state, startTime, err
 }
+
 
 func (e *Executer) clearTracking(device string) {
 	e.stuckMu.Lock()
@@ -775,8 +787,8 @@ func (e *Executer) MultipathdCmd(ctx context.Context, device string, command str
             // If we don't have a PID (socket call), we should mark it 
             // with a special sentinel or the multipathd PID to keep it stuck 
             // until the daemon recovers.
-            mPid, _ := e.getMultipathdPid() 
-            e.markAsStuck(device, mPid, "multipathd-socket")
+            //mPid, _ := e.getMultipathdPid() 
+            //e.markAsStuck(device, mPid, "multipathd-socket")
 		}
 		return "", fmt.Errorf("multipathd internal error: %s", response)
 	}
