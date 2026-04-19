@@ -833,11 +833,11 @@ func (e *Executer) MultipathdCmdLimiter(ctx context.Context, device string, comm
 	case e.sl.sem <- struct{}{}:
 		defer func() { <-e.sl.sem }()
 	case <-ctx.Done():
-		return ctx.Err()
+		return "", ctx.Err()
 	}
 
 	// 3. Execute
-	output, err := e.SafeMultipathdCmd(ctx, device, string)
+	output, err := e.SafeMultipathdCmd(ctx, device, command)
 
 	// 4. Update Circuit State
 	if err != nil {
@@ -903,7 +903,7 @@ func (e *Executer) IsMultipathdRunning() bool {
 // TODO this looks for the socket
 // Is it possible that in RH7 - the socket is not accessible but process is alive?
 // How do we communicate with it in this case?
-func (e *Executer) IsMultipathdAlive() (bool, error) {
+func (e *Executer) IsMultipathdAlive(ctx context.Context) (bool, error) {
 	// REQUIREMENT 4: Prefer filesystem/socket checks over process invocation.
 	// Multipathd usually listens on /run/multipathd.sock (or /var/run/...)
 	paths := []string{"/run/multipathd.sock", "/var/run/multipathd.sock"}
@@ -924,7 +924,7 @@ func (e *Executer) IsMultipathdAlive() (bool, error) {
 	if err == nil {
 		pid, _ := strconv.Atoi(strings.TrimSpace(string(pidData)))
 		if err := syscall.Kill(pid, 0); err == nil {
-			return e.sendMultipathProbe()
+			return e.sendMultipathProbe(ctx)
 			// TODO is this good enough or should we send a probe CLI: return e.sendMultipathProbe()
 		}
 	}
@@ -934,8 +934,8 @@ func (e *Executer) IsMultipathdAlive() (bool, error) {
 
 // IsMultipathdAlive performs a liveness check by sending a no-op command.
 // It distinguishes between "stopped" (connection refused) and "stuck" (timeout).	
-func (e *Executer) sendMultipathProbe() (bool, error) {
-	resp, err := e.MultipathdCmd("", "show status")
+func (e *Executer) sendMultipathProbe(ctx context.Context) (bool, error) {
+	resp, err := e.MultipathdCmd(ctx, "", "show status")
 	
 	
 	// TODO is this a better CLI for testing liveliness
