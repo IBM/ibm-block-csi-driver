@@ -129,11 +129,123 @@ def get_node_initiators_from_k8s_node(k8s_node):
     return initiators
 
 
+def _parse_initiators_from_legacy_node_id(node_id):
+    """
+    Parse initiators from legacy node_id format: 'node_name;nvme_nqn;fc_wwns;iscsi_iqn'
+    This is for backward compatibility with pre-CSI-5997 deployments.
+
+    Returns:
+        Initiators object or None if parsing fails
+    """
+    try:
+        split_node = node_id.split(';')
+        if len(split_node) < 2:
+            # Not in legacy format
+            return None
+
+        nvme_nqn = ""
+        fc_wwns = []
+        iscsi_iqn = ""
+
+        if len(split_node) >= 2:
+            nvme_nqn = split_node[1]
+        if len(split_node) >= 3:
+            fc_wwns_str = split_node[2]
+            fc_wwns = fc_wwns_str.split(':') if fc_wwns_str else []
+        if len(split_node) >= 4:
+            iscsi_iqn = split_node[3]
+
+        nvme_nqns = [nvme_nqn] if nvme_nqn else []
+        iscsi_iqns = [iscsi_iqn] if iscsi_iqn else []
+
+        return Initiators(nvme_nqns, fc_wwns, iscsi_iqns)
+    except Exception as e:
+        logger.warning(f"Failed to parse legacy node_id format: {e}")
+        return None
+
+
+def get_initiators_with_fallback(node_initiators_str, node_id_str, source_description=""):
+    """
+    Get initiators handling both new and legacy formats.
+
+    In upgrade scenarios, the node_initiators field may not be populated,
+    but the node_id field may contain initiators in the old format.
+
+    Args:
+        node_initiators_str: JSON string with initiators (new format) or empty string
+        node_id_str: Node ID which may contain initiators in legacy format
+        source_description: Description for logging (e.g., "host definition", "csi node")
+
+    Returns:
+        Initiators object
+    """
+    # First try the new format (node_initiators field)
+    if node_initiators_str:
+        try:
+            initiators = generate_node_initiators_from_string_data(node_initiators_str)
+            if initiators.nvme_nqns or initiators.fc_wwns or initiators.iscsi_iqns:
+                return initiators
+        except Exception as e:
+            logger.warning(f"Failed to parse node_initiators from {source_description}: {e}")
+
+    # Fallback: try to parse from legacy node_id format
+    if node_id_str:
+        logger.info(f"No initiators in {source_description} field, trying legacy node_id format")
+        legacy_initiators = _parse_initiators_from_legacy_node_id(node_id_str)
+        if legacy_initiators:
+            logger.info(f"Successfully parsed initiators from legacy {source_description} node_id")
+            return legacy_initiators
+
+    # Return empty initiators if nothing found
+    logger.warning(f"No initiators found in {source_description} (new or legacy format)")
+    return Initiators([], [], [])
+
+
+def get_initiators_from_host_definition(node_initiators_str, node_id_str):
+    """
+    Get initiators from host definition, handling both new and legacy formats.
+    Wrapper around get_initiators_with_fallback for host definitions.
+    """
+    return get_initiators_with_fallback(node_initiators_str, node_id_str, "host definition")
+
+
 def get_node_initiators(node_name):
-    "docstring"
-    initiators_data = get_node_initiators_data(node_name)
-    initiators = generate_node_initiators_from_string_data(initiators_data)
-    return initiators
+    """
+    Get node initiators from node annotations (new way) or from node_id (legacy way).
+
+    In upgrade scenarios, initiators might be in the old node_id format
+    (node_name;nvme_nqn;fc_wwns;iscsi_iqn) instead of node annotations.
+    This function handles both cases for backward compatibility.
+
+    Args:
+        node_name: Can be either just the node name (new format) or
+                   the full node_id with initiators (legacy format)
+
+    Returns:
+        Initiators object
+    """
+    # First, try to get initiators from node annotations (new way)
+    try:
+        initiators_data = get_node_initiators_data(node_name)
+        initiators = generate_node_initiators_from_string_data(initiators_data)
+
+        # Check if we got any initiators
+        if initiators.nvme_nqns or initiators.fc_wwns or initiators.iscsi_iqns:
+            return initiators
+    except Exception as e:
+        logger.warning(f"Failed to get initiators from node annotations: {e}")
+
+    # Fallback: try to parse from legacy node_id format
+    logger.info(f"No initiators found in annotations for {node_name}, trying legacy node_id format")
+    legacy_initiators = _parse_initiators_from_legacy_node_id(node_name)
+
+    if legacy_initiators:
+        logger.info(f"Successfully parsed initiators from legacy node_id format")
+        return legacy_initiators
+
+    # Return empty initiators if nothing found
+    logger.warning(f"No initiators found for node {node_name} in either new or legacy format")
+    return Initiators([], [], [])
 
 
 def get_array_connection_info_from_secrets(secrets, topologies=None, system_id=None):

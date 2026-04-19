@@ -5,7 +5,23 @@ from controllers.array_action import settings as array_config
 
 class NodeIdInfo:
     def __init__(self, node_id):
-        self.node_name = node_id
+        """
+        Extract node name from node_id.
+
+        Handles both formats:
+        - New format (CSI-5997+): node_id is just the node_name
+        - Legacy format: node_id is 'node_name;nvme_nqn;fc_wwns;iscsi_iqn'
+
+        Args:
+            node_id: Either just node_name or legacy format with initiators
+        """
+        # Handle legacy format by extracting just the node name
+        if ';' in node_id:
+            # Legacy format: node_name;nvme_nqn;fc_wwns;iscsi_iqn
+            self.node_name = node_id.split(';')[0]
+        else:
+            # New format: just the node name
+            self.node_name = node_id
 
 
 @dataclass

@@ -10,7 +10,9 @@ import controllers.common.settings as common_settings
 from controllers.servers.host_definer.hd_types import DefineHostResponse
 from controllers.servers.utils import (join_object_prefix_with_name,
                                        get_initiators_connectivity_type,
-                                       generate_node_initiators_from_string_data)
+                                       generate_node_initiators_from_string_data,
+                                       get_initiators_from_host_definition,
+                                       get_initiators_with_fallback)
 from controllers.servers.host_definer import messages
 
 logger = get_stdout_logger()
@@ -22,7 +24,10 @@ class HostDefinerServicer:
         array_addresses = array_connection_info.array_addresses
         node_id_info = NodeIdInfo(request.node_id_from_csi_node)
         node_name = node_id_info.node_name
-        initiators = generate_node_initiators_from_string_data(request.node_initiators_from_csi_node)
+        initiators = get_initiators_with_fallback(
+            request.node_initiators_from_csi_node,
+            request.node_id_from_csi_node,
+            "csi node")
         connectivity_type_from_user = get_initiators_connectivity_type(initiators, request.connectivity_type_from_user)
         host_name = join_object_prefix_with_name(prefix=request.prefix, name=node_name)
         logger.info(messages.DEFINE_NODE_ON_ARRAYS.format(node_name, array_addresses))
@@ -30,8 +35,9 @@ class HostDefinerServicer:
             array_type = detect_array_type(array_addresses)
             with get_agent(array_connection_info, array_type).get_mediator() as array_mediator:
                 try:
-                    initiators_from_host_definition = \
-                        generate_node_initiators_from_string_data(request.node_initiators_from_host_definition)
+                    initiators_from_host_definition = get_initiators_from_host_definition(
+                        request.node_initiators_from_host_definition,
+                        request.node_id_from_host_definition)
                     found_host_name = self._get_host_name(initiators_from_host_definition, array_mediator)
                     # Partition update is first one - verifies partition can be fixed (may fail if mapped)
                     self._update_host_partition(request, found_host_name,
@@ -61,7 +67,10 @@ class HostDefinerServicer:
 
     def undefine_host(self, request):
         node_id_info = NodeIdInfo(request.node_id_from_csi_node)
-        initiators = generate_node_initiators_from_string_data(request.node_initiators_from_csi_node)
+        initiators = get_initiators_with_fallback(
+            request.node_initiators_from_csi_node,
+            request.node_id_from_csi_node,
+            "csi node")
         array_connection_info = request.array_connection_info
         array_addresses = array_connection_info.array_addresses
         node_name = node_id_info.node_name
@@ -93,7 +102,10 @@ class HostDefinerServicer:
             raise array_errors.HostNotFoundError(host_name)
 
     def _update_host_ports(self, request, host, array_mediator, partition_name):
-        initiators = generate_node_initiators_from_string_data(request.node_initiators_from_csi_node)
+        initiators = get_initiators_with_fallback(
+            request.node_initiators_from_csi_node,
+            request.node_id_from_csi_node,
+            "csi node")
         connectivity_type_from_user = get_initiators_connectivity_type(initiators, request.connectivity_type_from_user)
         connectivity_type_from_host = array_mediator.get_host_connectivity_type(host)
         if self._is_protocol_switched(connectivity_type_from_user, connectivity_type_from_host):
@@ -137,7 +149,10 @@ class HostDefinerServicer:
 
     def _change_host_protocol_with_chhost(self, array_mediator, host_name, connectivity_type_from_host, request):
         self._remove_host_ports(array_mediator, host_name, connectivity_type_from_host)
-        initiators = generate_node_initiators_from_string_data(request.node_initiators_from_csi_node)
+        initiators = get_initiators_with_fallback(
+            request.node_initiators_from_csi_node,
+            request.node_id_from_csi_node,
+            "csi node")
         connectivity_type_from_user = get_initiators_connectivity_type(initiators, request.connectivity_type_from_user)
         protocol = self._get_host_protocol(connectivity_type_from_user)
         array_mediator.change_host_protocol(host_name, protocol)
@@ -162,7 +177,10 @@ class HostDefinerServicer:
         return connectivity_type == array_config.NVME_OVER_FC_CONNECTIVITY_TYPE
 
     def _create_host(self, host, array_mediator, request):
-        initiators = generate_node_initiators_from_string_data(request.node_initiators_from_csi_node)
+        initiators = get_initiators_with_fallback(
+            request.node_initiators_from_csi_node,
+            request.node_id_from_csi_node,
+            "csi node")
         connectivity_type = get_initiators_connectivity_type(initiators, request.connectivity_type_from_user)
         array_mediator.create_host(host, initiators, connectivity_type, request.io_group,
                                    request.array_connection_info.partition_name,
