@@ -76,10 +76,10 @@ type Executer struct {
 	waitDelay time.Duration
 }
 
-type ExecuterBridge struct {
-	ctx context.Context	*apiCtx
-	e *Executer
-}
+//type ExecuterBridge struct {
+//	ctx context.Context	*apiCtx
+//	e *Executer
+//}
 
 func NewExecuter() *Executer {
 	return &Executer{
@@ -93,7 +93,8 @@ func NewExecuter() *Executer {
 //Status (multipath -ll, iscsiadm -m node)	10KB - 1MB	2MB	Enough for typical node density.
 //nventory (discoverydb, scan)	1MB - 5MB	10MB	Prevents truncation on high-density nodes.
 
-var _ k8sexec.Interface = &ExecuterBridge{}
+//var _ k8sexec.Interface = &ExecuterBridge{}
+var _ k8sexec.Interface = &Executer{}
 var _ k8sexec.Cmd = &safeCmd{}
 
 const DefaultMaxOutput int = 1024 * 1024 // 1MB limit for safety
@@ -143,11 +144,11 @@ type safeCmd struct {
 
 
 // LookPath satisfies k8sexec.Interface
-func (e *ExecuterBridge) LookPath(file string) (string, error) {
+func (e *Executer) LookPath(file string) (string, error) {
 	return exec.LookPath(file)
 }
 
-func (e *ExecuterBridge) CommandContext(ctx context.Context, name string, args ...string) k8sexec.Cmd {
+func (e *Executer) CommandContext(ctx context.Context, name string, args ...string) k8sexec.Cmd {
     realExecutor := k8sexec.New()
     baseCmd := realExecutor.CommandContext(ctx, name, args...)
 
@@ -160,7 +161,7 @@ func (e *ExecuterBridge) CommandContext(ctx context.Context, name string, args .
         }
 }
 
-func (e *ExecuterBridge) Command(name string, args ...string) k8sexec.Cmd {
+func (e *Executer) Command(name string, args ...string) k8sexec.Cmd {
 		// TODO
         logger.Warningf("command %s", name)
         return e.CommandContext(context.Background(), name, args...)
