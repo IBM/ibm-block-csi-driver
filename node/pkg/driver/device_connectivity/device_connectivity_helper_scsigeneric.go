@@ -49,12 +49,12 @@ type OsDeviceConnectivityHelperScsiGenericInterface interface {
 	RescanDevices(lunId int, arrayIdentifiers []string, hostIDs map[int]bool) error
 	GetMpathDevice(volumeId string) (string, error)
 	GetExistingMpathDevice(volumeUuid string, volumePath string) (string, error)
-	RemovePhysicalDevice(sysDevices []string) error
-	RemoveGhostDevice(lexpectedSerial string, expectedLun int, arrayIdentifiers []string) error
-	ValidateLun(targetDm string, lun int, sysDevices []string, expectedSerial string) error
+	RemovePhysicalDevice(ctx context.Context, sysDevices []string) error
+	RemoveGhostDevice(ctx context.Context, expectedSerial string, expectedLun int, arrayIdentifiers []string) error
+	ValidateLun(ctx context.Context, targetDm string, lun int, sysDevices []string, expectedSerial string) error
 	IsVolumePathMatchesVolumeId(volumeId string, volumePath string) (bool, error)
-	TeardownVolume(target string, expectedWWID string) error
-	IdentityAwarePreScan(targetPath string, expectedWWID string) error
+	TeardownVolume(ctx context.Context, target string, expectedWWID string) error
+	IdentityAwarePreScan(ctx context.Context, targetPath string, expectedWWID string) error
 }
 
 type OsDeviceConnectivityHelperScsiGeneric struct {
@@ -104,7 +104,7 @@ type SgIoHeader struct {
 	Info           uint32
 }
 
-
+/*
 type SgIoHeader struct {
 	InterfaceID    int32   // 'S'
 	DxferDirection int32   // e.g., SG_DXFER_FROM_DEV
@@ -137,7 +137,7 @@ type SgIoHeader struct {
 	Duration       uint32
 	Info           uint32
 }
-
+*/
 
 // sgIoHdr is the Linux SG_IO ioctl structure
 // TODO duplicates SgIoHeader
@@ -188,6 +188,7 @@ type DmIoctl struct {
 }
 
 
+/*
 type DmIoctl struct {
 	VersionMajor uint32 // RHEL 7 expects 4
 	VersionMinor uint32 // RHEL 7 expects 0
@@ -204,7 +205,7 @@ type DmIoctl struct {
 	Uuid         [129]byte
 	_            [7]byte // Padding to align the entire struct to 8 bytes
 }
-
+*/
 
 const (
 	// Correct OpCode for DM_DEV_REMOVE (Cmd 0x04)
@@ -242,6 +243,7 @@ var DM_DEV_STATUS = iowr(DM_IOCTL, DM_DEV_STATUS_CMD, uint32(unsafe.Sizeof(dmIoc
 
 // dmIoctl matches the C struct dm_ioctl from <linux/dm-ioctl.h>
 // This layout is stable for RHEL 7 and later
+/*
 type dmIoctl struct {
 	VersionMajor uint32
 	VersionMinor uint32
@@ -258,6 +260,7 @@ type dmIoctl struct {
 	Uuid         [DM_UUID_LEN]byte
 	Data         [7]byte // Padding to align
 }
+*/
 
 // iowr helper to calculate ioctl command values based on direction, type, nr, and size
 func iowr(t, nr, size uint32) uintptr {
@@ -271,12 +274,12 @@ func iowr(t, nr, size uint32) uintptr {
 const (
 	DM_IOCTL_CONTROL    = "/dev/mapper/control"
 	DM_VERSION          = 0xc138fd00
-	DM_DEV_REMOVE       = 0xc138fd04
-	DM_DEV_SUSPEND      = 0xc138fd06
+	//DM_DEV_REMOVE       = 0xc138fd04
+	//DM_DEV_SUSPEND      = 0xc138fd06
 	DM_DEV_RESUME       = 0xc138fd06 // Resume is Suspend with flags=0
 	DM_TABLE_LOAD       = 0xc138fd09
 	
-	DM_DEFERRED_REMOVE  = 1 << 17
+	//DM_DEFERRED_REMOVE  = 1 << 17
 	DM_SKIP_LOCKFS_FLAG = 1 << 10
 )
 
@@ -488,7 +491,7 @@ func isNvmeDevice(dmPath string, executer executer.ExecuterInterface) bool {
 func (r OsDeviceConnectivityHelperScsiGeneric) GetMpathDevice(volumeId string) (string, error) {
 
 	logger.Infof("GetMpathDevice: Searching multipath devices for volume : [%s] ", volumeId)
-	dmPath, _ := r.Helper.GetMpathDeviceName(volumeId)	
+	//dmPath, _ := r.Helper.GetMpathDeviceName(volumeId)	
 	volumeIdVariations := r.Helper.GetVolumeIdVariations(volumeId)
 	
 
@@ -570,10 +573,10 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) flushDeviceBuffers(ctx context.C
 	}
 }
 
-func (r OsDeviceConnectivityHelperScsiGeneric) flushDevicesBuffers(deviceNames []string) error {
+func (r OsDeviceConnectivityHelperScsiGeneric) flushDevicesBuffers(ctx context.Context, deviceNames []string) error {
 	logger.Debugf("executing commands : {%v %v} on devices : {%v} and timeout : {%v} mseconds", blockDevCmd, flushBufsFlag, deviceNames, TimeOutBlockDevCmd)
 	for _, deviceName := range deviceNames {
-		err := r.flushDeviceBuffers(deviceName)
+		err := r.flushDeviceBuffers(ctx, deviceName)
 		if err != nil {
 			return err
 		}
@@ -607,7 +610,7 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) RemovePhysicalDevice(ctx context
 				30*time.Second,
 				func(ctx context.Context) (struct{}, error) {
 					devPath := fmt.Sprintf("/dev/%s", name)
-					_ = r.flushDeviceBuffers(devPath)
+					_ = r.flushDeviceBuffers(ctx, devPath)
 
 					var deletePath string
 					if strings.HasPrefix(name, "nvme") {
@@ -813,7 +816,7 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) RemoveGhostDevice(ctx context.Co
 		// Fix: getHardwareSerial returns (string, error). Added hwErr handling.
 		hwSerial, hwErr := r.getHardwareSerial(deviceDir)
 
-		isGhost, _ := r.IsGhostDevice(sgName)
+		isGhost, _ := r.IsGhostDevice(ctx, sgName)
 
 		// Logic: Prune if it's an IBM Ghost OR if it's a path we own but the hardware ID is wrong.
 		shouldDelete := (isGhost && isIBM) || (isOurPath && (isGhost || !isIBM || (hwSerial != "" && !r.IsSerialMatch(hwSerial, expectedSerial))))
@@ -1094,7 +1097,7 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) IsGhostDevice(ctx context.Contex
 
 	// 1. Sysfs Fast-Check (Requirement 4: No process forks)
 	// Use the context-aware readSysfs we defined earlier
-	state := r.readSysfs(ctx, fmt.Sprintf("/sys/class/scsi_generic/%s/device/state", sgName))
+	state := r.readSysfs(fmt.Sprintf("/sys/class/scsi_generic/%s/device/state", sgName))
 	// 'offline' or 'deleting' means the kernel has already severed ties
 	if state == "offline" || state == "cancelled" || state == "deleting" {
 		// TODO should we consider cancelled
@@ -1104,6 +1107,8 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) IsGhostDevice(ctx context.Contex
 	if state == "blocked" || state == "quiesce" {
 		return false, fmt.Errorf("device %s is blocked; cannot verify ghost status", sgName)
 	}
+
+	deviceBase := fmt.Sprintf("/sys/class/scsi_generic/%s/device", sgName)
 	
 	// 2. Type 31 Check (PQ=1 mapped to Type 31)
 	typeBytes, err := os.ReadFile(filepath.Join(deviceBase, "type"))
@@ -1388,7 +1393,7 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) TeardownVolume(ctx context.Conte
 				5*time.Second,
 				30*time.Second,
 				func(ctx context.Context) (struct{}, error) {
-					err := r.flushDeviceBuffers(fmt.Sprintf("/dev/mapper/%s", mpathName))
+					err := r.flushDeviceBuffers(ctx, fmt.Sprintf("/dev/mapper/%s", mpathName))
 					return struct{}{}, err
 				},
 			)
@@ -1703,7 +1708,7 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) IdentityAwarePreScan(ctx context
 	// CASE 2: Unmounted Zombie Device
 	if mpathName != "" {
 		// Before checking OpenCount, ensure we aren't queuing I/O to a dead map
-		_ = r.multipathdAction("disablequeueing map " + mpathName)
+		_ = r.multipathdAction(ctx, "disablequeueing map " + mpathName)
 
 		openCount, err := r.Helper.GetOpenCount(mpathName)
 		if err != nil {
@@ -1711,7 +1716,7 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) IdentityAwarePreScan(ctx context
 		}
 		if openCount == 0 {
 			// Clean fresh start
-			_ = r.multipathdAction("del map " + mpathName)
+			_ = r.multipathdAction(ctx, "del map " + mpathName)
 		} else {
 			// Device is busy (e.g. by an old LVM scan or udev).
 			// Schedule for deletion the moment it's released.
@@ -1722,13 +1727,13 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) IdentityAwarePreScan(ctx context
 	// CASE 2: Unmounted Zombie Device (Cleanup DM/Multipath leftovers)
 	if mpathName != "" {
 		// Stop I/O queuing to prevent D-state hangs during deletion
-		_ = r.multipathdAction("disablequeueing map " + mpathName)
+		_ = r.multipathdAction(ctx, "disablequeueing map " + mpathName)
 
 		openCount, err := r.Helper.GetOpenCount(mpathName)
 		if err == nil {
 			if openCount <= 0 {
 				// Clean fresh start: No one is using it
-				_ = r.multipathdAction("del map " + mpathName)
+				_ = r.multipathdAction(ctx, "del map " + mpathName)
 			} else {
 				// Device is busy (LVM/udev). Use Deferred Remove for RHEL 7 safety.
 				_ = r.dmIoctlCall(ctx, mpathName, DM_DEV_REMOVE, DM_DEFERRED_REMOVE)
@@ -1768,7 +1773,7 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) FinalWwidPurge(expectedWWID stri
 			10*time.Second,               // hardTimeout: return error to caller
 			func(ctx context.Context) (struct{}, error) {
 				// 1. Primary Method: Socket call to multipathd
-				if err := r.multipathdAction("del map " + mpathName); err != nil {
+				if err := r.multipathdAction(ctx, "del map " + mpathName); err != nil {
 					// 2. Fallback: If socket fails, try a deferred removal
 					// Note: deferredRemove likely triggers a kernel-level 'delete'
 					if errDeffered := r.deferredRemove(mpathName); errDeffered != nil {
@@ -1848,7 +1853,7 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) FinalWwidPurge(expectedWWID stri
 				}
 
 				// 2. Fail Path (Socket call to multipathd)
-				_ = r.multipathdAction("fail path " + name)
+				_ = r.multipathdAction(ctx, "fail path " + name)
 
 				// 3. Flush Buffers (Highest risk of D-state hang)
 				// Use the context provided by the worker if flushDeviceBuffers supports it
@@ -1945,8 +1950,8 @@ func (r OsDeviceConnectivityHelperScsiGeneric) VerifyAndGetDmDevice(devName stri
 	return targetDm, nil
 }
 
-func (r *OsDeviceConnectivityHelperScsiGeneric) multipathdAction(cmd string) error {
-	response, err := r.Executer.MultipathdCmd("", cmd)
+func (r *OsDeviceConnectivityHelperScsiGeneric) multipathdAction(ctx context.Context, cmd string) error {
+	response, err := r.Executer.MultipathdCmd(ctx, "", cmd)
 
 	if err != nil {
 		return err
