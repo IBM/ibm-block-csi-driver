@@ -17,6 +17,7 @@
 package device_connectivity
 
 import (
+	"context"
 	"fmt"
 	"strings"
 
@@ -115,6 +116,7 @@ func (r OsDeviceConnectivityNvmeOFc) EnsureLogin(ctx context.Context, ipsByArray
 			}
 
 			logger.Infof("NVMe-oFC EnsureLogin: connecting NQN=%s target=%s host=%s",
+				subNqn, arrayTargetPort, hostPort)
 
 			// Req 4: Direct write to /dev/nvme-fabrics via nvmeConnect
 			if r.nvmeConnect(ctx, arrayTargetPort, hostPort, subNqn) {
@@ -342,7 +344,6 @@ func (r OsDeviceConnectivityNvmeOFc) parseAddressField(raw string) string {
 	}
 	return raw
 }
-}
 
 // extractNvmeField extracts a field value from an nvme list-subsys path line.
 // e.g. extractNvmeField(line, "traddr=") returns "nn-5005...:pn-5005..."
@@ -547,7 +548,7 @@ func (r OsDeviceConnectivityNvmeOFc) readFCPortPairDirect(portPath string) (stri
 	portName, err := readFn(portPath)
 	if err != nil {
 		logger.Warningf("NVMe-oFC getHostFCPorts: cannot read %s: %v", portPath, err)
-		continue
+		return "", err
 	}
 	
 	if err != nil || portName == "" {
@@ -558,12 +559,12 @@ func (r OsDeviceConnectivityNvmeOFc) readFCPortPairDirect(portPath string) (stri
 	
 	if err != nil {
 		logger.Warningf("NVMe-oFC getHostFCPorts: cannot read %s: %v", nodePath, err)
-		continue
+		return "", err
 	}
 	
 	if portName == "" || nodeName == "" {
 		logger.Warningf("NVMe-oFC getHostFCPorts: empty port/node name at %s, skipping", hostDir)
-		continue
+		return "", err
 	}
 	
 
