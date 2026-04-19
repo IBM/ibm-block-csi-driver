@@ -94,10 +94,20 @@ def _get_array_connection_info_from_system_info(secrets, system_id):
                                partition_name=partition_name, partition_vg=partition_vg, port_set=port_set)
 
 
-def get_node_initiators_data(node_name):
+def get_node_initiators_data(node_name, node_id=None):
     """
-    Return value example:
-    '{"fc":[],"iscsi":["iqn.2016-04.com.open-iscsi:8bce7b6eab12"],"nvmeofc":[]}'
+    Get node initiators data from node annotations or legacy node_id format.
+    
+    In upgrade scenarios, initiators may be in node annotations (new way)
+    or embedded in the node_id from CSI node (legacy way).
+    
+    Args:
+        node_name: Name of the node
+        node_id: Optional node_id from CSI node (may contain legacy format initiators)
+    
+    Returns:
+        JSON string with initiators, e.g.:
+        '{"fc":[],"iscsi":["iqn.2016-04.com.open-iscsi:8bce7b6eab12"],"nvmeofc":[]}'
     """
     initiators_data = ''
     kubernetes_manager = KubernetesManager()
@@ -105,8 +115,24 @@ def get_node_initiators_data(node_name):
     k8s_node = core_api.read_node(name=node_name)
     if k8s_node:
         node_annotations = k8s_node.metadata.annotations
-        initiators_data = node_annotations.get(settings.NODE_INITIATORS_FIELD, "{}")
-    return initiators_data
+        initiators_data = node_annotations.get(settings.NODE_INITIATORS_FIELD, "")
+    
+    # If no initiators in annotations and we have a node_id, try legacy format
+    if not initiators_data and node_id:
+        logger.info(f"No initiators in node annotations for {node_name}, trying legacy node_id format")
+        legacy_initiators = _parse_initiators_from_legacy_node_id(node_id)
+        if legacy_initiators:
+            # Convert Initiators object to JSON format
+            import json
+            initiators_dict = {
+                array_settings.NVME_OVER_FC_CONNECTIVITY_TYPE: legacy_initiators.nvme_nqns,
+                array_settings.FC_CONNECTIVITY_TYPE: legacy_initiators.fc_wwns,
+                array_settings.ISCSI_CONNECTIVITY_TYPE: legacy_initiators.iscsi_iqns
+            }
+            initiators_data = json.dumps(initiators_dict)
+            logger.info(f"Successfully parsed initiators from legacy node_id for {node_name}")
+    
+    return initiators_data if initiators_data else "{}"
 
 
 def generate_node_initiators_from_string_data(initiators_data):
@@ -199,6 +225,14 @@ def get_initiators_with_fallback(node_initiators_str, node_id_str, source_descri
     # Return empty initiators if nothing found
     logger.warning(f"No initiators found in {source_description} (new or legacy format)")
     return Initiators([], [], [])
+
+
+def get_initiators_from_csi_node(node_initiators_str, node_id_str):
+    """
+    Get initiators from host definition, handling both new and legacy formats.
+    Wrapper around get_initiators_with_fallback for host definitions.
+    """
+    return get_initiators_with_fallback(node_initiators_str, node_id_str, "csi node")
 
 
 def get_initiators_from_host_definition(node_initiators_str, node_id_str):

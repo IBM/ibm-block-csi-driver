@@ -112,7 +112,9 @@ class KubernetesManager():
         csi_node_info = CsiNodeInfo()
         csi_node_info.name = k8s_csi_node.metadata.name
         csi_node_info.node_id = self._get_node_id_from_k8s_csi_node(k8s_csi_node)
-        csi_node_info.node_initiators = controllers_utils.get_node_initiators_data(csi_node_info.name)
+        # Pass node_id to support legacy format where initiators are embedded in node_id
+        csi_node_info.node_initiators = controllers_utils.get_node_initiators_data(
+            csi_node_info.name, csi_node_info.node_id)
         return csi_node_info
 
     def _get_node_id_from_k8s_csi_node(self, k8s_csi_node):
