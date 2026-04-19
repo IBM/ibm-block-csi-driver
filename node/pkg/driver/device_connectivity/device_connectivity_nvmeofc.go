@@ -614,8 +614,8 @@ func (r OsDeviceConnectivityNvmeOFc) GetMpathDevice(volumeId string) (string, er
 	return r.HelperScsiGeneric.GetMpathDevice(volumeId)
 }
 
-func (r OsDeviceConnectivityNvmeOFc) FlushMultipathDevice(mpathDevice string) error {
-	return r.HelperScsiGeneric.FlushMultipathDevice(mpathDevice)
+func (r OsDeviceConnectivityNvmeOFc) FlushMultipathDevice(ctx context.Context, mpathDevice string) error {
+	return r.HelperScsiGeneric.FlushMultipathDevice(ctx, mpathDevice)
 }
 
 func (r OsDeviceConnectivityNvmeOFc) RemovePhysicalDevice(sysDevices []string) error {
