@@ -217,6 +217,7 @@ func (s *safeCmd) Start() error {
             logger.Warning("start")
          } else {
              logger.Warning("failed to start %v", err)
+	}
 }
 
 
