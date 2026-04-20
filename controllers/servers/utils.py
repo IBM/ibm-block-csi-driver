@@ -974,7 +974,7 @@ def _get_connectivity_type_by_initiators(initiators):
     return None
 
 
-def     get_initiators_connectivity_type(initiators, connectivity_type):
+def get_initiators_connectivity_type(initiators, connectivity_type):
     if not connectivity_type:
         connectivity_type = _get_connectivity_type_by_initiators(initiators)
     return connectivity_type

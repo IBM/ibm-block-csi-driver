@@ -405,8 +405,10 @@ class TestUtils(unittest.TestCase):
 
     def test_get_node_id_info_legacy_format(self):
         """Test NodeIdInfo with legacy format (node_name;nvme_nqn;fc_wwns;iscsi_iqn)"""
-        legacy_node_id = "host-name;nqn.2014-08.org.nvmexpress:uuid:b57708c7;" \
-        "10000000c9934d9f:10000000c9934d9h;iqn.1994-07.com.redhat:e123456789"
+        legacy_node_id = (
+            "host-name;nqn.2014-08.org.nvmexpress:uuid:b57708c7;"
+            "10000000c9934d9f:10000000c9934d9h;iqn.1994-07.com.redhat:e123456789"
+        )
         node_id_info = NodeIdInfo(legacy_node_id)
         self._check_node_id_parameters(node_id_info)
 
