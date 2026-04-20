@@ -269,6 +269,7 @@ class Watcher(KubernetesManager):
             # Since CSI-5997, initiators are extracted from k8s node annoatations (not from k&s csinode nodeID).
             # However, They are still stored at CsiNodeInfo and ManagedNode (see hd_types.py)
             request.io_group = self._get_io_group_by_node(host_definition_info.node_name)
+        logger.info(request)
         return request
 
     def _get_new_request(self, labels):
