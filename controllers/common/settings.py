@@ -12,6 +12,7 @@ ARRAY_TYPE_DS8K = 'DS8K'
 ALL_ARRAY_TYPES = [ARRAY_TYPE_XIV, ARRAY_TYPE_SVC, ARRAY_TYPE_DS8K]
 
 PARAMETERS_NODE_ID_DELIMITER = config.parameters.node_id_info.delimiter
+PARAMETERS_FCS_DELIMITER = config.parameters.node_id_info.fcs_delimiter
 SPACE_EFFICIENCY_THIN = "thin"
 SPACE_EFFICIENCY_COMPRESSED = "compressed"
 SPACE_EFFICIENCY_DEDUPLICATED = "deduplicated"

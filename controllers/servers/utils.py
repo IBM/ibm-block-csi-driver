@@ -164,7 +164,7 @@ def _parse_initiators_from_legacy_node_id(node_id):
         Initiators object or None if parsing fails
     """
     try:
-        split_node = node_id.split(';')
+        split_node = node_id.split(settings.PARAMETERS_NODE_ID_DELIMITER)
         if len(split_node) < 2:
             # Not in legacy format
             return None
@@ -177,7 +177,7 @@ def _parse_initiators_from_legacy_node_id(node_id):
             nvme_nqn = split_node[1]
         if len(split_node) >= 3:
             fc_wwns_str = split_node[2]
-            fc_wwns = fc_wwns_str.split(':') if fc_wwns_str else []
+            fc_wwns = fc_wwns_str.split(settings.PARAMETERS_FCS_DELIMITER) if fc_wwns_str else []
         if len(split_node) >= 4:
             iscsi_iqn = split_node[3]
 
