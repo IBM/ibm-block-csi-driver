@@ -3,6 +3,7 @@ from dataclasses import dataclass, field
 from controllers.array_action import settings as array_config
 from controllers.common import settings
 
+
 class NodeIdInfo:
     def __init__(self, node_id):
         """

@@ -97,14 +97,14 @@ def _get_array_connection_info_from_system_info(secrets, system_id):
 def get_node_initiators_data(node_name, node_id=None):
     """
     Get node initiators data from node annotations or legacy node_id format.
-    
+
     In upgrade scenarios, initiators may be in node annotations (new way)
     or embedded in the node_id from CSI node (legacy way).
-    
+
     Args:
         node_name: Name of the node
         node_id: Optional node_id from CSI node (may contain legacy format initiators)
-    
+
     Returns:
         JSON string with initiators, e.g.:
         '{"fc":[],"iscsi":["iqn.2016-04.com.open-iscsi:8bce7b6eab12"],"nvmeofc":[]}'
@@ -116,7 +116,7 @@ def get_node_initiators_data(node_name, node_id=None):
     if k8s_node:
         node_annotations = k8s_node.metadata.annotations
         initiators_data = node_annotations.get(settings.NODE_INITIATORS_FIELD, "")
-    
+
     # If no initiators in annotations and we have a node_id, try legacy format
     if not initiators_data and node_id:
         logger.info(f"No initiators in node annotations for {node_name}, trying legacy node_id format")
@@ -131,7 +131,7 @@ def get_node_initiators_data(node_name, node_id=None):
             }
             initiators_data = json.dumps(initiators_dict)
             logger.info(f"Successfully parsed initiators from legacy node_id for {node_name}")
-    
+
     return initiators_data if initiators_data else "{}"
 
 
@@ -974,7 +974,7 @@ def _get_connectivity_type_by_initiators(initiators):
     return None
 
 
-def get_initiators_connectivity_type(initiators, connectivity_type):
+def     get_initiators_connectivity_type(initiators, connectivity_type):
     if not connectivity_type:
         connectivity_type = _get_connectivity_type_by_initiators(initiators)
     return connectivity_type
