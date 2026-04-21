@@ -45,7 +45,7 @@ CHECK_NODE_SHOULD_BE_MANAGED_BY_SECRET = 'Check if node {} should be managed by 
 NODE_SHOULD_BE_MANAGED_ON_SECRET = 'Node {} should be managed by {} secret in {} namespace'
 NODE_SHOULD_NOT_BE_MANAGED_ON_SECRET = 'Node {} should not be managed by {} secret in {} namespace'
 IO_GROUP_CHANGED = 'I/O group changed for node {}, from {} to {}, updating its definitions'
-DEFINE_NODE_ON_ARRAYS = 'Defining node {} on arrays {}'
+DEFINE_HOST_ON_ARRAYS = 'Defining host {} on arrays {}'
 UNDEFINE_NODE_FROM_ARRAYS = 'Undefine node {} from arrays {}'
 NODE_WAS_NOT_FOUND_CREATE_NEW_HOST_DEFINITION = "Node {} was not found."\
     "creating a new host definition with initiators: {}"
@@ -53,7 +53,7 @@ HOST_CREATED = 'Host {} in partition {} created on array [{}], with ports [{}], 
 NODE_WAS_NOT_FOUND = 'Node {} was not found'
 HOST_FOUND = 'host {} found on array'
 HOST_PROTOCOL_SHOULD_BE_CHANGE = 'Host {} protocol should be changed'
-HOST_PORTS_SHOULD_BE_CHANGE = 'Host {} ports should be changed, new initiators: {}'
+HOST_PORTS_SHOULD_BE_CHANGED = 'Host {} ports should be changed, new initiators: {}'
 HOST_FOUND_WITH_DIFFERENT_INITIATOR = 'host {} found but with different initiators: {}'
 CREATED_HOST_DEFINITION = 'Created hostDefinition {}'
 READ_SECRET = 'Reading secret {} in namespace {}'
@@ -64,7 +64,7 @@ UPDATED_CSI_NODE_VS_DESIRED = 'CSINode that was updated [{}] and the desired CSI
 CHECK_IF_CSI_NODE_POD_IS_RUNNING = 'Checking if CSINode pod {} is running'
 FOUND_HOST_DEFINITION_IN_PENDING_STATE = 'Found hostDefinition {} is in pending state'
 CSI_NODE_POD_DELETED_WHILE_HOST_DEFINER_WAS_DOWN = "CSINode pod {} was deleted when the hostDefiner was down,"\
-    "deleting all of his hostDefinitions if it allowed"
+    "deleting all of its hostDefinitions if it allowed"
 DETECTED_UNMANAGED_CSI_NODE_WITH_IBM_BLOCK_CSI_DRIVER = 'Detected unmanaged CSINodes with ibm block csi driver: {}'
 DETECTED_NEW_MANAGED_CSI_NODE = 'Detected new managed CSINodes [{}], defining it on all the managed secrets'
 SECRET_IS_BEING_USED_BY_STORAGE_CLASS = 'Secret {} in namespace {}, it is used by storageClass {}'
