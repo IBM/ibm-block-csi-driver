@@ -29,7 +29,7 @@ class HostDefinerServicer:
             request.node_id_from_csi_node)
         connectivity_type_from_user = get_initiators_connectivity_type(initiators, request.connectivity_type_from_user)
         host_name = join_object_prefix_with_name(prefix=request.prefix, name=node_name)
-        logger.info(messages.DEFINE_NODE_ON_ARRAYS.format(node_name, array_addresses))
+        logger.info(messages.DEFINE_HOST_ON_ARRAYS.format(node_name, array_addresses))
         try:
             array_type = detect_array_type(array_addresses)
             with get_agent(array_connection_info, array_type).get_mediator() as array_mediator:

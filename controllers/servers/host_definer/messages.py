@@ -45,7 +45,7 @@ CHECK_NODE_SHOULD_BE_MANAGED_BY_SECRET = 'Check if node {} should be managed by 
 NODE_SHOULD_BE_MANAGED_ON_SECRET = 'Node {} should be managed by {} secret in {} namespace'
 NODE_SHOULD_NOT_BE_MANAGED_ON_SECRET = 'Node {} should not be managed by {} secret in {} namespace'
 IO_GROUP_CHANGED = 'I/O group changed for node {}, from {} to {}, updating its definitions'
-DEFINE_NODE_ON_ARRAYS = 'Defining node {} on arrays {}'
+DEFINE_HOST_ON_ARRAYS = 'Defining host {} on arrays {}'
 UNDEFINE_NODE_FROM_ARRAYS = 'Undefine node {} from arrays {}'
 NODE_WAS_NOT_FOUND_CREATE_NEW_HOST_DEFINITION = "Node {} was not found."\
     "creating a new host definition with initiators: {}"
