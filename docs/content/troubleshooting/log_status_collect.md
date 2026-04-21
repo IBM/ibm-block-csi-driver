@@ -24,7 +24,7 @@ kubectl describe -n <namespace> pod/<pod-name>
 ```bash
 ./ibm-block-csi-logs-collector.sh
 ```
-The script can be found here: https://github.com/IBM/ibm-block-csi-driver/tree/release-1.13.1/scripts/ibm-block-csi-logs-collector.sh
+The script can be found here: https://github.com/IBM/ibm-block-csi-driver/tree/release-1.13.2/scripts/ibm-block-csi-logs-collector.sh
 * Collects: resources, logs, events, node-diagnostics
 * Does not collect: storage, workload
 * Scope: entire cluster
