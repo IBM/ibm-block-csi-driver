@@ -1372,7 +1372,7 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) TeardownVolume(ctx context.Conte
 			// Rescue Sequence: Swap hung device for a "Fail Fast" error device
 			_ = r.dmIoctlCall(ctx, mpathName, DM_DEV_SUSPEND, DM_SKIP_LOCKFS_FLAG)
 
-			sizeStr := r.readSysfs(ctx, fmt.Sprintf("/sys/class/block/%s/size", mpathName))
+			sizeStr := r.readSysfs(fmt.Sprintf("/sys/class/block/%s/size", mpathName))
 			errorTable := fmt.Sprintf("0 %s error", strings.TrimSpace(sizeStr))
 
 			_ = r.dmIoctlLoadTable(ctx, mpathName, errorTable)
