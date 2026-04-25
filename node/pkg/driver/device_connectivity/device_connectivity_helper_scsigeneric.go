@@ -53,7 +53,7 @@ type OsDeviceConnectivityHelperScsiGenericInterface interface {
 	RemovePhysicalDevice(ctx context.Context, sysDevices []string) error
 	RemoveGhostDevice(ctx context.Context, expectedSerial string, expectedLun int, arrayIdentifiers []string) error
 	ValidateLun(ctx context.Context, targetDm string, lun int, sysDevices []string, expectedSerial string) error
-	IsVolumePathMatchesVolumeId(volumeId string, volumePath string) (bool, error)
+	IsVolumePathMatchesVolumeId(ctx context.Context, volumeId string, volumePath string) (bool, error)
 	TeardownVolume(ctx context.Context, target string, expectedWWID string) error
 	IdentityAwarePreScan(ctx context.Context, targetPath string, expectedWWID string) error
 }
@@ -2764,9 +2764,10 @@ func (o *OsDeviceConnectivityHelperGeneric) MatchVolumeWWID(targetWWID string, c
 	return false
 }
 
-func (o *OsDeviceConnectivityHelperGeneric) GetMpathdOutputForVolume(volumeIdVariations []string,
+// UNUSED
+func (o *OsDeviceConnectivityHelperGeneric) GetMpathdOutputForVolume(ctx context.Context, volumeIdVariations []string,
 	multipathdCommandFormatArgs []string) (string, error) {
-	mpathdOutput, err := o.Helper.WaitForDmToExist(volumeIdVariations, WaitForMpathRetries,
+	mpathdOutput, err := o.Helper.WaitForDmToExist(ctx, volumeIdVariations, WaitForMpathRetries,
 		WaitForMpathWaitIntervalSec)
 	if err != nil {
 		return "", err
