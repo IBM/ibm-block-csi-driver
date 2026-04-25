@@ -85,11 +85,11 @@ func (r OsDeviceConnectivityFc) RescanDevices(lunId int, arrayIdentifiers []stri
 	return r.HelperScsiGeneric.RescanDevices(lunId, arrayIdentifiers, hostIDs)
 }
 
-func (r OsDeviceConnectivityFc) GetMpathDevice(volumeId string) (string, error) {
+func (r OsDeviceConnectivityFc) GetMpathDevice(ctx context.Context, volumeId string) (string, error) {
 	/*
 	   Return Value: "dm-X" of the volumeID.
 	*/
-	return r.HelperScsiGeneric.GetMpathDevice(volumeId)
+	return r.HelperScsiGeneric.GetMpathDevice(ctx, volumeId)
 }
 
 func (r OsDeviceConnectivityFc) FlushMultipathDevice(ctx context.Context, mpathDevice string) error {
