@@ -660,7 +660,7 @@ func (d *NodeService) NodeGetVolumeStats(ctx context.Context, req *csi.NodeGetVo
 		return nil, status.Errorf(codes.NotFound, "volume path %q does not exist", volumePath)
 	}
 
-	volumeStats, err := d.getVolumeStats(volumePathWithHostPrefix, volumeId)
+	volumeStats, err := d.getVolumeStats(ctx, olumePathWithHostPrefix, volumeId)
 	if err != nil {
 		return nil, err
 	}
@@ -694,7 +694,7 @@ func (d *NodeService) nodeGetVolumeStatsRequestValidation(volumeId string, volum
 	return nil
 }
 
-func (d *NodeService) getVolumeStats(path string, volumeId string) (VolumeStatistics, error) {
+func (d *NodeService) getVolumeStats(ctx context.Context, path string, volumeId string) (VolumeStatistics, error) {
 	var volumeStats VolumeStatistics
 	isBlock, err := d.NodeUtils.IsBlock(path)
 	if err != nil {
@@ -713,7 +713,7 @@ func (d *NodeService) getVolumeStats(path string, volumeId string) (VolumeStatis
 		}
 	} else {
 		volumeUuid := d.NodeUtils.GetVolumeUuid(volumeId)
-		isVolumePathMatchesVolumeId, err := d.OsDeviceConnectivityHelper.IsVolumePathMatchesVolumeId(volumeUuid, path)
+		isVolumePathMatchesVolumeId, err := d.OsDeviceConnectivityHelper.IsVolumePathMatchesVolumeId(ctx, volumeUuid, path)
 		if err != nil {
 			return VolumeStatistics{}, status.Errorf(codes.Internal,
 				"Failed to determine if volume id [%q], is accessible on volume path [%q], error: %s",
