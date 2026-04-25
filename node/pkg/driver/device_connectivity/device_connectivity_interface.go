@@ -25,7 +25,7 @@ import (
 type OsDeviceConnectivityInterface interface {
 	EnsureLogin(ipsByArrayIdentifier map[string][]string)    // For iSCSI login
 	RescanDevices(lunId int, arrayIdentifier []string) error // For NVME lunID will be namespace ID.
-	GetMpathDevice(volumeId string) (string, error)
+	GetMpathDevice(ctx context.Context, volumeId string) (string, error)
 	FlushMultipathDevice(ctx context.Context, mpathDevice string) error
 	RemovePhysicalDevice(ctx context.Context, sysDevices []string) error
 	RemoveGhostDevice(ctx context.Context, expectedSerial string, expectedLun int, arrayIdentifiers []string) error

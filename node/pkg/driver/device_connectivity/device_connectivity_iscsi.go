@@ -547,27 +547,27 @@ func (r OsDeviceConnectivityIscsi) RescanDevices(lunId int, arrayIdentifiers []s
 	return r.HelperScsiGeneric.RescanDevices(lunId, arrayIdentifiers, hostIDs)
 }
 
-func (r OsDeviceConnectivityIscsi) GetMpathDevice(volumeId string) (string, error) {
+func (r OsDeviceConnectivityIscsi) GetMpathDevice(ctx context.Context, volumeId string) (string, error) {
 	/*
 	   Return Value: "dm-X" of the volumeID.
 	*/
-	return r.HelperScsiGeneric.GetMpathDevice(volumeId)
+	return r.HelperScsiGeneric.GetMpathDevice(ctx, volumeId)
 }
 
 func (r OsDeviceConnectivityIscsi) FlushMultipathDevice(ctx context.Context, mpathDevice string) error {
 	return r.HelperScsiGeneric.FlushMultipathDevice(ctx, mpathDevice)
 }
 
-func (r OsDeviceConnectivityIscsi) RemovePhysicalDevice(sysDevices []string) error {
-	return r.HelperScsiGeneric.RemovePhysicalDevice(sysDevices)
+func (r OsDeviceConnectivityIscsi) RemovePhysicalDevice(ctx context.Context, sysDevices []string) error {
+	return r.HelperScsiGeneric.RemovePhysicalDevice(ctx, sysDevices)
 }
 
-func (r OsDeviceConnectivityIscsi) RemoveGhostDevice(expectedSerial string, expectedLun int, arrayIdentifiers []string) error {
-	return r.HelperScsiGeneric.RemoveGhostDevice(expectedSerial, expectedLun, arrayIdentifiers)
+func (r OsDeviceConnectivityIscsi) RemoveGhostDevice(ctx context.Context, expectedSerial string, expectedLun int, arrayIdentifiers []string) error {
+	return r.HelperScsiGeneric.RemoveGhostDevice(ctx, expectedSerial, expectedLun, arrayIdentifiers)
 }
 
-func (r OsDeviceConnectivityIscsi) ValidateLun(targetDm string, lun int, sysDevices []string, expectedSerial string) error {
-	return r.HelperScsiGeneric.ValidateLun(targetDm, lun, sysDevices, expectedSerial)
+func (r OsDeviceConnectivityIscsi) ValidateLun(ctx context.Context, targetDm string, lun int, sysDevices []string, expectedSerial string) error {
+	return r.HelperScsiGeneric.ValidateLun(ctx, targetDm, lun, sysDevices, expectedSerial)
 }
 
 // Helper function to be used to extract canonical ID

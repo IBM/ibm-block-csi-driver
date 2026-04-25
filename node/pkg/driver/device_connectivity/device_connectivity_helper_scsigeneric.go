@@ -17,6 +17,7 @@
 package device_connectivity
 
 import (
+	"bufio"
 	"context"
 	"encoding/binary"
 	"errors"
@@ -47,8 +48,8 @@ type OsDeviceConnectivityHelperScsiGenericInterface interface {
 	*/
 	RescanDevicesGetHostIds(lunId int, arrayIdentifiers []string) (map[int]bool, error)
 	RescanDevices(lunId int, arrayIdentifiers []string, hostIDs map[int]bool) error
-	GetMpathDevice(volumeId string) (string, error)
-	GetExistingMpathDevice(volumeUuid string, volumePath string) (string, error)
+	GetMpathDevice(ctx context.Context, volumeId string) (string, error)
+	GetExistingMpathDevice(ctx context.Context, volumeUuid string, volumePath string) (string, error)
 	RemovePhysicalDevice(ctx context.Context, sysDevices []string) error
 	RemoveGhostDevice(ctx context.Context, expectedSerial string, expectedLun int, arrayIdentifiers []string) error
 	ValidateLun(ctx context.Context, targetDm string, lun int, sysDevices []string, expectedSerial string) error
@@ -333,16 +334,16 @@ func NewOsDeviceConnectivityHelperScsiGeneric(executer executer.ExecuterInterfac
 	}
 }
 
-func (r OsDeviceConnectivityHelperScsiGeneric) IsVolumePathMatchesVolumeId(volumeUuid string, volumePath string) (bool, error) {
+func (r OsDeviceConnectivityHelperScsiGeneric) IsVolumePathMatchesVolumeId(ctx context.Context, volumeUuid string, volumePath string) (bool, error) {
 	logger.Infof("IsVolumePathMatchesVolumeId: Searching matching volume id for volume path: [%s] ", volumePath)
 	volumeIdVariations := r.Helper.GetVolumeIdVariations(volumeUuid)
 
-	mpathDeviceName, err := r.Helper.GetMpathDeviceName(volumePath)
+	mpathDeviceName, err := r.Helper.GetMpathDeviceName(ctx, volumePath)
 	if err != nil {
 		return false, err
 	}
 
-	SgInqWwn, err := r.Helper.GetWwnByScsiInq(mpathDeviceName)
+	SgInqWwn, err := r.Helper.GetWwnByScsiInq(ctx, mpathDeviceName)
 	if err != nil {
 		return false, err
 	}
@@ -354,11 +355,11 @@ func (r OsDeviceConnectivityHelperScsiGeneric) IsVolumePathMatchesVolumeId(volum
 	return true, nil
 }
 
-func (r OsDeviceConnectivityHelperScsiGeneric) GetExistingMpathDevice(volumeUuid string, volumePath string) (string, error) {
+func (r OsDeviceConnectivityHelperScsiGeneric) GetExistingMpathDevice(ctx context.Context, volumeUuid string, volumePath string) (string, error) {
         logger.Infof("GetExistingMpathDevice: Searching matching volume id for volume path: [%s] ", volumePath)
         //volumeIdVariations := r.Helper.GetVolumeIdVariations(volumeUuid)
 
-        mpathDeviceName, err := r.Helper.GetMpathDeviceName(volumePath)
+        mpathDeviceName, err := r.Helper.GetMpathDeviceName(ctx, volumePath)
         if err != nil {
                return "", err
        }
@@ -488,14 +489,14 @@ func isNvmeDevice(dmPath string, executer executer.ExecuterInterface) bool {
 	return result
 }
 
-func (r OsDeviceConnectivityHelperScsiGeneric) GetMpathDevice(volumeId string) (string, error) {
+func (r OsDeviceConnectivityHelperScsiGeneric) GetMpathDevice(ctx context.Context, volumeId string) (string, error) {
 
 	logger.Infof("GetMpathDevice: Searching multipath devices for volume : [%s] ", volumeId)
 	//dmPath, _ := r.Helper.GetMpathDeviceName(volumeId)	
 	volumeIdVariations := r.Helper.GetVolumeIdVariations(volumeId)
 	
 
-	mpathdOutput, err := r.Helper.WaitForDmToExist(volumeIdVariations, WaitForMpathRetries,
+	mpathdOutput, err := r.Helper.WaitForDmToExist(ctx, volumeIdVariations, WaitForMpathRetries,
 		WaitForMpathWaitIntervalSec)
 	if err != nil {
 		return "", err
@@ -724,7 +725,7 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) ValidateLun(ctx context.Context,
 				"inquiry-"+deviceName,
 				10, 50, 2*time.Second, 10*time.Second,
 				func(wCtx context.Context) (string, error) {
-					return r.Helper.GetWwnByScsiInq("/dev/" + deviceName)
+					return r.Helper.GetWwnByScsiInq(ctx, "/dev/" + deviceName)
 				},
 			)
 		}
@@ -1354,13 +1355,13 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) TeardownVolume(ctx context.Conte
 	mpathName := r.Helper.findDMByWWID(expectedWWID)
 	var major, minor uint32
 	if mpathName != "" {
-		major, minor, _ = r.Helper.GetMajorMinorFromSysfs(mpathName)
+		major, minor, _ = r.Helper.GetMajorMinorFromSysfs(ctx, mpathName)
 	}
 
 	// --- PHASE 2: BLOCK LAYER (Identity & OpenCount) ---
 	if mpathName != "" {
 	
-		openCount, _ := r.Helper.GetOpenCount(mpathName)
+		openCount, _ := r.Helper.GetOpenCount(ctx, mpathName)
 		
 		// TODO should we ignore the error rom GetOpenCount (perhaps return the error)
 		
@@ -1459,26 +1460,29 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) dmIoctlLoadTable(ctx context.Con
 
 
 func (r *OsDeviceConnectivityHelperScsiGeneric) dmIoctlCall(ctx context.Context, name string, op uintptr, flags uint32) error {
-         return executer.ExecuteUninterruptible[struct{}](
-                 ctx, r.KeyedGater, "dm-ioctl-"+name, 1, 10, 1*time.Second, 5*time.Second,
-                 func(wCtx context.Context) (struct{}, error) { // Fixed here
-                        f, err := os.OpenFile(DM_IOCTL_CONTROL, os.O_RDWR, 0)
-			if err != nil { return struct{}{}, err }
-			defer f.Close()
+    // Capture the tuple, discard the struct{}
+    _, err := executer.ExecuteUninterruptible[struct{}](
+        ctx, r.KeyedGater, "dm-ioctl-"+name, 1, 10, 1*time.Second, 5*time.Second,
+        func(wCtx context.Context) (struct{}, error) {
+            f, err := os.OpenFile(DM_IOCTL_CONTROL, os.O_RDWR, 0)
+            if err != nil { return struct{}{}, err }
+            defer f.Close()
 
-			payload := dmIoctl{
-				version:  [3]uint32{4, 0, 0}, // RHEL 7 compatible version
-				dataSize: uint32(unsafe.Sizeof(dmIoctl{})),
-				flags:    flags,
-			}
-			copy(payload.name[:], name)
+            payload := dmIoctl{
+                version:  [3]uint32{4, 0, 0},
+                dataSize: uint32(unsafe.Sizeof(dmIoctl{})),
+                flags:    flags,
+            }
+            copy(payload.name[:], name)
 
-			_, _, errno := unix.Syscall(unix.SYS_IOCTL, f.Fd(), op, uintptr(unsafe.Pointer(&payload)))
-			if errno != 0 && errno != unix.ENXIO { return struct{}{}, errno }
-			return struct{}{}, nil
-		},
-	)
+            _, _, errno := unix.Syscall(unix.SYS_IOCTL, f.Fd(), op, uintptr(unsafe.Pointer(&payload)))
+            if errno != 0 && errno != unix.ENXIO { return struct{}{}, errno }
+            return struct{}{}, nil
+        },
+    )
+    return err // Return the error alone
 }
+
 
 
 
@@ -1498,52 +1502,56 @@ const (
 
 
 func (r *OsDeviceConnectivityHelperScsiGeneric) dmIoctlLoadErrorTable(ctx context.Context, name string, sectorCount uint64) error {
-	return executer.ExecuteUninterruptible[struct{}](
-		ctx, r.KeyedGater, "dm-load-error-"+name, 1, 10, 1*time.Second, 5*time.Second,
-		func(wCtx context.Context) (struct{}, error) {
-			f, err := os.OpenFile(DM_IOCTL_CONTROL, os.O_RDWR, 0)
-			if err != nil { return struct{}{}, err }
-			defer f.Close()
+    // Capture the (struct{}, error) and return only the error
+    _, err := executer.ExecuteUninterruptible[struct{}](
+        ctx, r.KeyedGater, "dm-load-error-"+name, 1, 10, 1*time.Second, 5*time.Second,
+        func(wCtx context.Context) (struct{}, error) {
+            f, err := os.OpenFile(DM_IOCTL_CONTROL, os.O_RDWR, 0)
+            if err != nil { return struct{}{}, err }
+            defer f.Close()
 
-			// 1. Prepare Target Type and Params
-			targetType := "error"
-			// params for error target are usually empty or "0"
-			params := "" 
-			
-			// 2. Calculate sizes and padding (8-byte alignment)
-			specSize := uint32(unsafe.Sizeof(dmTargetSpec{}))
-			paramSize := uint32(len(params) + 1) // null-terminated
-			paddedParamSize := (paramSize + 7) &^ 7
-			totalDataSize := uint32(unsafe.Sizeof(dmIoctl{})) + specSize + paddedParamSize
+                        // 1. Prepare Target Type and Params
+                        targetType := "error"
+                        // params for error target are usually empty or "0"
+                        params := ""
 
-			// 3. Build the combined buffer
-			buf := make([]byte, totalDataSize)
-			
-			// Header
-			header := (*dmIoctl)(unsafe.Pointer(&buf[0]))
-			header.version = [3]uint32{4, 0, 0}
-			header.dataSize = totalDataSize
-			header.dataStart = uint32(unsafe.Sizeof(dmIoctl{}))
-			header.targetCount = 1
-			copy(header.name[:], name)
+                        // 2. Calculate sizes and padding (8-byte alignment)
+                        specSize := uint32(unsafe.Sizeof(dmTargetSpec{}))
+                        paramSize := uint32(len(params) + 1) // null-terminated
+                        paddedParamSize := (paramSize + 7) &^ 7
+                        totalDataSize := uint32(unsafe.Sizeof(dmIoctl{})) + specSize + paddedParamSize
 
-			// Target Spec
-			spec := (*dmTargetSpec)(unsafe.Pointer(&buf[header.dataStart]))
-			spec.sectorStart = 0
-			spec.length = sectorCount
-			spec.next = specSize + paddedParamSize
-			copy(spec.targetType[:], targetType)
+                        // 3. Build the combined buffer
+                        buf := make([]byte, totalDataSize)
 
-			// Params (immediately after spec)
-			copy(buf[header.dataStart+specSize:], params)
+                        // Header
+                        header := (*dmIoctl)(unsafe.Pointer(&buf[0]))
+                        header.version = [3]uint32{4, 0, 0}
+                        header.dataSize = totalDataSize
+                        header.dataStart = uint32(unsafe.Sizeof(dmIoctl{}))
+                        header.targetCount = 1
+                        copy(header.name[:], name)
 
-			// 4. Syscall
-			_, _, errno := unix.Syscall(unix.SYS_IOCTL, f.Fd(), DM_TABLE_LOAD, uintptr(unsafe.Pointer(&buf[0])))
-			if errno != 0 { return struct{}{}, errno }
-			return struct{}{}, nil
-		},
-	)
+                        // Target Spec
+                        spec := (*dmTargetSpec)(unsafe.Pointer(&buf[header.dataStart]))
+                        spec.sectorStart = 0
+                        spec.length = sectorCount
+                        spec.next = specSize + paddedParamSize
+                        copy(spec.targetType[:], targetType)
+
+                        // Params (immediately after spec)
+                        copy(buf[header.dataStart+specSize:], params)
+
+
+
+            _, _, errno := unix.Syscall(unix.SYS_IOCTL, f.Fd(), DM_TABLE_LOAD, uintptr(unsafe.Pointer(&buf[0])))
+            if errno != 0 { return struct{}{}, errno }
+            return struct{}{}, nil
+        },
+    )
+    return err
 }
+
 
 
 
@@ -1551,7 +1559,7 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) dmIoctlLoadErrorTable(ctx contex
 func (r *OsDeviceConnectivityHelperScsiGeneric) TeardownRescue(ctx context.Context, mpathName string) error {
     // 1. Check if the device is actually stuck
     // REMOVED ctx based on your compiler error log
-    openCount, _ := r.Helper.GetOpenCount(mpathName) 
+    openCount, _ := r.Helper.GetOpenCount(ctx, mpathName) 
     if openCount <= 0 {
         return r.multipathdAction(ctx, "del map "+mpathName)
     }
@@ -1608,52 +1616,69 @@ func (o *OsDeviceConnectivityHelperGeneric) getSlavesForDevice(major, minor uint
 	return results, nil
 }
 
-func (r *OsDeviceConnectivityHelperScsiGeneric) SwapToErrorTarget(ctx context.Context, name string) error {
-	// Requirement 8: Respect CSI Context
-	if err := ctx.Err(); err != nil { return err }
+type DmTargetSpec struct {
+    SectorStart uint64
+    Length      uint64
+    Status      int32
+    Next        uint32
+    TargetType  [16]byte
+}
 
-	return executer.ExecuteUninterruptible[struct{}](
+func (r *OsDeviceConnectivityHelperScsiGeneric) SwapToErrorTarget(ctx context.Context, name string) error {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+
+	_, err := executer.ExecuteUninterruptible[struct{}](
 		ctx, r.KeyedGater, "dm-hammer-"+name, 1, 10, 2*time.Second, 10*time.Second,
 		func(wCtx context.Context) (struct{}, error) {
 			f, err := os.OpenFile("/dev/mapper/control", os.O_RDWR, 0)
-			if err != nil { return struct{}{}, err }
+			if err != nil {
+				return struct{}{}, err
+			}
 			defer f.Close()
 
-			size, _ := r.Helper.GetBlockDeviceSize(ctx, name)
-			
-			// 1. Setup Sizes
+			sizeStr := r.readSysfs(fmt.Sprintf("/sys/class/block/%s/size", name))
+			// Trim space to avoid parsing errors from sysfs newlines
+			size, err := strconv.ParseUint(strings.TrimSpace(sizeStr), 10, 64)
+			if err != nil {
+				return struct{}{}, fmt.Errorf("failed to parse device size: %w", err)
+			}
+
 			ioctlSize := uint32(unsafe.Sizeof(DmIoctl{}))
 			specSize := uint32(unsafe.Sizeof(DmTargetSpec{}))
 			totalSize := ioctlSize + specSize
-			
 			buf := make([]byte, totalSize)
 
 			// 2. Map Ioctl Header
 			io := (*DmIoctl)(unsafe.Pointer(&buf[0]))
-			io.VersionMajor, io.VersionMinor, io.VersionPatch = 4, 0, 0
+			// Fixed: Match your DmIoctl struct definition (array vs separate fields)
+			io.Version = [3]uint32{4, 0, 0}
 			io.DataSize = totalSize
 			io.DataStart = ioctlSize
 			io.TargetCount = 1
 			copy(io.Name[:], name)
 
-			// 3. Map Target Spec (The "Error" Hammer)
+			// 3. Map Target Spec
 			spec := (*DmTargetSpec)(unsafe.Pointer(&buf[ioctlSize]))
 			spec.SectorStart = 0
-			spec.Length = uint64(size)
+			spec.Length = size
 			spec.Next = specSize
 			copy(spec.TargetType[:], "error")
 
-			// 4. REQUIREMENT 4: Direct Syscall
-			_, _, errno := unix.Syscall(unix.SYS_IOCTL, f.Fd(), 
-				uintptr(0xc138fd09), // DM_TABLE_LOAD
-				uintptr(unsafe.Pointer(&buf[0])))
+			// 4. Syscall
+			_, _, errno := unix.Syscall(unix.SYS_IOCTL, f.Fd(), uintptr(0xc138fd09), uintptr(unsafe.Pointer(&buf[0])))
+			if errno != 0 {
+				return struct{}{}, errno
+			}
 
-			if errno != 0 { return struct{}{}, errno }
-			
-			// 5. Trigger Resume to activate the Error Table
-			return struct{}{}, r.dmIoctlCall(wCtx, name, 0xc138fd06, 0) // DM_DEV_RESUME
+			// 5. Trigger Resume
+			// dmIoctlCall returns error, so we wrap it in (struct{}, error)
+			err = r.dmIoctlCall(wCtx, name, 0xc138fd06, 0) // DM_DEV_RESUME
+			return struct{}{}, err
 		},
 	)
+	return err
 }
 
 
@@ -1681,7 +1706,7 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) IdentityAwarePreScan(ctx context
 			10*time.Second,
 			func(ctx context.Context) (IdentityResult, error) {
 				wwid, _ := r.Helper.getWWIDByDev(mounts[0].Major, mounts[0].Minor)
-				hw, _ := r.Helper.GetWwnByScsiInq(mpathName)
+				hw, _ := r.Helper.GetWwnByScsiInq(ctx, mpathName)
 
 				return IdentityResult{WWID: wwid, HW: hw}, nil
 			},
@@ -1697,7 +1722,7 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) IdentityAwarePreScan(ctx context
 		if strings.EqualFold(currentWWID, normExpected) && (actualHw == "" || strings.EqualFold(actualHw, normExpected)) {
 			// Zombie Match: Same volume from a crashed attempt. Full cleanup.
 			// TODO not null case?
-			err := r.TeardownVolume(targetPath, expectedWWID)
+			err := r.TeardownVolume(ctx, targetPath, expectedWWID)
 			if err != nil {
 				return fmt.Errorf("pre-scan: failed to clear zombie volume: %w", err)
 			}
@@ -1723,7 +1748,7 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) IdentityAwarePreScan(ctx context
 		// Before checking OpenCount, ensure we aren't queuing I/O to a dead map
 		_ = r.multipathdAction(ctx, "disablequeueing map " + mpathName)
 
-		openCount, err := r.Helper.GetOpenCount(mpathName)
+		openCount, err := r.Helper.GetOpenCount(ctx, mpathName)
 		if err != nil {
 			return err
 		}
@@ -1742,7 +1767,7 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) IdentityAwarePreScan(ctx context
 		// Stop I/O queuing to prevent D-state hangs during deletion
 		_ = r.multipathdAction(ctx, "disablequeueing map " + mpathName)
 
-		openCount, err := r.Helper.GetOpenCount(mpathName)
+		openCount, err := r.Helper.GetOpenCount(ctx, mpathName)
 		if err == nil {
 			if openCount <= 0 {
 				// Clean fresh start: No one is using it
@@ -1771,13 +1796,14 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) IdentityAwarePreScan(ctx context
 }
 
 
-func (r *OsDeviceConnectivityHelperScsiGeneric) FinalWwidPurge(expectedWWID string) error {
+func (r *OsDeviceConnectivityHelperScsiGeneric) FinalWwidPurge(ctx context.Context, expectedWWID string) error {
 	targetWWID := r.Helper.normalizeWWID(expectedWWID)
 
 	// 1. CLEANUP MULTIPATH LAYER
 	mpathName := r.Helper.findDMByWWID(targetWWID)
 	if mpathName != "" {
 		_, err := executer.ExecuteUninterruptible[struct{}](
+			ctx,
 			r.KeyedGater,
 			"mpath-final-del-"+mpathName, // Unique key per map to prevent head-of-line blocking
 			1,                            // maxRunning: 1 operation per specific map
@@ -1808,6 +1834,7 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) FinalWwidPurge(expectedWWID stri
 		if err == nil && strings.Contains(r.Helper.normalizeWWID(string(data)), targetWWID) {
 			dmName := filepath.Base(filepath.Dir(filepath.Dir(path)))
 			_, err := executer.ExecuteUninterruptible[struct{}](
+				ctx,
 				r.KeyedGater,
 				"mpath-stale-del-"+dmName, // Unique key per DM device name
 				1,                         // maxRunning: 1 per device
@@ -1852,6 +1879,7 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) FinalWwidPurge(expectedWWID stri
 		//}
 
 		_, err := executer.ExecuteUninterruptible[struct{}](
+			ctx,
 			r.KeyedGater,
 			"scsi-purge-"+name, // Unique key per device prevents a hang on sda from blocking sdb
 			5,                  // maxRunning: allow up to 5 concurrent purges for this specific ID
@@ -2127,17 +2155,17 @@ type OsDeviceConnectivityHelperInterface interface {
 		Mainly for writting clean unit testing, so we can Mock this interface in order to unit test OsDeviceConnectivityHelperGeneric logic.
 	*/
 	GetHostsIdByArrayIdentifiers(arrayIdentifier []string) (map[int]bool, error)
-	GetWwnByScsiInq(dev string) (string, error)
+	GetWwnByScsiInq(ctx context.Context, dev string) (string, error)
 	GetVolumeIdVariations(volumeUuid string) []string
-	GetMpathDeviceName(volumePath string) (string, error)
-	GetMpathVolumeId(mpathDeviceName string) (string, error)
+	GetMpathDeviceName(ctx context.Context, volumePath string) (string, error)
+	GetMpathVolumeId(ctx context.Context, mpathDeviceName string) (string, error)
 	normalizeWWID(raw string) string
 	findDMByWWID(wwid string) string
 	getSlavesForDevice(major, minor uint32) ([]string, error)
-	GetOpenCount(dmName string) (int32, error)
-	GetMajorMinorFromSysfs(devicePath string) (major uint32, minor uint32, err error)
+	GetOpenCount(ctx context.Context, dmName string) (int32, error)
+	GetMajorMinorFromSysfs(ctx context.Context, devicePath string) (major uint32, minor uint32, err error)
 	getWWIDByDev(major, minor uint32) (string, error)
-	WaitForDmToExist(volumeIdVariations []string, maxRetries int, intervalSeconds int) (string, error)
+	WaitForDmToExist(ctx context.Context, volumeIdVariations []string, maxRetries int, intervalSeconds int) (string, error)
 }
 
 type OsDeviceConnectivityHelperGeneric struct {
@@ -2154,8 +2182,8 @@ func NewOsDeviceConnectivityHelperGeneric(executer executer.ExecuterInterface, M
 	}
 }
 
-func (o *OsDeviceConnectivityHelperGeneric) WaitForDmToExist(volumeIdVariations []string, maxRetries int, intervalSeconds int) (string, error) {
-       return o.Helper.WaitForDmToExist(volumeIdVariations, maxRetries, intervalSeconds)
+func (o *OsDeviceConnectivityHelperGeneric) WaitForDmToExist(ctx context.Context, volumeIdVariations []string, maxRetries int, intervalSeconds int) (string, error) {
+       return o.Helper.WaitForDmToExist(ctx, volumeIdVariations, maxRetries, intervalSeconds)
 }
 
 func (o *OsDeviceConnectivityHelperGeneric) GetHostsIdByArrayIdentifiers(arrayIdentifier []string) (map[int]bool, error) {
@@ -2339,8 +2367,8 @@ func (o *OsDeviceConnectivityHelperGeneric) RescanHosts(ctx context.Context, hos
 
 
 // TODO unused (has nvme sensitive implementation in 1.13.1)
-func (o OsDeviceConnectivityHelperGeneric) GetMpathVolumeId(dmPath string) (volId string, err error) {
-	SgInqWwn, err := o.GetWwnByScsiInq(dmPath)
+func (o OsDeviceConnectivityHelperGeneric) GetMpathVolumeId(ctx context.Context, dmPath string) (volId string, err error) {
+	SgInqWwn, err := o.GetWwnByScsiInq(ctx, dmPath)
 	if err != nil {
 		return "", err
 	}
@@ -2778,7 +2806,7 @@ func (o *OsDeviceConnectivityHelperGeneric) GetMpathDeviceName(ctx context.Conte
 	major, minor, err := mount.GetMajorMinorFromSysfs(volumePath)
 
 	if err != nil {
-		if kernelName, err := o.resolveIdToKernelName(major, minor); err == nil {
+		if kernelName, err := o.resolveIdToKernelName(ctx, major, minor); err == nil {
 				return kernelName, nil
 		}
 	}
@@ -2808,7 +2836,7 @@ func (o *OsDeviceConnectivityHelperGeneric) resolveIdToKernelName(ctx context.Co
 }
 
 
-func (o *OsDeviceConnectivityHelperGeneric) ResolveToKernelName(deviceName string) (string, error) {
+func (o *OsDeviceConnectivityHelperGeneric) ResolveToKernelName(ctx context.Context, deviceName string) (string, error) {
 	if strings.HasPrefix(deviceName, "dm-") || strings.HasPrefix(deviceName, "nvme") {
 		return deviceName, nil
 	}
@@ -2824,7 +2852,7 @@ func (o *OsDeviceConnectivityHelperGeneric) ResolveToKernelName(deviceName strin
 		for _, p := range searchPaths {
 			var stat syscall.Stat_t
 			if err := syscall.Stat(p, &stat); err == nil {
-				return o.resolveIdToKernelName(unix.Major(uint64(stat.Rdev)), unix.Minor(uint64(stat.Rdev)))
+				return o.resolveIdToKernelName(ctx, unix.Major(uint64(stat.Rdev)), unix.Minor(uint64(stat.Rdev)))
 			}
 		}
 	}
@@ -3074,7 +3102,7 @@ func (o *OsDeviceConnectivityHelperGeneric) GetGaterKey(ctx context.Context, dev
 }
 
 
-func (o *OsDeviceConnectivityHelperGeneric) GetDeviceWWID(dev string) (string, error) {
+func (o *OsDeviceConnectivityHelperGeneric) GetDeviceWWID(ctx context.Context, dev string) (string, error) {
 	name := filepath.Base(dev)
 
 	if strings.HasPrefix(name, "nvme") {
@@ -3082,7 +3110,7 @@ func (o *OsDeviceConnectivityHelperGeneric) GetDeviceWWID(dev string) (string, e
 	}
 
 	// Assume SCSI for everything else (sdX, dm-X, etc)
-	return o.GetWwnByScsiInq(dev)
+	return o.GetWwnByScsiInq(ctx, dev)
 }
 
 func (o *OsDeviceConnectivityHelperGeneric) GetWwnByNvmeSysfs(dev string) (string, error) {
@@ -3111,7 +3139,7 @@ func (o *OsDeviceConnectivityHelperGeneric) GetWwnByNvmeSysfs(dev string) (strin
 //go:generate mockgen -destination=../../../mocks/mock_GetDmsPathHelperInterface.go -package=mocks github.com/ibm/ibm-block-csi-driver/node/pkg/driver/device_connectivity GetDmsPathHelperInterface
 
 type GetDmsPathHelperInterface interface {
-	WaitForDmToExist(volumeIdVariations []string, maxRetries int, intervalSeconds int) (string, error)
+	WaitForDmToExist(ctx context.Context, volumeIdVariations []string, maxRetries int, intervalSeconds int) (string, error)
 }
 
 type GetDmsPathHelperGeneric struct {
@@ -3306,12 +3334,12 @@ func (o GetDmsPathHelperGeneric) validateAndSettle(ctx context.Context, path str
 		if err == nil {
 			unix.Close(fd)
 			// REQUIREMENT 5: Final Identity Integrity check before returning to Mounter
-			return o.validateDMIntegrity(ctx, path)
+			return o.validateDMIntegrity(path)
 		}
 
 		if err == unix.EBUSY {
 			// REQUIREMENT 3: Small jittered backoff to let udev finish
-			jitter := time.Duration(20+rand.Intn(50)) * time.Millisecond
+			jitter := time.Duration(20+rand.IntN(50)) * time.Millisecond
 			time.Sleep(jitter)
 			continue
 		}
@@ -3407,7 +3435,7 @@ func (o GetDmsPathHelperGeneric) scanDMSubsystem(targetID string) (string, error
 
 			// Safely get 'dm-X' regardless of path depth
 			dmName := filepath.Base(filepath.Dir(filepath.Dir(m)))
-			devPath = filepath.Join("/dev", dmName), nil
+			devPath := filepath.Join("/dev", dmName)
 			logger.Warningf("Found DM match: %s for WWID %s", devPath, targetID)
 			return devPath, nil
 		}
