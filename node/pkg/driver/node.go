@@ -752,7 +752,7 @@ func (d *NodeService) NodeExpandVolume(ctx context.Context, req *csi.NodeExpandV
     volumePath := req.VolumePath
     volumePathWithHostPrefix := d.NodeUtils.GetPodPath(volumePath)
 
-    device, err := d.OsDeviceConnectivityHelper.GetExistingMpathDevice(volumeUuid, volumePathWithHostPrefix)
+    device, err := d.OsDeviceConnectivityHelper.GetExistingMpathDevice(ctx, volumeUuid, volumePathWithHostPrefix)
 	if err != nil {
 		logger.Errorf("Error while discovering the device : {%v}", err.Error())
 		return nil, status.Error(codes.Internal, err.Error())
