@@ -552,10 +552,6 @@ func (r OsDeviceConnectivityIscsi) GetMpathDevice(ctx context.Context, volumeId 
 	return r.HelperScsiGeneric.GetMpathDevice(ctx, volumeId)
 }
 
-func (r OsDeviceConnectivityIscsi) FlushMultipathDevice(ctx context.Context, mpathDevice string) error {
-	return r.HelperScsiGeneric.FlushMultipathDevice(ctx, mpathDevice)
-}
-
 func (r OsDeviceConnectivityIscsi) RemovePhysicalDevice(ctx context.Context, sysDevices []string) error {
 	return r.HelperScsiGeneric.RemovePhysicalDevice(ctx, sysDevices)
 }
