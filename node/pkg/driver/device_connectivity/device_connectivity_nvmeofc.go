@@ -19,7 +19,13 @@ package device_connectivity
 import (
 	"context"
 	"fmt"
+	"path/filepath"
+	"os"
+	"strconv"
 	"strings"
+	"time"
+
+	"golang.org/x/sys/unix"
 
 	"github.com/ibm/ibm-block-csi-driver/node/logger"
 	"github.com/ibm/ibm-block-csi-driver/node/pkg/driver/executer"
@@ -37,12 +43,14 @@ const (
 
 type OsDeviceConnectivityNvmeOFc struct {
 	Executer          executer.ExecuterInterface
+	KeyedGater *executer.KeyedGater
 	HelperScsiGeneric OsDeviceConnectivityHelperScsiGenericInterface
 }
 
 func NewOsDeviceConnectivityNvmeOFc(executer executer.ExecuterInterface, KeyedGater *executer.KeyedGater, Mounter *mount.Mounter, clean_scsi_device bool) OsDeviceConnectivityInterface {
 	return &OsDeviceConnectivityNvmeOFc{
 		Executer:          executer,
+		KeyedGater: KeyedGater,
 		HelperScsiGeneric: NewOsDeviceConnectivityHelperScsiGeneric(executer, KeyedGater, Mounter, clean_scsi_device),
 	}
 }
@@ -130,9 +138,9 @@ func (r OsDeviceConnectivityNvmeOFc) EnsureLogin(ctx context.Context, ipsByArray
 	// Final verification and multipath checks
 
 	finalLivePaths := r.getLivePathPairs(ctx)
-	finalCount := countLivePathsForSubsystem(finalLivePaths, targets)
+	finalCount := countLivePathsForSubsystem(finalLivePaths, ipsByArrayInitiator) // TODO verify
 	
-	logger.Infof("NVMe-oFC EnsureLogin: final live paths=%d target=%d", finalPathCount, nvmeTargetPathCount)
+	logger.Infof("NVMe-oFC EnsureLogin: final live paths=%d target=%d", finalCount, nvmeTargetPathCount)
 
 
 	if finalCount == 0 {
@@ -141,9 +149,9 @@ func (r OsDeviceConnectivityNvmeOFc) EnsureLogin(ctx context.Context, ipsByArray
 		return
 	}
 	
-	if finalPathCount < nvmeTargetPathCount {
+	if finalCount < nvmeTargetPathCount {
 		logger.Warningf("NVMe-oFC EnsureLogin: below target path count: final=%d target=%d, continuing with reduced redundancy",
-			finalPathCount, nvmeTargetPathCount)
+			finalCount, nvmeTargetPathCount)
 	}
 
 	nativeMpath, err := isNvmeCoreMultipathEnabled()
@@ -155,7 +163,7 @@ func (r OsDeviceConnectivityNvmeOFc) EnsureLogin(ctx context.Context, ipsByArray
 	if !nativeMpath && finalCount < nvmeMinPathsForNonNativeDmMultipath {
 		// Logic to check find_multipaths=on via /etc/multipath.conf or sysfs
 		// If < 2 and find_multipaths is on, we trigger a warning.
-		findMpathsOn, err := r.isFindMultipathsOn()
+		findMpathsOn, err := r.isFindMultipathsOn(ctx)
 		if err != nil {
 			logger.Warningf("NVMe-oFC EnsureLogin: could not read find_multipaths setting: %v", err)
 			return
@@ -164,7 +172,7 @@ func (r OsDeviceConnectivityNvmeOFc) EnsureLogin(ctx context.Context, ipsByArray
 			logger.Errorf("NVMe-oFC EnsureLogin: non-native NVMe with find_multipaths=on requires >= %d paths "+
 				"but only %d are live — multipathd will not create a dm device. "+
 				"Set find_multipaths=no in /etc/multipath.conf or fix fabric connectivity.",
-				nvmeMinPathsForNonNativeDmMultipath, finalPathCount)
+				nvmeMinPathsForNonNativeDmMultipath, finalCount)
 		}		
 	}
 }
@@ -326,14 +334,23 @@ func (r OsDeviceConnectivityNvmeOFc) getLivePathPairs(ctx context.Context) map[s
 
 // readSysfsSingleLine uses your ExecuteUninterruptible infra to prevent D-state hangs (Req 6)
 func (r OsDeviceConnectivityNvmeOFc) readSysfsSingleLine(ctx context.Context, path string) (string, error) {
-	return ExecuteUninterruptible(
-		r.Gater, path, 10, 5, 1*time.Second, 2*time.Second,
+	// FIX 1: Pass 'ctx' as the first argument
+	// FIX 2: Explicitly provide the [string] type parameter (or let Go infer it)
+	return executer.ExecuteUninterruptible[string](
+		ctx,
+		r.KeyedGater, 
+		path, 
+		10, 5, 
+		1*time.Second, 
+		2*time.Second,
 		func(wCtx context.Context) (string, error) {
+			// Note: use the worker context 'wCtx' if your ReadFile supports it
 			data, err := r.Executer.IoutilReadFile(path)
 			return strings.TrimSpace(string(data)), err
 		},
 	)
 }
+
 
 func (r OsDeviceConnectivityNvmeOFc) parseAddressField(raw string) string {
 	// Sysfs address format: "trtype=fc,traddr=nn-0x200000110d123456:pn-0x100000110d123456"
@@ -369,14 +386,16 @@ func (r OsDeviceConnectivityNvmeOFc) discoverSubNqn(ctx context.Context, arrayTa
 		nvmeTransportFC, arrayTargetPort, hostPort)
 
 	// Use your infra to wrap the blocking file write (Req 6)
-	subNqn, err := ExecuteUninterruptible(
-		r.Gater, 
-		fmt.Sprintf("nvme-disc-%s-%s", arrayTargetPort, hostPort), 
-		2, 1, 5*time.Second, 15*time.Second,
-		func(wCtx context.Context) (string, error) {
-			return r.executeKernelDiscovery(cmd)
-		},
-	)
+         rawOutput, err := executer.ExecuteUninterruptible(
+                 ctx, // Add this line
+                 r.KeyedGater,
+                 fmt.Sprintf("nvme-disc-%s-%s", arrayTargetPort, hostPort),
+                 2, 1, 5*time.Second, 15*time.Second,
+                 func(wCtx context.Context) (string, error) {
+                         return r.executeKernelDiscovery(cmd)
+                 },
+         )
+
 
 	if err != nil {
 		logger.Debugf("NVMe-oFC discoverSubNqn: nvme discover failed target=%s host=%s: %v",
@@ -384,7 +403,7 @@ func (r OsDeviceConnectivityNvmeOFc) discoverSubNqn(ctx context.Context, arrayTa
 		return "", nil
 	}
 
-	subNqn := parseSubNqnFromDiscoverOutput(string(out))
+	subNqn := parseSubNqnFromDiscoverOutput(rawOutput)
 	if subNqn != "" {
 		logger.Debugf("NVMe-oFC discoverSubNqn: discovered subnqn=%s target=%s host=%s",
 			subNqn, arrayTargetPort, hostPort)
@@ -414,6 +433,52 @@ func (r OsDeviceConnectivityNvmeOFc) executeKernelDiscovery(cmd string) (string,
 	return r.findDiscoverySubNqnFromSysfs()
 }
 
+func (r OsDeviceConnectivityNvmeOFc) findDiscoverySubNqnFromSysfs() (string, error) {
+	const sysPath = "/sys/class/nvme"
+	const discoveryNQN = "nqn.2014-08.org.nvmexpress.discovery"
+
+	entries, err := os.ReadDir(sysPath)
+	if err != nil {
+		return "", fmt.Errorf("failed to read %s: %w", sysPath, err)
+	}
+
+	for _, entry := range entries {
+		// Controllers appear as /sys/class/nvme/nvmeX
+		if !strings.HasPrefix(entry.Name(), "nvme") {
+			continue
+		}
+
+		controllerPath := filepath.Join(sysPath, entry.Name())
+		
+		// 1. Verify this is a discovery controller by checking its Subsystem NQN
+		subnqnBuf, err := os.ReadFile(filepath.Join(controllerPath, "subsysnqn"))
+		if err != nil {
+			continue
+		}
+		
+		if strings.TrimSpace(string(subnqnBuf)) != discoveryNQN {
+			continue
+		}
+
+		// 2. A discovery controller won't have the target subnqn in its own attributes.
+		// Instead, we must read the 'discovery_log' or check for associated subsystems.
+		// However, per Requirement 4, for process-less discovery, we typically read 
+		// the log produced by the kernel's discovery attempt.
+		logPath := filepath.Join(controllerPath, "discovery_log")
+		logBuf, err := os.ReadFile(logPath)
+		if err != nil {
+			return "", fmt.Errorf("failed to read discovery log from %s: %w", entry.Name(), err)
+		}
+
+		// Use your existing parser on the raw binary/text log from the kernel
+		subNqn := parseSubNqnFromDiscoverOutput(string(logBuf))
+		if subNqn != "" {
+			return subNqn, nil
+		}
+	}
+
+	return "", fmt.Errorf("no active discovery controller found in sysfs")
+}
 
 // parseSubNqnFromDiscoverOutput extracts the storage subsystem NQN from "nvme discover" output.
 // Skips the discovery controller NQN (nqn.2014-08.org.nvmexpress.discovery).
@@ -447,8 +512,9 @@ func (r OsDeviceConnectivityNvmeOFc) nvmeConnect(ctx context.Context, arrayTarge
 	// We use the NQN + target as the resource key to gate concurrent attempts
 	resourceKey := fmt.Sprintf("connect-%s-%s", subNqn, arrayTargetPort)
 	
-	_, err := ExecuteUninterruptible(
-		r.Gater, resourceKey, 1, 1, 5*time.Second, 30*time.Second,
+	out, err := executer.ExecuteUninterruptible(
+		ctx,
+		r.KeyedGater, resourceKey, 1, 1, 5*time.Second, 30*time.Second,
 		func(wCtx context.Context) (string, error) {
 			// Req 4: Direct file write instead of process invocation
 			f, err := os.OpenFile("/dev/nvme-fabrics", os.O_WRONLY|os.O_APPEND, 0)
@@ -473,7 +539,7 @@ func (r OsDeviceConnectivityNvmeOFc) nvmeConnect(ctx context.Context, arrayTarge
 
 	if err != nil {
 		logger.Errorf("NVMe-oFC nvmeConnect: failed NQN=%s target=%s host=%s: %v output=%s",
-			subNqn, arrayTargetPort, hostPort, err, string(out))
+			subNqn, arrayTargetPort, hostPort, err, out)
 		return false
 	}
 	
@@ -498,8 +564,9 @@ func (r OsDeviceConnectivityNvmeOFc) getHostFCPorts(ctx context.Context) ([]stri
 		hostName := filepath.Base(filepath.Dir(portPath))
 
 		// Requirement 6 & 8: Wrap the potentially blocking sysfs read
-		res, err := ExecuteUninterruptible(
-			r.Gater,
+		res, err := executer.ExecuteUninterruptible(
+			ctx,
+			r.KeyedGater,
 			hostName, 
 			1, 1, 
 			2*time.Second, 5*time.Second,
@@ -563,7 +630,7 @@ func (r OsDeviceConnectivityNvmeOFc) readFCPortPairDirect(portPath string) (stri
 	}
 	
 	if portName == "" || nodeName == "" {
-		logger.Warningf("NVMe-oFC getHostFCPorts: empty port/node name at %s, skipping", hostDir)
+		logger.Warningf("NVMe-oFC getHostFCPorts: empty port/node name at %s, skipping", portPath) 
 		return "", err
 	}
 	
@@ -610,23 +677,23 @@ func (r OsDeviceConnectivityNvmeOFc) RescanDevices(_ int, _ []string) error {
 	return nil
 }
 
-func (r OsDeviceConnectivityNvmeOFc) GetMpathDevice(volumeId string) (string, error) {
-	return r.HelperScsiGeneric.GetMpathDevice(volumeId)
+func (r OsDeviceConnectivityNvmeOFc) GetMpathDevice(ctx context.Context, volumeId string) (string, error) {
+	return r.HelperScsiGeneric.GetMpathDevice(ctx, volumeId)
 }
 
 func (r OsDeviceConnectivityNvmeOFc) FlushMultipathDevice(ctx context.Context, mpathDevice string) error {
 	return r.HelperScsiGeneric.FlushMultipathDevice(ctx, mpathDevice)
 }
 
-func (r OsDeviceConnectivityNvmeOFc) RemovePhysicalDevice(sysDevices []string) error {
-	return r.HelperScsiGeneric.RemovePhysicalDevice(sysDevices)
+func (r OsDeviceConnectivityNvmeOFc) RemovePhysicalDevice(ctx context.Context, sysDevices []string) error {
+	return r.HelperScsiGeneric.RemovePhysicalDevice(ctx, sysDevices)
 }
 
-func (r OsDeviceConnectivityNvmeOFc) RemoveGhostDevice(expectedSerial string, expectedLun int, arrayIdentifiers []string) error {
-	return r.HelperScsiGeneric.RemoveGhostDevice(expectedSerial, expectedLun, arrayIdentifiers)
+func (r OsDeviceConnectivityNvmeOFc) RemoveGhostDevice(ctx context.Context, expectedSerial string, expectedLun int, arrayIdentifiers []string) error {
+	return r.HelperScsiGeneric.RemoveGhostDevice(ctx, expectedSerial, expectedLun, arrayIdentifiers)
 }
 
 // TODO
-func (r OsDeviceConnectivityNvmeOFc) ValidateLun(_ string, _ int, _ []string, _ string) error {
+func (r OsDeviceConnectivityNvmeOFc) ValidateLun(_ context.Context, _ string, _ int, _ []string, _ string) error {
 	return nil
 }

@@ -40,7 +40,7 @@ func NewOsDeviceConnectivityFc(executer executer.ExecuterInterface, KeyedGater *
 	}
 }
 
-func (r OsDeviceConnectivityFc) EnsureLogin(_ map[string][]string) {
+func (r OsDeviceConnectivityFc) EnsureLogin(_ context.Context, _ map[string][]string) {
 	// FC doesn't require login
 }
 
