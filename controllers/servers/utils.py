@@ -172,7 +172,7 @@ def convert_initiators_to_json_string(initiators):
     return json.dumps(initiators_dict, separators=(',', ':'))
 
 
-def are_initiators_equal(initiator_str1, initiator_str2):
+def are_initiators_equal(initiator_str1, initiator_str2, protocol=None):
     """
     Check if two initiator strings are equal by comparing them as Initiators objects.
 
@@ -210,7 +210,14 @@ def are_initiators_equal(initiator_str1, initiator_str2):
             set(iqn.lower() for iqn in initiators2.iscsi_iqns)
         )
 
-        return nvme_equal and fc_equal and iscsi_equal
+        if protocol == ISCSI_CONNECTIVITY_TYPE:
+            return iscsi_equal
+        elif protocol == FC_CONNECTIVITY_TYPE:
+            return fc_equal
+        elif protocol == NVME_OVER_FC_CONNECTIVITY_TYPE:
+            return nvme_equal
+        else:
+            return nvme_equal and fc_equal and iscsi_equal
     except Exception as e:
         logger.warning(f"Failed to compare initiators: {e}")
         return False
