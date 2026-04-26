@@ -328,7 +328,7 @@ func NewOsDeviceConnectivityHelperScsiGeneric(executer executer.ExecuterInterfac
 		Executer:        executer,
 		KeyedGater:      KeyedGater,
 		Mounter:         Mounter,
-		Helper:          NewOsDeviceConnectivityHelperGeneric(executer, Mounter),
+		Helper:          NewOsDeviceConnectivityHelperGeneric(executer, KeyedGater, Mounter),
 		MutexMultipathF: &sync.Mutex{},
 		CleanScsiDevice: clean_scsi_device,
 	}
@@ -1732,7 +1732,7 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) IdentityAwarePreScan(ctx context
 			// Collision: A DIFFERENT volume is here.
 			// We MUST NOT delete the DM map (we don't own it), but we must rescue the path.
 			// Use our Tiered Unmount logic instead of raw syscall
-			_ = r.Mounter.UnmountWithContext(ctx, targetPath)
+			_ = r.Mounter.UnmountWithTimeout(ctx, targetPath, 30*time.Second)
 			// TODO should call the immedidate unmount
 
 			// Verify the collision is cleared
@@ -1900,7 +1900,7 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) FinalWwidPurge(ctx context.Conte
 				// Use the context provided by the worker if flushDeviceBuffers supports it
 				flushCtx, cancel := context.WithTimeout(ctx, 2*time.Second)
 				defer cancel()
-				_ = r.flushDeviceBuffersWithContext(flushCtx, "/dev/"+name)
+				_ = r.flushDeviceBuffers(flushCtx, "/dev/"+name)
 
 				// 4. Determine Delete Path
 				var deletePath string
@@ -2170,13 +2170,15 @@ type OsDeviceConnectivityHelperInterface interface {
 
 type OsDeviceConnectivityHelperGeneric struct {
 	Executer executer.ExecuterInterface
+	KeyedGater      *executer.KeyedGater
 	Helper   GetDmsPathHelperInterface
 	Mounter  *mount.Mounter
 }
 
-func NewOsDeviceConnectivityHelperGeneric(executer executer.ExecuterInterface, Mounter *mount.Mounter) OsDeviceConnectivityHelperInterface {
+func NewOsDeviceConnectivityHelperGeneric(executer executer.ExecuterInterface, KeyedGater *executer.KeyedGater, Mounter *mount.Mounter) OsDeviceConnectivityHelperInterface {
 	return &OsDeviceConnectivityHelperGeneric{
 		Executer: executer,
+		KeyedGater: KeyedGater,
 		Helper:   NewGetDmsPathHelperGeneric(executer),
 		Mounter:  Mounter,
 	}
@@ -3023,7 +3025,7 @@ func (o *OsDeviceConnectivityHelperGeneric) GetMajorMinorFromSysfs(ctx context.C
 			ueventPath := filepath.Join(sysPath, "block", sdName, "uevent")
 			
 			// Use the helper to read from sysfs
-			data := o.readSysfs(ueventPath)
+			data, _ := o.readSysfs(ueventPath)
 			if data != "" {
 				major, minor = o.parseUeventMajorMinor(data)
 			}
@@ -3135,6 +3137,15 @@ func (o *OsDeviceConnectivityHelperGeneric) GetWwnByNvmeSysfs(dev string) (strin
 
 	return "", fmt.Errorf("no unique identifier found for nvme device %s", name)
 }
+
+func (r *OsDeviceConnectivityHelperGeneric) readSysfs(path string) (string, error) {
+        data, err := os.ReadFile(path)
+        if err != nil {
+                return "", err
+         }
+        return strings.Trim(string(data), " \n\r\t\x00"), nil
+}
+
 
 
 //go:generate mockgen -destination=../../../mocks/mock_GetDmsPathHelperInterface.go -package=mocks github.com/ibm/ibm-block-csi-driver/node/pkg/driver/device_connectivity GetDmsPathHelperInterface
