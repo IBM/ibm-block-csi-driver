@@ -82,12 +82,12 @@ type NodeUtilsInterface interface {
 	GetVolumeUuid(volumeId string) string
 	ReadNvmeNqn() (string, error)
 	IsNativeNVMeMultipathEnabled() (bool, error)
-	DevicesAreNvme(device string) (NvmeType, error)
+	DevicesAreNvme(ctx context.Context, device string) (NvmeType, error)
 	ParseFCPorts() ([]string, error)
 	ParseIscsiInitiators() (string, error)
 	GetInfoFromPublishContext(publishContext map[string]string) (string, int, map[string][]string, error)
 	GetArrayInitiators(ipsByArrayInitiator map[string][]string) []string
-	GetSysDevicesFromMpath(baseDevice string) ([]string, error)
+	GetSysDevicesFromMpath(ctx context.Context, baseDevice string) ([]string, error)
 
 	// TODO refactor and move all staging methods to dedicate interface.
 	ClearStageInfoFile(filePath string) error
@@ -98,17 +98,17 @@ type NodeUtilsInterface interface {
 	RemoveFileOrDirectory(filePath string) error
 	MakeDir(dirPath string) error
 	MakeFile(filePath string) error
-	ExpandFilesystem(devicePath string, volumePath string, fsType string) error
-	ExpandMpathDevice(mpathDevice string) error
-	RescanPhysicalDevices(sysDevices []string) error
+	ExpandFilesystem(ctx context.Context, devicePath string, volumePath string, fsType string) error
+	ExpandMpathDevice(ctx context.Context, mpathDevice string) error
+	RescanPhysicalDevices(ctx context.Context, sysDevices []string) error
 	FormatDevice(devicePath string, fsType string) error
 	IsNotMountPoint(file string) (bool, error)
 	GetPodPath(filepath string) string
 	GetTopologyLabels(ctx context.Context, nodeName string) (map[string]string, error)
 	UpdateNodeInitiatorsAnnotation(ctx context.Context, nodeName string, iscsiIQN string, fcWWNs []string, nvmeNQN string) error
-	IsBlock(devicePath string) (bool, error)
-	GetFileSystemVolumeStats(path string) (VolumeStatistics, error)
-	GetBlockVolumeStats(path string) (VolumeStatistics, error)
+	IsBlock(ctx context.Context, devicePath string) (bool, error)
+	GetFileSystemVolumeStats(ctx context.Context, path string) (VolumeStatistics, error)
+	GetBlockVolumeStats(ctx context.Context, path string) (VolumeStatistics, error)
 }
 
 type NodeUtils struct {
@@ -292,7 +292,7 @@ func (n NodeUtils) IsNativeNVMeMultipathEnabled() (bool, error) {
 	return val == "Y", nil
 }
 
-func (n NodeUtils) DevicesAreNvme(device string) (NvmeType, error) {
+func (n NodeUtils) DevicesAreNvme(ctx context.Context, device string) (NvmeType, error) {
 
 	nativeMultipath, err := n.IsNativeNVMeMultipathEnabled()
 	if err != nil {
@@ -329,7 +329,7 @@ func (n NodeUtils) DevicesAreNvme(device string) (NvmeType, error) {
 	}
 
 	nvmeListOutput := string(out)
-	slaves, err := n.GetSysDevicesFromMpath(device)
+	slaves, err := n.GetSysDevicesFromMpath(ctx, device)
 	if err == nil {
 		for _, slave := range slaves {
 			if strings.Contains(nvmeListOutput, slave) {
@@ -507,7 +507,7 @@ func (n NodeUtils) MakeFile(filePath string) error {
 }
 
 // TODO
-func (n NodeUtils) ExpandFilesystem(devicePath string, volumePath string, fsType string) error {
+func (n NodeUtils) ExpandFilesystem(ctx context.Context, devicePath string, volumePath string, fsType string) error {
 	var cmd string
 	var args []string
 	if fsType == "ext4" {
@@ -615,6 +615,7 @@ func (n NodeUtils) RescanPhysicalDevices(ctx context.Context, sysDevices []strin
 		// REQUIREMENT 7: Use all possible methods (Uninterruptible Wrapper)
 		// Writing to 'rescan' can block for 30s+ if the HBA is busy.
 		_, err := executer.ExecuteUninterruptible[struct{}](
+			ctx,
 			n.KeyedGater,
 			"rescan-"+deviceName,
 			5,              // maxRunning: concurrent rescans
