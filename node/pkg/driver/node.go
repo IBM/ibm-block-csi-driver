@@ -156,11 +156,11 @@ func (d *NodeService) NodeStageVolume(ctx context.Context, req *csi.NodeStageVol
 		return &csi.NodeStageVolumeResponse{}, nil
 	}
 
-	d.OsDeviceConnectivityHelper.IdentityAwarePreScan(stagingPathWithHostPrefix, volumeUuid)
+	d.OsDeviceConnectivityHelper.IdentityAwarePreScan(ctx, stagingPathWithHostPrefix, volumeUuid)
 
-	osDeviceConnectivity.EnsureLogin(ipsByArrayInitiator)
+	osDeviceConnectivity.EnsureLogin(ctx, ipsByArrayInitiator)
 
-	err = d.OsDeviceConnectivityHelper.RemoveGhostDevice(volumeUuid, lun, arrayInitiators)
+	err = d.OsDeviceConnectivityHelper.RemoveGhostDevice(ctx, volumeUuid, lun, arrayInitiators)
 	if err != nil {
 		return nil, status.Error(codes.Aborted, err.Error())
 	}
@@ -170,13 +170,13 @@ func (d *NodeService) NodeStageVolume(ctx context.Context, req *csi.NodeStageVol
 		return nil, status.Error(codes.Internal, err.Error())
 	}
 
-	err = d.OsDeviceConnectivityHelper.RemoveGhostDevice(volumeUuid, lun, arrayInitiators)
+	err = d.OsDeviceConnectivityHelper.RemoveGhostDevice(ctx, volumeUuid, lun, arrayInitiators)
 	if err != nil {
 		logger.Debugf("Failed to clean ghost device for lun %d", lun)
 		// we can swallow the error here, since it's just for cleanliness
 	}
 
-	mpathDevice, err := osDeviceConnectivity.GetMpathDevice(volumeUuid)
+	mpathDevice, err := osDeviceConnectivity.GetMpathDevice(ctx, volumeUuid)
 	//mpathDevice, err := osDeviceConnectivity.VerifyAndGetDmDevice(volumeUuid, lun)
 	logger.Debugf("Discovered device : {%v}", mpathDevice)
 	if err != nil {
@@ -192,12 +192,12 @@ func (d *NodeService) NodeStageVolume(ctx context.Context, req *csi.NodeStageVol
 	}
 
 	baseDevice := path.Base(mpathDevice)
-	sysDevices, err := d.NodeUtils.GetSysDevicesFromMpath(baseDevice)
+	sysDevices, err := d.NodeUtils.GetSysDevicesFromMpath(ctx, baseDevice)
 	if err != nil {
 		logger.Errorf("Error while trying to get sys devices : {%v}", err.Error())
 		return nil, status.Error(codes.Internal, err.Error())
 	}
-	err = osDeviceConnectivity.ValidateLun(mpathDevice, lun, sysDevices, volumeUuid)
+	err = osDeviceConnectivity.ValidateLun(ctx, mpathDevice, lun, sysDevices, volumeUuid)
 	if err != nil {
 		logger.Errorf("Error while trying to validate lun : {%v}", err.Error())
 		return nil, status.Error(codes.Internal, err.Error())
@@ -362,12 +362,12 @@ func (d *NodeService) NodeUnstageVolume(ctx context.Context, req *csi.NodeUnstag
 	logger.Debugf("Check if staging path {%s} is mounted", stagingPathWithHostPrefix)
 
 	volumeUuid := d.NodeUtils.GetVolumeUuid(volumeID)
-	err = d.OsDeviceConnectivityHelper.TeardownVolume(stagingTargetPath, volumeUuid)
+	err = d.OsDeviceConnectivityHelper.TeardownVolume(ctx, stagingTargetPath, volumeUuid)
 
 	// TODO NVME additions
 	baseDevice := path.Base(mpathDevice)
 
-	nvmeType, err := d.NodeUtils.DevicesAreNvme(baseDevice)
+	nvmeType, err := d.NodeUtils.DevicesAreNvme(ctx, baseDevice)
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "Failed to determine device type for %s: %v", baseDevice, err)
 	}
@@ -387,7 +387,7 @@ func (d *NodeService) NodeUnstageVolume(ctx context.Context, req *csi.NodeUnstag
 
 	case NotNVMe:
 		// SCSI (FC or iSCSI): flush mpath + delete sdX devices
-		sysDevices, err := d.NodeUtils.GetSysDevicesFromMpath(baseDevice)
+		sysDevices, err := d.NodeUtils.GetSysDevicesFromMpath(ctx, baseDevice)
 		if err != nil {
 			logger.Errorf("Error while trying to get sys devices for device %s: {%v}", baseDevice, err)
 			return nil, status.Error(codes.Internal, err.Error())
@@ -396,7 +396,7 @@ func (d *NodeService) NodeUnstageVolume(ctx context.Context, req *csi.NodeUnstag
 		if err != nil {
 			return nil, status.Errorf(codes.Internal, "Multipath -f command failed for device %s: %v", baseDevice, err)
 		}
-		err = d.OsDeviceConnectivityHelper.RemovePhysicalDevice(sysDevices)
+		err = d.OsDeviceConnectivityHelper.RemovePhysicalDevice(ctx, sysDevices)
 		if err != nil {
 			return nil, status.Errorf(codes.Internal, "Remove SCSI device failed for device %s: %v", baseDevice, err)
 		}
@@ -499,7 +499,7 @@ func (d *NodeService) NodePublishVolume(ctx context.Context, req *csi.NodePublis
 		err = d.publishFileSystemVolume(stagingPath, targetPath, fsType)
 	} else {
 		volumeUuid := d.NodeUtils.GetVolumeUuid(volumeID)
-		mpathDevice, err := d.OsDeviceConnectivityHelper.GetMpathDevice(volumeUuid)
+		mpathDevice, err := d.OsDeviceConnectivityHelper.GetMpathDevice(ctx, volumeUuid)
 		if err != nil {
 			logger.Errorf("Error while discovering the device : {%v}", err.Error())
 			return nil, status.Error(codes.Internal, err.Error())
@@ -660,7 +660,7 @@ func (d *NodeService) NodeGetVolumeStats(ctx context.Context, req *csi.NodeGetVo
 		return nil, status.Errorf(codes.NotFound, "volume path %q does not exist", volumePath)
 	}
 
-	volumeStats, err := d.getVolumeStats(ctx, olumePathWithHostPrefix, volumeId)
+	volumeStats, err := d.getVolumeStats(ctx, volumePathWithHostPrefix, volumeId)
 	if err != nil {
 		return nil, err
 	}
@@ -696,13 +696,13 @@ func (d *NodeService) nodeGetVolumeStatsRequestValidation(volumeId string, volum
 
 func (d *NodeService) getVolumeStats(ctx context.Context, path string, volumeId string) (VolumeStatistics, error) {
 	var volumeStats VolumeStatistics
-	isBlock, err := d.NodeUtils.IsBlock(path)
+	isBlock, err := d.NodeUtils.IsBlock(ctx, path)
 	if err != nil {
 		return VolumeStatistics{}, status.Errorf(codes.Internal, "Failed to determine if %q is block device: %s", path, err)
 	}
 
 	if isBlock {
-		volumeStats, err = d.NodeUtils.GetBlockVolumeStats(path)
+		volumeStats, err = d.NodeUtils.GetBlockVolumeStats(ctx, path)
 		if err != nil {
 			switch err.(type) {
 			case *device_connectivity.MultipathDeviceNotFoundForVolumeError:
@@ -723,7 +723,7 @@ func (d *NodeService) getVolumeStats(ctx context.Context, path string, volumeId 
 			return VolumeStatistics{}, status.Errorf(codes.NotFound,
 				"Volume id [%q] is not accessible on volume path [%q]", volumeId, path)
 		}
-		volumeStats, err = d.NodeUtils.GetFileSystemVolumeStats(path)
+		volumeStats, err = d.NodeUtils.GetFileSystemVolumeStats(ctx, path)
 		if err != nil {
 			return VolumeStatistics{}, status.Errorf(codes.Internal, "Failed to get statistics: %s", err)
 		}
@@ -761,7 +761,7 @@ func (d *NodeService) NodeExpandVolume(ctx context.Context, req *csi.NodeExpandV
 
 	baseDevice := path.Base(device)
 
-	nvmeType, err := d.NodeUtils.DevicesAreNvme(baseDevice)
+	nvmeType, err := d.NodeUtils.DevicesAreNvme(ctx, baseDevice)
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "Failed to determine device type for %s: %v", baseDevice, err)
 	}
@@ -774,25 +774,25 @@ func (d *NodeService) NodeExpandVolume(ctx context.Context, req *csi.NodeExpandV
 	case NVMeNonNative:
 		// Non-native NVMe → skip rescan, only expand multipath
 		logger.Infof("Device %s is non-native NVMe: skipping rescan, running ExpandMpathDevice", baseDevice)
-		err = d.NodeUtils.ExpandMpathDevice(baseDevice)
+		err = d.NodeUtils.ExpandMpathDevice(ctx, baseDevice)
 		if err != nil {
 			return nil, status.Error(codes.Internal, err.Error())
 		}
 
 	case NotNVMe:
 		// Non-NVMe → rescan physical devices + expand multipath
-		sysDevices, err := d.NodeUtils.GetSysDevicesFromMpath(baseDevice)
+		sysDevices, err := d.NodeUtils.GetSysDevicesFromMpath(ctx, baseDevice)
 		if err != nil {
 			logger.Errorf("Error getting sys devices for %s: %v", baseDevice, err)
 			return nil, status.Error(codes.Internal, err.Error())
 		}
 
-		err = d.NodeUtils.RescanPhysicalDevices(sysDevices)
+		err = d.NodeUtils.RescanPhysicalDevices(ctx, sysDevices)
 		if err != nil {
 			return nil, status.Error(codes.Internal, err.Error())
 		}
 
-		err = d.NodeUtils.ExpandMpathDevice(baseDevice)
+		err = d.NodeUtils.ExpandMpathDevice(ctx, baseDevice)
 		if err != nil {
 			return nil, status.Error(codes.Internal, err.Error())
 		}
@@ -814,7 +814,7 @@ func (d *NodeService) NodeExpandVolume(ctx context.Context, req *csi.NodeExpandV
 		mountPointToExpand = req.GetVolumePath()
 	}
 
-	err = d.NodeUtils.ExpandFilesystem(device, mountPointToExpand, existingFormat)
+	err = d.NodeUtils.ExpandFilesystem(ctx, device, mountPointToExpand, existingFormat)
 	if err != nil {
 		logger.Errorf("Could not resize {%v} file system of {%v} , error: %v", existingFormat, device, err)
 		return nil, status.Error(codes.Internal, err.Error())
