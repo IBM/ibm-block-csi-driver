@@ -364,56 +364,12 @@ func (d *NodeService) NodeUnstageVolume(ctx context.Context, req *csi.NodeUnstag
 	volumeUuid := d.NodeUtils.GetVolumeUuid(volumeID)
 	err = d.OsDeviceConnectivityHelper.TeardownVolume(ctx, stagingTargetPath, volumeUuid)
 
-	// TODO NVME additions
-	baseDevice := path.Base(mpathDevice)
-
-	nvmeType, err := d.NodeUtils.DevicesAreNvme(ctx, baseDevice)
-	if err != nil {
-		return nil, status.Errorf(codes.Internal, "Failed to determine device type for %s: %v", baseDevice, err)
-	}
-
-	switch nvmeType {
-	case NVMeNative:
-		// Native NVMe multipath: kernel manages everything, skip all cleanup
-		logger.Infof("Device %s is native NVMe: skipping multipath -f and SCSI device cleanup", baseDevice)
-
-	case NVMeNonNative:
-		// DM-multipath over NVMe: flush mpath only.
-		err = d.OsDeviceConnectivityHelper.FlushMultipathDevice(baseDevice)
-		if err != nil {
-			return nil, status.Errorf(codes.Internal, "Multipath -f command failed for device %s: %v", baseDevice, err)
-		}
-		logger.Infof("Device %s is non-native NVMe: flushed multipath, skipping physical device removal", baseDevice)
-
-	case NotNVMe:
-		// SCSI (FC or iSCSI): flush mpath + delete sdX devices
-		sysDevices, err := d.NodeUtils.GetSysDevicesFromMpath(ctx, baseDevice)
-		if err != nil {
-			logger.Errorf("Error while trying to get sys devices for device %s: {%v}", baseDevice, err)
-			return nil, status.Error(codes.Internal, err.Error())
-		}
-		err = d.OsDeviceConnectivityHelper.FlushMultipathDevice(baseDevice)
-		if err != nil {
-			return nil, status.Errorf(codes.Internal, "Multipath -f command failed for device %s: %v", baseDevice, err)
-		}
-		err = d.OsDeviceConnectivityHelper.RemovePhysicalDevice(ctx, sysDevices)
-		if err != nil {
-			return nil, status.Errorf(codes.Internal, "Remove SCSI device failed for device %s: %v", baseDevice, err)
-		}
-
-	default:
-		return nil, status.Errorf(codes.Internal, "Unknown NVMe type for device %s", baseDevice)
-	}
-
+	// TODO resurrected?
 	stageInfoPath := path.Join(stagingTargetPath, StageInfoFilename)
 	if d.NodeUtils.StageInfoFileIsExist(stageInfoPath) {
 		if err := d.NodeUtils.ClearStageInfoFile(stageInfoPath); err != nil {
 			return nil, status.Errorf(codes.Internal, "Fail to clear the stage info file: error %v", err)
 		}
-	}
-	// TODO nvme additions end
-	if err != nil {
-		return nil, err
 	}
 
 	err = os.Remove(stagingPathWithHostPrefix)

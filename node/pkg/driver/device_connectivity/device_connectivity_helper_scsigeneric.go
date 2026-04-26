@@ -1354,12 +1354,21 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) TeardownVolume(ctx context.Conte
 	// Resolve Hardware
 	mpathName := r.Helper.findDMByWWID(expectedWWID)
 	var major, minor uint32
+
+         var needFlush bool
+         var needRemovePhysical bool
+
 	if mpathName != "" {
 		major, minor, _ = r.Helper.GetMajorMinorFromSysfs(ctx, mpathName)
 	}
 
 	// --- PHASE 2: BLOCK LAYER (Identity & OpenCount) ---
 	if mpathName != "" {
+
+
+
+
+
 	
 		openCount, _ := r.Helper.GetOpenCount(ctx, mpathName)
 		
@@ -1383,6 +1392,7 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) TeardownVolume(ctx context.Conte
 			_ = r.dmIoctlCall(ctx, mpathName, DM_DEV_REMOVE, DM_DEFERRED_REMOVE)			
 		} else {
 			// Clean path: Flush and delete
+			if needFlush {
 			_, _ = executer.ExecuteUninterruptible[struct{}](
 				ctx, r.KeyedGater, "flush-"+mpathName, 10, 50, 5*time.Second, 30*time.Second,
 				func(wCtx context.Context) (struct{}, error) {
@@ -1391,15 +1401,19 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) TeardownVolume(ctx context.Conte
 				},
 			)
 			_ = r.multipathdAction(ctx, "del map "+mpathName)
+			}
 		}
 	}
 
 	// --- PHASE 3: PHYSICAL LAYER ---
 	// TODO does this require goroutine worker
+
+	if needRemovePhysical {
 	slaves, _ := r.Helper.getSlavesForDevice(major, minor)
 	if len(slaves) > 0 {
 		// RemovePhysicalDevice is already Gated and Context-Aware
 		_ = r.RemovePhysicalDevice(ctx, slaves)
+	}
 	}
 
 	// Final File Cleanup
