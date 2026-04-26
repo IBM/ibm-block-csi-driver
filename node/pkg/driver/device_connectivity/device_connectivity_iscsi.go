@@ -39,12 +39,14 @@ const (
 
 type OsDeviceConnectivityIscsi struct {
 	Executer          executer.ExecuterInterface
+	KeyedGater      *executer.KeyedGater
 	HelperScsiGeneric OsDeviceConnectivityHelperScsiGenericInterface
 }
 
 func NewOsDeviceConnectivityIscsi(executer executer.ExecuterInterface, KeyedGater *executer.KeyedGater, Mounter *mount.Mounter, clean_scsi_device bool) OsDeviceConnectivityInterface {
 	return &OsDeviceConnectivityIscsi{
 		Executer:          executer,
+		KeyedGater: KeyedGater,
 		HelperScsiGeneric: NewOsDeviceConnectivityHelperScsiGeneric(executer, KeyedGater, Mounter, clean_scsi_device),
 	}
 }
@@ -140,7 +142,7 @@ func (r OsDeviceConnectivityIscsi) iscsiGetRawSessions(ctx context.Context) ([]s
 		sessionPath := filepath.Join(sysPath, s.Name())
 
 		// 1. Quick Exit for non-logged-in sessions
-		stateBuf, err := r.readSysfs(ctx, filepath.Join(sessionPath, "state"))
+		stateBuf, err := r.readSysfs(filepath.Join(sessionPath, "state"))
 		if err != nil {
 			continue // Session likely vanished during ReadDir (common race condition)
 		}
@@ -152,7 +154,7 @@ func (r OsDeviceConnectivityIscsi) iscsiGetRawSessions(ctx context.Context) ([]s
 			continue
 		}
 
-		targetNameBuf, err := r.readSysfs(ctx, filepath.Join(sessionPath, "targetname"))
+		targetNameBuf, err := r.readSysfs(filepath.Join(sessionPath, "targetname"))
 		if err != nil {
 			continue
 		}
@@ -161,7 +163,7 @@ func (r OsDeviceConnectivityIscsi) iscsiGetRawSessions(ctx context.Context) ([]s
 		// 2. Direct Traversal (Avoids Glob overhead)
 		// Path: /sys/class/iscsi_session/sessionX/device/connectionX:S/iscsi_connection/connectionX:S/
 		devicePath := filepath.Join(sessionPath, "device")
-		connDirs, err := r.readSysfs(ctx, devicePath)
+		connDirs, err := os.ReadDir(devicePath)
 		if err != nil {
 			continue
 		}
@@ -175,20 +177,16 @@ func (r OsDeviceConnectivityIscsi) iscsiGetRawSessions(ctx context.Context) ([]s
 			// We use cd.Name() for both levels to ensure they match dynamically.
 			attrPath := filepath.Join(devicePath, cd.Name(), "iscsi_connection", cd.Name())
 
-			addrBuf, errA := r.readSysfs(ctx, filepath.Join(attrPath, "address"))
-			portBuf, errP := r.readSysfs(ctx, filepath.Join(attrPath, "port"))
-
-			// 3. Safety Check: Does the attrPath actually exist? 
-			// (Some hardware offload cards change this structure)
+			// FIX 2: Check existence first before attempting to read
 			if _, err := os.Stat(attrPath); os.IsNotExist(err) {
-				// Fallback: Check if attributes are directly in the connection folder 
-				// (Older kernels or specific transports)
 				logger.Warning("subdir not found")
 				attrPath = filepath.Join(devicePath, cd.Name())
-			}			
+			}
 
+			// FIX 3: Correct assignment for os.ReadFile (it returns []byte, error)
 			addrBuf, errA := os.ReadFile(filepath.Join(attrPath, "address"))
 			portBuf, errP := os.ReadFile(filepath.Join(attrPath, "port"))
+			// TODO trim
 
 			if errA == nil && errP == nil {
 				portal := net.JoinHostPort(
@@ -376,14 +374,14 @@ func (r OsDeviceConnectivityIscsi) normalizePortal(portal string) string {
 	return net.JoinHostPort(host, port)
 }
 
-func (r OsDeviceConnectivityIscsi) EnsureLogin(allPortalsByTarget map[string][]string) {
-	portalsByTarget, err := r.filterLoggedIn(allPortalsByTarget)
+func (r OsDeviceConnectivityIscsi) EnsureLogin(ctx context.Context, allPortalsByTarget map[string][]string) {
+	portalsByTarget, err := r.filterLoggedIn(ctx, allPortalsByTarget)
 	if err == nil {
 		if len(portalsByTarget) == 0 {
 			logger.Debug("All iSCSI portals are already logged in.")
 			return
 		}
-		r.discoverAndLogin(portalsByTarget)
+		r.discoverAndLogin(ctx, portalsByTarget)
 	} else {
 		logger.Errorf("Failed to filter logged in iSCSI portals: {%v}", err)
 	}
@@ -608,3 +606,12 @@ func (r OsDeviceConnectivityIscsi) GetBlockDeviceForSession(sessionID string) (s
 func cleanSysfsData(data []byte) string {
 	return strings.Trim(string(data), " \n\r\t\x00")
 }
+
+func (r *OsDeviceConnectivityIscsi) readSysfs(path string) (string, error) {
+        data, err := os.ReadFile(path)
+        if err != nil {
+                return "", err
+         }
+        return strings.Trim(string(data), " \n\r\t\x00"), nil
+}
+
