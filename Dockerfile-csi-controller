@@ -19,6 +19,7 @@ RUN if [[ "$(uname -m)" != "x86"* ]]; then yum install -y rust-toolset; fi
 
 USER default
 ENV PIP_DISABLE_PIP_VERSION_CHECK=1
+
 WORKDIR /tmp
 COPY controllers/servers/csi/requirements.txt .
 # avoid default boringssl lib, since it does not support z systems
@@ -47,6 +48,11 @@ LABEL name="IBM block storage CSI driver controller" \
       io.k8s.display-name="IBM block storage CSI driver controller" \
       io.k8s.description="The IBM block storage CSI driver enables container orchestrators, such as Kubernetes and OpenShift, to manage the life-cycle of persistent storage." \
       io.openshift.tags=ibm,csi,ibm-block-csi-driver,ibm-block-csi-node
+
+# Set PROTOCOL_BUFFERS_PYTHON_IMPLEMENTATION for zLinux platform only
+RUN if [ "$(uname -m)" = "s390x" ]; then \
+        echo 'export PROTOCOL_BUFFERS_PYTHON_IMPLEMENTATION=python' >> /opt/app-root/etc/scl_enable; \
+    fi
 
 COPY --from=builder /opt/app-root /opt/app-root
 COPY ./common /driver/common
