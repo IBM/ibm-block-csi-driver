@@ -11,7 +11,7 @@ cd ./proto/${PB2_DIR}
 
 curl -O https://raw.githubusercontent.com/container-storage-interface/spec/${CSI_VERSION}/csi.proto
 curl -O https://raw.githubusercontent.com/csi-addons/spec/${VG_VERSION}/volumegroup/volumegroup.proto
-curl -O https://raw.githubusercontent.com/Madhu-1/spec-1/fb39bcd0d4d741641659d9fe340e4c08dddab40f/replication/replication.proto
+curl -O https://raw.githubusercontent.com/csi-addons/spec/${ADDONS_VERSION}/replication/replication.proto
 sed -i 's|github.com/container-storage-interface/spec/lib/go/csi/csi.proto|csi_general/csi.proto|g' volumegroup.proto
 sed -i 's|github.com/container-storage-interface/spec/lib/go/csi/csi.proto|csi_general/csi.proto|g' replication.proto
 cd -
