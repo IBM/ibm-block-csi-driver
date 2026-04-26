@@ -145,7 +145,7 @@ class HostDefinerServicer:
             self._is_protocol_nvme(connectivity_type_from_user)
 
     def _change_host_protocol(self, array_mediator, host_name, existing_connectivity_type, request):
-        logger.info(messages.HOST_PROTOCOL_SHOULD_BE_CHANGE.format(host_name))
+        logger.info(messages.HOST_PROTOCOL_SHOULD_BE_CHANGED.format(host_name))
         try:
             self._change_host_protocol_with_chhost(array_mediator, host_name, existing_connectivity_type, request)
         except Exception as ex:

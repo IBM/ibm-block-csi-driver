@@ -465,6 +465,10 @@ class TestChangeHostProtocolWithChhost(TestDefineHost):
         self._prepare_define_host(is_host_exist=True)
         self.mediator.get_host_connectivity_type.return_value = array_settings.NVME_OVER_FC_CONNECTIVITY_TYPE
         self.mediator.get_host_io_group.return_value = test_utils.get_fake_host_io_group()
+        self.mediator.verify_host_partition.return_value = True
+
+        # Reset any side_effect from previous tests
+        self.mediator.change_host_protocol.side_effect = None
 
         # Current NVMe ports on host
         current_ports = ["nqn1", "nqn2"]
@@ -499,6 +503,10 @@ class TestChangeHostProtocolWithChhost(TestDefineHost):
         self._prepare_define_host(is_host_exist=True)
         self.mediator.get_host_connectivity_type.return_value = array_settings.ISCSI_CONNECTIVITY_TYPE
         self.mediator.get_host_io_group.return_value = test_utils.get_fake_host_io_group()
+        self.mediator.verify_host_partition.return_value = True
+
+        # Reset any side_effect from previous tests
+        self.mediator.change_host_protocol.side_effect = None
 
         # No current ports on host
         self.mediator.get_host_connectivity_ports.return_value = []
@@ -514,8 +522,9 @@ class TestChangeHostProtocolWithChhost(TestDefineHost):
         # Should not call remove_ports_from_host
         self.mediator.remove_ports_from_host.assert_not_called()
 
-        # Should still change protocol and add ports
-        self.mediator.change_host_protocol.assert_called_once()
+        # Should not change protocol because it remains SCSI
+        self.mediator.change_host_protocol.assert_not_called()
+        # Should still add ports
         self.mediator.add_ports_to_host.assert_called_once()
 
         self.assertEqual(response.error_message, '')
