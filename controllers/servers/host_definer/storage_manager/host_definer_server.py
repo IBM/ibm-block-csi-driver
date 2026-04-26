@@ -116,6 +116,9 @@ class HostDefinerServicer:
                 new_initiator_ports = initiators.get_by_connectivity_type(requested_connectivity_type)
                 ports_to_remove = self._get_ports_to_remove(ports_in_connectivity, new_initiator_ports)
                 ports_to_add = self._get_ports_to_add(new_initiator_ports, ports_in_connectivity)
+                logger.info("ports_in_connectivity: {} new_initiator_ports: {}".format(ports_in_connectivity,
+                                                                                       new_initiator_ports))
+                logger.info("ports_to_remove: {} ports_to_add: {}".format(ports_to_remove, ports_to_add))
                 if ports_to_remove:
                     self._remove_host_ports(array_mediator, host, ports_to_remove, existing_connectivity_type)
                 if ports_to_add:
@@ -271,6 +274,7 @@ class HostDefinerServicer:
 
     def _is_port_update_needed_when_same_protocol(
             self, request, connectivity_type_from_user, connectivity_type_from_host):
+        # FC and iSCSI are considered the same protocol - SCSI. NVMe is different.
         is_port_update_needed = (
             connectivity_type_from_user != connectivity_type_from_host
             or request.node_id_from_csi_node != request.node_id_from_host_definition
