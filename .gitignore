@@ -7,6 +7,6 @@
 /bin/
 node/mocks
 build/reports
-csi_general/
+# csi_general/
 /.run/
 docs/.vscode/settings.json
