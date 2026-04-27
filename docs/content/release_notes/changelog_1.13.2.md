@@ -13,3 +13,4 @@ IBM® block storage CSI driver version 1.13.2 resolved the following issues:
 
 |Ticket ID|Severity|Description|
 |---------|--------|-----------|
+|**CSI-6138**|Medium|On rare occasions, Host Definer is not able to read old listing format|
