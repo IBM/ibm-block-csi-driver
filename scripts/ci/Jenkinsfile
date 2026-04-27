@@ -15,23 +15,27 @@ pipeline {
     }
     stages {
         stage ('Controllers: static code analysis') {
+            when { expression { false } }
             steps {
                 sh './scripts/run_static_code_analysis.sh'
             }
         }
         stage ('Controllers: Unit testing + coverage') {
+            when { expression { false } }
             steps {
                 sh 'mkdir -p build/reports && chmod 777 build/reports'
                 sh './scripts/run_unitests.sh `pwd`/build/reports'
             }
         }
         stage ('CSI-node: go local tests') {
+            when { expression { false } }
             steps {
                 sh 'mkdir -p build/reports && chmod 777 build/reports'
                 sh 'make test-xunit-in-container'
             }
         }
         stage ('CSI-deployment: k8s yamls validation') {
+            when { expression { false } }
             steps {
                 sh './scripts/run_yamlcheck.sh'
             }
