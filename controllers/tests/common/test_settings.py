@@ -61,4 +61,4 @@ REQUEST_VOLUME_GROUP_ID = ID_FORMAT.format(INTERNAL_VOLUME_GROUP_ID, VOLUME_GROU
 
 HOST_OBJECT_TYPE = "host"
 NODE_INITIATORS_FIELD = common_settings.NODE_INITIATORS_FIELD
-EMPTY_INITIATORS_STR = '{"fc":[],"iscsi":[],"nvmeofc":[]}'
+EMPTY_INITIATORS_STR = '{"nvmeofc":[],"fc":[],"iscsi":[]}'

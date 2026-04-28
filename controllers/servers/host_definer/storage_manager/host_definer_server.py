@@ -2,6 +2,7 @@
 import json
 
 from controllers.array_action import settings as array_config
+from controllers.array_action import errors as array_errors
 from controllers.array_action.errors import HostNotFoundError, HostAlreadyExists
 from controllers.array_action.storage_agent import detect_array_type, get_agent
 from controllers.common.csi_logger import get_stdout_logger
@@ -10,7 +11,9 @@ import controllers.common.settings as common_settings
 from controllers.servers.host_definer.hd_types import DefineHostResponse
 from controllers.servers.utils import (join_object_prefix_with_name,
                                        get_initiators_connectivity_type,
-                                       generate_node_initiators_from_string_data)
+                                       get_initiators_from_host_definition,
+                                       get_initiators_from_csi_node,
+                                       are_initiators_equal)
 from controllers.servers.host_definer import messages
 
 logger = get_stdout_logger()
@@ -22,16 +25,19 @@ class HostDefinerServicer:
         array_addresses = array_connection_info.array_addresses
         node_id_info = NodeIdInfo(request.node_id_from_csi_node)
         node_name = node_id_info.node_name
-        initiators = generate_node_initiators_from_string_data(request.node_initiators_from_csi_node)
+        initiators = get_initiators_from_csi_node(
+            request.node_initiators_from_csi_node,
+            request.node_id_from_csi_node)
         connectivity_type_from_user = get_initiators_connectivity_type(initiators, request.connectivity_type_from_user)
         host_name = join_object_prefix_with_name(prefix=request.prefix, name=node_name)
-        logger.info(messages.DEFINE_NODE_ON_ARRAYS.format(node_name, array_addresses))
+        logger.info(messages.DEFINE_HOST_ON_ARRAYS.format(node_name, array_addresses))
         try:
             array_type = detect_array_type(array_addresses)
             with get_agent(array_connection_info, array_type).get_mediator() as array_mediator:
                 try:
-                    initiators_from_host_definition = \
-                        generate_node_initiators_from_string_data(request.node_initiators_from_host_definition)
+                    initiators_from_host_definition = get_initiators_from_host_definition(
+                        request.node_initiators_from_host_definition,
+                        request.node_id_from_host_definition)
                     found_host_name = self._get_host_name(initiators_from_host_definition, array_mediator)
                     # Partition update is first one - verifies partition can be fixed (may fail if mapped)
                     self._update_host_partition(request, found_host_name,
@@ -61,7 +67,9 @@ class HostDefinerServicer:
 
     def undefine_host(self, request):
         node_id_info = NodeIdInfo(request.node_id_from_csi_node)
-        initiators = generate_node_initiators_from_string_data(request.node_initiators_from_csi_node)
+        initiators = get_initiators_from_csi_node(
+            request.node_initiators_from_csi_node,
+            request.node_id_from_csi_node)
         array_connection_info = request.array_connection_info
         array_addresses = array_connection_info.array_addresses
         node_name = node_id_info.node_name
@@ -93,17 +101,29 @@ class HostDefinerServicer:
             raise array_errors.HostNotFoundError(host_name)
 
     def _update_host_ports(self, request, host, array_mediator, partition_name):
-        initiators = generate_node_initiators_from_string_data(request.node_initiators_from_csi_node)
-        connectivity_type_from_user = get_initiators_connectivity_type(initiators, request.connectivity_type_from_user)
-        connectivity_type_from_host = array_mediator.get_host_connectivity_type(host)
-        if self._is_protocol_switched(connectivity_type_from_user, connectivity_type_from_host):
-            self._change_host_protocol(array_mediator, host, connectivity_type_from_host, request)
-        elif self._is_port_update_needed_when_same_protocol(request, connectivity_type_from_user,
-                                                            connectivity_type_from_host):
-            logger.info(messages.HOST_PORTS_SHOULD_BE_CHANGE.format(host, initiators))
+        initiators = get_initiators_from_csi_node(
+            request.node_initiators_from_csi_node,
+            request.node_id_from_csi_node)
+        requested_connectivity_type = get_initiators_connectivity_type(initiators, request.connectivity_type_from_user)
+        existing_connectivity_type = array_mediator.get_host_connectivity_type(host)
+        if self._is_protocol_switched(requested_connectivity_type, existing_connectivity_type):
+            self._change_host_protocol(array_mediator, host, existing_connectivity_type, request)
+        elif self._is_port_update_needed_when_same_protocol(request, requested_connectivity_type,
+                                                            existing_connectivity_type):
+            logger.info(messages.HOST_PORTS_SHOULD_BE_CHANGED.format(host, initiators))
             try:
-                self._remove_host_ports(array_mediator, host, connectivity_type_from_host)
-                array_mediator.add_ports_to_host(host, initiators, connectivity_type_from_user)
+                ports_in_connectivity = array_mediator.get_host_connectivity_ports(host, existing_connectivity_type)
+                new_initiator_ports = initiators.get_by_connectivity_type(requested_connectivity_type)
+                ports_to_remove = self._get_ports_to_remove(ports_in_connectivity, new_initiator_ports)
+                ports_to_add = self._get_ports_to_add(new_initiator_ports, ports_in_connectivity)
+                logger.info("ports_to_remove: {} ports_to_add: {}".format(ports_to_remove, ports_to_add))
+                if ports_to_remove:
+                    self._remove_host_ports(array_mediator, host, ports_to_remove, existing_connectivity_type)
+                if ports_to_add:
+                    # Create Initiators object with only the ports to add for the specific connectivity type
+                    initiators_to_add = self._create_initiators_for_connectivity_type(
+                        ports_to_add, requested_connectivity_type)
+                    array_mediator.add_ports_to_host(host, initiators_to_add, requested_connectivity_type)
             except Exception as ex:
                 if partition_name:
                     logger.error(ex)
@@ -125,28 +145,105 @@ class HostDefinerServicer:
         return self._is_protocol_scsi(connectivity_type_from_host) and \
             self._is_protocol_nvme(connectivity_type_from_user)
 
-    def _change_host_protocol(self, array_mediator, host_name, connectivity_type_from_host, request):
-        logger.info(messages.HOST_PROTOCOL_SHOULD_BE_CHANGE.format(host_name))
+    def _change_host_protocol(self, array_mediator, host_name, existing_connectivity_type, request):
+        logger.info(messages.HOST_PROTOCOL_SHOULD_BE_CHANGED.format(host_name))
         try:
-            self._change_host_protocol_with_chhost(array_mediator, host_name, connectivity_type_from_host, request)
+            self._change_host_protocol_with_chhost(array_mediator, host_name, existing_connectivity_type, request)
         except Exception as ex:
             logger.error(ex)
             logger.info(messages.COULD_NOT_CHANGE_HOST_PROTOCOL_USING_CHHOST.format(host_name))
             array_mediator.delete_host(host_name)
             self._create_host(host_name, array_mediator, request)
 
-    def _change_host_protocol_with_chhost(self, array_mediator, host_name, connectivity_type_from_host, request):
-        self._remove_host_ports(array_mediator, host_name, connectivity_type_from_host)
-        initiators = generate_node_initiators_from_string_data(request.node_initiators_from_csi_node)
-        connectivity_type_from_user = get_initiators_connectivity_type(initiators, request.connectivity_type_from_user)
-        protocol = self._get_host_protocol(connectivity_type_from_user)
-        array_mediator.change_host_protocol(host_name, protocol)
-        array_mediator.add_ports_to_host(host_name, initiators, connectivity_type_from_user)
+    def _change_host_protocol_with_chhost(self, array_mediator, host_name, existing_connectivity_type, request):
+        # Get all current ports and remove them all when changing protocol
+        ports_in_connectivity = array_mediator.get_host_connectivity_ports(host_name, existing_connectivity_type)
+        if ports_in_connectivity:
+            self._remove_host_ports(array_mediator, host_name, ports_in_connectivity, existing_connectivity_type)
 
-    def _remove_host_ports(self, array_mediator, host_name, connectivity_type):
-        if connectivity_type:
-            ports_to_remove = array_mediator.get_host_connectivity_ports(host_name, connectivity_type)
+        # Always change protocol and add new ports, even if there were no ports to remove
+        initiators = get_initiators_from_csi_node(
+            request.node_initiators_from_csi_node,
+            request.node_id_from_csi_node)
+        requested_connectivity_type = get_initiators_connectivity_type(initiators, request.connectivity_type_from_user)
+        protocol = self._get_host_protocol(requested_connectivity_type)
+        array_mediator.change_host_protocol(host_name, protocol)
+        array_mediator.add_ports_to_host(host_name, initiators, requested_connectivity_type)
+
+    def _remove_host_ports(self, array_mediator, host_name, ports_to_remove, connectivity_type):
+        """
+        Remove specified ports from a host.
+
+        Args:
+            array_mediator: The array mediator instance
+            host_name: Name of the host
+            ports_to_remove: List of ports to remove
+            connectivity_type: The connectivity type
+        """
+        if connectivity_type and ports_to_remove:
             array_mediator.remove_ports_from_host(host_name, ports_to_remove, connectivity_type)
+
+    def _get_ports_to_remove(self, all_ports, do_not_remove_ports):
+        """
+        Filter out ports that should not be removed from the list of all ports.
+
+        Args:
+            all_ports: List of all ports currently on the host
+            do_not_remove_ports: List of ports (initiators) that should be kept
+
+        Returns:
+            List of ports that should be removed
+        """
+        if not do_not_remove_ports:
+            return all_ports
+
+        # Convert do_not_remove_ports to a set for efficient lookup (case-insensitive)
+        ports_to_keep = set(port.lower() for port in do_not_remove_ports)
+
+        # Return only ports that are not in the keep list (case-insensitive comparison)
+        return [port for port in all_ports if port.lower() not in ports_to_keep]
+
+    def _get_ports_to_add(self, new_ports, existing_ports):
+        """
+        Filter out ports that are already on the host from the list of new ports.
+
+        Args:
+            new_ports: List of ports (initiators) that should be on the host
+            existing_ports: List of ports currently on the host
+
+        Returns:
+            List of ports that need to be added
+        """
+        if not existing_ports:
+            return new_ports
+
+        # Convert existing_ports to a set for efficient lookup (case-insensitive)
+        existing_ports_set = set(port.lower() for port in existing_ports)
+
+        # Return only ports that are not already on the host (case-insensitive comparison)
+        return [port for port in new_ports if port.lower() not in existing_ports_set]
+
+    def _create_initiators_for_connectivity_type(self, ports, connectivity_type):
+        """
+        Create an Initiators object with ports for a specific connectivity type.
+
+        Args:
+            ports: List of ports to add
+            connectivity_type: The connectivity type (fc, iscsi, or nvme)
+
+        Returns:
+            Initiators object with the ports set for the appropriate connectivity type
+        """
+        from controllers.common.node_info import Initiators
+
+        if connectivity_type == array_config.FC_CONNECTIVITY_TYPE:
+            return Initiators(fc_wwns=ports)
+        elif connectivity_type == array_config.ISCSI_CONNECTIVITY_TYPE:
+            return Initiators(iscsi_iqns=ports)
+        elif connectivity_type == array_config.NVME_OVER_FC_CONNECTIVITY_TYPE:
+            return Initiators(nvme_nqns=ports)
+        else:
+            return Initiators()
 
     def _get_host_protocol(self, connectivity_type):
         if self._is_protocol_scsi(connectivity_type):
@@ -162,7 +259,9 @@ class HostDefinerServicer:
         return connectivity_type == array_config.NVME_OVER_FC_CONNECTIVITY_TYPE
 
     def _create_host(self, host, array_mediator, request):
-        initiators = generate_node_initiators_from_string_data(request.node_initiators_from_csi_node)
+        initiators = get_initiators_from_csi_node(
+            request.node_initiators_from_csi_node,
+            request.node_id_from_csi_node)
         connectivity_type = get_initiators_connectivity_type(initiators, request.connectivity_type_from_user)
         array_mediator.create_host(host, initiators, connectivity_type, request.io_group,
                                    request.array_connection_info.partition_name,
@@ -173,9 +272,25 @@ class HostDefinerServicer:
 
     def _is_port_update_needed_when_same_protocol(
             self, request, connectivity_type_from_user, connectivity_type_from_host):
-        return connectivity_type_from_user != connectivity_type_from_host \
-            or request.node_id_from_csi_node != request.node_id_from_host_definition \
-            or request.node_initiators_from_csi_node != request.node_initiators_from_host_definition
+        # FC and iSCSI are considered the same protocol - SCSI. NVMe is different.
+        is_port_update_needed = (
+            connectivity_type_from_user != connectivity_type_from_host
+            or request.node_id_from_csi_node != request.node_id_from_host_definition
+            or not are_initiators_equal(
+                request.node_initiators_from_csi_node,
+                request.node_initiators_from_host_definition,
+                request.connectivity_type_from_user
+            )
+        )
+        if is_port_update_needed:
+            logger.info("{} != {} || {} != {} || {} != {}".format(
+                connectivity_type_from_user,
+                connectivity_type_from_host,
+                request.node_id_from_csi_node,
+                request.node_id_from_host_definition,
+                request.node_initiators_from_csi_node,
+                request.node_initiators_from_host_definition))
+        return is_port_update_needed
 
     def _update_host_io_group(self, request, host, array_mediator):
         io_group_from_host = array_mediator.get_host_io_group(host)

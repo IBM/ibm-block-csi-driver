@@ -1,12 +1,13 @@
 
 {{site.data.keyword.attribute-definition-list}}
 
-# 1.14.0 (TODO-Month 2026)
+# 1.13.1 (April 2026)
 
 As of this document's publication date, the IBM Power® and zLinux® architectures are not supported for this release.{: restriction}
 
-IBM® Block Storage CSI driver 1.14.0 added new support and enhancements.
-- IBM Storage Virtualize® partitions PBHA with iscsi host
+IBM® Block Storage CSI driver 1.13.1 added new support and enhancements.
+- IBM Storage Virtualize® partitions PBHA for both FC and iSCSI hosts
+- Support of snapshots in IBM Storage Virtualize® PBHA (Partitions in Policy Based High Availability)
 - Support of NVMe over FC hosts
 - Extended support to RedHat OpenShift® 4.21
 - Extended support to Kubernetes 1.35

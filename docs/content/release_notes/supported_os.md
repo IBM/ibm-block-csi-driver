@@ -17,7 +17,7 @@ The following table lists supported operating systems for deployment of the IBM�
 
 | Operating system                                     |Architecture           |
 |------------------------------------------------------|-----------------------|
-| Red Hat Enterprise Linux CoreOS® (RHCOS) 4.17-4.21   |x86, IBM Z®, IBM Power®|
+| Red Hat Enterprise Linux CoreOS® (RHCOS) 4.18-4.21   |x86|
 
 IBM Power® architecture is only supported with IBM Storage Virtualize® family storage systems.{: restriction}
 

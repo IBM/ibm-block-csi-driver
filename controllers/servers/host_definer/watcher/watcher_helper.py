@@ -5,9 +5,11 @@ from munch import Munch
 import json
 
 from controllers.common.csi_logger import get_stdout_logger
+from controllers.common.node_info import NodeIdInfo
 from controllers.servers.settings import SECRET_SUPPORTED_TOPOLOGIES_PARAMETER
 from controllers.servers.utils import (
-    validate_secrets, get_array_connection_info_from_secrets, get_system_info_for_topologies)
+    validate_secrets, get_array_connection_info_from_secrets, get_system_info_for_topologies,
+    get_initiators_from_host_definition, get_initiators_from_csi_node, convert_initiators_to_json_string)
 from controllers.servers.errors import ValidationException
 import controllers.servers.host_definer.messages as messages
 from controllers.servers.host_definer.kubernetes_manager.manager import KubernetesManager
@@ -83,8 +85,17 @@ class Watcher(KubernetesManager):
             host_definition_info.node_name, host_definition_info.secret_name, host_definition_info.secret_namespace)
         if host_definition_info_on_cluster:
             host_definition_info.connectivity_type = host_definition_info_on_cluster.connectivity_type
-            host_definition_info.node_id = host_definition_info_on_cluster.node_id
-            host_definition_info.node_initiators = host_definition_info_on_cluster.node_initiators
+            # Handle both legacy and new formats for node_id and node_initiators
+            # Extract node_id in new format (just node name)
+            node_id_info = NodeIdInfo(host_definition_info_on_cluster.node_id)
+            host_definition_info.node_id = node_id_info.node_name
+
+            # Get initiators in new format (JSON string) from either new or legacy format
+            initiators = get_initiators_from_host_definition(
+                host_definition_info_on_cluster.node_initiators,
+                host_definition_info_on_cluster.node_id)
+            # Convert Initiators object to JSON string format
+            host_definition_info.node_initiators = convert_initiators_to_json_string(initiators)
         return host_definition_info
 
     def _define_host(self, host_definition_info):
@@ -261,14 +272,30 @@ class Watcher(KubernetesManager):
         request = self._add_array_connectivity_info_to_request(
             request, host_definition_info.secret_name, host_definition_info.secret_namespace, node_info.labels)
         if request:
-            request.node_id_from_host_definition = host_definition_info.node_id
-            request.node_initiators_from_host_definition = host_definition_info.node_initiators
-            request.node_id_from_csi_node = self._get_node_id_by_node(host_definition_info)
-            request.node_initiators_from_csi_node = self._get_node_initiators_by_node(host_definition_info)
+            # Normalize node_id and node_initiators from host_definition to new format
+            # Handle both legacy format (node_id contains initiators) and new format (separate fields)
+            node_id_info_hd = NodeIdInfo(host_definition_info.node_id)
+            request.node_id_from_host_definition = node_id_info_hd.node_name
+
+            initiators_hd = get_initiators_from_host_definition(
+                host_definition_info.node_initiators, host_definition_info.node_id)
+            request.node_initiators_from_host_definition = convert_initiators_to_json_string(initiators_hd)
+
+            # Normalize node_id and node_initiators from csi_node to new format
+            csi_node_id = self._get_node_id_by_node(host_definition_info)
+            csi_node_initiators = self._get_node_initiators_by_node(host_definition_info)
+
+            node_id_info_csi = NodeIdInfo(csi_node_id)
+            request.node_id_from_csi_node = node_id_info_csi.node_name
+
+            initiators_csi = get_initiators_from_csi_node(csi_node_initiators, csi_node_id)
+            request.node_initiators_from_csi_node = convert_initiators_to_json_string(initiators_csi)
+
             # To clarify the variable name 'node_initiators_from_csi_node' -
             # Since CSI-5997, initiators are extracted from k8s node annoatations (not from k&s csinode nodeID).
             # However, They are still stored at CsiNodeInfo and ManagedNode (see hd_types.py)
             request.io_group = self._get_io_group_by_node(host_definition_info.node_name)
+        logger.info(request)
         return request
 
     def _get_new_request(self, labels):

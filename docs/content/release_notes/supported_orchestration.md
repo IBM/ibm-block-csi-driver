@@ -15,11 +15,10 @@ The following table details orchestration platforms suitable for deployment of t
 |Kubernetes            | 1.33    |x86|
 |Kubernetes            | 1.34    |x86|
 |Kubernetes            | 1.35    |x86|
-|Red Hat OpenShift®    | 4.17    |x86, IBM Z®, IBM Power®|
-|Red Hat OpenShift®    | 4.18    |x86, IBM Z®, IBM Power®|
-|Red Hat OpenShift®    | 4.19    |x86, IBM Z®, IBM Power®|
-|Red Hat OpenShift®    | 4.20    |x86, IBM Z®, IBM Power®|
-|Red Hat OpenShift®    | 4.21    |x86, IBM Z®, IBM Power®|
+|Red Hat OpenShift®    | 4.18    |x86|
+|Red Hat OpenShift®    | 4.19    |x86|
+|Red Hat OpenShift®    | 4.20    |x86|
+|Red Hat OpenShift®    | 4.21    |x86|
 
 IBM Power® architecture is only supported with IBM Storage Virtualize® family storage systems.{: restriction}
 

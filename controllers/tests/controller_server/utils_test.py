@@ -403,6 +403,15 @@ class TestUtils(unittest.TestCase):
         node_id_info = NodeIdInfo(host_name)
         self._check_node_id_parameters(node_id_info)
 
+    def test_get_node_id_info_legacy_format(self):
+        """Test NodeIdInfo with legacy format (node_name;nvme_nqn;fc_wwns;iscsi_iqn)"""
+        legacy_node_id = (
+            "host-name;nqn.2014-08.org.nvmexpress:uuid:b57708c7;"
+            "10000000c9934d9f:10000000c9934d9h;iqn.1994-07.com.redhat:e123456789"
+        )
+        node_id_info = NodeIdInfo(legacy_node_id)
+        self._check_node_id_parameters(node_id_info)
+
     def test_choose_connectivity_types(self):
         nvme = NVME_OVER_FC_CONNECTIVITY_TYPE
         fc = FC_CONNECTIVITY_TYPE
@@ -526,3 +535,295 @@ class TestUtils(unittest.TestCase):
         result = utils.get_odf_call_home_version()
         self.assertEqual(result, expected_result)
         mock_getenv.assert_called_once_with(controller_config.ODF_VERSION_FOR_CALL_HOME_ENV_VAR, '')
+
+    def test_are_initiators_equal_identical(self):
+        """Test that identical initiator strings are equal"""
+        initiator_str = json.dumps({
+            NVME_OVER_FC_CONNECTIVITY_TYPE: ["nqn.2014-08.org.nvmexpress:uuid:12345"],
+            FC_CONNECTIVITY_TYPE: ["10000000c9934d9f", "10000000c9934d9e"],
+            ISCSI_CONNECTIVITY_TYPE: ["iqn.1994-07.com.redhat:e123456789"]
+        })
+        self.assertTrue(utils.are_initiators_equal(initiator_str, initiator_str))
+
+    def test_are_initiators_equal_same_content_different_order(self):
+        """Test that initiators with same content but different order are equal"""
+        initiator_str1 = json.dumps({
+            NVME_OVER_FC_CONNECTIVITY_TYPE: [],
+            FC_CONNECTIVITY_TYPE: ["wwn1", "wwn2", "wwn3"],
+            ISCSI_CONNECTIVITY_TYPE: []
+        })
+        initiator_str2 = json.dumps({
+            NVME_OVER_FC_CONNECTIVITY_TYPE: [],
+            FC_CONNECTIVITY_TYPE: ["wwn3", "wwn1", "wwn2"],
+            ISCSI_CONNECTIVITY_TYPE: []
+        })
+        self.assertTrue(utils.are_initiators_equal(initiator_str1, initiator_str2))
+
+    def test_are_initiators_equal_case_insensitive(self):
+        """Test that initiator comparison is case-insensitive"""
+        initiator_str1 = json.dumps({
+            NVME_OVER_FC_CONNECTIVITY_TYPE: [],
+            FC_CONNECTIVITY_TYPE: ["WWN1", "WWN2"],
+            ISCSI_CONNECTIVITY_TYPE: ["IQN.1994-07.COM.REDHAT:E123456789"]
+        })
+        initiator_str2 = json.dumps({
+            NVME_OVER_FC_CONNECTIVITY_TYPE: [],
+            FC_CONNECTIVITY_TYPE: ["wwn1", "wwn2"],
+            ISCSI_CONNECTIVITY_TYPE: ["iqn.1994-07.com.redhat:e123456789"]
+        })
+        self.assertTrue(utils.are_initiators_equal(initiator_str1, initiator_str2))
+
+    def test_are_initiators_equal_different_fc_wwns(self):
+        """Test that different FC WWNs are not equal"""
+        initiator_str1 = json.dumps({
+            NVME_OVER_FC_CONNECTIVITY_TYPE: [],
+            FC_CONNECTIVITY_TYPE: ["wwn1", "wwn2"],
+            ISCSI_CONNECTIVITY_TYPE: []
+        })
+        initiator_str2 = json.dumps({
+            NVME_OVER_FC_CONNECTIVITY_TYPE: [],
+            FC_CONNECTIVITY_TYPE: ["wwn1", "wwn3"],
+            ISCSI_CONNECTIVITY_TYPE: []
+        })
+        self.assertFalse(utils.are_initiators_equal(initiator_str1, initiator_str2))
+
+    def test_are_initiators_equal_different_iscsi_iqns(self):
+        """Test that different iSCSI IQNs are not equal"""
+        initiator_str1 = json.dumps({
+            NVME_OVER_FC_CONNECTIVITY_TYPE: [],
+            FC_CONNECTIVITY_TYPE: [],
+            ISCSI_CONNECTIVITY_TYPE: ["iqn.1994-07.com.redhat:e123456789"]
+        })
+        initiator_str2 = json.dumps({
+            NVME_OVER_FC_CONNECTIVITY_TYPE: [],
+            FC_CONNECTIVITY_TYPE: [],
+            ISCSI_CONNECTIVITY_TYPE: ["iqn.1994-07.com.redhat:e987654321"]
+        })
+        self.assertFalse(utils.are_initiators_equal(initiator_str1, initiator_str2))
+
+    def test_are_initiators_equal_different_nvme_nqns(self):
+        """Test that different NVMe NQNs are not equal"""
+        initiator_str1 = json.dumps({
+            NVME_OVER_FC_CONNECTIVITY_TYPE: ["nqn.2014-08.org.nvmexpress:uuid:12345"],
+            FC_CONNECTIVITY_TYPE: [],
+            ISCSI_CONNECTIVITY_TYPE: []
+        })
+        initiator_str2 = json.dumps({
+            NVME_OVER_FC_CONNECTIVITY_TYPE: ["nqn.2014-08.org.nvmexpress:uuid:67890"],
+            FC_CONNECTIVITY_TYPE: [],
+            ISCSI_CONNECTIVITY_TYPE: []
+        })
+        self.assertFalse(utils.are_initiators_equal(initiator_str1, initiator_str2))
+
+    def test_are_initiators_equal_empty_initiators(self):
+        """Test that empty initiator strings are equal"""
+        initiator_str1 = json.dumps({
+            NVME_OVER_FC_CONNECTIVITY_TYPE: [],
+            FC_CONNECTIVITY_TYPE: [],
+            ISCSI_CONNECTIVITY_TYPE: []
+        })
+        initiator_str2 = json.dumps({
+            NVME_OVER_FC_CONNECTIVITY_TYPE: [],
+            FC_CONNECTIVITY_TYPE: [],
+            ISCSI_CONNECTIVITY_TYPE: []
+        })
+        self.assertTrue(utils.are_initiators_equal(initiator_str1, initiator_str2))
+
+    def test_are_initiators_equal_one_empty_one_not(self):
+        """Test that empty and non-empty initiators are not equal"""
+        initiator_str1 = json.dumps({
+            NVME_OVER_FC_CONNECTIVITY_TYPE: [],
+            FC_CONNECTIVITY_TYPE: [],
+            ISCSI_CONNECTIVITY_TYPE: []
+        })
+        initiator_str2 = json.dumps({
+            NVME_OVER_FC_CONNECTIVITY_TYPE: [],
+            FC_CONNECTIVITY_TYPE: ["wwn1"],
+            ISCSI_CONNECTIVITY_TYPE: []
+        })
+        self.assertFalse(utils.are_initiators_equal(initiator_str1, initiator_str2))
+
+    def test_are_initiators_equal_invalid_json(self):
+        """Test that invalid JSON returns False"""
+        initiator_str1 = "invalid json"
+        initiator_str2 = json.dumps({
+            NVME_OVER_FC_CONNECTIVITY_TYPE: [],
+            FC_CONNECTIVITY_TYPE: [],
+            ISCSI_CONNECTIVITY_TYPE: []
+        })
+        self.assertFalse(utils.are_initiators_equal(initiator_str1, initiator_str2))
+
+    def test_are_initiators_equal_mixed_connectivity_types(self):
+        """Test comparison with multiple connectivity types"""
+        initiator_str1 = json.dumps({
+            NVME_OVER_FC_CONNECTIVITY_TYPE: ["nqn.2014-08.org.nvmexpress:uuid:12345"],
+            FC_CONNECTIVITY_TYPE: ["wwn1", "wwn2"],
+            ISCSI_CONNECTIVITY_TYPE: ["iqn.1994-07.com.redhat:e123456789"]
+        })
+        initiator_str2 = json.dumps({
+            NVME_OVER_FC_CONNECTIVITY_TYPE: ["nqn.2014-08.org.nvmexpress:uuid:12345"],
+            FC_CONNECTIVITY_TYPE: ["wwn2", "wwn1"],  # Different order
+            ISCSI_CONNECTIVITY_TYPE: ["iqn.1994-07.com.redhat:e123456789"]
+        })
+        self.assertTrue(utils.are_initiators_equal(initiator_str1, initiator_str2))
+
+    def test_are_initiators_equal_with_protocol_iscsi_match(self):
+        """Test protocol-specific comparison for iSCSI - matching IQNs"""
+        initiator_str1 = json.dumps({
+            NVME_OVER_FC_CONNECTIVITY_TYPE: ["nqn1"],
+            FC_CONNECTIVITY_TYPE: ["wwn1", "wwn2"],
+            ISCSI_CONNECTIVITY_TYPE: ["iqn.1994-07.com.redhat:e123456789"]
+        })
+        initiator_str2 = json.dumps({
+            NVME_OVER_FC_CONNECTIVITY_TYPE: ["nqn2"],  # Different NQN
+            FC_CONNECTIVITY_TYPE: ["wwn3", "wwn4"],  # Different WWNs
+            ISCSI_CONNECTIVITY_TYPE: ["iqn.1994-07.com.redhat:e123456789"]  # Same IQN
+        })
+        # Should return True because iSCSI IQNs match
+        self.assertTrue(utils.are_initiators_equal(initiator_str1, initiator_str2, ISCSI_CONNECTIVITY_TYPE))
+
+    def test_are_initiators_equal_with_protocol_iscsi_no_match(self):
+        """Test protocol-specific comparison for iSCSI - different IQNs"""
+        initiator_str1 = json.dumps({
+            NVME_OVER_FC_CONNECTIVITY_TYPE: ["nqn1"],
+            FC_CONNECTIVITY_TYPE: ["wwn1", "wwn2"],
+            ISCSI_CONNECTIVITY_TYPE: ["iqn.1994-07.com.redhat:e123456789"]
+        })
+        initiator_str2 = json.dumps({
+            NVME_OVER_FC_CONNECTIVITY_TYPE: ["nqn1"],  # Same NQN
+            FC_CONNECTIVITY_TYPE: ["wwn1", "wwn2"],  # Same WWNs
+            ISCSI_CONNECTIVITY_TYPE: ["iqn.1994-07.com.redhat:e987654321"]  # Different IQN
+        })
+        # Should return False because iSCSI IQNs don't match
+        self.assertFalse(utils.are_initiators_equal(initiator_str1, initiator_str2, ISCSI_CONNECTIVITY_TYPE))
+
+    def test_are_initiators_equal_with_protocol_fc_match(self):
+        """Test protocol-specific comparison for FC - matching WWNs"""
+        initiator_str1 = json.dumps({
+            NVME_OVER_FC_CONNECTIVITY_TYPE: ["nqn1"],
+            FC_CONNECTIVITY_TYPE: ["wwn1", "wwn2"],
+            ISCSI_CONNECTIVITY_TYPE: ["iqn1"]
+        })
+        initiator_str2 = json.dumps({
+            NVME_OVER_FC_CONNECTIVITY_TYPE: ["nqn2"],  # Different NQN
+            FC_CONNECTIVITY_TYPE: ["wwn2", "wwn1"],  # Same WWNs, different order
+            ISCSI_CONNECTIVITY_TYPE: ["iqn2"]  # Different IQN
+        })
+        # Should return True because FC WWNs match
+        self.assertTrue(utils.are_initiators_equal(initiator_str1, initiator_str2, FC_CONNECTIVITY_TYPE))
+
+    def test_are_initiators_equal_with_protocol_fc_no_match(self):
+        """Test protocol-specific comparison for FC - different WWNs"""
+        initiator_str1 = json.dumps({
+            NVME_OVER_FC_CONNECTIVITY_TYPE: ["nqn1"],
+            FC_CONNECTIVITY_TYPE: ["wwn1", "wwn2"],
+            ISCSI_CONNECTIVITY_TYPE: ["iqn1"]
+        })
+        initiator_str2 = json.dumps({
+            NVME_OVER_FC_CONNECTIVITY_TYPE: ["nqn1"],  # Same NQN
+            FC_CONNECTIVITY_TYPE: ["wwn1", "wwn3"],  # Different WWNs
+            ISCSI_CONNECTIVITY_TYPE: ["iqn1"]  # Same IQN
+        })
+        # Should return False because FC WWNs don't match
+        self.assertFalse(utils.are_initiators_equal(initiator_str1, initiator_str2, FC_CONNECTIVITY_TYPE))
+
+    def test_are_initiators_equal_with_protocol_nvme_match(self):
+        """Test protocol-specific comparison for NVMe - matching NQNs"""
+        initiator_str1 = json.dumps({
+            NVME_OVER_FC_CONNECTIVITY_TYPE: ["nqn.2014-08.org.nvmexpress:uuid:12345"],
+            FC_CONNECTIVITY_TYPE: ["wwn1"],
+            ISCSI_CONNECTIVITY_TYPE: ["iqn1"]
+        })
+        initiator_str2 = json.dumps({
+            NVME_OVER_FC_CONNECTIVITY_TYPE: ["nqn.2014-08.org.nvmexpress:uuid:12345"],  # Same NQN
+            FC_CONNECTIVITY_TYPE: ["wwn2"],  # Different WWN
+            ISCSI_CONNECTIVITY_TYPE: ["iqn2"]  # Different IQN
+        })
+        # Should return True because NVMe NQNs match
+        self.assertTrue(utils.are_initiators_equal(initiator_str1, initiator_str2, NVME_OVER_FC_CONNECTIVITY_TYPE))
+
+    def test_are_initiators_equal_with_protocol_nvme_no_match(self):
+        """Test protocol-specific comparison for NVMe - different NQNs"""
+        initiator_str1 = json.dumps({
+            NVME_OVER_FC_CONNECTIVITY_TYPE: ["nqn.2014-08.org.nvmexpress:uuid:12345"],
+            FC_CONNECTIVITY_TYPE: ["wwn1"],
+            ISCSI_CONNECTIVITY_TYPE: ["iqn1"]
+        })
+        initiator_str2 = json.dumps({
+            NVME_OVER_FC_CONNECTIVITY_TYPE: ["nqn.2014-08.org.nvmexpress:uuid:67890"],  # Different NQN
+            FC_CONNECTIVITY_TYPE: ["wwn1"],  # Same WWN
+            ISCSI_CONNECTIVITY_TYPE: ["iqn1"]  # Same IQN
+        })
+        # Should return False because NVMe NQNs don't match
+        self.assertFalse(utils.are_initiators_equal(initiator_str1, initiator_str2, NVME_OVER_FC_CONNECTIVITY_TYPE))
+
+    def test_are_initiators_equal_with_protocol_none_checks_all(self):
+        """Test that None protocol checks all connectivity types"""
+        initiator_str1 = json.dumps({
+            NVME_OVER_FC_CONNECTIVITY_TYPE: ["nqn1"],
+            FC_CONNECTIVITY_TYPE: ["wwn1", "wwn2"],
+            ISCSI_CONNECTIVITY_TYPE: ["iqn1"]
+        })
+        initiator_str2 = json.dumps({
+            NVME_OVER_FC_CONNECTIVITY_TYPE: ["nqn1"],
+            FC_CONNECTIVITY_TYPE: ["wwn2", "wwn1"],
+            ISCSI_CONNECTIVITY_TYPE: ["iqn1"]
+        })
+        # Should return True because all match
+        self.assertTrue(utils.are_initiators_equal(initiator_str1, initiator_str2, None))
+
+        # Now test with one difference
+        initiator_str3 = json.dumps({
+            NVME_OVER_FC_CONNECTIVITY_TYPE: ["nqn1"],
+            FC_CONNECTIVITY_TYPE: ["wwn1", "wwn2"],
+            ISCSI_CONNECTIVITY_TYPE: ["iqn2"]  # Different IQN
+        })
+        # Should return False because not all match
+        self.assertFalse(utils.are_initiators_equal(initiator_str1, initiator_str3, None))
+
+    def test_are_initiators_equal_with_protocol_empty_lists(self):
+        """Test protocol-specific comparison with empty initiator lists"""
+        initiator_str1 = json.dumps({
+            NVME_OVER_FC_CONNECTIVITY_TYPE: [],
+            FC_CONNECTIVITY_TYPE: [],
+            ISCSI_CONNECTIVITY_TYPE: []
+        })
+        initiator_str2 = json.dumps({
+            NVME_OVER_FC_CONNECTIVITY_TYPE: [],
+            FC_CONNECTIVITY_TYPE: [],
+            ISCSI_CONNECTIVITY_TYPE: []
+        })
+        # Should return True for all protocols when both are empty
+        self.assertTrue(utils.are_initiators_equal(initiator_str1, initiator_str2, ISCSI_CONNECTIVITY_TYPE))
+        self.assertTrue(utils.are_initiators_equal(initiator_str1, initiator_str2, FC_CONNECTIVITY_TYPE))
+        self.assertTrue(utils.are_initiators_equal(initiator_str1, initiator_str2, NVME_OVER_FC_CONNECTIVITY_TYPE))
+
+    def test_are_initiators_equal_with_protocol_case_insensitive(self):
+        """Test that protocol-specific comparison is case-insensitive"""
+        initiator_str1 = json.dumps({
+            NVME_OVER_FC_CONNECTIVITY_TYPE: [],
+            FC_CONNECTIVITY_TYPE: ["WWN1", "WWN2"],
+            ISCSI_CONNECTIVITY_TYPE: []
+        })
+        initiator_str2 = json.dumps({
+            NVME_OVER_FC_CONNECTIVITY_TYPE: [],
+            FC_CONNECTIVITY_TYPE: ["wwn1", "wwn2"],
+            ISCSI_CONNECTIVITY_TYPE: []
+        })
+        # Should return True because comparison is case-insensitive
+        self.assertTrue(utils.are_initiators_equal(initiator_str1, initiator_str2, FC_CONNECTIVITY_TYPE))
+
+    def test_are_initiators_equal_with_invalid_protocol(self):
+        """Test with invalid/unknown protocol parameter"""
+        initiator_str1 = json.dumps({
+            NVME_OVER_FC_CONNECTIVITY_TYPE: ["nqn1"],
+            FC_CONNECTIVITY_TYPE: ["wwn1"],
+            ISCSI_CONNECTIVITY_TYPE: ["iqn1"]
+        })
+        initiator_str2 = json.dumps({
+            NVME_OVER_FC_CONNECTIVITY_TYPE: ["nqn1"],
+            FC_CONNECTIVITY_TYPE: ["wwn1"],
+            ISCSI_CONNECTIVITY_TYPE: ["iqn1"]
+        })
+        # With invalid protocol, should check all (default behavior)
+        self.assertTrue(utils.are_initiators_equal(initiator_str1, initiator_str2, "invalid_protocol"))
