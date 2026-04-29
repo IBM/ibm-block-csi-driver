@@ -1,4 +1,4 @@
-FROM registry.access.redhat.com/ubi9/python-39:1-1776963304 AS builder
+FROM registry.access.redhat.com/ubi9/python-312:1-1777392292 AS builder
 
 USER root
 RUN if [[ "$(uname -m)" != "x86"* ]]; then yum install -y rust-toolset; fi
@@ -7,10 +7,12 @@ USER default
 ENV PIP_DISABLE_PIP_VERSION_CHECK=1
 WORKDIR /tmp
 COPY controllers/servers/csi/requirements.txt ./csi_requirements.txt
+COPY controllers/servers/csi/requirements_pyxcli.txt ./csi_requirements_pyxcli.txt
 COPY controllers/servers/host_definer/requirements.txt ./host_definer_requirements.txt
 # avoid default- boringssl lib, since it does not support z systems
 ENV GRPC_PYTHON_BUILD_SYSTEM_OPENSSL=True
 RUN pip3 install -r ./csi_requirements.txt -r ./host_definer_requirements.txt
+RUN pip3 install --no-deps -r ./csi_requirements_pyxcli.txt
 
 USER root
 COPY controllers/scripts/csi_general .
@@ -18,7 +20,7 @@ RUN chmod +x csi_pb2.sh
 RUN ./csi_pb2.sh
 RUN pip3 install .
 
-FROM registry.access.redhat.com/ubi9/python-39:1-1776963304
+FROM registry.access.redhat.com/ubi9/python-312:1-1777392292
 
 ARG VERSION=1.14.0
 ARG BUILD_NUMBER=0

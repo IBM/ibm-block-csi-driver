@@ -11,8 +11,14 @@ class DefineHostRequest:
     node_initiators_from_host_definition: str = ''
     node_id_from_csi_node: str = ''
     node_initiators_from_csi_node: str = ''
-    array_connection_info: ArrayConnectionInfo = ArrayConnectionInfo(array_addresses='', user='', password='',
-                                                                     partition_name='', partition_vg='', port_set='')
+    array_connection_info: ArrayConnectionInfo = field(
+        default_factory=lambda: ArrayConnectionInfo(
+            array_addresses='',
+            user='',
+            password='',
+            partition_name='',
+            partition_vg='',
+            port_set=''))
     io_group: str = ''
 
 
