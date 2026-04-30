@@ -19,14 +19,13 @@ RUN if [ "$TARGETARCH" = "s390x" ]; then yum install -y rust-toolset; fi
 
 USER default
 ENV PIP_DISABLE_PIP_VERSION_CHECK=1
-RUN if [ "$TARGETARCH" = "s390x" ]; then \
-    export PROTOCOL_BUFFERS_PYTHON_IMPLEMENTATION=python; \
-    fi
+ENV PROTOCOL_BUFFERS_PYTHON_IMPLEMENTATION=python
 WORKDIR /tmp
-COPY controllers/servers/csi/requirements.txt .
 # avoid default boringssl lib, since it does not support z systems
 ENV GRPC_PYTHON_BUILD_SYSTEM_OPENSSL=True
-RUN pip install --no-index --find-links=~/wheels -r requirements.txt
+COPY --from=quay.io/sushilmaxbhile/csi-deps:v1 /wheels /wheels
+COPY controllers/servers/csi/requirements.txt .
+RUN pip install --no-index --find-links=/wheels -r requirements.txt
 
 USER root
 COPY controllers/scripts/csi_general .
@@ -51,9 +50,7 @@ LABEL name="IBM block storage CSI driver controller" \
       io.k8s.description="The IBM block storage CSI driver enables container orchestrators, such as Kubernetes and OpenShift, to manage the life-cycle of persistent storage." \
       io.openshift.tags=ibm,csi,ibm-block-csi-driver,ibm-block-csi-node
 
-RUN if [ "$TARGETARCH" = "s390x" ]; then \
-    export PROTOCOL_BUFFERS_PYTHON_IMPLEMENTATION=python; \
-    fi
+ENV PROTOCOL_BUFFERS_PYTHON_IMPLEMENTATION=python
 COPY --from=builder /opt/app-root /opt/app-root
 COPY ./common /driver/common
 COPY ./controllers/ /driver/controllers/
