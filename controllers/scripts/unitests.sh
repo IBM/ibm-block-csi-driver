@@ -5,12 +5,15 @@ coveragedir=/driver/coverage/
 
 # -n 4: Run tests in parallel using 4 processes (equivalent to nose --processes=4)
 # --timeout=600: Set test timeout to 600 seconds (equivalent to nose --process-timeout=600)
-pytest \
+# --exitfirst = stop running on first failure
+timeout 120 pytest \
     --verbose \
+    --exitfirst \
+    --maxfail=1 \
     --capture=no \
     --tb=short \
     -n 4 \
-    --timeout=600 \
+    --timeout=60 \
     --cov=common \
     --cov=controllers \
     --cov-report=xml:$coveragedir/.coverage.xml \
