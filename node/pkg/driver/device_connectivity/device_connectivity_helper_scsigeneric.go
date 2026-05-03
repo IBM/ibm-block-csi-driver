@@ -28,6 +28,7 @@ import (
 	"strings"
 	"sync"
 	"time"
+	"math/rand/v2"
 
 	"github.com/ibm/ibm-block-csi-driver/node/logger"
 	"github.com/ibm/ibm-block-csi-driver/node/pkg/driver/executer"
@@ -315,10 +316,316 @@ func (r OsDeviceConnectivityHelperScsiGeneric) GetMpathDevice(volumeId string) (
 		return "", err
 	}
 	if isSameId(SgInqWwn, volumeIdVariations) {
+		_, err = WaitForDmToExistVerify(volumeIdVariations, 5, 10)
+		if err != nil {
+			logger.Errorf("Varification failed %w", err)
+			return "", err
+		}
 		return dmPath, nil
 	}
 	// To make sure we found the right WWN, if not raise error instead of using wrong mpath
 	return "", &ErrorWrongDeviceFound{dmPath, volumeIdVariations[0], SgInqWwn}
+}
+
+func WaitForDmToExistVerify(volumeWWID []string, maxRetries int, intervalSeconds int) (string, error) {
+        var lastCount int
+        var lastRo string
+        var stableCycles int
+
+        norm := make([]string, len(volumeWWID))
+        for i, wwid := range volumeWWID {
+                norm[i] = normalizeWWID(wwid)
+                logger.Warningf("normalized %s to %s", wwid, norm[i])
+        }
+
+        for i := 0; i < maxRetries; i++ {
+                path, err := performDiscovery(norm)
+                if err == nil {
+                        // 1. KERNEL STATE: Check if DM is suspended or NVMe is not live
+                        if !isKernelSettled(path) {
+                                logger.Warning("reset")
+                                stableCycles = 0
+                                goto retry
+                        }
+
+                        logger.Warningf("stable %d", stableCycles)
+
+                        // 2. FINGERPRINT STABILIZATION:
+                        // Ensure path count AND Read-Only status are consistent.
+                        count := getSlaveCount(path)
+                        ro := getRoStatus(path)
+
+                        logger.Warningf("ro %s", ro)
+
+                        if count > 0 && count == lastCount && ro == lastRo {
+                                stableCycles++
+                        } else {
+                                stableCycles = 0 // Reset if anything is still moving
+                        }
+
+                        // 3. SETTLEMENT: IO Quiescence
+                        if stableCycles >= 2 {
+                                logger.Warning("validate settle")
+                                // Final check: Is the device quiet (no in-flight IO)?
+                                if err := safeSettle(path); err == nil {
+                                        return validateDMIntegrity(path)
+                                }
+                        }
+
+                        lastCount = count
+                        lastRo = ro
+                }
+
+        retry:
+                logger.Debugf("Attempt %d/%d: %v", i+1, maxRetries, err)
+                time.Sleep(time.Duration(intervalSeconds) * time.Second)
+        }
+        return "", &MultipathDeviceNotFoundForVolumeError{volumeWWID[0]}
+}
+
+
+func isKernelSettled(path string) bool {
+	name := filepath.Base(path)
+
+	logger.Warningf("check %s", path)
+
+	// 1. Check Read-Only flag (Generic for DM and NVMe)
+	// Some devices start 'ro=1' during initialization. We want '0'.
+	ro, err := os.ReadFile(fmt.Sprintf("/sys/block/%s/ro", name))
+	if err == nil && strings.TrimSpace(string(ro)) != "0" {
+		logger.Warningf("ro flag check failed %s", path)
+		return false
+	}
+
+	// 2. DM Specific: Check suspended state
+	// If suspended == 1, multipathd is loading a new table
+	if strings.HasPrefix(name, "dm-") {
+		suspended, err := os.ReadFile(fmt.Sprintf("/sys/block/%s/dm/suspended", name))
+		// If we can't read it, assume not settled yet
+		return err == nil && strings.TrimSpace(string(suspended)) == "0"
+	}
+
+	// 3. NVMe Specific: Check if the subsystem/namespace is 'live'
+	if strings.HasPrefix(name, "nvme") {
+		statePath := fmt.Sprintf("/sys/block/%s/device/state", name)
+		state, err := os.ReadFile(statePath)
+		if err != nil {
+			// On some kernels/nodes, 'state' file doesn't exist.
+			// If missing, we treat existence as settled.
+			return os.IsNotExist(err)
+		}
+		return strings.TrimSpace(string(state)) == "live"
+	}
+
+	return true
+}
+
+func getRoStatus(path string) string {
+	data, err := os.ReadFile(fmt.Sprintf("/sys/block/%s/ro", filepath.Base(path)))
+	if err != nil {
+		return "unknown"
+	}
+	return strings.TrimSpace(string(data))
+}
+
+func safeSettle(path string) error {
+    name := filepath.Base(path)
+    
+    for i := 0; i < 10; i++ { // Increase retries for slow udev
+		logger.Warningf("safeSettle %d", i)
+        // 1. Check suspended state (The "Gold Standard" for DM stability)
+        // If suspended is 1, multipathd is currently reconfiguring the map.
+        suspended, err := os.ReadFile(fmt.Sprintf("/sys/block/%s/dm/suspended", name))
+		logger.Warningf("suspended %s", string(suspended))
+        if err == nil && strings.TrimSpace(string(suspended)) == "0" {
+			logger.Warningf("successful open suspended %s", string(suspended))
+            // 2. Instead of checking in-flight IO, verify we can perform a small read.
+            // This forces the block layer to actually exercise the path.
+            f, err := os.OpenFile(path, os.O_RDONLY, 0)
+            if err == nil {
+				logger.Warning("successful open")
+                // Read the first 512 bytes to ensure the plumbing is actually working
+                buf := make([]byte, 512)
+                _, readErr := f.Read(buf)
+                f.Close()
+                
+                if readErr == nil {
+                    logger.Warningf("Settlement reached: %s is live and readable", path)
+                    return nil
+                }
+            }
+        }
+        
+        // Use a slightly longer, jittered sleep to let udev/multipathd finish
+        time.Sleep(time.Duration(200+rand.IntN(300)) * time.Millisecond)
+    }
+    return fmt.Errorf("device %s failed to settle after 10 attempts", path)
+}
+
+
+func getSlaveCount(path string) int {
+	name := filepath.Base(path)
+
+	// DM: Count /sys/block/dm-X/slaves/*
+	if strings.HasPrefix(name, "dm-") {
+		entries, _ := os.ReadDir(fmt.Sprintf("/sys/block/%s/slaves", name))
+		return len(entries)
+	}
+
+	// NVMe: Count controllers in the subsystem
+	if strings.HasPrefix(name, "nvme") {
+		// Native NVMe Multipath devices usually look like nvme-subsys0n1
+		// Their paths are controllers (nvme0, nvme1) linked in the subsystem dir
+		subsysDir := fmt.Sprintf("/sys/block/%s/device", name)
+		entries, _ := os.ReadDir(subsysDir)
+		count := 0
+		for _, e := range entries {
+			if strings.HasPrefix(e.Name(), "nvme") && !strings.Contains(e.Name(), "n") {
+				count++ // Count 'nvme0', skip 'nvme0n1'
+			}
+		}
+		return count
+	}
+	return 1
+}
+
+
+func performDiscovery(volumeWWID []string) (string, error) {
+	normalizedWWID := make([]string, len(volumeWWID))
+
+	for i, wwid := range volumeWWID {
+		// TODO is this normalization safe
+		clean := strings.ReplaceAll(wwid, "-", "")
+		normalizedWWID[i] = strings.ToLower(clean)
+	}
+
+	// 1. STRATEGY A: DM-Multipath (SCSI or NVMe via DM)
+	// Check udev shortcut first (O(1))
+
+	dmPath := fmt.Sprintf("/dev/disk/by-id/dm-uuid-mpath-%s", normalizedWWID[0])
+	if dev, err := verifyDevice(dmPath); err == nil {
+		return dev, nil
+	}
+
+	// 2. STRATEGY B: Native NVMe (NVMe-oF / TCP / RDMA)
+	// Check udev shortcut: /dev/disk/by-id/nvme-<uuid>
+	nvmePath := fmt.Sprintf("/dev/disk/by-id/nvme-%s", normalizedWWID[1])
+	if dev, err := verifyDevice(nvmePath); err == nil {
+		return dev, nil
+	}
+
+	// Fallback: Scan DM list in sysfs (O(N_dm))
+	// Catches cases where udev is slow or stale
+	if dev, err := scanDMSubsystem(normalizedWWID[0]); err == nil {
+		return dev, nil
+	}
+
+	return "", fmt.Errorf("device with WWID %s not found after exhaustive scan", volumeWWID)
+}
+
+// verifyDevice ensures the link exists and returns the canonical path
+func verifyDevice(path string) (string, error) {
+	if _, err := os.Stat(path); err != nil {
+		return "", err
+	}
+	// Crucial for CSI: Resolve /dev/mapper/mpatha to /dev/dm-X
+	realPath, err := filepath.EvalSymlinks(path)
+	if err != nil {
+		return "", err
+	}
+	return realPath, nil
+}
+
+// scanDMSubsystem finds the DM device using robust normalization.
+func scanDMSubsystem(targetID string) (string, error) {
+	// 1. Glob all DM UUIDs
+	matches, err := filepath.Glob("/sys/block/dm-*/dm/uuid")
+	if err != nil {
+		logger.Warning("No matches")
+		return "", err
+	}
+
+	target := normalizeWWID(targetID)
+	logger.Debugf("Scanning DM subsystem for target: %s", target)
+
+	for _, m := range matches {
+		logger.Warningf("check %s", m)
+		content, err := os.ReadFile(m)
+		if err != nil {
+			continue
+		}
+
+		// 2. Normalize the content (strips 'mpath-', 'uuid-', whitespace, and lowercase)
+		foundUUID := normalizeWWID(string(content))
+		
+		logger.Warningf("found file %s", foundUUID)
+		
+		if foundUUID == target {
+			// 3. Extract 'dm-X' from /sys/block/dm-X/dm/uuid
+			// We go up two levels from the file to get the block device folder
+			parts := strings.Split(m, "/")
+			if len(parts) < 4 {
+				continue
+			}
+
+			// Safely get 'dm-X' regardless of path depth
+			dmName := filepath.Base(filepath.Dir(filepath.Dir(m)))
+			devPath := filepath.Join("/dev", dmName)
+			logger.Warningf("Found DM match: %s for WWID %s", devPath, targetID)
+			return devPath, nil
+		}
+	}
+
+	return "", fmt.Errorf("dm device not found for WWID %s", targetID)
+}
+
+func validateDMIntegrity(dmPath string) (string, error) {
+	dmName := filepath.Base(dmPath)
+	slavesPath := fmt.Sprintf("/sys/block/%s/slaves", dmName)
+
+	slaves, err := os.ReadDir(slavesPath)
+	if err != nil || len(slaves) == 0 {
+		return "", fmt.Errorf("dm device %s has no active slaves", dmName)
+	}
+
+	// Optional: Check if at least one slave is 'running'
+	for _, s := range slaves {
+		state, _ := os.ReadFile(fmt.Sprintf("/sys/block/%s/device/state", s.Name()))
+		if strings.TrimSpace(string(state)) == "running" {
+			return dmPath, nil
+		}
+	}
+
+	return "", fmt.Errorf("dm device %s has slaves but none are in 'running' state", dmName)
+}
+
+func normalizeWWID(raw string) string {
+	// 1. Lowercase and clean whitespace/newlines
+	s := strings.ToLower(strings.TrimSpace(raw))
+
+	// 2. Multi-pass prefix stripping 
+	// (Required because dm-uuid can look like "uuid-mpath-3600...")
+	prefixes := []string{"uuid-", "mpath-", "naa.", "uuid.", "nvme.", "t10.", "eui."}
+	
+	changed := true
+	for changed {
+		changed = false
+		for _, p := range prefixes {
+			if strings.HasPrefix(s, p) {
+				s = strings.TrimPrefix(s, p)
+				changed = true
+			}
+		}
+	}
+
+	// 3. Character Cleanup
+	// Only strip hyphens if your Array API provides IDs without them.
+	// Most CSI drivers strip: hyphens, dots, and "0x"
+	s = strings.ReplaceAll(s, "-", "")
+	s = strings.ReplaceAll(s, ".", "")
+	s = strings.TrimPrefix(s, "0x")
+
+	return s
 }
 
 func isSameId(wwn string, volumeIdVariations []string) bool {
