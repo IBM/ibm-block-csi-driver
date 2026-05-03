@@ -393,7 +393,7 @@ func WaitForDmToExistVerify(volumeWWID []string, maxRetries int, intervalSeconds
 func isKernelSettled(path string) bool {
 	name := filepath.Base(path)
 
-	logger.Warningf("check %s", path)
+	logger.Warningf("check %s base %s", name, path)
 
 	// 1. Check Read-Only flag (Generic for DM and NVMe)
 	// Some devices start 'ro=1' during initialization. We want '0'.
@@ -407,6 +407,11 @@ func isKernelSettled(path string) bool {
 	// If suspended == 1, multipathd is loading a new table
 	if strings.HasPrefix(name, "dm-") {
 		suspended, err := os.ReadFile(fmt.Sprintf("/sys/block/%s/dm/suspended", name))
+		if err != nil {
+			logger.Error("error open")
+			return false
+		}
+		logger.Errorf("Suspended string %s",  strings.TrimSpace(string(suspended)))
 		// If we can't read it, assume not settled yet
 		return err == nil && strings.TrimSpace(string(suspended)) == "0"
 	}
@@ -502,7 +507,7 @@ func performDiscovery(volumeWWID []string) (string, error) {
 	for i, wwid := range volumeWWID {
 		// TODO is this normalization safe
 		clean := strings.ReplaceAll(wwid, "-", "")
-		normalizedWWID[i] = strings.ToLower(clean)
+		normalizedWWID[i] = "3" + strings.ToLower(clean)
 	}
 
 	// 1. STRATEGY A: DM-Multipath (SCSI or NVMe via DM)
@@ -531,12 +536,15 @@ func performDiscovery(volumeWWID []string) (string, error) {
 
 // verifyDevice ensures the link exists and returns the canonical path
 func verifyDevice(path string) (string, error) {
+	logger.Debugf("verify device %s", path)
 	if _, err := os.Stat(path); err != nil {
+		logger.Error("path")
 		return "", err
 	}
 	// Crucial for CSI: Resolve /dev/mapper/mpatha to /dev/dm-X
 	realPath, err := filepath.EvalSymlinks(path)
 	if err != nil {
+		logger.Error("eval")
 		return "", err
 	}
 	return realPath, nil
