@@ -221,60 +221,57 @@ func (r OsDeviceConnectivityIscsi) filterLoggedIn(ctx context.Context, portalsBy
 	filtered := make(map[string][]string)
 	for targetName, requestedPortals := range portalsByTarget {
 		activeForTarget := loggedIn[targetName]
-		logger.Infof("[filterLoggedIn] Target: %s. Map entries found in sysfs: %v", targetName, activeForTarget)
-
+		
 		for _, p := range requestedPortals {
-			// TRACE: Log exactly what we are looking for
 			logger.Infof("[filterLoggedIn] Checking requested portal: %s", p)
+		
+			// REGRESSION FIX: Do not skip. 
+			// We need to return these so discoverAndLogin can run iscsiDiscover.
+			// iscsiDiscover is the ONLY function that handles the login-discovery 
+			// to find the OTHER portals (like .144, .145) that aren't logged in yet.
+			filtered[targetName] = append(filtered[targetName], p)
 			
 			if activeForTarget != nil && activeForTarget[p] {
-				logger.Infof("[filterLoggedIn] MATCH: Portal %s is ALREADY active for target %s. Skipping.", p, targetName)
+				logger.Infof("[filterLoggedIn] Portal %s is active, but keeping in list to ensure discovery probes for hidden paths.", p)
 			} else {
-				logger.Infof("[filterLoggedIn] NO MATCH: Portal %s is NOT active for target %s. Adding to Task List.", p, targetName)
-				filtered[targetName] = append(filtered[targetName], p)
+				logger.Infof("[filterLoggedIn] Portal %s is NOT active. Adding to task list.", p)
 			}
 		}
 	}
-	
 	if len(filtered) == 0 {
 		logger.Warning("[filterLoggedIn] Result is EMPTY. Driver thinks all portals are already logged in.")
 	} else {
 		logger.Infof("[filterLoggedIn] Result: %v", filtered)
 	}
+	
 	return filtered, nil
 }
 
+
 func (r OsDeviceConnectivityIscsi) discoverAndLogin(ctx context.Context, portalsByTarget map[string][]string) {
-	dbCache := r.loadRelevantTargets(portalsByTarget)
-	
 	for targetName, portals := range portalsByTarget {
-		logger.Infof("[discoverAndLogin] Starting loop for Target: %s (%d portals)", targetName, len(portals))
+		logger.Infof("[discoverAndLogin] Target: %s", targetName)
 		
+		// Attempt discovery on the portals provided. 
+		// If the portal requires login, iscsiDiscover handles the auth.
+		discoverySuccess := false
 		for _, portal := range portals {
-			normP := r.normalizePortal(portal)
-			logger.Debugf("[discoverAndLogin] Normalizing %s -> %s", portal, normP)
-
-			// Step 1: Check Database presence
-			inDB := dbCache[targetName][normP]
-			if !inDB {
-				logger.Infof("[discoverAndLogin] Portal %s (norm: %s) MISSING from DB. Triggering iscsiDiscover.", portal, normP)
-				if err := r.iscsiDiscover(ctx, normP); err != nil {
-					logger.Errorf("[discoverAndLogin] iscsiDiscover FAILED for %s: %v", normP, err)
-					// We continue to login anyway, as discovery might have partially succeeded
-				} else {
-					logger.Infof("[discoverAndLogin] iscsiDiscover SUCCESS for %s", normP)
-				}
-			} else {
-				logger.Infof("[discoverAndLogin] Portal %s (norm: %s) already in DB. Skipping discovery.", portal, normP)
+			if err := r.iscsiDiscover(ctx, portal); err == nil {
+				logger.Infof("[discoverAndLogin] Discovery successful on %s", portal)
+				discoverySuccess = true
+				// One successful discovery populates the DB for ALL portals of this target.
+				break 
 			}
+		}
 
-			// Step 2: Attempt Login
-			logger.Infof("[discoverAndLogin] Attempting iscsiLogin: Target=%s Portal=%s", targetName, portal)
+		// Even if discovery fails, we try login as a fallback if the nodes exist
+		for _, portal := range portals {
+			logger.Infof("[discoverAndLogin] Attempting login: %s via %s", targetName, portal)
 			r.iscsiLogin(ctx, targetName, portal)
 		}
 	}
-	logger.Infof("[discoverAndLogin] Completed all requested tasks.")
 }
+
 
 // loadRelevantTargets only probes the specific subdirectories for the targets in the request
 func (r OsDeviceConnectivityIscsi) loadRelevantTargets(requestedTargets map[string][]string) map[string]map[string]bool {
