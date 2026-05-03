@@ -287,6 +287,12 @@ func (r OsDeviceConnectivityHelperScsiGeneric) GetMpathDevice(volumeId string) (
 
 		SgInqWwn, _ := r.Helper.GetWwnByScsiInq(dmPath)
 		if isSameId(SgInqWwn, volumeIdVariations) {
+                   _, err := WaitForDmToExistVerify(volumeIdVariations, 5, 10)
+                  if err != nil {
+                          logger.Errorf("Varification failed %w", err)
+                          return "", err
+                  }
+
 			return dmPath, nil
 		}
 		logger.Warningf("Expected {%v} but got {%v} from sg_inq", volumeId, SgInqWwn)
