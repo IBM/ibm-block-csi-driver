@@ -263,55 +263,52 @@ func (r OsDeviceConnectivityIscsi) filterLoggedIn(ctx context.Context, portalsBy
 
 	filteredPortalsByTarget := make(map[string][]string)
 
-	for targetName, portals := range portalsByTarget {
-		logger.Errorf("Scan target %s", targetName)
-	
-		// IQNs are technically case-insensitive in the iSCSI spec,
-		// but Linux sysfs and iscsiadm usually present them as lowercase.
+	for targetName, requestedPortals := range portalsByTarget {
 		normalizedTarget := strings.ToLower(targetName)
+		
+		logger.Errorf("Scan target %s", normalizedTarget)
+		
+		activePortals, exists := loggedInPortalsByTarget[normalizedTarget]
 
-		for _, portal := range portals {
-			logger.Errorf("Scan portal %s", portal)
-			// Normalize input portal to match the map keys
-			normalizedPortal := r.normalizePortal(portal)
+		for _, rawPortal := range requestedPortals {
+			// Normalize to ensure comparison matches map keys (e.g., "ip:3260")
+			normalizedPortal := r.normalizePortal(rawPortal)
+			
+			logger.Errorf("Normalized portal %s", normalizedPortal)
 
-			activePortals, exists := loggedInPortalsByTarget[normalizedTarget]
-
-			// If target doesn't exist or this specific portal isn't logged in
+			// If the target has no sessions, or THIS specific portal is not active
 			if !exists || !activePortals[normalizedPortal] {
-				logger.Errorf("add target %s portal %s", targetName, portal)
-				filteredPortalsByTarget[targetName] = append(filteredPortalsByTarget[targetName], portal)
+				logger.Infof("Target %s portal %s needs login", targetName, rawPortal)
+				filteredPortalsByTarget[targetName] = append(filteredPortalsByTarget[targetName], rawPortal)
 			}
 		}
 	}
 	return filteredPortalsByTarget, nil
 }
 
-func (r OsDeviceConnectivityIscsi) discoverAndLogin(ctx context.Context, portalsByTarget map[string][]string) {
-	// 1. Surgical Scan: Only load the DB entries for the targets we actually care about
+func (r OsDeviceConnectivityIscsi) discoverAndLogin(ctx context.Context, portalsByTarget map[string][]string, secrets map[string]string) {
+	// 1. Surgical Scan: Only load DB entries for the targets we are currently processing
 	dbCache := r.loadRelevantTargets(portalsByTarget)
-
 	discoveredPortals := make(map[string]bool)
 
 	for targetName, requestedPortals := range portalsByTarget {
 		for _, portal := range requestedPortals {
 			normPortal := r.normalizePortal(portal)
 
-			// If this specific portal isn't in the DB for this target, we must discover
+			// If this specific portal isn't in the DB for this target, we must discover it
 			if !dbCache[targetName][normPortal] {
 				if !discoveredPortals[normPortal] {
 					logger.Infof("Target %s portal %s missing from DB, discovering...", targetName, normPortal)
-					if err := r.iscsiDiscover(ctx, normPortal); err == nil {
+					
+					// Perform discovery with CHAP secrets
+					if err := r.iscsiDiscover(ctx, normPortal, secrets); err == nil {
 						discoveredPortals[normPortal] = true
-
-						// FIX: Immediately update the DB cache.
-						// This ensures that if the same target is encountered again
-						// (or if multiple targets are discovered via one portal),
-						// the cache reflects the current system state.
-						if dbCache[targetName] == nil {
-							dbCache[targetName] = make(map[string]bool)
-						}
-						dbCache[targetName][normPortal] = true
+						
+						// Re-read DB for this target to confirm portals are now registered
+						updatedDB := r.loadRelevantTargets(map[string][]string{targetName: {portal}})
+						dbCache[targetName] = updatedDB[targetName]
+					} else {
+						logger.Errorf("Discovery failed for portal %s: %v", normPortal, err)
 					}
 				}
 			}
@@ -321,10 +318,11 @@ func (r OsDeviceConnectivityIscsi) discoverAndLogin(ctx context.Context, portals
 	// 2. Perform Logins (using 'exit 15' safe login)
 	for targetName, portals := range portalsByTarget {
 		for _, portal := range portals {
-			r.iscsiLogin(ctx, targetName, portal)
+			r.iscsiLogin(ctx, targetName, portal, secrets)
 		}
 	}
 }
+
 
 
 // loadRelevantTargets only probes the specific subdirectories for the targets in the request
