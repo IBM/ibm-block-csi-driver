@@ -232,7 +232,7 @@ func (r OsDeviceConnectivityIscsi) getAllSessions(ctx context.Context) (map[stri
 	portalsByTarget := make(map[string]map[string]bool)
 	for _, line := range lines {
 		// Native/iscsiadm format: "tcp: [id] 1.2.3.4:3260 iqn.2026-01.com.example:target"
-		logger.ErrorF("Check line %s", line)
+		logger.Errorf("Check line %s", line)
 		parts := strings.Fields(line)
 		// Check for "tcp" as validity in case we switch back to using iscsiadm
 		if len(parts) < 4 || !strings.HasPrefix(parts[0], "tcp") {
@@ -244,7 +244,7 @@ func (r OsDeviceConnectivityIscsi) getAllSessions(ctx context.Context) (map[stri
 		targetName := strings.ToLower(parts[3])
 		normalizedPortal := r.normalizePortal(parts[2])
 		
-		logger.ErrorF("target %s portal %s", targetName, normalizePortal)
+		logger.Errorf("target %s portal %s", targetName, normalizedPortal)
 
 		if _, exists := portalsByTarget[targetName]; !exists {
 			portalsByTarget[targetName] = make(map[string]bool)
@@ -264,14 +264,14 @@ func (r OsDeviceConnectivityIscsi) filterLoggedIn(ctx context.Context, portalsBy
 	filteredPortalsByTarget := make(map[string][]string)
 
 	for targetName, portals := range portalsByTarget {
-		logger.ErrorF("Scan target %s", targetName)
+		logger.Errorf("Scan target %s", targetName)
 	
 		// IQNs are technically case-insensitive in the iSCSI spec,
 		// but Linux sysfs and iscsiadm usually present them as lowercase.
 		normalizedTarget := strings.ToLower(targetName)
 
 		for _, portal := range portals {
-			logger.ErrorF("Scan portal %s", portal)
+			logger.Errorf("Scan portal %s", portal)
 			// Normalize input portal to match the map keys
 			normalizedPortal := r.normalizePortal(portal)
 
@@ -279,7 +279,7 @@ func (r OsDeviceConnectivityIscsi) filterLoggedIn(ctx context.Context, portalsBy
 
 			// If target doesn't exist or this specific portal isn't logged in
 			if !exists || !activePortals[normalizedPortal] {
-				logger.ErrorF("add target %s portal %s", targetName, portal)
+				logger.Errorf("add target %s portal %s", targetName, portal)
 				filteredPortalsByTarget[targetName] = append(filteredPortalsByTarget[targetName], portal)
 			}
 		}
@@ -335,20 +335,20 @@ func (r OsDeviceConnectivityIscsi) loadRelevantTargets(requestedTargets map[stri
 	for targetName := range requestedTargets {
 		targetPath := filepath.Join(basePath, targetName)
 		
-		logger.ErrorF("Check target path %s", targetPath)
+		logger.Errorf("Check target path %s", targetPath)
 
 		db[targetName] = make(map[string]bool)
 
 		// Attempt to read the specific target directory
 		portals, err := os.ReadDir(targetPath)
 		if err != nil {
-			logger.ErrorF("Check target path %s - fail", targetPath)
+			logger.Errorf("Check target path %s - fail", targetPath)
 			// Directory doesn't exist; target unknown to DB
 			continue
 		}
 
 		for _, p := range portals {
-			logger.ErrorF("Check portal %s", p.Name())
+			logger.Errorf("Check portal %s", p.Name())
 			if !p.IsDir() {
 				logger.Error("Not dir")
 				continue
@@ -373,7 +373,7 @@ func (r OsDeviceConnectivityIscsi) loadRelevantTargets(requestedTargets map[stri
 				// to match the format used in filterLoggedIn logic.
 				norm := r.normalizePortal(hostPort)
 				
-				logger.ErrorF("norm %s", norm)
+				logger.Errorf("norm %s", norm)
 				
 				db[targetName][norm] = true
 			}
@@ -477,12 +477,12 @@ func (r OsDeviceConnectivityIscsi) parseActiveSessions() ([]activeSession, error
 	for _, entry := range entries {
 		sessionPath := filepath.Join(sessionBaseDir, entry.Name())
 		
-		logger.ErrorF("Session path %s", sessionPath)
+		logger.Errorf("Session path %s", sessionPath)
 
 		// 1. STATE CHECK (using the helper from before)
 		stateBuf, _ := os.ReadFile(filepath.Join(sessionPath, "state"))
 		if cleanSysfsData(stateBuf) != "LOGGED_IN" {
-			logger.ErrorF("State %s", cleanSysfsData(stateBuf))
+			logger.Errorf("State %s", cleanSysfsData(stateBuf))
 			continue
 		}
 
@@ -506,7 +506,7 @@ func (r OsDeviceConnectivityIscsi) parseActiveSessions() ([]activeSession, error
 			hostNum:   hostNum,
 		})
 		
-		logger.ErrorF("Add init %s host %s", initiatorIQN, hostName)
+		logger.Errorf("Add init %s host %s", initiatorIQN, hostName)
 	}
 	return sessions, nil
 }
