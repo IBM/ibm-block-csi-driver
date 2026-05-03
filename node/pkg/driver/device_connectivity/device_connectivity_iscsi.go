@@ -254,11 +254,11 @@ func (r OsDeviceConnectivityIscsi) discoverAndLogin(ctx context.Context, portals
 		
 		// Attempt discovery on the portals provided. 
 		// If the portal requires login, iscsiDiscover handles the auth.
-		discoverySuccess := false
+		//discoverySuccess := false
 		for _, portal := range portals {
 			if err := r.iscsiDiscover(ctx, portal); err == nil {
 				logger.Infof("[discoverAndLogin] Discovery successful on %s", portal)
-				discoverySuccess = true
+				//discoverySuccess = true
 				// One successful discovery populates the DB for ALL portals of this target.
 				break 
 			}
