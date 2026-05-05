@@ -1,5 +1,15 @@
 #!/bin/bash
-set -x
+set -ex
+
 coveragedir=/driver/coverage/
-[ ! -d $coveragedir ] && mkdir -p $coveragedir
-exec nosetests --exe --with-coverage --cover-xml --cover-xml-file=$coveragedir/.coverage.xml --cover-package=common --cover-package=controllers --with-xunit --xunit-file=$coveragedir/.unitests.xml $@
+[ ! -d "$coveragedir" ] && mkdir -p "$coveragedir"
+
+exec pytest \
+  --verbose \
+  --capture=no \
+  --tb=short \
+  --cov=common \
+  --cov=controllers \
+  --cov-report=xml:$coveragedir/.coverage.xml \
+  --junit-xml=$coveragedir/.unitests.xml \
+  controllers/tests/ "$@"
