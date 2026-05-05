@@ -156,14 +156,14 @@ func (d *NodeService) NodeStageVolume(ctx context.Context, req *csi.NodeStageVol
 		return &csi.NodeStageVolumeResponse{}, nil
 	}
 
-	//d.OsDeviceConnectivityHelper.IdentityAwarePreScan(ctx, stagingPathWithHostPrefix, volumeUuid)
+	d.OsDeviceConnectivityHelper.IdentityAwarePreScan(ctx, stagingPathWithHostPrefix, volumeUuid)
 
 	osDeviceConnectivity.EnsureLogin(ctx, ipsByArrayInitiator)
 
-	//err = d.OsDeviceConnectivityHelper.RemoveGhostDevice(ctx, volumeUuid, lun, arrayInitiators)
-	//if err != nil {
-	//	return nil, status.Error(codes.Aborted, err.Error())
-	//}
+	err = d.OsDeviceConnectivityHelper.RemoveGhostDevice(ctx, volumeUuid, lun, arrayInitiators)
+	if err != nil {
+		return nil, status.Error(codes.Aborted, err.Error())
+	}
 
 	err = osDeviceConnectivity.RescanDevices(lun, arrayInitiators)
 	if err != nil {
@@ -171,10 +171,10 @@ func (d *NodeService) NodeStageVolume(ctx context.Context, req *csi.NodeStageVol
 	}
 
 	//err = d.OsDeviceConnectivityHelper.RemoveGhostDevice(ctx, volumeUuid, lun, arrayInitiators)
-	//if err != nil {
-	//	logger.Debugf("Failed to clean ghost device for lun %d", lun)
-	//	// we can swallow the error here, since it's just for cleanliness
-	//}
+	if err != nil {
+		logger.Debugf("Failed to clean ghost device for lun %d", lun)
+		// we can swallow the error here, since it's just for cleanliness
+	}
 
 	mpathDevice, err := osDeviceConnectivity.GetMpathDevice(ctx, volumeUuid)
 	//mpathDevice, err := osDeviceConnectivity.VerifyAndGetDmDevice(volumeUuid, lun)
@@ -197,11 +197,11 @@ func (d *NodeService) NodeStageVolume(ctx context.Context, req *csi.NodeStageVol
 		logger.Errorf("Error while trying to get sys devices : {%v}", err.Error())
 		return nil, status.Error(codes.Internal, err.Error())
 	}
-	//err = osDeviceConnectivity.ValidateLun(ctx, mpathDevice, lun, sysDevices, volumeUuid)
-	//if err != nil {
-	//	logger.Errorf("Error while trying to validate lun : {%v}", err.Error())
-	//	return nil, status.Error(codes.Internal, err.Error())
-	//}
+	err = osDeviceConnectivity.ValidateLun(ctx, mpathDevice, lun, sysDevices, volumeUuid)
+	if err != nil {
+		logger.Errorf("Error while trying to validate lun : {%v}", err.Error())
+		return nil, status.Error(codes.Internal, err.Error())
+	}
 
 	existingFormat, err := d.Mounter.GetDiskFormat(mpathDevice)
 	if err != nil {
