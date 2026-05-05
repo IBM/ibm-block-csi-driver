@@ -1,6 +1,8 @@
 import grpc
 from csi_general import replication_pb2 as pb2
 from csi_general import replication_pb2_grpc as pb2_grpc
+from google.protobuf.timestamp_pb2 import Timestamp
+from google.protobuf.duration_pb2 import Duration
 
 import controllers.servers.settings as servers_settings
 import controllers.array_action.settings as array_settings
@@ -8,7 +10,7 @@ from controllers.array_action import errors as array_errors
 from controllers.array_action.storage_agent import get_agent
 from controllers.common.csi_logger import get_stdout_logger
 from controllers.servers import utils
-from controllers.servers.csi.decorators import csi_method
+from controllers.servers.csi.decorators import csi_method, csi_replication_method
 from controllers.servers.csi.exception_handler import build_error_response
 
 logger = get_stdout_logger()
@@ -195,3 +197,43 @@ class ReplicationControllerServicer(pb2_grpc.ControllerServicer):
         # TODO function name misleading - checks partition_name attribute, not necessarily volume
         mediator.verify_volume_partition(replication_object, array_connection_info.partition_name)
         return replication_object
+
+    @csi_replication_method(error_response_type=pb2.GetVolumeReplicationInfoResponse)
+    def GetVolumeReplicationInfo(self, request, context):
+        logger.info("GetVolumeReplicationInfo: called with replication_source='{}'".format(request.replication_source))
+
+        object_type, object_id_info = utils.get_replication_object_type_and_id_info(request)
+        object_id = object_id_info.ids.internal_id
+
+        utils.validate_secrets(request.secrets)
+
+        # GetVolumeReplicationInfo is only supported for EAR (VolumeGroup level).
+        if object_type != servers_settings.VOLUME_GROUP_TYPE_NAME:
+            error_message = "GetVolumeReplicationInfo is supported only on volume group level (EAR replication)"
+            logger.error("GetVolumeReplicationInfo: {}".format(error_message))
+            return build_error_response(error_message, context, grpc.StatusCode.FAILED_PRECONDITION,
+                                        pb2.GetVolumeReplicationInfoResponse)
+
+        connection_info = utils.get_array_connection_info_from_secrets(request.secrets)
+
+        with get_agent(connection_info, object_id_info.array_type).get_mediator() as mediator:
+            replication_info = mediator.get_replication_info(object_id)
+
+        response = pb2.GetVolumeReplicationInfoResponse()
+
+        if replication_info.last_sync_time is not None:
+            ts_seconds = int(replication_info.last_sync_time.timestamp())
+            response.last_sync_time.CopyFrom(Timestamp(seconds=ts_seconds, nanos=0))
+        else:
+            response.last_sync_time.CopyFrom(Timestamp(seconds=0, nanos=0))
+            logger.warning(
+                "GetVolumeReplicationInfo: last_sync_time not available "
+                "(fixed_recovery_point was blank). Setting to default timestamp (0)."
+            )
+
+        bytes_val = replication_info.last_sync_bytes if replication_info.last_sync_bytes is not None else -1
+        response.last_sync_bytes = bytes_val
+
+        logger.info("GetVolumeReplicationInfo: returning response last_sync_time.seconds={}, last_sync_bytes={}"
+                    .format(response.last_sync_time.seconds, response.last_sync_bytes))
+        return response

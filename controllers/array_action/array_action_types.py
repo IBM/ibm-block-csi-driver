@@ -95,3 +95,11 @@ class VolumeGroupIds:
 
     def __bool__(self):
         return bool(self.internal_id or self.name)
+
+
+@dataclass
+class ReplicationInfo:
+    volume_group_id: str
+    last_sync_time: object = None
+    last_sync_duration_seconds: object = None
+    last_sync_bytes: object = None
