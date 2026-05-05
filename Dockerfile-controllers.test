@@ -58,5 +58,6 @@ RUN chown -R appuser:appuser /driver /opt/app-root
 USER appuser
 WORKDIR /driver
 ENV PYTHONPATH=/driver
+ENV PATH=/opt/app-root/bin:$PATH
 
 ENTRYPOINT ["/driver/controllers/scripts/entrypoint-test.sh"]
