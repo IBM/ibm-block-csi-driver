@@ -29,6 +29,7 @@ COPY controllers/servers/csi/requirements.txt ./csi_requirements.txt
 COPY controllers/servers/host_definer/requirements.txt ./host_definer_requirements.txt
 # avoid default- boringssl lib, since it does not support z systems
 ENV GRPC_PYTHON_BUILD_SYSTEM_OPENSSL=True
+COPY --from=quay.io/sushilmaxbhile/csi-deps:v1 /wheels /wheels
 RUN pip3 install --no-index --find-links=/wheels -r ./csi_requirements.txt
 RUN pip3 install -r ./host_definer_requirements.txt
 
