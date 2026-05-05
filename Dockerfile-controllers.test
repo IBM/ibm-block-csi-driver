@@ -31,7 +31,7 @@ COPY controllers/servers/csi/requirements.txt ./csi_requirements.txt
 COPY controllers/servers/host_definer/requirements.txt ./host_definer_requirements.txt
 
 ENV GRPC_PYTHON_BUILD_SYSTEM_OPENSSL=True
-COPY --from=quay.io/sushilmaxbhile/csi-deps:v1 /wheels /wheels
+COPY --from=quay.io/sushilmaxbhile/csi-deps:v2 /wheels /wheels
 
 RUN pip3 install --no-index --find-links=/wheels -r ./csi_requirements.txt -r ./host_definer_requirements.txt
 

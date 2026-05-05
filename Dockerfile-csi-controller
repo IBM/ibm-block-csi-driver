@@ -26,7 +26,7 @@ WORKDIR /tmp
 # avoid default boringssl lib, since it does not support z systems
 ENV GRPC_PYTHON_BUILD_SYSTEM_OPENSSL=True
 
-COPY --from=quay.io/sushilmaxbhile/csi-deps:v1 /wheels /wheels
+COPY --from=quay.io/sushilmaxbhile/csi-deps:v2 /wheels /wheels
 COPY controllers/servers/csi/requirements.txt .
 RUN pip install --no-index --find-links=/wheels -r requirements.txt
 
