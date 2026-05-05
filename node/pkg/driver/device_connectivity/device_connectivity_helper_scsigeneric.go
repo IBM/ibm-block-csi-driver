@@ -676,98 +676,102 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) readSysfs(path string) string {
 	return strings.Trim(string(data), " \n\r\t\x00")
 }
 
-
 func (r *OsDeviceConnectivityHelperScsiGeneric) ValidateLun(ctx context.Context, targetDm string, expectedLun int, sysDevices []string, expectedSerial string) error {
-	// TODO expectedSerial should consider variations
 	logger.Debugf("Validating LUN {%v} on devices: {%v}", expectedLun, sysDevices)
 
-	validPathsFound := 0
-	normLun := r.normalizeLun(strconv.Itoa(expectedLun))
+	normExpectedLun := r.normalizeLun(strconv.Itoa(expectedLun))
 	normExpectedSerial := r.Helper.normalizeWWID(expectedSerial)
+	validPathsFound := 0
+	hctlRegex := regexp.MustCompile(`(\d+):(\d+):(\d+):(\d+)$`)
 
 	for _, deviceName := range sysDevices {
 		if deviceName == "" {
 			continue
 		}
 
-		// 1. D-State Gating: Don't inquiry hardware if it's already wedged
+		// 1. D-State Gating
 		if r.Mounter.IsPathStuck(deviceName) {
-			logger.Warningf("Path %s is stuck in D-state, skipping validation", deviceName)
+			logger.Warningf("Path %s is stuck in D-state, skipping", deviceName)
 			continue
 		}
 
 		var actualLun, sysfsId, hwId string
 		var err error
-		
-		// 2. Branching Logic for NVMe vs SCSI
+
 		if strings.HasPrefix(deviceName, "nvme") {
-			// NVMe Logic (Native Multipath)
-			// TODO is this the LUN number in NVME
+			// NVMe Health Check
+			state := r.readSysfs(fmt.Sprintf("/sys/block/%s/device/state", deviceName))
+			if state != "live" {
+				logger.Warningf("NVMe path %s is in state %s; skipping", deviceName, state)
+				continue
+			}
 			actualLun = r.readSysfs(fmt.Sprintf("/sys/block/%s/device/nsid", deviceName))
 			sysfsId = r.readSysfs(fmt.Sprintf("/sys/block/%s/wwid", deviceName))
 			if sysfsId == "" {
-				// TODO is this fallback applicable
-				// Fallback to nguid/uuid
-				sysfsId = r.readSysfs(fmt.Sprintf("/sys/block/%s/nguid", deviceName))
+				sysfsId = r.readSysfs(fmt.Sprintf("/sys/block/%s/device/wwid", deviceName))
 			}
-			hwId = sysfsId // NVMe sysfs is generally authoritative
+			if sysfsId == "" {
+				sysfsId = r.readSysfs(fmt.Sprintf("/sys/block/%s/device/serial", deviceName))
+			}
+			hwId = r.Helper.normalizeWWID(sysfsId)
 		} else {
-			// SCSI Logic (iSCSI/FC)
-			actualLun = r.normalizeLun(r.readSysfs(fmt.Sprintf("/sys/block/%s/device/lun", deviceName)))
-			sysfsId = r.readSysfs(fmt.Sprintf("/sys/block/%s/device/wwid", deviceName))
+			// SCSI Health Check
+			state := r.readSysfs(fmt.Sprintf("/sys/block/%s/device/state", deviceName))
+			if state != "running" {
+				logger.Warningf("SCSI path %s is in state %s; skipping", deviceName, state)
+				continue
+			}
 
-			// Force Hardware Inquiry (SG_IO) to detect stale kernel cache (Identity Split)
-			// 2. Hardware Inquiry with Protection (Requirement 7)
-			// We use a shorter timeout for validation to keep the CSI response snappy.
+			// LUN Discovery
+			actualLun = r.normalizeLun(r.readSysfs(fmt.Sprintf("/sys/block/%s/device/lun", deviceName)))
+			if actualLun == "" {
+				if devLink, err := os.Readlink(fmt.Sprintf("/sys/block/%s/device", deviceName)); err == nil {
+					if match := hctlRegex.FindStringSubmatch(devLink); len(match) > 4 {
+						actualLun = r.normalizeLun(match[4])
+					}
+				}
+			}
+
+			sysfsId = r.Helper.normalizeWWID(r.readSysfs(fmt.Sprintf("/sys/block/%s/device/wwid", deviceName)))
+
+			// Hardware Inquiry
 			hwId, err = executer.ExecuteUninterruptible[string](
-				ctx,
-				r.KeyedGater,
-				"inquiry-"+deviceName,
-				10, 50, 2*time.Second, 10*time.Second,
+				ctx, r.KeyedGater, "inquiry-"+deviceName, 10, 50, 2*time.Second, 10*time.Second,
 				func(wCtx context.Context) (string, error) {
-					return r.Helper.GetWwnByScsiInq(ctx, "/dev/" + deviceName)
+					return r.Helper.GetWwnByScsiInq(ctx, "/dev/"+deviceName)
 				},
 			)
+			if err != nil {
+				logger.Errorf("Hardware inquiry failed for %s: %v", deviceName, err)
+				// TODO maybe fail?
+				continue // Skip path, don't abort yet
+			}
+			hwId = r.Helper.normalizeWWID(hwId)
 		}
 
-		// 3. Evaluation of Identity & Health
-		reason := ""
-		state := r.readSysfs(fmt.Sprintf("/sys/block/%s/device/state", deviceName))
-
-		if state != "running" {
-			reason = fmt.Sprintf("Path state is %s", state)
-			logger.Errorf("Safety Check Failed for path %s on %s: %s", deviceName, targetDm, reason)
-			continue
-		}
-		if err != nil {
-			reason = fmt.Sprintf("Hardware inquiry failed: %v", err)
-			logger.Errorf("Safety Check Failed for path %s on %s: %s", deviceName, targetDm, reason)
-		} else if !r.IsSerialMatch(hwId, normExpectedSerial) {
-			reason = fmt.Sprintf("Hardware Serial mismatch (got %s, exp %s)", hwId, normExpectedSerial)
-			return fmt.Errorf("Safety Check Failed for path %s on %s: %s", deviceName, targetDm, reason)
-		} else if actualLun != normLun {
-			reason = fmt.Sprintf("LUN Mismatch (got %s, exp %s)", actualLun, normLun)
-			return fmt.Errorf("Safety Check Failed for path %s on %s: %s", deviceName, targetDm, reason)
-		}
-		if sysfsId != "" && !r.IsSerialMatch(sysfsId, hwId) {
-			// CRITICAL: Identity Split. The kernel thinks it's one LUN, the hardware says another.
-			reason = fmt.Sprintf("Kernel/Hardware Identity Split (Sysfs: %s, HW: %s)", sysfsId, hwId)
-			return fmt.Errorf("Safety Check Failed for path %s on %s: %s", deviceName, targetDm, reason)
+		// 3. Validation Logic
+		if actualLun != normExpectedLun {
+			return fmt.Errorf("FATAL: LUN Mismatch on %s (got %s, exp %s)", deviceName, actualLun, normExpectedLun)
 		}
 
-		if reason != "" {
-			logger.Errorf("Safety Check Failed for path %s on %s: %s", deviceName, targetDm, reason)
-			continue
+		if hwId != normExpectedSerial {
+			return fmt.Errorf("FATAL: Hardware Serial mismatch on %s (got %s, exp %s)", deviceName, hwId, normExpectedSerial)
+		}
+
+		if sysfsId != "" && sysfsId != hwId {
+			// This is usually a stale kernel path. 
+			// Abort here because using this path could lead to data corruption.
+			return fmt.Errorf("FATAL: Kernel/Hardware Identity Split on %s (Sysfs: %s, HW: %s)", deviceName, sysfsId, hwId)
 		}
 
 		validPathsFound++
 	}
 
 	if validPathsFound == 0 {
-		return fmt.Errorf("all paths for device %s failed safety verification", targetDm)
+		return fmt.Errorf("no valid paths found for %s", targetDm)
 	}
 
-	logger.Debugf("LUN validation successful. %d healthy paths found for %s", validPathsFound, targetDm)
+	logger.Infof("Successfully validated %d paths for lun %d", validPathsFound, expectedLun)
 	return nil
 }
 
