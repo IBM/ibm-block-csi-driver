@@ -2594,3 +2594,99 @@ class TestArrayMediatorSVC(unittest.TestCase):
                       version='1.7.0')
 
         self.svc.client.svctask.registerplugin.assert_has_calls([call_1, call_2])
+
+    def _mock_vg_replication(self, partition_name='', local_location='1', fixed_rp='', sync_required='',
+                             sync_remaining='', loc2_system_id='', loc3_system_id=''):
+
+        return Munch({
+            'partition_name': partition_name,
+            'local_location': local_location,
+            'local_partition_location': 'upper' if partition_name else '',
+            'location1_system_id': svc_settings.DUMMY_ID_ALIAS,
+            'location1_system_name': 'Cluster_local',
+            'location2_system_id': loc2_system_id,
+            'location2_system_name': '',
+            'location2_fixed_recovery_point': fixed_rp if not partition_name else '',
+            'location2_sync_required': sync_required if not partition_name else '',
+            'location2_sync_remaining': sync_remaining if not partition_name else '',
+            'location3_system_id': loc3_system_id,
+            'location3_system_name': '',
+            'location3_fixed_recovery_point': fixed_rp if partition_name else '',
+            'location3_sync_required': sync_required if partition_name else '',
+            'location3_sync_remaining': sync_remaining if partition_name else '',
+            'replication_policy_name': REPLICATION_NAME,
+        })
+
+    # --- _get_recovery_location_index tests ---
+    def test_get_recovery_location_index_non_partition_returns_location2(self):
+        vg_replication = self._mock_vg_replication(partition_name='')
+        result = self.svc._get_recovery_location_index(vg_replication)
+        self.assertEqual('2', result)
+
+    def test_get_recovery_location_index_partition_returns_location3(self):
+        vg_replication = self._mock_vg_replication(partition_name='SKGPTN0')
+        result = self.svc._get_recovery_location_index(vg_replication)
+        self.assertEqual('3', result)
+
+    # --- get_replication_info tests ---
+
+    def test_get_replication_info_non_partition_all_fields_populated_success(self):
+        vg_replication = self._mock_vg_replication(
+            partition_name='',
+            loc2_system_id='00000204AFE0632C',
+            fixed_rp='250422041647',
+            sync_required='10.00GB',
+            sync_remaining='9.00GB',
+        )
+        self.svc.client.svcinfo.lsvolumegroupreplication.return_value = Mock(
+            as_single_element=vg_replication)
+
+        result = self.svc.get_replication_info(OBJECT_INTERNAL_ID)
+
+        self.svc.client.svcinfo.lsvolumegroupreplication.assert_called_once_with(
+            object_id=OBJECT_INTERNAL_ID)
+        self.assertIsNotNone(result.last_sync_time)
+        self.assertIsNone(result.last_sync_duration_seconds)
+        expected_bytes = int(10.00 * 1024 ** 3) - int(9.00 * 1024 ** 3)
+        self.assertEqual(expected_bytes, result.last_sync_bytes)
+
+    def test_get_replication_info_partition_uses_location3_success(self):
+        vg_replication = self._mock_vg_replication(
+            partition_name='SKGPTN0',
+            loc3_system_id='00000204AFE0632C',
+            fixed_rp='250422041647',
+            sync_required='',
+            sync_remaining='',
+        )
+        self.svc.client.svcinfo.lsvolumegroupreplication.return_value = Mock(
+            as_single_element=vg_replication)
+
+        result = self.svc.get_replication_info(OBJECT_INTERNAL_ID)
+
+        self.assertIsNotNone(result.last_sync_time)
+        self.assertIsNone(result.last_sync_duration_seconds)
+        self.assertIsNone(result.last_sync_bytes)
+
+    def test_get_replication_info_no_record_raises_object_not_found(self):
+        self.svc.client.svcinfo.lsvolumegroupreplication.return_value = Mock(
+            as_single_element=None)
+
+        with self.assertRaises(array_errors.ObjectNotFoundError):
+            self.svc.get_replication_info(OBJECT_INTERNAL_ID)
+
+    def test_get_replication_info_all_fields_blank_returns_none_fields(self):
+        vg_replication = self._mock_vg_replication(
+            partition_name='',
+            loc2_system_id='00000204AFE0632C',
+            fixed_rp='',
+            sync_required='',
+            sync_remaining='',
+        )
+        self.svc.client.svcinfo.lsvolumegroupreplication.return_value = Mock(
+            as_single_element=vg_replication)
+
+        result = self.svc.get_replication_info(OBJECT_INTERNAL_ID)
+
+        self.assertIsNone(result.last_sync_time)
+        self.assertIsNone(result.last_sync_duration_seconds)
+        self.assertIsNone(result.last_sync_bytes)
