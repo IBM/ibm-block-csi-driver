@@ -33,8 +33,7 @@ COPY controllers/servers/host_definer/requirements.txt ./host_definer_requiremen
 ENV GRPC_PYTHON_BUILD_SYSTEM_OPENSSL=True
 COPY --from=quay.io/sushilmaxbhile/csi-deps:v1 /wheels /wheels
 
-RUN pip3 install --no-index --find-links=/wheels -r ./csi_requirements.txt
-RUN pip3 install -r ./host_definer_requirements.txt
+RUN pip3 install --no-index --find-links=/wheels -r ./csi_requirements.txt -r ./host_definer_requirements.txt
 
 USER root
 COPY controllers/scripts/csi_general .
@@ -43,8 +42,7 @@ RUN ./csi_pb2.sh
 RUN pip3 install .
 
 COPY controllers/tests/requirements.txt ./requirements-tests.txt
-RUN pip3 install --find-links=/wheels -r ./requirements-tests.txt
-
+RUN pip3 install --no-index --find-links=/wheels -r ./requirements-tests.txt
 
 # Final stage
 FROM registry.access.redhat.com/ubi9/python-39:1-1774968736
