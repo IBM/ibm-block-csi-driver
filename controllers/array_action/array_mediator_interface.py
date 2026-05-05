@@ -579,6 +579,22 @@ class ArrayMediator(ABC):
         raise NotImplementedError
 
     @abstractmethod
+    def get_replication_info(self, volume_group_id):
+        """
+        This function will return replication sync info for a volume group.
+
+        Args:
+            volume_group_id : internal id of the volume group (EAR only)
+
+        Returns:
+            ReplicationInfo
+
+        Raises:
+            ObjectNotFoundError
+        """
+        raise NotImplementedError
+
+    @abstractmethod
     def add_io_group_to_host(self, host_name, io_group):
         """
         This function should add io_group to host.
