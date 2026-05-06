@@ -319,10 +319,10 @@ return e.err.Error() }
 func (e *annotatedError) String() string {
     // Tunnel to the underlying Stringer if it exists (it usually does for ExitErrors)
     if stringer, ok := e.err.(fmt.Stringer); ok {
-		ogger.Warning("underlying string")
+		logger.Warning("underlying string")
         return stringer.String()
     }
-	ogger.Warning("err to string")
+	logger.Warning("err to string")
     return e.err.Error()
 }
 
@@ -340,7 +340,7 @@ func (e *annotatedError) ExitStatus() int {
 func (e *annotatedError) Exited() bool {
 	// Try to forward first
 	if exitErr, ok := e.err.(k8sexec.ExitError); ok {
-ogger.Warning("forward exitited")
+logger.Warning("forward exitited")
  	
 		return exitErr.Exited()
 	}
@@ -353,8 +353,8 @@ ogger.Warning("forward exitited")
 
 
 // Compiler check to prevent future "Bad Casts"
-var _ k8s_exec.ExitError = &annotatedError{}
-
+var _ k8sexec.Cmd = &safeCmd{}
+var _ k8sexec.ExitError = &annotatedError{}
 
 // Stop satisfies k8sexec.Cmd
 func (s *safeCmd) Stop() {
