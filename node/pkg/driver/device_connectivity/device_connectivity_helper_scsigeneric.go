@@ -759,10 +759,10 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) ValidateLun(ctx context.Context,
 			return fmt.Errorf("FATAL: Hardware Serial mismatch on %s (got %s, exp %s)", deviceName, hwId, normExpectedSerial)
 		}
 
-		if sysfsId != "" && sysfsId != hwId {
+		if sysfsId != "" && sysfsId != ("3" + hwId) {
 			// This is usually a stale kernel path. 
 			// Abort here because using this path could lead to data corruption.
-			return fmt.Errorf("FATAL: Kernel/Hardware Identity Split on %s (Sysfs: %s, HW: %s)", deviceName, sysfsId, hwId)
+			return fmt.Errorf("FATAL: Kernel/Hardware Identity Split on %s (Sysfs: %s, HW: %s)", deviceName, sysfsId, "3" + hwId)
 		}
 
 		validPathsFound++
