@@ -285,18 +285,48 @@ func (s *safeCmd) CombinedOutput() ([]byte, error) {
         logger.Warningf("failed to start %v", err)
         return nil, err
     }
+	out := b.Bytes()
+     logger.Warningf("output %s", string(out))
+	
     err := s.Wait()
          if err == nil {
              logger.Warning("wait")
           } else {
               logger.Warning("failed to wait %v", err)
+				// Wrap the error so it satisfies k8sexec.ExitError
+				// and proxies the ExitStatus from our safeCmd.
+				return out, &annotatedError{err: err, cmd: s}
+		  
       }
 
-     logger.Warningf("output %s", string(b.Bytes()))
 
 
     return b.Bytes(), err
 }
+
+// annotatedError ensures the ExitStatus is never lost during the cast
+type annotatedError struct {
+    err error
+    cmd *safeCmd
+}
+
+func (e *annotatedError) Error() string { 
+logger.Warning("forward Error")
+return e.err.Error() }
+
+func (e *annotatedError) ExitStatus() int {
+logger.Warning("forward exit status")
+    return e.cmd.ExitStatus() // Uses the proxy we added to safeCmd
+}
+
+func (e *annotatedError) Exited() bool {
+logger.Warning("forward exitited")
+    if ee, ok := e.err.(k8sexec.ExitError); ok {
+        return ee.Exited()
+    }
+    return true
+}
+
 
 
 
@@ -314,6 +344,16 @@ func (s *safeCmd) ExitStatus() int {
 	logger.Warning("Cannot forward exit status")
     // Fallback if the underlying Cmd doesn't support it directly
     return -1 
+}
+
+func (s *safeCmd) Exited() bool {
+	if exitErr, ok := s.Cmd.(interface{ Exited() bool }); ok {
+		logger.Warning("Forward exited")
+		return exitErr.Exited()
+	}
+	// Fallback: if there was no error, the process finished
+	logger.Warning("Forward exited - failed")
+	return true 
 }
 
 // LookPath satisfies k8sexec.Interface
