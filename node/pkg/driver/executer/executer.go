@@ -279,11 +279,19 @@ type exitError struct {
 }
 
 func (e *exitError) ExitStatus() int {
+	logger.Warning("exit status")
     return e.code
+}
+
+func (e *exitError) Exited() bool {
+	logger.Warning("exit error")
+    // If we have an exit code from the process, it has exited.
+    return true
 }
 
 // Ensure it implements String() to fully satisfy the k8sexec.ExitError interface
 func (e *exitError) String() string {
+	logger.Warning("exitstring")
     return e.Error()
 }
 
