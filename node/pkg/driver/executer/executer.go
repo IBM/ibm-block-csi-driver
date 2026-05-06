@@ -301,7 +301,7 @@ func (s *safeCmd) CombinedOutput() ([]byte, error) {
 
 
 
-    return b.Bytes(), err
+    return out, err
 }
 
 // annotatedError ensures the ExitStatus is never lost during the cast
@@ -310,24 +310,50 @@ type annotatedError struct {
     cmd *safeCmd
 }
 
+
 func (e *annotatedError) Error() string { 
 logger.Warning("forward Error")
 return e.err.Error() }
 
-func (e *annotatedError) ExitStatus() int {
-logger.Warning("forward exit status")
-    return e.cmd.ExitStatus() // Uses the proxy we added to safeCmd
+
+func (e *annotatedError) String() string {
+    // Tunnel to the underlying Stringer if it exists (it usually does for ExitErrors)
+    if stringer, ok := e.err.(fmt.Stringer); ok {
+		ogger.Warning("underlying string")
+        return stringer.String()
+    }
+	ogger.Warning("err to string")
+    return e.err.Error()
 }
+
+
+func (e *annotatedError) ExitStatus() int {
+    // This MUST return 2 for blkid on an empty disk
+	logger.Warning("forward exit status")
+    return e.cmd.ExitStatus() 
+}
+
+
+
+
 
 func (e *annotatedError) Exited() bool {
-logger.Warning("forward exitited")
-    if ee, ok := e.err.(k8sexec.ExitError); ok {
-        return ee.Exited()
-    }
-    return true
+	// Try to forward first
+	if exitErr, ok := e.err.(k8sexec.ExitError); ok {
+ogger.Warning("forward exitited")
+ 	
+		return exitErr.Exited()
+	}
+	// Fallback: If we have an annotatedError, Wait() has returned.
+	// In the context of SafeFormatAndMount, returning true here 
+	// prevents "nil pointer" or "invalid state" errors in the caller.
+	logger.Warning("force exitited")
+	return true 
 }
 
 
+// Compiler check to prevent future "Bad Casts"
+var _ k8s_exec.ExitError = &annotatedError{}
 
 
 // Stop satisfies k8sexec.Cmd
@@ -353,8 +379,20 @@ func (s *safeCmd) Exited() bool {
 	}
 	// Fallback: if there was no error, the process finished
 	logger.Warning("Forward exited - failed")
-	return true 
+	return false 
 }
+
+func (s *safeCmd) String() string {
+    // If the underlying k8s Cmd implements Stringer (which they do), proxy it.
+    if stringer, ok := s.Cmd.(fmt.Stringer); ok {
+		logger.Warning("Forward string")
+        return stringer.String()
+    }
+    // Fallback: Construct a readable version from name and args
+	logger.Warning("safeCmd string")
+    return fmt.Sprintf("%s %s", s.name, strings.Join(s.args, " "))
+}
+
 
 // LookPath satisfies k8sexec.Interface
 func (e *Executer) LookPath(file string) (string, error) {
