@@ -1363,6 +1363,9 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) TeardownVolume(ctx context.Conte
          var needFlush bool
          var needRemovePhysical bool
 
+	needFlush = true
+	needRemovePhysical = true
+
 	if mpathName != "" {
 		major, minor, _ = r.Helper.GetMajorMinorFromSysfs(ctx, mpathName)
 	}
