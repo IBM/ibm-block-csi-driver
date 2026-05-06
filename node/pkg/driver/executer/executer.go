@@ -243,6 +243,15 @@ func (s *safeCmd) Wait() error {
     }
 
         if err != nil {
+				exitCode := -1
+				// Extract the code from the real baseCmd's error
+				if ee, ok := err.(interface{ ExitStatus() int }); ok {
+					logger.Warning("extraced code")
+					exitCode = ee.ExitStatus()
+				}		
+				else {
+					logger.Warning("did not extraced code")
+				}
                 logger.Warningf("error %v", err)
                 // 3. Use s.ctx instead of s.Cmd.Context()
                 isTimeout := s.ctx != nil && s.ctx.Err() != nil
@@ -253,7 +262,8 @@ func (s *safeCmd) Wait() error {
                                 s.executor.markAsStuck(device, pid, s.name)
                         }
                 }
-                return err
+				// MUST return a type that satisfies k8sexec.ExitError
+				return &exitError{error: err, code: exitCode}				
         }
         logger.Warning("success")
 
@@ -262,6 +272,20 @@ func (s *safeCmd) Wait() error {
                 s.executor.clearTracking(device)
         }
         return nil
+}
+
+type exitError struct {
+    error
+    code int
+}
+
+func (e *exitError) ExitStatus() int {
+    return e.code
+}
+
+// Ensure it implements String() to fully satisfy the k8sexec.ExitError interface
+func (e *exitError) String() string {
+    return e.Error()
 }
 
 
