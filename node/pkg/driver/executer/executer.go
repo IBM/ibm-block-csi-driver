@@ -248,8 +248,7 @@ func (s *safeCmd) Wait() error {
 				if ee, ok := err.(interface{ ExitStatus() int }); ok {
 					logger.Warning("extraced code")
 					exitCode = ee.ExitStatus()
-				}		
-				else {
+				} else {
 					logger.Warning("did not extraced code")
 				}
                 logger.Warningf("error %v", err)
