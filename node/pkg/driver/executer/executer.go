@@ -206,11 +206,15 @@ func (s *safeCmd) Start() error {
         // Returning a generic fmt.Errorf here causes the "exit status 2" log.
         return &stuckError{device: device, name: s.name}
     }
+	
+	if s.stdout == nil {
+		s.SetStdout(&limitWriter{Writer: &bytes.Buffer{}, Limit: DefaultMaxOutput})
+	}
+	if s.stderr == nil {
+		s.SetStderr(&limitWriter{Writer: &bytes.Buffer{}, Limit: DefaultMaxOutput})
+	}
 
-    // Wrap Stdout ONLY if it isn't already set
-    if s.stdout == nil {
-        s.SetStdout(&limitWriter{Writer: &bytes.Buffer{}, Limit: DefaultMaxOutput})
-    }
+	return s.Cmd.Start()	
 
         err := s.Cmd.Start()
 
@@ -218,7 +222,7 @@ func (s *safeCmd) Start() error {
             logger.Warning("start")
          } else {
              logger.Warning("failed to start %v", err)
-}
+	}
 
     return err
 }
@@ -300,6 +304,16 @@ func (s *safeCmd) CombinedOutput() ([]byte, error) {
 func (s *safeCmd) Stop() {
         logger.Warning("Stop")
         s.Cmd.Stop()
+}
+
+func (s *safeCmd) ExitStatus() int {
+    if exitErr, ok := s.Cmd.(k8sexec.ExitError); ok {
+		logger.Warning("Forward exit status")
+        return exitErr.ExitStatus()
+    }
+	logger.Warning("Cannot forward exit status")
+    // Fallback if the underlying Cmd doesn't support it directly
+    return -1 
 }
 
 // LookPath satisfies k8sexec.Interface
