@@ -5,12 +5,19 @@ RUN if [[ "$(uname -m)" != "x86"* ]]; then yum install -y rust-toolset; fi
 
 USER default
 ENV PIP_DISABLE_PIP_VERSION_CHECK=1
+RUN if [[ "$(uname -m)" == "s390x" ]]; then \
+    export PROTOCOL_BUFFERS_PYTHON_IMPLEMENTATION=python; \
+    fi
+
 WORKDIR /tmp
 COPY controllers/servers/csi/requirements.txt ./csi_requirements.txt
 COPY controllers/servers/host_definer/requirements.txt ./host_definer_requirements.txt
 # avoid default- boringssl lib, since it does not support z systems
 ENV GRPC_PYTHON_BUILD_SYSTEM_OPENSSL=True
-RUN pip3 install -r ./csi_requirements.txt -r ./host_definer_requirements.txt
+
+COPY --from=quay.io/sushilmaxbhile/csi-deps:v2 /wheels /wheels
+COPY controllers/servers/csi/requirements.txt .
+RUN pip3 install --no-index --find-links=/wheels -r ./csi_requirements.txt -r ./host_definer_requirements.txt
 
 USER root
 COPY controllers/scripts/csi_general .
@@ -34,6 +41,10 @@ LABEL name="IBM block storage CSI driver host definer" \
       io.k8s.display-name="IBM block storage CSI driver host definer" \
       io.k8s.description="The host definer defines container orchestrator nodes on IBM block storage." \
       io.openshift.tags=ibm,csi,ibm-block-csi-driver,host-definer
+
+RUN if [[ "$(uname -m)" == "s390x" ]]; then \
+    export PROTOCOL_BUFFERS_PYTHON_IMPLEMENTATION=python; \
+    fi
 
 COPY --from=builder /opt/app-root /opt/app-root
 COPY ./common /driver/common
