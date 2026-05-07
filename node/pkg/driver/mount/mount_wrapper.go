@@ -192,18 +192,31 @@ func (m *Mounter) List() ([]mount.MountPoint, error) {
 	return results, nil
 }
 
-func (m *Mounter) MountSensitive(source, target, fstype string, options, sensitiveOptions []string) error {
-    // 1. Log only the safe stuff
-    //klog.V(4).Infof("Mounting %s to %s with options %v", source, target, options)
-    logger.Infof("Mounting %s to %s with options %v", source, target, options)
+const (
+    // Standard placeholder for sensitive data in k8s logs
+    sensitiveOptionsRemoved = "<masked>"
+)
 
-    // 2. Combine them for the actual system call
+// MountSensitive implements k8s.io/mount-utils Interface
+func (m *Mounter) MountSensitive(source, target, fstype string, options, sensitiveOptions []string) error {
+    // 1. Log safely using the k8s standard <masked> placeholder
+    if len(sensitiveOptions) > 0 {
+        logger.Infof("Mounting %s to %s with options %v and sensitive options %s", 
+            source, target, options, sensitiveOptionsRemoved)
+    } else {
+        logger.Infof("Mounting %s to %s with options %v", source, target, options)
+    }
+
+    // 2. Combine all options for the system call
     allOptions := append(options, sensitiveOptions...)
     
-    // 3. Your existing logic to translate flags and call unix.Mount
+    // 3. Translate flags and perform the syscall
     flags, data := m.parseMountOptions(allOptions)
+    
+    // Note: fstype can be empty for bind mounts or remounts
     return unix.Mount(source, target, fstype, flags, data)
 }
+
 
 
 func (m *Mounter) SearchForLongerMountPoints(targetPath string, _ []string, _ bool) ([]mount.MountPoint, error) {
@@ -843,34 +856,79 @@ func (m *Mounter) clearStuck(target string) {
 func (m *Mounter) parseMountOptions(options []string) (uintptr, string) {
 	var flags uintptr
 	var data []string
+
 	for _, opt := range options {
 		switch opt {
+		// ALIASES & HELPERS (Skip to avoid kernel EINVAL)
+		case "defaults":
+			continue // Handled by kernel default behaviors
+		case "_netdev", "nofail", "auto", "noauto", "user", "nouser":
+			continue // System-level flags the kernel doesn't process
+
+		// READ/WRITE
 		case "ro":
 			flags |= unix.MS_RDONLY
+		case "rw":
+			flags &= ^uintptr(unix.MS_RDONLY)
+
+		// BIND & RECURSIVE
 		case "bind":
 			flags |= unix.MS_BIND
-		case "shared":
-			flags |= unix.MS_SHARED
-		case "slave":
-			flags |= unix.MS_SLAVE
-		case "private":
-			flags |= unix.MS_PRIVATE
 		case "rbind":
 			flags |= (unix.MS_BIND | unix.MS_REC)
-		case "nosuid":
-			flags |= unix.MS_NOSUID
-		case "nodev":
-			flags |= unix.MS_NODEV
-		case "noexec":
-			flags |= unix.MS_NOEXEC
 		case "remount":
 			flags |= unix.MS_REMOUNT
+
+		// SECURITY & EXECUTION
+		case "nosuid":
+			flags |= unix.MS_NOSUID
+		case "suid":
+			flags &= ^uintptr(unix.MS_NOSUID)
+		case "nodev":
+			flags |= unix.MS_NODEV
+		case "dev":
+			flags &= ^uintptr(unix.MS_NODEV)
+		case "noexec":
+			flags |= unix.MS_NOEXEC
+		case "exec":
+			flags &= ^uintptr(unix.MS_NOEXEC)
+
+		// PROPAGATION (Critical for CSI drivers)
+		case "shared":
+			flags |= unix.MS_SHARED
+		case "rshared":
+			flags |= (unix.MS_SHARED | unix.MS_REC)
+		case "slave":
+			flags |= unix.MS_SLAVE
+		case "rslave":
+			flags |= (unix.MS_SLAVE | unix.MS_REC)
+		case "private":
+			flags |= unix.MS_PRIVATE
+		case "rprivate":
+			flags |= (unix.MS_PRIVATE | unix.MS_REC)
+
+		// PERFORMANCE & ATIME
+		case "sync":
+			flags |= unix.MS_SYNCHRONOUS
+		case "async":
+			flags &= ^uintptr(unix.MS_SYNCHRONOUS)
+		case "noatime":
+			flags |= unix.MS_NOATIME
+		case "atime":
+			flags &= ^uintptr(unix.MS_NOATIME)
+		case "relatime":
+			flags |= unix.MS_RELATIME
+		case "strictatime":
+			flags |= unix.MS_STRICTATIME
+
 		default:
+			// Custom filesystem data (e.g., "mode=0755", "uid=1000")
 			data = append(data, opt)
 		}
 	}
 	return flags, strings.Join(data, ",")
 }
+
 
 // isMountedInProc is the Single Source of Truth
 func (m *Mounter) isMountedInProc(target string) (bool, error) {
