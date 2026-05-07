@@ -66,5 +66,4 @@ ENV PYTHONPATH=/driver
 ENV PATH=/opt/app-root/bin:$PATH
 
 RUN pip3 install pytest-xdist pytest-timeout
-
 ENTRYPOINT ["/driver/controllers/scripts/entrypoint-test.sh"]
