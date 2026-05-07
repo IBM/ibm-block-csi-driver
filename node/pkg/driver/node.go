@@ -217,7 +217,7 @@ func (d *NodeService) NodeStageVolume(ctx context.Context, req *csi.NodeStageVol
 	}
 	
     if err = os.MkdirAll(stagingPathWithHostPrefix, 0750); err != nil {
-        logger.Errorf("failed to create target directory %s: %v", target, err)
+        logger.Errorf("failed to create target directory %s: %v", stagingPathWithHostPrefix, err)
 		return nil, err
     }	
 
