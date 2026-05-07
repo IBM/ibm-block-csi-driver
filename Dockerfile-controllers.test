@@ -51,4 +51,5 @@ USER appuser
 WORKDIR /driver
 ENV PYTHONPATH=/driver
 
+RUN pip3 install pytest pytest-cov pytest-xdist pytest-timeout
 ENTRYPOINT ["/driver/controllers/scripts/entrypoint-test.sh"]
