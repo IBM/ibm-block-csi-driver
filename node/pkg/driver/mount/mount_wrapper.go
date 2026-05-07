@@ -207,10 +207,6 @@ func (m *Mounter) MountSensitive(source, target, fstype string, options, sensiti
         logger.Infof("Mounting %s to %s with options %v", source, target, options)
     }
 	
-    if err := os.MkdirAll(target, 0750); err != nil {
-        return fmt.Errorf("failed to create target directory %s: %v", target, err)
-    }	
-
     // 2. Combine all options for the system call
     allOptions := append(options, sensitiveOptions...)
     
