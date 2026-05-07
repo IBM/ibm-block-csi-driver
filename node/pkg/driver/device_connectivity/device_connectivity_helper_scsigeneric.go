@@ -692,16 +692,52 @@ func (o OsDeviceConnectivityHelperGeneric) GetWwnByScsiInq(dev string) (string, 
 		return "", err
 	}
 
-	args := []string{"-p", "0x83", dev}
-	// add timeout in case the call never comes back.
-	logger.Debugf("Calling [%s] with timeout", sgInqCmd)
-	outputBytes, err := o.Executer.ExecuteWithTimeout(TimeOutSgInqCmd, sgInqCmd, args)
+	// sg_inq v2.3x (sg3_utils 1.48+) changed default output for -p 0x83 to raw hex.
+	// Try -i first because it keeps human-readable identification output across versions.
+	commandArgsList := [][]string{
+		{"-i", dev},
+		{"-p", "0x83", dev},
+	}
+	var parseErrors []string
+	var executionErrors []string
+	for _, args := range commandArgsList {
+		// add timeout in case the call never comes back.
+		logger.Debugf("Calling [%s %s] with timeout", sgInqCmd, strings.Join(args, " "))
+		outputBytes, err := o.Executer.ExecuteWithTimeout(TimeOutSgInqCmd, sgInqCmd, args)
+		if err != nil {
+			executionErrors = append(executionErrors, err.Error())
+			continue
+		}
+
+		wwn, err := o.getWwnFromScsiInqOutput(string(outputBytes), dev)
+		if err == nil {
+			return wwn, nil
+		}
+		parseErrors = append(parseErrors, err.Error())
+	}
+
+	if len(executionErrors) == len(commandArgsList) {
+		return "", errors.New(strings.Join(executionErrors, ","))
+	}
+	if len(executionErrors) > 0 {
+		allErrors := append(executionErrors, parseErrors...)
+		return "", fmt.Errorf("sg_inq failed for %s: %s", dev, strings.Join(allErrors, "; "))
+	}
+	if len(parseErrors) > 0 {
+		logger.Warningf("GetWwnByScsiInq: failed parsing sg_inq output for %s: %s", dev, strings.Join(parseErrors, ","))
+	}
+	return "", &MultipathDeviceNotFoundForVolumeError{dev}
+}
+
+func (o OsDeviceConnectivityHelperGeneric) getWwnFromScsiInqOutput(output string, dev string) (string, error) {
+	wwnBracketRegex := "(?i)" + `\[0x(.*?)\]`
+	wwnBracketRegexCompiled, err := regexp.Compile(wwnBracketRegex)
 	if err != nil {
 		return "", err
 	}
-	wwnRegex := "(?i)" + `\[0x(.*?)\]`
-	wwnRegexCompiled, err := regexp.Compile(wwnRegex)
-
+	// sg_inq v2.3x may output plain hex tokens without brackets.
+	wwnRawRegex := "(?i)" + `0x([[:xdigit:]]+)`
+	wwnRawRegexCompiled, err := regexp.Compile(wwnRawRegex)
 	if err != nil {
 		return "", err
 	}
@@ -710,7 +746,7 @@ func (o OsDeviceConnectivityHelperGeneric) GetWwnByScsiInq(dev string) (string, 
 	   sg_inq on device EUI-64 returns "Vendor Specific Extension Identifier".
 	*/
 	pattern := "(?i)" + "Vendor Specific (Identifier Extension|Extension Identifier):"
-	scanner := bufio.NewScanner(strings.NewReader(string(outputBytes[:])))
+	scanner := bufio.NewScanner(strings.NewReader(output))
 	regex, err := regexp.Compile(pattern)
 	if err != nil {
 		return "", err
@@ -720,12 +756,17 @@ func (o OsDeviceConnectivityHelperGeneric) GetWwnByScsiInq(dev string) (string, 
 	for scanner.Scan() {
 		line := scanner.Text()
 		if found {
-			matches := wwnRegexCompiled.FindStringSubmatch(line)
-			if len(matches) != 2 {
-				logger.Debugf("wrong line, too many matches in sg_inq output : %#v", matches)
-				return "", &ErrorNoRegexWwnMatchInScsiInq{dev, line}
+			matches := wwnBracketRegexCompiled.FindStringSubmatch(line)
+			if len(matches) == 2 {
+				wwn = matches[1]
+			} else {
+				matches = wwnRawRegexCompiled.FindStringSubmatch(line)
+				if len(matches) != 2 {
+					logger.Debugf("no wwn match in sg_inq output line: %q", line)
+					return "", &ErrorNoRegexWwnMatchInScsiInq{dev, line}
+				}
+				wwn = matches[1]
 			}
-			wwn = matches[1]
 			logger.Debugf("Found wwn [%s] in sg_inq", wwn)
 			return wwn, nil
 		}
@@ -736,7 +777,8 @@ func (o OsDeviceConnectivityHelperGeneric) GetWwnByScsiInq(dev string) (string, 
 		}
 
 	}
-	return "", &MultipathDeviceNotFoundForVolumeError{wwn}
+
+	return "", &MultipathDeviceNotFoundForVolumeError{dev}
 }
 
 func (o OsDeviceConnectivityHelperGeneric) ReloadMultipath() error {

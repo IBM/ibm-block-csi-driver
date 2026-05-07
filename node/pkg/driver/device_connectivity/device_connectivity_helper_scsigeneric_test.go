@@ -520,54 +520,107 @@ func TestHelperWaitForDmToExist(t *testing.T) {
 }
 
 func TestHelperGetWwnByScsiInq(t *testing.T) {
+	hexWwn := "6001738cfc9035eb0000000000ceaaaa"
 	testCases := []struct {
-		name            string
-		cmdReturn       []byte
-		expErr          error
-		wwn             string
-		cmdReturnErr    error
-		sgInqExecutable error
-		expErrType      reflect.Type
+		name              string
+		inquiryCmdReturn  []byte
+		inquiryCmdErr     error
+		vpdCmdReturn      []byte
+		vpdCmdErr         error
+		expErr            error
+		wwn               string
+		sgInqExecutable   error
+		expErrType        reflect.Type
+		expectVpdFallback bool
 	}{
 		{
-			name:            "Should fail when sg_Inq is not executable",
-			cmdReturn:       []byte(""),
-			wwn:             "",
-			cmdReturnErr:    nil,
-			expErr:          fmt.Errorf("error"),
-			sgInqExecutable: fmt.Errorf("error"),
+			name:             "Should fail when sg_Inq is not executable",
+			inquiryCmdReturn: []byte(""),
+			wwn:              "",
+			inquiryCmdErr:    nil,
+			expErr:           fmt.Errorf("error"),
+			sgInqExecutable:  fmt.Errorf("error"),
 		},
 		{
-			name:            "Should fail when cmd return error",
-			cmdReturn:       []byte(""),
-			wwn:             "",
-			cmdReturnErr:    fmt.Errorf("error"),
-			expErr:          fmt.Errorf("error"),
-			sgInqExecutable: nil,
+			name:              "Should fail when both commands return error",
+			inquiryCmdReturn:  []byte(""),
+			wwn:               "",
+			inquiryCmdErr:     fmt.Errorf("error"),
+			vpdCmdErr:         fmt.Errorf("error"),
+			expErr:            errors.New("error,error"),
+			sgInqExecutable:   nil,
+			expectVpdFallback: true,
 		},
 		{
-			name:            "Should return error when wwn line not matching the expected pattern",
-			cmdReturn:       []byte(fmt.Sprintf("Vendor Specific Identifier Extension: 0xcea5f6\n\t\t\t  [%s]", volumeUuid)),
-			wwn:             "",
-			cmdReturnErr:    nil,
-			expErrType:      reflect.TypeOf(&device_connectivity.ErrorNoRegexWwnMatchInScsiInq{}),
-			sgInqExecutable: nil,
+			name:              "Should fail when no device found",
+			inquiryCmdReturn:  []byte(""),
+			vpdCmdReturn:      []byte(""),
+			wwn:               "",
+			inquiryCmdErr:     nil,
+			vpdCmdErr:         nil,
+			expErrType:        reflect.TypeOf(&device_connectivity.MultipathDeviceNotFoundForVolumeError{}),
+			sgInqExecutable:   nil,
+			expectVpdFallback: true,
 		},
 		{
-			name:            "Should fail when no device found",
-			cmdReturn:       []byte(""),
-			wwn:             "",
-			cmdReturnErr:    nil,
-			expErrType:      reflect.TypeOf(&device_connectivity.MultipathDeviceNotFoundForVolumeError{}),
-			sgInqExecutable: nil,
+			name:             "Should succeed with sg_inq -i output",
+			inquiryCmdReturn: []byte(fmt.Sprintf("Vendor Specific Identifier Extension: 0xcea5f6\n\t\t\t  [0x%s]", volumeUuid)),
+			wwn:              volumeUuid,
+			inquiryCmdErr:    nil,
+			expErr:           nil,
+			sgInqExecutable:  nil,
 		},
 		{
-			name:            "Should succeed",
-			cmdReturn:       []byte(fmt.Sprintf("Vendor Specific Identifier Extension: 0xcea5f6\n\t\t\t  [0x%s]", volumeUuid)),
-			wwn:             volumeUuid,
-			cmdReturnErr:    nil,
+			name:              "Should fallback to sg_inq -p 0x83 when -i output is not parseable",
+			inquiryCmdReturn:  []byte("non parseable output"),
+			vpdCmdReturn:      []byte(fmt.Sprintf("Vendor Specific Identifier Extension: 0xcea5f6\n\t\t\t  [0x%s]", volumeUuid)),
+			wwn:               volumeUuid,
+			inquiryCmdErr:     nil,
+			vpdCmdErr:         nil,
+			expErr:            nil,
+			sgInqExecutable:   nil,
+			expectVpdFallback: true,
+		},
+		{
+			name: "Should succeed with sg_inq v2.3x raw hex output (no brackets)",
+			inquiryCmdReturn: []byte(fmt.Sprintf(
+				"Vendor Specific Identifier Extension: 0xcea5f6\n\t\t\t  0x%s", hexWwn)),
+			wwn:             hexWwn,
+			inquiryCmdErr:   nil,
 			expErr:          nil,
 			sgInqExecutable: nil,
+		},
+		{
+			name: "Should succeed with EUI-64 sg_inq v2.3x raw hex output (no brackets)",
+			inquiryCmdReturn: []byte(fmt.Sprintf(
+				"Vendor Specific Extension Identifier: 0xcea5f6\n\t\t\t  0x%s", hexWwn)),
+			wwn:             hexWwn,
+			inquiryCmdErr:   nil,
+			expErr:          nil,
+			sgInqExecutable: nil,
+		},
+		{
+			name:              "Should succeed when -i execution fails but -p 0x83 succeeds",
+			inquiryCmdReturn:  []byte(""),
+			inquiryCmdErr:     fmt.Errorf("error"),
+			vpdCmdReturn:      []byte(fmt.Sprintf("Vendor Specific Identifier Extension: 0xcea5f6\n\t\t\t  [0x%s]", volumeUuid)),
+			vpdCmdErr:         nil,
+			wwn:               volumeUuid,
+			expErr:            nil,
+			sgInqExecutable:   nil,
+			expectVpdFallback: true,
+		},
+		{
+			name:             "Should surface execution error in mixed parse+exec failure",
+			inquiryCmdReturn: []byte("non parseable output"),
+			inquiryCmdErr:    nil,
+			vpdCmdErr:        fmt.Errorf("exec_error"),
+			wwn:              "",
+			expErr: fmt.Errorf("sg_inq failed for /dev/dm-1: exec_error; " +
+				"Couldn't find multipath device for volumeID [/dev/dm-1]. " +
+				"Please check the host connectivity to the storage."),
+			sgInqExecutable:   nil,
+			expectVpdFallback: true,
 		},
 	}
 	sgInqCmd := "sg_inq"
@@ -579,11 +632,15 @@ func TestHelperGetWwnByScsiInq(t *testing.T) {
 			defer mockCtrl.Finish()
 
 			fakeExecuter := mocks.NewMockExecuterInterface(mockCtrl)
-			args := []string{"-p", "0x83", device}
+			inquiryArgs := []string{"-i", device}
+			vpdArgs := []string{"-p", "0x83", device}
 			fakeExecuter.EXPECT().IsExecutable(sgInqCmd).Return(tc.sgInqExecutable)
 
 			if tc.sgInqExecutable == nil {
-				fakeExecuter.EXPECT().ExecuteWithTimeout(device_connectivity.TimeOutSgInqCmd, sgInqCmd, args).Return(tc.cmdReturn, tc.cmdReturnErr)
+				fakeExecuter.EXPECT().ExecuteWithTimeout(device_connectivity.TimeOutSgInqCmd, sgInqCmd, inquiryArgs).Return(tc.inquiryCmdReturn, tc.inquiryCmdErr)
+				if tc.expectVpdFallback {
+					fakeExecuter.EXPECT().ExecuteWithTimeout(device_connectivity.TimeOutSgInqCmd, sgInqCmd, vpdArgs).Return(tc.vpdCmdReturn, tc.vpdCmdErr)
+				}
 			}
 
 			helperGeneric := device_connectivity.NewOsDeviceConnectivityHelperGeneric(fakeExecuter)
