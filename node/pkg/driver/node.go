@@ -215,6 +215,12 @@ func (d *NodeService) NodeStageVolume(ctx context.Context, req *csi.NodeStageVol
 		logger.Errorf("Error while resolving type of filesystem to mount : {%v}", err.Error())
 		return nil, err
 	}
+	
+    if err = os.MkdirAll(stagingPathWithHostPrefix, 0750); err != nil {
+        logger.Errorf("failed to create target directory %s: %v", target, err)
+		return nil, err
+    }	
+
 
 	err = d.formatAndMount(mpathDevice, stagingPath, fsTypeForMount, existingFormat)
 	if err != nil {
