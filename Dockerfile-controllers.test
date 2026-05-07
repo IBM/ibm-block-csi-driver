@@ -42,7 +42,7 @@ RUN ./csi_pb2.sh
 RUN pip3 install .
 
 COPY controllers/tests/requirements.txt ./requirements-tests.txt
-RUN pip3 install --no-index --find-links=/wheels -r ./requirements-tests.txt
+RUN pip3 install -r ./requirements-tests.txt
 
 # Final stage
 FROM registry.access.redhat.com/ubi9/python-39:1-1774968736
