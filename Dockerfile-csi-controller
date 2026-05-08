@@ -20,7 +20,7 @@ RUN if [[ "$(uname -m)" != "x86"* ]]; then yum install -y rust-toolset; fi
 USER default
 ENV PIP_DISABLE_PIP_VERSION_CHECK=1
 RUN if [[ "$(uname -m)" == "s390x" ]]; then \
-    ENV PROTOCOL_BUFFERS_PYTHON_IMPLEMENTATION=python; \
+    export PROTOCOL_BUFFERS_PYTHON_IMPLEMENTATION=python; \
     fi
 
 WORKDIR /tmp
@@ -54,7 +54,7 @@ LABEL name="IBM block storage CSI driver controller" \
       io.openshift.tags=ibm,csi,ibm-block-csi-driver,ibm-block-csi-node
 
 RUN if [[ "$(uname -m)" == "s390x" ]]; then \
-    ENV PROTOCOL_BUFFERS_PYTHON_IMPLEMENTATION=python; \
+    export PROTOCOL_BUFFERS_PYTHON_IMPLEMENTATION=python; \
     fi
 
 COPY --from=builder /opt/app-root /opt/app-root
