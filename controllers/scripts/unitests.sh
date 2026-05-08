@@ -1,11 +1,9 @@
 #!/bin/bash
 set -ex
 
-# REQUIRED: ensure protobuf fix is applied
-if [[ "$(uname -m)" == "s390x" ]]; then
+RUN if [ "$TARGETARCH" = "s390x" ]; then \
   export PROTOCOL_BUFFERS_PYTHON_IMPLEMENTATION=python
-fi
-
+  fi
 coveragedir=/driver/coverage/
 [ ! -d "$coveragedir" ] && mkdir -p "$coveragedir"
 
