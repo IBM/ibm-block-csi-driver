@@ -207,12 +207,12 @@ class ReplicationControllerServicer(pb2_grpc.ControllerServicer):
 
         utils.validate_secrets(request.secrets)
 
-        # GetVolumeReplicationInfo is only supported for EAR (VolumeGroup level).
         if object_type != servers_settings.VOLUME_GROUP_TYPE_NAME:
-            error_message = "GetVolumeReplicationInfo is supported only on volume group level (EAR replication)"
-            logger.error("GetVolumeReplicationInfo: {}".format(error_message))
-            return build_error_response(error_message, context, grpc.StatusCode.FAILED_PRECONDITION,
-                                        pb2.GetVolumeReplicationInfoResponse)
+            logger.warning(
+                "GetVolumeReplicationInfo: only supported for EAR (VolumeGroup level). "
+                "Returning empty response for object_type='{}'".format(object_type)
+            )
+            return pb2.GetVolumeReplicationInfoResponse()
 
         connection_info = utils.get_array_connection_info_from_secrets(request.secrets)
 
