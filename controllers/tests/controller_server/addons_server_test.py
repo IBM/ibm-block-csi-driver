@@ -411,10 +411,9 @@ class TestGetVolumeReplicationInfo(BaseReplicationSetUp, CommonControllerTest):
         response = self.servicer.GetVolumeReplicationInfo(volume_request, self.context)
 
         self.assertEqual(grpc.StatusCode.OK, self.context.code)
-        self.mediator.get_last_async_snapshot_info.assert_not_called()
+        self.mediator.get_replication_info.assert_not_called()
         self.assertEqual(0, response.last_sync_time.seconds)
-        self.assertEqual(ReplicationStatus.UNKNOWN, response.status)
-        self.assertEqual('', response.status_message)
+        self.assertEqual(0, response.last_sync_bytes)
 
     def test_get_volume_replication_info_already_processing(self):
         self._test_request_already_processing(
