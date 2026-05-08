@@ -19,7 +19,7 @@ RUN if [[ "$(uname -m)" != "x86"* ]]; then yum install -y rust-toolset; fi
 
 USER default
 ENV PIP_DISABLE_PIP_VERSION_CHECK=1
-RUN if [ "$TARGETARCH" = "s390x" ]; then \
+RUN if [[ "$(uname -m)" == "s390x" ]]; then \
     ENV PROTOCOL_BUFFERS_PYTHON_IMPLEMENTATION=python; \
     fi
 
@@ -53,7 +53,7 @@ LABEL name="IBM block storage CSI driver controller" \
       io.k8s.description="The IBM block storage CSI driver enables container orchestrators, such as Kubernetes and OpenShift, to manage the life-cycle of persistent storage." \
       io.openshift.tags=ibm,csi,ibm-block-csi-driver,ibm-block-csi-node
 
-RUN if [ "$TARGETARCH" = "s390x" ]; then \
+RUN if [[ "$(uname -m)" == "s390x" ]]; then \
     ENV PROTOCOL_BUFFERS_PYTHON_IMPLEMENTATION=python; \
     fi
 

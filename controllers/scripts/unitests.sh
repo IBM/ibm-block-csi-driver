@@ -1,7 +1,7 @@
 #!/bin/bash
 set -ex
 
-if [ "$TARGETARCH" = "s390x" ]; then \
+if [[ "$(uname -m)" == "s390x" ]]; then \
   export PROTOCOL_BUFFERS_PYTHON_IMPLEMENTATION=python
   fi
 coveragedir=/driver/coverage/
