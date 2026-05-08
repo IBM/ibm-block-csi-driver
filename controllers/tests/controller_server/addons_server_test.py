@@ -397,7 +397,7 @@ class TestGetVolumeReplicationInfo(BaseReplicationSetUp, CommonControllerTest):
         self.mediator.get_replication_info.assert_called_once_with(OBJECT_INTERNAL_ID)
         self.assertEqual(0, response.last_sync_bytes)
 
-    def test_get_volume_replication_info_non_volumegroup_source_fails(self):
+    def test_get_volume_replication_info_non_volumegroup_source_returns_empty(self):
         volume_request = ProtoBufMock()
         volume_request.secrets = self.request.secrets
         volume_request.volume_id = "{0}:{1};{1}".format("A9000", OBJECT_INTERNAL_ID)
@@ -407,10 +407,12 @@ class TestGetVolumeReplicationInfo(BaseReplicationSetUp, CommonControllerTest):
         replication_source.volume.volume_id = volume_request.volume_id
         volume_request.replication_source = replication_source
 
-        self.servicer.GetVolumeReplicationInfo(volume_request, self.context)
+        response = self.servicer.GetVolumeReplicationInfo(volume_request, self.context)
 
-        self.assertEqual(grpc.StatusCode.FAILED_PRECONDITION, self.context.code)
+        self.assertEqual(grpc.StatusCode.OK, self.context.code)
         self.mediator.get_replication_info.assert_not_called()
+        self.assertEqual(0, response.last_sync_time.seconds)
+        self.assertEqual(0, response.last_sync_bytes)
 
     def test_get_volume_replication_info_already_processing(self):
         self._test_request_already_processing(
