@@ -222,7 +222,7 @@ func (d *NodeService) NodeStageVolume(ctx context.Context, req *csi.NodeStageVol
     }	
 
 
-	err = d.formatAndMount(mpathDevice, stagingPath, fsTypeForMount, existingFormat)
+	err = d.formatAndMount(mpathDevice, stagingPathWithHostPrefix, fsTypeForMount, existingFormat)
 	if err != nil {
 		return nil, status.Error(codes.Internal, err.Error())
 	}
