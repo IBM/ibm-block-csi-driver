@@ -9,6 +9,7 @@ from pysvc.unified.response import CLIFailureError, SVCResponse
 
 from controllers.common.config import config
 import controllers.array_action.errors as array_errors
+import controllers.servers.settings as controller_settings
 import controllers.tests.array_action.svc.test_settings as svc_settings
 import controllers.tests.array_action.test_settings as array_settings
 import controllers.tests.common.test_settings as common_settings
@@ -2690,3 +2691,52 @@ class TestArrayMediatorSVC(unittest.TestCase):
         self.assertIsNone(result.last_sync_time)
         self.assertIsNone(result.last_sync_duration_seconds)
         self.assertIsNone(result.last_sync_bytes)
+
+    # --- get_replication_destination_info tests ---
+
+    def _prepare_lsvolumegroupreplication_for_destination(self, vg_replication=None):
+        self.svc.client.svcinfo.lsvolumegroupreplication.return_value = Mock(
+            as_single_element=vg_replication)
+
+    def test_get_replication_destination_info_volumegroup_no_replication_raises_object_not_found(self):
+        self._prepare_lsvolumegroupreplication_for_destination(vg_replication=None)
+
+        with self.assertRaises(array_errors.ObjectNotFoundError):
+            self.svc.get_replication_destination_info(
+                OBJECT_INTERNAL_ID, controller_settings.VOLUME_GROUP_TYPE_NAME)
+
+    def test_get_replication_destination_info_volumegroup_with_volumes_succeeds(self):
+        vg_replication = self._mock_vg_replication()
+        self._prepare_lsvolumegroupreplication_for_destination(vg_replication=vg_replication)
+        self.svc.client.svcinfo.lsvolumegroup.return_value = Mock(
+            as_single_element=self._mock_cli_volume_group(volume_count=1))
+        cli_volume = self._get_cli_volume()
+        self.svc.client.svcinfo.lsvdisk.return_value = Mock(as_list=[cli_volume])
+
+        result = self.svc.get_replication_destination_info(
+            OBJECT_INTERNAL_ID, controller_settings.VOLUME_GROUP_TYPE_NAME)
+
+        self.assertEqual(OBJECT_INTERNAL_ID, result.source_id)
+        self.assertEqual(OBJECT_INTERNAL_ID, result.destination_volume_group_id)
+        self.assertEqual({common_settings.VOLUME_UID: common_settings.VOLUME_UID},
+                         result.destination_volume_ids)
+
+    def test_get_replication_destination_info_volume_not_found_raises_object_not_found(self):
+        self.svc.client.svcinfo.lsvdisk.return_value = Mock(as_single_element=None)
+
+        with self.assertRaises(array_errors.ObjectNotFoundError):
+            self.svc.get_replication_destination_info(
+                OBJECT_INTERNAL_ID, controller_settings.VOLUME_TYPE_NAME)
+
+    def test_get_replication_destination_info_volume_succeeds(self):
+        cli_volume = self._get_cli_volume()
+        self.svc.client.svcinfo.lsvdisk.return_value = Mock(as_single_element=cli_volume)
+
+        result = self.svc.get_replication_destination_info(
+            OBJECT_INTERNAL_ID, controller_settings.VOLUME_TYPE_NAME)
+
+        self.svc.client.svcinfo.lsvdisk.assert_called_once_with(
+            bytes=True, object_id=OBJECT_INTERNAL_ID)
+        self.assertEqual(OBJECT_INTERNAL_ID, result.source_id)
+        self.assertEqual(common_settings.VOLUME_UID, result.destination_volume_id)
+        self.assertIsNone(result.destination_volume_group_id)
