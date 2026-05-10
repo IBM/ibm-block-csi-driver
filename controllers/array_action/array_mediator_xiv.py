@@ -520,6 +520,9 @@ class XIVArrayMediator(ArrayMediatorAbstract):
     def get_replication_info(self, volume_group_id):
         raise NotImplementedError
 
+    def get_replication_destination_info(self, object_id, object_type):
+        raise NotImplementedError
+
     def create_replication(self, replication_request):
         raise NotImplementedError
 

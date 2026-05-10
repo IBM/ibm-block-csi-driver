@@ -209,7 +209,7 @@ class ReplicationControllerServicer(pb2_grpc.ControllerServicer):
 
         if object_type != servers_settings.VOLUME_GROUP_TYPE_NAME:
             logger.warning(
-                "GetVolumeReplicationInfo: only supported for EAR (VolumeGroup level). "
+                "GetVolumeReplicationInfo is only supported for EAR (VolumeGroup level). "
                 "Returning empty response for object_type='{}'".format(object_type)
             )
             return pb2.GetVolumeReplicationInfoResponse()
@@ -227,13 +227,57 @@ class ReplicationControllerServicer(pb2_grpc.ControllerServicer):
         else:
             response.last_sync_time.CopyFrom(Timestamp(seconds=0, nanos=0))
             logger.warning(
-                "GetVolumeReplicationInfo: last_sync_time not available "
-                "(fixed_recovery_point was blank). Setting to default timestamp (0)."
+                "last_sync_time not available (fixed_recovery_point was blank). "
+                "Setting to default timestamp (0)."
             )
 
         bytes_val = replication_info.last_sync_bytes if replication_info.last_sync_bytes is not None else -1
         response.last_sync_bytes = bytes_val
 
-        logger.info("GetVolumeReplicationInfo: returning response last_sync_time.seconds={}, last_sync_bytes={}"
+        logger.info("Returning response last_sync_time.seconds={}, last_sync_bytes={}"
                     .format(response.last_sync_time.seconds, response.last_sync_bytes))
+        return response
+
+    @csi_replication_method(error_response_type=pb2.GetReplicationDestinationInfoResponse)
+    def GetReplicationDestinationInfo(self, request, context):
+        logger.info("GetReplicationDestinationInfo: called with replication_source='{}'".format(
+            request.replication_source))
+
+        object_type, object_id_info = utils.get_replication_object_type_and_id_info(request)
+        object_id = object_id_info.ids.internal_id
+
+        utils.validate_secrets(request.secrets)
+
+        connection_info = utils.get_array_connection_info_from_secrets(request.secrets)
+
+        with get_agent(connection_info, object_id_info.array_type).get_mediator() as mediator:
+            destination_info = mediator.get_replication_destination_info(object_id, object_type)
+
+        response = pb2.GetReplicationDestinationInfoResponse()
+
+        if destination_info.destination_volume_group_id is not None:
+            response.replication_destination.volumegroup.volume_group_id = (
+                destination_info.destination_volume_group_id
+            )
+            if destination_info.destination_volume_ids:
+                for source_vol_id, dest_vol_id in destination_info.destination_volume_ids.items():
+                    response.replication_destination.volumegroup.volume_ids[source_vol_id] = dest_vol_id
+            logger.info(
+                "Returning destination_volume_group_id='{}' "
+                "volume_ids='{}'".format(
+                    destination_info.destination_volume_group_id,
+                    destination_info.destination_volume_ids
+                )
+            )
+        elif destination_info.destination_volume_id is not None:
+            response.replication_destination.volume.volume_id = destination_info.destination_volume_id
+            logger.info(
+                "Returning destination_volume_id='{}'".format(destination_info.destination_volume_id)
+            )
+        else:
+            logger.warning(
+                "No destination info available for object_id='{}' "
+                "object_type='{}'".format(object_id, object_type)
+            )
+
         return response

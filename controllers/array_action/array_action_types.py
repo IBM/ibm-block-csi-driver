@@ -103,3 +103,11 @@ class ReplicationInfo:
     last_sync_time: object = None
     last_sync_duration_seconds: object = None
     last_sync_bytes: object = None
+
+
+@dataclass
+class ReplicationDestinationInfo:
+    source_id: str
+    destination_volume_id: str = None
+    destination_volume_group_id: str = None
+    destination_volume_ids: dict = field(default_factory=dict)

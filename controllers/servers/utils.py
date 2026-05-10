@@ -893,9 +893,6 @@ def get_object_final_name(volume_parameters, name, array_mediator, object_type):
 
 
 def get_replication_object_type_and_id_info(request):
-    object_id = request.volume_id
-    object_type = servers_settings.VOLUME_TYPE_NAME
-
     replication_source = request.replication_source
     if replication_source and replication_source.ListFields():
         logger.info(replication_source)
@@ -908,6 +905,10 @@ def get_replication_object_type_and_id_info(request):
         else:
             logger.error(messages.UNSUPPORTED_REPLICATION_SOURCE_TYPE_MESSAGE)
             raise ValidationException(messages.UNSUPPORTED_REPLICATION_SOURCE_TYPE_MESSAGE)
+    else:
+        object_id = request.volume_id
+        object_type = servers_settings.VOLUME_TYPE_NAME
+
     object_id_info = get_object_id_info(object_id, object_type)
     return object_type, object_id_info
 
