@@ -56,7 +56,7 @@ type OsDeviceConnectivityHelperScsiGenericInterface interface {
 	RemoveGhostDevice(ctx context.Context, expectedSerial string, expectedLun int, arrayIdentifiers []string) error
 	ValidateLun(ctx context.Context, targetDm string, lun int, sysDevices []string, expectedSerial string) error
 	IsVolumePathMatchesVolumeId(ctx context.Context, volumeId string, volumePath string) (bool, error)
-	TeardownVolume(ctx context.Context, target string, expectedWWID string) error
+	TeardownVolume(ctx context.Context, target string, needFlush bool, needRemovePhysical bool, expectedWWID string) error
 	IdentityAwarePreScan(ctx context.Context, targetPath string, expectedWWID string) error
 }
 
@@ -1324,7 +1324,7 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) isHardwareBlocked(sgName string)
 
 // sHardwareBlocked, also check for the quiesce state. It often indicates a storage controller failover where I/O is paused but not failed.
 
-func (r *OsDeviceConnectivityHelperScsiGeneric) TeardownVolume(ctx context.Context, target string, expectedWWID string) error {
+func (r *OsDeviceConnectivityHelperScsiGeneric) TeardownVolume(ctx context.Context, target string, needFlush bool, needRemovePhysical bool, expectedWWID string) error {
 	// REQUIREMENT 8: Respect CSI API Context
 	if err := ctx.Err(); err != nil {
 		return err
@@ -1361,40 +1361,9 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) TeardownVolume(ctx context.Conte
 	mpathName := r.Helper.findDMByWWID(expectedWWID)
 	var major, minor uint32
 
-         var needFlush bool
-         var needRemovePhysical bool
-
-
 	if mpathName != "" {
 		major, minor, _ = r.Helper.GetMajorMinorFromSysfs(ctx, mpathName)
 		
-       baseDevice := path.Base(mpathDevice)
-
-       nvmeType, err := d.NodeUtils.DevicesAreNvme(ctx, baseDevice)
-       if err != nil {
-               logger.Errorf("Failed to determine device type for %s: %v", baseDevice, err)
-       }
-
-       switch nvmeType {
-       case NVMeNative:
-               // Native NVMe multipath: kernel manages everything, skip all cleanup
-               logger.Infof("Device %s is native NVMe: skipping flush and SCSI device cleanup", baseDevice)
-
-       case NVMeNonNative:
-               // DM-multipath over NVMe: flush mpath only.
-			needFlush = true
-               logger.Infof("Device %s is non-native NVMe: flush multipath, skip physical device removal", baseDevice)
-
-       case NotNVMe:
-			logger.Infof("Device %s is not NVMe: flush multipath, physical device removal", baseDevice)
-			needFlush = true
-			needRemovePhysical = true
-
-       default:
-               return status.Errorf(codes.Internal, "Unknown NVMe type for device %s", baseDevice)
-       }
-		
-
 
 	
 		openCount, _ := r.Helper.GetOpenCount(ctx, mpathName)
@@ -1763,7 +1732,7 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) IdentityAwarePreScan(ctx context
 		if strings.EqualFold(currentWWID, normExpected) && (actualHw == "" || strings.EqualFold(actualHw, normExpected)) {
 			// Zombie Match: Same volume from a crashed attempt. Full cleanup.
 			// TODO not null case?
-			err := r.TeardownVolume(ctx, targetPath, expectedWWID)
+			err := r.TeardownVolume(ctx, targetPath, false, false, expectedWWID)
 			if err != nil {
 				return fmt.Errorf("pre-scan: failed to clear zombie volume: %w", err)
 			}
