@@ -209,7 +209,7 @@ class ReplicationControllerServicer(pb2_grpc.ControllerServicer):
 
         if object_type != servers_settings.VOLUME_GROUP_TYPE_NAME:
             logger.warning(
-                "GetVolumeReplicationInfo: only supported for EAR (VolumeGroup level). "
+                "GetVolumeReplicationInfo is only supported for EAR (VolumeGroup level). "
                 "Returning empty response for object_type='{}'".format(object_type)
             )
             return pb2.GetVolumeReplicationInfoResponse()
@@ -227,14 +227,14 @@ class ReplicationControllerServicer(pb2_grpc.ControllerServicer):
         else:
             response.last_sync_time.CopyFrom(Timestamp(seconds=0, nanos=0))
             logger.warning(
-                "GetVolumeReplicationInfo: last_sync_time not available "
-                "(fixed_recovery_point was blank). Setting to default timestamp (0)."
+                "last_sync_time not available (fixed_recovery_point was blank). "
+                "Setting to default timestamp (0)."
             )
 
         bytes_val = replication_info.last_sync_bytes if replication_info.last_sync_bytes is not None else -1
         response.last_sync_bytes = bytes_val
 
-        logger.info("GetVolumeReplicationInfo: returning response last_sync_time.seconds={}, last_sync_bytes={}"
+        logger.info("Returning response last_sync_time.seconds={}, last_sync_bytes={}"
                     .format(response.last_sync_time.seconds, response.last_sync_bytes))
         return response
 
@@ -263,7 +263,7 @@ class ReplicationControllerServicer(pb2_grpc.ControllerServicer):
                 for source_vol_id, dest_vol_id in destination_info.destination_volume_ids.items():
                     response.replication_destination.volumegroup.volume_ids[source_vol_id] = dest_vol_id
             logger.info(
-                "GetReplicationDestinationInfo: returning destination_volume_group_id='{}' "
+                "Returning destination_volume_group_id='{}' "
                 "volume_ids='{}'".format(
                     destination_info.destination_volume_group_id,
                     destination_info.destination_volume_ids
@@ -272,14 +272,12 @@ class ReplicationControllerServicer(pb2_grpc.ControllerServicer):
         elif destination_info.destination_volume_id is not None:
             response.replication_destination.volume.volume_id = destination_info.destination_volume_id
             logger.info(
-                "GetReplicationDestinationInfo: returning destination_volume_id='{}'".format(
-                    destination_info.destination_volume_id
-                )
+                "Returning destination_volume_id='{}'".format(destination_info.destination_volume_id)
             )
         else:
             logger.warning(
-                "GetReplicationDestinationInfo: no destination info available for "
-                "object_id='{}' object_type='{}'".format(object_id, object_type)
+                "No destination info available for object_id='{}' "
+                "object_type='{}'".format(object_id, object_type)
             )
 
         return response

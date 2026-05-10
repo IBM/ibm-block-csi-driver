@@ -1783,23 +1783,23 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
     def _parse_svc_str_field(self, raw_value, field_name):
         raw_str = str(raw_value or '').strip()
         if not raw_str:
-            logger.warning("_parse_svc_str_field: field='{}' is blank, returning None".format(field_name))
+            logger.warning("Field='{}' is blank, returning None".format(field_name))
             return None
 
-        logger.debug("_parse_svc_str_field: field='{}' parsed '{}'".format(field_name, raw_str))
+        logger.debug("Field='{}' parsed '{}'".format(field_name, raw_str))
         return raw_str
 
     def _parse_svc_timestamp(self, raw_value, field_name):
         raw_str = str(raw_value or '').strip()
         if not raw_str:
-            logger.warning("_parse_svc_timestamp: field='{}' is blank, returning None".format(field_name))
+            logger.warning("Field='{}' is blank, returning None".format(field_name))
             return None
         try:
             dt = datetime.strptime(raw_str, "%y%m%d%H%M%S")
-            logger.debug("_parse_svc_timestamp: field='{}' parsed '{}' -> {}".format(field_name, raw_str, dt))
+            logger.debug("Field='{}' parsed '{}' -> {}".format(field_name, raw_str, dt))
             return dt
         except ValueError as ex:
-            logger.warning("_parse_svc_timestamp: field='{}' failed to parse '{}': {}".format(
+            logger.warning("Field='{}' failed to parse '{}': {}".format(
                 field_name, raw_str, ex))
             return None
 
@@ -1807,7 +1807,7 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
         raw_str = str(raw_value or '').strip().upper()
 
         if not raw_str:
-            logger.warning("_parse_svc_size_to_bytes: field='{}' is blank, returning None".format(field_name))
+            logger.warning("Field='{}' is blank, returning None".format(field_name))
             return None
 
         suffixes = {
@@ -1823,11 +1823,11 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
                 numeric_part = raw_str[:-len(suffix)].strip()
                 try:
                     bytes_val = int(float(numeric_part) * multiplier)
-                    logger.debug("_parse_svc_size_to_bytes: field='{}' parsed '{}' -> {} bytes".format(
+                    logger.debug("Field='{}' parsed '{}' -> {} bytes".format(
                         field_name, raw_value, bytes_val))
                     return bytes_val
                 except (ValueError, TypeError) as ex:
-                    logger.warning("_parse_svc_size_to_bytes: field='{}' failed to parse '{}': {}".format(
+                    logger.warning("Field='{}' failed to parse '{}': {}".format(
                         field_name, raw_value, ex))
                     return None
 
@@ -1836,7 +1836,7 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
             result = int(raw_str)
             return result
         except (ValueError, TypeError) as ex:
-            logger.warning("_parse_svc_size_to_bytes: field='{}' failed to parse '{}' as int: {}".format(
+            logger.warning("Field='{}' failed to parse '{}' as int: {}".format(
                 field_name, raw_value, ex))
             return None
 
@@ -1846,11 +1846,11 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
 
         if is_partition:
             recovery_idx = '3'
-            logger.info("_get_recovery_location_index: partition VG "
-                        "(partition_name='{}') -> DR location = '{}'".format(partition_name, recovery_idx))
+            logger.info("Partition VG (partition_name='{}') -> "
+                        "DR location = '{}'".format(partition_name, recovery_idx))
         else:
             recovery_idx = '2'
-            logger.info("_get_recovery_location_index: non-partition VG -> DR location = '{}'".format(recovery_idx))
+            logger.info("Non-partition VG -> DR location = '{}'".format(recovery_idx))
 
         return recovery_idx
 
@@ -1860,7 +1860,7 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
         vg_replication = self._lsvolumegroupreplication(volume_group_id)
         if not vg_replication:
             logger.error(
-                "get_replication_info: no replication record found for "
+                "No replication record found for "
                 "volume_group_id='{}'".format(volume_group_id)
             )
             raise array_errors.ObjectNotFoundError(volume_group_id)
@@ -1869,7 +1869,7 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
 
         if recovery_loc_idx is None:
             logger.warning(
-                "get_replication_info: could not determine recovery location index for "
+                "Could not determine recovery location index for "
                 "volume_group_id='{}'.".format(volume_group_id)
             )
             return ReplicationInfo(volume_group_id=volume_group_id)
@@ -1891,8 +1891,8 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
         if sync_required is not None and sync_remaining is not None:
             last_sync_bytes = sync_required - sync_remaining
         else:
-            logger.info("get_replication_info: last_sync_bytes cannot be computed as "
-                        "one or both of sync_required/sync_remaining is None")
+            logger.info("last_sync_bytes cannot be computed as one or both of "
+                        "sync_required/sync_remaining is None")
 
         replication_info = ReplicationInfo(
             volume_group_id=volume_group_id,
@@ -1919,20 +1919,24 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
             raw_destination_volume_group_id = getattr(vg_replication, vg_id_attr, None)
             destination_volume_group_id = self._parse_svc_str_field(raw_destination_volume_group_id, vg_id_attr)
 
-            destination_volume_group = VolumeGroup(
-                name=source_volume_group.name,
-                id="",
-                array_type=self.array_type,
-                internal_id=destination_volume_group_id,
-                volumes=[],
-            )
+            if destination_volume_group_id:
+                destination_volume_group = VolumeGroup(
+                    name=source_volume_group.name,
+                    id="",
+                    array_type=self.array_type,
+                    internal_id=destination_volume_group_id,
+                    volumes=[],
+                )
+            else:
+                logger.info("Destination VolumeGroup ID is empty for Source VolumeGroup.")
+                return ReplicationDestinationInfo(source_id=object_id)
 
-            destination_volume_group_handle = get_volume_group_id(destination_volume_group, self.identifier)
+            destination_volume_group_handle = get_volume_group_id(destination_volume_group, None)
 
             destination_volume_ids = {}
             for source_volume in source_volume_group.volumes:
                 # Mock: destination volume_handle is currently unavailable from storage, using source volume_handle
-                source_volume_handle = get_volume_id(source_volume, self.identifier)
+                source_volume_handle = get_volume_id(source_volume, None)
                 destination_volume_ids[source_volume_handle] = source_volume_handle
 
             return ReplicationDestinationInfo(
@@ -1945,16 +1949,13 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
             raw_cli_volume = self._get_cli_volume(object_id)
             source_thin_volume = self._generate_thin_volume_response(raw_cli_volume)
             # Mock: destination volume_handle is currently unavailable from storage, using source volume_handle
-            destination_volume_handle = get_volume_id(source_thin_volume, self.identifier)
+            destination_volume_handle = get_volume_id(source_thin_volume, None)
             return ReplicationDestinationInfo(
                 source_id=object_id,
                 destination_volume_id=destination_volume_handle
             )
 
-        return ReplicationDestinationInfo(
-            source_id=object_id,
-            destination_volume_id=object_id
-        )
+        return ReplicationDestinationInfo(source_id=object_id)
 
     def _get_replication_policy(self, volume_group_id):
         volume_group_replication = self._lsvolumegroupreplication(volume_group_id)

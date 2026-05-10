@@ -2729,7 +2729,7 @@ class TestArrayMediatorSVC(unittest.TestCase):
             internal_id=common_settings.INTERNAL_VOLUME_GROUP_ID,
             volumes=[],
         )
-        expected_vg_handle = get_volume_group_id(expected_destination_vg, svc_settings.DUMMY_ID_ALIAS)
+        expected_vg_handle = get_volume_group_id(expected_destination_vg, None)
         self.assertEqual(expected_vg_handle, result.destination_volume_group_id)
 
         expected_thin_volume = ThinVolume(
@@ -2739,7 +2739,7 @@ class TestArrayMediatorSVC(unittest.TestCase):
             name=cli_volume.name,
             array_type=ARRAY_TYPE_SVC
         )
-        expected_vol_handle = get_volume_id(expected_thin_volume, svc_settings.DUMMY_ID_ALIAS)
+        expected_vol_handle = get_volume_id(expected_thin_volume, None)
         self.assertEqual({expected_vol_handle: expected_vol_handle}, result.destination_volume_ids)
 
     def test_get_replication_destination_info_volume_not_found_raises_object_not_found(self):
@@ -2767,6 +2767,19 @@ class TestArrayMediatorSVC(unittest.TestCase):
             name=cli_volume.name,
             array_type=ARRAY_TYPE_SVC
         )
-        expected_handle = get_volume_id(expected_thin_volume, svc_settings.DUMMY_ID_ALIAS)
+        expected_handle = get_volume_id(expected_thin_volume, None)
         self.assertEqual(expected_handle, result.destination_volume_id)
         self.assertIsNone(result.destination_volume_group_id)
+
+    def test_get_replication_destination_info_volumegroup_blank_destination_id_returns_empty(self):
+        vg_replication = self._mock_vg_replication(partition_name='')
+        self._prepare_lsvolumegroupreplication_for_destination(vg_replication=vg_replication)
+        self.svc.client.svcinfo.lsvolumegroup.return_value = Mock(
+            as_single_element=self._mock_cli_volume_group(volume_count=0))
+
+        result = self.svc.get_replication_destination_info(
+            OBJECT_INTERNAL_ID, controller_settings.VOLUME_GROUP_TYPE_NAME)
+
+        self.assertEqual(OBJECT_INTERNAL_ID, result.source_id)
+        self.assertIsNone(result.destination_volume_group_id)
+        self.assertEqual({}, result.destination_volume_ids)
