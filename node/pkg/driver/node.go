@@ -386,7 +386,6 @@ func (d *NodeService) NodeUnstageVolume(ctx context.Context, req *csi.NodeUnstag
 		
 		
 		
-		   nvmeType, err := d.NodeUtils.DevicesAreNvme(ctx, baseDevice)
 		   if err != nil {
 				   logger.Errorf("Failed to determine device type for %s: %v", baseDevice, err)
 		   }
@@ -407,7 +406,7 @@ func (d *NodeService) NodeUnstageVolume(ctx context.Context, req *csi.NodeUnstag
 				needRemovePhysical = true
 
 		   default:
-				   return status.Errorf(codes.Internal, "Unknown NVMe type for device %s", baseDevice)
+				   return nil, status.Errorf(codes.Internal, "Unknown NVMe type for device %s", baseDevice)
 		   }
 			
 	
