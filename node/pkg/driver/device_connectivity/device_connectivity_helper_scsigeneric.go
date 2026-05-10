@@ -36,7 +36,6 @@ import (
 	"github.com/ibm/ibm-block-csi-driver/node/logger"
 	"github.com/ibm/ibm-block-csi-driver/node/pkg/driver/executer"
 	"github.com/ibm/ibm-block-csi-driver/node/pkg/driver/mount"
-	"github.com/ibm/ibm-block-csi-driver/node/pkg/driver"
 
 	"golang.org/x/sys/unix"
 )
