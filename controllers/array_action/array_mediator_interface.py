@@ -595,6 +595,25 @@ class ArrayMediator(ABC):
         raise NotImplementedError
 
     @abstractmethod
+    def get_replication_destination_info(self, object_id, object_type):
+        """
+        This function will return replication destination info for a volume or volume group.
+        Storage does not provide this API yet. Returns a mock response until
+        storage provides the real command.
+
+        Args:
+            object_id   : internal id of the volume or volume group
+            object_type : VOLUME_TYPE_NAME or VOLUME_GROUP_TYPE_NAME
+
+        Returns:
+            ReplicationDestinationInfo
+
+        Raises:
+            ObjectNotFoundError
+        """
+        raise NotImplementedError
+
+    @abstractmethod
     def add_io_group_to_host(self, host_name, io_group):
         """
         This function should add io_group to host.

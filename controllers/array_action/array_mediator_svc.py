@@ -18,8 +18,8 @@ from controllers.array_action.registration_cache import SVC_REGISTRATION_CACHE
 from controllers.array_action import svc_messages
 import controllers.servers.settings as controller_settings
 from controllers.servers.csi.decorators import register_csi_plugin
-from controllers.array_action.array_action_types import (Volume, Snapshot, Replication, Host,
-                                                         VolumeGroup, ThinVolume, ReplicationInfo)
+from controllers.array_action.array_action_types import (Volume, Snapshot, Replication, Host, VolumeGroup,
+                                                         ThinVolume, ReplicationInfo, ReplicationDestinationInfo)
 from controllers.array_action.array_mediator_abstract import ArrayMediatorAbstract
 from controllers.array_action.utils import ClassProperty, convert_scsi_id_to_nguid
 from controllers.array_action.volume_group_interface import VolumeGroupInterface
@@ -1904,6 +1904,52 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
         )
         logger.info("get_replication_info: returning {}".format(replication_info))
         return replication_info
+
+    # Storage does not provide a destination info API yet.
+    def get_replication_destination_info(self, object_id, object_type):
+        logger.info("get_replication_destination_info: called for object_id='{}' "
+                    "object_type='{}'".format(object_id, object_type))
+
+        if object_type == controller_settings.VOLUME_GROUP_TYPE_NAME:
+            vg_replication = self._lsvolumegroupreplication(object_id)
+            if not vg_replication:
+                raise array_errors.ObjectNotFoundError(object_id)
+
+            cli_volume_group = self._lsvolumegroup(object_id)
+            if not cli_volume_group:
+                raise array_errors.ObjectNotFoundError(object_id)
+
+            destination_volume_ids = {}
+            if int(cli_volume_group.volume_count) > 0:
+                cli_volumes = self._get_cli_volumes_from_volume_group(cli_volume_group.name)
+                for volume in cli_volumes:
+                    # mock: source and destination are same since storage API not available
+                    internal_uid = volume.id
+                    destination_uid = volume.id
+                    destination_volume_ids[internal_uid] = destination_uid
+
+            return ReplicationDestinationInfo(
+                source_id=object_id,
+                destination_volume_group_id=object_id,
+                destination_volume_ids=destination_volume_ids
+            )
+
+        if object_type == controller_settings.VOLUME_TYPE_NAME:
+            cli_volume = self._lsvdisk_single_element(object_id=object_id)
+            if not cli_volume:
+                raise array_errors.ObjectNotFoundError(object_id)
+
+            # mock: source and destination vdisk_UID are same since storage API not available
+            destination_uid = cli_volume.vdisk_UID
+            return ReplicationDestinationInfo(
+                source_id=object_id,
+                destination_volume_id=destination_uid
+            )
+
+        return ReplicationDestinationInfo(
+            source_id=object_id,
+            destination_volume_id=object_id
+        )
 
     def _get_replication_policy(self, volume_group_id):
         volume_group_replication = self._lsvolumegroupreplication(volume_group_id)
