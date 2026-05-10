@@ -192,7 +192,7 @@ func (d *NodeService) NodeStageVolume(ctx context.Context, req *csi.NodeStageVol
 	}
 
 	baseDevice := path.Base(mpathDevice)
-	sysDevices, err := d.NodeUtils.GetSysDevicesFromMpath(ctx, baseDevice)
+	sysDevices, err := driver.GetSysDevicesFromMpath(ctx, baseDevice)
 	if err != nil {
 		logger.Errorf("Error while trying to get sys devices : {%v}", err.Error())
 		return nil, status.Error(codes.Internal, err.Error())
@@ -222,7 +222,7 @@ func (d *NodeService) NodeStageVolume(ctx context.Context, req *csi.NodeStageVol
     }	
 
 
-	err = d.formatAndMount(mpathDevice, stagingPathWithHostPrefix, fsTypeForMount, existingFormat)
+	err = d.formatAndMount(mpathDevice, stagingPath, fsTypeForMount, existingFormat)
 	if err != nil {
 		return nil, status.Error(codes.Internal, err.Error())
 	}
@@ -370,7 +370,6 @@ func (d *NodeService) NodeUnstageVolume(ctx context.Context, req *csi.NodeUnstag
 	volumeUuid := d.NodeUtils.GetVolumeUuid(volumeID)
 	err = d.OsDeviceConnectivityHelper.TeardownVolume(ctx, stagingTargetPath, volumeUuid)
 
-	// TODO resurrected?
 	stageInfoPath := path.Join(stagingTargetPath, StageInfoFilename)
 	if d.NodeUtils.StageInfoFileIsExist(stageInfoPath) {
 		if err := d.NodeUtils.ClearStageInfoFile(stageInfoPath); err != nil {
@@ -723,7 +722,7 @@ func (d *NodeService) NodeExpandVolume(ctx context.Context, req *csi.NodeExpandV
 
 	baseDevice := path.Base(device)
 
-	nvmeType, err := d.NodeUtils.DevicesAreNvme(ctx, baseDevice)
+	nvmeType, err := driver.DevicesAreNvme(ctx, baseDevice)
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "Failed to determine device type for %s: %v", baseDevice, err)
 	}

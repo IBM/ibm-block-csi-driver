@@ -81,13 +81,13 @@ const (
 type NodeUtilsInterface interface {
 	GetVolumeUuid(volumeId string) string
 	ReadNvmeNqn() (string, error)
-	IsNativeNVMeMultipathEnabled() (bool, error)
+	//IsNativeNVMeMultipathEnabled() (bool, error)
 	DevicesAreNvme(ctx context.Context, device string) (NvmeType, error)
 	ParseFCPorts() ([]string, error)
 	ParseIscsiInitiators() (string, error)
 	GetInfoFromPublishContext(publishContext map[string]string) (string, int, map[string][]string, error)
 	GetArrayInitiators(ipsByArrayInitiator map[string][]string) []string
-	GetSysDevicesFromMpath(ctx context.Context, baseDevice string) ([]string, error)
+	//GetSysDevicesFromMpath(ctx context.Context, baseDevice string) ([]string, error)
 
 	// TODO refactor and move all staging methods to dedicate interface.
 	ClearStageInfoFile(filePath string) error
@@ -193,7 +193,7 @@ func (n NodeUtils) ClearStageInfoFile(filePath string) error {
 	return os.Remove(filePath)
 }
 
-func (n NodeUtils) GetSysDevicesFromMpath(ctx context.Context, baseDevice string) ([]string, error) {
+func GetSysDevicesFromMpath(ctx context.Context, baseDevice string) ([]string, error) {
     if err := ctx.Err(); err != nil { return nil, err }
 
 	// baseDevice is expected to be "dm-X" or "nvmeXnY"
@@ -280,7 +280,7 @@ func (n NodeUtils) StageInfoFileIsExist(filePath string) bool {
 	return true
 }
 
-func (n NodeUtils) IsNativeNVMeMultipathEnabled() (bool, error) {
+func IsNativeNVMeMultipathEnabled() (bool, error) {
 	data, err := os.ReadFile("/sys/module/nvme_core/parameters/multipath")
 	if err != nil {
 		if os.IsNotExist(err) {
@@ -292,9 +292,9 @@ func (n NodeUtils) IsNativeNVMeMultipathEnabled() (bool, error) {
 	return val == "Y", nil
 }
 
-func (n NodeUtils) DevicesAreNvme(ctx context.Context, device string) (NvmeType, error) {
+func DevicesAreNvme(ctx context.Context, device string) (NvmeType, error) {
 
-	nativeMultipath, err := n.IsNativeNVMeMultipathEnabled()
+	nativeMultipath, err := IsNativeNVMeMultipathEnabled()
 	if err != nil {
 		logger.Warningf("Failed to read nvme_core multipath param, will try all checks: %v", err)
 	}
@@ -329,7 +329,7 @@ func (n NodeUtils) DevicesAreNvme(ctx context.Context, device string) (NvmeType,
 	}
 
 	nvmeListOutput := string(out)
-	slaves, err := n.GetSysDevicesFromMpath(ctx, device)
+	slaves, err := GetSysDevicesFromMpath(ctx, device)
 	if err == nil {
 		for _, slave := range slaves {
 			if strings.Contains(nvmeListOutput, slave) {
