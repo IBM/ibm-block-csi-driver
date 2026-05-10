@@ -36,6 +36,7 @@ import (
 	"github.com/ibm/ibm-block-csi-driver/node/logger"
 	"github.com/ibm/ibm-block-csi-driver/node/pkg/driver/executer"
 	"github.com/ibm/ibm-block-csi-driver/node/pkg/driver/mount"
+	"github.com/ibm/ibm-block-csi-driver/node/pkg/driver"
 
 	"golang.org/x/sys/unix"
 )
@@ -1363,18 +1364,36 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) TeardownVolume(ctx context.Conte
          var needFlush bool
          var needRemovePhysical bool
 
-	needFlush = true
-	needRemovePhysical = true
 
 	if mpathName != "" {
 		major, minor, _ = r.Helper.GetMajorMinorFromSysfs(ctx, mpathName)
-	}
+		
+       baseDevice := path.Base(mpathDevice)
 
-	// --- PHASE 2: BLOCK LAYER (Identity & OpenCount) ---
-	if mpathName != "" {
+       nvmeType, err := d.NodeUtils.DevicesAreNvme(ctx, baseDevice)
+       if err != nil {
+               logger.Errorf("Failed to determine device type for %s: %v", baseDevice, err)
+       }
 
+       switch nvmeType {
+       case NVMeNative:
+               // Native NVMe multipath: kernel manages everything, skip all cleanup
+               logger.Infof("Device %s is native NVMe: skipping flush and SCSI device cleanup", baseDevice)
 
+       case NVMeNonNative:
+               // DM-multipath over NVMe: flush mpath only.
+			needFlush = true
+               logger.Infof("Device %s is non-native NVMe: flush multipath, skip physical device removal", baseDevice)
 
+       case NotNVMe:
+			logger.Infof("Device %s is not NVMe: flush multipath, physical device removal", baseDevice)
+			needFlush = true
+			needRemovePhysical = true
+
+       default:
+               return status.Errorf(codes.Internal, "Unknown NVMe type for device %s", baseDevice)
+       }
+		
 
 
 	
