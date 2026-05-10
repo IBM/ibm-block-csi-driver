@@ -214,7 +214,7 @@ func (m *Mounter) MountSensitive(source, target, fstype string, options, sensiti
     flags, data := m.parseMountOptions(allOptions)
     
     // Note: fstype can be empty for bind mounts or remounts
-    return unix.Mount(source, target, fstype, flags, data)
+    return unix.Mount(source, GetPodPath(target), fstype, flags, data)
 }
 
 
