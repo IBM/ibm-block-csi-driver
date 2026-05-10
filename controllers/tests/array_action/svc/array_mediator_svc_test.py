@@ -10,10 +10,11 @@ from pysvc.unified.response import CLIFailureError, SVCResponse
 from controllers.common.config import config
 import controllers.array_action.errors as array_errors
 import controllers.servers.settings as controller_settings
+from controllers.servers.utils import get_volume_id, get_volume_group_id
 import controllers.tests.array_action.svc.test_settings as svc_settings
 import controllers.tests.array_action.test_settings as array_settings
 import controllers.tests.common.test_settings as common_settings
-from controllers.array_action.array_action_types import ReplicationRequest
+from controllers.array_action.array_action_types import ReplicationRequest, VolumeGroup, ThinVolume
 from controllers.array_action.array_mediator_svc import SVCArrayMediator, build_kwargs_from_parameters, \
     FCMAP_STATUS_DONE, YES
 from controllers.array_action.settings import REPLICATION_TYPE_MIRROR, REPLICATION_TYPE_EAR, \
@@ -2706,10 +2707,13 @@ class TestArrayMediatorSVC(unittest.TestCase):
                 OBJECT_INTERNAL_ID, controller_settings.VOLUME_GROUP_TYPE_NAME)
 
     def test_get_replication_destination_info_volumegroup_with_volumes_succeeds(self):
-        vg_replication = self._mock_vg_replication()
+        vg_replication = self._mock_vg_replication(partition_name='', loc2_system_id='00000204AFE0632C')
+        vg_replication['location2_volumegroup_id'] = common_settings.INTERNAL_VOLUME_GROUP_ID
+
         self._prepare_lsvolumegroupreplication_for_destination(vg_replication=vg_replication)
         self.svc.client.svcinfo.lsvolumegroup.return_value = Mock(
             as_single_element=self._mock_cli_volume_group(volume_count=1))
+
         cli_volume = self._get_cli_volume()
         self.svc.client.svcinfo.lsvdisk.return_value = Mock(as_list=[cli_volume])
 
@@ -2717,9 +2721,26 @@ class TestArrayMediatorSVC(unittest.TestCase):
             OBJECT_INTERNAL_ID, controller_settings.VOLUME_GROUP_TYPE_NAME)
 
         self.assertEqual(OBJECT_INTERNAL_ID, result.source_id)
-        self.assertEqual(OBJECT_INTERNAL_ID, result.destination_volume_group_id)
-        self.assertEqual({common_settings.VOLUME_UID: common_settings.VOLUME_UID},
-                         result.destination_volume_ids)
+
+        expected_destination_vg = VolumeGroup(
+            name=common_settings.VOLUME_GROUP_NAME,
+            array_type=ARRAY_TYPE_SVC,
+            id="",
+            internal_id=common_settings.INTERNAL_VOLUME_GROUP_ID,
+            volumes=[],
+        )
+        expected_vg_handle = get_volume_group_id(expected_destination_vg, svc_settings.DUMMY_ID_ALIAS)
+        self.assertEqual(expected_vg_handle, result.destination_volume_group_id)
+
+        expected_thin_volume = ThinVolume(
+            capacity_bytes=int(cli_volume.capacity),
+            id=cli_volume.vdisk_UID,
+            internal_id=cli_volume.id,
+            name=cli_volume.name,
+            array_type=ARRAY_TYPE_SVC
+        )
+        expected_vol_handle = get_volume_id(expected_thin_volume, svc_settings.DUMMY_ID_ALIAS)
+        self.assertEqual({expected_vol_handle: expected_vol_handle}, result.destination_volume_ids)
 
     def test_get_replication_destination_info_volume_not_found_raises_object_not_found(self):
         self.svc.client.svcinfo.lsvdisk.return_value = Mock(as_single_element=None)
@@ -2738,5 +2759,14 @@ class TestArrayMediatorSVC(unittest.TestCase):
         self.svc.client.svcinfo.lsvdisk.assert_called_once_with(
             bytes=True, object_id=OBJECT_INTERNAL_ID)
         self.assertEqual(OBJECT_INTERNAL_ID, result.source_id)
-        self.assertEqual(common_settings.VOLUME_UID, result.destination_volume_id)
+
+        expected_thin_volume = ThinVolume(
+            capacity_bytes=int(cli_volume.capacity),
+            id=cli_volume.vdisk_UID,
+            internal_id=cli_volume.id,
+            name=cli_volume.name,
+            array_type=ARRAY_TYPE_SVC
+        )
+        expected_handle = get_volume_id(expected_thin_volume, svc_settings.DUMMY_ID_ALIAS)
+        self.assertEqual(expected_handle, result.destination_volume_id)
         self.assertIsNone(result.destination_volume_group_id)
