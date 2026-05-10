@@ -192,7 +192,7 @@ func (d *NodeService) NodeStageVolume(ctx context.Context, req *csi.NodeStageVol
 	}
 
 	baseDevice := path.Base(mpathDevice)
-	sysDevices, err := driver.GetSysDevicesFromMpath(ctx, baseDevice)
+	sysDevices, err := d.NodeUtils.GetSysDevicesFromMpath(ctx, baseDevice)
 	if err != nil {
 		logger.Errorf("Error while trying to get sys devices : {%v}", err.Error())
 		return nil, status.Error(codes.Internal, err.Error())
@@ -368,8 +368,63 @@ func (d *NodeService) NodeUnstageVolume(ctx context.Context, req *csi.NodeUnstag
 	logger.Debugf("Check if staging path {%s} is mounted", stagingPathWithHostPrefix)
 
 	volumeUuid := d.NodeUtils.GetVolumeUuid(volumeID)
-	err = d.OsDeviceConnectivityHelper.TeardownVolume(ctx, stagingTargetPath, volumeUuid)
+	
+	
+	
+	var needFlush bool
+	var needRemovePhysical bool
+	
+    device, err := d.OsDeviceConnectivityHelper.GetExistingMpathDevice(ctx, volumeUuid, stagingPathWithHostPrefix)
+	if err != nil {
+		logger.Errorf("Error while discovering the device : {%v}", err.Error())
+	} 	else {
+		logger.Debugf("Discovered device : {%v}", device)
 
+		baseDevice := path.Base(device)
+
+		nvmeType, err := d.NodeUtils.DevicesAreNvme(ctx, baseDevice)
+		
+		
+		
+		   nvmeType, err := d.NodeUtils.DevicesAreNvme(ctx, baseDevice)
+		   if err != nil {
+				   logger.Errorf("Failed to determine device type for %s: %v", baseDevice, err)
+		   }
+
+		   switch nvmeType {
+		   case NVMeNative:
+				   // Native NVMe multipath: kernel manages everything, skip all cleanup
+				   logger.Infof("Device %s is native NVMe: skipping flush and SCSI device cleanup", baseDevice)
+
+		   case NVMeNonNative:
+				   // DM-multipath over NVMe: flush mpath only.
+				needFlush = true
+				   logger.Infof("Device %s is non-native NVMe: flush multipath, skip physical device removal", baseDevice)
+
+		   case NotNVMe:
+				logger.Infof("Device %s is not NVMe: flush multipath, physical device removal", baseDevice)
+				needFlush = true
+				needRemovePhysical = true
+
+		   default:
+				   return status.Errorf(codes.Internal, "Unknown NVMe type for device %s", baseDevice)
+		   }
+			
+	
+	}
+
+
+	
+	
+	
+	
+	
+	
+	
+	
+	err = d.OsDeviceConnectivityHelper.TeardownVolume(ctx, stagingTargetPath, needFlush, needRemovePhysical, volumeUuid)
+
+	// TODO resurrected?
 	stageInfoPath := path.Join(stagingTargetPath, StageInfoFilename)
 	if d.NodeUtils.StageInfoFileIsExist(stageInfoPath) {
 		if err := d.NodeUtils.ClearStageInfoFile(stageInfoPath); err != nil {
@@ -722,7 +777,7 @@ func (d *NodeService) NodeExpandVolume(ctx context.Context, req *csi.NodeExpandV
 
 	baseDevice := path.Base(device)
 
-	nvmeType, err := driver.DevicesAreNvme(ctx, baseDevice)
+	nvmeType, err := d.NodeUtils.DevicesAreNvme(ctx, baseDevice)
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "Failed to determine device type for %s: %v", baseDevice, err)
 	}
