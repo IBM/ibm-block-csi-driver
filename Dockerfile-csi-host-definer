@@ -52,4 +52,4 @@ WORKDIR /driver/controllers/servers/host_definer/
 ENV PYTHONPATH=/driver
 
 USER default
-CMD ["python3", "/driver/controllers/servers/host_definer/main.py"]
+ENTRYPOINT ["/driver/controllers/scripts/entrypoint-hostdefiner.sh"]

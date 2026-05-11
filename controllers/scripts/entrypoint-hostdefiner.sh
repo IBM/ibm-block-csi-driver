@@ -1,0 +1,7 @@
+#!/bin/bash
+
+if [[ "$(uname -m)" == "s390x" ]]; then
+  export PROTOCOL_BUFFERS_PYTHON_IMPLEMENTATION=python
+fi
+
+exec python3 /driver/controllers/servers/host_definer/main.py "$@"
