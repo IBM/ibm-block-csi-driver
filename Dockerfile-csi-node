@@ -27,7 +27,7 @@ COPY . .
 RUN make ibm-block-csi-driver
 
 # Final stage
-FROM registry.access.redhat.com/ubi9-minimal:9.7-1776833838
+FROM registry.access.redhat.com/ubi9-minimal:9.7-1778461551
 
 ARG VERSION=1.14.0
 ARG BUILD_NUMBER=0
