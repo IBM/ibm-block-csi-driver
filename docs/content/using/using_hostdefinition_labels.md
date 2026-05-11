@@ -30,8 +30,6 @@ The values for the connectivityType label are the same as those for defining the
 
 For more information about defining the connectivity type within the HostDefiner, see [Configuring the host definer](../configuration/configuring_hostdefiner.md).{: tip}
 
-As of this document's publication date, NVMe/FC is not supported for this release.{: restriction}
-
 ## Specifying I/O group usage
 
 To specify which I/O group(s) a node should use, add any of the following labels to the node:

@@ -75,8 +75,6 @@ When left blank, the connectivity type will update along with any changes within
 
 There is no default portset for hosts with ports of type NVMe on IBM Storage Virtualize®. When using connectivity of type NVMe, a portset must be created by the user on the storage, and specified in the configmap. Refer to IBM Storage Virtualize® documentation for more details.{: attention}
 
-As of this document's publication date, NVMe/FC is not supported for this release.{: restriction}
-
 |Field|Description|
 |---------|--------|
 |`prefix`|Adds a prefix to the hosts defined by the host definer.|
