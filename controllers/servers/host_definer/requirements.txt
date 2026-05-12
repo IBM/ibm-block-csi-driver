@@ -1,1 +1,2 @@
+requests==2.33.0
 kubernetes==35.0.0

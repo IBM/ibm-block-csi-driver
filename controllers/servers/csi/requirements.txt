@@ -8,6 +8,7 @@ munch==4.0.0
 retry2==0.9.5
 packaging==25.0
 base58==2.1.1
+requests==2.33.0
 kubernetes==35.0.0
 setuptools==78.1.1
 
