@@ -22,7 +22,7 @@ run_tests() {
     else
         DIST_ARGS="-n $WORKERS"
     fi
-    timeout 120 pytest \
+    timeout 120 pytest -s --full-trace \
         --verbose \
         --exitfirst \
         --maxfail=1 \
