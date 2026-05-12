@@ -80,7 +80,7 @@ class ArrayMediator(ABC):
         raise NotImplementedError
 
     @abstractmethod
-    def delete_volume(self, volume_id):
+    def delete_volume(self, volume_id, partition_name=None):
         """
         This function should delete a volume in the storage system.
 

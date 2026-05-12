@@ -285,7 +285,7 @@ class XIVArrayMediator(ArrayMediatorAbstract):
         logger.debug("found volume name : {0}".format(object_name))
         return object_name
 
-    def delete_volume(self, volume_id):
+    def delete_volume(self, volume_id, partition_name=None):
         logger.info("Deleting volume with id : {0}".format(volume_id))
         volume_name = self._get_object_name_by_wwn(volume_id)
         cli_snapshots = self.client.cmd.snapshot_list(vol=volume_name).as_list

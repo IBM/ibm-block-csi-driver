@@ -348,7 +348,7 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
         self.volume_cache.remove(api_volume.name)
 
     @convert_scsi_ids_to_array_ids()
-    def delete_volume(self, volume_id):
+    def delete_volume(self, volume_id, partition_name=None):
         logger.info("deleting volume with id : {0}".format(volume_id))
         self._delete_object(volume_id)
         logger.info("finished deleting volume {}".format(volume_id))
