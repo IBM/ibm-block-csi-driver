@@ -12,14 +12,22 @@ ENV PROTOCOL_BUFFERS_PYTHON_IMPLEMENTATION=python
 ENV GRPC_PYTHON_BUILD_SYSTEM_OPENSSL=True
 ENV PIP_DISABLE_PIP_VERSION_CHECK=1
 
-# Copy all requirement files once
+# 👇 Pull previously built wheels (cache layer)
+COPY --from=quay.io/sushilmaxbhile/csi-deps:latest /wheels /wheels
+
+# Copy requirement files
 COPY controllers/servers/csi/requirements.txt ./csi_requirements.txt
 COPY controllers/servers/csi/requirements_pyxcli.txt ./csi_requirements_pyxcli.txt
 COPY controllers/servers/host_definer/requirements.txt ./host_definer_requirements.txt
 
-# Combine + deduplicate + build wheels
+# Combine + deduplicate
 RUN cat csi_requirements.txt \
         csi_requirements_pyxcli.txt \
         host_definer_requirements.txt \
-    | sort -u > all_requirements.txt \
-    && pip wheel --no-cache-dir -r all_requirements.txt
+    | sort -u > all_requirements.txt
+
+# 👇 KEY PART: reuse existing wheels, build only missing
+RUN pip wheel \
+        --no-cache-dir \
+        --find-links=/wheels \
+        -r all_requirements.txt
