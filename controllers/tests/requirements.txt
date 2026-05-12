@@ -1,4 +1,4 @@
-pip==26.0.1
+pip==26.1
 mock==5.2.0
 pytest==9.0.3
 pytest-cov==6.0.0
