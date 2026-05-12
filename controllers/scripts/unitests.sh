@@ -7,6 +7,7 @@ coveragedir=/driver/coverage/
 ARCH=$(uname -m)
 if [ "$ARCH" = "s390x" ]; then
     WORKERS=0
+    export PROTOCOL_BUFFERS_PYTHON_IMPLEMENTATION=python
 else
     WORKERS=4
 fi
@@ -14,13 +15,18 @@ echo "Detected ARCH: $ARCH"
 echo "Using WORKERS: $WORKERS"
 
 run_tests() {
+    if [ "$WORKERS" -eq 0 ]; then
+        DIST_ARGS="-p no:xdist"
+    else
+        DIST_ARGS="-n $WORKERS"
+    fi
     timeout 120 pytest \
         --verbose \
         --exitfirst \
         --maxfail=1 \
         --capture=no \
         --tb=short \
-        -n $WORKERS \
+        $DIST_ARGS \
         --timeout=60 \
         --cov=common \
         --cov=controllers \
