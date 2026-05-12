@@ -8,6 +8,8 @@ ARCH=$(uname -m)
 if [ "$ARCH" = "s390x" ]; then
     WORKERS=0
     export PROTOCOL_BUFFERS_PYTHON_IMPLEMENTATION=python
+    # Force reinstall protobuf from source to avoid broken s390x wheel
+    pip install --no-binary :all: protobuf --quiet --break-system-packages
 else
     WORKERS=4
 fi
