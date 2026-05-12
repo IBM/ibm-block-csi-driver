@@ -13,7 +13,7 @@ ENV GRPC_PYTHON_BUILD_SYSTEM_OPENSSL=True
 ENV PIP_DISABLE_PIP_VERSION_CHECK=1
 
 # 👇 Pull previously built wheels (cache layer)
-COPY --from=quay.io/sushilmaxbhile/csi-deps:latest /wheels /wheels
+COPY --from=quay.io/csiblock/ibm-block-csi-deps:1.14.0 /wheels /wheels
 
 # Copy requirement files
 COPY controllers/servers/csi/requirements.txt ./csi_requirements.txt
