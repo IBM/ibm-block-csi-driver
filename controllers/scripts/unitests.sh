@@ -4,11 +4,14 @@ set -xe
 coveragedir=/driver/coverage/
 [ ! -d $coveragedir ] && mkdir -p $coveragedir
 
+ARCH=$(uname -m)
 if [ "$ARCH" = "s390x" ]; then
     WORKERS=0
 else
     WORKERS=4
 fi
+echo "Detected ARCH: $ARCH"
+echo "Using WORKERS: $WORKERS"
 
 run_tests() {
     timeout 120 pytest \
