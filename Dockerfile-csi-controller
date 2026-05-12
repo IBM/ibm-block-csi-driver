@@ -30,6 +30,7 @@ COPY controllers/servers/csi/requirements_pyxcli.txt .
 ENV GRPC_PYTHON_BUILD_SYSTEM_OPENSSL=True
 
 COPY --from=quay.io/sushilmaxbhile/csi-deps:v2 /wheels /wheels
+RUN pip download pip==26.1.1 -d /wheels
 RUN pip3 install --no-index --find-links=/wheels -r ./requirements.txt
 RUN pip3 install --no-deps -r ./requirements_pyxcli.txt
 
