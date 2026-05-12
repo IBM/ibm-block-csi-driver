@@ -6,7 +6,7 @@ Be sure to verify that you comply with all of the following prerequisites before
 
 For IBM Cloud® Satellite users, see [cloud.ibm.com/docs/satellite](https://cloud.ibm.com/docs/satellite) for full system requirements.
 
-**Important:** When using Satellite, complete the following checks, configurations, and the installation process before assigning the hosts to your locations. </br>In addition, **do not** create a Kubernetes cluster. Creating the Kubernetes cluster is done through Satellite.
+When using Satellite, complete the following checks, configurations, and the installation process before assigning the hosts to your locations. </br>In addition, **do not** create a Kubernetes cluster. Creating the Kubernetes cluster is done through Satellite.{: .important}
 
 The CSI driver requires the following ports to be opened on the worker nodes OS firewall:
  -   **For all iSCSI users**
@@ -26,7 +26,7 @@ Complete these steps to prepare your environment for installing the CSI (Contain
 
 1. Configure Linux® multipath devices, per worker node.
 
-   **Important:** Be sure to configure each worker with storage connectivity according to your storage system instructions. For more information, find your storage system documentation in [IBM Documentation](http://www.ibm.com/docs/).
+Be sure to configure each worker with storage connectivity according to your storage system instructions. For more information, find your storage system documentation in [IBM Documentation](http://www.ibm.com/docs/).{: .important}
 
 2. Configure your storage system host attachment, per worker node.
 
@@ -54,7 +54,7 @@ Complete these steps to prepare your environment for installing the CSI (Contain
 
 4. (Optional) To use CSI Topology, at least one node in the cluster must have the label-prefix of `topology.block.csi.ibm.com` to introduce topology awareness.
 
-      **Important:** This label-prefix must be found on the nodes in the cluster **before** installing the IBM® block storage CSI driver. If the nodes do not have the proper label-prefix before installation, CSI Topology cannot be used with the CSI driver.
+      This label-prefix must be found on the nodes in the cluster **before** installing the IBM® block storage CSI driver. If the nodes do not have the proper label-prefix before installation, CSI Topology cannot be used with the CSI driver.{: .important}
 
       For more information, see [Configuring for CSI Topology](../configuration/configuring_topology.md).
 
