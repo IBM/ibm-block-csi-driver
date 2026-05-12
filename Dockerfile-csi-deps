@@ -1,4 +1,4 @@
-FROM registry.access.redhat.com/ubi9/python-39:1-1774968736
+FROM registry.access.redhat.com/ubi9/python-312:1-1778473732
 
 USER root
 
