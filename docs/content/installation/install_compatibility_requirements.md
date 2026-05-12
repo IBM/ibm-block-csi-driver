@@ -28,26 +28,6 @@ Complete these steps to prepare your environment for installing the CSI (Contain
 
    **Important:** Be sure to configure each worker with storage connectivity according to your storage system instructions. For more information, find your storage system documentation in [IBM Documentation](http://www.ibm.com/docs/).
 
-   **Additional configuration steps for Red Hat OpenShift Container Platform users (RHEL and RHCOS).** Other users can skip these additional configuration steps.
-
-   Download and save the following YAML file:
-
-   ```
-   curl https://raw.githubusercontent.com/IBM/ibm-block-csi-operator/v1.13.0/deploy/99-ibm-attach.yaml > 99-ibm-attach.yaml
-   ```
-
-   This file can be used for both Fibre Channel and iSCSI configurations. To support iSCSI, uncomment the last two lines in the file.
-
-   **Important:**
-   - The `99-ibm-attach.yaml` configuration file overrides any files that exist on your system. Only use this file if the files mentioned are not already created. <br />If one or more have been created, edit this YAML file, as necessary.
-   - The `99-ibm-attach.yaml` configuration file contains the default configuration for the CSI driver. It is best practice to update the file according to your storage system and application networking needs.
-
-   Apply the YAML file.
-
-   ```
-   oc apply -f 99-ibm-attach.yaml
-    ```
-
 2. Configure your storage system host attachment, per worker node.
 
     **Note:** IBM® block storage CSI driver 1.11.0 introduced dynamic host definition. For more information and installation instructions, see [Installing the host definer](install_hostdefiner.md). If this feature is not installed, the nodes are not dynamically defined on the storage system and they must be defined manually. <br />
