@@ -4,6 +4,12 @@ set -xe
 coveragedir=/driver/coverage/
 [ ! -d $coveragedir ] && mkdir -p $coveragedir
 
+if [ "$ARCH" = "s390x" ]; then
+    WORKERS=0
+else
+    WORKERS=4
+fi
+
 run_tests() {
     timeout 120 pytest \
         --verbose \
@@ -11,7 +17,7 @@ run_tests() {
         --maxfail=1 \
         --capture=no \
         --tb=short \
-        -n 4 \
+        -n $WORKERS \
         --timeout=60 \
         --cov=common \
         --cov=controllers \
