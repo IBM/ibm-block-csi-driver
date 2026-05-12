@@ -1,0 +1,25 @@
+FROM registry.access.redhat.com/ubi9/python-39:1-1774968736
+
+USER root
+
+RUN yum install -y \
+    gcc gcc-c++ make python3-devel openssl-devel rust cargo \
+    && yum clean all
+
+WORKDIR /wheels
+
+ENV PROTOCOL_BUFFERS_PYTHON_IMPLEMENTATION=python
+ENV GRPC_PYTHON_BUILD_SYSTEM_OPENSSL=True
+ENV PIP_DISABLE_PIP_VERSION_CHECK=1
+
+# Copy all requirement files once
+COPY controllers/servers/csi/requirements.txt ./csi_requirements.txt
+COPY controllers/servers/csi/requirements_pyxcli.txt ./csi_requirements_pyxcli.txt
+COPY controllers/servers/host_definer/requirements.txt ./host_definer_requirements.txt
+
+# Combine + deduplicate + build wheels
+RUN cat csi_requirements.txt \
+        csi_requirements_pyxcli.txt \
+        host_definer_requirements.txt \
+    | sort -u > all_requirements.txt \
+    && pip wheel --no-cache-dir -r all_requirements.txt
