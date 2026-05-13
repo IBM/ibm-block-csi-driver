@@ -19,7 +19,7 @@ from controllers.array_action import svc_messages
 import controllers.servers.settings as controller_settings
 from controllers.servers.csi.decorators import register_csi_plugin
 from controllers.array_action.array_action_types import (Volume, Snapshot, Replication, Host,
-                                                         VolumeGroup, ThinVolume, ReplicationInfo)
+                                                         VolumeGroup, ThinVolume)
 from controllers.array_action.array_mediator_abstract import ArrayMediatorAbstract
 from controllers.array_action.utils import ClassProperty, convert_scsi_id_to_nguid
 from controllers.array_action.volume_group_interface import VolumeGroupInterface
@@ -1780,39 +1780,26 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
         return getattr(volume_group_replication, location_attr_name, None)
 
     def _parse_svc_timestamp(self, raw_value, field_name):
-        if not raw_value or not str(raw_value).strip():
-            logger.warning("_parse_svc_timestamp: field='{}' is blank, returning None".format(field_name))
+        raw_str = str(raw_value or '').strip()
+        if not raw_str:
+            logger.warning("Field='{}' is blank, returning None".format(field_name))
             return None
-        raw_str = str(raw_value).strip()
         try:
             dt = datetime.strptime(raw_str, "%y%m%d%H%M%S")
-            logger.debug("_parse_svc_timestamp: field='{}' parsed '{}' -> {}".format(field_name, raw_str, dt))
+            logger.debug("Field='{}' parsed '{}' -> {}".format(field_name, raw_str, dt))
             return dt
         except ValueError as ex:
-            logger.warning("_parse_svc_timestamp: field='{}' failed to parse '{}': {}".format(
+            logger.warning("Field='{}' failed to parse '{}': {}".format(
                 field_name, raw_str, ex))
             return None
 
-    def _parse_svc_int_field(self, raw_value, field_name):
-        if not raw_value or not str(raw_value).strip():
-            logger.warning("_parse_svc_int_field: field='{}' is blank, returning None".format(field_name))
-            return None
-        try:
-            result = int(str(raw_value).strip())
-            logger.debug("_parse_svc_int_field: field='{}' parsed '{}' -> {}".format(
-                field_name, raw_value, result))
-            return result
-        except (ValueError, TypeError) as ex:
-            logger.warning("_parse_svc_int_field: field='{}' failed to parse '{}': {}".format(
-                field_name, raw_value, ex))
-            return None
-
     def _parse_svc_size_to_bytes(self, raw_value, field_name):
-        if not raw_value or not str(raw_value).strip():
-            logger.warning("_parse_svc_size_to_bytes: field='{}' is blank, returning None".format(field_name))
+        raw_str = str(raw_value or '').strip().upper()
+
+        if not raw_str:
+            logger.warning("Field='{}' is blank, returning None".format(field_name))
             return None
 
-        raw_str = str(raw_value).strip().upper()
         suffixes = {
             'TB': 1024 ** 4,
             'GB': 1024 ** 3,
@@ -1826,11 +1813,11 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
                 numeric_part = raw_str[:-len(suffix)].strip()
                 try:
                     bytes_val = int(float(numeric_part) * multiplier)
-                    logger.debug("_parse_svc_size_to_bytes: field='{}' parsed '{}' -> {} bytes".format(
+                    logger.debug("Field='{}' parsed '{}' -> {} bytes".format(
                         field_name, raw_value, bytes_val))
                     return bytes_val
                 except (ValueError, TypeError) as ex:
-                    logger.warning("_parse_svc_size_to_bytes: field='{}' failed to parse '{}': {}".format(
+                    logger.warning("Field='{}' failed to parse '{}': {}".format(
                         field_name, raw_value, ex))
                     return None
 
@@ -1839,7 +1826,7 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
             result = int(raw_str)
             return result
         except (ValueError, TypeError) as ex:
-            logger.warning("_parse_svc_size_to_bytes: field='{}' failed to parse '{}' as int: {}".format(
+            logger.warning("Field='{}' failed to parse '{}' as int: {}".format(
                 field_name, raw_value, ex))
             return None
 
@@ -1849,61 +1836,26 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
 
         if is_partition:
             recovery_idx = '3'
-            logger.info("_get_recovery_location_index: partition VG "
-                        "(partition_name='{}') -> DR location = '{}'".format(partition_name, recovery_idx))
+            logger.info("Partition VG (partition_name='{}') -> "
+                        "DR location = '{}'".format(partition_name, recovery_idx))
         else:
             recovery_idx = '2'
-            logger.info("_get_recovery_location_index: non-partition VG -> DR location = '{}'".format(recovery_idx))
+            logger.info("Non-partition VG -> DR location = '{}'".format(recovery_idx))
 
         return recovery_idx
 
-    def get_replication_info(self, volume_group_id):
-        logger.info("get_replication_info: called for volume_group_id='{}'".format(volume_group_id))
+    def get_last_async_snapshot_info(self, volume_group_id):
+        logger.info("get_last_async_snapshot_info: called for volume_group_id='{}'".format(volume_group_id))
 
         vg_replication = self._lsvolumegroupreplication(volume_group_id)
         if not vg_replication:
             logger.error(
-                "get_replication_info: no replication record found for "
+                "No replication record found for "
                 "volume_group_id='{}'".format(volume_group_id)
             )
             raise array_errors.ObjectNotFoundError(volume_group_id)
 
-        recovery_loc_idx = self._get_recovery_location_index(vg_replication)
-
-        if recovery_loc_idx is None:
-            logger.warning(
-                "get_replication_info: could not determine recovery location index for "
-                "volume_group_id='{}'.".format(volume_group_id)
-            )
-            return ReplicationInfo(volume_group_id=volume_group_id)
-
-        fixed_rp_attr = 'location{}_fixed_recovery_point'.format(recovery_loc_idx)
-        sync_required_attr = 'location{}_sync_required'.format(recovery_loc_idx)
-        sync_remaining_attr = 'location{}_sync_remaining'.format(recovery_loc_idx)
-
-        raw_fixed_rp = getattr(vg_replication, fixed_rp_attr, '')
-        raw_sync_required = getattr(vg_replication, sync_required_attr, '')
-        raw_sync_remaining = getattr(vg_replication, sync_remaining_attr, '')
-
-        last_sync_time = self._parse_svc_timestamp(raw_fixed_rp, fixed_rp_attr)
-
-        sync_required = self._parse_svc_size_to_bytes(raw_sync_required, sync_required_attr)
-        sync_remaining = self._parse_svc_size_to_bytes(raw_sync_remaining, sync_remaining_attr)
-
-        last_sync_bytes = None
-        if sync_required is not None and sync_remaining is not None:
-            last_sync_bytes = sync_required - sync_remaining
-        else:
-            logger.info("get_replication_info: last_sync_bytes cannot be computed as "
-                        "one or both of sync_required/sync_remaining is None")
-
-        replication_info = ReplicationInfo(
-            volume_group_id=volume_group_id,
-            last_sync_time=last_sync_time,
-            last_sync_bytes=last_sync_bytes
-        )
-        logger.info("get_replication_info: returning {}".format(replication_info))
-        return replication_info
+        return vg_replication
 
     def _get_replication_policy(self, volume_group_id):
         volume_group_replication = self._lsvolumegroupreplication(volume_group_id)

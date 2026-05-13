@@ -103,3 +103,5 @@ class ReplicationInfo:
     last_sync_time: object = None
     last_sync_duration_seconds: object = None
     last_sync_bytes: object = None
+    replication_status: str = None
+    status_message: str = None
