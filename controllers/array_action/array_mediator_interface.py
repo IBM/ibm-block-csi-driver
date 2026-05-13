@@ -579,7 +579,7 @@ class ArrayMediator(ABC):
         raise NotImplementedError
 
     @abstractmethod
-    def get_replication_info(self, volume_group_id):
+    def get_last_async_snapshot_info(self, volume_group_id):
         """
         This function will return replication sync info for a volume group.
 
