@@ -43,3 +43,7 @@ REQUIRED_BYTES_MISMATCH_MESSAGE = "required bytes : {0} does not match the sourc
 UNSUPPORTED_STORAGECLASS_VOLUME_GROUP = "Unsupported storage class volume group with volume group feature"
 VOLUME_PARTITION_MISMATCH = "Volume {0} is in partition {1}, not part of partition {2}"
 VOLUME_GROUP_PARTITION_MISMATCH = "Volume group {0} is in partition {1}, not part of partition {2}"
+REPLICATION_STATUS_MESSAGE = (
+    "Replication is {0}; local site is {1}, remote site {2} is {3} and {4}, "
+    "within RPO: {5}, lag: {6}s."
+    )
