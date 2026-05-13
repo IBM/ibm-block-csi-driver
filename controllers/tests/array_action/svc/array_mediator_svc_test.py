@@ -2628,65 +2628,20 @@ class TestArrayMediatorSVC(unittest.TestCase):
         result = self.svc._get_recovery_location_index(vg_replication)
         self.assertEqual('3', result)
 
-    # --- get_replication_info tests ---
-
-    def test_get_replication_info_non_partition_all_fields_populated_success(self):
-        vg_replication = self._mock_vg_replication(
-            partition_name='',
-            loc2_system_id='00000204AFE0632C',
-            fixed_rp='250422041647',
-            sync_required='10.00GB',
-            sync_remaining='9.00GB',
-        )
+    # --- get_last_async_snapshot_info tests ---
+    def test_get_last_async_snapshot_info_returns_vg_replication_object(self):
+        vg_replication = self._mock_vg_replication(partition_name='')
         self.svc.client.svcinfo.lsvolumegroupreplication.return_value = Mock(
             as_single_element=vg_replication)
 
-        result = self.svc.get_replication_info(OBJECT_INTERNAL_ID)
+        result = self.svc.get_last_async_snapshot_info(OBJECT_INTERNAL_ID)
 
         self.svc.client.svcinfo.lsvolumegroupreplication.assert_called_once_with(
             object_id=OBJECT_INTERNAL_ID)
-        self.assertIsNotNone(result.last_sync_time)
-        self.assertIsNone(result.last_sync_duration_seconds)
-        expected_bytes = int(10.00 * 1024 ** 3) - int(9.00 * 1024 ** 3)
-        self.assertEqual(expected_bytes, result.last_sync_bytes)
+        self.assertEqual(vg_replication, result)
 
-    def test_get_replication_info_partition_uses_location3_success(self):
-        vg_replication = self._mock_vg_replication(
-            partition_name='SKGPTN0',
-            loc3_system_id='00000204AFE0632C',
-            fixed_rp='250422041647',
-            sync_required='',
-            sync_remaining='',
-        )
-        self.svc.client.svcinfo.lsvolumegroupreplication.return_value = Mock(
-            as_single_element=vg_replication)
-
-        result = self.svc.get_replication_info(OBJECT_INTERNAL_ID)
-
-        self.assertIsNotNone(result.last_sync_time)
-        self.assertIsNone(result.last_sync_duration_seconds)
-        self.assertIsNone(result.last_sync_bytes)
-
-    def test_get_replication_info_no_record_raises_object_not_found(self):
+    def test_get_last_async_snapshot_info_no_record_raises_object_not_found(self):
         self.svc.client.svcinfo.lsvolumegroupreplication.return_value = Mock(
             as_single_element=None)
-
         with self.assertRaises(array_errors.ObjectNotFoundError):
-            self.svc.get_replication_info(OBJECT_INTERNAL_ID)
-
-    def test_get_replication_info_all_fields_blank_returns_none_fields(self):
-        vg_replication = self._mock_vg_replication(
-            partition_name='',
-            loc2_system_id='00000204AFE0632C',
-            fixed_rp='',
-            sync_required='',
-            sync_remaining='',
-        )
-        self.svc.client.svcinfo.lsvolumegroupreplication.return_value = Mock(
-            as_single_element=vg_replication)
-
-        result = self.svc.get_replication_info(OBJECT_INTERNAL_ID)
-
-        self.assertIsNone(result.last_sync_time)
-        self.assertIsNone(result.last_sync_duration_seconds)
-        self.assertIsNone(result.last_sync_bytes)
+            self.svc.get_last_async_snapshot_info(OBJECT_INTERNAL_ID)
