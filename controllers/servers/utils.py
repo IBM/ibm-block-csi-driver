@@ -1178,3 +1178,13 @@ def is_call_home_enabled():
 
 def get_odf_call_home_version():
     return getenv(servers_settings.ODF_VERSION_FOR_CALL_HOME_ENV_VAR, '')
+
+
+def getattr_as_str(obj, attr, default=servers_settings.UNKNOWN):
+    value = getattr(obj, attr, None)
+
+    if value is None:
+        return default
+
+    value = str(value).strip()
+    return value or default
