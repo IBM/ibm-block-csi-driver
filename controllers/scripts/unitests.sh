@@ -24,48 +24,52 @@ run_tests() {
         DIST_ARGS="-n $WORKERS"
     fi
 
-    if [ "$ARCH" = "s390x" ]; then
-        # On s390x, 'timeout' wrapper causes segfault during pytest shutdown.
-        # Run pytest directly; rely on --timeout=60 per-test instead.
-        pytest -s --full-trace \
-            --verbose \
-            --exitfirst \
-            --maxfail=1 \
-            --capture=no \
-            --tb=short \
-            $DIST_ARGS \
-            --timeout=60 \
-            --cov=common \
-            --cov=controllers \
-            --cov-report=xml:$coveragedir/.coverage.xml \
-            --junit-xml=$coveragedir/.unitests.xml \
-            controllers/tests/ \
-            "$@"
-        EXIT_CODE=$?
-        # Ignore segfault exit code (139) if all tests passed
-        if [ $EXIT_CODE -eq 139 ]; then
-            echo "WARNING: pytest exited with segfault (139) on s390x during shutdown - treating as success if XML artifacts exist."
-            if [ -f "$coveragedir/.unitests.xml" ]; then
-                return 0
-            fi
+    timeout 120 pytest -s --full-trace \
+        --verbose \
+        --exitfirst \
+        --maxfail=1 \
+        --capture=no \
+        --tb=short \
+        $DIST_ARGS \
+        --timeout=60 \
+        --cov=common \
+        --cov=controllers \
+        --cov-report=xml:$coveragedir/.coverage.xml \
+        --junit-xml=$coveragedir/.unitests.xml \
+        controllers/tests/ \
+        "$@"
+    EXIT_CODE=$?
+
+    if [ "$ARCH" = "s390x" ] && [ $EXIT_CODE -eq 139 ]; then
+        echo "s390x: caught exit 139 (segfault during pytest shutdown), checking test results..."
+
+        # Confirm XML exists
+        if [ ! -f "$coveragedir/.unitests.xml" ]; then
+            echo "FAIL: no JUnit XML found — pytest likely crashed before completing."
+            return 1
         fi
-        return $EXIT_CODE
-    else
-        timeout 120 pytest -s --full-trace \
-            --verbose \
-            --exitfirst \
-            --maxfail=1 \
-            --capture=no \
-            --tb=short \
-            $DIST_ARGS \
-            --timeout=60 \
-            --cov=common \
-            --cov=controllers \
-            --cov-report=xml:$coveragedir/.coverage.xml \
-            --junit-xml=$coveragedir/.unitests.xml \
-            controllers/tests/ \
-            "$@"
+
+        # Check for failures/errors in the XML
+        FAILURES=$(python3 -c "
+import xml.etree.ElementTree as ET
+tree = ET.parse('$coveragedir/.unitests.xml')
+root = tree.getroot()
+suite = root if root.tag == 'testsuite' else root.find('testsuite')
+failures = int(suite.attrib.get('failures', 1))
+errors   = int(suite.attrib.get('errors',   1))
+print(failures + errors)
+")
+
+        if [ "$FAILURES" -eq 0 ]; then
+            echo "s390x: all tests passed. Ignoring post-run segfault."
+            return 0
+        else
+            echo "FAIL: JUnit XML reports $FAILURES failure(s)/error(s). Real test failure."
+            return 1
+        fi
     fi
+
+    return $EXIT_CODE
 }
 
 MAX_FAILURES=3
