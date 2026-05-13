@@ -14,6 +14,16 @@ pipeline {
         label  "${env.AGENT_LABEL}"
     }
     stages {
+        stage ('Login to quay') {
+            steps {
+                script {
+                    registryUrl = "${DOCKER_REGISTRY}"
+                    withCredentials([usernamePassword(credentialsId: registryCredentialsID, usernameVariable: 'USERNAME', passwordVariable: 'PASSWORD')]) {
+                        sh 'docker login -u $USERNAME -p $PASSWORD ${DOCKER_REGISTRY}'
+                    }
+                }
+            }
+        }
         stage ('Controllers: static code analysis') {
             steps {
                 sh './scripts/run_static_code_analysis.sh'
