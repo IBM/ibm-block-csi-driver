@@ -5,15 +5,17 @@ coveragedir=/driver/coverage/
 [ ! -d $coveragedir ] && mkdir -p $coveragedir
 
 ARCH=$(uname -m)
+
 if [ "$ARCH" = "s390x" ]; then
-    WORKERS=0
     export PROTOCOL_BUFFERS_PYTHON_IMPLEMENTATION=python
-    export COVERAGE_CORE=pytrace        # pure Python, no C extension
-    # Force reinstall protobuf from source to avoid broken s390x wheel
-    pip install --no-binary :all: protobuf --quiet --break-system-packages
+    export COVERAGE_CORE=pytrace
+    WORKERS=0
+    USE_SUBPROCESS=1
 else
     WORKERS=4
+    USE_SUBPROCESS=0
 fi
+
 echo "Detected ARCH: $ARCH"
 echo "Using WORKERS: $WORKERS"
 
@@ -24,52 +26,46 @@ run_tests() {
         DIST_ARGS="-n $WORKERS"
     fi
 
-    timeout 120 pytest -s --full-trace \
-        --verbose \
-        --exitfirst \
-        --maxfail=1 \
-        --capture=no \
-        --tb=short \
-        $DIST_ARGS \
-        --timeout=60 \
-        --cov=common \
-        --cov=controllers \
-        --cov-report=xml:$coveragedir/.coverage.xml \
-        --junit-xml=$coveragedir/.unitests.xml \
-        controllers/tests/ \
-        "$@"
-    EXIT_CODE=$?
+    if [ "$USE_SUBPROCESS" -eq 1 ]; then
+        # critical for s390x stability
+        python - <<PY
+import subprocess, sys
 
-    if [ "$ARCH" = "s390x" ] && [ $EXIT_CODE -eq 139 ]; then
-        echo "s390x: caught exit 139 (segfault during pytest shutdown), checking test results..."
+cmd = [
+    "pytest",
+    "--verbose",
+    "--exitfirst",
+    "--maxfail=1",
+    "--capture=no",
+    "--tb=short",
+    $([ "$WORKERS" -eq 0 ] && echo '"-p","no:xdist",' )
+    "--timeout=60",
+    "--cov=common",
+    "--cov=controllers",
+    "--cov-report=xml:$coveragedir/.coverage.xml",
+    "--junit-xml=$coveragedir/.unitests.xml",
+    "controllers/tests/"
+]
 
-        # Confirm XML exists
-        if [ ! -f "$coveragedir/.unitests.xml" ]; then
-            echo "FAIL: no JUnit XML found — pytest likely crashed before completing."
-            return 1
-        fi
-
-        # Check for failures/errors in the XML
-        FAILURES=$(python3 -c "
-import xml.etree.ElementTree as ET
-tree = ET.parse('$coveragedir/.unitests.xml')
-root = tree.getroot()
-suite = root if root.tag == 'testsuite' else root.find('testsuite')
-failures = int(suite.attrib.get('failures', 1))
-errors   = int(suite.attrib.get('errors',   1))
-print(failures + errors)
-")
-
-        if [ "$FAILURES" -eq 0 ]; then
-            echo "s390x: all tests passed. Ignoring post-run segfault."
-            return 0
-        else
-            echo "FAIL: JUnit XML reports $FAILURES failure(s)/error(s). Real test failure."
-            return 1
-        fi
+result = subprocess.run(cmd)
+sys.exit(result.returncode)
+PY
+    else
+        timeout 120 pytest \
+            --verbose \
+            --exitfirst \
+            --maxfail=1 \
+            --capture=no \
+            --tb=short \
+            $DIST_ARGS \
+            --timeout=60 \
+            --cov=common \
+            --cov=controllers \
+            --cov-report=xml:$coveragedir/.coverage.xml \
+            --junit-xml=$coveragedir/.unitests.xml \
+            controllers/tests/ \
+            "$@"
     fi
-
-    return $EXIT_CODE
 }
 
 MAX_FAILURES=3
