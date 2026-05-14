@@ -1,8 +1,8 @@
 #!/bin/bash
-set -xe
+set -euo pipefail
 
 coveragedir=/driver/coverage/
-[ ! -d $coveragedir ] && mkdir -p $coveragedir
+mkdir -p "$coveragedir"
 
 ARCH=$(uname -m)
 
@@ -20,6 +20,8 @@ echo "Detected ARCH: $ARCH"
 echo "Using WORKERS: $WORKERS"
 
 run_tests() {
+    local rc=0
+
     if [ "$WORKERS" -eq 0 ]; then
         DIST_ARGS="-p no:xdist"
     else
@@ -27,8 +29,8 @@ run_tests() {
     fi
 
     if [ "$USE_SUBPROCESS" -eq 1 ]; then
-        # critical for s390x stability
-        python - <<PY
+        # s390x-safe execution via python subprocess
+        python - <<'PY'
 import subprocess, sys
 
 cmd = [
@@ -38,7 +40,7 @@ cmd = [
     "--maxfail=1",
     "--capture=no",
     "--tb=short",
-    $([ "$WORKERS" -eq 0 ] && echo '"-p","no:xdist",' )
+    "-p", "no:xdist",
     "--timeout=60",
     "--cov=common",
     "--cov=controllers",
@@ -48,8 +50,10 @@ cmd = [
 ]
 
 result = subprocess.run(cmd)
+print("PYTEST EXIT CODE:", result.returncode)
 sys.exit(result.returncode)
 PY
+        rc=$?
     else
         timeout 120 pytest \
             --verbose \
@@ -63,9 +67,11 @@ PY
             --cov=controllers \
             --cov-report=xml:$coveragedir/.coverage.xml \
             --junit-xml=$coveragedir/.unitests.xml \
-            controllers/tests/ \
-            "$@"
+            controllers/tests/
+        rc=$?
     fi
+
+    return $rc
 }
 
 MAX_FAILURES=3
@@ -76,19 +82,22 @@ while true; do
     attempt=$((attempt + 1))
     echo "[Attempt $attempt] Running unit tests..."
 
-    if run_tests "$@"; then
+    run_tests
+    rc=$?
+
+    if [ $rc -eq 0 ]; then
         echo "[Attempt $attempt] Unit tests completed successfully."
         break
-    else
-        failures=$((failures + 1))
-        echo "[Attempt $attempt] Tests FAILED (failure $failures of $MAX_FAILURES)."
-
-        if [ $failures -ge $MAX_FAILURES ]; then
-            echo "Maximum failures ($MAX_FAILURES) reached. Aborting."
-            exit 1
-        fi
-
-        echo "Sleeping 60 seconds before retry..."
-        sleep 60
     fi
+
+    failures=$((failures + 1))
+    echo "[Attempt $attempt] Tests FAILED (failure $failures of $MAX_FAILURES). Exit code: $rc"
+
+    if [ $failures -ge $MAX_FAILURES ]; then
+        echo "Maximum failures ($MAX_FAILURES) reached. Aborting."
+        exit $rc
+    fi
+
+    echo "Sleeping 60 seconds before retry..."
+    sleep 60
 done
