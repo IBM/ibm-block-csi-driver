@@ -11,6 +11,7 @@ from controllers.array_action.settings import (REPLICATION_TYPE_MIRROR, REPLICAT
                                                REPLICATION_COPY_TYPE_SYNC, DR_LINK_STATUS_RUNNING, RECOVERY)
 from controllers.array_action.array_action_types import ReplicationRequest, ReplicationInfo, ReplicationStatus
 from controllers.servers.csi.addons_server import ReplicationControllerServicer
+from controllers.servers.csi.controller_types import ReplicationInfo, ReplicationStatus
 from controllers.tests import utils
 from controllers.tests.common.test_settings import VOLUME_NAME, VOLUME_UID, OBJECT_INTERNAL_ID, \
     OTHER_OBJECT_INTERNAL_ID, REPLICATION_NAME, SYSTEM_ID, COPY_TYPE, SECRET_USERNAME_VALUE, SECRET_PASSWORD_VALUE, \
@@ -414,7 +415,7 @@ class TestGetVolumeReplicationInfo(BaseReplicationSetUp, CommonControllerTest):
         self.mediator.get_last_async_snapshot_info.assert_not_called()
         self.assertEqual(0, response.last_sync_time.seconds)
         self.assertEqual(0, response.last_sync_bytes)
-        self.assertEqual(pb2.GetVolumeReplicationInfoResponse.UNKNOWN, response.status)
+        self.assertEqual(ReplicationStatus.UNKNOWN, response.status)
         self.assertEqual('', response.status_message)
 
     def test_get_volume_replication_info_already_processing(self):
