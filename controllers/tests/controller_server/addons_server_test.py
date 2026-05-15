@@ -9,8 +9,9 @@ from controllers.servers.settings import (PARAMETERS_SYSTEM_ID, PARAMETERS_COPY_
                                           DR_LINK_STATUS_RUNNING, PRODUCTION, RECOVERY)
 import controllers.servers.messages as servers_messages
 from controllers.array_action.settings import REPLICATION_TYPE_MIRROR, REPLICATION_TYPE_EAR, REPLICATION_COPY_TYPE_SYNC
-from controllers.array_action.array_action_types import ReplicationRequest, ReplicationInfo
+from controllers.array_action.array_action_types import ReplicationRequest
 from controllers.servers.csi.addons_server import ReplicationControllerServicer
+from controllers.servers.csi.controller_types import ReplicationInfo, ReplicationStatus
 from controllers.tests import utils
 from controllers.tests.common.test_settings import VOLUME_NAME, VOLUME_UID, OBJECT_INTERNAL_ID, \
     OTHER_OBJECT_INTERNAL_ID, REPLICATION_NAME, SYSTEM_ID, COPY_TYPE, SECRET_USERNAME_VALUE, SECRET_PASSWORD_VALUE, \
@@ -358,8 +359,7 @@ class TestGetVolumeReplicationInfo(BaseReplicationSetUp, CommonControllerTest):
         return pb2.GetVolumeReplicationInfoResponse
 
     def _make_replication_info(self, last_sync_time=None, last_sync_bytes=None,
-                               replication_status=pb2.GetVolumeReplicationInfoResponse.UNKNOWN,
-                               status_message=None):
+                               replication_status=ReplicationStatus.UNKNOWN, status_message=None):
         return ReplicationInfo(
             volume_group_id=OBJECT_INTERNAL_ID,
             last_sync_time=last_sync_time,
@@ -380,7 +380,7 @@ class TestGetVolumeReplicationInfo(BaseReplicationSetUp, CommonControllerTest):
         self._prepare_get_replication_info(self._make_replication_info(
             last_sync_time=datetime(2025, 4, 22, 4, 16, 47),
             last_sync_bytes=1024,
-            replication_status=pb2.GetVolumeReplicationInfoResponse.HEALTHY,
+            replication_status=ReplicationStatus.HEALTHY,
             status_message=replication_status_message,
         ))
 
@@ -390,7 +390,7 @@ class TestGetVolumeReplicationInfo(BaseReplicationSetUp, CommonControllerTest):
         self.mediator.get_last_async_snapshot_info.assert_called_once_with(OBJECT_INTERNAL_ID)
         self.assertNotEqual(0, response.last_sync_time.seconds)
         self.assertEqual(1024, response.last_sync_bytes)
-        self.assertEqual(pb2.GetVolumeReplicationInfoResponse.HEALTHY, response.status)
+        self.assertEqual(ReplicationStatus.HEALTHY, response.status)
         self.assertEqual(replication_status_message, response.status_message)
 
     def test_get_volume_replication_info_all_fields_none_succeeds(self):
@@ -402,7 +402,7 @@ class TestGetVolumeReplicationInfo(BaseReplicationSetUp, CommonControllerTest):
         self.mediator.get_last_async_snapshot_info.assert_called_once_with(OBJECT_INTERNAL_ID)
         self.assertEqual(0, response.last_sync_time.seconds)
         self.assertEqual(-1, response.last_sync_bytes)
-        self.assertEqual(pb2.GetVolumeReplicationInfoResponse.UNKNOWN, response.status)
+        self.assertEqual(ReplicationStatus.UNKNOWN, response.status)
         self.assertEqual('', response.status_message)
 
     def test_get_volume_replication_info_non_volumegroup_source_returns_empty(self):
@@ -421,7 +421,7 @@ class TestGetVolumeReplicationInfo(BaseReplicationSetUp, CommonControllerTest):
         self.mediator.get_last_async_snapshot_info.assert_not_called()
         self.assertEqual(0, response.last_sync_time.seconds)
         self.assertEqual(0, response.last_sync_bytes)
-        self.assertEqual(pb2.GetVolumeReplicationInfoResponse.UNKNOWN, response.status)
+        self.assertEqual(ReplicationStatus.UNKNOWN, response.status)
         self.assertEqual('', response.status_message)
 
     def test_get_volume_replication_info_already_processing(self):
