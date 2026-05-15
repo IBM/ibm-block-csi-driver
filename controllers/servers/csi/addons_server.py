@@ -13,7 +13,7 @@ from controllers.common.csi_logger import get_stdout_logger
 from controllers.servers import utils
 from controllers.servers.csi.decorators import csi_method, csi_replication_method
 from controllers.servers.csi.exception_handler import build_error_response
-from controllers.array_action.array_action_types import ReplicationInfo
+from controllers.servers.csi.controller_types import ReplicationInfo, ReplicationStatus
 
 logger = get_stdout_logger()
 
@@ -224,12 +224,12 @@ class ReplicationControllerServicer(pb2_grpc.ControllerServicer):
     @staticmethod
     def _map_dr_link_status_to_proto_status(dr_link_status):
         if dr_link_status in servers_settings.HEALTHY_DR_LINK_STATES:
-            return pb2.GetVolumeReplicationInfoResponse.HEALTHY
+            return ReplicationStatus.HEALTHY
         if dr_link_status in servers_settings.DEGRADED_DR_LINK_STATES:
-            return pb2.GetVolumeReplicationInfoResponse.DEGRADED
+            return ReplicationStatus.DEGRADED
         if dr_link_status in servers_settings.FAILED_DR_LINK_STATES:
-            return pb2.GetVolumeReplicationInfoResponse.ERROR
-        return pb2.GetVolumeReplicationInfoResponse.UNKNOWN
+            return ReplicationStatus.ERROR
+        return ReplicationStatus.UNKNOWN
 
     @staticmethod
     def _build_replication_status_message(vg_replication, recovery_loc_idx, dr_link_status):
