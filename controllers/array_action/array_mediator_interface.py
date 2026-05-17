@@ -587,7 +587,7 @@ class ArrayMediator(ABC):
             volume_group_id : internal id of the volume group (EAR only)
 
         Returns:
-            Raw volume group replication object
+            ReplicationInfo
 
         Raises:
             ObjectNotFoundError
