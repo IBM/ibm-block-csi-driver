@@ -236,17 +236,12 @@ class ReplicationControllerServicer(pb2_grpc.ControllerServicer):
             logger.warning("Could not determine recovery location for volume_group_id='{}'.".format(volume_group_id))
             return ReplicationInfo(replication_status=proto_status)
 
-        fixed_rp_attr = 'location{}_fixed_recovery_point'.format(recovery_loc_idx)
-        sync_required_attr = 'location{}_sync_required'.format(recovery_loc_idx)
-        sync_remaining_attr = 'location{}_sync_remaining'.format(recovery_loc_idx)
-
-        raw_fixed_rp = getattr(vg_replication, fixed_rp_attr, '')
-        raw_sync_required = getattr(vg_replication, sync_required_attr, '')
-        raw_sync_remaining = getattr(vg_replication, sync_remaining_attr, '')
-
-        last_sync_time = mediator._parse_svc_timestamp(raw_fixed_rp, fixed_rp_attr)
-        sync_required = mediator._parse_svc_size_to_bytes(raw_sync_required, sync_required_attr)
-        sync_remaining = mediator._parse_svc_size_to_bytes(raw_sync_remaining, sync_remaining_attr)
+        last_sync_time = utils.get_vg_replication_location_field(
+            vg_replication, recovery_loc_idx, 'fixed_recovery_point', mediator._parse_svc_timestamp)
+        sync_required = utils.get_vg_replication_location_field(
+            vg_replication, recovery_loc_idx, 'sync_required', mediator._parse_svc_size_to_bytes)
+        sync_remaining = utils.get_vg_replication_location_field(
+            vg_replication, recovery_loc_idx, 'sync_remaining', mediator._parse_svc_size_to_bytes)
 
         if sync_required is not None and sync_remaining is not None:
             last_sync_bytes = sync_required - sync_remaining
