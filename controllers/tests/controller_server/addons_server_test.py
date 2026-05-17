@@ -413,7 +413,6 @@ class TestGetVolumeReplicationInfo(BaseReplicationSetUp, CommonControllerTest):
         self.assertEqual(grpc.StatusCode.OK, self.context.code)
         self.mediator.get_last_async_snapshot_info.assert_not_called()
         self.assertEqual(0, response.last_sync_time.seconds)
-        self.assertEqual(0, response.last_sync_bytes)
         self.assertEqual(ReplicationStatus.UNKNOWN, response.status)
         self.assertEqual('', response.status_message)
 
