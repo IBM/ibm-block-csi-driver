@@ -3347,6 +3347,108 @@ func (o GetDmsPathHelperGeneric) getSlaveCount(path string) int {
 	return 1
 }
 
+func (o GetDmsPathHelperGeneric) getSlaveCount(path string) int {
+	name := filepath.Base(path)
+
+	// DM: Protocol and distribution agnostic path counting (RHEL 7+)
+	if strings.HasPrefix(name, "dm-") {
+		tablePath := fmt.Sprintf("/sys/block/%s/dm/table", name)
+		tableData, err := os.ReadFile(tablePath)
+		if err != nil {
+			logger.Warningf("failed to read dm table for %s: %v", name, err)
+			return 0
+		}
+
+		// A multipath table string always follows this exact kernel format layout:
+		// <start_sector> <size> multipath <num_feature_args> [feature_args] <num_handler_args> [handler_args] <num_path_groups> <next_path_group_index> [path_groups...]
+		// Example entry: "0 20971520 multipath 0 0 1 1 service-time 0 2 1 8:16 1 8:32 1"
+		lines := strings.Split(strings.TrimSpace(string(tableData)), "\n")
+		totalPaths := 0
+
+		for _, line := range lines {
+			fields := strings.Fields(line)
+			if len(fields) < 4 || fields[2] != "multipath" {
+				continue
+			}
+
+			// Find where the path groups section starts by skipping features and handlers
+			// 1. Skip features
+			numFeatureArgs, err := strconv.Atoi(fields[3])
+			if err != nil {
+				continue
+			}
+			idx := 4 + numFeatureArgs
+
+			// 2. Skip handlers
+			if idx >= len(fields) {
+				continue
+			}
+			numHandlerArgs, err := strconv.Atoi(fields[idx])
+			if err != nil {
+				continue
+			}
+			idx = idx + 1 + numHandlerArgs
+
+			// 3. Extract path group configuration
+			if idx >= len(fields) {
+				continue
+			}
+			numPathGroups, err := strconv.Atoi(fields[idx])
+			if err != nil {
+				continue
+			}
+			idx++ // Skip 'num_path_groups' field
+			idx++ // Skip 'next_path_group_index' field
+
+			// 4. Iterate through each path group to count individual paths
+			for pg := 0; pg < numPathGroups; pg++ {
+				if idx + 2 >= len(fields) {
+					break
+				}
+				// Each path group layout: <selector> <num_selector_args> <num_paths> <next_path_to_try> [path_args...]
+				numSelectorArgs, err := strconv.Atoi(fields[idx+1])
+				if err != nil {
+					break
+				}
+				numPathsInGroup, err := strconv.Atoi(fields[idx+2])
+				if err != nil {
+					break
+				}
+				totalPaths += numPathsInGroup
+
+				// Advance index past this entire group's metadata and its specific paths block
+				// Each individual path inside the group consumes (2 + num_selector_args) tokens
+				idx += 4 + (numPathsInGroup * (2 + numSelectorArgs))
+			}
+		}
+
+		// Fallback safely to legacy sysfs slaves checking if the table was unparseable 
+		// but the DM target is alive.
+		if totalPaths == 0 {
+			if entries, err := os.ReadDir(fmt.Sprintf("/sys/block/%s/slaves", name)); err == nil && len(entries) > 0 {
+				return len(entries)
+			}
+		}
+		return totalPaths
+	}
+
+	// NVMe: Controller tracking for native nvme-multipath subsystem
+	if strings.HasPrefix(name, "nvme") {
+		subsysDir := fmt.Sprintf("/sys/block/%s/device", name)
+		entries, _ := os.ReadDir(subsysDir)
+		count := 0
+		for _, e := range entries {
+			if strings.HasPrefix(e.Name(), "nvme") && !strings.Contains(e.Name(), "n") {
+				count++ 
+			}
+		}
+		return count
+	}
+
+	return 1
+}
+
+
 //func (o GetDmsPathHelperGeneric) validateAndSettle(ctx context.Context, path string) (string, error) {
 //	// REQUIREMENT 8: Respect CSI Context
 //	for i := 0; i < 5; i++ {
