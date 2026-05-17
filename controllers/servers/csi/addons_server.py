@@ -228,11 +228,13 @@ class ReplicationControllerServicer(pb2_grpc.ControllerServicer):
             )
 
     def _build_replication_info(self, vg_replication, volume_group_id, mediator):
-        recovery_loc_idx = mediator._get_recovery_location_index(vg_replication)
+        dr_link_status = utils.getattr_as_str(vg_replication, 'dr_link_status', servers_settings.UNKNOWN)
+        proto_status = self._map_dr_link_status_to_proto_status(dr_link_status)
 
+        recovery_loc_idx = mediator._get_recovery_location_index(vg_replication)
         if recovery_loc_idx is None:
             logger.warning("Could not determine recovery location for volume_group_id='{}'.".format(volume_group_id))
-            return ReplicationInfo(volume_group_id=volume_group_id)
+            return ReplicationInfo(replication_status=proto_status)
 
         fixed_rp_attr = 'location{}_fixed_recovery_point'.format(recovery_loc_idx)
         sync_required_attr = 'location{}_sync_required'.format(recovery_loc_idx)
@@ -252,12 +254,9 @@ class ReplicationControllerServicer(pb2_grpc.ControllerServicer):
             last_sync_bytes = None
             logger.info("last_sync_bytes cannot be computed, one or both of sync_required/sync_remaining is None")
 
-        dr_link_status = utils.getattr_as_str(vg_replication, 'dr_link_status', servers_settings.UNKNOWN)
-        proto_status = self._map_dr_link_status_to_proto_status(dr_link_status)
         dr_status_message = self._build_replication_status_message(vg_replication, recovery_loc_idx, dr_link_status)
 
         return ReplicationInfo(
-            volume_group_id=volume_group_id,
             last_sync_time=last_sync_time,
             last_sync_bytes=last_sync_bytes,
             replication_status=proto_status,
