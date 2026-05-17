@@ -1,9 +1,5 @@
 from dataclasses import dataclass, field, InitVar
-from enum import IntEnum
-from typing import Optional
-from datetime import datetime, timedelta
 
-from csi_general import replication_pb2 as pb2
 from controllers.array_action.array_action_types import ObjectIds, VolumeGroupIds
 
 
@@ -56,19 +52,3 @@ class ObjectParameters:
 @dataclass
 class VolumeGroupParameters:
     prefix: str
-
-
-class ReplicationStatus(IntEnum):
-    UNKNOWN = pb2.GetVolumeReplicationInfoResponse.UNKNOWN
-    HEALTHY = pb2.GetVolumeReplicationInfoResponse.HEALTHY
-    DEGRADED = pb2.GetVolumeReplicationInfoResponse.DEGRADED
-    ERROR = pb2.GetVolumeReplicationInfoResponse.ERROR
-
-
-@dataclass
-class ReplicationInfo:
-    last_sync_time: Optional[datetime] = None
-    last_sync_duration: Optional[timedelta] = None
-    last_sync_bytes: Optional[int] = None
-    replication_status: ReplicationStatus = ReplicationStatus.UNKNOWN
-    status_message: Optional[str] = None
