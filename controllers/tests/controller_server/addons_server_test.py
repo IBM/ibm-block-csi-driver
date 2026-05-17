@@ -8,7 +8,7 @@ from mock import Mock, MagicMock
 from controllers.servers.settings import PARAMETERS_SYSTEM_ID, PARAMETERS_COPY_TYPE, PARAMETERS_REPLICATION_POLICY
 from controllers.array_action import svc_messages
 from controllers.array_action.settings import (REPLICATION_TYPE_MIRROR, REPLICATION_TYPE_EAR,
-                                               REPLICATION_COPY_TYPE_SYNC, DR_LINK_STATUS_RUNNING, PRODUCTION, RECOVERY)
+                                               REPLICATION_COPY_TYPE_SYNC, DR_LINK_STATUS_RUNNING, RECOVERY)
 from controllers.array_action.array_action_types import ReplicationRequest, ReplicationInfo, ReplicationStatus
 from controllers.servers.csi.addons_server import ReplicationControllerServicer
 from controllers.tests import utils
@@ -357,11 +357,10 @@ class TestGetVolumeReplicationInfo(BaseReplicationSetUp, CommonControllerTest):
     def tested_method_response_class(self):
         return pb2.GetVolumeReplicationInfoResponse
 
-    def _make_replication_info(self, last_sync_time=None, last_sync_bytes=None,
+    def _make_replication_info(self, last_sync_time=None,
                                replication_status=ReplicationStatus.UNKNOWN, status_message=None):
         return ReplicationInfo(
             last_sync_time=last_sync_time,
-            last_sync_bytes=last_sync_bytes,
             replication_status=replication_status,
             status_message=status_message,
         )
@@ -371,12 +370,11 @@ class TestGetVolumeReplicationInfo(BaseReplicationSetUp, CommonControllerTest):
 
     def test_get_volume_replication_info_all_fields_populated_succeeds(self):
         replication_status_message = svc_messages.REPLICATION_STATUS_MESSAGE.format(
-            DR_LINK_STATUS_RUNNING, PRODUCTION, "fab3p-118-c", RECOVERY, "healthy", "yes", "0"
-            )
+            DR_LINK_STATUS_RUNNING, "fab3p-118-c", RECOVERY, "healthy", "yes"
+        )
 
         self._prepare_get_replication_info(self._make_replication_info(
             last_sync_time=datetime(2025, 4, 22, 4, 16, 47),
-            last_sync_bytes=1024,
             replication_status=ReplicationStatus.HEALTHY,
             status_message=replication_status_message,
         ))
@@ -386,7 +384,6 @@ class TestGetVolumeReplicationInfo(BaseReplicationSetUp, CommonControllerTest):
         self.assertEqual(grpc.StatusCode.OK, self.context.code)
         self.mediator.get_last_async_snapshot_info.assert_called_once_with(OBJECT_INTERNAL_ID)
         self.assertNotEqual(0, response.last_sync_time.seconds)
-        self.assertEqual(1024, response.last_sync_bytes)
         self.assertEqual(ReplicationStatus.HEALTHY, response.status)
         self.assertEqual(replication_status_message, response.status_message)
 
@@ -398,7 +395,6 @@ class TestGetVolumeReplicationInfo(BaseReplicationSetUp, CommonControllerTest):
         self.assertEqual(grpc.StatusCode.OK, self.context.code)
         self.mediator.get_last_async_snapshot_info.assert_called_once_with(OBJECT_INTERNAL_ID)
         self.assertEqual(0, response.last_sync_time.seconds)
-        self.assertEqual(-1, response.last_sync_bytes)
         self.assertEqual(ReplicationStatus.UNKNOWN, response.status)
         self.assertEqual('', response.status_message)
 
@@ -417,7 +413,6 @@ class TestGetVolumeReplicationInfo(BaseReplicationSetUp, CommonControllerTest):
         self.assertEqual(grpc.StatusCode.OK, self.context.code)
         self.mediator.get_last_async_snapshot_info.assert_not_called()
         self.assertEqual(0, response.last_sync_time.seconds)
-        self.assertEqual(0, response.last_sync_bytes)
         self.assertEqual(ReplicationStatus.UNKNOWN, response.status)
         self.assertEqual('', response.status_message)
 

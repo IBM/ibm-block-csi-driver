@@ -228,24 +228,15 @@ class ReplicationControllerServicer(pb2_grpc.ControllerServicer):
             # so it is easy to detect and verify case for debugging where storage returns an empty value.
             # This corresponds to 1970-01-01T00:00:00Z (Unix time starting point).
             response.last_sync_time.CopyFrom(Timestamp(seconds=0, nanos=0))
-            logger.warning(
-                "last_sync_time not available "
-                "(fixed_recovery_point was blank). Setting to default timestamp (0)."
-            )
+            logger.warning("last_sync_time not available at storage, Setting to default timestamp (0).")
 
-        # NOTE: For now, I have intentionally kept -1 for last_sync_bytes when storage fields return empty.
-        # I have not returned 0 because it means complete sync.
-        bytes_val = replication_info.last_sync_bytes if replication_info.last_sync_bytes is not None else -1
-
-        response.last_sync_bytes = bytes_val
         response.status = replication_info.replication_status
         response.status_message = replication_info.status_message or ''
 
         logger.info(
             "GetVolumeReplicationInfo: returning response last_sync_time.seconds={}, "
-            "last_sync_bytes={}, status={}, status_message='{}'".format(
+            "status={}, status_message='{}'".format(
                 response.last_sync_time.seconds,
-                response.last_sync_bytes,
                 response.status,
                 response.status_message
             )

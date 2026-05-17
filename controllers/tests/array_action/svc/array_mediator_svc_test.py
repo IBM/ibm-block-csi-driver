@@ -12,11 +12,12 @@ import controllers.array_action.errors as array_errors
 import controllers.tests.array_action.svc.test_settings as svc_settings
 import controllers.tests.array_action.test_settings as array_settings
 import controllers.tests.common.test_settings as common_settings
-from controllers.array_action.array_action_types import ReplicationRequest
+from controllers.array_action.array_action_types import ReplicationRequest, ReplicationInfo, ReplicationStatus
 from controllers.array_action.array_mediator_svc import SVCArrayMediator, build_kwargs_from_parameters, \
     FCMAP_STATUS_DONE, YES
-from controllers.array_action.settings import REPLICATION_TYPE_MIRROR, REPLICATION_TYPE_EAR, \
-    RCRELATIONSHIP_STATE_READY, ENDPOINT_TYPE_PRODUCTION
+from controllers.array_action.settings import (REPLICATION_TYPE_MIRROR, REPLICATION_TYPE_EAR,
+                                               RCRELATIONSHIP_STATE_READY, ENDPOINT_TYPE_PRODUCTION,
+                                               HEALTHY_DR_LINK_STATES, DEGRADED_DR_LINK_STATES, FAILED_DR_LINK_STATES)
 from controllers.common.node_info import Initiators
 from controllers.common.settings import ARRAY_TYPE_SVC, SPACE_EFFICIENCY_THIN, SPACE_EFFICIENCY_COMPRESSED, \
     SPACE_EFFICIENCY_DEDUPLICATED_COMPRESSED, SPACE_EFFICIENCY_DEDUPLICATED_THIN, SPACE_EFFICIENCY_DEDUPLICATED, \
@@ -2595,25 +2596,21 @@ class TestArrayMediatorSVC(unittest.TestCase):
 
         self.svc.client.svctask.registerplugin.assert_has_calls([call_1, call_2])
 
-    def _mock_vg_replication(self, partition_name='', local_location='1', fixed_rp='', sync_required='',
-                             sync_remaining='', loc2_system_id='', loc3_system_id=''):
-
+    def _mock_vg_replication(self, partition_name='', local_location='1', dr_link_status='running',
+                             loc2_system_name='', loc3_system_name='', loc2_status='', loc3_status='',
+                             loc2_within_rpo='', loc3_within_rpo='', loc2_running_rp='', loc3_running_rp=''):
         return Munch({
             'partition_name': partition_name,
             'local_location': local_location,
-            'local_partition_location': 'upper' if partition_name else '',
-            'location1_system_id': svc_settings.DUMMY_ID_ALIAS,
-            'location1_system_name': 'Cluster_local',
-            'location2_system_id': loc2_system_id,
-            'location2_system_name': '',
-            'location2_fixed_recovery_point': fixed_rp if not partition_name else '',
-            'location2_sync_required': sync_required if not partition_name else '',
-            'location2_sync_remaining': sync_remaining if not partition_name else '',
-            'location3_system_id': loc3_system_id,
-            'location3_system_name': '',
-            'location3_fixed_recovery_point': fixed_rp if partition_name else '',
-            'location3_sync_required': sync_required if partition_name else '',
-            'location3_sync_remaining': sync_remaining if partition_name else '',
+            'dr_link_status': dr_link_status,
+            'location2_system_name': loc2_system_name,
+            'location2_status': loc2_status,
+            'location2_within_rpo': loc2_within_rpo,
+            'location2_running_recovery_point': loc2_running_rp,
+            'location3_system_name': loc3_system_name,
+            'location3_status': loc3_status,
+            'location3_within_rpo': loc3_within_rpo,
+            'location3_running_recovery_point': loc3_running_rp,
             'replication_policy_name': REPLICATION_NAME,
         })
 
@@ -2628,9 +2625,49 @@ class TestArrayMediatorSVC(unittest.TestCase):
         result = self.svc._get_recovery_location_index(vg_replication)
         self.assertEqual('3', result)
 
+    # --- _map_dr_link_status_to_proto_status tests ---
+    def test_map_dr_link_status_healthy_states(self):
+        for status in HEALTHY_DR_LINK_STATES:
+            with self.subTest(status=status):
+                result = self.svc._map_dr_link_status_to_proto_status(status)
+                self.assertEqual(ReplicationStatus.HEALTHY, result)
+
+    def test_map_dr_link_status_degraded_states(self):
+        for status in DEGRADED_DR_LINK_STATES:
+            with self.subTest(status=status):
+                result = self.svc._map_dr_link_status_to_proto_status(status)
+                self.assertEqual(ReplicationStatus.DEGRADED, result)
+
+    def test_map_dr_link_status_failed_states(self):
+        for status in FAILED_DR_LINK_STATES:
+            with self.subTest(status=status):
+                result = self.svc._map_dr_link_status_to_proto_status(status)
+                self.assertEqual(ReplicationStatus.ERROR, result)
+
+    def test_map_dr_link_status_unknown_returns_unknown(self):
+        result = self.svc._map_dr_link_status_to_proto_status('some_unknown_state')
+        self.assertEqual(ReplicationStatus.UNKNOWN, result)
+
+    # --- _build_replication_info tests ---
+    def test_build_replication_info(self):
+        vg_replication = self._mock_vg_replication(
+            partition_name='',
+            dr_link_status='running',
+            loc2_status='healthy',
+            loc2_within_rpo='yes',
+            loc2_running_rp='0',
+        )
+
+        result = self.svc._build_replication_info(vg_replication)
+
+        self.assertIsInstance(result, ReplicationInfo)
+        self.assertIsNotNone(result.last_sync_time)
+        self.assertEqual(ReplicationStatus.HEALTHY, result.replication_status)
+        self.assertIsNotNone(result.status_message)
+
     # --- get_last_async_snapshot_info tests ---
-    def test_get_last_async_snapshot_info_returns_vg_replication_object(self):
-        vg_replication = self._mock_vg_replication(partition_name='')
+    def test_get_last_async_snapshot_info_returns_replication_info(self):
+        vg_replication = self._mock_vg_replication(partition_name='', dr_link_status='running')
         self.svc.client.svcinfo.lsvolumegroupreplication.return_value = Mock(
             as_single_element=vg_replication)
 
@@ -2638,7 +2675,9 @@ class TestArrayMediatorSVC(unittest.TestCase):
 
         self.svc.client.svcinfo.lsvolumegroupreplication.assert_called_once_with(
             object_id=OBJECT_INTERNAL_ID)
-        self.assertEqual(vg_replication, result)
+        self.assertIsInstance(result, ReplicationInfo)
+        self.assertIsNotNone(result.last_sync_time)
+        self.assertEqual(ReplicationStatus.HEALTHY, result.replication_status)
 
     def test_get_last_async_snapshot_info_no_record_raises_object_not_found(self):
         self.svc.client.svcinfo.lsvolumegroupreplication.return_value = Mock(
