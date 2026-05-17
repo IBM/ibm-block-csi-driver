@@ -306,7 +306,7 @@ type dmIoctl struct {
 const (
 	DevPath                     = "/dev"
 	DevMapperPath               = "/dev/mapper"
-	WaitForMpathRetries         = 5
+	WaitForMpathRetries         = 20
 	WaitForMpathWaitIntervalSec = 1
 	FcHostSysfsPath             = "/sys/class/fc_remote_ports/rport-*/port_name"
 	IscsiHostRexExPath          = "/sys/class/iscsi_host/host*/device/session*/iscsi_session/session*/targetname"
