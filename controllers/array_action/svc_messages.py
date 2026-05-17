@@ -10,3 +10,7 @@ DELETE_HOST = 'Deleting host {}'
 CREATE_HOST_WITHOUT_IO_GROUP = 'Created host {} with port {}'
 CREATE_HOST_WITH_IO_GROUP = 'Created host {} with port [{}] and with io_group [{}]'
 CHANGE_HOST_PROTOCOL = 'Changed host {} protocol to: {}'
+REPLICATION_STATUS_MESSAGE = (
+    "Replication is {0}; local site is {1}, remote site {2} is {3} and {4}, "
+    "within RPO: {5}, lag: {6}s."
+    )
