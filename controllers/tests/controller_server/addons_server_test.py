@@ -361,7 +361,6 @@ class TestGetVolumeReplicationInfo(BaseReplicationSetUp, CommonControllerTest):
     def _make_replication_info(self, last_sync_time=None, last_sync_bytes=None,
                                replication_status=ReplicationStatus.UNKNOWN, status_message=None):
         return ReplicationInfo(
-            volume_group_id=OBJECT_INTERNAL_ID,
             last_sync_time=last_sync_time,
             last_sync_bytes=last_sync_bytes,
             replication_status=replication_status,
