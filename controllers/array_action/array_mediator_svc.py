@@ -1,7 +1,7 @@
 from collections import defaultdict
 from io import StringIO
 from random import choice, randint
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 import os
 from packaging.version import Version
@@ -1781,59 +1781,6 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
         return getattr(volume_group_replication, location_attr_name, None)
 
     @staticmethod
-    def _parse_svc_timestamp(raw_value, field_name):
-        raw_str = str(raw_value or '').strip()
-        if not raw_str:
-            logger.warning("Field='{}' is blank, returning None".format(field_name))
-            return None
-        try:
-            dt = datetime.strptime(raw_str, "%y%m%d%H%M%S")
-            logger.debug("Field='{}' parsed '{}' -> {}".format(field_name, raw_str, dt))
-            return dt
-        except ValueError as ex:
-            logger.warning("Field='{}' failed to parse '{}': {}".format(
-                field_name, raw_str, ex))
-            return None
-
-    @staticmethod
-    def _parse_svc_size_to_bytes(raw_value, field_name):
-        raw_str = str(raw_value or '').strip().upper()
-
-        if not raw_str:
-            logger.warning("Field='{}' is blank, returning None".format(field_name))
-            return None
-
-        suffixes = {
-            'TB': 1024 ** 4,
-            'GB': 1024 ** 3,
-            'MB': 1024 ** 2,
-            'KB': 1024,
-            'B':  1,
-        }
-
-        for suffix, multiplier in suffixes.items():
-            if raw_str.endswith(suffix):
-                numeric_part = raw_str[:-len(suffix)].strip()
-                try:
-                    bytes_val = int(float(numeric_part) * multiplier)
-                    logger.debug("Field='{}' parsed '{}' -> {} bytes".format(
-                        field_name, raw_value, bytes_val))
-                    return bytes_val
-                except (ValueError, TypeError) as ex:
-                    logger.warning("Field='{}' failed to parse '{}': {}".format(
-                        field_name, raw_value, ex))
-                    return None
-
-        # No suffix matched then try to parse plain integer
-        try:
-            result = int(raw_str)
-            return result
-        except (ValueError, TypeError) as ex:
-            logger.warning("Field='{}' failed to parse '{}' as int: {}".format(
-                field_name, raw_value, ex))
-            return None
-
-    @staticmethod
     def _getattr_as_str(obj, attr, default=array_settings.UNKNOWN):
         value = getattr(obj, attr, None)
 
@@ -1842,12 +1789,6 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
 
         value = str(value).strip()
         return value or default
-
-    @staticmethod
-    def _get_vg_replication_location_field(vg_replication, recovery_loc_idx, attr_suffix, parser_func):
-        attr_name = 'location{}_{}'.format(recovery_loc_idx, attr_suffix)
-        raw_value = getattr(vg_replication, attr_name, '')
-        return parser_func(raw_value, attr_name)
 
     @staticmethod
     def _map_dr_link_status_to_proto_status(dr_link_status):
@@ -1873,35 +1814,21 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
         return recovery_idx
 
     def _build_replication_status_message(self, vg_replication, recovery_loc_idx, dr_link_status):
-        local_location = self._getattr_as_str(vg_replication, 'local_location', '')
-        local_role = array_settings.RECOVERY if local_location == recovery_loc_idx else array_settings.PRODUCTION
-        remote_role = (array_settings.PRODUCTION if local_role == array_settings.RECOVERY else
-                       array_settings.RECOVERY)
-
         remote_name = self._getattr_as_str(vg_replication, 'location{}_system_name'.format(recovery_loc_idx))
+        remote_role = self._getattr_as_str(vg_replication, 'location{}_replication_mode'.format(recovery_loc_idx))
         remote_status = self._getattr_as_str(vg_replication, 'location{}_status'.format(recovery_loc_idx))
         within_rpo = self._getattr_as_str(vg_replication, 'location{}_within_rpo'.format(recovery_loc_idx))
-        lag = self._getattr_as_str(vg_replication, 'location{}_running_recovery_point'.format(recovery_loc_idx))
 
         return svc_messages.REPLICATION_STATUS_MESSAGE.format(
-            dr_link_status, local_role, remote_name, remote_role, remote_status, within_rpo, lag
+            dr_link_status, remote_name, remote_role, remote_status, within_rpo
         )
 
     def _build_replication_info(self, vg_replication):
         recovery_loc_idx = self._get_recovery_location_index(vg_replication)
 
-        last_sync_time = self._get_vg_replication_location_field(
-            vg_replication, recovery_loc_idx, 'fixed_recovery_point', self._parse_svc_timestamp)
-        sync_required = self._get_vg_replication_location_field(
-            vg_replication, recovery_loc_idx, 'sync_required', self._parse_svc_size_to_bytes)
-        sync_remaining = self._get_vg_replication_location_field(
-            vg_replication, recovery_loc_idx, 'sync_remaining', self._parse_svc_size_to_bytes)
-
-        if sync_required is not None and sync_remaining is not None:
-            last_sync_bytes = sync_required - sync_remaining
-        else:
-            last_sync_bytes = None
-            logger.info("last_sync_bytes cannot be computed, one or both of sync_required/sync_remaining is None")
+        # NOTE: For now we have not decided field from storage to be populated into last_sync_time
+        # until then using current time
+        last_sync_time = datetime.now(timezone.utc)
 
         dr_link_status = self._getattr_as_str(vg_replication, 'dr_link_status', array_settings.UNKNOWN)
         proto_status = self._map_dr_link_status_to_proto_status(dr_link_status)
@@ -1909,7 +1836,6 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
 
         return ReplicationInfo(
             last_sync_time=last_sync_time,
-            last_sync_bytes=last_sync_bytes,
             replication_status=proto_status,
             status_message=dr_status_message
         )
