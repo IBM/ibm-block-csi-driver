@@ -5,13 +5,12 @@ import grpc
 from csi_general import replication_pb2 as pb2
 from mock import Mock, MagicMock
 
-from controllers.servers.settings import (PARAMETERS_SYSTEM_ID, PARAMETERS_COPY_TYPE, PARAMETERS_REPLICATION_POLICY,
-                                          DR_LINK_STATUS_RUNNING, PRODUCTION, RECOVERY)
-import controllers.servers.messages as servers_messages
-from controllers.array_action.settings import REPLICATION_TYPE_MIRROR, REPLICATION_TYPE_EAR, REPLICATION_COPY_TYPE_SYNC
-from controllers.array_action.array_action_types import ReplicationRequest
+from controllers.servers.settings import PARAMETERS_SYSTEM_ID, PARAMETERS_COPY_TYPE, PARAMETERS_REPLICATION_POLICY
+from controllers.array_action import svc_messages
+from controllers.array_action.settings import (REPLICATION_TYPE_MIRROR, REPLICATION_TYPE_EAR,
+                                               REPLICATION_COPY_TYPE_SYNC, DR_LINK_STATUS_RUNNING, PRODUCTION, RECOVERY)
+from controllers.array_action.array_action_types import ReplicationRequest, ReplicationInfo, ReplicationStatus
 from controllers.servers.csi.addons_server import ReplicationControllerServicer
-from controllers.servers.csi.controller_types import ReplicationInfo, ReplicationStatus
 from controllers.tests import utils
 from controllers.tests.common.test_settings import VOLUME_NAME, VOLUME_UID, OBJECT_INTERNAL_ID, \
     OTHER_OBJECT_INTERNAL_ID, REPLICATION_NAME, SYSTEM_ID, COPY_TYPE, SECRET_USERNAME_VALUE, SECRET_PASSWORD_VALUE, \
@@ -368,11 +367,10 @@ class TestGetVolumeReplicationInfo(BaseReplicationSetUp, CommonControllerTest):
         )
 
     def _prepare_get_replication_info(self, replication_info):
-        self.mediator.get_last_async_snapshot_info.return_value = Mock()
-        self.servicer._build_replication_info = Mock(return_value=replication_info)
+        self.mediator.get_last_async_snapshot_info.return_value = replication_info
 
     def test_get_volume_replication_info_all_fields_populated_succeeds(self):
-        replication_status_message = servers_messages.REPLICATION_STATUS_MESSAGE.format(
+        replication_status_message = svc_messages.REPLICATION_STATUS_MESSAGE.format(
             DR_LINK_STATUS_RUNNING, PRODUCTION, "fab3p-118-c", RECOVERY, "healthy", "yes", "0"
             )
 

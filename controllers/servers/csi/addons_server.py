@@ -4,7 +4,6 @@ from csi_general import replication_pb2_grpc as pb2_grpc
 from google.protobuf.timestamp_pb2 import Timestamp
 
 import controllers.servers.settings as servers_settings
-import controllers.servers.messages as servers_messages
 import controllers.array_action.settings as array_settings
 from controllers.array_action import errors as array_errors
 from controllers.array_action.storage_agent import get_agent
@@ -12,7 +11,6 @@ from controllers.common.csi_logger import get_stdout_logger
 from controllers.servers import utils
 from controllers.servers.csi.decorators import csi_method, csi_replication_method
 from controllers.servers.csi.exception_handler import build_error_response
-from controllers.servers.csi.controller_types import ReplicationInfo, ReplicationStatus
 
 logger = get_stdout_logger()
 
@@ -199,65 +197,6 @@ class ReplicationControllerServicer(pb2_grpc.ControllerServicer):
         mediator.verify_volume_partition(replication_object, array_connection_info.partition_name)
         return replication_object
 
-    @staticmethod
-    def _map_dr_link_status_to_proto_status(dr_link_status):
-        if dr_link_status in servers_settings.HEALTHY_DR_LINK_STATES:
-            return ReplicationStatus.HEALTHY
-        if dr_link_status in servers_settings.DEGRADED_DR_LINK_STATES:
-            return ReplicationStatus.DEGRADED
-        if dr_link_status in servers_settings.FAILED_DR_LINK_STATES:
-            return ReplicationStatus.ERROR
-        return ReplicationStatus.UNKNOWN
-
-    @staticmethod
-    def _build_replication_status_message(vg_replication, recovery_loc_idx, dr_link_status):
-        local_location = utils.getattr_as_str(vg_replication, 'local_location', '')
-        local_role = servers_settings.RECOVERY if local_location == recovery_loc_idx else servers_settings.PRODUCTION
-        remote_role = (servers_settings.PRODUCTION if local_role == servers_settings.RECOVERY else
-                       servers_settings.RECOVERY)
-
-        remote_name = utils.getattr_as_str(vg_replication, 'location{}_system_name'.format(recovery_loc_idx))
-        remote_status = utils.getattr_as_str(vg_replication, 'location{}_status'.format(recovery_loc_idx))
-        within_rpo = utils.getattr_as_str(vg_replication, 'location{}_within_rpo'.format(recovery_loc_idx))
-
-        raw_lag = getattr(vg_replication, 'location{}_running_recovery_point'.format(recovery_loc_idx), '')
-        lag_str = servers_settings.NOT_AVAILABLE if not (raw_lag and str(raw_lag).strip()) else str(int(raw_lag))
-
-        return servers_messages.REPLICATION_STATUS_MESSAGE.format(
-            dr_link_status, local_role, remote_name, remote_role, remote_status, within_rpo, lag_str
-            )
-
-    def _build_replication_info(self, vg_replication, volume_group_id, mediator):
-        dr_link_status = utils.getattr_as_str(vg_replication, 'dr_link_status', servers_settings.UNKNOWN)
-        proto_status = self._map_dr_link_status_to_proto_status(dr_link_status)
-
-        recovery_loc_idx = mediator._get_recovery_location_index(vg_replication)
-        if recovery_loc_idx is None:
-            logger.warning("Could not determine recovery location for volume_group_id='{}'.".format(volume_group_id))
-            return ReplicationInfo(replication_status=proto_status)
-
-        last_sync_time = utils.get_vg_replication_location_field(
-            vg_replication, recovery_loc_idx, 'fixed_recovery_point', mediator._parse_svc_timestamp)
-        sync_required = utils.get_vg_replication_location_field(
-            vg_replication, recovery_loc_idx, 'sync_required', mediator._parse_svc_size_to_bytes)
-        sync_remaining = utils.get_vg_replication_location_field(
-            vg_replication, recovery_loc_idx, 'sync_remaining', mediator._parse_svc_size_to_bytes)
-
-        if sync_required is not None and sync_remaining is not None:
-            last_sync_bytes = sync_required - sync_remaining
-        else:
-            last_sync_bytes = None
-            logger.info("last_sync_bytes cannot be computed, one or both of sync_required/sync_remaining is None")
-
-        dr_status_message = self._build_replication_status_message(vg_replication, recovery_loc_idx, dr_link_status)
-
-        return ReplicationInfo(
-            last_sync_time=last_sync_time,
-            last_sync_bytes=last_sync_bytes,
-            replication_status=proto_status,
-            status_message=dr_status_message
-        )
-
     @csi_replication_method(error_response_type=pb2.GetVolumeReplicationInfoResponse)
     def GetVolumeReplicationInfo(self, request, context):
         logger.info("GetVolumeReplicationInfo: called with replication_source='{}'".format(request.replication_source))
@@ -277,8 +216,7 @@ class ReplicationControllerServicer(pb2_grpc.ControllerServicer):
         connection_info = utils.get_array_connection_info_from_secrets(request.secrets)
 
         with get_agent(connection_info, object_id_info.array_type).get_mediator() as mediator:
-            vg_replication = mediator.get_last_async_snapshot_info(object_id)
-            replication_info = self._build_replication_info(vg_replication, object_id, mediator)
+            replication_info = mediator.get_last_async_snapshot_info(object_id)
 
         response = pb2.GetVolumeReplicationInfoResponse()
 

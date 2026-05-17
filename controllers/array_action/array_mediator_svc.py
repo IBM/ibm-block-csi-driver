@@ -19,7 +19,8 @@ from controllers.array_action import svc_messages
 import controllers.servers.settings as controller_settings
 from controllers.servers.csi.decorators import register_csi_plugin
 from controllers.array_action.array_action_types import (Volume, Snapshot, Replication, Host,
-                                                         VolumeGroup, ThinVolume)
+                                                         VolumeGroup, ThinVolume, ReplicationInfo,
+                                                         ReplicationStatus)
 from controllers.array_action.array_mediator_abstract import ArrayMediatorAbstract
 from controllers.array_action.utils import ClassProperty, convert_scsi_id_to_nguid
 from controllers.array_action.volume_group_interface import VolumeGroupInterface
@@ -1779,7 +1780,8 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
 
         return getattr(volume_group_replication, location_attr_name, None)
 
-    def _parse_svc_timestamp(self, raw_value, field_name):
+    @staticmethod
+    def _parse_svc_timestamp(raw_value, field_name):
         raw_str = str(raw_value or '').strip()
         if not raw_str:
             logger.warning("Field='{}' is blank, returning None".format(field_name))
@@ -1793,7 +1795,8 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
                 field_name, raw_str, ex))
             return None
 
-    def _parse_svc_size_to_bytes(self, raw_value, field_name):
+    @staticmethod
+    def _parse_svc_size_to_bytes(raw_value, field_name):
         raw_str = str(raw_value or '').strip().upper()
 
         if not raw_str:
@@ -1830,11 +1833,36 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
                 field_name, raw_value, ex))
             return None
 
-    def _get_recovery_location_index(self, vg_replication):
-        partition_name = getattr(vg_replication, 'partition_name', '')
-        is_partition = bool(partition_name and str(partition_name).strip())
+    @staticmethod
+    def _getattr_as_str(obj, attr, default=array_settings.UNKNOWN):
+        value = getattr(obj, attr, None)
 
-        if is_partition:
+        if value is None:
+            return default
+
+        value = str(value).strip()
+        return value or default
+
+    @staticmethod
+    def _get_vg_replication_location_field(vg_replication, recovery_loc_idx, attr_suffix, parser_func):
+        attr_name = 'location{}_{}'.format(recovery_loc_idx, attr_suffix)
+        raw_value = getattr(vg_replication, attr_name, '')
+        return parser_func(raw_value, attr_name)
+
+    @staticmethod
+    def _map_dr_link_status_to_proto_status(dr_link_status):
+        if dr_link_status in array_settings.HEALTHY_DR_LINK_STATES:
+            return ReplicationStatus.HEALTHY
+        if dr_link_status in array_settings.DEGRADED_DR_LINK_STATES:
+            return ReplicationStatus.DEGRADED
+        if dr_link_status in array_settings.FAILED_DR_LINK_STATES:
+            return ReplicationStatus.ERROR
+        return ReplicationStatus.UNKNOWN
+
+    def _get_recovery_location_index(self, vg_replication):
+        partition_name = self._getattr_as_str(vg_replication, 'partition_name', '')
+
+        if partition_name:
             recovery_idx = '3'
             logger.info("Partition VG (partition_name='{}') -> "
                         "DR location = '{}'".format(partition_name, recovery_idx))
@@ -1843,6 +1871,48 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
             logger.info("Non-partition VG -> DR location = '{}'".format(recovery_idx))
 
         return recovery_idx
+
+    def _build_replication_status_message(self, vg_replication, recovery_loc_idx, dr_link_status):
+        local_location = self._getattr_as_str(vg_replication, 'local_location', '')
+        local_role = array_settings.RECOVERY if local_location == recovery_loc_idx else array_settings.PRODUCTION
+        remote_role = (array_settings.PRODUCTION if local_role == array_settings.RECOVERY else
+                       array_settings.RECOVERY)
+
+        remote_name = self._getattr_as_str(vg_replication, 'location{}_system_name'.format(recovery_loc_idx))
+        remote_status = self._getattr_as_str(vg_replication, 'location{}_status'.format(recovery_loc_idx))
+        within_rpo = self._getattr_as_str(vg_replication, 'location{}_within_rpo'.format(recovery_loc_idx))
+        lag = self._getattr_as_str(vg_replication, 'location{}_running_recovery_point'.format(recovery_loc_idx))
+
+        return svc_messages.REPLICATION_STATUS_MESSAGE.format(
+            dr_link_status, local_role, remote_name, remote_role, remote_status, within_rpo, lag
+        )
+
+    def _build_replication_info(self, vg_replication):
+        recovery_loc_idx = self._get_recovery_location_index(vg_replication)
+
+        last_sync_time = self._get_vg_replication_location_field(
+            vg_replication, recovery_loc_idx, 'fixed_recovery_point', self._parse_svc_timestamp)
+        sync_required = self._get_vg_replication_location_field(
+            vg_replication, recovery_loc_idx, 'sync_required', self._parse_svc_size_to_bytes)
+        sync_remaining = self._get_vg_replication_location_field(
+            vg_replication, recovery_loc_idx, 'sync_remaining', self._parse_svc_size_to_bytes)
+
+        if sync_required is not None and sync_remaining is not None:
+            last_sync_bytes = sync_required - sync_remaining
+        else:
+            last_sync_bytes = None
+            logger.info("last_sync_bytes cannot be computed, one or both of sync_required/sync_remaining is None")
+
+        dr_link_status = self._getattr_as_str(vg_replication, 'dr_link_status', array_settings.UNKNOWN)
+        proto_status = self._map_dr_link_status_to_proto_status(dr_link_status)
+        dr_status_message = self._build_replication_status_message(vg_replication, recovery_loc_idx, dr_link_status)
+
+        return ReplicationInfo(
+            last_sync_time=last_sync_time,
+            last_sync_bytes=last_sync_bytes,
+            replication_status=proto_status,
+            status_message=dr_status_message
+        )
 
     def get_last_async_snapshot_info(self, volume_group_id):
         logger.info("get_last_async_snapshot_info: called for volume_group_id='{}'".format(volume_group_id))
@@ -1855,7 +1925,7 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
             )
             raise array_errors.ObjectNotFoundError(volume_group_id)
 
-        return vg_replication
+        return self._build_replication_info(vg_replication)
 
     def _get_replication_policy(self, volume_group_id):
         volume_group_replication = self._lsvolumegroupreplication(volume_group_id)
