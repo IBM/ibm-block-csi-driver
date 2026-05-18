@@ -16,6 +16,8 @@
 #    This Dockerfile.test is for running the csi controller local tests inside a container.
 #    Its similar to the Dockerfile, but with additional requirements-tests.txt and ENTRYPOINT to run the local tests.
 
+FROM quay.io/csiblock/ibm-block-csi-deps:latest AS deps
+
 FROM registry.access.redhat.com/ubi9/python-312:1-1778473732 AS builder
 USER root
 RUN if [[ "$(uname -m)" != "x86"* ]]; then yum install -y rust-toolset; fi
@@ -27,7 +29,9 @@ COPY controllers/servers/csi/requirements_pyxcli.txt ./csi_requirements_pyxcli.t
 COPY controllers/servers/host_definer/requirements.txt ./host_definer_requirements.txt
 # avoid default- boringssl lib, since it does not support z systems
 ENV GRPC_PYTHON_BUILD_SYSTEM_OPENSSL=True
-RUN pip3 install -r ./csi_requirements.txt -r ./host_definer_requirements.txt
+COPY --from=deps /wheels /wheels
+
+RUN pip3 install --no-index --find-links=/wheels -r ./csi_requirements.txt -r ./host_definer_requirements.txt
 RUN pip3 install --no-deps -r ./csi_requirements_pyxcli.txt
 
 USER root
