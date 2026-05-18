@@ -2,7 +2,8 @@ pip==26.1.1
 wheel==0.46.2
 grpcio==1.74.0
 grpcio-tools==1.74.0
-protobuf==6.33.5
+protobuf==6.33.5; platform_machine == "x86_64"
+protobuf==6.31.1; platform_machine != "x86_64"
 pyyaml==6.0.2
 munch==4.0.0
 retry2==0.9.5
