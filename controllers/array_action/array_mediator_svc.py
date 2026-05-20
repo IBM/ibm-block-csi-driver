@@ -750,6 +750,11 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
             return self._mkvolumegroup(name=name, partition=partition_name)
         return self._mkvolumegroup(name=name)
 
+    def _is_stretch_pool(self, pool):
+        if ":" not in pool:
+            return False
+        return (self._get_pool_site(pool.split(":")[0]) != self._get_pool_site(pool.split(":")[1]))
+
     def _create_volume_in_volume_group(self, name, pool, io_group, source_id):
         cli_kwargs = build_create_volume_in_volume_group_kwargs(pool, io_group, source_id)
         self._mkvolumegroup(name, **cli_kwargs)
@@ -759,12 +764,24 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
         self._rmvolumegroup(name)
         self._rename_volume(cli_volume_id, name)
 
+    def _add_vdisk_copies(self, is_stretch, pool, vdisk_id):
+        if not is_stretch:
+            return
+        pools = pool.split(":")
+        for additional_pool in pools[1:]:
+            logger.info("adding vdisk copy to pool: {}".format(additional_pool))
+            self.client.svctask.addvdiskcopy(mdiskgrp=additional_pool, vdisk_id=vdisk_id)
+
     def _create_cli_volume_from_snapshot(self, name, pool, io_group, volume_group, source_id):
-        logger.info("creating volume from snapshot")
-        self._create_volume_in_volume_group(name, pool, io_group, source_id)
+        logger.info("creating volume from snapshot. pool: {}".format(pool))
+        is_stretch = self._is_stretch_pool(pool)
+        vg_pool = pool.split(":")[0] if is_stretch else pool
+        self._create_volume_in_volume_group(name, vg_pool, io_group, source_id)
         cli_volume_id = self._get_cli_volume_id_from_volume_group("volume_group_name", name)
         try:
+            # remove vg and leave volume, with name <name>
             self._fix_creation_side_effects(name, cli_volume_id, volume_group)
+            self._add_vdisk_copies(is_stretch, pool, cli_volume_id)
         except (svc_errors.CommandExecutionError, CLIFailureError, array_errors.VolumeAlreadyExists) as ex:
             self._rollback_create_volume_from_snapshot(cli_volume_id, name)
             raise ex
@@ -795,8 +812,10 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
     def _create_cli_volume_from_volume(self, name, pool, io_group, volume_group, source_id):
         logger.info("creating volume from volume")
         cli_snapshot = self._add_snapshot(name, source_id, pool)
-        self._create_cli_volume_from_snapshot(name, pool, io_group, volume_group, cli_snapshot.snapshot_id)
-        self._rmsnapshot(cli_snapshot.snapshot_id)
+        try:
+            self._create_cli_volume_from_snapshot(name, pool, io_group, volume_group, cli_snapshot.snapshot_id)
+        finally:
+            self._rmsnapshot(cli_snapshot.snapshot_id)
 
     def _partition_create_cli_volume_from_cli_vol(self, name, pool, io_group, volume_group, cli_volume,
                                                   space_efficiency, partition_name):
