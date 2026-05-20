@@ -24,7 +24,7 @@ When setting the optional "virt_snap_func" parameter to "true", the optional "Sp
       volume_group: demo-volumegroup   # Optional.
       SpaceEfficiency: thin            # Optional. Do not set this optional parameter if virt_snap_func is set to "true"
       volume_name_prefix: demo-prefix  # Optional.
-      virt_snap_func: "false"          # Optional. Values "true"/"false". The default is "false". If set, this value MUST be identical to the value set in the VolumeSnapshotClass yamls
+      virt_snap_func: "true"           # Optional. Values "true"/"false". The default is "false". If set, this value MUST be identical to the value set in the VolumeSnapshotClass yamls
 
       csi.storage.k8s.io/fstype: xfs   # Optional. Values ext4/xfs. The default is ext4.
       csi.storage.k8s.io/secret-name: demo-secret
