@@ -749,7 +749,10 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
         return self._mkvolumegroup(name=name)
 
     def _create_volume_in_volume_group(self, name, pool, io_group, source_id):
-        cli_kwargs = build_create_volume_in_volume_group_kwargs(pool, io_group, source_id)
+        # If pool contains multiple pools (stretch volume), use only the first to create vg
+        pools = pool.split(":")
+        first_pool = pools[0]
+        cli_kwargs = build_create_volume_in_volume_group_kwargs(first_pool, io_group, source_id)
         self._mkvolumegroup(name, **cli_kwargs)
 
     def _fix_creation_side_effects(self, name, cli_volume_id, volume_group):
@@ -758,11 +761,19 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
         self._rename_volume(cli_volume_id, name)
 
     def _create_cli_volume_from_snapshot(self, name, pool, io_group, volume_group, source_id):
-        logger.info("creating volume from snapshot")
+        logger.info("creating volume from snapshot. pool: {}".format(pool))
         self._create_volume_in_volume_group(name, pool, io_group, source_id)
         cli_volume_id = self._get_cli_volume_id_from_volume_group("volume_group_name", name)
         try:
+            # remove vg and leave volume, with name <name>
             self._fix_creation_side_effects(name, cli_volume_id, volume_group)
+
+            # If pool contains multiple pools (stretch volume), add vdisk copies for additional pools
+            if ":" in pool:
+                pools = pool.split(":")
+                for additional_pool in pools[1:]:
+                    logger.info("adding vdisk copy to pool: {}".format(additional_pool))
+                    self.client.svctask.addvdiskcopy(mdiskgrp=additional_pool, vdisk_id=cli_volume_id)
         except (svc_errors.CommandExecutionError, CLIFailureError, array_errors.VolumeAlreadyExists) as ex:
             self._rollback_create_volume_from_snapshot(cli_volume_id, name)
             raise ex
@@ -793,8 +804,10 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
     def _create_cli_volume_from_volume(self, name, pool, io_group, volume_group, source_id):
         logger.info("creating volume from volume")
         cli_snapshot = self._add_snapshot(name, source_id, pool)
-        self._create_cli_volume_from_snapshot(name, pool, io_group, volume_group, cli_snapshot.snapshot_id)
-        self._rmsnapshot(cli_snapshot.snapshot_id)
+        try:
+            self._create_cli_volume_from_snapshot(name, pool, io_group, volume_group, cli_snapshot.snapshot_id)
+        finally:
+            self._rmsnapshot(cli_snapshot.snapshot_id)
 
     def _partition_create_cli_volume_from_cli_vol(self, name, pool, io_group, volume_group, cli_volume,
                                                   space_efficiency, partition_name):
