@@ -409,12 +409,13 @@ class TestArrayMediatorSVC(unittest.TestCase):
         self._test_create_volume_mkvolume_cli_failure_error("CMMVC9301E", array_errors.PoolDoesNotMatchSpaceEfficiency)
 
     def _test_create_volume_success(self, space_efficiency=None, source_id=None, source_type=None, volume_group=None,
-                                    is_virt_snap_func=False):
+                                    is_virt_snap_func=False, pool=None):
         self.svc.client.svctask.mkvolume.return_value = Mock()
         vol_ret = Mock(as_single_element=self._get_cli_volume())
         self.svc.client.svcinfo.lsvdisk.return_value = vol_ret
+        pool_to_use = pool if pool else common_settings.DUMMY_POOL1
         volume = self.svc.create_volume(common_settings.VOLUME_NAME, array_settings.DUMMY_CAPACITY_INT,
-                                        space_efficiency, common_settings.DUMMY_POOL1,
+                                        space_efficiency, pool_to_use,
                                         None,
                                         volume_group,
                                         self._mock_source_ids(source_id), source_type,
@@ -514,6 +515,67 @@ class TestArrayMediatorSVC(unittest.TestCase):
 
     def test_create_volume_mkvolumegroup_from_volume_success(self):
         self._test_create_volume_mkvolumegroup_success(source_type=common_settings.VOLUME_OBJECT_TYPE)
+
+    def test_is_stretch_pool_with_stretch_pool_returns_true(self):
+        pools_to_return = [Munch({svc_settings.LSMDISKGRP_SITE_NAME_ATTR_KEY: svc_settings.DUMMY_POOL_SITE}),
+                           Munch({svc_settings.LSMDISKGRP_SITE_NAME_ATTR_KEY: svc_settings.DUMMY_VOLUME_SITE1})]
+        self.svc.client.svcinfo.lsmdiskgrp.side_effect = self._mock_cli_objects(pools_to_return)
+
+        result = self.svc._is_stretch_pool(common_settings.STRETCHED_POOL)
+
+        self.assertTrue(result)
+
+    def test_is_stretch_pool_with_non_stretch_pool_returns_false(self):
+        result = self.svc._is_stretch_pool(common_settings.DUMMY_POOL1)
+
+        self.assertFalse(result)
+
+    def test_is_stretch_pool_with_same_site_pools_returns_false(self):
+        pools_to_return = [Munch({svc_settings.LSMDISKGRP_SITE_NAME_ATTR_KEY: svc_settings.DUMMY_POOL_SITE}),
+                           Munch({svc_settings.LSMDISKGRP_SITE_NAME_ATTR_KEY: svc_settings.DUMMY_POOL_SITE})]
+        self.svc.client.svcinfo.lsmdiskgrp.side_effect = self._mock_cli_objects(pools_to_return)
+
+        result = self.svc._is_stretch_pool(common_settings.STRETCHED_POOL)
+
+        self.assertFalse(result)
+
+    def test_add_vdisk_copies_with_stretch_pool_adds_copies(self):
+        self.svc.client.svctask.addvdiskcopy = Mock()
+
+        self.svc._add_vdisk_copies(True, common_settings.STRETCHED_POOL, common_settings.INTERNAL_VOLUME_ID)
+
+        self.svc.client.svctask.addvdiskcopy.assert_called_once_with(
+            mdiskgrp=common_settings.DUMMY_POOL2,
+            vdisk_id=common_settings.INTERNAL_VOLUME_ID
+        )
+
+    def test_add_vdisk_copies_with_non_stretch_pool_does_nothing(self):
+        self.svc.client.svctask.addvdiskcopy = Mock()
+
+        self.svc._add_vdisk_copies(False, common_settings.DUMMY_POOL1, common_settings.INTERNAL_VOLUME_ID)
+
+        self.svc.client.svctask.addvdiskcopy.assert_not_called()
+
+    def test_create_volume_mkvolumegroup_from_snapshot_with_stretch_pool_success(self):
+        self._prepare_mocks_for_create_volume_mkvolumegroup()
+        self.svc.client.svctask.addvdiskcopy = Mock()
+        pools_to_return = [Munch({svc_settings.LSMDISKGRP_SITE_NAME_ATTR_KEY: svc_settings.DUMMY_POOL_SITE}),
+                           Munch({svc_settings.LSMDISKGRP_SITE_NAME_ATTR_KEY: svc_settings.DUMMY_VOLUME_SITE1})]
+        self.svc.client.svcinfo.lsmdiskgrp.side_effect = self._mock_cli_objects(pools_to_return)
+
+        self._test_create_volume_success(source_id=common_settings.INTERNAL_SNAPSHOT_ID,
+                                         source_type=common_settings.SNAPSHOT_OBJECT_TYPE,
+                                         is_virt_snap_func=True,
+                                         pool=common_settings.STRETCHED_POOL)
+
+        self.svc.client.svctask.mkvolumegroup.assert_called_with(type=svc_settings.MKVOLUMEGROUP_CLONE_TYPE,
+                                                                 fromsnapshotid=common_settings.INTERNAL_SNAPSHOT_ID,
+                                                                 pool=common_settings.DUMMY_POOL1,
+                                                                 name=common_settings.VOLUME_NAME)
+        self.svc.client.svctask.addvdiskcopy.assert_called_once_with(
+            mdiskgrp=common_settings.DUMMY_POOL2,
+            vdisk_id=common_settings.INTERNAL_VOLUME_ID
+        )
 
     @patch("controllers.array_action.array_mediator_svc.is_warning_message")
     def test_create_volume_mkvolumegroup_with_rollback(self, mock_warning):
