@@ -2,7 +2,7 @@ pip==26.1.1
 wheel==0.46.2
 grpcio==1.80.0
 grpcio-tools==1.80.0
-protobuf==7.35.0
+protobuf==6.33.5
 pyyaml==6.0.2
 munch==4.0.0
 retry2==0.9.5
