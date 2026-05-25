@@ -1,6 +1,8 @@
 #!/bin/bash
 set -xe
-
+if [[ "$(uname -m)" == "s390x" ]]; then
+  export PROTOCOL_BUFFERS_PYTHON_IMPLEMENTATION=python
+fi
 coveragedir=/driver/coverage/
 [ ! -d $coveragedir ] && mkdir -p $coveragedir
 
