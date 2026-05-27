@@ -17,7 +17,9 @@
 package device_connectivity
 
 import (
+	"bytes"
 	"context"
+	"encoding/binary"
 	"fmt"
 	"path/filepath"
 	"os"
@@ -380,27 +382,43 @@ func extractNvmeField(line, field string) string {
 // discoverSubNqn runs "nvme discover" for one (arrayTargetPort, hostPort) pair
 // and returns the storage subsystem NQN. Returns ("", nil) if no path exists.
 func (r OsDeviceConnectivityNvmeOFc) discoverSubNqn(ctx context.Context, arrayTargetPort, hostPort string) (string, error) {
-	// Construct the kernel command string
-	// format: transport=fc,traddr=...,host_traddr=...
-	cmd := fmt.Sprintf("transport=%s,traddr=%s,host_traddr=%s", 
-		nvmeTransportFC, arrayTargetPort, hostPort)
+	// 1. Extract raw WWNs by stripping "nn-" and "pn-" prefixes
+	// Input format example: "nn-5005076810003f8c:pn-50050768101c3f8c"
+	
+	targetParts := strings.Split(arrayTargetPort, ":")
+	hostParts := strings.Split(hostPort, ":")
+	
+	if len(targetParts) < 2 || len(hostParts) < 2 {
+		return "", fmt.Errorf("invalid port format target=%s host=%s", arrayTargetPort, hostPort)
+	}
+
+	// Strip "nn-" and "pn-" labels to get raw hex strings
+	targetNN := strings.TrimPrefix(targetParts[0], "nn-")
+	targetPN := strings.TrimPrefix(targetParts[1], "pn-")
+	hostNN := strings.TrimPrefix(hostParts[0], "nn-")
+	hostPN := strings.TrimPrefix(hostParts[1], "pn-")
+
+	// 2. Construct the exact kernel command string
+	// Format: transport=fc,traddr=nn-0x...,host_traddr=nn-0x...,nqn=...
+	// Note: The kernel requires the "0x" prefix for FC hex values
+	cmd := fmt.Sprintf("transport=fc,traddr=nn-0x%s:pn-0x%s,host_traddr=nn-0x%s:pn-0x%s,nqn=nqn.2014-08.org.nvmexpress.discovery", 
+		targetNN, targetPN, hostNN, hostPN)
 
 	// Use your infra to wrap the blocking file write (Req 6)
-         rawOutput, err := executer.ExecuteUninterruptible(
-                 ctx, // Add this line
-                 r.KeyedGater,
-                 fmt.Sprintf("nvme-disc-%s-%s", arrayTargetPort, hostPort),
-                 2, 1, 5*time.Second, 15*time.Second,
-                 func(wCtx context.Context) (string, error) {
-                         return r.executeKernelDiscovery(cmd)
-                 },
-         )
-
+	rawOutput, err := executer.ExecuteUninterruptible(
+		ctx, 
+		r.KeyedGater,
+		fmt.Sprintf("nvme-disc-%s-%s", arrayTargetPort, hostPort),
+		2, 1, 5*time.Second, 15*time.Second,
+		func(wCtx context.Context) (string, error) {
+			return r.executeKernelDiscovery(cmd)
+		},
+	)
 
 	if err != nil {
 		logger.Debugf("NVMe-oFC discoverSubNqn: nvme discover failed target=%s host=%s: %v",
 			arrayTargetPort, hostPort, err)
-		return "", nil
+		return "", err // Return the error to the loop so it logs properly
 	}
 
 	subNqn := parseSubNqnFromDiscoverOutput(rawOutput)
@@ -411,6 +429,7 @@ func (r OsDeviceConnectivityNvmeOFc) discoverSubNqn(ctx context.Context, arrayTa
 
 	return subNqn, nil
 }
+
 
 func (r OsDeviceConnectivityNvmeOFc) executeKernelDiscovery(cmd string) (string, error) {
 	// 1. Open fabrics device
@@ -502,14 +521,108 @@ func parseSubNqnFromDiscoverOutput(output string) string {
 	return ""
 }
 
+
+// NVMe-oF Discovery Log Page Constants based on NVMe Spec 1.4+
+const (
+	nvmeDiscoveryNqn = "nqn.2014-08.org.nvmexpress.discovery"
+	recordSize       = 1024 // Each discovery log entry is exactly 1024 bytes
+)
+
+// NVMe Discovery Log Page Entry Header Structure
+type nvmeDiscoveryLogEntry struct {
+	Trtype      uint8     `header:"trtype"`      // Transport type (e.g., 2 for FC)
+	Adrfam      uint8     `header:"adrfam"`      // Address family
+	Subtype     uint8     `header:"subtype"`     // Subsystem type (0x2 = Storage Subsystem)
+	Treq        uint8     `header:"treq"`        // Transport requirements
+	Portid      uint16    `header:"portid"`      // Port ID
+	Cntlid      uint16    `header:"cntlid"`      // Controller ID
+	Asqsz       uint32    `header:"asqsz"`       // Admin Submission Queue Size
+	Reserved    [20]byte  `header:"reserved"`    // Reserved space
+	Trsvcid     [32]byte  `header:"trsvcid"`     // Transport Service ID (port)
+	SubnqnBytes [256]byte `header:"subnqn"`      // The raw Target NQN we need
+	TraddrBytes [256]byte `header:"traddr"`      // Transport address
+	Tsas        [256]byte `header:"tsas"`        // Transport Specific Address Subtype
+}
+
+func parseSubNqnFromDiscoverOutput(output string) string {
+	rawBytes := []byte(output)
+	if len(rawBytes) < 16 { // Ensure header preamble minimum exists
+		return ""
+	}
+
+	// The first 16 bytes contain the Discovery Log Page Header
+	// Generation Counter (uint64) + Number of Records (uint64)
+	if len(rawBytes) < 16 {
+		return ""
+	}
+	
+	numRecords := binary.LittleEndian.Uint64(rawBytes[8:16])
+	if numRecords == 0 {
+		return ""
+	}
+
+	// Offset past the 16-byte Discovery Log Page header to reach records
+	offset := 16
+
+	for i := uint64(0); i < numRecords; i++ {
+		if offset+recordSize > len(rawBytes) {
+			break
+		}
+
+		var entry nvmeDiscoveryLogEntry
+		buffer := bytes.NewReader(rawBytes[offset : offset+recordSize])
+		err := binary.Read(buffer, binary.LittleEndian, &entry)
+		if err != nil {
+			return ""
+		}
+
+		// Advance pointer to the next record block
+		offset += recordSize
+
+		// Filter out records that are not standard storage subsystems (subtype 0x2)
+		if entry.Subtype != 0x02 {
+			continue
+		}
+
+		// Extract string from null-padded byte array
+		subNqn := string(bytes.Trim(entry.SubnqnBytes[:], "\x00"))
+		subNqn = strings.TrimSpace(subNqn)
+
+		// Ignore empty matches or connections pointing back to the discovery target itself
+		if subNqn == "" || subNqn == nvmeDiscoveryNqn {
+			continue
+		}
+
+		// Successfully extracted the unique operational volume NQN
+		return subNqn
+	}
+
+	return ""
+}
+
+
 func (r OsDeviceConnectivityNvmeOFc) nvmeConnect(ctx context.Context, arrayTargetPort, hostPort, subNqn string) bool {
-	// Construct the kernel-native connection string
+	// 1. Extract raw WWNs by stripping "nn-" and "pn-" prefixes
+	targetParts := strings.Split(arrayTargetPort, ":")
+	hostParts := strings.Split(hostPort, ":")
+	
+	if len(targetParts) < 2 || len(hostParts) < 2 {
+		logger.Errorf("NVMe-oFC nvmeConnect: invalid port format target=%s host=%s", arrayTargetPort, hostPort)
+		return false
+	}
+
+	// Strip "nn-" and "pn-" labels to isolate raw hex strings
+	targetNN := strings.TrimPrefix(targetParts[0], "nn-")
+	targetPN := strings.TrimPrefix(targetParts[1], "pn-")
+	hostNN := strings.TrimPrefix(hostParts[0], "nn-")
+	hostPN := strings.TrimPrefix(hostParts[1], "pn-")
+
+	// 2. Construct the kernel-native connection string using required 0x prefixes
 	// Req 1 & 2: This format is compatible with RHEL7+ kernels
-	options := fmt.Sprintf("nqn=%s,transport=%s,traddr=%s,host_traddr=%s",
-		subNqn, nvmeTransportFC, arrayTargetPort, hostPort)
+	options := fmt.Sprintf("nqn=%s,transport=%s,traddr=nn-0x%s:pn-0x%s,host_traddr=nn-0x%s:pn-0x%s",
+		subNqn, nvmeTransportFC, targetNN, targetPN, hostNN, hostPN)
 
 	// Req 6 & 8: Use your infrastructure to protect against "D" state hangs
-	// We use the NQN + target as the resource key to gate concurrent attempts
 	resourceKey := fmt.Sprintf("connect-%s-%s", subNqn, arrayTargetPort)
 	
 	out, err := executer.ExecuteUninterruptible(
@@ -528,7 +641,8 @@ func (r OsDeviceConnectivityNvmeOFc) nvmeConnect(ctx context.Context, arrayTarge
 			if err != nil {
 				// If already connected, kernel returns EALREADY
 				if strings.Contains(err.Error(), "already connected") || 
-				   strings.Contains(err.Error(), "file exists") {
+				   strings.Contains(err.Error(), "file exists") ||
+				   strings.Contains(err.Error(), "device or resource busy") {
 					return "already_connected", nil
 				}
 				return "", err
@@ -543,10 +657,7 @@ func (r OsDeviceConnectivityNvmeOFc) nvmeConnect(ctx context.Context, arrayTarge
 		return false
 	}
 	
-	logger.Infof("NVMe-oFC nvmeConnect: connected NQN=%s target=%s host=%s", subNqn, arrayTargetPort, hostPort)
-
-
-	logger.Infof("NVMe-oFC nvmeConnect: connected NQN=%s", subNqn)
+	logger.Infof("NVMe-oFC nvmeConnect: connected NQN=%s target=%s host=%s result=%s", subNqn, arrayTargetPort, hostPort, out)
 	return true
 }
 
