@@ -38,6 +38,7 @@ const (
 	nvmeCmdTimeout                      = 10 * 1000
 	nvmeTransportFC                     = "fc"
 	nvmeDiscoveryNqn                    = "nqn.2014-08.org.nvmexpress.discovery"
+        recordSize                          = 1024 // Each discovery log entry is exactly 1024 bytes
 	FCPortPath                          = "/sys/class/fc_host/host*/port_name"
 	nvmeTargetPathCount                 = 3
 	nvmeMinPathsForNonNativeDmMultipath = 2
@@ -499,35 +500,6 @@ func (r OsDeviceConnectivityNvmeOFc) findDiscoverySubNqnFromSysfs() (string, err
 	return "", fmt.Errorf("no active discovery controller found in sysfs")
 }
 
-// parseSubNqnFromDiscoverOutput extracts the storage subsystem NQN from "nvme discover" output.
-// Skips the discovery controller NQN (nqn.2014-08.org.nvmexpress.discovery).
-func parseSubNqnFromDiscoverOutput(output string) string {
-	for _, line := range strings.Split(output, "\n") {
-		trimmed := strings.TrimSpace(line)
-		if !strings.HasPrefix(trimmed, "subnqn:") {
-			continue
-		}
-		// SplitN limit=2 preserves colons in the NQN itself.
-		parts := strings.SplitN(trimmed, ":", 2)
-		if len(parts) != 2 {
-			continue
-		}
-		nqn := strings.TrimSpace(parts[1])
-		if nqn == "" || nqn == nvmeDiscoveryNqn {
-			continue
-		}
-		return nqn
-	}
-	return ""
-}
-
-
-// NVMe-oF Discovery Log Page Constants based on NVMe Spec 1.4+
-const (
-	nvmeDiscoveryNqn = "nqn.2014-08.org.nvmexpress.discovery"
-	recordSize       = 1024 // Each discovery log entry is exactly 1024 bytes
-)
-
 // NVMe Discovery Log Page Entry Header Structure
 type nvmeDiscoveryLogEntry struct {
 	Trtype      uint8     `header:"trtype"`      // Transport type (e.g., 2 for FC)
@@ -544,6 +516,8 @@ type nvmeDiscoveryLogEntry struct {
 	Tsas        [256]byte `header:"tsas"`        // Transport Specific Address Subtype
 }
 
+// parseSubNqnFromDiscoverOutput extracts the storage subsystem NQN from "nvme discover" output.
+// Skips the discovery controller NQN (nqn.2014-08.org.nvmexpress.discovery).
 func parseSubNqnFromDiscoverOutput(output string) string {
 	rawBytes := []byte(output)
 	if len(rawBytes) < 16 { // Ensure header preamble minimum exists
