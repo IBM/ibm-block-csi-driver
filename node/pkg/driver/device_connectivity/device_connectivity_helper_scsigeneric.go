@@ -3492,42 +3492,62 @@ func (o GetDmsPathHelperGeneric) getSlaveCount(path string) int {
 //}
 
 func (o GetDmsPathHelperGeneric) performDiscovery(volumeWWID []string) (string, error) {
-	normalizedWWID := make([]string, len(volumeWWID))
-
-	for i, wwid := range volumeWWID {
-		// TODO is this normalization safe
-		clean := strings.ReplaceAll(wwid, "-", "")
-		normalizedWWID[i] = strings.ToLower(clean)
+	if len(volumeWWID) < 2 {
+		return "", fmt.Errorf("insufficient identifiers provided: expected [scsi_id, nvme_id]")
 	}
 
-	// 1. STRATEGY A: DM-Multipath (SCSI or NVMe via DM)
-	// Check udev shortcut first (O(1))
+	// Corrected Index Alignment
+	scsiID := strings.ToLower(strings.ReplaceAll(volumeWWID[0], "-", "")) // Index 0 = SCSI
+	nvmeID := strings.ToLower(strings.ReplaceAll(volumeWWID[1], "-", "")) // Index 1 = NVMe
 
-	dmPath := fmt.Sprintf("/dev/disk/by-id/dm-uuid-mpath-%s", normalizedWWID[0])
-	if dev, err := o.verifyDevice(dmPath); err == nil {
+	// =========================================================================
+	// STRATEGY A: DM-Multipath (SCSI or NVMe-over-DM)
+	// =========================================================================
+	
+	// Check standard SCSI multipath device node (Uses SCSI ID)
+	dmScsiPath := fmt.Sprintf("/dev/disk/by-id/dm-uuid-mpath-%s", scsiID)
+	if dev, err := o.verifyDevice(dmScsiPath); err == nil {
 		return dev, nil
 	}
 
-	// 2. STRATEGY B: Native NVMe (NVMe-oF / TCP / RDMA)
-	// Check udev shortcut: /dev/disk/by-id/nvme-<uuid>
-	nvmePath := fmt.Sprintf("/dev/disk/by-id/nvme-%s", normalizedWWID[1])
-	if dev, err := o.verifyDevice(nvmePath); err == nil {
+	// Check NVMe managed by DM-multipath (nvme_core.multipath=N) (Uses NVMe ID)
+	dmNvmePath := fmt.Sprintf("/dev/disk/by-id/dm-uuid-mpath-nvme-%s", nvmeID)
+	if dev, err := o.verifyDevice(dmNvmePath); err == nil {
 		return dev, nil
 	}
 
-	// Fallback: Scan DM list in sysfs (O(N_dm))
-	// Catches cases where udev is slow or stale
-	if dev, err := o.scanDMSubsystem(normalizedWWID[0]); err == nil {
+	// =========================================================================
+	// STRATEGY B: Native Kernel NVMe Multipathing (ANA)
+	// =========================================================================
+	
+	// Native NVMe links use the raw NVMe ID string directly (Uses NVMe ID)
+	nvmeNativePath := fmt.Sprintf("/dev/disk/by-id/nvme-%s", nvmeID)
+	if dev, err := o.verifyDevice(nvmeNativePath); err == nil {
 		return dev, nil
 	}
 
-	// Fallback: Scan NVMe subsystems (O(N_nvme))
-	if dev, err := o.scanNVMeSubsystem(normalizedWWID[1]); err == nil {
+	// =========================================================================
+	// FALLBACKS: Exhaustive Sysfs Sweeps (Catches slow/stale udev layers)
+	// =========================================================================
+	
+	// Fallback Scan for Device Mapper layer entries (Checks SCSI ID)
+	if dev, err := o.scanDMSubsystem(scsiID); err == nil {
 		return dev, nil
 	}
 
-	return "", fmt.Errorf("device with WWID %s not found after exhaustive scan", volumeWWID)
+	// Secondary Fallback Scan for Device Mapper using NVMe ID (if mapped as NVMe DM)
+	if dev, err := o.scanDMSubsystem(nvmeID); err == nil {
+		return dev, nil
+	}
+
+	// Fallback Scan for Native NVMe paths (Checks NVMe ID)
+	if dev, err := o.scanNVMeSubsystem(nvmeID); err == nil {
+		return dev, nil
+	}
+
+	return "", fmt.Errorf("block device not found after exhaustive scan routines")
 }
+
 
 // verifyDevice ensures the link exists and returns the canonical path
 func (o GetDmsPathHelperGeneric) verifyDevice(path string) (string, error) {
@@ -3542,16 +3562,17 @@ func (o GetDmsPathHelperGeneric) verifyDevice(path string) (string, error) {
 	return realPath, nil
 }
 
-// scanDMSubsystem finds the DM device using robust normalization.
 func (o GetDmsPathHelperGeneric) scanDMSubsystem(targetID string) (string, error) {
-	// 1. Glob all DM UUIDs
 	matches, err := filepath.Glob("/sys/block/dm-*/dm/uuid")
 	if err != nil {
-		logger.Warning("No matches")
+		logger.Warningf("NVMe-oFC scanDMSubsystem: failed to glob DM uuids: %v", err)
 		return "", err
 	}
 
+	// Ensure the search target is perfectly clean, uniform, and lowercase
 	target := normalizeWWID(targetID)
+	
+	target := strings.ToLower(strings.ReplaceAll(targetID, "-", ""))
 	logger.Debugf("Scanning DM subsystem for target: %s", target)
 
 	for _, m := range matches {
@@ -3561,23 +3582,26 @@ func (o GetDmsPathHelperGeneric) scanDMSubsystem(targetID string) (string, error
 			continue
 		}
 
-		// 2. Normalize the content (strips 'mpath-', 'uuid-', whitespace, and lowercase)
+		// Normalize raw sysfs content to a clean, lowercase comparative baseline
 		foundUUID := normalizeWWID(string(content))
 		
 		logger.Warningf("found file %s", foundUUID)
-		
-		if foundUUID == target {
-			// 3. Extract 'dm-X' from /sys/block/dm-X/dm/uuid
-			// We go up two levels from the file to get the block device folder
+
+
+		// Robust Evaluation: Match if the string contains or explicitly equals our target ID.
+		// This safely handles "mpath-<scsi_id>", "mpath-nvme-<nvme_id>", or "part1-mpath-..."
+		if foundUUID == target || strings.Contains(foundUUID, target) {
 			parts := strings.Split(m, "/")
 			if len(parts) < 4 {
 				continue
 			}
-
-			// Safely get 'dm-X' regardless of path depth
+		
+			
+			// Safely extract 'dm-X' by jumping up two directory levels from the matching file node
 			dmName := filepath.Base(filepath.Dir(filepath.Dir(m)))
 			devPath := filepath.Join("/dev", dmName)
-			logger.Warningf("Found DM match: %s for WWID %s", devPath, targetID)
+			
+			logger.Infof("Found DM match: %s for WWID %s (sysfs uuid: %s)", devPath, targetID, rawUUID)
 			return devPath, nil
 		}
 	}
@@ -3587,48 +3611,37 @@ func (o GetDmsPathHelperGeneric) scanDMSubsystem(targetID string) (string, error
 
 
 func (o GetDmsPathHelperGeneric) scanNVMeSubsystem(targetID string) (string, error) {
-	// Find all namespaces (n1, n2...)
 	matches, _ := filepath.Glob("/sys/block/nvme*n*")
-	target := normalizeWWID(targetID)
+	
+	// Ensure our search target is perfectly uniform, lowercase, and clean
+	target := strings.ToLower(strings.ReplaceAll(targetID, "-", ""))
 
 	for _, m := range matches {
-		var foundID string
-		// 1. Check NGUID (FlashSystem/SVC standard) then UUID
-		if data, err := os.ReadFile(filepath.Join(m, "nguid")); err == nil {
-			foundID = normalizeWWID(string(data))
-		}
-		if foundID != target {
-			if data, err := os.ReadFile(filepath.Join(m, "uuid")); err == nil {
-				foundID = normalizeWWID(string(data))
+		name := filepath.Base(m)
+		
+		// 1. Skip hidden path allocation structures when native multipath is active
+		if data, err := os.ReadFile(filepath.Join(m, "hidden")); err == nil {
+			if strings.TrimSpace(string(data)) == "1" {
+				continue 
 			}
 		}
 
-		if foundID == target {
-			name := filepath.Base(m)
-			// 2. CHECK: Is this a "Private Path" or the "Multipath Head"?
-			// If 'subsystem' folder exists and name is 'nvmeXnY', it's likely a path.
-			// Native Multipath heads are usually named 'nvme-subsysXnY'
-			if !strings.Contains(name, "subsys") {
-				// This is a private path (e.g. nvme0n1). 
-				// Find the head (e.g. nvme-subsys0n1) so we return the multipath device.
-				if link, err := os.Readlink(filepath.Join(m, "subsystem")); err == nil {
-					// The subsystem link points to /sys/class/nvme-subsystem/nvme-subsys0
-					// We append the namespace suffix 'n1' to the subsys name
-					subsysName := filepath.Base(link)
-					nsSuffix := name[strings.LastIndex(name, "n"):] // e.g. "n1"
-					headDevice := subsysName + nsSuffix
-					
-					if _, err := os.Stat(filepath.Join("/dev", headDevice)); err == nil {
-						return filepath.Join("/dev", headDevice), nil
-					}
+		// 2. Direct Evaluation: targetID is strictly an NGUID, so only read the nguid file
+		if data, err := os.ReadFile(filepath.Join(m, "nguid")); err == nil {
+			foundID := strings.ToLower(strings.TrimSpace(strings.ReplaceAll(string(data), "-", "")))
+			
+			// 3. Verify match and return the active Multipath Head handle directly
+			if foundID == target {
+				devPath := filepath.Join("/dev", name)
+				if _, err := os.Stat(devPath); err == nil {
+					return devPath, nil
 				}
 			}
-			return filepath.Join("/dev", name), nil
 		}
 	}
-	return "", fmt.Errorf("nvme device not found")
+	
+	return "", fmt.Errorf("matching operational NVMe device handle not found in sysfs for NGUID %s", targetID)
 }
-
 
 func (o GetDmsPathHelperGeneric) getWWIDByDevName(devName string) (string, error) {
 	// Modern Linux kernels (4.x+) expose the WWID in sysfs for SCSI devices
