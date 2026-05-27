@@ -3348,6 +3348,7 @@ func (o GetDmsPathHelperGeneric) getSlaveCount(path string) int {
 	return 1
 }
 
+/*
 func (o GetDmsPathHelperGeneric) getSlaveCount(path string) int {
 	name := filepath.Base(path)
 
@@ -3448,7 +3449,7 @@ func (o GetDmsPathHelperGeneric) getSlaveCount(path string) int {
 
 	return 1
 }
-
+*/
 
 //func (o GetDmsPathHelperGeneric) validateAndSettle(ctx context.Context, path string) (string, error) {
 //	// REQUIREMENT 8: Respect CSI Context
@@ -3573,7 +3574,6 @@ func (o GetDmsPathHelperGeneric) scanDMSubsystem(targetID string) (string, error
 	// Ensure the search target is perfectly clean, uniform, and lowercase
 	target := normalizeWWID(targetID)
 	
-	target := strings.ToLower(strings.ReplaceAll(targetID, "-", ""))
 	logger.Debugf("Scanning DM subsystem for target: %s", target)
 
 	for _, m := range matches {
@@ -3602,7 +3602,7 @@ func (o GetDmsPathHelperGeneric) scanDMSubsystem(targetID string) (string, error
 			dmName := filepath.Base(filepath.Dir(filepath.Dir(m)))
 			devPath := filepath.Join("/dev", dmName)
 			
-			logger.Infof("Found DM match: %s for WWID %s (sysfs uuid: %s)", devPath, targetID, rawUUID)
+			logger.Infof("Found DM match: %s for WWID %s (sysfs uuid: %s)", devPath, targetID, foundUUID)
 			return devPath, nil
 		}
 	}
