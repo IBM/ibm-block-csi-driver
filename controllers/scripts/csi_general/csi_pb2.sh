@@ -2,7 +2,7 @@
 set -x
 
 CSI_VERSION="v1.12.0"
-ADDONS_VERSION="v0.2.0"
+ADDONS_VERSION="main"
 VG_VERSION="main"
 PB2_DIR="csi_general"
 

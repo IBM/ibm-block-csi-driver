@@ -1,7 +1,7 @@
 from collections import defaultdict
 from io import StringIO
 from random import choice, randint
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 import os
 from packaging.version import Version
@@ -18,7 +18,9 @@ from controllers.array_action.registration_cache import SVC_REGISTRATION_CACHE
 from controllers.array_action import svc_messages
 import controllers.servers.settings as controller_settings
 from controllers.servers.csi.decorators import register_csi_plugin
-from controllers.array_action.array_action_types import Volume, Snapshot, Replication, Host, VolumeGroup, ThinVolume
+from controllers.array_action.array_action_types import (Volume, Snapshot, Replication, Host,
+                                                         VolumeGroup, ThinVolume, ReplicationInfo,
+                                                         ReplicationStatus)
 from controllers.array_action.array_mediator_abstract import ArrayMediatorAbstract
 from controllers.array_action.utils import ClassProperty, convert_scsi_id_to_nguid
 from controllers.array_action.volume_group_interface import VolumeGroupInterface
@@ -1777,6 +1779,79 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
             location_attr_name = f"location{replication_local_location}_replication_mode"
 
         return getattr(volume_group_replication, location_attr_name, None)
+
+    @staticmethod
+    def _getattr_as_str(obj, attr, default=array_settings.UNKNOWN):
+        value = getattr(obj, attr, None)
+
+        if value is None:
+            return default
+
+        value = str(value).strip()
+        return value or default
+
+    @staticmethod
+    def _map_dr_link_status_to_proto_status(dr_link_status):
+        if dr_link_status in array_settings.HEALTHY_DR_LINK_STATES:
+            return ReplicationStatus.HEALTHY
+        if dr_link_status in array_settings.DEGRADED_DR_LINK_STATES:
+            return ReplicationStatus.DEGRADED
+        if dr_link_status in array_settings.FAILED_DR_LINK_STATES:
+            return ReplicationStatus.ERROR
+        return ReplicationStatus.UNKNOWN
+
+    def _get_recovery_location_index(self, vg_replication):
+        partition_name = self._getattr_as_str(vg_replication, 'partition_name', '')
+
+        if partition_name:
+            recovery_idx = '3'
+            logger.info("Partition VG (partition_name='{}') -> "
+                        "DR location = '{}'".format(partition_name, recovery_idx))
+        else:
+            recovery_idx = '2'
+            logger.info("Non-partition VG -> DR location = '{}'".format(recovery_idx))
+
+        return recovery_idx
+
+    def _build_replication_status_message(self, vg_replication, recovery_loc_idx, dr_link_status):
+        remote_name = self._getattr_as_str(vg_replication, 'location{}_system_name'.format(recovery_loc_idx))
+        remote_role = self._getattr_as_str(vg_replication, 'location{}_replication_mode'.format(recovery_loc_idx))
+        remote_status = self._getattr_as_str(vg_replication, 'location{}_status'.format(recovery_loc_idx))
+        within_rpo = self._getattr_as_str(vg_replication, 'location{}_within_rpo'.format(recovery_loc_idx))
+
+        return svc_messages.REPLICATION_STATUS_MESSAGE.format(
+            dr_link_status, remote_name, remote_role, remote_status, within_rpo
+        )
+
+    def _build_replication_info(self, vg_replication):
+        recovery_loc_idx = self._get_recovery_location_index(vg_replication)
+
+        # NOTE: For now we have not decided field from storage to be populated into last_sync_time
+        # until then using current time
+        last_sync_time = datetime.now(timezone.utc)
+
+        dr_link_status = self._getattr_as_str(vg_replication, 'dr_link_status', array_settings.UNKNOWN)
+        proto_status = self._map_dr_link_status_to_proto_status(dr_link_status)
+        dr_status_message = self._build_replication_status_message(vg_replication, recovery_loc_idx, dr_link_status)
+
+        return ReplicationInfo(
+            last_sync_time=last_sync_time,
+            replication_status=proto_status,
+            status_message=dr_status_message
+        )
+
+    def get_last_async_snapshot_info(self, volume_group_id):
+        logger.info("get_last_async_snapshot_info: called for volume_group_id='{}'".format(volume_group_id))
+
+        vg_replication = self._lsvolumegroupreplication(volume_group_id)
+        if not vg_replication:
+            logger.error(
+                "No replication record found for "
+                "volume_group_id='{}'".format(volume_group_id)
+            )
+            raise array_errors.ObjectNotFoundError(volume_group_id)
+
+        return self._build_replication_info(vg_replication)
 
     def _get_replication_policy(self, volume_group_id):
         volume_group_replication = self._lsvolumegroupreplication(volume_group_id)

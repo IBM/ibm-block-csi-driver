@@ -1,6 +1,7 @@
 import grpc
 from csi_general import replication_pb2 as pb2
 from csi_general import replication_pb2_grpc as pb2_grpc
+from google.protobuf.timestamp_pb2 import Timestamp
 
 import controllers.servers.settings as servers_settings
 import controllers.array_action.settings as array_settings
@@ -8,7 +9,7 @@ from controllers.array_action import errors as array_errors
 from controllers.array_action.storage_agent import get_agent
 from controllers.common.csi_logger import get_stdout_logger
 from controllers.servers import utils
-from controllers.servers.csi.decorators import csi_method
+from controllers.servers.csi.decorators import csi_method, csi_replication_method
 from controllers.servers.csi.exception_handler import build_error_response
 
 logger = get_stdout_logger()
@@ -195,3 +196,49 @@ class ReplicationControllerServicer(pb2_grpc.ControllerServicer):
         # TODO function name misleading - checks partition_name attribute, not necessarily volume
         mediator.verify_volume_partition(replication_object, array_connection_info.partition_name)
         return replication_object
+
+    @csi_replication_method(error_response_type=pb2.GetVolumeReplicationInfoResponse)
+    def GetVolumeReplicationInfo(self, request, context):
+        logger.info("GetVolumeReplicationInfo: called with replication_source='{}'".format(request.replication_source))
+
+        object_type, object_id_info = utils.get_replication_object_type_and_id_info(request)
+        object_id = object_id_info.ids.internal_id
+
+        utils.validate_secrets(request.secrets)
+
+        if object_type != servers_settings.VOLUME_GROUP_TYPE_NAME:
+            logger.warning(
+                "GetVolumeReplicationInfo is only supported for EAR (VolumeGroup level). "
+                "Returning empty response for object_type='{}'".format(object_type)
+            )
+            return pb2.GetVolumeReplicationInfoResponse()
+
+        connection_info = utils.get_array_connection_info_from_secrets(request.secrets)
+
+        with get_agent(connection_info, object_id_info.array_type).get_mediator() as mediator:
+            replication_info = mediator.get_last_async_snapshot_info(object_id)
+
+        response = pb2.GetVolumeReplicationInfoResponse()
+
+        if replication_info.last_sync_time is not None:
+            ts_seconds = int(replication_info.last_sync_time.timestamp())
+            response.last_sync_time.CopyFrom(Timestamp(seconds=ts_seconds, nanos=0))
+        else:
+            # NOTE: For now, I have intentionally kept Timestamp(0, 0) when last_sync_time is not available,
+            # so it is easy to detect and verify case for debugging where storage returns an empty value.
+            # This corresponds to 1970-01-01T00:00:00Z (Unix time starting point).
+            response.last_sync_time.CopyFrom(Timestamp(seconds=0, nanos=0))
+            logger.warning("last_sync_time not available at storage, Setting to default timestamp (0).")
+
+        response.status = replication_info.replication_status
+        response.status_message = replication_info.status_message or ''
+
+        logger.info(
+            "GetVolumeReplicationInfo: returning response last_sync_time.seconds={}, "
+            "status={}, status_message='{}'".format(
+                response.last_sync_time.seconds,
+                response.status,
+                response.status_message
+            )
+        )
+        return response
