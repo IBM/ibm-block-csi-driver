@@ -2190,11 +2190,72 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
         endpoint_type_to_promote = self._get_replication_other_endpoint_type(rcrelationship)
         self._ensure_endpoint_is_primary(rcrelationship, endpoint_type_to_promote)
 
-    def _demote_ear_replication_volume(self):
+    def _demote_ear_replication_volume(self, volume_group_id):
+        """
+        Demote an EAR replication volume by transitioning from production to recovery mode.
+        
+        Steps:
+        1. Verify EAR replication support
+        2. Get current replication mode
+        3. If production mode, transition to independent
+        4. Take a checkpoint to initiate sync
+        5. Poll checkpoint_achieved status until sync completes
+        6. Once checkpoint_achieved='yes', transition to recovery mode
+        """
         if not self._is_earreplication_supported():
             logger.info("EAR replication is not supported on the existing storage")
             return
-        logger.info("Demote volume is not supported in the current version")
+        
+        current_mode = self._get_replication_mode(volume_group_id)
+        
+        # Step 1: Transition from production to independent if needed
+        if current_mode == array_settings.ENDPOINT_TYPE_PRODUCTION:
+            cli_kwargs = {'mode': array_settings.ENDPOINT_TYPE_INDEPENDENT}
+            logger.info("Changing the local volume group from production to independent copy")
+            self._chvolumegroupreplication(volume_group_id, **cli_kwargs)
+            current_mode = array_settings.ENDPOINT_TYPE_INDEPENDENT
+        
+        # Step 2: Take checkpoint and wait for sync completion
+        if current_mode == array_settings.ENDPOINT_TYPE_INDEPENDENT:
+            logger.info("Taking checkpoint to initiate synchronization")
+            
+            # Take checkpoint (this will trigger sync between SVC1 and SVC2)
+            checkpoint_kwargs = {'checkpoint': 'yes'}
+            self._chvolumegroupreplication(volume_group_id, **checkpoint_kwargs)
+            
+            # Poll for checkpoint_achieved status
+            max_retries = 60  # 5 minutes with 5-second intervals
+            retry_interval = 5
+            checkpoint_achieved = False
+            
+            for attempt in range(max_retries):
+                volume_group_replication = self._lsvolumegroupreplication(volume_group_id)
+                
+                if volume_group_replication and hasattr(volume_group_replication, 'checkpoint_achieved'):
+                    if volume_group_replication.checkpoint_achieved == 'yes':
+                        logger.info("Checkpoint achieved - synchronization complete")
+                        checkpoint_achieved = True
+                        break
+                    else:
+                        logger.debug(f"Checkpoint not yet achieved (attempt {attempt + 1}/{max_retries})")
+                
+                if attempt < max_retries - 1:
+                    import time
+                    time.sleep(retry_interval)
+            
+            if not checkpoint_achieved:
+                logger.warning("Checkpoint not achieved within timeout - sync may still be in progress")
+                raise array_errors.InvalidArgumentError(
+                    f"Checkpoint synchronization did not complete within {max_retries * retry_interval} seconds"
+                )
+            
+            # Step 3: Transition from independent to recovery
+            cli_kwargs = {'mode': array_settings.ENDPOINT_TYPE_RECOVERY}
+            logger.info("Changing the local volume group from independent to recovery copy")
+            self._chvolumegroupreplication(volume_group_id, **cli_kwargs)
+        else:
+            logger.info(f"Cannot demote - volume group is in {current_mode} mode, expected production or independent")
+
 
     def _get_host_name_if_equal(self, nvme_host, fc_host, iscsi_host):
         unique_names = {nvme_host, iscsi_host, fc_host}
