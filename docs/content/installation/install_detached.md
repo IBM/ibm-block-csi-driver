@@ -100,10 +100,10 @@ The IBM Block CSI Driver itself uses the following container images:
 * ```registry.k8s.io/sig-storage/livenessprobe:v2.16.0```
 * ```quay.io/ibmcsiblock/csi-block-volumereplication-operator:v0.9.3```
 * ```quay.io/ibmcsiblock/csi-volume-group-operator:v0.9.3```
-* ```quay.io/ibmcsiblock/ibm-block-csi-host-definer-amd64:1.13.0```
-* ```quay.io/ibmcsiblock/ibm-block-csi-operator-amd64:1.13.0 ```
-* ```quay.io/ibmcsiblock/ibm-block-csi-driver-controller-amd64:1.13.0```
-* ```quay.io/ibmcsiblock/ibm-block-csi-driver-node-amd64:1.13.0```
+* ```quay.io/ibmcsiblock/ibm-block-csi-host-definer-amd64:1.13.2```
+* ```quay.io/ibmcsiblock/ibm-block-csi-operator-amd64:1.13.2 ```
+* ```quay.io/ibmcsiblock/ibm-block-csi-driver-controller-amd64:1.13.2```
+* ```quay.io/ibmcsiblock/ibm-block-csi-driver-node-amd64:1.13.2```
 
 All the images above must be copied to your private registry using ```skopeo```.<br>
 

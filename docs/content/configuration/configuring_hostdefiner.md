@@ -11,7 +11,7 @@ The old way, of adding the parameters in the hostdefiner yaml is obsolete!{: imp
 
 The config map should be created in the same namespace as the hostdefiner pod.
 
-Because the configuration is saved in a config map - it can, and should, be defined even before the upgrade to 1.13.0
+Because the configuration is saved in a config map - it can, and should, be defined even before the upgrade to 1.13.0 or above
 
 If not created before upgrade or installation, for the configuration changes to take effect, the host definer must be restarted (by deleting the hostdefiner pod).
 
@@ -88,7 +88,7 @@ Get the config changes from existing hostdefiner pod:
 ```
 kubectl get pod host-definer-hostdefiner-xxxxxxxxxx-xxxxx -o yaml
 ```
-in metadata.annotations.kubectl.kubernetes.io/last-applied-configuration, you'll be able to search for all the values mentioned in the above table. If they appear there, and are not the default (as specified in the above table), you should create a configmap for them prior to upgrading to 1.13.0.
+in metadata.annotations.kubectl.kubernetes.io/last-applied-configuration, you'll be able to search for all the values mentioned in the above table. If they appear there, and are not the default (as specified in the above table), you should create a configmap for them prior to upgrading to 1.13.0 or above.
 
 For example, if this part looks like this:
 ```
