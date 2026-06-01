@@ -517,6 +517,9 @@ class XIVArrayMediator(ArrayMediatorAbstract):
     def get_replication(self, replication_request):
         raise NotImplementedError
 
+    def get_last_async_snapshot_info(self, volume_group_id):
+        raise NotImplementedError
+
     def create_replication(self, replication_request):
         raise NotImplementedError
 
