@@ -2214,7 +2214,7 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
         
         # Poll for checkpoint_achieved='yes' with 120-second timeout
         timeout = 120  # 2 minutes
-        sleep_interval = 2  # 2 seconds
+        sleep_interval = 5  # 5 seconds
         
         while checkpoint_achieved != 'yes' and timeout > 0:
             time.sleep(sleep_interval)

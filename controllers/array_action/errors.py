@@ -339,3 +339,9 @@ class AsyncDRReplicationPolicyNotFoundError(BaseArrayActionException):
         super().__init__()
         self.message = messages.ASYNC_DR_REPLICATION_POLICY_NOT_FOUND_MESSAGE.format(
             requested_policy_name, volume_group_id)
+
+class OperationTimeoutError(BaseArrayActionException):
+
+    def __init__(self, operation_details):
+        super().__init__()
+        self.message = messages.OPERATION_TIMEOUT_ERROR_MESSAGE.format(operation_details)
