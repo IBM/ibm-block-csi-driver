@@ -2185,9 +2185,7 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
         if replication.replication_type == array_settings.REPLICATION_TYPE_MIRROR:
             self._demote_replication_volume(replication.name)
         elif replication.replication_type == array_settings.REPLICATION_TYPE_EAR:
-            error_code = self._demote_ear_replication_volume(replication.volume_group_id)
-            if error_code == grpc.StatusCode.ABORTED:
-                raise array_errors.OperationAbortedError(f"Checkpoint not achieved for volume group {replication.volume_group_id}")
+            self._demote_ear_replication_volume(replication.volume_group_id)
 
     def _demote_replication_volume(self, replication_name):
         rcrelationship = self._get_rcrelationship_by_name(replication_name)
@@ -2225,7 +2223,7 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
         if checkpoint_achieved != 'yes':
             error_msg = f"Demote failed for volume group {volume_group_id}: checkpoint not achieved"
             logger.error(error_msg)
-            return grpc.StatusCode.ABORTED
+            raise array_errors.OperationAbortedError(error_msg)
         logger.info(f"Successfully demoted volume group {volume_group_id}")
 
 
