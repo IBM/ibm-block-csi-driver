@@ -3,7 +3,6 @@ from io import StringIO
 from random import choice, randint
 from datetime import datetime, timedelta, timezone
 import time
-import grpc
 
 import os
 from packaging.version import Version
