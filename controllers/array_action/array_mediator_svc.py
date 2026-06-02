@@ -2194,16 +2194,23 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
 
     def _demote_ear_replication_volume(self, volume_group_id):
         """
-        Demote an EAR replication volume by checking checkpoint synchronization status.
-        
-        Checks the volume group replication checkpoint status and returns "ABORTED"
-        if checkpoint is not achieved.
+        Demote an EAR replication volume by creating and verifying checkpoint synchronization.
+
+        Creates a checkpoint and verifies it's achieved. Raises OperationAbortedError
+        if checkpoint is not achieved (retryable condition).
+
+        Args:
+            volume_group_id: The ID of the volume group to demote
+
+        Raises:
+            ObjectNotFoundError: If volume group replication not found
+            OperationAbortedError: If checkpoint is not achieved after creation
         """
         if not self._is_earreplication_supported():
             logger.info("EAR replication is not supported on the existing storage")
             return
         
-        # Get checkpoint status
+        # Validate volume group exists
         volume_group_replication = self._lsvolumegroupreplication(volume_group_id)
         if not volume_group_replication:
             logger.error(f"Volume group replication not found for {volume_group_id}")
