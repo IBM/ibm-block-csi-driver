@@ -2219,18 +2219,21 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
         checkpoint_achieved = getattr(volume_group_replication, 'checkpoint_achieved', 'no')
         logger.info(f"Checkpoint status for volume group {volume_group_id}: {checkpoint_achieved}")
 
-        cli_kwargs = {}
-        cli_kwargs['checkpoint'] = array_settings.CHECKPOINT
-        logger.info("Creating checkpoint for volume group {volume_group_id}, waiting for replication to complete")
+        # Create checkpoint
+        cli_kwargs = {'checkpoint': array_settings.CHECKPOINT}
+        logger.info(f"Creating checkpoint for volume group {volume_group_id}, waiting for replication to complete")
         self._chvolumegroupreplication(volume_group_id, **cli_kwargs)
         time.sleep(2)
 
+        # Re-fetch to get updated checkpoint status
+        volume_group_replication = self._lsvolumegroupreplication(volume_group_id)
         checkpoint_achieved = getattr(volume_group_replication, 'checkpoint_achieved', 'no')
 
         if checkpoint_achieved != 'yes':
             error_msg = f"Demote failed for volume group {volume_group_id}: checkpoint not achieved"
             logger.error(error_msg)
             raise array_errors.OperationAbortedError(error_msg)
+        
         logger.info(f"Successfully demoted volume group {volume_group_id}")
 
 
