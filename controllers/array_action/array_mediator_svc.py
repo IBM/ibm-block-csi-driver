@@ -2183,11 +2183,9 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
         if replication.replication_type == array_settings.REPLICATION_TYPE_MIRROR:
             self._demote_replication_volume(replication.name)
         elif replication.replication_type == array_settings.REPLICATION_TYPE_EAR:
-            error_code: self._demote_ear_replication_volume(replication.volume_group_id)
-            if error_code != "ABORTED":
-                raise array_errors.DemoteReplicationError(error_code)
-        else:
-            raise array_errors.UnsupportedReplicationType(replication.replication_type)
+            error_code = self._demote_ear_replication_volume(replication.volume_group_id)
+            if error_code == "ABORTED":
+                raise array_errors.OperationAbortedError(f"Checkpoint not achieved for volume group {replication.volume_group_id}")
 
     def _demote_replication_volume(self, replication_name):
         rcrelationship = self._get_rcrelationship_by_name(replication_name)
