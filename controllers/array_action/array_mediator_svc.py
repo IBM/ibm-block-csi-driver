@@ -2183,7 +2183,11 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
         if replication.replication_type == array_settings.REPLICATION_TYPE_MIRROR:
             self._demote_replication_volume(replication.name)
         elif replication.replication_type == array_settings.REPLICATION_TYPE_EAR:
-            self._demote_ear_replication_volume(replication.volume_group_id)
+            error_code: self._demote_ear_replication_volume(replication.volume_group_id)
+            if error_code != "ABORTED":
+                raise array_errors.DemoteReplicationError(error_code)
+        else:
+            raise array_errors.UnsupportedReplicationType(replication.replication_type)
 
     def _demote_replication_volume(self, replication_name):
         rcrelationship = self._get_rcrelationship_by_name(replication_name)
@@ -2192,49 +2196,28 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
 
     def _demote_ear_replication_volume(self, volume_group_id):
         """
-        Demote an EAR replication volume by waiting for checkpoint synchronization.
+        Demote an EAR replication volume by checking checkpoint synchronization status.
         
-        Polls the volume group replication checkpoint status until it achieves 'yes'
-        or timeout occurs (120 seconds).
+        Checks the volume group replication checkpoint status and returns "ABORTED"
+        if checkpoint is not achieved.
         """
         if not self._is_earreplication_supported():
             logger.info("EAR replication is not supported on the existing storage")
             return
         
-        import time
-        
-        # Get initial checkpoint status
+        # Get checkpoint status
         volume_group_replication = self._lsvolumegroupreplication(volume_group_id)
         if not volume_group_replication:
             logger.error(f"Volume group replication not found for {volume_group_id}")
             raise array_errors.ObjectNotFoundError(volume_group_id)
         
         checkpoint_achieved = getattr(volume_group_replication, 'checkpoint_achieved', 'no')
-        logger.info(f"Initial checkpoint status for volume group {volume_group_id}: {checkpoint_achieved}")
+        logger.info(f"Checkpoint status for volume group {volume_group_id}: {checkpoint_achieved}")
         
-        # Poll for checkpoint_achieved='yes' with 120-second timeout
-        timeout = 120  # 2 minutes
-        sleep_interval = 5  # 5 seconds
-        
-        while checkpoint_achieved != 'yes' and timeout > 0:
-            time.sleep(sleep_interval)
-            
-            volume_group_replication = self._lsvolumegroupreplication(volume_group_id)
-            if volume_group_replication:
-                checkpoint_achieved = getattr(volume_group_replication, 'checkpoint_achieved', 'no')
-                logger.debug(f"Checkpoint status: {checkpoint_achieved}, remaining timeout: {timeout}s")
-            
-            if checkpoint_achieved == 'yes':
-                logger.info(f"Checkpoint achieved for volume group {volume_group_id}")
-                break
-            
-            timeout -= sleep_interval
-        
-        # Check final status
-        if timeout <= 0 and checkpoint_achieved != 'yes':
-            error_msg = f"Demote failed for volume group {volume_group_id}: checkpoint not achieved within timeout"
+        if checkpoint_achieved != 'yes':
+            error_msg = f"Demote failed for volume group {volume_group_id}: checkpoint not achieved"
             logger.error(error_msg)
-            raise array_errors.OperationTimeoutError(error_msg)
+            return "ABORTED"
         
         logger.info(f"Successfully demoted volume group {volume_group_id}")
 
