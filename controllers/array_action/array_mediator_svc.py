@@ -2,6 +2,8 @@ from collections import defaultdict
 from io import StringIO
 from random import choice, randint
 from datetime import datetime, timedelta, timezone
+import time
+import grpc
 
 import os
 from packaging.version import Version
@@ -2211,12 +2213,19 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
         
         checkpoint_achieved = getattr(volume_group_replication, 'checkpoint_achieved', 'no')
         logger.info(f"Checkpoint status for volume group {volume_group_id}: {checkpoint_achieved}")
-        
+
+        cli_kwargs = {}
+        cli_kwargs['checkpoint'] = array_settings.CHECKPOINT
+        logger.info("Creating checkpoint for volume group {volume_group_id}, waiting for replication to complete")
+        self._chvolumegroupreplication(volume_group_id, **cli_kwargs)
+        time.sleep(2)
+
+        checkpoint_achieved = getattr(volume_group_replication, 'checkpoint_achieved', 'no')
+
         if checkpoint_achieved != 'yes':
             error_msg = f"Demote failed for volume group {volume_group_id}: checkpoint not achieved"
             logger.error(error_msg)
-            return "ABORTED"
-        
+            return grpc.StatusCode.ABORTED
         logger.info(f"Successfully demoted volume group {volume_group_id}")
 
 
