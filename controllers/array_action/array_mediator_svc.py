@@ -2192,7 +2192,10 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
         if replication.replication_type == array_settings.REPLICATION_TYPE_MIRROR:
             self._demote_replication_volume(replication.name)
         elif replication.replication_type == array_settings.REPLICATION_TYPE_EAR:
-            self._demote_ear_replication_volume(replication.volume_group_id)
+            aborted = self._demote_ear_replication_volume(replication.volume_group_name)
+            if aborted:
+                raise array_errors.OperationAbortedError(
+                    f"Checkpoint not yet achieved for volume group {replication.volume_group_name}")
 
     def _demote_replication_volume(self, replication_name):
         rcrelationship = self._get_rcrelationship_by_name(replication_name)
@@ -2210,13 +2213,16 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
         Args:
             volume_group_id: The ID of the volume group to demote
 
+        Returns:
+            bool: True if operation aborted (checkpoint not achieved, retry needed),
+                  False if successful (checkpoint achieved)
+
         Raises:
             ObjectNotFoundError: If volume group replication not found
-            OperationAbortedError: If checkpoint is not achieved (retryable condition)
         """
         if not self._is_earreplication_supported():
             logger.info("EAR replication is not supported on the existing storage")
-            return
+            return False
         
         # Validate volume group exists
         volume_group_replication = self._lsvolumegroupreplication(volume_group_id)
@@ -2229,9 +2235,8 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
             # First attempt - create checkpoint and track state
             self._demote_state_map[volume_group_id] = time.time()
 
-            cli_kwargs = {'checkpoint': array_settings.CHECKPOINT}
             logger.info(f"First demote attempt for volume group {volume_group_id}, creating checkpoint")
-            self._chvolumegroupreplication(volume_group_id, **cli_kwargs)
+            self._chvolumegroupreplication(volume_group_id, checkpoint=array_settings.CHECKPOINT)
         else:
             # Retry - checkpoint already created, just check status
             first_attempt_time = self._demote_state_map[volume_group_id]
@@ -2239,20 +2244,19 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
             logger.info(f"Retry demote for volume group {volume_group_id}, checking checkpoint status "
                        f"(elapsed time: {elapsed_time:.1f}s)")
 
-        # Check if checkpoint achieved
+        # Re-fetch after checkpoint creation (or on retry) to get current state
         volume_group_replication = self._lsvolumegroupreplication(volume_group_id)
         checkpoint_achieved = getattr(volume_group_replication, 'checkpoint_achieved', 'no')
 
         if checkpoint_achieved == 'yes':
-            # Success - clear state and return
+            # Success - clear state and return False (not aborted)
             logger.info(f"Checkpoint achieved for volume group {volume_group_id}, demote successful")
             self._demote_state_map.pop(volume_group_id, None)
-            return
+            return False
         else:
-            # Not ready yet - return retryable error
-            error_msg = f"Checkpoint not yet achieved for volume group {volume_group_id}, will retry"
-            logger.info(error_msg)
-            raise array_errors.OperationAbortedError(error_msg)
+            # Not ready yet - return True (aborted, needs retry)
+            logger.info(f"Checkpoint not yet achieved for volume group {volume_group_id}, will retry")
+            return True
 
 
     def _get_host_name_if_equal(self, nvme_host, fc_host, iscsi_host):
