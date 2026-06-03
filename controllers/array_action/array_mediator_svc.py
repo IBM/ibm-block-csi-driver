@@ -2202,7 +2202,7 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
         endpoint_type_to_promote = self._get_replication_other_endpoint_type(rcrelationship)
         self._ensure_endpoint_is_primary(rcrelationship, endpoint_type_to_promote)
 
-    def _demote_ear_replication_volume(self, volume_group_id):
+    def _demote_ear_replication_volume(self, volume_group_name):
         """
         Demote an EAR replication volume by creating and verifying checkpoint synchronization.
 
@@ -2211,7 +2211,7 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
         is achieved without creating a new one.
 
         Args:
-            volume_group_id: The ID of the volume group to demote
+            volume_group_name: The name of the volume group to demote
 
         Returns:
             bool: True if operation aborted (checkpoint not achieved, retry needed),
@@ -2225,37 +2225,37 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
             return False
         
         # Validate volume group exists
-        volume_group_replication = self._lsvolumegroupreplication(volume_group_id)
+        volume_group_replication = self._lsvolumegroupreplication(volume_group_name)
         if not volume_group_replication:
-            logger.error(f"Volume group replication not found for {volume_group_id}")
-            raise array_errors.ObjectNotFoundError(volume_group_id)
+            logger.error(f"Volume group replication not found for {volume_group_name}")
+            raise array_errors.ObjectNotFoundError(volume_group_name)
 
         # Check if this is first demote attempt or retry
-        if volume_group_id not in self._demote_state_map:
+        if volume_group_name not in self._demote_state_map:
             # First attempt - create checkpoint and track state
-            self._demote_state_map[volume_group_id] = time.time()
+            self._demote_state_map[volume_group_name] = time.time()
 
-            logger.info(f"First demote attempt for volume group {volume_group_id}, creating checkpoint")
-            self._chvolumegroupreplication(volume_group_id, checkpoint=array_settings.CHECKPOINT)
+            logger.info(f"First demote attempt for volume group {volume_group_name}, creating checkpoint")
+            self._chvolumegroupreplication(volume_group_name, checkpoint=array_settings.CHECKPOINT)
         else:
             # Retry - checkpoint already created, just check status
-            first_attempt_time = self._demote_state_map[volume_group_id]
+            first_attempt_time = self._demote_state_map[volume_group_name]
             elapsed_time = time.time() - first_attempt_time
-            logger.info(f"Retry demote for volume group {volume_group_id}, checking checkpoint status "
+            logger.info(f"Retry demote for volume group {volume_group_name}, checking checkpoint status "
                        f"(elapsed time: {elapsed_time:.1f}s)")
 
         # Re-fetch after checkpoint creation (or on retry) to get current state
-        volume_group_replication = self._lsvolumegroupreplication(volume_group_id)
+        volume_group_replication = self._lsvolumegroupreplication(volume_group_name)
         checkpoint_achieved = getattr(volume_group_replication, 'checkpoint_achieved', 'no')
 
         if checkpoint_achieved == 'yes':
             # Success - clear state and return False (not aborted)
-            logger.info(f"Checkpoint achieved for volume group {volume_group_id}, demote successful")
-            self._demote_state_map.pop(volume_group_id, None)
+            logger.info(f"Checkpoint achieved for volume group {volume_group_name}, demote successful")
+            self._demote_state_map.pop(volume_group_name, None)
             return False
         else:
             # Not ready yet - return True (aborted, needs retry)
-            logger.info(f"Checkpoint not yet achieved for volume group {volume_group_id}, will retry")
+            logger.info(f"Checkpoint not yet achieved for volume group {volume_group_name}, will retry")
             return True
 
 
