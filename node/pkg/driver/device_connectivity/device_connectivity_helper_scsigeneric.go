@@ -3577,7 +3577,7 @@ func (o GetDmsPathHelperGeneric) scanDMSubsystem(targetID string) (string, error
 	logger.Debugf("Scanning DM subsystem for target: %s", target)
 
 	for _, m := range matches {
-		logger.Warningf("check %s", m)
+		//logger.Warningf("check %s", m)
 		content, err := os.ReadFile(m)
 		if err != nil {
 			continue
@@ -3586,7 +3586,7 @@ func (o GetDmsPathHelperGeneric) scanDMSubsystem(targetID string) (string, error
 		// Normalize raw sysfs content to a clean, lowercase comparative baseline
 		foundUUID := normalizeWWID(string(content))
 		
-		logger.Warningf("found file %s", foundUUID)
+		//logger.Warningf("found file %s", foundUUID)
 
 
 		// Robust Evaluation: Match if the string contains or explicitly equals our target ID.
