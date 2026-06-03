@@ -315,6 +315,8 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
                 endpoint)
         self.endpoint = self.endpoint[0]
         self._cluster = None
+        # In-memory map to track demote operations: VG_ID -> first_demote_timestamp
+        self._demote_state_map = {}
 
         logger.debug("in init")
         self._connect()
@@ -2142,6 +2144,12 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
         if not self._is_earreplication_supported():
             logger.info("EAR replication is not supported on the existing storage")
             return
+
+        # Clear demote state if exists (handles case where K8S gave up on demote and decided to promote)
+        if volume_group_id in self._demote_state_map:
+            logger.info(f"Clearing demote state for volume group {volume_group_id} during promote")
+            self._demote_state_map.pop(volume_group_id, None)
+
         cli_kwargs = {}
         if self._get_replication_mode(volume_group_id) == array_settings.ENDPOINT_TYPE_RECOVERY:
             cli_kwargs['mode'] = array_settings.ENDPOINT_TYPE_INDEPENDENT
@@ -2195,15 +2203,16 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
         """
         Demote an EAR replication volume by creating and verifying checkpoint synchronization.
 
-        Creates a checkpoint and verifies it's achieved. Raises OperationAbortedError
-        if checkpoint is not achieved (retryable condition).
+        Uses state tracking to handle long-running checkpoint creation. On first attempt,
+        creates a checkpoint and tracks the operation. On retries, checks if checkpoint
+        is achieved without creating a new one.
 
         Args:
             volume_group_id: The ID of the volume group to demote
 
         Raises:
             ObjectNotFoundError: If volume group replication not found
-            OperationAbortedError: If checkpoint is not achieved after creation
+            OperationAbortedError: If checkpoint is not achieved (retryable condition)
         """
         if not self._is_earreplication_supported():
             logger.info("EAR replication is not supported on the existing storage")
@@ -2214,26 +2223,36 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
         if not volume_group_replication:
             logger.error(f"Volume group replication not found for {volume_group_id}")
             raise array_errors.ObjectNotFoundError(volume_group_id)
-        
-        checkpoint_achieved = getattr(volume_group_replication, 'checkpoint_achieved', 'no')
-        logger.info(f"Checkpoint status for volume group {volume_group_id}: {checkpoint_achieved}")
 
-        # Create checkpoint
-        cli_kwargs = {'checkpoint': array_settings.CHECKPOINT}
-        logger.info(f"Creating checkpoint for volume group {volume_group_id}, waiting for replication to complete")
-        self._chvolumegroupreplication(volume_group_id, **cli_kwargs)
-        time.sleep(2)
+        # Check if this is first demote attempt or retry
+        if volume_group_id not in self._demote_state_map:
+            # First attempt - create checkpoint and track state
+            self._demote_state_map[volume_group_id] = time.time()
 
-        # Re-fetch to get updated checkpoint status
+            cli_kwargs = {'checkpoint': array_settings.CHECKPOINT}
+            logger.info(f"First demote attempt for volume group {volume_group_id}, creating checkpoint")
+            self._chvolumegroupreplication(volume_group_id, **cli_kwargs)
+        else:
+            # Retry - checkpoint already created, just check status
+            first_attempt_time = self._demote_state_map[volume_group_id]
+            elapsed_time = time.time() - first_attempt_time
+            logger.info(f"Retry demote for volume group {volume_group_id}, checking checkpoint status "
+                       f"(elapsed time: {elapsed_time:.1f}s)")
+
+        # Check if checkpoint achieved
         volume_group_replication = self._lsvolumegroupreplication(volume_group_id)
         checkpoint_achieved = getattr(volume_group_replication, 'checkpoint_achieved', 'no')
 
-        if checkpoint_achieved != 'yes':
-            error_msg = f"Demote failed for volume group {volume_group_id}: checkpoint not achieved"
-            logger.error(error_msg)
+        if checkpoint_achieved == 'yes':
+            # Success - clear state and return
+            logger.info(f"Checkpoint achieved for volume group {volume_group_id}, demote successful")
+            self._demote_state_map.pop(volume_group_id, None)
+            return
+        else:
+            # Not ready yet - return retryable error
+            error_msg = f"Checkpoint not yet achieved for volume group {volume_group_id}, will retry"
+            logger.info(error_msg)
             raise array_errors.OperationAbortedError(error_msg)
-        
-        logger.info(f"Successfully demoted volume group {volume_group_id}")
 
 
     def _get_host_name_if_equal(self, nvme_host, fc_host, iscsi_host):
