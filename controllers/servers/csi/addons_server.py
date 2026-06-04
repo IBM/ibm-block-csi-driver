@@ -137,7 +137,12 @@ class ReplicationControllerServicer(pb2_grpc.ControllerServicer):
                 return build_error_response(message, context, grpc.StatusCode.FAILED_PRECONDITION, response_type)
             logger.info("found replication {} on system {}".format(replication.name, mediator.identifier))
 
-            self._ensure_volume_role_for_replication(mediator, replication, is_to_promote)
+            try:
+                self._ensure_volume_role_for_replication(mediator, replication, is_to_promote)
+            except array_errors.OperationNotReadyError as e:
+                # Checkpoint not yet achieved - return UNAVAILABLE to trigger retry
+                logger.info("Operation not ready, will be retried: {}".format(str(e)))
+                return build_error_response(str(e), context, grpc.StatusCode.UNAVAILABLE, response_type)
 
         logger.info("finished {}".format(method_name))
         return response_type()

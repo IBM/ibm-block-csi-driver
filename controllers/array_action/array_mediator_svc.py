@@ -2217,10 +2217,11 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
             volume_group_name: The name of the volume group to demote
 
         Returns:
-           None
+           None on success, or raises OperationNotReadyError if checkpoint not achieved
 
         Raises:
             ObjectNotFoundError: If volume group replication not found
+            OperationNotReadyError: If checkpoint not yet achieved (should trigger retry)
         """
         if not self._is_earreplication_supported():
             logger.info("EAR replication is not supported on the existing storage")
@@ -2251,11 +2252,12 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
         checkpoint_achieved = getattr(volume_group_replication, 'checkpoint_achieved', 'no')
 
         if checkpoint_achieved == 'yes':
-            # Success - clear state and return False (not aborted)
+            # Success - clear state and return
             logger.info(f"Checkpoint achieved for volume group {volume_group_name}, demote successful")
             self._demote_state_map.pop(volume_group_name, None)
             return
         else:
+            # Checkpoint not ready - raise error to trigger retry with UNAVAILABLE status
             logger.info(f"Checkpoint not yet achieved for volume group {volume_group_name}, will retry")
             raise array_errors.OperationNotReadyError(
                 f"Checkpoint not yet achieved for volume group {volume_group_name}")
