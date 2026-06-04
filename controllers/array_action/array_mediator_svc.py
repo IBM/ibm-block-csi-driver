@@ -2256,9 +2256,9 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
             self._demote_state_map.pop(volume_group_name, None)
             return
         else:
-            # Not ready yet - return True (aborted, needs retry)
             logger.info(f"Checkpoint not yet achieved for volume group {volume_group_name}, will retry")
-            return
+            raise array_errors.OperationNotReadyError(
+                f"Checkpoint not yet achieved for volume group {volume_group_name}")
 
     def _get_host_name_if_equal(self, nvme_host, fc_host, iscsi_host):
         unique_names = {nvme_host, iscsi_host, fc_host}

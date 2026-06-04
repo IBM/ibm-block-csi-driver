@@ -99,3 +99,5 @@ ASYNC_DR_REPLICATION_POLICY_NOT_FOUND_MESSAGE = "No async-dr replication policy 
 OPERATION_ABORTED_ERROR_MESSAGE = "Operation aborted: {0}"
 
 OPERATION_TIMEOUT_ERROR_MESSAGE = "Operation timed out: {0}"
+
+OPERATION_NOT_READY_ERROR_MESSAGE = "Operation not ready: {0}"
