@@ -2192,10 +2192,7 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
         if replication.replication_type == array_settings.REPLICATION_TYPE_MIRROR:
             self._demote_replication_volume(replication.name)
         elif replication.replication_type == array_settings.REPLICATION_TYPE_EAR:
-            aborted = self._demote_ear_replication_volume(replication.volume_group_name)
-            if aborted:
-                raise array_errors.OperationAbortedError(
-                    f"Checkpoint not yet achieved for volume group {replication.volume_group_name}")
+            self._demote_ear_replication_volume(replication.volume_group_name)
 
     def _demote_replication_volume(self, replication_name):
         rcrelationship = self._get_rcrelationship_by_name(replication_name)
@@ -2214,15 +2211,14 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
             volume_group_name: The name of the volume group to demote
 
         Returns:
-            bool: True if operation aborted (checkpoint not achieved, retry needed),
-                  False if successful (checkpoint achieved)
+           None
 
         Raises:
             ObjectNotFoundError: If volume group replication not found
         """
         if not self._is_earreplication_supported():
             logger.info("EAR replication is not supported on the existing storage")
-            return False
+            return
         
         # Validate volume group exists
         volume_group_replication = self._lsvolumegroupreplication(volume_group_name)
@@ -2252,12 +2248,11 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
             # Success - clear state and return False (not aborted)
             logger.info(f"Checkpoint achieved for volume group {volume_group_name}, demote successful")
             self._demote_state_map.pop(volume_group_name, None)
-            return False
+            return
         else:
             # Not ready yet - return True (aborted, needs retry)
             logger.info(f"Checkpoint not yet achieved for volume group {volume_group_name}, will retry")
-            return True
-
+            return
 
     def _get_host_name_if_equal(self, nvme_host, fc_host, iscsi_host):
         unique_names = {nvme_host, iscsi_host, fc_host}
