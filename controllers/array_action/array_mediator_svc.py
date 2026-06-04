@@ -1708,7 +1708,7 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
                            replication_type=array_settings.REPLICATION_TYPE_MIRROR,
                            is_primary=is_primary)
 
-    def _generate_ear_replication_response(self, volume_group_id, replication_mode, replication_policy):
+    def _generate_ear_replication_response(self, volume_group_id, volume_group_name, replication_mode, replication_policy):
         copy_type = array_settings.REPLICATION_COPY_TYPE_ASYNC
         is_ready = True
         is_primary = (replication_mode == array_settings.ENDPOINT_TYPE_PRODUCTION)
@@ -1718,7 +1718,8 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
                            is_ready=is_ready,
                            replication_type=array_settings.REPLICATION_TYPE_EAR,
                            is_primary=is_primary,
-                           volume_group_id=volume_group_id)
+                           volume_group_id=volume_group_id,
+                           volume_group_name=volume_group_name)
 
     def _lsrcrelationship(self, filter_value):
         try:
@@ -1802,9 +1803,14 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
         replication_mode = self._get_replication_mode(volume_group_id)
         if not replication_mode:
             return None
+
+        # Get volume group name from ID
+        volume_group = self._lsvolumegroup(volume_group_id)
+        volume_group_name = volume_group.name if volume_group else volume_group_id
+
         logger.info("found ear replication: {} in mode: {}".format(volume_group_id,
                                                                    replication_mode))
-        return self._generate_ear_replication_response(volume_group_id, replication_mode,
+        return self._generate_ear_replication_response(volume_group_id, volume_group_name, replication_mode,
                                                        replication_request.replication_policy)
 
     def _get_replication_mode(self, volume_group_id):
