@@ -688,7 +688,7 @@ class DS8KArrayMediator(ArrayMediatorAbstract):
     def get_last_async_snapshot_info(self, volume_group_id):
         raise NotImplementedError
 
-    def get_replication_destination_info(self, object_id, object_type, dr_mediator=None):
+    def get_replication_destination_info(self, object_id, object_type, object_uid, dr_mediator=None):
         raise NotImplementedError
 
     def create_replication(self, replication_request):

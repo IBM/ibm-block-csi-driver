@@ -699,6 +699,13 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
             raise array_errors.ObjectNotFoundError(volume_id)
         return vol_name
 
+    def _get_volume_internal_id_from_uid(self, uid):
+        if not uid:
+            raise array_errors.ObjectNotFoundError(uid)
+        logger.info("internal_id not in volume handle, resolving using uid '{}'".format(uid))
+        cli_volume = self._get_cli_volume_by_wwn(uid, not_exist_err=True)
+        return cli_volume.id
+
     def _create_cli_volume(self, name, size_in_bytes, space_efficiency, pool, io_group, volume_group=None):
         logger.info("creating volume with name : {}. size : {} . in pool : {} with parameters : {}".format(
             name, size_in_bytes, pool, space_efficiency))
@@ -1884,8 +1891,9 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
 
         return self._build_replication_info(vg_replication)
 
-    def get_replication_destination_info(self, object_id, object_type, dr_mediator=None):
-        raw_cli_volume = self._get_cli_volume(object_id)
+    def get_replication_destination_info(self, object_id, object_type, object_uid, dr_mediator=None):
+        volume_internal_id = object_id if object_id else self._get_volume_internal_id_from_uid(object_uid)
+        raw_cli_volume = self._get_cli_volume(volume_internal_id)
         source_thin_volume = self._generate_thin_volume_response(raw_cli_volume)
         source_volume_handle = get_volume_id(source_thin_volume, None)
 
@@ -1894,8 +1902,7 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
                 source_volume_handle))
             return source_volume_handle
 
-        destination_volume_handle = self._get_destination_volume_handle(
-            source_thin_volume.name, dr_mediator)
+        destination_volume_handle = self._get_destination_volume_handle(source_thin_volume.name, dr_mediator)
 
         if destination_volume_handle is None:
             logger.warning("destination volume not yet available on secondary storage "

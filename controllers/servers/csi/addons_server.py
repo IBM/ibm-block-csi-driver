@@ -273,6 +273,7 @@ class ReplicationControllerServicer(pb2_grpc.ControllerServicer):
             return pb2.GetReplicationDestinationInfoResponse()
 
         object_id = object_id_info.ids.internal_id
+        object_uid = object_id_info.ids.uid
         utils.validate_secrets(request.secrets)
 
         connection_info = utils.get_array_connection_info_from_secrets(request.secrets)
@@ -282,17 +283,17 @@ class ReplicationControllerServicer(pb2_grpc.ControllerServicer):
             if dr_connection_info is not None:
                 with get_agent(dr_connection_info, object_id_info.array_type).get_mediator() as dr_mediator:
                     destination_volume_id = mediator.get_replication_destination_info(
-                        object_id, object_type, dr_mediator=dr_mediator)
+                        object_id, object_type, object_uid=object_uid, dr_mediator=dr_mediator)
             else:
                 destination_volume_id = mediator.get_replication_destination_info(
-                    object_id, object_type)
+                    object_id, object_type, object_uid=object_uid)
 
         response = pb2.GetReplicationDestinationInfoResponse()
         if destination_volume_id is not None:
             response.replication_destination.volume.volume_id = destination_volume_id
-            logger.info("destination volume id '{}' for object '{}'".format(
-                destination_volume_id, object_id))
+            logger.info("destination volume id '{}' for source uid '{}'".format(
+                destination_volume_id, object_uid))
         else:
-            logger.warning("destination volume not yet available for object '{}'".format(object_id))
+            logger.warning("destination volume not yet available for source uid '{}'".format(object_uid))
 
         return response
