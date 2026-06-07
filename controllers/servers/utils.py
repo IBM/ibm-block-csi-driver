@@ -363,6 +363,15 @@ def get_array_connection_info_from_secrets(secrets, topologies=None, system_id=N
     return _get_array_connection_info_from_system_info(system_info, system_id)
 
 
+def get_dr_array_connection_info_from_secrets(secrets):
+    dr_address = secrets.get(servers_settings.SECRET_DR_ARRAY_PARAMETER)
+    if not dr_address:
+        return None
+    dr_secrets = dict(secrets)
+    dr_secrets[servers_settings.SECRET_ARRAY_PARAMETER] = dr_address
+    return _get_array_connection_info_from_system_info(dr_secrets, system_id=None)
+
+
 def get_volume_parameters(parameters, system_id=None):
     return get_object_parameters(parameters, servers_settings.PARAMETERS_VOLUME_NAME_PREFIX, system_id)
 
@@ -1114,10 +1123,7 @@ def get_object_final_name(volume_parameters, name, array_mediator, object_type):
     return full_name[:array_mediator.max_object_name_length]
 
 
-def get_replication_object_type_and_id_info(request):
-    object_id = request.volume_id
-    object_type = servers_settings.VOLUME_TYPE_NAME
-
+def get_replication_object_type_and_id_info(request, require_replication_source=False):
     replication_source = request.replication_source
     if replication_source and replication_source.ListFields():
         logger.info(replication_source)
@@ -1130,8 +1136,40 @@ def get_replication_object_type_and_id_info(request):
         else:
             logger.error(messages.UNSUPPORTED_REPLICATION_SOURCE_TYPE_MESSAGE)
             raise ValidationException(messages.UNSUPPORTED_REPLICATION_SOURCE_TYPE_MESSAGE)
+    elif require_replication_source:
+        logger.error("replication_source is required but not set in request")
+        raise ValidationException(messages.UNSUPPORTED_REPLICATION_SOURCE_TYPE_MESSAGE)
+    else:
+        object_id = request.volume_id
+        object_type = servers_settings.VOLUME_TYPE_NAME
+        logger.info("replication_source not set, falling back to volume_id '{}'".format(object_id))
+
     object_id_info = get_object_id_info(object_id, object_type)
     return object_type, object_id_info
+
+
+def resolve_ramen_ear_volume_to_volume_group(object_type, object_id_info, replication_type, mediator):
+    if object_type != servers_settings.VOLUME_TYPE_NAME or replication_type != array_settings.REPLICATION_TYPE_EAR:
+        return object_type, object_id_info
+
+    volume_uid = object_id_info.ids.uid
+    cli_volume = mediator.get_object_by_id(volume_uid, servers_settings.VOLUME_TYPE_NAME)
+    if not cli_volume:
+        raise array_errors.ObjectNotFoundError(volume_uid)
+
+    vg_internal_id = cli_volume.volume_group_id
+    if not vg_internal_id:
+        raise array_errors.ObjectNotFoundError("volume '{}' is not part of any VolumeGroup".format(volume_uid))
+
+    logger.info("volume '{}' resolved to volume group '{}'".format(volume_uid, vg_internal_id))
+
+    vg_object_id_info = ObjectIdInfo(
+        array_type=object_id_info.array_type,
+        internal_id=vg_internal_id,
+        system_id=object_id_info.system_id,
+        uid=vg_internal_id
+    )
+    return servers_settings.VOLUME_GROUP_TYPE_NAME, vg_object_id_info
 
 
 def is_call_home_enabled():

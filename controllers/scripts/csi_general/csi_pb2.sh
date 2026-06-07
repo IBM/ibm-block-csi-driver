@@ -2,7 +2,7 @@
 set -x
 
 CSI_VERSION="v1.12.0"
-ADDONS_VERSION="main"
+ADDONS_VERSION="parthraj/ramen"
 VG_VERSION="main"
 PB2_DIR="csi_general"
 
@@ -11,7 +11,7 @@ cd ./proto/${PB2_DIR}
 
 curl -O https://raw.githubusercontent.com/container-storage-interface/spec/${CSI_VERSION}/csi.proto
 curl -O https://raw.githubusercontent.com/csi-addons/spec/${VG_VERSION}/volumegroup/volumegroup.proto
-curl -O https://raw.githubusercontent.com/csi-addons/spec/${ADDONS_VERSION}/replication/replication.proto
+curl -O https://raw.githubusercontent.com/parthraaj/spec/${ADDONS_VERSION}/replication/replication.proto
 sed -i 's|github.com/container-storage-interface/spec/lib/go/csi/csi.proto|csi_general/csi.proto|g' volumegroup.proto
 sed -i 's|github.com/container-storage-interface/spec/lib/go/csi/csi.proto|csi_general/csi.proto|g' replication.proto
 cd -

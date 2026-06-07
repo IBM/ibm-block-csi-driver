@@ -89,3 +89,9 @@ UNSUPPORTED_PARAMETER_THROUGH_PARTITION = "The parameter {} is not supported whe
 
 CANNOT_CHANGE_HOST_PROTOCOL_BECAUSE_OF_MAPPED_PORTS = "The host protocol cannot be changed"\
     " because the host {} has ports configured."
+
+SECONDARY_STORAGE_TRANSITION_TO_PRODUCTION_NOT_READY_ERROR_MESSAGE = "Secondary storage is not yet ready to " \
+    "transition to production after becoming independent: {0}"
+
+ASYNC_DR_REPLICATION_POLICY_NOT_FOUND_MESSAGE = "No async-dr replication policy '{0}' found on storage for " \
+    "volume group '{1}'"
