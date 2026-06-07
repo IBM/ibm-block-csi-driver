@@ -271,7 +271,11 @@ func (r OsDeviceConnectivityIscsi) discoverAndLogin(ctx context.Context, portals
 
 			// Step 2: Attempt Login
 			logger.Infof("[discoverAndLogin] Attempting iscsiLogin: Target=%s Portal=%s", targetName, portal)
-			r.iscsiLogin(ctx, targetName, portal)
+			if err := r.iscsiLogin(ctx, targetName, portal); err != nil {
+				logger.Errorf("[discoverAndLogin] iscsiLogin FAILED: %v", err)
+			} else {
+				logger.Infof("[discoverAndLogin] iscsiLogin SUCCESS for %s", portal)
+			}
 		}
 	}
 	logger.Infof("[discoverAndLogin] Completed all requested tasks.")
