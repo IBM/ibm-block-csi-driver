@@ -120,166 +120,189 @@ func (r OsDeviceConnectivityIscsi) iscsiLogin(ctx context.Context, targetName, p
 }
 
 
+// iscsiGetRawSessions now reads from /sys/class/iscsi_session
+// It returns lines in the format: "tcp: [1] 192.168.1.100:3260,1 iqn.target.name"
+// matching the output of `iscsiadm -m session`
 func (r OsDeviceConnectivityIscsi) iscsiGetRawSessions(ctx context.Context) ([]string, error) {
 	const sysPath = "/sys/class/iscsi_session"
 	sessions, err := os.ReadDir(sysPath)
 	if err != nil {
-		logger.Errorf("[iscsiGetRawSessions] FAILED to read sysfs path %s: %v", sysPath, err)
-		if os.IsNotExist(err) { return []string{}, nil }
-		return nil, err
+		logger.Error("Cannot read sessions dir")
+		if os.IsNotExist(err) {
+			return []string{}, nil
+		}
+		return nil, fmt.Errorf("failed to read %s: %w", sysPath, err)
 	}
 
 	var results []string
 	for _, s := range sessions {
+		// Example: /sys/class/iscsi_session/session1
+		logger.Errorf("Check session %s", s.Name())
 		if !strings.HasPrefix(s.Name(), "session") {
-			logger.Debugf("[iscsiGetRawSessions] Skipping non-session entry: %s", s.Name())
 			continue
 		}
-		
-		sessionPath := filepath.Join(sysPath, s.Name())
-		logger.Debugf("[iscsiGetRawSessions] Analyzing %s", s.Name())
 
-		// Read TargetName
-		targetNameBuf, err := os.ReadFile(filepath.Join(sessionPath, "targetname"))
+		sessionID := strings.TrimPrefix(s.Name(), "session")
+		sessionPath := filepath.Join(sysPath, s.Name())
+
+		// 1. Quick Exit for non-logged-in sessions
+		stateBuf, err := r.readSysfs(filepath.Join(sessionPath, "state"))
 		if err != nil {
-			logger.Errorf("[iscsiGetRawSessions] %s: FAILED to read targetname: %v", s.Name(), err)
+			logger.Error("Ignore")
+			continue // Session likely vanished during ReadDir (common race condition)
+		}
+		stateStr := strings.TrimSpace(string(stateBuf))
+
+		if stateStr != "LOGGED_IN" {
+			logger.Warningf("Session %s is in %s", sessionID, stateStr)
+			// Ignore other transient/failed states (REOPENING, FREE, etc.)
+			continue
+		}
+
+		targetNameBuf, err := r.readSysfs(filepath.Join(sessionPath, "targetname"))
+		if err != nil {
+			logger.Error("Cannot read target")
 			continue
 		}
 		targetName := strings.TrimSpace(string(targetNameBuf))
+		
+		logger.Errorf("Target name %s", targetName)
 
-		// Check Session State
-		stateBuf, err := os.ReadFile(filepath.Join(sessionPath, "state"))
-		stateStr := "UNKNOWN"
-		if err == nil {
-			stateStr = strings.TrimSpace(string(stateBuf))
-		}
-		logger.Debugf("[iscsiGetRawSessions] %s: Target=%s, State=%s", s.Name(), targetName, stateStr)
-
-		// Traverse Connections
+		// 2. Direct Traversal (Avoids Glob overhead)
+		// Path: /sys/class/iscsi_session/sessionX/device/connectionX:S/iscsi_connection/connectionX:S/
 		devicePath := filepath.Join(sessionPath, "device")
 		connDirs, err := os.ReadDir(devicePath)
 		if err != nil {
-			logger.Errorf("[iscsiGetRawSessions] %s: FAILED to read device dir: %v", s.Name(), err)
+			logger.Error("Cannot open devicePath")
 			continue
 		}
 
 		for _, cd := range connDirs {
-			if !strings.HasPrefix(cd.Name(), "connection") { continue }
-			
-			attrPath := filepath.Join(devicePath, cd.Name(), "iscsi_connection", cd.Name())
-			addrBuf, errA := os.ReadFile(filepath.Join(attrPath, "address"))
-			portBuf, errP := os.ReadFile(filepath.Join(attrPath, "port"))
-
-			if errA != nil || errP != nil {
-				logger.Warningf("[iscsiGetRawSessions] %s: FAILED to read address/port for %s", s.Name(), cd.Name())
+			logger.Errorf("Scan conn %s", cd.Name())
+			if !strings.HasPrefix(cd.Name(), "connection") {
 				continue
 			}
+			
+			// 2. The standard path: /device/connectionX:S/iscsi_connection/connectionX:S/
+			// We use cd.Name() for both levels to ensure they match dynamically.
+			attrPath := filepath.Join(devicePath, cd.Name(), "iscsi_connection", cd.Name())
 
-			portal := net.JoinHostPort(strings.TrimSpace(string(addrBuf)), strings.TrimSpace(string(portBuf)))
-			line := fmt.Sprintf("tcp: [%s] %s %s", s.Name(), portal, targetName)
-			results = append(results, line)
-			logger.Infof("[iscsiGetRawSessions] FOUND active connection: %s", line)
+			// FIX 2: Check existence first before attempting to read
+			if _, err := os.Stat(attrPath); os.IsNotExist(err) {
+				logger.Warning("subdir not found")
+				attrPath = filepath.Join(devicePath, cd.Name())
+			}
+
+			// FIX 3: Correct assignment for os.ReadFile (it returns []byte, error)
+			addrBuf, errA := os.ReadFile(filepath.Join(attrPath, "address"))
+			portBuf, errP := os.ReadFile(filepath.Join(attrPath, "port"))
+			
+			if errA != nil {
+				logger.Error("errA")
+			}
+			if errP != nil {
+				logger.Error("errP")
+			}
+			// TODO trim
+
+			if errA == nil && errP == nil {
+				logger.Error("Compare portal")
+				portal := net.JoinHostPort(
+					strings.TrimSpace(string(addrBuf)),
+					strings.TrimSpace(string(portBuf)),
+				)
+				logger.Errorf("Compare portal %s", portal)
+				// Format matches parser: "tcp: [id] ip:port iqn"
+				// Format as: tcp: [1] 192.168.1.100:3260 iqn.2026.com.ibm:target
+				// Matches iscsiadm format exactly for downstream parsers
+				results = append(results, fmt.Sprintf("tcp: [%s] %s %s", sessionID, portal, targetName))
+				break // One connection per session is the standard CSI expectation
+			}
 		}
 	}
-	logger.Infof("[iscsiGetRawSessions] COMPLETED. Found %d total connections.", len(results))
 	return results, nil
 }
 
 func (r OsDeviceConnectivityIscsi) getAllSessions(ctx context.Context) (map[string]map[string]bool, error) {
 	lines, err := r.iscsiGetRawSessions(ctx)
-	if err != nil { return nil, err }
+	if err != nil {
+		logger.Error("Cannot get raw")
+		return nil, err
+	}
 
 	portalsByTarget := make(map[string]map[string]bool)
 	for _, line := range lines {
+		// Native/iscsiadm format: "tcp: [id] 1.2.3.4:3260 iqn.2026-01.com.example:target"
+		logger.Errorf("Check line %s", line)
 		parts := strings.Fields(line)
-		if len(parts) < 4 {
-			logger.Warningf("[getAllSessions] Skipping malformed line: %s", line)
+		// Check for "tcp" as validity in case we switch back to using iscsiadm
+		if len(parts) < 4 || !strings.HasPrefix(parts[0], "tcp") {
+			logger.Error("Malformed line")
 			continue
 		}
-		
-		portalInfo := parts[2] // "ip:port"
-		targetName := parts[3] // "iqn..."
-		
-		// Logic Check: Stripping port for IP-only matching if that's what the driver expects
-		ip := portalInfo
-		if idx := strings.LastIndex(portalInfo, ":"); idx != -1 {
-			ip = portalInfo[:idx]
-		}
 
-		if portalsByTarget[targetName] == nil {
+		// Normalize both pieces of data from sysfs
+		targetName := strings.ToLower(parts[3])
+		normalizedPortal := r.normalizePortal(parts[2])
+		
+		logger.Errorf("target %s portal %s", targetName, normalizedPortal)
+
+		if _, exists := portalsByTarget[targetName]; !exists {
 			portalsByTarget[targetName] = make(map[string]bool)
 		}
-		portalsByTarget[targetName][ip] = true
-		logger.Debugf("[getAllSessions] Map Update: Target[%s] -> IP[%s] = true (Source: %s)", targetName, ip, portalInfo)
+		portalsByTarget[targetName][normalizedPortal] = true
 	}
 	return portalsByTarget, nil
 }
 
 func (r OsDeviceConnectivityIscsi) filterLoggedIn(ctx context.Context, portalsByTarget map[string][]string) (map[string][]string, error) {
-	loggedIn, err := r.getAllSessions(ctx)
-	if err != nil { return nil, err }
-
-	filtered := make(map[string][]string)
-	for targetName, requestedPortals := range portalsByTarget {
-		activeForTarget := loggedIn[targetName]
-		logger.Infof("[filterLoggedIn] Target: %s. Map entries found in sysfs: %v", targetName, activeForTarget)
-
-		for _, p := range requestedPortals {
-			// TRACE: Log exactly what we are looking for
-			logger.Infof("[filterLoggedIn] Checking requested portal: %s", p)
-			
-			if activeForTarget != nil && activeForTarget[p] {
-				logger.Infof("[filterLoggedIn] MATCH: Portal %s is ALREADY active for target %s. Skipping.", p, targetName)
-			} else {
-				logger.Infof("[filterLoggedIn] NO MATCH: Portal %s is NOT active for target %s. Adding to Task List.", p, targetName)
-				filtered[targetName] = append(filtered[targetName], p)
-			}
-		}
-	}
+    activeSessions, _ := r.getAllSessions(ctx) // Reads /sys
+    filtered := make(map[string][]string)
 	
-	if len(filtered) == 0 {
-		logger.Warning("[filterLoggedIn] Result is EMPTY. Driver thinks all portals are already logged in.")
-	} else {
-		logger.Infof("[filterLoggedIn] Result: %v", filtered)
-	}
-	return filtered, nil
+    for target, requestedPortals := range portalsByTarget {
+        activeForTarget := activeSessions[strings.ToLower(target)]
+		
+		logger.Errorf("Scan target %s", activeForTarget)
+		
+        for _, p := range requestedPortals {
+			logger.Errorf(" portal %s normalize %s", p, r.normalizePortal(p))
+            // If this SPECIFIC portal (IP:Port) isn't in sysfs, 
+            // we MUST return it so discoverAndLogin can try discovery.
+            if !activeForTarget[r.normalizePortal(p)] {
+                filtered[target] = append(filtered[target], p)
+				logger.Infof("Target %s portal %s is not logged in", target, p)
+            }
+        }
+    }
+    return filtered, nil
 }
 
 func (r OsDeviceConnectivityIscsi) discoverAndLogin(ctx context.Context, portalsByTarget map[string][]string) {
-	dbCache := r.loadRelevantTargets(portalsByTarget)
-	
-	for targetName, portals := range portalsByTarget {
-		logger.Infof("[discoverAndLogin] Starting loop for Target: %s (%d portals)", targetName, len(portals))
-		
-		for _, portal := range portals {
-			normP := r.normalizePortal(portal)
-			logger.Debugf("[discoverAndLogin] Normalizing %s -> %s", portal, normP)
-
-			// Step 1: Check Database presence
-			inDB := dbCache[targetName][normP]
-			if !inDB {
-				logger.Infof("[discoverAndLogin] Portal %s (norm: %s) MISSING from DB. Triggering iscsiDiscover.", portal, normP)
-				if err := r.iscsiDiscover(ctx, normP); err != nil {
-					logger.Errorf("[discoverAndLogin] iscsiDiscover FAILED for %s: %v", normP, err)
-					// We continue to login anyway, as discovery might have partially succeeded
-				} else {
-					logger.Infof("[discoverAndLogin] iscsiDiscover SUCCESS for %s", normP)
-				}
-			} else {
-				logger.Infof("[discoverAndLogin] Portal %s (norm: %s) already in DB. Skipping discovery.", portal, normP)
-			}
-
-			// Step 2: Attempt Login
-			logger.Infof("[discoverAndLogin] Attempting iscsiLogin: Target=%s Portal=%s", targetName, portal)
-			if err := r.iscsiLogin(ctx, targetName, portal); err != nil {
-				logger.Errorf("[discoverAndLogin] iscsiLogin FAILED: %v", err)
-			} else {
-				logger.Infof("[discoverAndLogin] iscsiLogin SUCCESS for %s", portal)
-			}
-		}
-	}
-	logger.Infof("[discoverAndLogin] Completed all requested tasks.")
+    db := r.loadRelevantTargets(portalsByTarget) // Reads /etc/iscsi/nodes
+    
+    for target, portals := range portalsByTarget {
+		logger.Errorf("Scan target %s", target)
+        for _, p := range portals {
+            normP := r.normalizePortal(p)
+			logger.Errorf("Scan normalized portal %s", normP)
+            // If portal is missing from DB, we MUST run iscsiDiscover
+            if !db[target][normP] {
+				logger.Errorf("discover %s", normP)
+                r.iscsiDiscover(ctx, normP) 
+                // iscsiDiscover will now use credentials to populate the DB
+            }
+        }
+    }
+    // Now that discovery populated the DB, login will work
+    for target, portals := range portalsByTarget {
+		logger.Errorf("Login target %s", target)
+        for _, p := range portals {
+			logger.Errorf("Login portal %s", target)
+            r.iscsiLogin(ctx, target, p)
+        }
+    }
 }
+
 
 // loadRelevantTargets only probes the specific subdirectories for the targets in the request
 func (r OsDeviceConnectivityIscsi) loadRelevantTargets(requestedTargets map[string][]string) map[string]map[string]bool {
