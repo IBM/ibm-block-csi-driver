@@ -226,7 +226,8 @@ class TestArrayMediatorSVC(unittest.TestCase):
 
         replication = self.svc.get_replication(replication_request)
         self.assertEqual(replication, None)
-        self.svc.client.svcinfo.lsvolumegroupreplication.assert_called_once_with(object_id=OBJECT_INTERNAL_ID)
+        self.assertEqual(2, self.svc.client.svcinfo.lsvolumegroupreplication.call_count)
+        self.svc.client.svcinfo.lsvolumegroupreplication.assert_called_with(object_id=OBJECT_INTERNAL_ID)
 
     def test_create_ear_replication_success(self):
         _, replication_request = self._prepare_mocks_for_ear_replication()

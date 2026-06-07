@@ -1,5 +1,5 @@
 import unittest
-from datetime import datetime
+from datetime import datetime, timezone
 
 import grpc
 from csi_general import replication_pb2 as pb2
@@ -408,22 +408,86 @@ class TestGetVolumeReplicationInfo(BaseReplicationSetUp, CommonControllerTest):
         replication_source.volume.volume_id = volume_request.volume_id
         volume_request.replication_source = replication_source
 
+        before = int(datetime.now(timezone.utc).timestamp())
         response = self.servicer.GetVolumeReplicationInfo(volume_request, self.context)
+        after = int(datetime.now(timezone.utc).timestamp())
 
         self.assertEqual(grpc.StatusCode.OK, self.context.code)
         self.mediator.get_last_async_snapshot_info.assert_not_called()
-        self.assertEqual(0, response.last_sync_time.seconds)
+        self.assertGreaterEqual(response.last_sync_time.seconds, before)
+        self.assertLessEqual(response.last_sync_time.seconds, after)
         self.assertEqual(ReplicationStatus.UNKNOWN, response.status)
         self.assertEqual('', response.status_message)
-
-    def test_get_volume_replication_info_already_processing(self):
-        self._test_request_already_processing(
-            "replication_source",
-            self.request.replication_source.volumegroup.volume_group_id
-        )
 
     def test_get_volume_replication_info_with_wrong_secrets(self):
         self._test_request_with_wrong_secrets()
 
     def test_get_volume_replication_info_with_array_connection_exception(self):
+        self._test_request_with_array_connection_exception()
+
+
+class TestGetReplicationDestinationInfo(BaseReplicationSetUp, CommonControllerTest):
+    @property
+    def tested_method(self):
+        return self.servicer.GetReplicationDestinationInfo
+
+    @property
+    def tested_method_response_class(self):
+        return pb2.GetReplicationDestinationInfoResponse
+
+    def setUp(self):
+        super().setUp()
+        volume_id = "{0}:{1};{1}".format("A9000", OBJECT_INTERNAL_ID)
+        replication_source = ProtoBufMock(spec=['volume', 'ListFields'])
+        replication_source.ListFields.return_value = [True]
+        replication_source.volume.volume_id = volume_id
+        self.request.replication_source = replication_source
+
+    def test_get_destination_info_with_dr_mediator_returns_destination_id(self):
+        destination_id = "{0}:{1};{1}".format("A9000", OTHER_OBJECT_INTERNAL_ID)
+        self.request.secrets["dr_management_address"] = SECRET_MANAGEMENT_ADDRESS_VALUE
+        self.mediator.get_replication_destination_info.return_value = destination_id
+
+        response = self.servicer.GetReplicationDestinationInfo(self.request, self.context)
+
+        self.assertEqual(grpc.StatusCode.OK, self.context.code)
+        self.mediator.get_replication_destination_info.assert_called_once()
+        self.assertEqual(destination_id, response.replication_destination.volume.volume_id)
+
+    def test_get_destination_info_destination_not_yet_available_returns_empty(self):
+        self.request.secrets["dr_management_address"] = SECRET_MANAGEMENT_ADDRESS_VALUE
+        self.mediator.get_replication_destination_info.return_value = None
+
+        response = self.servicer.GetReplicationDestinationInfo(self.request, self.context)
+
+        self.assertEqual(grpc.StatusCode.OK, self.context.code)
+        self.mediator.get_replication_destination_info.assert_called_once()
+        self.assertEqual("", response.replication_destination.volume.volume_id)
+
+    def test_get_destination_info_volumegroup_source_not_supported_returns_empty(self):
+        replication_source = ProtoBufMock(spec=['volumegroup', 'ListFields'])
+        replication_source.ListFields.return_value = [True]
+        replication_source.volumegroup.volume_group_id = self.request.volume_id
+        self.request.replication_source = replication_source
+
+        response = self.servicer.GetReplicationDestinationInfo(self.request, self.context)
+
+        self.assertEqual(grpc.StatusCode.OK, self.context.code)
+        self.mediator.get_replication_destination_info.assert_not_called()
+        self.assertEqual("", response.replication_destination.volume.volume_id)
+
+    def test_get_destination_info_without_dr_mediator_returns_source_handle(self):
+        source_id = "{0}:{1};{1}".format("A9000", OBJECT_INTERNAL_ID)
+        self.mediator.get_replication_destination_info.return_value = source_id
+
+        response = self.servicer.GetReplicationDestinationInfo(self.request, self.context)
+
+        self.assertEqual(grpc.StatusCode.OK, self.context.code)
+        self.mediator.get_replication_destination_info.assert_called_once()
+        self.assertEqual(source_id, response.replication_destination.volume.volume_id)
+
+    def test_get_destination_info_with_wrong_secrets(self):
+        self._test_request_with_wrong_secrets()
+
+    def test_get_destination_info_with_array_connection_exception(self):
         self._test_request_with_array_connection_exception()

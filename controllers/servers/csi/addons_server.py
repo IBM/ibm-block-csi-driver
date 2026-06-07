@@ -2,6 +2,7 @@ import grpc
 from csi_general import replication_pb2 as pb2
 from csi_general import replication_pb2_grpc as pb2_grpc
 from google.protobuf.timestamp_pb2 import Timestamp
+from datetime import datetime, timezone
 
 import controllers.servers.settings as servers_settings
 import controllers.array_action.settings as array_settings
@@ -23,17 +24,21 @@ class ReplicationControllerServicer(pb2_grpc.ControllerServicer):
         utils.validate_addons_request(request, replication_type)
 
         object_type, object_id_info = utils.get_replication_object_type_and_id_info(request)
-        object_id = object_id_info.ids.internal_id
-
-        error_message = self._validate_replication_object(object_type, replication_type)
-        if error_message:
-            return build_error_response(error_message, context, grpc.StatusCode.FAILED_PRECONDITION,
-                                        pb2.EnableVolumeReplicationResponse)
-
-        replication_request = utils.generate_addons_replication_request(request, replication_type, object_id)
-
         connection_info = utils.get_array_connection_info_from_secrets(request.secrets)
+
         with get_agent(connection_info, object_id_info.array_type).get_mediator() as mediator:
+            object_type, object_id_info = utils.resolve_ramen_ear_volume_to_volume_group(
+                object_type, object_id_info, replication_type, mediator)
+
+            object_id = object_id_info.ids.internal_id
+
+            error_message = self._validate_replication_object(object_type, replication_type)
+            if error_message:
+                return build_error_response(error_message, context, grpc.StatusCode.FAILED_PRECONDITION,
+                                            pb2.EnableVolumeReplicationResponse)
+
+            replication_request = utils.generate_addons_replication_request(request, replication_type, object_id)
+
             replication_object = self._get_replication_object(object_id_info, object_type, connection_info, mediator)
             replication = mediator.get_replication(replication_request)
             if replication:
@@ -58,17 +63,21 @@ class ReplicationControllerServicer(pb2_grpc.ControllerServicer):
         utils.validate_addons_request(request, replication_type)
 
         object_type, object_id_info = utils.get_replication_object_type_and_id_info(request)
-        object_id = object_id_info.ids.internal_id
-
-        error_message = self._validate_replication_object(object_type, replication_type)
-        if error_message:
-            return build_error_response(error_message, context, grpc.StatusCode.FAILED_PRECONDITION,
-                                        pb2.EnableVolumeReplicationResponse)
-
-        replication_request = utils.generate_addons_replication_request(request, replication_type, object_id)
-
         connection_info = utils.get_array_connection_info_from_secrets(request.secrets)
+
         with get_agent(connection_info, object_id_info.array_type).get_mediator() as mediator:
+            object_type, object_id_info = utils.resolve_ramen_ear_volume_to_volume_group(
+                object_type, object_id_info, replication_type, mediator)
+
+            object_id = object_id_info.ids.internal_id
+
+            error_message = self._validate_replication_object(object_type, replication_type)
+            if error_message:
+                return build_error_response(error_message, context, grpc.StatusCode.FAILED_PRECONDITION,
+                                            pb2.EnableVolumeReplicationResponse)
+
+            replication_request = utils.generate_addons_replication_request(request, replication_type, object_id)
+
             self._get_replication_object(object_id_info, object_type, connection_info, mediator)
             replication = mediator.get_replication(replication_request)
             if replication:
@@ -103,17 +112,21 @@ class ReplicationControllerServicer(pb2_grpc.ControllerServicer):
         utils.validate_addons_request(request, replication_type)
 
         object_type, object_id_info = utils.get_replication_object_type_and_id_info(request)
-        object_id = object_id_info.ids.internal_id
-
-        error_message = self._validate_replication_object(object_type, replication_type)
-        if error_message:
-            return build_error_response(error_message, context, grpc.StatusCode.FAILED_PRECONDITION,
-                                        pb2.EnableVolumeReplicationResponse)
-
-        replication_request = utils.generate_addons_replication_request(request, replication_type, object_id)
 
         connection_info = utils.get_array_connection_info_from_secrets(request.secrets)
         with get_agent(connection_info, object_id_info.array_type).get_mediator() as mediator:
+            object_type, object_id_info = utils.resolve_ramen_ear_volume_to_volume_group(
+                object_type, object_id_info, replication_type, mediator)
+
+            object_id = object_id_info.ids.internal_id
+
+            error_message = self._validate_replication_object(object_type, replication_type)
+            if error_message:
+                return build_error_response(error_message, context, grpc.StatusCode.FAILED_PRECONDITION,
+                                            pb2.EnableVolumeReplicationResponse)
+
+            replication_request = utils.generate_addons_replication_request(request, replication_type, object_id)
+
             self._get_replication_object(object_id_info, object_type, connection_info, mediator)
             replication = mediator.get_replication(replication_request)
             if not replication:
@@ -143,17 +156,21 @@ class ReplicationControllerServicer(pb2_grpc.ControllerServicer):
         utils.validate_addons_request(request, replication_type)
 
         object_type, object_id_info = utils.get_replication_object_type_and_id_info(request)
-        object_id = object_id_info.ids.internal_id
-
-        error_message = self._validate_replication_object(object_type, replication_type)
-        if error_message:
-            return build_error_response(error_message, context, grpc.StatusCode.FAILED_PRECONDITION,
-                                        pb2.EnableVolumeReplicationResponse)
-
-        replication_request = utils.generate_addons_replication_request(request, replication_type, object_id)
 
         connection_info = utils.get_array_connection_info_from_secrets(request.secrets)
         with get_agent(connection_info, object_id_info.array_type).get_mediator() as mediator:
+            object_type, object_id_info = utils.resolve_ramen_ear_volume_to_volume_group(
+                object_type, object_id_info, replication_type, mediator)
+
+            object_id = object_id_info.ids.internal_id
+
+            error_message = self._validate_replication_object(object_type, replication_type)
+            if error_message:
+                return build_error_response(error_message, context, grpc.StatusCode.FAILED_PRECONDITION,
+                                            pb2.EnableVolumeReplicationResponse)
+
+            replication_request = utils.generate_addons_replication_request(request, replication_type, object_id)
+
             self._get_replication_object(object_id_info, object_type, connection_info, mediator)
             replication = mediator.get_replication(replication_request)
             if not replication:
@@ -205,20 +222,24 @@ class ReplicationControllerServicer(pb2_grpc.ControllerServicer):
         object_id = object_id_info.ids.internal_id
 
         utils.validate_secrets(request.secrets)
+        response = pb2.GetVolumeReplicationInfoResponse()
 
         if object_type != servers_settings.VOLUME_GROUP_TYPE_NAME:
             logger.warning(
                 "GetVolumeReplicationInfo is only supported for EAR (VolumeGroup level). "
-                "Returning empty response for object_type='{}'".format(object_type)
+                "Storage does not provide sync data at volume level. "
+                "Returning current time as last_sync_time for replication type = '{}'"
+                .format(object_type)
             )
-            return pb2.GetVolumeReplicationInfoResponse()
+
+            ts_seconds = int(datetime.now(timezone.utc).timestamp())
+            response.last_sync_time.CopyFrom(Timestamp(seconds=ts_seconds, nanos=0))
+            return response
 
         connection_info = utils.get_array_connection_info_from_secrets(request.secrets)
 
         with get_agent(connection_info, object_id_info.array_type).get_mediator() as mediator:
             replication_info = mediator.get_last_async_snapshot_info(object_id)
-
-        response = pb2.GetVolumeReplicationInfoResponse()
 
         if replication_info.last_sync_time is not None:
             ts_seconds = int(replication_info.last_sync_time.timestamp())
@@ -241,4 +262,37 @@ class ReplicationControllerServicer(pb2_grpc.ControllerServicer):
                 response.status_message
             )
         )
+        return response
+
+    @csi_replication_method(error_response_type=pb2.GetReplicationDestinationInfoResponse)
+    def GetReplicationDestinationInfo(self, request, context):
+        object_type, object_id_info = utils.get_replication_object_type_and_id_info(
+            request, require_replication_source=True)
+        if object_type != servers_settings.VOLUME_TYPE_NAME:
+            logger.warning("object type '{}' is not volume, not supported".format(object_type))
+            return pb2.GetReplicationDestinationInfoResponse()
+
+        object_id = object_id_info.ids.internal_id
+        utils.validate_secrets(request.secrets)
+
+        connection_info = utils.get_array_connection_info_from_secrets(request.secrets)
+        dr_connection_info = utils.get_dr_array_connection_info_from_secrets(request.secrets)
+
+        with get_agent(connection_info, object_id_info.array_type).get_mediator() as mediator:
+            if dr_connection_info is not None:
+                with get_agent(dr_connection_info, object_id_info.array_type).get_mediator() as dr_mediator:
+                    destination_volume_id = mediator.get_replication_destination_info(
+                        object_id, object_type, dr_mediator=dr_mediator)
+            else:
+                destination_volume_id = mediator.get_replication_destination_info(
+                    object_id, object_type)
+
+        response = pb2.GetReplicationDestinationInfoResponse()
+        if destination_volume_id is not None:
+            response.replication_destination.volume.volume_id = destination_volume_id
+            logger.info("destination volume id '{}' for object '{}'".format(
+                destination_volume_id, object_id))
+        else:
+            logger.warning("destination volume not yet available for object '{}'".format(object_id))
+
         return response
