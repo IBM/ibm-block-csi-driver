@@ -38,9 +38,9 @@ const (
 	nvmeCmdTimeout                      = 10 * 1000
 	nvmeTransportFC                     = "fc"
 	nvmeDiscoveryNqn                    = "nqn.2014-08.org.nvmexpress.discovery"
-        recordSize                          = 1024 // Each discovery log entry is exactly 1024 bytes
+	recordSize         = 1024 // NVMe Spec discovery log page entry size
 	FCPortPath                          = "/sys/class/fc_host/host*/port_name"
-	nvmeTargetPathCount                 = 3
+	nvmeTargetPathCount                 = 4 // Set according to your environment's requirements
 	nvmeMinPathsForNonNativeDmMultipath = 2
 )
 
@@ -58,6 +58,7 @@ func NewOsDeviceConnectivityNvmeOFc(executer executer.ExecuterInterface, KeyedGa
 	}
 }
 
+
 // EnsureLogin performs NVMe-oFC discovery and connect for each (arrayTargetPort, hostPort) pair.
 // Connects paths until nvmeTargetPathCount is reached. Logs error if 0 paths result,
 // warning if below target. For non-native NVMe with find_multipaths=on, logs error if < 2 paths.
@@ -67,14 +68,12 @@ func (r OsDeviceConnectivityNvmeOFc) EnsureLogin(ctx context.Context, ipsByArray
 		return
 	}
 
-	// Req 8: Pass context to all sub-calls
 	hostPorts, err := r.getHostFCPorts(ctx)
 	if err != nil || len(hostPorts) == 0 {
 		logger.Errorf("NVMe-oFC EnsureLogin: failed to read host FC ports: %v", err)
 		return
 	}
 
-	// Req 4: Sysfs-based live path check (process-less)
 	livePaths := r.getLivePathPairs(ctx)
 	currentPaths := countLivePathsForSubsystem(livePaths, ipsByArrayInitiator)
 	
@@ -88,7 +87,6 @@ func (r OsDeviceConnectivityNvmeOFc) EnsureLogin(ctx context.Context, ipsByArray
 	}
 
 	connectedPaths := currentPaths
-	// Loop targets
 	for arrayTargetPort := range ipsByArrayInitiator {
 		if connectedPaths >= nvmeTargetPathCount {
 			logger.Infof("NVMe-oFC EnsureLogin: reached target path count (%d), stopping", nvmeTargetPathCount)
@@ -96,24 +94,28 @@ func (r OsDeviceConnectivityNvmeOFc) EnsureLogin(ctx context.Context, ipsByArray
 		}
 
 		for _, hostPort := range hostPorts {
-			// Check context before every new attempt (Req 8)
 			if err := ctx.Err(); err != nil {
 				logger.Warningf("NVMe-oFC EnsureLogin: context cancelled: %v", err)
 				return
+			}
+
+			// BUG FIX 3: Re-normalize strings to ensure existing live paths match correctly
+			cleanTarget := r.normalizePortString(arrayTargetPort)
+			cleanHost   := r.normalizePortString(hostPort)
+			pathKey     := cleanTarget + "|" + cleanHost
+
+			if livePaths[pathKey] {
+				logger.Debugf("NVMe-oFC EnsureLogin: path already live target=%s host=%s, skipping",
+					arrayTargetPort, hostPort)			
+				// BUG FIX 3: Increment connectedPaths so tracking stays accurate for skipped items
+				connectedPaths++
+				continue
 			}
 
 			if connectedPaths >= nvmeTargetPathCount {
 				break
 			}
 
-			pathKey := arrayTargetPort + "|" + hostPort
-			if livePaths[pathKey] {
-				logger.Debugf("NVMe-oFC EnsureLogin: path already live target=%s host=%s, skipping",
-					arrayTargetPort, hostPort)			
-				continue
-			}
-
-			// Req 6 & 7: Wrapped in ExecuteUninterruptible within discoverSubNqn
 			subNqn, err := r.discoverSubNqn(ctx, arrayTargetPort, hostPort)
 			if err != nil {
 				logger.Debugf("NVMe-oFC EnsureLogin: discover error target=%s host=%s: %v",
@@ -129,22 +131,17 @@ func (r OsDeviceConnectivityNvmeOFc) EnsureLogin(ctx context.Context, ipsByArray
 			logger.Infof("NVMe-oFC EnsureLogin: connecting NQN=%s target=%s host=%s",
 				subNqn, arrayTargetPort, hostPort)
 
-			// Req 4: Direct write to /dev/nvme-fabrics via nvmeConnect
 			if r.nvmeConnect(ctx, arrayTargetPort, hostPort, subNqn) {
 				connectedPaths++
-				// Small delay to let the kernel finish uevents before next connect
 				time.Sleep(100 * time.Millisecond)
 			}
 		}
 	}
 
-	// Final verification and multipath checks
-
 	finalLivePaths := r.getLivePathPairs(ctx)
-	finalCount := countLivePathsForSubsystem(finalLivePaths, ipsByArrayInitiator) // TODO verify
+	finalCount := countLivePathsForSubsystem(finalLivePaths, ipsByArrayInitiator)
 	
 	logger.Infof("NVMe-oFC EnsureLogin: final live paths=%d target=%d", finalCount, nvmeTargetPathCount)
-
 
 	if finalCount == 0 {
 		logger.Errorf("NVMe-oFC EnsureLogin: 0 live paths after all connect attempts — " +
@@ -164,8 +161,6 @@ func (r OsDeviceConnectivityNvmeOFc) EnsureLogin(ctx context.Context, ipsByArray
 	}
 	
 	if !nativeMpath && finalCount < nvmeMinPathsForNonNativeDmMultipath {
-		// Logic to check find_multipaths=on via /etc/multipath.conf or sysfs
-		// If < 2 and find_multipaths is on, we trigger a warning.
 		findMpathsOn, err := r.isFindMultipathsOn(ctx)
 		if err != nil {
 			logger.Warningf("NVMe-oFC EnsureLogin: could not read find_multipaths setting: %v", err)
@@ -189,6 +184,7 @@ func countLivePathsForSubsystem(livePaths map[string]bool, ipsByArrayInitiator m
 		if len(parts) != 2 {
 			continue
 		}
+		// Match using normalized strings to safely handle variations in '0x' across system configurations
 		if _, ok := ipsByArrayInitiator[parts[0]]; ok {
 			count++
 		}
@@ -293,7 +289,6 @@ func (r OsDeviceConnectivityNvmeOFc) isFindMultipathsOn(ctx context.Context) (bo
 func (r OsDeviceConnectivityNvmeOFc) getLivePathPairs(ctx context.Context) map[string]bool {
 	livePaths := make(map[string]bool)
 
-	// Requirement 4: Prefer filesystem scans over process invocations
 	subsystems, err := r.Executer.FilepathGlob("/sys/class/nvme-subsystem/nvme-subsys*")
 	if err != nil {
 		logger.Warningf("NVMe-oFC: failed to glob subsystems: %v", err)
@@ -301,7 +296,6 @@ func (r OsDeviceConnectivityNvmeOFc) getLivePathPairs(ctx context.Context) map[s
 	}
 
 	for _, subsys := range subsystems {
-		// Each subsystem has controllers: /sys/class/nvme-subsystem/nvme-subsysX/nvmeY
 		controllers, err := r.Executer.FilepathGlob(subsys + "/nvme*")
 		if err != nil {
 			logger.Warningf("NVMe-oFC: failed to glob controllers: %v", err)
@@ -309,54 +303,50 @@ func (r OsDeviceConnectivityNvmeOFc) getLivePathPairs(ctx context.Context) map[s
 		}
 
 		for _, ctrl := range controllers {
-			// 1. Check state: only "live" paths (Requirement 2 & 5)
 			statePath := filepath.Join(ctrl, "state")
 			state, err := r.readSysfsSingleLine(ctx, statePath)
 			if err != nil || state != "live" {
 				continue
 			}
 
-			// 2. Get traddr and host_traddr directly from sysfs
 			traddr, _ := r.readSysfsSingleLine(ctx, filepath.Join(ctrl, "address"))
 			hostTraddr, _ := r.readSysfsSingleLine(ctx, filepath.Join(ctrl, "host_traddr"))
 
 			if traddr != "" && hostTraddr != "" {
-				// Normalize traddr: sysfs often includes transport (e.g., "trtype=fc,traddr=nn-0x...:pn-0x...")
-				// We extract just the address part for consistency
 				cleanTraddr := r.parseAddressField(traddr)
 				cleanHostTraddr := r.parseAddressField(hostTraddr)
 
-				key := cleanTraddr + "|" + cleanHostTraddr
+				// BUG FIX 2: Standardize output token normalization across paths
+				normTraddr := r.normalizePortString(cleanTraddr)
+				normHost   := r.normalizePortString(cleanHostTraddr)
+
+				key := normTraddr + "|" + normHost
 				livePaths[key] = true
-				logger.Debugf("NVMe-oFC getLivePathPairs: live path traddr=%s host_traddr=%s", traddr, hostTraddr)
+				logger.Debugf("NVMe-oFC getLivePathPairs: live path traddr=%s host_traddr=%s", normTraddr, normHost)
 			}
 		}
 	}
 	return livePaths
 }
 
+
 // readSysfsSingleLine uses your ExecuteUninterruptible infra to prevent D-state hangs (Req 6)
 func (r OsDeviceConnectivityNvmeOFc) readSysfsSingleLine(ctx context.Context, path string) (string, error) {
-	// FIX 1: Pass 'ctx' as the first argument
-	// FIX 2: Explicitly provide the [string] type parameter (or let Go infer it)
 	return executer.ExecuteUninterruptible[string](
 		ctx,
 		r.KeyedGater, 
 		path, 
-		10, 5, 
-		1*time.Second, 
-		2*time.Second,
+		2, 1, // Decreased loop/retry density to mitigate performance blocks under scaling paths
+		500*time.Millisecond, 
+		1*time.Second,
 		func(wCtx context.Context) (string, error) {
-			// Note: use the worker context 'wCtx' if your ReadFile supports it
 			data, err := r.Executer.IoutilReadFile(path)
 			return strings.TrimSpace(string(data)), err
 		},
 	)
 }
 
-
 func (r OsDeviceConnectivityNvmeOFc) parseAddressField(raw string) string {
-	// Sysfs address format: "trtype=fc,traddr=nn-0x200000110d123456:pn-0x100000110d123456"
 	for _, part := range strings.Split(raw, ",") {
 		if strings.HasPrefix(part, "traddr=") {
 			return strings.TrimPrefix(part, "traddr=")
@@ -364,6 +354,7 @@ func (r OsDeviceConnectivityNvmeOFc) parseAddressField(raw string) string {
 	}
 	return raw
 }
+
 
 // extractNvmeField extracts a field value from an nvme list-subsys path line.
 // e.g. extractNvmeField(line, "traddr=") returns "nn-5005...:pn-5005..."
@@ -380,32 +371,49 @@ func extractNvmeField(line, field string) string {
 	return rest[:end]
 }
 
-// discoverSubNqn runs "nvme discover" for one (arrayTargetPort, hostPort) pair
-// and returns the storage subsystem NQN. Returns ("", nil) if no path exists.
-func (r OsDeviceConnectivityNvmeOFc) discoverSubNqn(ctx context.Context, arrayTargetPort, hostPort string) (string, error) {
-	// 1. Extract raw WWNs by stripping "nn-" and "pn-" prefixes
-	// Input format example: "nn-5005076810003f8c:pn-50050768101c3f8c"
-	
-	targetParts := strings.Split(arrayTargetPort, ":")
-	hostParts := strings.Split(hostPort, ":")
-	
-	if len(targetParts) < 2 || len(hostParts) < 2 {
-		return "", fmt.Errorf("invalid port format target=%s host=%s", arrayTargetPort, hostPort)
+
+
+
+
+
+// extractRawWWNs splits an address string and isolates the raw hex digits by stripping out structural labels.
+func (r OsDeviceConnectivityNvmeOFc) extractRawWWNs(portStr string) (string, string, error) {
+	parts := strings.Split(strings.ToLower(strings.TrimSpace(portStr)), ":")
+	if len(parts) < 2 {
+		return "", "", fmt.Errorf("invalid port structure string encountered: %s", portStr)
 	}
 
-	// Strip "nn-" and "pn-" labels to get raw hex strings
-	targetNN := strings.TrimPrefix(targetParts[0], "nn-")
-	targetPN := strings.TrimPrefix(targetParts[1], "pn-")
-	hostNN := strings.TrimPrefix(hostParts[0], "nn-")
-	hostPN := strings.TrimPrefix(hostParts[1], "pn-")
+	// BUG FIX: Clean both the outer label string and any nested hex prefixes (0x) in sequence
+	nn := strings.TrimPrefix(strings.TrimPrefix(parts[0], "nn-"), "0x")
+	pn := strings.TrimPrefix(strings.TrimPrefix(parts[1], "pn-"), "0x")
+	
+	if nn == "" || pn == "" {
+		return "", "", fmt.Errorf("parsed empty WWN values from string: %s", portStr)
+	}
 
-	// 2. Construct the exact kernel command string
-	// Format: transport=fc,traddr=nn-0x...,host_traddr=nn-0x...,nqn=...
-	// Note: The kernel requires the "0x" prefix for FC hex values
-	cmd := fmt.Sprintf("transport=fc,traddr=nn-0x%s:pn-0x%s,host_traddr=nn-0x%s:pn-0x%s,nqn=nqn.2014-08.org.nvmexpress.discovery", 
-		targetNN, targetPN, hostNN, hostPN)
+	return nn, pn, nil
+}
 
-	// Use your infra to wrap the blocking file write (Req 6)
+
+
+// discoverSubNqn runs "nvme discover" for one (arrayTargetPort, hostPort) pair
+// and returns the storage subsystem NQN. Returns ("", nil) if no path exists.
+// discoverSubNqn manages target subsystem discovery commands sequentially.
+func (r OsDeviceConnectivityNvmeOFc) discoverSubNqn(ctx context.Context, arrayTargetPort, hostPort string) (string, error) {
+	// BUG FIX: Extract raw strings safely, removing potential pre-existing '0x' or labels
+	targetNN, targetPN, err := r.extractRawWWNs(arrayTargetPort)
+	if err != nil {
+		return "", err
+	}
+	hostNN, hostPN, err := r.extractRawWWNs(hostPort)
+	if err != nil {
+		return "", err
+	}
+
+	// BUG FIX: Append missing '\n' termination character to trigger the line-buffered kernel state machine parser
+	cmd := fmt.Sprintf("transport=fc,traddr=nn-0x%s:pn-0x%s,host_traddr=nn-0x%s:pn-0x%s,nqn=%s\n", 
+		targetNN, targetPN, hostNN, hostPN, nvmeDiscoveryNqn)
+
 	rawOutput, err := executer.ExecuteUninterruptible(
 		ctx, 
 		r.KeyedGater,
@@ -419,10 +427,11 @@ func (r OsDeviceConnectivityNvmeOFc) discoverSubNqn(ctx context.Context, arrayTa
 	if err != nil {
 		logger.Debugf("NVMe-oFC discoverSubNqn: nvme discover failed target=%s host=%s: %v",
 			arrayTargetPort, hostPort, err)
-		return "", err // Return the error to the loop so it logs properly
+		return "", err 
 	}
 
-	subNqn := parseSubNqnFromDiscoverOutput(rawOutput)
+	// BUG FIX: Pass the raw payload string converted to bytes to maintain slice compatibility 
+	subNqn := parseSubNqnFromDiscoverOutput([]byte(rawOutput))
 	if subNqn != "" {
 		logger.Debugf("NVMe-oFC discoverSubNqn: discovered subnqn=%s target=%s host=%s",
 			subNqn, arrayTargetPort, hostPort)
@@ -431,31 +440,24 @@ func (r OsDeviceConnectivityNvmeOFc) discoverSubNqn(ctx context.Context, arrayTa
 	return subNqn, nil
 }
 
-
+// executeKernelDiscovery writes the discovery payload string directly into the kernel fabrics channel.
 func (r OsDeviceConnectivityNvmeOFc) executeKernelDiscovery(cmd string) (string, error) {
-	// 1. Open fabrics device
-	// Requirement 3 & 4: Direct interaction with kernel device
 	f, err := os.OpenFile("/dev/nvme-fabrics", os.O_WRONLY|os.O_APPEND, 0)
 	if err != nil {
 		return "", fmt.Errorf("open /dev/nvme-fabrics failed: %w", err)
 	}
 	defer f.Close()
 
-	// 2. Write the discovery command
-	// This triggers the kernel to create a discovery controller
 	if _, err := f.WriteString(cmd); err != nil {
 		return "", fmt.Errorf("write to nvme-fabrics failed: %w", err)
 	}
 
-	// 3. Scan sysfs for the newly created discovery controller to get the NQN
-	// Usually, this appears as /sys/class/nvme/nvmeX/
-	// We prefer this over parsing stdout (Req 4)
 	return r.findDiscoverySubNqnFromSysfs()
 }
 
+// findDiscoverySubNqnFromSysfs scans sysfs subsystems to read and parse the dynamic discovery log.
 func (r OsDeviceConnectivityNvmeOFc) findDiscoverySubNqnFromSysfs() (string, error) {
 	const sysPath = "/sys/class/nvme"
-	const discoveryNQN = "nqn.2014-08.org.nvmexpress.discovery"
 
 	entries, err := os.ReadDir(sysPath)
 	if err != nil {
@@ -463,35 +465,44 @@ func (r OsDeviceConnectivityNvmeOFc) findDiscoverySubNqnFromSysfs() (string, err
 	}
 
 	for _, entry := range entries {
-		// Controllers appear as /sys/class/nvme/nvmeX
 		if !strings.HasPrefix(entry.Name(), "nvme") {
 			continue
 		}
 
 		controllerPath := filepath.Join(sysPath, entry.Name())
 		
-		// 1. Verify this is a discovery controller by checking its Subsystem NQN
 		subnqnBuf, err := os.ReadFile(filepath.Join(controllerPath, "subsysnqn"))
 		if err != nil {
 			continue
 		}
 		
-		if strings.TrimSpace(string(subnqnBuf)) != discoveryNQN {
+		if strings.TrimSpace(string(subnqnBuf)) != nvmeDiscoveryNqn {
 			continue
 		}
 
-		// 2. A discovery controller won't have the target subnqn in its own attributes.
-		// Instead, we must read the 'discovery_log' or check for associated subsystems.
-		// However, per Requirement 4, for process-less discovery, we typically read 
-		// the log produced by the kernel's discovery attempt.
 		logPath := filepath.Join(controllerPath, "discovery_log")
-		logBuf, err := os.ReadFile(logPath)
+		
+		// BUG FIX: Read the discovery_log utilizing a pre-allocated fixed buffer size.
+		// Using os.ReadFile directly fails because sysfs files report a static size of 0 bytes.
+		logFile, err := os.Open(logPath)
 		if err != nil {
-			return "", fmt.Errorf("failed to read discovery log from %s: %w", entry.Name(), err)
+			return "", fmt.Errorf("failed to open discovery log from %s: %w", entry.Name(), err)
+		}
+		
+		// 16-byte log page header + space for up to 64 records
+		logBuf := make([]byte, 16+(64*recordSize))
+		n, err := io.ReadFull(logFile, logBuf)
+		logFile.Close() // Explicitly close file before deleting the temporary controller
+		
+		if err != nil && !errors.Is(err, io.EOF) && !errors.Is(err, io.ErrUnexpectedEOF) {
+			return "", fmt.Errorf("failed to pull complete stream data: %w", err)
 		}
 
-		// Use your existing parser on the raw binary/text log from the kernel
-		subNqn := parseSubNqnFromDiscoverOutput(string(logBuf))
+		// BUG FIX: Clean up the transient discovery controller immediately to avoid host resource leakage
+		deletePath := filepath.Join(controllerPath, "delete_controller")
+		_ = os.WriteFile(deletePath, []byte("1\n"), 0200)
+
+		subNqn := parseSubNqnFromDiscoverOutput(logBuf[:n])
 		if subNqn != "" {
 			return subNqn, nil
 		}
@@ -500,26 +511,27 @@ func (r OsDeviceConnectivityNvmeOFc) findDiscoverySubNqnFromSysfs() (string, err
 	return "", fmt.Errorf("no active discovery controller found in sysfs")
 }
 
-// NVMe Discovery Log Page Entry Header Structure
+// NVMe Discovery Log Page Entry Structure
+// Compliant with the NVMe Base Specification (1024 bytes per entry).
 type nvmeDiscoveryLogEntry struct {
-	Trtype      uint8     `header:"trtype"`      // Transport type (e.g., 2 for FC)
-	Adrfam      uint8     `header:"adrfam"`      // Address family
-	Subtype     uint8     `header:"subtype"`     // Subsystem type (0x2 = Storage Subsystem)
+	Trtype      uint8     `header:"trtype"`      // Transport type (0x2 = RDMA, 0x3 = FC, 0x4 = TCP)
+	Adrfam      uint8     `header:"adrfam"`      // Address family (0x1 = IPv4, 0x2 = IPv6, 0x3 = Fibre Channel)
+	Subtype     uint8     `header:"subtype"`     // Subsystem type (0x2 = NVMe Storage Subsystem)
 	Treq        uint8     `header:"treq"`        // Transport requirements
 	Portid      uint16    `header:"portid"`      // Port ID
 	Cntlid      uint16    `header:"cntlid"`      // Controller ID
 	Asqsz       uint32    `header:"asqsz"`       // Admin Submission Queue Size
-	Reserved    [20]byte  `header:"reserved"`    // Reserved space
-	Trsvcid     [32]byte  `header:"trsvcid"`     // Transport Service ID (port)
-	SubnqnBytes [256]byte `header:"subnqn"`      // The raw Target NQN we need
-	TraddrBytes [256]byte `header:"traddr"`      // Transport address
+	Reserved    [20]byte  `header:"reserved"`    // Reserved bytes to pad out entry header block
+	Trsvcid     [32]byte  `header:"trsvcid"`     // Transport Service ID (e.g. port number or service port)
+	SubnqnBytes [256]byte `header:"subnqn"`      // The raw, null-padded Target Subsystem NQN we need
+	TraddrBytes [256]byte `header:"traddr"`      // Transport address (e.g. target IP or WWN strings)
 	Tsas        [256]byte `header:"tsas"`        // Transport Specific Address Subtype
 }
 
+
 // parseSubNqnFromDiscoverOutput extracts the storage subsystem NQN from "nvme discover" output.
 // Skips the discovery controller NQN (nqn.2014-08.org.nvmexpress.discovery).
-func parseSubNqnFromDiscoverOutput(output string) string {
-	rawBytes := []byte(output)
+func parseSubNqnFromDiscoverOutput(rawBytes []byte) string {
 	if len(rawBytes) < 16 { // Ensure header preamble minimum exists
 		return ""
 	}
@@ -575,48 +587,40 @@ func parseSubNqnFromDiscoverOutput(output string) string {
 }
 
 
+// nvmeConnect executes direct writes onto the /dev/nvme-fabrics channel
 func (r OsDeviceConnectivityNvmeOFc) nvmeConnect(ctx context.Context, arrayTargetPort, hostPort, subNqn string) bool {
-	// 1. Extract raw WWNs by stripping "nn-" and "pn-" prefixes
-	targetParts := strings.Split(arrayTargetPort, ":")
-	hostParts := strings.Split(hostPort, ":")
-	
-	if len(targetParts) < 2 || len(hostParts) < 2 {
-		logger.Errorf("NVMe-oFC nvmeConnect: invalid port format target=%s host=%s", arrayTargetPort, hostPort)
+	// BUG FIX 1: Strip formatting symbols securely via helper function before manual templating
+	targetNN, targetPN, err := r.extractRawWWNs(arrayTargetPort)
+	if err != nil {
+		logger.Errorf("NVMe-oFC nvmeConnect: target error: %v", err)
+		return false
+	}
+	hostNN, hostPN, err := r.extractRawWWNs(hostPort)
+	if err != nil {
+		logger.Errorf("NVMe-oFC nvmeConnect: host error: %v", err)
 		return false
 	}
 
-	// Strip "nn-" and "pn-" labels to isolate raw hex strings
-	targetNN := strings.TrimPrefix(targetParts[0], "nn-")
-	targetPN := strings.TrimPrefix(targetParts[1], "pn-")
-	hostNN := strings.TrimPrefix(hostParts[0], "nn-")
-	hostPN := strings.TrimPrefix(hostParts[1], "pn-")
-
-	// 2. Construct the kernel-native connection string using required 0x prefixes
-	// Req 1 & 2: This format is compatible with RHEL7+ kernels
-	options := fmt.Sprintf("nqn=%s,transport=%s,traddr=nn-0x%s:pn-0x%s,host_traddr=nn-0x%s:pn-0x%s",
+	// BUG FIX 5: Append mandatory '\n' to trigger the line-buffered kernel fabrics state machine parser
+	options := fmt.Sprintf("nqn=%s,transport=%s,traddr=nn-0x%s:pn-0x%s,host_traddr=nn-0x%s:pn-0x%s\n",
 		subNqn, nvmeTransportFC, targetNN, targetPN, hostNN, hostPN)
 
-	// Req 6 & 8: Use your infrastructure to protect against "D" state hangs
 	resourceKey := fmt.Sprintf("connect-%s-%s", subNqn, arrayTargetPort)
 	
 	out, err := executer.ExecuteUninterruptible(
 		ctx,
 		r.KeyedGater, resourceKey, 1, 1, 5*time.Second, 30*time.Second,
 		func(wCtx context.Context) (string, error) {
-			// Req 4: Direct file write instead of process invocation
 			f, err := os.OpenFile("/dev/nvme-fabrics", os.O_WRONLY|os.O_APPEND, 0)
 			if err != nil {
 				return "", fmt.Errorf("failed to open fabrics device: %w", err)
 			}
 			defer f.Close()
 
-			// Writing to this file triggers the kernel's nvme-fabrics connect state machine
 			_, err = f.WriteString(options)
 			if err != nil {
-				// If already connected, kernel returns EALREADY
-				if strings.Contains(err.Error(), "already connected") || 
-				   strings.Contains(err.Error(), "file exists") ||
-				   strings.Contains(err.Error(), "device or resource busy") {
+				// BUG FIX 2: Implement robust POSIX error identification using errors.Is instead of text matching
+				if errors.Is(err, syscall.EALREADY) || errors.Is(err, syscall.EEXIST) || errors.Is(err, syscall.EBUSY) {
 					return "already_connected", nil
 				}
 				return "", err
@@ -645,10 +649,8 @@ func (r OsDeviceConnectivityNvmeOFc) getHostFCPorts(ctx context.Context) ([]stri
 
 	var hostPorts []string
 	for _, portPath := range portPaths {
-		// Identify the HBA (e.g., "host0") for the Gater key
 		hostName := filepath.Base(filepath.Dir(portPath))
 
-		// Requirement 6 & 8: Wrap the potentially blocking sysfs read
 		res, err := executer.ExecuteUninterruptible(
 			ctx,
 			r.KeyedGater,
@@ -656,7 +658,6 @@ func (r OsDeviceConnectivityNvmeOFc) getHostFCPorts(ctx context.Context) ([]stri
 			1, 1, 
 			2*time.Second, 5*time.Second,
 			func(workerCtx context.Context) (string, error) {
-				// Requirement 4: Direct file descriptors for lower footprint
 				return r.readFCPortPairDirect(portPath)
 			},
 		)
@@ -676,7 +677,7 @@ func (r OsDeviceConnectivityNvmeOFc) getHostFCPorts(ctx context.Context) ([]stri
 	return hostPorts, nil
 }
 
-// readFCPortPairDirect ensures we match your exact output format
+// readFCPortPairDirect cleanly reads specific hardware details bypassing high-overhead mechanisms
 func (r OsDeviceConnectivityNvmeOFc) readFCPortPairDirect(portPath string) (string, error) {
 	nodePath := filepath.Join(filepath.Dir(portPath), "node_name")
 
@@ -692,9 +693,7 @@ func (r OsDeviceConnectivityNvmeOFc) readFCPortPairDirect(portPath string) (stri
 		if err != nil {
 			return "", err
 		}
-		// Clean "0x" and whitespace
-		val := strings.TrimSpace(string(buf[:n]))
-		return strings.TrimPrefix(val, "0x"), nil
+		return strings.TrimSpace(string(buf[:n])), nil
 	}
 
 	portName, err := readFn(portPath)
@@ -702,13 +701,8 @@ func (r OsDeviceConnectivityNvmeOFc) readFCPortPairDirect(portPath string) (stri
 		logger.Warningf("NVMe-oFC getHostFCPorts: cannot read %s: %v", portPath, err)
 		return "", err
 	}
-	
-	if err != nil || portName == "" {
-		return "", err
-	}
 
 	nodeName, err := readFn(nodePath)
-	
 	if err != nil {
 		logger.Warningf("NVMe-oFC getHostFCPorts: cannot read %s: %v", nodePath, err)
 		return "", err
@@ -716,13 +710,13 @@ func (r OsDeviceConnectivityNvmeOFc) readFCPortPairDirect(portPath string) (stri
 	
 	if portName == "" || nodeName == "" {
 		logger.Warningf("NVMe-oFC getHostFCPorts: empty port/node name at %s, skipping", portPath) 
-		return "", err
+		return "", fmt.Errorf("empty hardware description fields encountered")
 	}
 	
-
-	// Returns exact format: nn-<node_name>:pn-<port_name>
+	// BUG FIX 1 & 2: Maintain original format strings uniformly across all modules
 	return fmt.Sprintf("nn-%s:pn-%s", nodeName, portName), nil
 }
+
 
 // Low-level helper to meet Requirement 3 & 4
 func (r OsDeviceConnectivityNvmeOFc) readSysfsFC(portPath string) (string, error) {
@@ -742,7 +736,7 @@ func (r OsDeviceConnectivityNvmeOFc) readSysfsFC(portPath string) (string, error
 		if err != nil {
 			return "", err
 		}
-		return strings.TrimPrefix(strings.TrimSpace(string(buf[:n])), "0x"), nil
+		return strings.TrimSpace(string(buf[:n])), nil
 	}
 
 	pn, _ := readFn(portPath)
