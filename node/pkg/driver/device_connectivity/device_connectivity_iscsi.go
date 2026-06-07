@@ -145,35 +145,41 @@ func (r OsDeviceConnectivityIscsi) iscsiGetRawSessions(ctx context.Context) ([]s
 		sessionID := strings.TrimPrefix(s.Name(), "session")
 		sessionPath := filepath.Join(sysPath, s.Name())
 
+		// Context Check: Ensure we respect upstream cancellations or timeouts 
+		// before initiating block reads on a target session path.
+		if err := ctx.Err(); err != nil {
+			logger.Warningf("Context canceled during session directory scan: %v", err)
+			return nil, err
+		}
+
 		// 1. Quick Exit for non-logged-in sessions
 		stateBuf, err := r.readSysfs(filepath.Join(sessionPath, "state"))
 		if err != nil {
-			logger.Error("Ignore")
-			continue // Session likely vanished during ReadDir (common race condition)
+			logger.Warningf("Session %s likely vanished during processing, skipping", sessionID)
+			continue // Gracefully skip common race condition (Session vanished during ReadDir)
 		}
 		stateStr := strings.TrimSpace(string(stateBuf))
 
 		if stateStr != "LOGGED_IN" {
-			logger.Warningf("Session %s is in %s", sessionID, stateStr)
+			logger.Warningf("Session %s is in %s state, skipping", sessionID, stateStr)
 			// Ignore other transient/failed states (REOPENING, FREE, etc.)
 			continue
 		}
 
 		targetNameBuf, err := r.readSysfs(filepath.Join(sessionPath, "targetname"))
 		if err != nil {
-			logger.Error("Cannot read target")
-			continue
+			logger.Errorf("Cannot read target for session %s, skipping", sessionID)
+			continue // Handle partial teardown gracefully
 		}
 		targetName := strings.TrimSpace(string(targetNameBuf))
 		
 		logger.Errorf("Target name %s", targetName)
 
 		// 2. Direct Traversal (Avoids Glob overhead)
-		// Path: /sys/class/iscsi_session/sessionX/device/connectionX:S/iscsi_connection/connectionX:S/
 		devicePath := filepath.Join(sessionPath, "device")
 		connDirs, err := os.ReadDir(devicePath)
 		if err != nil {
-			logger.Error("Cannot open devicePath")
+			logger.Errorf("Cannot open devicePath for session %s, skipping", sessionID)
 			continue
 		}
 
@@ -183,28 +189,26 @@ func (r OsDeviceConnectivityIscsi) iscsiGetRawSessions(ctx context.Context) ([]s
 				continue
 			}
 			
-			// 2. The standard path: /device/connectionX:S/iscsi_connection/connectionX:S/
-			// We use cd.Name() for both levels to ensure they match dynamically.
+			// Path structure: /device/connectionX:S/iscsi_connection/connectionX:S/
 			attrPath := filepath.Join(devicePath, cd.Name(), "iscsi_connection", cd.Name())
 
-			// FIX 2: Check existence first before attempting to read
+			// Fallback check if the subdirectory structure differs on older kernel versions
 			if _, err := os.Stat(attrPath); os.IsNotExist(err) {
-				logger.Warning("subdir not found")
+				logger.Warningf("Subdir not found for connection %s, falling back to base connection path", cd.Name())
 				attrPath = filepath.Join(devicePath, cd.Name())
 			}
 
-			// FIX 3: Correct assignment for os.ReadFile (it returns []byte, error)
 			addrBuf, errA := os.ReadFile(filepath.Join(attrPath, "address"))
 			portBuf, errP := os.ReadFile(filepath.Join(attrPath, "port"))
 			
 			if errA != nil {
-				logger.Error("errA")
+				logger.Errorf("Failed to read connection address for %s: %v", cd.Name(), errA)
 			}
 			if errP != nil {
-				logger.Error("errP")
+				logger.Errorf("Failed to read connection port for %s: %v", cd.Name(), errP)
 			}
-			// TODO trim
 
+			// Construct the record string only if both components were successfully read
 			if errA == nil && errP == nil {
 				logger.Error("Compare portal")
 				portal := net.JoinHostPort(
@@ -212,85 +216,10 @@ func (r OsDeviceConnectivityIscsi) iscsiGetRawSessions(ctx context.Context) ([]s
 					strings.TrimSpace(string(portBuf)),
 				)
 				logger.Errorf("Compare portal %s", portal)
-				// Format matches parser: "tcp: [id] ip:port iqn"
-				// Format as: tcp: [1] 192.168.1.100:3260 iqn.2026.com.ibm:target
-				// Matches iscsiadm format exactly for downstream parsers
+				
+				// Re-synthesizes the native/iscsiadm output format exactly: "tcp: [id] ip:port iqn"
 				results = append(results, fmt.Sprintf("tcp: [%s] %s %s", sessionID, portal, targetName))
 				break // One connection per session is the standard CSI expectation
-			}
-		}
-	}
-	return results, nil
-}
-
-
-
-
-// -------------------------------------------------------------------------
-// Core iSCSI Function Suite
-// -------------------------------------------------------------------------
-
-// iscsiGetRawSessions streams local active sessions from sysfs to mimic iscsiadm format
-func (r OsDeviceConnectivityIscsi) iscsiGetRawSessions(ctx context.Context) ([]string, error) {
-	sessions, err := os.ReadDir(sysPath)
-	if err != nil {
-		if os.IsNotExist(err) {
-			return []string{}, nil
-		}
-		return nil, fmt.Errorf("failed to read %s: %w", sysPath, err)
-	}
-
-	var results []string
-	for _, s := range sessions {
-		if !strings.HasPrefix(s.Name(), "session") {
-			continue
-		}
-
-		sessionID := strings.TrimPrefix(s.Name(), "session")
-		sessionPath := filepath.Join(sysPath, s.Name())
-
-		stateBuf, err := r.readSysfs(filepath.Join(sessionPath, "state"))
-		if err != nil {
-			continue // Transient session disappeared
-		}
-		
-		if strings.TrimSpace(string(stateBuf)) != "LOGGED_IN" {
-			continue
-		}
-
-		targetNameBuf, err := r.readSysfs(filepath.Join(sessionPath, "targetname"))
-		if err != nil {
-			continue
-		}
-		targetName := strings.TrimSpace(string(targetNameBuf))
-
-		devicePath := filepath.Join(sessionPath, "device")
-		connDirs, err := os.ReadDir(devicePath)
-		if err != nil {
-			continue
-		}
-
-		for _, cd := range connDirs {
-			if !strings.HasPrefix(cd.Name(), "connection") {
-				continue
-			}
-
-			attrPath := filepath.Join(devicePath, cd.Name(), "iscsi_connection", cd.Name())
-			if _, err := os.Stat(attrPath); os.IsNotExist(err) {
-				attrPath = filepath.Join(devicePath, cd.Name())
-			}
-
-			addrBuf, errA := os.ReadFile(filepath.Join(attrPath, "address"))
-			portBuf, errP := os.ReadFile(filepath.Join(attrPath, "port"))
-
-			if errA == nil && errP == nil {
-				addr := strings.TrimSpace(string(addrBuf))
-				port := strings.TrimSpace(string(portBuf))
-				portal := net.JoinHostPort(addr, port)
-				
-				// Re-synthesizes standard CLI format for parsing engines
-				results = append(results, fmt.Sprintf("tcp: [%s] %s %s", sessionID, portal, targetName))
-				break
 			}
 		}
 	}
@@ -782,16 +711,22 @@ func (r OsDeviceConnectivityIscsi) EnsurePort(portal string) string {
 
 // getDiscoveryScopeKey groups locks by subnet prefix to avoid write collisions on the same storage array
 func (r OsDeviceConnectivityIscsi) getDiscoveryScopeKey(portal string) string {
-	ipStr := r.ExtractIP(portal)
-	ip := net.ParseIP(ipStr)
-	if ip == nil {
-		return ipStr
-	}
-	if ipv4 := ip.To4(); ipv4 != nil {
-		return fmt.Sprintf("%d.%d.%d", ipv4[0], ipv4[1], ipv4[2]) // /24 grouping
-	}
-	if ipv6 := ip.To16(); ipv6 != nil {
-		return fmt.Sprintf("%x:%x:%x:%x", ipv6[0]:ipv6[1], ipv6[2]:ipv6[3], ipv6[4]:ipv6[5], ipv6[6]:ipv6[7]) // /64 grouping
-	}
-	return ipStr
+        ipStr := r.ExtractIP(portal)
+        ip := net.ParseIP(ipStr)
+        if ip == nil {
+                return ipStr
+        }
+        if ipv4 := ip.To4(); ipv4 != nil {
+                return fmt.Sprintf("%d.%d.%d", ipv4[0], ipv4[1], ipv4[2]) // /24 grouping
+        }
+        if ipv6 := ip.To16(); ipv6 != nil {
+                // FIX: Combine adjacent bytes to construct the first four 16-bit blocks of a standard IPv6 /64 prefix
+                block1 := uint16(ipv6[0])<<8 | uint16(ipv6[1])
+                block2 := uint16(ipv6[2])<<8 | uint16(ipv6[3])
+                block3 := uint16(ipv6[4])<<8 | uint16(ipv6[5])
+                block4 := uint16(ipv6[6])<<8 | uint16(ipv6[7])
+
+                return fmt.Sprintf("%x:%x:%x:%x", block1, block2, block3, block4) // /64 grouping
+        }
+        return ipStr
 }
