@@ -4,7 +4,7 @@ if [[ "$(uname -m)" == "s390x" ]]; then
   export PROTOCOL_BUFFERS_PYTHON_IMPLEMENTATION=python
 fi
 coveragedir=/driver/coverage/
-[ ! -d $coveragedir ] && mkdir -p $coveragedir
+[[ ! -d "$coveragedir" ]] && mkdir -p "$coveragedir"
 
 run_tests() {
     timeout 120 pytest \
@@ -21,6 +21,12 @@ run_tests() {
         --junit-xml=$coveragedir/.unitests.xml \
         controllers/tests/ \
         "$@"
+
+    local exit_code=$?
+    # exit_codes:
+    # 124 = timeout expired
+    # 137 = killed by signal
+    return $exit_code
 }
 
 MAX_FAILURES=3
@@ -38,7 +44,7 @@ while true; do
         failures=$((failures + 1))
         echo "[Attempt $attempt] Tests FAILED (failure $failures of $MAX_FAILURES)."
 
-        if [ $failures -ge $MAX_FAILURES ]; then
+        if [[ $failures -ge $MAX_FAILURES ]]; then
             echo "Maximum failures ($MAX_FAILURES) reached. Aborting."
             exit 1
         fi

@@ -198,7 +198,7 @@ class HostDefinerServicer:
             return all_ports
 
         # Convert do_not_remove_ports to a set for efficient lookup (case-insensitive)
-        ports_to_keep = set(port.lower() for port in do_not_remove_ports)
+        ports_to_keep = {port.lower() for port in do_not_remove_ports}
 
         # Return only ports that are not in the keep list (case-insensitive comparison)
         return [port for port in all_ports if port.lower() not in ports_to_keep]
@@ -218,7 +218,7 @@ class HostDefinerServicer:
             return new_ports
 
         # Convert existing_ports to a set for efficient lookup (case-insensitive)
-        existing_ports_set = set(port.lower() for port in existing_ports)
+        existing_ports_set = {port.lower() for port in existing_ports}
 
         # Return only ports that are not already on the host (case-insensitive comparison)
         return [port for port in new_ports if port.lower() not in existing_ports_set]

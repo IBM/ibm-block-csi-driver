@@ -198,16 +198,16 @@ def are_initiators_equal(initiator_str1, initiator_str2, protocol=None):
 
         # Compare initiators by converting to sets (case-insensitive)
         nvme_equal = (
-            set(nqn.lower() for nqn in initiators1.nvme_nqns) ==
-            set(nqn.lower() for nqn in initiators2.nvme_nqns)
+            {nqn.lower() for nqn in initiators1.nvme_nqns} ==
+            {nqn.lower() for nqn in initiators2.nvme_nqns}
         )
         fc_equal = (
-            set(wwn.lower() for wwn in initiators1.fc_wwns) ==
-            set(wwn.lower() for wwn in initiators2.fc_wwns)
+            {wwn.lower() for wwn in initiators1.fc_wwns} ==
+            {wwn.lower() for wwn in initiators2.fc_wwns}
         )
         iscsi_equal = (
-            set(iqn.lower() for iqn in initiators1.iscsi_iqns) ==
-            set(iqn.lower() for iqn in initiators2.iscsi_iqns)
+            {iqn.lower() for iqn in initiators1.iscsi_iqns} ==
+            {iqn.lower() for iqn in initiators2.iscsi_iqns}
         )
 
         if protocol == ISCSI_CONNECTIVITY_TYPE:
@@ -350,7 +350,7 @@ def get_node_initiators(node_name):
     legacy_initiators = _parse_initiators_from_legacy_node_id(node_name)
 
     if legacy_initiators:
-        logger.info(f"Successfully parsed initiators from legacy node_id format")
+        logger.info("Successfully parsed initiators from legacy node_id format")
         return legacy_initiators
 
     # Return empty initiators if nothing found
