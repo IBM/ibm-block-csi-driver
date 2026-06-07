@@ -35,6 +35,7 @@ const (
 	IscsiCmdTimeout     = 30 * time.Second
 	iscsiPort           = 3260
 	ISCSIErrNoObjsFound = 21
+	sysPath             = "/sys/class/iscsi_session"
 )
 
 type OsDeviceConnectivityIscsi struct {
@@ -60,65 +61,64 @@ func (r OsDeviceConnectivityIscsi) iscsiCmd(args ...string) (string, error) {
 }
 
 func (r OsDeviceConnectivityIscsi) iscsiDiscover(ctx context.Context, portal string) error {
-	logger.Infof("Performing iSCSI discovery for portal: %s", portal)
+	// Fixed: Lock scope isolated via subnet to balance performance and avoid DB collisions
+	lockScope := r.getDiscoveryScopeKey(portal)
 
-	// REQUIREMENT 6: Gater prevents concurrent discovery to the same portal
-	// We use the portal IP as the key to isolate failures.
-	err := r.KeyedGater.Acquire(ctx, "discovery-"+portal, 1, 15*time.Second)
+	err := r.KeyedGater.Acquire(ctx, "discovery-scope-"+lockScope, 1, 30*time.Second)
 	if err != nil {
-		logger.Error("Acquire")
-		return err
-	}
-	defer r.KeyedGater.Release("discovery-"+portal)
-
-	// Adding --op=update ensures that if the TPGT or other parameters
-	// changed on the array, the local Open-iSCSI DB is refreshed.	
-	output, err := r.iscsiCmd("-m", "discoverydb", "-t", "sendtargets", "-p", portal, "--discover", "--op=update")
-	if err != nil {
-		// On RH7, discovery might fail if the DB is locked. 
-		// The Gater + Context ensures we don't stay stuck.	
-		logger.Errorf("Failed to discover iSCSI for %s: {%s}, error: {%s}", portal, output, err)
+		logger.Errorf("Timeout waiting for discovery scope lock %s: %v", lockScope, err)
+		return err}
+	defer r.KeyedGater.Release("discovery-scope-" + lockScope)
+	cliPortal := r.EnsurePort(portal)
+	output, err := r.iscsiCmd("-m", "discoverydb", "-t", "sendtargets", "-p", cliPortal, "--discover", "--op=update")
+	if err != nil  {
+		logger.Errorf("Failed to discover iSCSI for %s: %s (err: %v)", cliPortal, output, err)
 		return err
 	}
 	return nil
 }
 
-
-
 func (r OsDeviceConnectivityIscsi) iscsiLogin(ctx context.Context, targetName, portal string) {
-	// REQUIREMENT 6: Gater prevents a "Thundering Herd" on a single portal
-	// We use the portal IP as the key to isolate failures.
-	err := r.KeyedGater.Acquire(ctx, "login-"+portal, 1, 30*time.Second)
+	// 1. Isolate the concurrency gate lock using strictly the portal's IP address.
+	// This prevents format variations (like "10.0.0.1" vs "10.0.0.1:3260") from bypassing the lock.
+	ipKey := r.ExtractIP(portal)
+	err := r.KeyedGater.Acquire(ctx, "login-"+ipKey, 1, 30*time.Second)
 	if err != nil {
-		logger.Errorf("Gater: timed out waiting for login slot on %s", portal)
+		logger.Errorf("Gater: timed out waiting for login slot on portal IP %s", ipKey)
 		return
 	}
-	defer r.KeyedGater.Release("login-"+portal)
+	defer r.KeyedGater.Release("login-" + ipKey)
 	
-	// portal is already normalized to "host:port" via r.normalizePortal()
-	output, err := r.iscsiCmd("-m", "node", "-p", portal, "-T", targetName, "--login")
+	// 2. Ensure a port format exists on the portal parameter string.
+	// The iscsiadm CLI strictly requires the host:port format to match its internal node records.
+	cliPortal := r.EnsurePort(portal)
+	
+	logger.Infof("Executing iSCSI login for target %s via portal %s", targetName, cliPortal)
+	output, err := r.iscsiCmd("-m", "node", "-p", cliPortal, "-T", targetName, "--login")
 
+	// 3. Evaluate the command response and exit codes gracefully
 	if err != nil {
 		if exitCode, isExitError := r.Executer.GetExitCode(err); isExitError {
-			// 15 = Already logged in. This is success for CSI.
-			// TODO exit code doesn't work
+			// Exit Code 15: ISCSI_ERR_LOGIN_EXIST
+			// The session is already logged in and active. This is a success state for a CSI driver.
 			if exitCode == 15 {
-				logger.Debugf("iSCSI session for %s (%s) already active", targetName, portal)
+				logger.Debugf("iSCSI session for %s (%s) already active", targetName, cliPortal)
 				return
 			}
 
-			// 24 = Login failed but session exists (often happens during transient SVC failovers)
+			// Exit Code 24: ISCSI_ERR_SESSION_EXISTS
+			// The connection session exists but logging in failed (common during transient storage failovers).
+			// We treat this as success because Linux Multipath daemon (multipathd) handles path recovery automatically.
 			if exitCode == 24 {
-				logger.Warningf("iSCSI session exists but login failed for %s. Multipath will handle recovery.", portal)
+				logger.Warningf("iSCSI session exists but login failed for %s. Multipath will handle recovery.", cliPortal)
 				return
 			}
 		}
 
-		// Real error: log it so we can debug fabric/auth issues
-		logger.Errorf("Failed to login iSCSI target %s via %s: %s (err: %v)", targetName, portal, output, err)
+		// Real connection, authorization, or fabric failure: log details for storage troubleshooting
+		logger.Errorf("Failed to login iSCSI target %s via %s: %s (err: %v)", targetName, cliPortal, output, err)
 	}
 }
-
 
 // iscsiGetRawSessions now reads from /sys/class/iscsi_session
 // It returns lines in the format: "tcp: [1] 192.168.1.100:3260,1 iqn.target.name"
@@ -223,39 +223,124 @@ func (r OsDeviceConnectivityIscsi) iscsiGetRawSessions(ctx context.Context) ([]s
 	return results, nil
 }
 
+
+
+
+// -------------------------------------------------------------------------
+// Core iSCSI Function Suite
+// -------------------------------------------------------------------------
+
+// iscsiGetRawSessions streams local active sessions from sysfs to mimic iscsiadm format
+func (r OsDeviceConnectivityIscsi) iscsiGetRawSessions(ctx context.Context) ([]string, error) {
+	sessions, err := os.ReadDir(sysPath)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return []string{}, nil
+		}
+		return nil, fmt.Errorf("failed to read %s: %w", sysPath, err)
+	}
+
+	var results []string
+	for _, s := range sessions {
+		if !strings.HasPrefix(s.Name(), "session") {
+			continue
+		}
+
+		sessionID := strings.TrimPrefix(s.Name(), "session")
+		sessionPath := filepath.Join(sysPath, s.Name())
+
+		stateBuf, err := r.readSysfs(filepath.Join(sessionPath, "state"))
+		if err != nil {
+			continue // Transient session disappeared
+		}
+		
+		if strings.TrimSpace(string(stateBuf)) != "LOGGED_IN" {
+			continue
+		}
+
+		targetNameBuf, err := r.readSysfs(filepath.Join(sessionPath, "targetname"))
+		if err != nil {
+			continue
+		}
+		targetName := strings.TrimSpace(string(targetNameBuf))
+
+		devicePath := filepath.Join(sessionPath, "device")
+		connDirs, err := os.ReadDir(devicePath)
+		if err != nil {
+			continue
+		}
+
+		for _, cd := range connDirs {
+			if !strings.HasPrefix(cd.Name(), "connection") {
+				continue
+			}
+
+			attrPath := filepath.Join(devicePath, cd.Name(), "iscsi_connection", cd.Name())
+			if _, err := os.Stat(attrPath); os.IsNotExist(err) {
+				attrPath = filepath.Join(devicePath, cd.Name())
+			}
+
+			addrBuf, errA := os.ReadFile(filepath.Join(attrPath, "address"))
+			portBuf, errP := os.ReadFile(filepath.Join(attrPath, "port"))
+
+			if errA == nil && errP == nil {
+				addr := strings.TrimSpace(string(addrBuf))
+				port := strings.TrimSpace(string(portBuf))
+				portal := net.JoinHostPort(addr, port)
+				
+				// Re-synthesizes standard CLI format for parsing engines
+				results = append(results, fmt.Sprintf("tcp: [%s] %s %s", sessionID, portal, targetName))
+				break
+			}
+		}
+	}
+	return results, nil
+}
+
+// getAllSessions groups currently active sessions into maps isolated by IP key signatures
 func (r OsDeviceConnectivityIscsi) getAllSessions(ctx context.Context) (map[string]map[string]bool, error) {
 	lines, err := r.iscsiGetRawSessions(ctx)
 	if err != nil {
-		logger.Error("Cannot get raw")
 		return nil, err
 	}
 
 	portalsByTarget := make(map[string]map[string]bool)
 	for _, line := range lines {
-		// Native/iscsiadm format: "tcp: [id] 1.2.3.4:3260 iqn.2026-01.com.example:target"
-		logger.Errorf("Check line %s", line)
+		line = strings.TrimSpace(line)
+		if line == "" {
+			continue // Completely empty lines are safe to ignore gracefully
+		}
+
 		parts := strings.Fields(line)
-		// Check for "tcp" as validity in case we switch back to using iscsiadm
-		if len(parts) < 4 || !strings.HasPrefix(parts[0], "tcp") {
-			logger.Error("Malformed line")
+		
+		// If it doesn't start with tcp, it's likely a benign log header or comment. 
+		// We can safely skip it without assuming a session was lost.
+		if len(parts) > 0 && !strings.HasPrefix(parts[0], "tcp") {
+			logger.Warningf("Skipping non-session utility line: %s", line)
 			continue
 		}
 
-		// Normalize both pieces of data from sysfs
+		// CRITICAL LINE VALIDATION: 
+		// If the line explicitly claimed to be a "tcp" session entry but is missing 
+		// structural data fields, we MUST fail fast to prevent a dual-login collision.
+		if len(parts) < 4 {
+			logger.Errorf("CRITICAL: Active iSCSI session entry is corrupt or truncated: %s", line)
+			return nil, fmt.Errorf("failed to parse active iSCSI session list safely: truncation detected")
+		}
+
 		targetName := strings.ToLower(parts[3])
-		normalizedPortal := r.normalizePortal(parts[2])
-		
-		logger.Errorf("target %s portal %s", targetName, normalizedPortal)
+		ipKey := r.ExtractIP(parts[2]) // Strips ports for correct filterLoggedIn mapping
 
 		if _, exists := portalsByTarget[targetName]; !exists {
 			portalsByTarget[targetName] = make(map[string]bool)
 		}
-		portalsByTarget[targetName][normalizedPortal] = true
+		portalsByTarget[targetName][ipKey] = true
 	}
 	return portalsByTarget, nil
 }
 
 func (r OsDeviceConnectivityIscsi) filterLoggedIn(ctx context.Context, portalsByTarget map[string][]string) (map[string][]string, error) {
+	// 1. Fetch current active sessions (keys are lowercase IQNs and portless IPs)
 	loggedInPortalsByTarget, err := r.getAllSessions(ctx)
 	if err != nil {
 		logger.Error("Failed to get all sessions")
@@ -265,23 +350,28 @@ func (r OsDeviceConnectivityIscsi) filterLoggedIn(ctx context.Context, portalsBy
 	filteredPortalsByTarget := make(map[string][]string)
 
 	for targetName, portals := range portalsByTarget {
-		logger.Errorf("Scan target %s", targetName)
+		logger.Debugf("Scanning target for active sessions: %s", targetName)
 	
-		// IQNs are technically case-insensitive in the iSCSI spec,
-		// but Linux sysfs and iscsiadm usually present them as lowercase.
+		// Normalize target name to lowercase to match standard Linux sysfs formatting
 		normalizedTarget := strings.ToLower(targetName)
+		activePortals, exists := loggedInPortalsByTarget[normalizedTarget]
 
 		for _, portal := range portals {
-			logger.Errorf("Scan portal %s", portal)
-			// Normalize input portal to match the map keys
-			normalizedPortal := r.normalizePortal(portal)
+			logger.Debugf("Checking login status for portal: %s", portal)
+			
+			// FIX: Extract ONLY the IP/host identity to accurately match the map keys.
+			// This fixes the bug where appended ports caused false lookup misses.
+			ipKey := r.ExtractIP(portal)
 
-			activePortals, exists := loggedInPortalsByTarget[normalizedTarget]
-
-			// If target doesn't exist or this specific portal isn't logged in
-			if !exists || !activePortals[normalizedPortal] {
-				logger.Errorf("add target %s portal %s", targetName, portal)
+			// If the target has no active sessions, or this specific IP path isn't logged in yet
+			if !exists || !activePortals[ipKey] {
+				logger.Infof("Portal %s for target %s is not logged in; adding to execution queue.", portal, targetName)
+				
+				// CRITICAL: Append the ORIGINAL, unmutated 'portal' string (with its original port intact).
+				// This guarantees downstream commands like iscsiLogin receive fully qualified parameters.
 				filteredPortalsByTarget[targetName] = append(filteredPortalsByTarget[targetName], portal)
+			} else {
+				logger.Debugf("Portal %s for target %s is already logged in. Skipping redundant login.", portal, targetName)
 			}
 		}
 	}
@@ -289,39 +379,53 @@ func (r OsDeviceConnectivityIscsi) filterLoggedIn(ctx context.Context, portalsBy
 }
 
 func (r OsDeviceConnectivityIscsi) discoverAndLogin(ctx context.Context, portalsByTarget map[string][]string) {
-	// 1. Surgical Scan: Only load the DB entries for the targets we actually care about
+	// 1. Surgical Scan: Load existing target folders from the local database on disk.
+	// All keys inside dbCache are fully normalized to lowercase targets and portless IPs.
 	dbCache := r.loadRelevantTargets(portalsByTarget)
-
 	discoveredPortals := make(map[string]bool)
 
 	for targetName, requestedPortals := range portalsByTarget {
+		normalizedTarget := strings.ToLower(targetName)
+
 		for _, portal := range requestedPortals {
-			normPortal := r.normalizePortal(portal)
+			// Extract a standardized, portless IP key for accurate cache comparisons.
+			ipKey := r.ExtractIP(portal)
 
-			// If this specific portal isn't in the DB for this target, we must discover
-			if !dbCache[targetName][normPortal] {
-				if !discoveredPortals[normPortal] {
-					logger.Infof("Target %s portal %s missing from DB, discovering...", targetName, normPortal)
-					if err := r.iscsiDiscover(ctx, normPortal); err == nil {
-						discoveredPortals[normPortal] = true
+			// Double-Checked Lock Optimization: If the local disk database already 
+			// contains this target/IP record, skip discovery completely to maximize performance.
+			if dbCache[normalizedTarget] != nil && dbCache[normalizedTarget][ipKey] {
+				logger.Debugf("Target %s portal IP %s already verified in database cache. Skipping discovery.", targetName, ipKey)
+				continue
+			}
 
-						// FIX: Immediately update the DB cache.
-						// This ensures that if the same target is encountered again
-						// (or if multiple targets are discovered via one portal),
-						// the cache reflects the current system state.
-						if dbCache[targetName] == nil {
-							dbCache[targetName] = make(map[string]bool)
-						}
-						dbCache[targetName][normPortal] = true
+			// If the target record isn't in the database, execute discovery
+			if !discoveredPortals[ipKey] {
+				logger.Infof("Target %s portal IP %s missing from DB, triggering discovery sequence...", targetName, ipKey)
+				
+				// Pass the full unmutated portal string containing the port to ensure 
+				// iscsiadm can reach the array properly.
+				if err := r.iscsiDiscover(ctx, portal); err == nil {
+					discoveredPortals[ipKey] = true
+
+					// Gracefully update the dynamic runtime cache map so subsequent 
+					// targets discovered via this interface avoid redundant scans.
+					if dbCache[normalizedTarget] == nil {
+						dbCache[normalizedTarget] = make(map[string]bool)
 					}
+					dbCache[normalizedTarget][ipKey] = true
+				} else {
+					logger.Errorf("Discovery failed for portal %s. Proceeding gracefully with remaining targets.", portal)
 				}
 			}
 		}
 	}
 
-	// 2. Perform Logins (using 'exit 15' safe login)
+	// 2. Perform Logins (using 'exit 15' safe login checks)
+	// Iterates through the original slice payloads to preserve original caller formats 
+	// and ensure that standard host:port parameters pass directly to node map attachments.
 	for targetName, portals := range portalsByTarget {
 		for _, portal := range portals {
+			logger.Infof("Routing attachment request to login subsystem for target %s via %s", targetName, portal)
 			r.iscsiLogin(ctx, targetName, portal)
 		}
 	}
@@ -329,22 +433,25 @@ func (r OsDeviceConnectivityIscsi) discoverAndLogin(ctx context.Context, portals
 
 
 // loadRelevantTargets only probes the specific subdirectories for the targets in the request
+// loadRelevantTargets only probes the specific subdirectories for the targets in the request
 func (r OsDeviceConnectivityIscsi) loadRelevantTargets(requestedTargets map[string][]string) map[string]map[string]bool {
 	db := make(map[string]map[string]bool)
 	basePath := "/etc/iscsi/nodes"
 
 	for targetName := range requestedTargets {
+		// FIX: Use lowercase target keys to ensure case-insensitivity mapping
+		normalizedTarget := strings.ToLower(targetName)
 		targetPath := filepath.Join(basePath, targetName)
 		
 		logger.Errorf("Check target path %s", targetPath)
 
-		db[targetName] = make(map[string]bool)
+		db[normalizedTarget] = make(map[string]bool)
 
 		// Attempt to read the specific target directory
 		portals, err := os.ReadDir(targetPath)
 		if err != nil {
 			logger.Errorf("Check target path %s - fail", targetPath)
-			// Directory doesn't exist; target unknown to DB
+			// Graceful containment: directory doesn't exist; target unknown to DB
 			continue
 		}
 
@@ -362,21 +469,14 @@ func (r OsDeviceConnectivityIscsi) loadRelevantTargets(requestedTargets map[stri
 			parts := strings.Split(p.Name(), ",")
 			if len(parts) >= 2 {
 				logger.Error("portal validity")
-				// 1. Get raw IP and Port from the directory name
-				rawIP := parts[0]
-				rawPort := parts[1]
-
-				// 2. net.JoinHostPort correctly wraps IPv6 (parts[0]) in brackets
-				// if it detects colons, resulting in "[2001:db8::1]:3260"
-				hostPort := net.JoinHostPort(rawIP, rawPort)
-
-				// 3. Normalize to ensure consistent casing and bracket formatting
-				// to match the format used in filterLoggedIn logic.
-				norm := r.normalizePortal(hostPort)
 				
-				logger.Errorf("norm %s", norm)
+				// FIX: Run ExtractIP directly on the raw IP slice from the comma-split data.
+				// This isolates the raw, portless, bracketless IP key instantly and consistently.
+				ipKey := r.ExtractIP(parts[0])
 				
-				db[targetName][norm] = true
+				logger.Errorf("norm %s", ipKey)
+				
+				db[normalizedTarget][ipKey] = true
 			}
 		}
 	}
@@ -656,3 +756,42 @@ func (r *OsDeviceConnectivityIscsi) readSysfs(path string) (string, error) {
         return strings.Trim(string(data), " \n\r\t\x00"), nil
 }
 
+
+
+// -------------------------------------------------------------------------
+// Helper Utilities for Format Extraction & Key Isolation
+// -------------------------------------------------------------------------
+
+// ExtractIP extracts a clean, bracketless IP/host for internal map matching and KeyedGater locks.
+func (r OsDeviceConnectivityIscsi) ExtractIP(portal string) string {
+	portal = strings.ToLower(strings.TrimSpace(portal))
+	if host, _, err := net.SplitHostPort(portal); err == nil {
+		return strings.Trim(host, "[]")
+	}
+	return strings.Trim(portal, "[]")
+}
+
+// EnsurePort ensures that the portal string passed to CLI execution contains a port suffix.
+func (r OsDeviceConnectivityIscsi) EnsurePort(portal string) string {
+	portal = strings.TrimSpace(portal)
+	if _, _, err := net.SplitHostPort(portal); err == nil {
+		return portal
+	}
+	return net.JoinHostPort(portal, "3260")
+}
+
+// getDiscoveryScopeKey groups locks by subnet prefix to avoid write collisions on the same storage array
+func (r OsDeviceConnectivityIscsi) getDiscoveryScopeKey(portal string) string {
+	ipStr := r.ExtractIP(portal)
+	ip := net.ParseIP(ipStr)
+	if ip == nil {
+		return ipStr
+	}
+	if ipv4 := ip.To4(); ipv4 != nil {
+		return fmt.Sprintf("%d.%d.%d", ipv4[0], ipv4[1], ipv4[2]) // /24 grouping
+	}
+	if ipv6 := ip.To16(); ipv6 != nil {
+		return fmt.Sprintf("%x:%x:%x:%x", ipv6[0]:ipv6[1], ipv6[2]:ipv6[3], ipv6[4]:ipv6[5], ipv6[6]:ipv6[7]) // /64 grouping
+	}
+	return ipStr
+}
