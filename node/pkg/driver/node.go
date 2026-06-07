@@ -170,7 +170,7 @@ func (d *NodeService) NodeStageVolume(ctx context.Context, req *csi.NodeStageVol
 		return nil, status.Error(codes.Internal, err.Error())
 	}
 
-	//err = d.OsDeviceConnectivityHelper.RemoveGhostDevice(ctx, volumeUuid, lun, arrayInitiators)
+	err = d.OsDeviceConnectivityHelper.RemoveGhostDevice(ctx, volumeUuid, lun, arrayInitiators)
 	if err != nil {
 		logger.Debugf("Failed to clean ghost device for lun %d", lun)
 		// we can swallow the error here, since it's just for cleanliness
