@@ -101,6 +101,7 @@ func (r OsDeviceConnectivityIscsi) iscsiLogin(ctx context.Context, targetName, p
 	if err != nil {
 		if exitCode, isExitError := r.Executer.GetExitCode(err); isExitError {
 			// 15 = Already logged in. This is success for CSI.
+			// TODO exit code doesn't work
 			if exitCode == 15 {
 				logger.Debugf("iSCSI session for %s (%s) already active", targetName, portal)
 				return
