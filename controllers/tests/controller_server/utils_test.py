@@ -8,7 +8,12 @@ from munch import Munch
 import controllers.servers.utils as utils
 from controllers.array_action.settings import (NVME_OVER_FC_CONNECTIVITY_TYPE,
                                                FC_CONNECTIVITY_TYPE,
-                                               ISCSI_CONNECTIVITY_TYPE)
+                                               ISCSI_CONNECTIVITY_TYPE,
+                                               REPLICATION_TYPE_MIRROR,
+                                               REPLICATION_TYPE_EAR,
+                                               REPLICATION_COPY_TYPE_SYNC,
+                                               REPLICATION_COPY_TYPE_ASYNC,
+                                               REPLICATION_DEFAULT_COPY_TYPE)
 from controllers.common.node_info import NodeIdInfo
 from controllers.common.settings import SPACE_EFFICIENCY_DEDUPLICATED_COMPRESSED, SPACE_EFFICIENCY_NONE, \
     SPACE_EFFICIENCY_DEDUPLICATED, SPACE_EFFICIENCY_THIN
@@ -827,3 +832,134 @@ class TestUtils(unittest.TestCase):
         })
         # With invalid protocol, should check all (default behavior)
         self.assertTrue(utils.are_initiators_equal(initiator_str1, initiator_str2, "invalid_protocol"))
+
+    def test_validate_addons_request_mirror_without_replication_source_requires_volume_and_replication_id(self):
+        request = Mock()
+        request.replication_source = None
+        request.replication_id = "A9000:1;uid"
+        request.parameters = {controller_config.PARAMETERS_COPY_TYPE: REPLICATION_COPY_TYPE_SYNC}
+
+        utils.validate_addons_request(request, REPLICATION_TYPE_MIRROR)
+
+    def test_validate_addons_request_ear_rejects_replication_id(self):
+        request = Mock()
+        request.replication_source = Mock()
+        request.replication_id = "obsolete"
+        request.parameters = {controller_config.PARAMETERS_REPLICATION_POLICY: "policy"}
+
+        self._test_validation_exception(
+            lambda req: utils.validate_addons_request(req, REPLICATION_TYPE_EAR),
+            request,
+            str_in_msg=controller_config.PARAMETERS_REPLICATION_HANDLE
+        )
+
+    def test_validate_addons_request_ear_rejects_system_id(self):
+        request = Mock()
+        request.replication_source = Mock()
+        request.replication_id = ""
+        request.parameters = {
+            controller_config.PARAMETERS_REPLICATION_POLICY: "policy",
+            controller_config.PARAMETERS_SYSTEM_ID: "system-id"
+        }
+
+        self._test_validation_exception(
+            lambda req: utils.validate_addons_request(req, REPLICATION_TYPE_EAR),
+            request,
+            str_in_msg=controller_config.PARAMETERS_SYSTEM_ID
+        )
+
+    def test_validate_addons_request_rejects_invalid_copy_type(self):
+        request = Mock()
+        request.replication_source = Mock()
+        request.replication_id = "A9000:1;uid"
+        request.parameters = {controller_config.PARAMETERS_COPY_TYPE: "invalid-copy-type"}
+
+        self._test_validation_exception(
+            lambda req: utils.validate_addons_request(req, REPLICATION_TYPE_MIRROR),
+            request,
+            str_in_msg="invalid-copy-type"
+        )
+
+    def test_get_addons_replication_type_returns_ear_when_policy_exists(self):
+        request = Mock()
+        request.parameters = {controller_config.PARAMETERS_REPLICATION_POLICY: "policy"}
+        self.assertEqual(REPLICATION_TYPE_EAR, utils.get_addons_replication_type(request))
+
+    def test_get_addons_replication_type_returns_mirror_without_policy(self):
+        request = Mock()
+        request.parameters = {}
+        self.assertEqual(REPLICATION_TYPE_MIRROR, utils.get_addons_replication_type(request))
+
+    @patch("controllers.servers.utils.get_volume_id_info")
+    def test_generate_addons_replication_request_for_mirror(self, get_volume_id_info):
+        request = Mock()
+        request.replication_id = "A9000:other-id;uid"
+        request.parameters = {
+            controller_config.PARAMETERS_SYSTEM_ID: "system-id",
+            controller_config.PARAMETERS_COPY_TYPE: REPLICATION_COPY_TYPE_ASYNC
+        }
+        get_volume_id_info.return_value = Munch(ids=Munch(internal_id="other-internal-id"))
+
+        replication_request = utils.generate_addons_replication_request(
+            request, REPLICATION_TYPE_MIRROR, "volume-internal-id")
+
+        self.assertEqual("volume-internal-id", replication_request.volume_internal_id)
+        self.assertEqual("other-internal-id", replication_request.other_volume_internal_id)
+        self.assertEqual("system-id", replication_request.other_system_id)
+        self.assertEqual(REPLICATION_COPY_TYPE_ASYNC, replication_request.copy_type)
+        self.assertEqual(REPLICATION_TYPE_MIRROR, replication_request.replication_type)
+
+    def test_generate_addons_replication_request_for_ear_uses_defaults(self):
+        request = Mock()
+        request.parameters = {controller_config.PARAMETERS_REPLICATION_POLICY: "policy-name"}
+
+        replication_request = utils.generate_addons_replication_request(
+            request, REPLICATION_TYPE_EAR, "volume-group-id")
+
+        self.assertEqual("volume-group-id", replication_request.volume_internal_id)
+        self.assertIsNone(replication_request.other_volume_internal_id)
+        self.assertIsNone(replication_request.other_system_id)
+        self.assertEqual(REPLICATION_DEFAULT_COPY_TYPE, replication_request.copy_type)
+        self.assertEqual(REPLICATION_TYPE_EAR, replication_request.replication_type)
+        self.assertEqual("policy-name", replication_request.replication_policy)
+
+    @patch("controllers.servers.utils.get_object_id_info")
+    def test_get_replication_object_type_and_id_info_from_volume_group_source(self, get_object_id_info):
+        request = Mock()
+        request.volume_id = "A9000:vol-id"
+        request.replication_source = ProtoBufMock(spec=["ListFields", "HasField", "volumegroup", "volume"])
+        request.replication_source.ListFields.return_value = [True]
+        request.replication_source.HasField.side_effect = lambda field: field == controller_config.VOLUME_GROUP_TYPE_NAME
+        request.replication_source.volumegroup.volume_group_id = "A9000:vg-id"
+        get_object_id_info.return_value = "object-info"
+
+        object_type, object_id_info = utils.get_replication_object_type_and_id_info(request)
+
+        self.assertEqual(controller_config.VOLUME_GROUP_TYPE_NAME, object_type)
+        self.assertEqual("object-info", object_id_info)
+        get_object_id_info.assert_called_once_with("A9000:vg-id", controller_config.VOLUME_GROUP_TYPE_NAME)
+
+    @patch("controllers.servers.utils.get_object_id_info")
+    def test_get_replication_object_type_and_id_info_from_volume_source(self, get_object_id_info):
+        request = Mock()
+        request.volume_id = "A9000:vol-id"
+        request.replication_source = ProtoBufMock(spec=["ListFields", "HasField", "volumegroup", "volume"])
+        request.replication_source.ListFields.return_value = [True]
+        request.replication_source.HasField.side_effect = lambda field: field == controller_config.VOLUME_TYPE_NAME
+        request.replication_source.volume.volume_id = "A9000:source-vol-id"
+        get_object_id_info.return_value = "object-info"
+
+        object_type, object_id_info = utils.get_replication_object_type_and_id_info(request)
+
+        self.assertEqual(controller_config.VOLUME_TYPE_NAME, object_type)
+        self.assertEqual("object-info", object_id_info)
+        get_object_id_info.assert_called_once_with("A9000:source-vol-id", controller_config.VOLUME_TYPE_NAME)
+
+    def test_get_replication_object_type_and_id_info_unsupported_source_raises(self):
+        request = Mock()
+        request.volume_id = "A9000:vol-id"
+        request.replication_source = ProtoBufMock(spec=["ListFields", "HasField"])
+        request.replication_source.ListFields.return_value = [True]
+        request.replication_source.HasField.return_value = False
+
+        self._test_validation_exception(utils.get_replication_object_type_and_id_info, request)

@@ -9,12 +9,14 @@ from pysvc.unified.response import CLIFailureError, SVCResponse
 
 from controllers.common.config import config
 import controllers.array_action.errors as array_errors
+import controllers.array_action.settings as array_settings
 import controllers.tests.array_action.svc.test_settings as svc_settings
-import controllers.tests.array_action.test_settings as array_settings
+import controllers.tests.array_action.test_settings as array_test_settings
 import controllers.tests.common.test_settings as common_settings
 from controllers.array_action.array_action_types import ReplicationRequest, ReplicationInfo, ReplicationStatus
 from controllers.array_action.array_mediator_svc import SVCArrayMediator, build_kwargs_from_parameters, \
-    FCMAP_STATUS_DONE, YES
+    FCMAP_STATUS_DONE, YES, build_create_host_kwargs, build_host_port_command_kwargs, \
+    build_change_host_protocol_kwargs, build_register_plugin_kwargs, _get_cli_volume_space_efficiency_aliases
 from controllers.array_action.settings import (REPLICATION_TYPE_MIRROR, REPLICATION_TYPE_EAR,
                                                RCRELATIONSHIP_STATE_READY, ENDPOINT_TYPE_PRODUCTION,
                                                HEALTHY_DR_LINK_STATES, DEGRADED_DR_LINK_STATES, FAILED_DR_LINK_STATES)
@@ -44,10 +46,10 @@ class TestArrayMediatorSVC(unittest.TestCase):
         self.svc.client.svcinfo.lsnode.return_value = [node]
         lsportip_port = Munch(
             {svc_settings.LSPORTIP_NODE_ID_ATTR_KEY: svc_settings.DUMMY_INTERNAL_ID1,
-             svc_settings.LSPORTIP_IP_ADDRESS_ATTR_KEY: array_settings.DUMMY_IP_ADDRESS1,
+             svc_settings.LSPORTIP_IP_ADDRESS_ATTR_KEY: array_test_settings.DUMMY_IP_ADDRESS1,
              svc_settings.LSPORTIP_IP_ADDRESS_6_ATTR_KEY: None})
         lsip_port = Munch({svc_settings.LSIP_NODE_ID_ATTR_KEY: svc_settings.DUMMY_INTERNAL_ID1,
-                           svc_settings.LSIP_IP_ADDRESS_ATTR_KEY: array_settings.DUMMY_IP_ADDRESS1,
+                           svc_settings.LSIP_IP_ADDRESS_ATTR_KEY: array_test_settings.DUMMY_IP_ADDRESS1,
                            svc_settings.LSIP_PORTSET_ID_ATTR_KEY: svc_settings.DUMMY_PORTSET_ID})
         self.svc.client.svcinfo.lsportip.return_value = [lsportip_port]
         self.svc.client.svcinfo.lsip.return_value = [lsip_port]
@@ -58,8 +60,8 @@ class TestArrayMediatorSVC(unittest.TestCase):
         del self.svc.client.svctask.addsnapshot
         del self.svc.client.svctask.chvolumereplicationinternals
 
-    def _mock_node(self, node_id=svc_settings.DUMMY_INTERNAL_ID1, name=array_settings.DUMMY_NODE1_NAME,
-                   iqn=array_settings.DUMMY_NODE1_IQN, status=svc_settings.ONLINE_STATUS):
+    def _mock_node(self, node_id=svc_settings.DUMMY_INTERNAL_ID1, name=array_test_settings.DUMMY_NODE1_NAME,
+                   iqn=array_test_settings.DUMMY_NODE1_IQN, status=svc_settings.ONLINE_STATUS):
         return Munch({svc_settings.NODE_ID_ATTR_KEY: node_id,
                       svc_settings.NODE_NAME_ATTR_KEY: name,
                       svc_settings.NODE_ISCSI_NAME_ATTR_KEY: iqn,
@@ -283,6 +285,69 @@ class TestArrayMediatorSVC(unittest.TestCase):
         prefix_length = len(self.svc.default_object_prefix)
         self.assertGreaterEqual(self.svc.max_object_prefix_length, prefix_length)
         self.assertGreaterEqual(self.svc.max_object_prefix_length, prefix_length)
+
+    def test_build_create_host_kwargs_fc_with_defaults(self):
+        result = build_create_host_kwargs("host1", array_settings.FC_CONNECTIVITY_TYPE, "wwpn1", None, None, None)
+        self.assertEqual("host1", result["name"])
+        self.assertEqual("wwpn1", result["fcwwpn"])
+        self.assertEqual("0:1:2:3", result["iogrp"])
+        self.assertNotIn("partition", result)
+
+    def test_build_create_host_kwargs_nvme_with_partition_and_portset(self):
+        result = build_create_host_kwargs(
+            "host1", array_settings.NVME_OVER_FC_CONNECTIVITY_TYPE, "nqn1", "0", "part1", "ps1")
+        self.assertEqual("host1", result["name"])
+        self.assertEqual("nqn1", result["nqn"])
+        self.assertEqual("fcnvme", result["protocol"])
+        self.assertEqual("0", result["iogrp"])
+        self.assertEqual("part1", result["partition"])
+        self.assertEqual("ps1", result["portset"])
+
+    def test_build_host_port_command_kwargs_for_iscsi(self):
+        result = build_host_port_command_kwargs("host1", array_settings.ISCSI_CONNECTIVITY_TYPE, "iqn1")
+        self.assertEqual({"host_name": "host1", "iscsiname": "iqn1"}, result)
+
+    def test_build_change_host_protocol_kwargs(self):
+        result = build_change_host_protocol_kwargs("host1", NVME_PROTOCOL)
+        self.assertEqual({"object_id": "host1", "protocol": NVME_PROTOCOL}, result)
+
+    def test_build_register_plugin_kwargs_with_metadata(self):
+        result = build_register_plugin_kwargs("unique-key", "metadata", "1.0")
+        self.assertEqual("unique-key", result["unique_key"])
+        self.assertEqual("metadata", result["metadata"])
+        self.assertEqual("1.0", result["version"])
+
+    def test_build_register_plugin_kwargs_without_metadata(self):
+        result = build_register_plugin_kwargs("unique-key", None, "1.0")
+        self.assertEqual("unique-key", result["unique_key"])
+        self.assertNotIn("metadata", result)
+        self.assertEqual("1.0", result["version"])
+
+    def test_get_cli_volume_space_efficiency_aliases_thick(self):
+        cli_volume = Munch(se_copy='no', compressed_copy='no')
+        self.assertEqual({SPACE_EFFICIENCY_THICK, ''},
+                         _get_cli_volume_space_efficiency_aliases(cli_volume))
+
+    def test_get_cli_volume_space_efficiency_aliases_thin(self):
+        cli_volume = Munch(se_copy=YES, compressed_copy='no')
+        self.assertEqual({SPACE_EFFICIENCY_THIN},
+                         _get_cli_volume_space_efficiency_aliases(cli_volume))
+
+    def test_get_cli_volume_space_efficiency_aliases_compressed(self):
+        cli_volume = Munch(se_copy='no', compressed_copy=YES)
+        self.assertEqual({SPACE_EFFICIENCY_COMPRESSED},
+                         _get_cli_volume_space_efficiency_aliases(cli_volume))
+
+    def test_get_cli_volume_space_efficiency_aliases_deduplicated_thin(self):
+        cli_volume = Munch(se_copy=YES, compressed_copy='no', deduplicated_copy=YES)
+        self.assertEqual({SPACE_EFFICIENCY_DEDUPLICATED_THIN},
+                         _get_cli_volume_space_efficiency_aliases(cli_volume))
+
+    def test_get_cli_volume_space_efficiency_aliases_deduplicated_compressed(self):
+        cli_volume = Munch(se_copy='no', compressed_copy=YES, deduplicated_copy=YES)
+        self.assertEqual({SPACE_EFFICIENCY_DEDUPLICATED_COMPRESSED,
+                          SPACE_EFFICIENCY_DEDUPLICATED},
+                         _get_cli_volume_space_efficiency_aliases(cli_volume))
 
     @patch("controllers.array_action.array_mediator_svc.is_warning_message")
     def _test_mediator_method_client_error(self, mediator_method, args, client_method, client_error, expected_error,

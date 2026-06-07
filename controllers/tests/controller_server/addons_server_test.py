@@ -10,6 +10,7 @@ from controllers.array_action import svc_messages
 from controllers.array_action.settings import (REPLICATION_TYPE_MIRROR, REPLICATION_TYPE_EAR,
                                                REPLICATION_COPY_TYPE_SYNC, DR_LINK_STATUS_RUNNING, RECOVERY)
 from controllers.array_action.array_action_types import ReplicationRequest, ReplicationInfo, ReplicationStatus
+from controllers.servers import utils as server_utils
 from controllers.servers.csi.addons_server import ReplicationControllerServicer
 from controllers.tests import utils
 from controllers.tests.common.test_settings import VOLUME_NAME, VOLUME_UID, OBJECT_INTERNAL_ID, \
@@ -427,3 +428,91 @@ class TestGetVolumeReplicationInfo(BaseReplicationSetUp, CommonControllerTest):
 
     def test_get_volume_replication_info_with_array_connection_exception(self):
         self._test_request_with_array_connection_exception()
+
+
+class TestReplicationControllerHelpers(BaseReplicationSetUp):
+
+    def test_ensure_volume_role_for_replication_promotes_secondary(self):
+        replication = utils.get_mock_mediator_response_replication(
+            name=REPLICATION_NAME, replication_type=REPLICATION_TYPE_MIRROR, is_primary=False)
+
+        self.servicer._ensure_volume_role_for_replication(self.mediator, replication, True)
+
+        self.mediator.promote_replication_volume.assert_called_once_with(replication)
+        self.mediator.demote_replication_volume.assert_not_called()
+
+    def test_ensure_volume_role_for_replication_promote_is_idempotent_for_primary(self):
+        replication = utils.get_mock_mediator_response_replication(
+            name=REPLICATION_NAME, replication_type=REPLICATION_TYPE_MIRROR, is_primary=True)
+
+        self.servicer._ensure_volume_role_for_replication(self.mediator, replication, True)
+
+        self.mediator.promote_replication_volume.assert_not_called()
+        self.mediator.demote_replication_volume.assert_not_called()
+
+    def test_ensure_volume_role_for_replication_demotes_primary(self):
+        replication = utils.get_mock_mediator_response_replication(
+            name=REPLICATION_NAME, replication_type=REPLICATION_TYPE_MIRROR, is_primary=True)
+
+        self.servicer._ensure_volume_role_for_replication(self.mediator, replication, False)
+
+        self.mediator.demote_replication_volume.assert_called_once_with(replication)
+        self.mediator.promote_replication_volume.assert_not_called()
+
+    def test_ensure_volume_role_for_replication_demotes_when_primary_is_none(self):
+        replication = utils.get_mock_mediator_response_replication(
+            name=REPLICATION_NAME, replication_type=REPLICATION_TYPE_MIRROR, is_primary=False)
+        replication.is_primary = None
+
+        self.servicer._ensure_volume_role_for_replication(self.mediator, replication, False)
+
+        self.mediator.demote_replication_volume.assert_called_once_with(replication)
+
+    def test_ensure_volume_role_for_replication_demote_is_idempotent_for_secondary(self):
+        replication = utils.get_mock_mediator_response_replication(
+            name=REPLICATION_NAME, replication_type=REPLICATION_TYPE_MIRROR, is_primary=False)
+
+        self.servicer._ensure_volume_role_for_replication(self.mediator, replication, False)
+
+        self.mediator.demote_replication_volume.assert_not_called()
+        self.mediator.promote_replication_volume.assert_not_called()
+
+    def test_validate_replication_object_rejects_ear_for_volume(self):
+        error = self.servicer._validate_replication_object("volume", REPLICATION_TYPE_EAR)
+        self.assertEqual("EAR replication is supported only on volume group level", error)
+
+    def test_validate_replication_object_accepts_mirror_for_volume(self):
+        error = self.servicer._validate_replication_object("volume", REPLICATION_TYPE_MIRROR)
+        self.assertIsNone(error)
+
+    def test_get_replication_object_raises_when_object_not_found(self):
+        object_id_info = server_utils.get_object_id_info(self.request.volume_id, "volume")
+        self.mediator.get_object_by_id.return_value = None
+
+        with self.assertRaises(Exception):
+            self.servicer._get_replication_object(
+                object_id_info, "volume", self.request.secrets, self.mediator)
+
+    def test_get_replication_object_uses_uid_for_volume(self):
+        object_id_info = server_utils.get_object_id_info(self.request.volume_id, "volume")
+        replication_object = utils.get_mock_mediator_response_volume(10, VOLUME_NAME, VOLUME_UID, "xiv")
+        self.mediator.get_object_by_id.return_value = replication_object
+
+        result = self.servicer._get_replication_object(
+            object_id_info, "volume", self.request.secrets, self.mediator)
+
+        self.assertEqual(replication_object, result)
+        self.mediator.get_object_by_id.assert_called_once_with(VOLUME_UID, "volume")
+        self.mediator.verify_volume_partition.assert_called_once()
+
+    def test_get_replication_object_uses_internal_id_for_volume_group(self):
+        object_id_info = server_utils.get_object_id_info(self.request.volume_id, "volumegroup")
+        replication_object = Mock()
+        self.mediator.get_object_by_id.return_value = replication_object
+
+        result = self.servicer._get_replication_object(
+            object_id_info, "volumegroup", self.request.secrets, self.mediator)
+
+        self.assertEqual(replication_object, result)
+        self.mediator.get_object_by_id.assert_called_once_with(OBJECT_INTERNAL_ID, "volumegroup")
+        self.mediator.verify_volume_partition.assert_called_once()

@@ -528,3 +528,58 @@ class TestChangeHostProtocolWithChhost(TestDefineHost):
         self.mediator.add_ports_to_host.assert_called_once()
 
         self.assertEqual(response.error_message, '')
+
+
+class TestHostDefinerHelpers(BaseSetUp):
+
+    def test_update_host_partition_deletes_host_and_raises_when_partition_mismatch(self):
+        self.mediator.verify_host_partition.return_value = False
+
+        with self.assertRaises(HostNotFoundError):
+            self.servicer._update_host_partition(self.request, HOST_NAME, "partition-a", self.mediator)
+
+        self.mediator.delete_host.assert_called_once_with(HOST_NAME)
+
+    def test_create_initiators_for_connectivity_type_fc(self):
+        result = self.servicer._create_initiators_for_connectivity_type(
+            ["wwn1"], array_settings.FC_CONNECTIVITY_TYPE)
+        self.assertEqual(Initiators(fc_wwns=["wwn1"]), result)
+
+    def test_create_initiators_for_connectivity_type_iscsi(self):
+        result = self.servicer._create_initiators_for_connectivity_type(
+            ["iqn1"], array_settings.ISCSI_CONNECTIVITY_TYPE)
+        self.assertEqual(Initiators(iscsi_iqns=["iqn1"]), result)
+
+    def test_create_initiators_for_connectivity_type_nvme(self):
+        result = self.servicer._create_initiators_for_connectivity_type(
+            ["nqn1"], array_settings.NVME_OVER_FC_CONNECTIVITY_TYPE)
+        self.assertEqual(Initiators(nvme_nqns=["nqn1"]), result)
+
+    def test_create_initiators_for_connectivity_type_unknown_returns_empty(self):
+        result = self.servicer._create_initiators_for_connectivity_type(["port1"], "unknown")
+        self.assertEqual(Initiators(), result)
+
+    def test_get_host_protocol_returns_scsi_for_fc_and_iscsi(self):
+        self.assertEqual(common_settings.SCSI_PROTOCOL,
+                         self.servicer._get_host_protocol(array_settings.FC_CONNECTIVITY_TYPE))
+        self.assertEqual(common_settings.SCSI_PROTOCOL,
+                         self.servicer._get_host_protocol(array_settings.ISCSI_CONNECTIVITY_TYPE))
+
+    def test_get_host_protocol_returns_nvme_for_nvme_connectivity(self):
+        self.assertEqual(common_settings.NVME_PROTOCOL,
+                         self.servicer._get_host_protocol(array_settings.NVME_OVER_FC_CONNECTIVITY_TYPE))
+
+    def test_get_host_protocol_returns_empty_for_unknown_connectivity(self):
+        self.assertEqual('', self.servicer._get_host_protocol("unknown"))
+
+    def test_is_protocol_switched_returns_true_for_nvme_to_scsi(self):
+        self.assertTrue(self.servicer._is_protocol_switched(
+            array_settings.FC_CONNECTIVITY_TYPE, array_settings.NVME_OVER_FC_CONNECTIVITY_TYPE))
+
+    def test_is_protocol_switched_returns_true_for_scsi_to_nvme(self):
+        self.assertTrue(self.servicer._is_protocol_switched(
+            array_settings.NVME_OVER_FC_CONNECTIVITY_TYPE, array_settings.ISCSI_CONNECTIVITY_TYPE))
+
+    def test_is_protocol_switched_returns_false_within_scsi_family(self):
+        self.assertFalse(self.servicer._is_protocol_switched(
+            array_settings.FC_CONNECTIVITY_TYPE, array_settings.ISCSI_CONNECTIVITY_TYPE))
