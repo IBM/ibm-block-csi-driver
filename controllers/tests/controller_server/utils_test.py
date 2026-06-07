@@ -837,7 +837,10 @@ class TestUtils(unittest.TestCase):
         request = Mock()
         request.replication_source = None
         request.replication_id = "A9000:1;uid"
+        request.volume_id = "A9000:0;uid"
         request.parameters = {controller_config.PARAMETERS_COPY_TYPE: REPLICATION_COPY_TYPE_SYNC}
+        request.secrets = {"username": SECRET_USERNAME_VALUE, "password": SECRET_PASSWORD_VALUE,
+                           "management_address": ARRAY}
 
         utils.validate_addons_request(request, REPLICATION_TYPE_MIRROR)
 
@@ -846,6 +849,8 @@ class TestUtils(unittest.TestCase):
         request.replication_source = Mock()
         request.replication_id = "obsolete"
         request.parameters = {controller_config.PARAMETERS_REPLICATION_POLICY: "policy"}
+        request.secrets = {"username": SECRET_USERNAME_VALUE, "password": SECRET_PASSWORD_VALUE,
+                           "management_address": ARRAY}
 
         self._test_validation_exception(
             lambda req: utils.validate_addons_request(req, REPLICATION_TYPE_EAR),
@@ -861,6 +866,8 @@ class TestUtils(unittest.TestCase):
             controller_config.PARAMETERS_REPLICATION_POLICY: "policy",
             controller_config.PARAMETERS_SYSTEM_ID: "system-id"
         }
+        request.secrets = {"username": SECRET_USERNAME_VALUE, "password": SECRET_PASSWORD_VALUE,
+                           "management_address": ARRAY}
 
         self._test_validation_exception(
             lambda req: utils.validate_addons_request(req, REPLICATION_TYPE_EAR),
@@ -873,6 +880,8 @@ class TestUtils(unittest.TestCase):
         request.replication_source = Mock()
         request.replication_id = "A9000:1;uid"
         request.parameters = {controller_config.PARAMETERS_COPY_TYPE: "invalid-copy-type"}
+        request.secrets = {"username": SECRET_USERNAME_VALUE, "password": SECRET_PASSWORD_VALUE,
+                           "management_address": ARRAY}
 
         self._test_validation_exception(
             lambda req: utils.validate_addons_request(req, REPLICATION_TYPE_MIRROR),
@@ -927,9 +936,10 @@ class TestUtils(unittest.TestCase):
     def test_get_replication_object_type_and_id_info_from_volume_group_source(self, get_object_id_info):
         request = Mock()
         request.volume_id = "A9000:vol-id"
-        request.replication_source = ProtoBufMock(spec=["ListFields", "HasField", "volumegroup", "volume"])
+        request.replication_source = Mock()
         request.replication_source.ListFields.return_value = [True]
-        request.replication_source.HasField.side_effect = lambda field: field == controller_config.VOLUME_GROUP_TYPE_NAME
+        request.replication_source.HasField = Mock(
+            side_effect=lambda field: field == controller_config.VOLUME_GROUP_TYPE_NAME)
         request.replication_source.volumegroup.volume_group_id = "A9000:vg-id"
         get_object_id_info.return_value = "object-info"
 
@@ -943,9 +953,10 @@ class TestUtils(unittest.TestCase):
     def test_get_replication_object_type_and_id_info_from_volume_source(self, get_object_id_info):
         request = Mock()
         request.volume_id = "A9000:vol-id"
-        request.replication_source = ProtoBufMock(spec=["ListFields", "HasField", "volumegroup", "volume"])
+        request.replication_source = Mock()
         request.replication_source.ListFields.return_value = [True]
-        request.replication_source.HasField.side_effect = lambda field: field == controller_config.VOLUME_TYPE_NAME
+        request.replication_source.HasField = Mock(
+            side_effect=lambda field: field == controller_config.VOLUME_TYPE_NAME)
         request.replication_source.volume.volume_id = "A9000:source-vol-id"
         get_object_id_info.return_value = "object-info"
 
@@ -958,8 +969,8 @@ class TestUtils(unittest.TestCase):
     def test_get_replication_object_type_and_id_info_unsupported_source_raises(self):
         request = Mock()
         request.volume_id = "A9000:vol-id"
-        request.replication_source = ProtoBufMock(spec=["ListFields", "HasField"])
+        request.replication_source = Mock()
         request.replication_source.ListFields.return_value = [True]
-        request.replication_source.HasField.return_value = False
+        request.replication_source.HasField = Mock(return_value=False)
 
         self._test_validation_exception(utils.get_replication_object_type_and_id_info, request)
