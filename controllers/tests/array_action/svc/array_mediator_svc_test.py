@@ -315,13 +315,13 @@ class TestArrayMediatorSVC(unittest.TestCase):
 
     def test_build_register_plugin_kwargs_with_metadata(self):
         result = build_register_plugin_kwargs("unique-key", "metadata", "1.0")
-        self.assertEqual("unique-key", result["unique_key"])
+        self.assertEqual("unique-key", result["uniquekey"])
         self.assertEqual("metadata", result[METADATA_KEY])
         self.assertEqual("1.0", result[VERSION_KEY])
 
     def test_build_register_plugin_kwargs_without_metadata(self):
         result = build_register_plugin_kwargs("unique-key", None, "1.0")
-        self.assertEqual("unique-key", result["unique_key"])
+        self.assertEqual("unique-key", result["uniquekey"])
         self.assertNotIn(METADATA_KEY, result)
         self.assertEqual("1.0", result[VERSION_KEY])
 
