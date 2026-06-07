@@ -488,31 +488,34 @@ class TestReplicationControllerHelpers(BaseReplicationSetUp):
     def test_get_replication_object_raises_when_object_not_found(self):
         object_id_info = server_utils.get_object_id_info(self.request.volume_id, "volume")
         self.mediator.get_object_by_id.return_value = None
+        array_connection_info = Mock(partition_name=None)
 
         with self.assertRaises(Exception):
             self.servicer._get_replication_object(
-                object_id_info, "volume", self.request.secrets, self.mediator)
+                object_id_info, "volume", array_connection_info, self.mediator)
 
     def test_get_replication_object_uses_uid_for_volume(self):
         object_id_info = server_utils.get_object_id_info(self.request.volume_id, "volume")
         replication_object = utils.get_mock_mediator_response_volume(10, VOLUME_NAME, VOLUME_UID, "xiv")
         self.mediator.get_object_by_id.return_value = replication_object
+        array_connection_info = Mock(partition_name=None)
 
         result = self.servicer._get_replication_object(
-            object_id_info, "volume", self.request.secrets, self.mediator)
+            object_id_info, "volume", array_connection_info, self.mediator)
 
         self.assertEqual(replication_object, result)
-        self.mediator.get_object_by_id.assert_called_once_with(VOLUME_UID, "volume")
-        self.mediator.verify_volume_partition.assert_called_once()
+        self.mediator.get_object_by_id.assert_called_once_with(OBJECT_INTERNAL_ID, "volume")
+        self.mediator.verify_volume_partition.assert_called_once_with(replication_object, None)
 
     def test_get_replication_object_uses_internal_id_for_volume_group(self):
         object_id_info = server_utils.get_object_id_info(self.request.volume_id, "volumegroup")
         replication_object = Mock()
         self.mediator.get_object_by_id.return_value = replication_object
+        array_connection_info = Mock(partition_name=None)
 
         result = self.servicer._get_replication_object(
-            object_id_info, "volumegroup", self.request.secrets, self.mediator)
+            object_id_info, "volumegroup", array_connection_info, self.mediator)
 
         self.assertEqual(replication_object, result)
         self.mediator.get_object_by_id.assert_called_once_with(OBJECT_INTERNAL_ID, "volumegroup")
-        self.mediator.verify_volume_partition.assert_called_once()
+        self.mediator.verify_volume_partition.assert_called_once_with(replication_object, None)
