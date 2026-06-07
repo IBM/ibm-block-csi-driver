@@ -20,11 +20,14 @@ import (
 	"bytes"
 	"context"
 	"encoding/binary"
+	"errors"
 	"fmt"
 	"path/filepath"
+	"io"
 	"os"
 	"strconv"
 	"strings"
+	"syscall"
 	"time"
 
 	"golang.org/x/sys/unix"
@@ -173,6 +176,23 @@ func (r OsDeviceConnectivityNvmeOFc) EnsureLogin(ctx context.Context, ipsByArray
 				nvmeMinPathsForNonNativeDmMultipath, finalCount)
 		}		
 	}
+}
+
+// Helper: Normalizes variants like "nn-0x123", "nn-123", or raw "123" strings uniformly to "nn-0x123:pn-0x..."
+func (r OsDeviceConnectivityNvmeOFc) normalizePortString(val string) string {
+	val = strings.ToLower(strings.TrimSpace(val))
+	parts := strings.Split(val, ":")
+	for i, part := range parts {
+		part = strings.TrimPrefix(part, "nn-")
+		part = strings.TrimPrefix(part, "pn-")
+		part = strings.TrimPrefix(part, "0x")
+		if i == 0 {
+			parts[i] = "nn-0x" + part
+		} else {
+			parts[i] = "pn-0x" + part
+		}
+	}
+	return strings.Join(parts, ":")
 }
 
 
