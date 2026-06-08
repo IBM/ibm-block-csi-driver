@@ -420,18 +420,18 @@ func (r OsDeviceConnectivityNvmeOFc) extractRawWWNs(portStr string) (string, str
 // and returns the storage subsystem NQN. Returns ("", nil) if no path exists.
 // discoverSubNqn manages target subsystem discovery commands sequentially.
 func (r OsDeviceConnectivityNvmeOFc) discoverSubNqn(ctx context.Context, arrayTargetPort, hostPort string) (string, error) {
-	// BUG FIX: Extract raw strings safely, removing potential pre-existing '0x' or labels
-	targetNN, targetPN, err := r.extractRawWWNs(arrayTargetPort)
+	// FIX: Keep original '0x' formatting flavor if present
+	targetNN, targetPN, err := r.extractPreservedWWNs(arrayTargetPort)
 	if err != nil {
 		return "", err
 	}
-	hostNN, hostPN, err := r.extractRawWWNs(hostPort)
+	hostNN, hostPN, err := r.extractPreservedWWNs(hostPort)
 	if err != nil {
 		return "", err
 	}
 
-	// BUG FIX: Append missing '\n' termination character to trigger the line-buffered kernel state machine parser
-	cmd := fmt.Sprintf("transport=fc,traddr=nn-0x%s:pn-0x%s,host_traddr=nn-0x%s:pn-0x%s,nqn=%s\n", 
+	// FIX: Formatted directly WITHOUT forcing hardcoded '0x' tokens into the string
+	cmd := fmt.Sprintf("transport=fc,traddr=nn-%s:pn-%s,host_traddr=nn-%s:pn-%s,nqn=%s\n", 
 		targetNN, targetPN, hostNN, hostPN, nvmeDiscoveryNqn)
 
 	rawOutput, err := executer.ExecuteUninterruptible(
@@ -609,20 +609,13 @@ func parseSubNqnFromDiscoverOutput(rawBytes []byte) string {
 
 // nvmeConnect executes direct writes onto the /dev/nvme-fabrics channel
 func (r OsDeviceConnectivityNvmeOFc) nvmeConnect(ctx context.Context, arrayTargetPort, hostPort, subNqn string) bool {
-	// BUG FIX 1: Strip formatting symbols securely via helper function before manual templating
-	targetNN, targetPN, err := r.extractRawWWNs(arrayTargetPort)
-	if err != nil {
-		logger.Errorf("NVMe-oFC nvmeConnect: target error: %v", err)
-		return false
-	}
-	hostNN, hostPN, err := r.extractRawWWNs(hostPort)
-	if err != nil {
-		logger.Errorf("NVMe-oFC nvmeConnect: host error: %v", err)
-		return false
-	}
+	targetNN, targetPN, err := r.extractPreservedWWNs(arrayTargetPort)
+	if err != nil { return false }
 
-	// BUG FIX 5: Append mandatory '\n' to trigger the line-buffered kernel fabrics state machine parser
-	options := fmt.Sprintf("nqn=%s,transport=%s,traddr=nn-0x%s:pn-0x%s,host_traddr=nn-0x%s:pn-0x%s\n",
+	hostNN, hostPN, err := r.extractPreservedWWNs(hostPort)
+	if err != nil { return false }
+
+	options := fmt.Sprintf("nqn=%s,transport=%s,traddr=nn-%s:pn-%s,host_traddr=nn-%s:pn-%s\n",
 		subNqn, nvmeTransportFC, targetNN, targetPN, hostNN, hostPN)
 
 	resourceKey := fmt.Sprintf("connect-%s-%s", subNqn, arrayTargetPort)
@@ -657,6 +650,23 @@ func (r OsDeviceConnectivityNvmeOFc) nvmeConnect(ctx context.Context, arrayTarge
 	
 	logger.Infof("NVMe-oFC nvmeConnect: connected NQN=%s target=%s host=%s result=%s", subNqn, arrayTargetPort, hostPort, out)
 	return true
+}
+
+func (r OsDeviceConnectivityNvmeOFc) extractPreservedWWNs(portStr string) (string, string, error) {
+	parts := strings.Split(strings.ToLower(strings.TrimSpace(portStr)), ":")
+	if len(parts) < 2 {
+		return "", "", fmt.Errorf("invalid port structure string encountered: %s", portStr)
+	}
+
+	// Only strip the network labels (nn- / pn-). Leave the rest of the string exactly as it arrived.
+	nn := strings.TrimPrefix(parts[0], "nn-")
+	pn := strings.TrimPrefix(parts[1], "pn-")
+	
+	if nn == "" || pn == "" {
+		return "", "", fmt.Errorf("parsed empty WWN values from string: %s", portStr)
+	}
+
+	return nn, pn, nil
 }
 
 // getHostFCPorts reads node_name and port_name for every FC host adapter from sysfs
