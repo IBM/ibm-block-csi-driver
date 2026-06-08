@@ -219,37 +219,34 @@ class ReplicationControllerServicer(pb2_grpc.ControllerServicer):
         logger.info("GetVolumeReplicationInfo: called with replication_source='{}'".format(request.replication_source))
 
         object_type, object_id_info = utils.get_replication_object_type_and_id_info(request)
-        object_id = object_id_info.ids.internal_id
 
         utils.validate_secrets(request.secrets)
         response = pb2.GetVolumeReplicationInfoResponse()
 
-        if object_type != servers_settings.VOLUME_GROUP_TYPE_NAME:
-            logger.warning(
-                "GetVolumeReplicationInfo is only supported for EAR (VolumeGroup level). "
-                "Storage does not provide sync data at volume level. "
-                "Returning current time as last_sync_time for replication type = '{}'"
-                .format(object_type)
-            )
-
-            ts_seconds = int(datetime.now(timezone.utc).timestamp())
-            response.last_sync_time.CopyFrom(Timestamp(seconds=ts_seconds, nanos=0))
-            return response
-
         connection_info = utils.get_array_connection_info_from_secrets(request.secrets)
 
         with get_agent(connection_info, object_id_info.array_type).get_mediator() as mediator:
+            if object_type != servers_settings.VOLUME_GROUP_TYPE_NAME:
+                try:
+                    object_type, object_id_info = utils.resolve_ramen_ear_volume_to_volume_group(
+                        object_type, object_id_info, array_settings.REPLICATION_TYPE_EAR, mediator)
+                except array_errors.ObjectNotFoundError:
+                    logger.warning(
+                        "GetVolumeReplicationInfo: volume not part of any VolumeGroup, "
+                        "returning current time as last_sync_time")
+                    ts_seconds = int(datetime.now(timezone.utc).timestamp())
+                    response.last_sync_time.CopyFrom(Timestamp(seconds=ts_seconds, nanos=0))
+                    return response
+
+            object_id = object_id_info.ids.internal_id
             replication_info = mediator.get_last_async_snapshot_info(object_id)
 
         if replication_info.last_sync_time is not None:
             ts_seconds = int(replication_info.last_sync_time.timestamp())
             response.last_sync_time.CopyFrom(Timestamp(seconds=ts_seconds, nanos=0))
         else:
-            # NOTE: For now, I have intentionally kept Timestamp(0, 0) when last_sync_time is not available,
-            # so it is easy to detect and verify case for debugging where storage returns an empty value.
-            # This corresponds to 1970-01-01T00:00:00Z (Unix time starting point).
             response.last_sync_time.CopyFrom(Timestamp(seconds=0, nanos=0))
-            logger.warning("last_sync_time not available at storage, Setting to default timestamp (0).")
+            logger.warning("last_sync_time not available at storage, setting to default timestamp (0).")
 
         response.status = replication_info.replication_status
         response.status_message = replication_info.status_message or ''
