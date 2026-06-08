@@ -33,6 +33,8 @@ import (
 	"time"
 	"unsafe"
 
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 	"github.com/ibm/ibm-block-csi-driver/node/logger"
 	"github.com/ibm/ibm-block-csi-driver/node/pkg/driver/executer"
 	"github.com/ibm/ibm-block-csi-driver/node/pkg/driver/mount"
@@ -1702,42 +1704,93 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) IdentityAwarePreScan(ctx context
 	mpathName := r.Helper.findDMByWWID(expectedWWID)
 	normExpected := r.Helper.normalizeWWID(expectedWWID)
 
-	// 1. Evaluate block state
-	isBusy, err := r.Helper.IsDeviceMapBusy(mpathName)
-	if mpathName == "" && !isBusy {
-		isBusy, _, _ = r.Helper.EvaluateLowerBlockLayer(expectedWWID)
+	// 1. TIER 1 SAFETY: Check if a previous kernel rescan is still actively hanging
+	isBusy, err := r.isDeviceMapBusy(mpathName)
+	if err != nil {
+		logger.Warningf("Pre-scan block layer check error: %v", err)
 	}
 
-	// 2. Enforce Concurrency Gating
+	// Fallback to checking underlying physical paths if the DM node isn't fully formed
+	if mpathName == "" && !isBusy {
+		isBusy, _, _ = r.evaluateLowerBlockLayer(expectedWWID)
+	}
+
+	// 2. CONCURRENCY GATING MATRIX
 	if isBusy {
+		now := time.Now()
+		val, loaded := r.busyTimestamps.LoadOrStore(expectedWWID, now)
+		firstDetected := val.(time.Time)
+
 		const maxKernelSettleDuration = 5 * time.Minute
-		if r.Helper.TrackOrCheckStuckDuration(expectedWWID, maxKernelSettleDuration) {
-			logger.Errorf("Storage layer permanently stuck for WWID %s. Forcing path purge.", expectedWWID)
-			r.Helper.ClearStuckTrack(expectedWWID)
-			_ = r.Helper.PurgeStuckPhysicalPaths(expectedWWID)
-			// Let it drop through to run your Case 2 cleanup mechanisms
+		if loaded && now.Sub(firstDetected) > maxKernelSettleDuration {
+			// BYPASS WINDOW: The kernel has been stuck for over 5 minutes.
+			// Force physical path removal to drop the dead kernel locks.
+			logger.Errorf("Storage layer permanently stuck for WWID %s for %v. Forcing violent path purge.", expectedWWID, now.Sub(firstDetected))
+			r.busyTimestamps.Delete(expectedWWID)
+			
+			_ = r.purgeStuckPhysicalPaths(expectedWWID)
+			// Let execution fall through to Case 2 to wipe the remaining dead topology maps
 		} else {
-			return status.Error(codes.Aborted, "previous rescan is still settling in the kernel. Backing off.")
+			// SECURE ABORT: Attempt 1 is still scanning. Back off safely.
+			return status.Error(codes.Aborted, "previous rescan operation is still settling in the kernel. Backing off.")
 		}
 	} else {
-		r.Helper.ClearStuckTrack(expectedWWID)
+		// Clean the tracking token once the path stabilizes or becomes empty
+		r.busyTimestamps.Delete(expectedWWID)
 	}
 
-	// 3. CASE 1: Path is mounted (unchanged workflow)
+	// 3. CASE 1: Path is mounted
 	mounts, _ := r.Mounter.GetMountsForPath(targetPath)
 	if len(mounts) > 0 {
-		// ... your uninterruptible identity validation execution ...
-		// if confirmed zombie: return r.TeardownVolume(ctx, targetPath, false, false, expectedWWID)
-		return nil
+		res, err := executer.ExecuteUninterruptible[IdentityResult](
+			ctx,
+			r.KeyedGater,
+			"wwid-check",
+			5,
+			20,
+			2*time.Second,
+			10*time.Second,
+			func(ctx context.Context) (IdentityResult, error) {
+				wwid, _ := r.Helper.getWWIDByDev(mounts[0].Major, mounts[0].Minor)
+				hw, _ := r.Helper.GetWwnByScsiInq(ctx, mpathName)
+
+				return IdentityResult{WWID: wwid, HW: hw}, nil
+			},
+		)
+
+		if err != nil {
+			return err
+		}
+
+		var currentWWID = res.WWID
+		var actualHw = res.HW
+
+		if strings.EqualFold(currentWWID, normExpected) && (actualHw == "" || strings.EqualFold(actualHw, normExpected)) {
+			// Zombie Match: Volume matches a crashed attempt. Perform full unmount and cleanup.
+			err := r.TeardownVolume(ctx, targetPath, false, false, expectedWWID)
+			if err != nil {
+				return fmt.Errorf("pre-scan: failed to clear zombie volume: %w", err)
+			}
+			return nil
+		} else {
+			logger.Warningf("Identity Collision at %s: Found %s, expected %s", targetPath, res.WWID, normExpected)
+			_ = r.Mounter.UnmountWithTimeout(ctx, targetPath, 30*time.Second)
+			return fmt.Errorf("pre-scan: identity collision detected at target path")
+		}
 	}
 
-	// 4. CASE 2: Unmounted Zombie Device Leftovers (YOUR ORIGINAL STRATEGY)
+	// 4. CASE 2: Unmounted Zombie Device Leftovers (YOUR ORIGINAL CLEANUP)
 	if mpathName != "" {
+		// Prevent D-state process hangs by disabling map queuing before doing a deletion
 		_ = r.multipathdAction(ctx, "disablequeueing map "+mpathName)
-		if openCount, err := r.Helper.GetOpenCount(ctx, mpathName); err == nil {
+
+		openCount, err := r.Helper.GetOpenCount(ctx, mpathName)
+		if err == nil {
 			if openCount <= 0 {
+				// Clean fresh start
 				_ = r.multipathdAction(ctx, "del map "+mpathName)
 			} else {
+				// Device is busy (e.g. by udev or an engine scan). Use deferred deletion safely.
 				_ = r.dmIoctlCall(ctx, mpathName, DM_DEV_REMOVE, DM_DEFERRED_REMOVE)
 			}
 		}
@@ -1746,28 +1799,7 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) IdentityAwarePreScan(ctx context
 	return nil
 }
 
-func (h *OsDeviceConnectivityHelperGeneric) TrackOrCheckStuckDuration(expectedWWID string, threshold time.Duration) bool {
-	now := time.Now()
-	val, loaded := h.busyTimestamps.LoadOrStore(expectedWWID, now)
-	
-	if !loaded {
-		return false // First time seeing it busy, not expired yet
-	}
-	
-	firstDetected := val.(time.Time)
-	if now.Sub(firstDetected) > threshold {
-		return true // The kernel has been stuck longer than the threshold
-	}
-	
-	return false
-}
-
-func (h *OsDeviceConnectivityHelperGeneric) ClearStuckTrack(expectedWWID string) {
-	h.busyTimestamps.Delete(expectedWWID)
-}
-
-
-func (h *OsDeviceConnectivityHelperGeneric) isDeviceMapBusy(mpathName string) (bool, error) {
+func (h *OsDeviceConnectivityHelperScsiGeneric) isDeviceMapBusy(mpathName string) (bool, error) {
 	// mpathName is the alias (e.g., "mpatha") returned by findDMByWWID.
 	// 1. Resolve it back to the actual kernel dm-X name, exactly like your existing logic.
 	fullPath := filepath.Join("/dev/mapper", mpathName)
@@ -1841,12 +1873,12 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) purgeStuckPhysicalPaths(expected
 	return nil
 }
 
-func (h *OsDeviceConnectivityHelperGeneric) evaluateLowerBlockLayer(expectedWWID string) (bool, string, error) {
+func (r *OsDeviceConnectivityHelperScsiGeneric) evaluateLowerBlockLayer(expectedWWID string) (bool, string, error) {
 	// 1. Try to locate an established DM device using your existing method
-	mpathName := h.findDMByWWID(expectedWWID)
+	mpathName := r.Helper.findDMByWWID(expectedWWID)
 	if mpathName != "" {
 		// Device node exists. Check if it's trapped in a RELOAD or SUSPENDED state
-		busy, err := h.isDeviceMapBusy(mpathName)
+		busy, err := r.isDeviceMapBusy(mpathName)
 		return busy, mpathName, err
 	}
 
@@ -1877,12 +1909,19 @@ func (h *OsDeviceConnectivityHelperGeneric) evaluateLowerBlockLayer(expectedWWID
 		if strings.Contains(strings.ToLower(string(wwidBytes)), strings.ToLower(expectedWWID)) {
 			// Check if the kernel has locked or quiesced this specific path's block queue
 			// A value of "1" means the kernel froze the queue during a stuck rescan/negotiation
-			quiescedPath := filepath.Join("/sys/block", devName, "queue", "quiesced")
-			if qBytes, err := os.WriteFile, os.ReadFile(quiescedPath); err == nil {
-				if strings.TrimSpace(string(qBytes)) == "1" {
-					return true, "", nil // Path is actively stuck in the kernel
-				}
-			}
+// Check if the kernel has locked or quiesced this specific path's block queue
+// A value of "1" means the kernel froze the queue during a stuck rescan/negotiation
+quiescedPath := filepath.Join("/sys/block", devName, "queue", "quiesced")
+quiescedBytes, err := os.ReadFile(quiescedPath)
+if err != nil {
+        continue // Skip this path if we cannot read its queue state
+}
+
+// If the path is quiesced ("1"), the lower block layer is stuck/busy
+if strings.TrimSpace(string(quiescedBytes)) == "1" {
+        return true, devName, nil
+}
+
 
 			// Check transport-specific states for stuck links
 			if strings.HasPrefix(devName, "sd") {
