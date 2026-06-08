@@ -1853,12 +1853,11 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
 
     def _build_replication_status_message(self, vg_replication, recovery_loc_idx, dr_link_status):
         remote_name = self._getattr_as_str(vg_replication, 'location{}_system_name'.format(recovery_loc_idx))
-        remote_role = self._getattr_as_str(vg_replication, 'location{}_replication_mode'.format(recovery_loc_idx))
         remote_status = self._getattr_as_str(vg_replication, 'location{}_status'.format(recovery_loc_idx))
         within_rpo = self._getattr_as_str(vg_replication, 'location{}_within_rpo'.format(recovery_loc_idx))
 
         return svc_messages.REPLICATION_STATUS_MESSAGE.format(
-            dr_link_status, remote_name, remote_role, remote_status, within_rpo
+            dr_link_status, remote_name, remote_status, within_rpo
         )
 
     def _build_replication_info(self, vg_replication):

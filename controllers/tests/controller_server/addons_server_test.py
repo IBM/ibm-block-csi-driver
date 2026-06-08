@@ -8,7 +8,7 @@ from mock import Mock, MagicMock
 from controllers.servers.settings import PARAMETERS_SYSTEM_ID, PARAMETERS_COPY_TYPE, PARAMETERS_REPLICATION_POLICY
 from controllers.array_action import svc_messages
 from controllers.array_action.settings import (REPLICATION_TYPE_MIRROR, REPLICATION_TYPE_EAR,
-                                               REPLICATION_COPY_TYPE_SYNC, DR_LINK_STATUS_RUNNING, RECOVERY)
+                                               REPLICATION_COPY_TYPE_SYNC, DR_LINK_STATUS_RUNNING)
 from controllers.array_action.array_action_types import ReplicationRequest, ReplicationInfo, ReplicationStatus
 from controllers.servers.csi.addons_server import ReplicationControllerServicer
 from controllers.tests import utils
@@ -368,11 +368,23 @@ class TestGetVolumeReplicationInfo(BaseReplicationSetUp, CommonControllerTest):
     def _prepare_get_replication_info(self, replication_info):
         self.mediator.get_last_async_snapshot_info.return_value = replication_info
 
-    def test_get_volume_replication_info_all_fields_populated_succeeds(self):
-        replication_status_message = svc_messages.REPLICATION_STATUS_MESSAGE.format(
-            DR_LINK_STATUS_RUNNING, "fab3p-118-c", RECOVERY, "healthy", "yes"
+    def _make_volume_source_request(self):
+        volume_request = ProtoBufMock()
+        volume_request.secrets = self.request.secrets
+        volume_request.volume_id = "{0}:{1};{1}".format("A9000", OBJECT_INTERNAL_ID)
+        replication_source = ProtoBufMock(spec=['volume', 'ListFields'])
+        replication_source.ListFields.return_value = [True]
+        replication_source.volume.volume_id = volume_request.volume_id
+        volume_request.replication_source = replication_source
+        return volume_request
+
+    def _make_status_message(self):
+        return svc_messages.REPLICATION_STATUS_MESSAGE.format(
+            DR_LINK_STATUS_RUNNING, "fab3p-118-c", "healthy", "yes"
         )
 
+    def test_get_volume_replication_info_all_fields_populated_succeeds(self):
+        replication_status_message = self._make_status_message()
         self._prepare_get_replication_info(self._make_replication_info(
             last_sync_time=datetime(2025, 4, 22, 4, 16, 47),
             replication_status=ReplicationStatus.HEALTHY,
@@ -398,26 +410,33 @@ class TestGetVolumeReplicationInfo(BaseReplicationSetUp, CommonControllerTest):
         self.assertEqual(ReplicationStatus.UNKNOWN, response.status)
         self.assertEqual('', response.status_message)
 
-    def test_get_volume_replication_info_non_volumegroup_source_returns_empty(self):
-        volume_request = ProtoBufMock()
-        volume_request.secrets = self.request.secrets
-        volume_request.volume_id = "{0}:{1};{1}".format("A9000", OBJECT_INTERNAL_ID)
+    def test_get_volume_replication_info_ramen_volume_source_resolves_to_vg_succeeds(self):
+        self._prepare_get_replication_info(self._make_replication_info(
+            last_sync_time=datetime(2025, 4, 22, 4, 16, 47),
+            replication_status=ReplicationStatus.HEALTHY,
+            status_message=self._make_status_message(),
+        ))
+        self.mediator.get_object_by_id.return_value = utils.get_mock_mediator_response_volume(
+            volume_group_id=OBJECT_INTERNAL_ID)
 
-        replication_source = ProtoBufMock(spec=['volume', 'ListFields'])
-        replication_source.ListFields.return_value = [True]
-        replication_source.volume.volume_id = volume_request.volume_id
-        volume_request.replication_source = replication_source
+        response = self.servicer.GetVolumeReplicationInfo(self._make_volume_source_request(), self.context)
+
+        self.assertEqual(grpc.StatusCode.OK, self.context.code)
+        self.mediator.get_last_async_snapshot_info.assert_called_once_with(OBJECT_INTERNAL_ID)
+        self.assertNotEqual(0, response.last_sync_time.seconds)
+        self.assertEqual(ReplicationStatus.HEALTHY, response.status)
+
+    def test_get_volume_replication_info_volume_not_in_vg_returns_current_time(self):
+        self.mediator.get_object_by_id.return_value = utils.get_mock_mediator_response_volume(volume_group_id=None)
 
         before = int(datetime.now(timezone.utc).timestamp())
-        response = self.servicer.GetVolumeReplicationInfo(volume_request, self.context)
+        response = self.servicer.GetVolumeReplicationInfo(self._make_volume_source_request(), self.context)
         after = int(datetime.now(timezone.utc).timestamp())
 
         self.assertEqual(grpc.StatusCode.OK, self.context.code)
         self.mediator.get_last_async_snapshot_info.assert_not_called()
         self.assertGreaterEqual(response.last_sync_time.seconds, before)
         self.assertLessEqual(response.last_sync_time.seconds, after)
-        self.assertEqual(ReplicationStatus.UNKNOWN, response.status)
-        self.assertEqual('', response.status_message)
 
     def test_get_volume_replication_info_with_wrong_secrets(self):
         self._test_request_with_wrong_secrets()
