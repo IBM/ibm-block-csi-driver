@@ -95,14 +95,13 @@ func (r OsDeviceConnectivityNvmeOFc) EnsureLogin(ctx context.Context, ipsByArray
 			logger.Infof("NVMe-oFC EnsureLogin: reached target path count (%d), stopping", nvmeTargetPathCount)
 			break
 		}
-
+		
 		for _, hostPort := range hostPorts {
 			if err := ctx.Err(); err != nil {
 				logger.Warningf("NVMe-oFC EnsureLogin: context cancelled: %v", err)
 				return
 			}
 
-			// BUG FIX 3: Re-normalize strings to ensure existing live paths match correctly
 			cleanTarget := r.normalizePortString(arrayTargetPort)
 			cleanHost   := r.normalizePortString(hostPort)
 			pathKey     := cleanTarget + "|" + cleanHost
@@ -110,7 +109,6 @@ func (r OsDeviceConnectivityNvmeOFc) EnsureLogin(ctx context.Context, ipsByArray
 			if livePaths[pathKey] {
 				logger.Debugf("NVMe-oFC EnsureLogin: path already live target=%s host=%s, skipping",
 					arrayTargetPort, hostPort)			
-				// BUG FIX 3: Increment connectedPaths so tracking stays accurate for skipped items
 				connectedPaths++
 				continue
 			}
@@ -119,12 +117,18 @@ func (r OsDeviceConnectivityNvmeOFc) EnsureLogin(ctx context.Context, ipsByArray
 				break
 			}
 
+			// ADD THIS CRITICAL PACING FIX HERE:
+			// Ensures that if a previous discovery iteration failed and 'continued',
+			// the kernel fabric channel has enough time to clear its locks before the next write.
+			time.Sleep(150 * time.Millisecond)
+
 			subNqn, err := r.discoverSubNqn(ctx, arrayTargetPort, hostPort)
 			if err != nil {
 				logger.Debugf("NVMe-oFC EnsureLogin: discover error target=%s host=%s: %v",
 					arrayTargetPort, hostPort, err)
 				continue
 			}
+			
 			if subNqn == "" {
 				logger.Debugf("NVMe-oFC EnsureLogin: no subnqn found target=%s host=%s, skipping",
 					arrayTargetPort, hostPort)
@@ -502,11 +506,23 @@ func (r OsDeviceConnectivityNvmeOFc) findDiscoverySubNqnFromSysfs() (string, err
 
 		logPath := filepath.Join(controllerPath, "discovery_log")
 		
-		// BUG FIX: Read the discovery_log utilizing a pre-allocated fixed buffer size.
-		// Using os.ReadFile directly fails because sysfs files report a static size of 0 bytes.
-		logFile, err := os.Open(logPath)
-		if err != nil {
-			return "", fmt.Errorf("failed to open discovery log from %s: %w", entry.Name(), err)
+		// FIX: Add a polling backoff mechanism to wait for the kernel's async sysfs population
+		var logFile *os.File
+		var openErr error
+		for attempts := 0; attempts < 5; attempts++ {
+			logFile, openErr = os.Open(logPath)
+			if openErr == nil {
+				break
+			}
+			// If it's a "not found" error, wait 15ms and try again
+			if os.IsNotExist(openErr) {
+				time.Sleep(15 * time.Millisecond)
+				continue
+			}
+			return "", fmt.Errorf("failed to open discovery log from %s: %w", entry.Name(), openErr)
+		}
+		if openErr != nil {
+			return "", fmt.Errorf("kernel failed to expose discovery log path within timeout: %w", openErr)
 		}
 		
 		// 16-byte log page header + space for up to 64 records
@@ -518,7 +534,7 @@ func (r OsDeviceConnectivityNvmeOFc) findDiscoverySubNqnFromSysfs() (string, err
 			return "", fmt.Errorf("failed to pull complete stream data: %w", err)
 		}
 
-		// BUG FIX: Clean up the transient discovery controller immediately to avoid host resource leakage
+		// Clean up the transient discovery controller immediately to avoid host resource leakage
 		deletePath := filepath.Join(controllerPath, "delete_controller")
 		_ = os.WriteFile(deletePath, []byte("1\n"), 0200)
 
