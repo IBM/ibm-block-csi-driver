@@ -424,17 +424,12 @@ func (r OsDeviceConnectivityNvmeOFc) extractRawWWNs(portStr string) (string, str
 // and returns the storage subsystem NQN. Returns ("", nil) if no path exists.
 // discoverSubNqn manages target subsystem discovery commands sequentially.
 func (r OsDeviceConnectivityNvmeOFc) discoverSubNqn(ctx context.Context, arrayTargetPort, hostPort string) (string, error) {
-	// FIX: Keep original '0x' formatting flavor if present
-	targetNN, targetPN, err := r.extractPreservedWWNs(arrayTargetPort)
-	if err != nil {
-		return "", err
-	}
-	hostNN, hostPN, err := r.extractPreservedWWNs(hostPort)
-	if err != nil {
-		return "", err
-	}
+	targetNN, targetPN, err := r.extractCleanHexWWNs(arrayTargetPort)
+	if err != nil { return "", err }
+	hostNN, hostPN, err := r.extractCleanHexWWNs(hostPort)
+	if err != nil { return "", err }
 
-	// FIX: Formatted directly WITHOUT forcing hardcoded '0x' tokens into the string
+	// The helper handles the 0x, so we just use %s directly
 	cmd := fmt.Sprintf("transport=fc,traddr=nn-%s:pn-%s,host_traddr=nn-%s:pn-%s,nqn=%s\n", 
 		targetNN, targetPN, hostNN, hostPN, nvmeDiscoveryNqn)
 
@@ -625,12 +620,12 @@ func parseSubNqnFromDiscoverOutput(rawBytes []byte) string {
 
 // nvmeConnect executes direct writes onto the /dev/nvme-fabrics channel
 func (r OsDeviceConnectivityNvmeOFc) nvmeConnect(ctx context.Context, arrayTargetPort, hostPort, subNqn string) bool {
-	targetNN, targetPN, err := r.extractPreservedWWNs(arrayTargetPort)
+	targetNN, targetPN, err := r.extractCleanHexWWNs(arrayTargetPort)
+	if err != nil { return false }
+	hostNN, hostPN, err := r.extractCleanHexWWNs(hostPort)
 	if err != nil { return false }
 
-	hostNN, hostPN, err := r.extractPreservedWWNs(hostPort)
-	if err != nil { return false }
-
+	// The helper handles the 0x, so we just use %s directly
 	options := fmt.Sprintf("nqn=%s,transport=%s,traddr=nn-%s:pn-%s,host_traddr=nn-%s:pn-%s\n",
 		subNqn, nvmeTransportFC, targetNN, targetPN, hostNN, hostPN)
 
@@ -684,6 +679,29 @@ func (r OsDeviceConnectivityNvmeOFc) extractPreservedWWNs(portStr string) (strin
 
 	return nn, pn, nil
 }
+
+func (r OsDeviceConnectivityNvmeOFc) extractCleanHexWWNs(portStr string) (string, string, error) {
+	parts := strings.Split(strings.ToLower(strings.TrimSpace(portStr)), ":")
+	if len(parts) < 2 {
+		return "", "", fmt.Errorf("invalid port structure string encountered: %s", portStr)
+	}
+
+	// 1. Strip structural prefixes if present
+	nn := strings.TrimPrefix(parts[0], "nn-")
+	pn := strings.TrimPrefix(parts[1], "pn-")
+	
+	// 2. Strip any existing "0x" to avoid duplicate 0x0x formatting
+	nn = strings.TrimPrefix(nn, "0x")
+	pn = strings.TrimPrefix(pn, "0x")
+
+	if nn == "" || pn == "" {
+		return "", "", fmt.Errorf("parsed empty WWN values from string: %s", portStr)
+	}
+
+	// 3. Return with EXACTLY one "0x" attached
+	return "0x" + nn, "0x" + pn, nil
+}
+
 
 // getHostFCPorts reads node_name and port_name for every FC host adapter from sysfs
 // and returns them as "nn-<node_name>:pn-<port_name>" strings for use as --host-traddr.
