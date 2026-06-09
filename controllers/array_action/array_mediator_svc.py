@@ -2230,7 +2230,7 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
         # Validate volume group exists
         volume_group_replication = self._lsvolumegroupreplication(volume_group_name)
         if not volume_group_replication:
-            logger.error(f"Volume group replication not found for {volume_group_name}")
+            logger.error("Volume group replication not found for {}".format(volume_group_name))
             raise array_errors.ObjectNotFoundError(volume_group_name)
 
         # Check if this is first demote attempt or retry
@@ -2238,14 +2238,14 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
             # First attempt - create checkpoint and track state
             self._demote_state_map[volume_group_name] = time.time()
 
-            logger.info(f"First demote attempt for volume group {volume_group_name}, creating checkpoint")
+            logger.info("First demote attempt for volume group {}, creating checkpoint".format(volume_group_name))
             self._chvolumegroupreplication(volume_group_name, checkpoint=array_settings.CHECKPOINT)
         else:
             # Retry - checkpoint already created, just check status
             first_attempt_time = self._demote_state_map[volume_group_name]
             elapsed_time = time.time() - first_attempt_time
-            logger.info(f"Retry demote for volume group {volume_group_name}, checking checkpoint status "
-                       f"(elapsed time: {elapsed_time:.1f}s)")
+            logger.info("Retry demote for volume group {}, checking checkpoint status "
+                            "(elapsed time: {:.1f}s)".format(volume_group_name, elapsed_time))
 
         # Re-fetch after checkpoint creation (or on retry) to get current state
         volume_group_replication = self._lsvolumegroupreplication(volume_group_name)
@@ -2253,12 +2253,12 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
 
         if checkpoint_achieved == 'yes':
             # Success - clear state and return
-            logger.info(f"Checkpoint achieved for volume group {volume_group_name}, demote successful")
+            logger.info("Checkpoint achieved for volume group {}, demote successful".format(volume_group_name))
             self._demote_state_map.pop(volume_group_name, None)
             return
         else:
             # Checkpoint not ready - raise error to trigger retry with UNAVAILABLE status
-            logger.info(f"Checkpoint not yet achieved for volume group {volume_group_name}, will retry")
+            logger.info("Checkpoint not yet achieved for volume group {}, will retry".format(volume_group_name))
             raise array_errors.OperationNotReadyError(
                 f"Checkpoint not yet achieved for volume group {volume_group_name}")
 
