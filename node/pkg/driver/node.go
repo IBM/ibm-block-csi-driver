@@ -155,34 +155,51 @@ func (d *NodeService) NodeStageVolume(ctx context.Context, req *csi.NodeStageVol
 	if isMounted { // idempotent case
 		return &csi.NodeStageVolumeResponse{}, nil
 	}
-
-	d.OsDeviceConnectivityHelper.IdentityAwarePreScan(ctx, stagingPathWithHostPrefix, volumeUuid)
-
-	osDeviceConnectivity.EnsureLogin(ctx, ipsByArrayInitiator)
-
-	err = d.OsDeviceConnectivityHelper.RemoveGhostDevice(ctx, volumeUuid, lun, arrayInitiators)
+	
+	// 2. INVOKE THE ENCAPSULATED PRE-SCAN MATRIX
+	mpathDevice, isBusy, isLeftover, err := d.OsDeviceConnectivityHelper.IdentityAwarePreScan(ctx, stagingPathWithHostPrefix, volumeUuid)
 	if err != nil {
-		return nil, status.Error(codes.Aborted, err.Error())
+		return nil, err // Propagate Aborted/Internal errors directly
 	}
 
-	err = osDeviceConnectivity.RescanDevices(lun, arrayInitiators)
-	if err != nil {
-		return nil, status.Error(codes.Internal, err.Error())
+	// 3. DETERMINISTIC ROUTING GATE
+	// Track whether we can skip the physical fabric scan
+	skipRescanPipeline := (mpathDevice != "" && !isBusy && !isLeftover)
+
+	if !skipRescanPipeline {
+		logger.Infof("Device path missing, busy, or purged for WWID %s. Running full rescan pipeline.", expectedWWID)
+
+		// Your original login and ghost-clearing steps
+		osDeviceConnectivity.EnsureLogin(ctx, ipsByArrayInitiator)
+
+		err = d.OsDeviceConnectivityHelper.RemoveGhostDevice(ctx, volumeUuid, lun, arrayInitiators)
+		if err != nil {
+			return nil, status.Error(codes.Aborted, err.Error())
+		}
+
+		// Trigger physical fabric/bus scanning
+		err = osDeviceConnectivity.RescanDevices(lun, arrayInitiators)
+		if err != nil {
+			return nil, status.Error(codes.Internal, err.Error())
+		}
+
+		err = d.OsDeviceConnectivityHelper.RemoveGhostDevice(ctx, volumeUuid, lun, arrayInitiators)
+		if err != nil {
+			logger.Debugf("Failed to clean ghost device for lun %d", lun)
+			// we can swallow the error here, since it's just for cleanliness
+		}
+
+		// Re-discover the device node post-scan
+		mpathDevice, err = osDeviceConnectivity.GetMpathDevice(ctx, volumeUuid)
+		logger.Debugf("Discovered device post-scan: {%v}", mpathDevice)
+		if err != nil {
+			logger.Errorf("Error while discovering the device : {%v}", err.Error())
+			return nil, status.Error(codes.Internal, err.Error())
+		}
+	} else {
+		logger.Infof("Optimization: Healthy device node %s already present. Skipping login and fabric rescan.", mpathDevice)
 	}
 
-	err = d.OsDeviceConnectivityHelper.RemoveGhostDevice(ctx, volumeUuid, lun, arrayInitiators)
-	if err != nil {
-		logger.Debugf("Failed to clean ghost device for lun %d", lun)
-		// we can swallow the error here, since it's just for cleanliness
-	}
-
-	mpathDevice, err := osDeviceConnectivity.GetMpathDevice(ctx, volumeUuid)
-	//mpathDevice, err := osDeviceConnectivity.VerifyAndGetDmDevice(volumeUuid, lun)
-	logger.Debugf("Discovered device : {%v}", mpathDevice)
-	if err != nil {
-		logger.Errorf("Error while discovering the device : {%v}", err.Error())
-		return nil, status.Error(codes.Internal, err.Error())
-	}
 
 	volumeCap := req.GetVolumeCapability()
 	switch volumeCap.GetAccessType().(type) {
