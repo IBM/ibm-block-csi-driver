@@ -1722,7 +1722,7 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) IdentityAwarePreScan(
 			2*time.Second,
 			10*time.Second,
 			func(ctx context.Context) (IdentityResult, error) {
-				wwid, _ := r.Helper.getWWIDByDev(mounts.Major, mounts.Minor)
+				wwid, _ := r.Helper.getWWIDByDev(mounts[0].Major, mounts[0].Minor)
 				hw, _ := r.Helper.GetWwnByScsiInq(ctx, mpathName)
 
 				return IdentityResult{WWID: wwid, HW: hw}, nil
