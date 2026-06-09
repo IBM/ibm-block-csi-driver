@@ -58,7 +58,7 @@ type OsDeviceConnectivityHelperScsiGenericInterface interface {
 	ValidateLun(ctx context.Context, targetDm string, lun int, sysDevices []string, expectedSerial string) error
 	IsVolumePathMatchesVolumeId(ctx context.Context, volumeId string, volumePath string) (bool, error)
 	TeardownVolume(ctx context.Context, target string, needFlush bool, needRemovePhysical bool, expectedWWID string) error
-	IdentityAwarePreScan(ctx context.Context, targetPath string, expectedWWID string) error
+	IdentityAwarePreScan(ctx context.Context, targetPath string, expectedWWID string) (discoveredDev string, isBusy bool, isLeftover bool, err error)
 }
 
 type OsDeviceConnectivityHelperScsiGeneric struct {
@@ -1746,13 +1746,6 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) IdentityAwarePreScan(
 			_ = r.Mounter.UnmountWithTimeout(ctx, targetPath, 30*time.Second)
 			return "", false, false, status.Error(codes.Internal, "pre-scan: identity collision detected at target path")
 		}
-	}
-
-	// =========================================================================
-	// TIER 1: IN-MEMORY CONCURRENCY GATE
-	// =========================================================================
-	if r.isRescanMutexLocked(expectedWWID) {
-		return "", true, false, status.Error(codes.Aborted, "internal driver rescan lock is held by another thread")
 	}
 
 	// =========================================================================
