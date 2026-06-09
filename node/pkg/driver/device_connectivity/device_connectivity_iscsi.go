@@ -100,11 +100,11 @@ func (r OsDeviceConnectivityIscsi) iscsiLogin(ctx context.Context, targetName, p
 
 			// Exit Code 24: ISCSI_ERR_SESSION_EXISTS -> Active but needs recovery
 			if exitCode == 24 {
-				logger.Warnf("iSCSI session exists but path requires recovery for %s. Multipath will handle.", cliPortal)
+				logger.Warningf("iSCSI session exists but path requires recovery for %s. Multipath will handle.", cliPortal)
 				return nil
 			}
 		}
-		return fmt.Sprintf("iscsiadm login failed (target: %s, portal: %s, output: %s): %w", targetName, cliPortal, strings.TrimSpace(output), err)
+		return fmt.Errorf("iscsiadm login failed (target: %s, portal: %s, output: %s): %w", targetName, cliPortal, strings.TrimSpace(output), err)
 	}
 
 	logger.Infof("Successfully logged into target %s via portal %s", targetName, cliPortal)
@@ -339,7 +339,7 @@ func (r OsDeviceConnectivityIscsi) discoverAndLogin(ctx context.Context, portals
 		if len(loginErrors) == len(portalsByTarget) { // All paths totally failed
 			return fmt.Errorf("all iSCSI login attempts failed: %v", loginErrors)
 		}
-		logger.Warnf("Some iSCSI paths failed to log in, but proceeding with successful sessions: %v", loginErrors)
+		logger.Warningf("Some iSCSI paths failed to log in, but proceeding with successful sessions: %v", loginErrors)
 	}
 
 	return nil
@@ -422,24 +422,32 @@ func (r OsDeviceConnectivityIscsi) normalizePortal(portal string) string {
 }
 
 func (r OsDeviceConnectivityIscsi) EnsureLogin(ctx context.Context, allPortalsByTarget map[string][]string) {
-	// filterLoggedIn removes portals that are already authenticated and connected
+	logger.Infof("Starting iSCSI login verification for %d requested targets", len(allPortalsByTarget))
+
+	// 1. Identify which targets and portals are missing active sessions in sysfs
 	portalsToLogin, err := r.filterLoggedIn(ctx, allPortalsByTarget)
 	if err != nil {
 		logger.Errorf("Failed to filter logged in iSCSI portals: {%v}", err)
 		return
 	}
 
-	// Early exit if the host already has active sessions for all requested paths
+	// 2. Early exit optimization if all paths are already logged in and healthy
 	if len(portalsToLogin) == 0 {
 		logger.Debug("All iSCSI portals are already logged in.")
 		return
 	}
 
-	logger.Infof("Found %d targets requiring discovery and login.", len(portalsToLogin))
+	logger.Infof("%d targets have paths requiring active discovery or login operations", len(portalsToLogin))
 	
-	// Execute the actual attachment sequence and bubble up any hardware/network faults
-	r.discoverAndLogin(ctx, portalsByTarget)
+	// 3. Trigger discovery and execute the login pipeline
+	if err := r.discoverAndLogin(ctx, portalsToLogin); err != nil {
+		logger.Errorf("iSCSI storage attachment pipeline failed: %v", err)
+		return
+	}
+
+	logger.Info("Successfully completed all required iSCSI target login procedures.")
 }
+
 
 
 type activeSession struct {
