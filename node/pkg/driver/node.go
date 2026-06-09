@@ -167,7 +167,7 @@ func (d *NodeService) NodeStageVolume(ctx context.Context, req *csi.NodeStageVol
 	skipRescanPipeline := (mpathDevice != "" && !isBusy && !isLeftover)
 
 	if !skipRescanPipeline {
-		logger.Infof("Device path missing, busy, or purged for WWID %s. Running full rescan pipeline.", expectedWWID)
+		logger.Infof("Device path missing, busy, or purged for WWID %s. Running full rescan pipeline.", volumeUuid)
 
 		// Your original login and ghost-clearing steps
 		osDeviceConnectivity.EnsureLogin(ctx, ipsByArrayInitiator)
