@@ -58,7 +58,7 @@ type OsDeviceConnectivityHelperScsiGenericInterface interface {
 	ValidateLun(ctx context.Context, targetDm string, lun int, sysDevices []string, expectedSerial string) error
 	IsVolumePathMatchesVolumeId(ctx context.Context, volumeId string, volumePath string) (bool, error)
 	TeardownVolume(ctx context.Context, target string, needFlush bool, needRemovePhysical bool, expectedWWID string) error
-	IdentityAwarePreScan(ctx context.Context, targetPath string, expectedWWID string) (discoveredDev string, isBusy bool, isLeftover bool, err error)
+	IdentityAwarePreScan(ctx context.Context, targetPath string, expectedWWID string) (discoveredDev string, isStaged bool, skipRescan bool, isLeftover bool, err error)
 }
 
 type OsDeviceConnectivityHelperScsiGeneric struct {
@@ -1704,12 +1704,12 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) IdentityAwarePreScan(
 	ctx context.Context, 
 	targetPath string, 
 	expectedWWID string,
-) (discoveredDev string, isBusy bool, isLeftover bool, err error) {
+) (discoveredDev string, isStaged bool, skipRescan bool, isLeftover bool, err error) {
 	normExpected := r.Helper.normalizeWWID(expectedWWID)
 	mpathName := r.Helper.findDMByWWID(normExpected)
 
 	// =========================================================================
-	// TIER 0: MOUNTED PATH IDENTITY VERIFICATION & ZOMBIE CLEANUP
+	// TIER 0: MOUNTED PATH IDENTITY VERIFICATION & RETRY SHORT-CIRCUIT
 	// =========================================================================
 	mounts, _ := r.Mounter.GetMountsForPath(targetPath)
 	if len(mounts) > 0 {
@@ -1722,50 +1722,72 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) IdentityAwarePreScan(
 			2*time.Second,
 			10*time.Second,
 			func(ctx context.Context) (IdentityResult, error) {
-				wwid, _ := r.Helper.getWWIDByDev(mounts[0].Major, mounts[0].Minor)
+				wwid, _ := r.Helper.getWWIDByDev(mounts.Major, mounts.Minor)
 				hw, _ := r.Helper.GetWwnByScsiInq(ctx, mpathName)
 
 				return IdentityResult{WWID: wwid, HW: hw}, nil
 			},
 		)
 		if err != nil {
-			return "", false, false, err
+			return "", false, false, false, err
 		}
 
+		// Verify if the active mount targets the expected LUN identity
 		if strings.EqualFold(res.WWID, normExpected) && (res.HW == "" || strings.EqualFold(res.HW, normExpected)) {
-			// Zombie Match: Volume matches a crashed attempt. Perform full unmount and cleanup.
+			
+			// Verify if the underlying block topology supporting this mount is healthy
+			isBusy, isLeftoverTopology, currentDev := r.evaluateDeviceTopology(expectedWWID)
+			if currentDev == "" && mpathName != "" {
+				currentDev = "/dev/" + mpathName
+			}
+			
+			if !isLeftoverTopology && !isBusy && currentDev != "" {
+				// CASE A: Fully mounted, block layer healthy. Complete short-circuit.
+				logger.Infof("Pre-scan: Volume %s is already staged and healthy at %s.", expectedWWID, targetPath)
+				r.busyTimestamps.Delete(expectedWWID)
+				return currentDev, true, true, false, nil
+			}
+
+			// CASE B: Mount exists but underlying topology is corrupted or empty. 
+			// Treat as a broken zombie from a crashed attempt. Clear the slate.
+			logger.Warningf("Pre-scan: Mount exists for %s but underlying pathing is broken. Forcing teardown.", expectedWWID)
 			err := r.TeardownVolume(ctx, targetPath, false, false, expectedWWID)
 			if err != nil {
-				return "", false, false, fmt.Errorf("pre-scan: failed to clear zombie volume: %w", err)
+				return "", false, false, true, fmt.Errorf("pre-scan: failed to clear zombie volume: %w", err)
 			}
 			r.busyTimestamps.Delete(expectedWWID)
-			// Return completely empty states because we just forcefully removed everything
-			return "", false, false, nil
+			return "", false, false, true, nil
 		} else {
-			logger.Warningf("Identity Collision at %s: Found %s, expected %s", targetPath, res.WWID, normExpected)
+			// Identity Collision: Path belongs to a completely different volume!
+			logger.Warningf("Pre-scan: Identity Collision at %s: Found %s, expected %s", targetPath, res.WWID, normExpected)
 			_ = r.Mounter.UnmountWithTimeout(ctx, targetPath, 30*time.Second)
-			return "", false, false, status.Error(codes.Internal, "pre-scan: identity collision detected at target path")
+			return "", false, false, false, status.Error(codes.Internal, "pre-scan: identity collision detected at target path")
+			// Verify the collision is cleared
+			// TODO should we expect the detach to be immediate or add small polling loop a la pollLayerDeleted
+			//if mounted, _ := r.Mounter.IsMounted(targetPath); mounted {
+			//		return fmt.Errorf("pre-scan: collision at %s; failed to detach rogue volume %s", targetPath, currentWWID)
+			//}
+			
 		}
 	}
 
 	// =========================================================================
 	// TIER 2: TOPOLOGY STATE DETECTION (SCSI/DM vs NVMe)
 	// =========================================================================
-	isBusy, isLeftover, currentDev := r.evaluateDeviceTopology(expectedWWID)
+	isBusy, isLeftoverTopology, currentDev := r.evaluateDeviceTopology(expectedWWID)
 	if currentDev == "" && mpathName != "" {
 		currentDev = "/dev/" + mpathName
 	}
 
-	// Case A: Topology is a dead leftover shell (0 physical paths/slaves attached)
-	if isLeftover {
-		logger.Warningf("Detected zombie topology for WWID %s. Safely purging before retry.", expectedWWID)
+	// Case A: Dead leftover topology mapping shell (0 physical paths/slaves)
+	if isLeftoverTopology {
+		logger.Warningf("Pre-scan: Detected zombie topology for WWID %s. Cleaning up layers.", expectedWWID)
 		_ = r.cleanupOrphanedTopology(ctx, mpathName, expectedWWID)
 		r.busyTimestamps.Delete(expectedWWID)
-		// Return isLeftover=true so caller knows it was just destroyed and needs a fresh scan
-		return "", false, true, nil 
+		return "", false, false, true, nil 
 	}
 
-	// Case B: Previous kernel rescan is actively running or stuck in a D-state transition
+	// Case B: Previous kernel rescan is actively processing or stuck in D-state
 	if isBusy {
 		now := time.Now()
 		val, loaded := r.busyTimestamps.LoadOrStore(expectedWWID, now)
@@ -1773,19 +1795,24 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) IdentityAwarePreScan(
 
 		const maxKernelSettleDuration = 5 * time.Minute
 		if loaded && now.Sub(firstDetected) > maxKernelSettleDuration {
-			logger.Errorf("Storage layer permanently stuck for WWID %s for %v. Disabling queues and purging.", expectedWWID, now.Sub(firstDetected))
+			logger.Errorf("Pre-scan: Storage permanently stuck for WWID %s for %v. Disabling queues and purging.", expectedWWID, now.Sub(firstDetected))
 			r.busyTimestamps.Delete(expectedWWID)
 			_ = r.cleanupOrphanedTopology(ctx, mpathName, expectedWWID)
-			// We violently wiped it, so we treat it as no longer busy, but a fresh scan is required
-			return "", false, true, nil 
+			return "", false, false, true, nil 
 		} else {
-			return currentDev, true, false, status.Error(codes.Aborted, "previous rescan operation is still settling in the kernel. Backing off.")
+			return currentDev, false, false, false, status.Error(codes.Aborted, "previous rescan operation is still settling in the kernel. Backing off.")
 		}
 	}
 
-	// Case C: Everything is clean. Clear tracking tokens and return device details.
+	// Case C: Device exists natively on host, not mounted anywhere yet. Optimize.
+	if currentDev != "" && !isBusy && !isLeftoverTopology {
+		r.busyTimestamps.Delete(expectedWWID)
+		return currentDev, false, true, false, nil
+	}
+
+	// Case D: Complete clean slate (no device, no mount). Run normal discovery.
 	r.busyTimestamps.Delete(expectedWWID)
-	return currentDev, false, false, nil
+	return "", false, false, false, nil
 }
 
 
