@@ -157,92 +157,78 @@ func (d *NodeService) NodeStageVolume(ctx context.Context, req *csi.NodeStageVol
 	}
 	
 	
-	// 1. RUN THE ENCAPSULATED BOOSTER MATRIX
+	// 1. RUN PRE-SCAN CONTROLLER MAPPING
 	mpathDevice, isStaged, skipRescan, _, err := d.OsDeviceConnectivityHelper.IdentityAwarePreScan(ctx, stagingPathWithHostPrefix, volumeUuid)
 	if err != nil {
-		return nil, err // Propagate Aborted / Internal blocks natively
+		return nil, err
 	}
 
-	// 2. TIER 0 SHORT-CIRCUIT ROUTE
 	if isStaged {
-		logger.Infof("NodeStageVolume Complete (Short-Circuit): Volume %s is already fully staged.", volumeUuid)
+		logger.Infof("NodeStageVolume Complete: Already fully staged.")
 		return &csi.NodeStageVolumeResponse{}, nil
 	}
 
-	// 3. PHYSICAL LAYER DISCOVERY DISPATCH
+	// 2. DISCOVERY OR STABILIZATION ROUTING
 	if !skipRescan {
-		logger.Infof("Device missing or recently purged for WWID %s. Initiating fabric discovery.", volumeUuid)
-		
+		logger.Infof("Device missing or recently purged for WWID %v. Initiating fabric discovery.", volumeWWID)
 		osDeviceConnectivity.EnsureLogin(ctx, ipsByArrayInitiator)
 
-		err = d.OsDeviceConnectivityHelper.RemoveGhostDevice(ctx, volumeUuid, lun, arrayInitiators)
-		if err != nil {
-			return nil, status.Error(codes.Aborted, err.Error())
-		}
-
-		err = osDeviceConnectivity.RescanDevices(lun, arrayInitiators)
-		if err != nil {
+		_ = d.OsDeviceConnectivityHelper.RemoveGhostDevice(ctx, volumeUuid, lun, arrayInitiators)
+		if err := osDeviceConnectivity.RescanDevices(lun, arrayInitiators); err != nil {
 			return nil, status.Error(codes.Internal, err.Error())
 		}
+		_ = d.OsDeviceConnectivityHelper.RemoveGhostDevice(ctx, volumeUuid, lun, arrayInitiators)
 
-		err = d.OsDeviceConnectivityHelper.RemoveGhostDevice(ctx, volumeUuid, lun, arrayInitiators)
+		// CALL YOUR DISCOVERY SETTLEMENT ROUTINE
+		// This uses performDiscovery, safeSettle, fingerprinting loops to guarantee readability.
+		mpathDevice, err = d.OsDeviceConnectivityHelper.WaitForDmToExist(ctx, volumeWWID, 15, 2)
 		if err != nil {
-			logger.Debugf("Failed to clean ghost device for lun %d", lun)
-		}
-
-		mpathDevice, err = osDeviceConnectivity.GetMpathDevice(ctx, volumeUuid)
-		if err != nil {
-			return nil, status.Error(codes.Internal, err.Error())
+			return nil, status.Errorf(codes.Internal, "device fingerprint stabilization failed: %v", err)
 		}
 	} else {
-		logger.Infof("Optimization: Healthy device node %s found. Skipping physical login and rescan.", mpathDevice)
+		logger.Infof("Optimization: Healthy node %s found. Checking settlement directly.", mpathDevice)
+		// Ensure even the cached short-circuit dev path handles a quick safeSettle read before formatting
+		if err := d.OsDeviceConnectivityHelper.safeSettle(mpathDevice); err != nil {
+			return nil, status.Errorf(codes.Internal, "existing cached device failed to settle: %v", err)
+		}
 	}
 
-
-	volumeCap := req.GetVolumeCapability()
+	// 3. BLOCK VOLUME EXIT
 	switch volumeCap.GetAccessType().(type) {
 	case *csi.VolumeCapability_Block:
-		logger.Debugf("NodeStageVolume Finished: multipath device [%s] is ready to be mounted by NodePublishVolume API", mpathDevice)
 		return &csi.NodeStageVolumeResponse{}, nil
 	}
 
+	// 4. TOPOLOGY VALIDATION, FORMATTING, AND MOUNTING
 	baseDevice := path.Base(mpathDevice)
 	sysDevices, err := d.NodeUtils.GetSysDevicesFromMpath(ctx, baseDevice)
 	if err != nil {
-		logger.Errorf("Error while trying to get sys devices : {%v}", err.Error())
 		return nil, status.Error(codes.Internal, err.Error())
 	}
-	err = osDeviceConnectivity.ValidateLun(ctx, mpathDevice, lun, sysDevices, volumeUuid)
-	if err != nil {
-		logger.Errorf("Error while trying to validate lun : {%v}", err.Error())
+	
+	if err := osDeviceConnectivity.ValidateLun(ctx, mpathDevice, lun, sysDevices, volumeUuid); err != nil {
 		return nil, status.Error(codes.Internal, err.Error())
 	}
 
 	existingFormat, err := d.Mounter.GetDiskFormat(mpathDevice)
 	if err != nil {
-		logger.Errorf("Could not determine if disk {%v} is formatted, error: %v", mpathDevice, err)
 		return nil, status.Error(codes.Internal, err.Error())
 	}
 
-	requestedFsType := volumeCap.GetMount().FsType
-	fsTypeForMount, err := d.resolveFsTypeForMount(requestedFsType, existingFormat)
+	fsTypeForMount, err := d.resolveFsTypeForMount(volumeCap.GetMount().FsType, existingFormat)
 	if err != nil {
-		logger.Errorf("Error while resolving type of filesystem to mount : {%v}", err.Error())
 		return nil, err
 	}
 	
-    if err = os.MkdirAll(stagingPathWithHostPrefix, 0750); err != nil {
-        logger.Errorf("failed to create target directory %s: %v", stagingPathWithHostPrefix, err)
+	stagingPathWithHostPrefix := d.getHostPrefixPath(stagingPath) 
+	if err = os.MkdirAll(stagingPathWithHostPrefix, 0750); err != nil {
 		return nil, err
-    }	
+	}	
 
-
-	err = d.formatAndMount(mpathDevice, stagingPath, fsTypeForMount, existingFormat)
-	if err != nil {
+	if err = d.formatAndMount(mpathDevice, stagingPath, fsTypeForMount, existingFormat); err != nil {
 		return nil, status.Error(codes.Internal, err.Error())
 	}
 
-	logger.Debugf("NodeStageVolume Finished: staging path [%s] is ready to be mounted by NodePublishVolume API", stagingPath)
 	return &csi.NodeStageVolumeResponse{}, nil
 }
 
