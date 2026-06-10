@@ -428,13 +428,8 @@ func (r OsDeviceConnectivityNvmeOFc) discoverSubNqn(ctx context.Context, arrayTa
 	if err != nil {
 		return "", err
 	}
-	hostNN, hostPN, err := r.extractCleanHexWWNs(hostPort)
-	if err != nil {
-		return "", err
-	}
-
-        cmd := fmt.Sprintf("nqn=%s,transport=fc,traddr=nn-%s:pn-%s,host-traddr=nn-%s:pn-%s\n",
-                nvmeDiscoveryNqn, targetNN, targetPN, hostNN, hostPN)
+        cmd := fmt.Sprintf("nqn=%s,transport=fc,traddr=nn-%s:pn-%s\n",
+                nvmeDiscoveryNqn, targetNN, targetPN)
 
 
 	// DEBUG PRINT BLOCK: %q shows exact escape characters like \n and spaces
@@ -570,12 +565,7 @@ type nvmeDiscoveryLogEntry struct {
 // parseSubNqnFromDiscoverOutput extracts the storage subsystem NQN from "nvme discover" output.
 // Skips the discovery controller NQN (nqn.2014-08.org.nvmexpress.discovery).
 func parseSubNqnFromDiscoverOutput(rawBytes []byte) string {
-	if len(rawBytes) < 16 { // Ensure header preamble minimum exists
-		return ""
-	}
-
-	// The first 16 bytes contain the Discovery Log Page Header
-	// Generation Counter (uint64) + Number of Records (uint64)
+	// 1. Ensure the raw byte slice can completely fit the 16-byte header block
 	if len(rawBytes) < 16 {
 		return ""
 	}
@@ -585,10 +575,16 @@ func parseSubNqnFromDiscoverOutput(rawBytes []byte) string {
 		return ""
 	}
 
-	// Offset past the 16-byte Discovery Log Page header to reach records
+	// 2. Validate total expected memory bounds up front to prevent mid-loop breaks
+	expectedMinimumSize := 16 + (int(numRecords) * recordSize)
+	if len(rawBytes) < expectedMinimumSize {
+		return ""
+	}
+
 	offset := 16
 
 	for i := uint64(0); i < numRecords; i++ {
+		// Guard array indexing just in case recordSize parameters are shifted
 		if offset+recordSize > len(rawBytes) {
 			break
 		}
@@ -600,7 +596,6 @@ func parseSubNqnFromDiscoverOutput(rawBytes []byte) string {
 			return ""
 		}
 
-		// Advance pointer to the next record block
 		offset += recordSize
 
 		// Filter out records that are not standard storage subsystems (subtype 0x2)
@@ -608,9 +603,13 @@ func parseSubNqnFromDiscoverOutput(rawBytes []byte) string {
 			continue
 		}
 
-		// Extract string from null-padded byte array
-		subNqn := string(bytes.Trim(entry.SubnqnBytes[:], "\x00"))
-		subNqn = strings.TrimSpace(subNqn)
+		// 3. FIX: Safely parse string up to the very FIRST null byte terminator
+		endIndex := bytes.IndexByte(entry.SubnqnBytes[:], 0)
+		if endIndex == -1 {
+			endIndex = len(entry.SubnqnBytes)
+		}
+		
+		subNqn := strings.TrimSpace(string(entry.SubnqnBytes[:endIndex]))
 
 		// Ignore empty matches or connections pointing back to the discovery target itself
 		if subNqn == "" || subNqn == nvmeDiscoveryNqn {
@@ -625,6 +624,7 @@ func parseSubNqnFromDiscoverOutput(rawBytes []byte) string {
 }
 
 
+
 // nvmeConnect executes direct writes onto the /dev/nvme-fabrics channel
 func (r OsDeviceConnectivityNvmeOFc) nvmeConnect(ctx context.Context, arrayTargetPort, hostPort, subNqn string) bool {
 	targetNN, targetPN, err := r.extractCleanHexWWNs(arrayTargetPort)
@@ -632,14 +632,9 @@ func (r OsDeviceConnectivityNvmeOFc) nvmeConnect(ctx context.Context, arrayTarge
 		logger.Errorf("NVMe-oFC nvmeConnect: target error: %v", err)
 		return false
 	}
-	hostNN, hostPN, err := r.extractCleanHexWWNs(hostPort)
-	if err != nil {
-		logger.Errorf("NVMe-oFC nvmeConnect: host error: %v", err)
-		return false
-	}
 
-        options := fmt.Sprintf("nqn=%s,transport=fc,traddr=nn-%s:pn-%s,host-traddr=nn-%s:pn-%s\n",
-        subNqn, targetNN, targetPN, hostNN, hostPN)
+        options := fmt.Sprintf("nqn=%s,transport=fc,traddr=nn-%s:pn-%s\n",
+                subNqn, targetNN, targetPN)
 
 	// DEBUG PRINT BLOCK: %q shows exact escape characters like \n and spaces
 	logger.Infof("NVMe-oFC DEBUG RAW CONNECT STRING: %q", options)
