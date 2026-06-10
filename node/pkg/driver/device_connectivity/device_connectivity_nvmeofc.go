@@ -428,13 +428,13 @@ func (r OsDeviceConnectivityNvmeOFc) discoverSubNqn(ctx context.Context, arrayTa
 	if err != nil {
 		return "", err
 	}
-	_, hostPN, err := r.extractCleanHexWWNs(hostPort)
+	hostNN, hostPN, err := r.extractCleanHexWWNs(hostPort)
 	if err != nil {
 		return "", err
 	}
 
-        cmd := fmt.Sprintf("nqn=%s,transport=fc,traddr=nn-%s:pn-%s,host-traddr=%s\n",
-                nvmeDiscoveryNqn, targetNN, targetPN, hostPN)
+        cmd := fmt.Sprintf("nqn=%s,transport=fc,traddr=nn-%s:pn-%s,host-traddr=nn-%s:pn-%s\n",
+                nvmeDiscoveryNqn, targetNN, targetPN, hostNN, hostPN)
 
 
 	// DEBUG PRINT BLOCK: %q shows exact escape characters like \n and spaces
@@ -632,15 +632,14 @@ func (r OsDeviceConnectivityNvmeOFc) nvmeConnect(ctx context.Context, arrayTarge
 		logger.Errorf("NVMe-oFC nvmeConnect: target error: %v", err)
 		return false
 	}
-	_, hostPN, err := r.extractCleanHexWWNs(hostPort)
+	hostNN, hostPN, err := r.extractCleanHexWWNs(hostPort)
 	if err != nil {
 		logger.Errorf("NVMe-oFC nvmeConnect: host error: %v", err)
 		return false
 	}
 
-        options := fmt.Sprintf("nqn=%s,transport=fc,traddr=nn-%s:pn-%s,host-traddr=%s\n",
-                subNqn, targetNN, targetPN, hostPN)
-
+        options := fmt.Sprintf("nqn=%s,transport=fc,traddr=nn-%s:pn-%s,host-traddr=nn-%s:pn-%s\n",
+        subNqn, targetNN, targetPN, hostNN, hostPN)
 
 	// DEBUG PRINT BLOCK: %q shows exact escape characters like \n and spaces
 	logger.Infof("NVMe-oFC DEBUG RAW CONNECT STRING: %q", options)
