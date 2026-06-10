@@ -628,6 +628,73 @@ func parseSubNqnFromDiscoverOutput(rawBytes []byte) string {
 	return ""
 }
 
+// ensureFCTargetDiscovery forces a target sync and reliably polls sysfs until the hardware link is active.
+func (r OsDeviceConnectivityNvmeOFc) ensureFCTargetDiscovery(hostPN, targetPN string) error {
+	cleanHostPN := strings.ToLower(strings.TrimPrefix(hostPN, "0x"))
+	cleanTargetPN := strings.ToLower(strings.TrimPrefix(targetPN, "0x"))
+
+	// 1. Locate and trigger the asynchronous fabric scan on the correct local HBA
+	hosts, err := filepath.Glob("/sys/class/fc_host/host*")
+	if err != nil {
+		return fmt.Errorf("failed to list fc_hosts: %w", err)
+	}
+
+	hbaTriggered := false
+	for _, hostPath := range hosts {
+		buf, err := os.ReadFile(filepath.Join(hostPath, "port_name"))
+		if err != nil {
+			continue
+		}
+		sysfsPortName := strings.ToLower(strings.TrimPrefix(strings.TrimSpace(string(buf)), "0x"))
+
+		logger.Warningf("compare %s with %s", sysfsPortName, cleanHostPN)
+
+		if sysfsPortName == cleanHostPN {
+			lipPath := filepath.Join(hostPath, "issue_lip")
+			if err := os.WriteFile(lipPath, []byte("1\n"), 0200); err != nil {
+				return fmt.Errorf("failed to write issue_lip: %w", err)
+			}
+			hbaTriggered = true
+			break
+		}
+	}
+
+	if !hbaTriggered {
+		return fmt.Errorf("local HBA matching port %s not found", hostPN)
+	}
+
+	// 2. DETERMINISTIC WAIT LOOP: Poll sysfs to verify when the target port surfaces
+	timeout := 10 * time.Second
+	pollInterval := 100 * time.Millisecond
+	deadline := time.Now().Add(timeout)
+	startTime := time.Now()
+
+	for time.Now().Before(deadline) {
+		rports, err := filepath.Glob("/sys/class/fc_remote_ports/rport-*")
+		if err == nil {
+			for _, rportPath := range rports {
+				// Read the remote port name registered by the kernel
+				pBuf, err := os.ReadFile(filepath.Join(rportPath, "port_name"))
+				if err != nil {
+					logger.Warningf("failed to read port name")
+					continue
+				}
+				discoveredWWPN := strings.ToLower(strings.TrimPrefix(strings.TrimSpace(string(pBuf)), "0x"))
+
+				// If the target WWPN is now visible in the kernel, we can proceed safely
+
+				logger.Warningf("compare %s with %s", discoveredWWPN, cleanTargetPN)
+				if discoveredWWPN == cleanTargetPN {
+					logger.Infof("NVMe-oFC: Hardware target %s successfully discovered by HBA in %v", targetPN, time.Since(startTime))
+					return nil
+				}
+			}
+		}
+		time.Sleep(pollInterval)
+	}
+
+	return fmt.Errorf("timeout waiting for target port %s to emerge in fabric topology", targetPN)
+}
 
 
 // nvmeConnect executes direct writes onto the /dev/nvme-fabrics channel
@@ -641,6 +708,11 @@ func (r OsDeviceConnectivityNvmeOFc) nvmeConnect(ctx context.Context, arrayTarge
         if err != nil {
                 logger.Errorf("NVMe-oFC nvmeConnect: host error: %v", err)
                 return false
+        }
+
+        if err := r.ensureFCTargetDiscovery(hostPN, targetPN); err != nil {
+                logger.Errorf("NVMe-oFC: Fabric registration halted: %v", err)
+                return false // Or return "", err for the discovery method
         }
 
         // Canonical Format for /dev/nvme-fabrics (guaranteed 16 characters each)
