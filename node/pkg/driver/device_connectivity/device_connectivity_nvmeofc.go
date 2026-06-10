@@ -466,88 +466,91 @@ func (r OsDeviceConnectivityNvmeOFc) discoverSubNqn(ctx context.Context, arrayTa
 	return subNqn, nil
 }
 
-// executeKernelDiscovery writes the discovery payload string directly into the kernel fabrics channel.
 func (r OsDeviceConnectivityNvmeOFc) executeKernelDiscovery(cmd string) (string, error) {
-	f, err := os.OpenFile("/dev/nvme-fabrics", os.O_WRONLY|os.O_APPEND, 0)
-	if err != nil {
-		return "", fmt.Errorf("open /dev/nvme-fabrics failed: %w", err)
-	}
-	defer f.Close()
+        f, err := os.OpenFile("/dev/nvme-fabrics", os.O_WRONLY|os.O_APPEND, 0)
+        if err != nil {
+                return "", fmt.Errorf("open /dev/nvme-fabrics failed: %w", err)
+        }
+        defer f.Close()
 
-	if _, err := f.WriteString(cmd); err != nil {
-		return "", fmt.Errorf("write to nvme-fabrics failed: %w", err)
-	}
+        logger.Debugf("NVMe-oFC: Writing discovery string to /dev/nvme-fabrics")
+        if _, err := f.WriteString(cmd); err != nil {
+                return "", fmt.Errorf("write to nvme-fabrics failed: %w", err)
+        }
 
-	return r.findDiscoverySubNqnFromSysfs()
+        return r.findDiscoverySubNqnFromSysfs()
 }
 
-// findDiscoverySubNqnFromSysfs scans sysfs subsystems to read and parse the dynamic discovery log.
 func (r OsDeviceConnectivityNvmeOFc) findDiscoverySubNqnFromSysfs() (string, error) {
-	const sysPath = "/sys/class/nvme"
+        const sysPath = "/sys/class/nvme"
 
-	entries, err := os.ReadDir(sysPath)
-	if err != nil {
-		return "", fmt.Errorf("failed to read %s: %w", sysPath, err)
-	}
+        entries, err := os.ReadDir(sysPath)
+        if err != nil {
+                return "", fmt.Errorf("failed to read %s: %w", sysPath, err)
+        }
 
-	for _, entry := range entries {
-		if !strings.HasPrefix(entry.Name(), "nvme") {
-			continue
-		}
+        for _, entry := range entries {
+                if !strings.HasPrefix(entry.Name(), "nvme") {
+                        continue
+                }
 
-		controllerPath := filepath.Join(sysPath, entry.Name())
-		
-		subnqnBuf, err := os.ReadFile(filepath.Join(controllerPath, "subsysnqn"))
-		if err != nil {
-			continue
-		}
-		
-		if strings.TrimSpace(string(subnqnBuf)) != nvmeDiscoveryNqn {
-			continue
-		}
+                controllerPath := filepath.Join(sysPath, entry.Name())
 
-		logPath := filepath.Join(controllerPath, "discovery_log")
-		
-		// FIX: Add a polling backoff mechanism to wait for the kernel's async sysfs population
-		var logFile *os.File
-		var openErr error
-		for attempts := 0; attempts < 5; attempts++ {
-			logFile, openErr = os.Open(logPath)
-			if openErr == nil {
-				break
-			}
-			// If it's a "not found" error, wait 15ms and try again
-			if os.IsNotExist(openErr) {
-				time.Sleep(15 * time.Millisecond)
-				continue
-			}
-			return "", fmt.Errorf("failed to open discovery log from %s: %w", entry.Name(), openErr)
-		}
-		if openErr != nil {
-			return "", fmt.Errorf("kernel failed to expose discovery log path within timeout: %w", openErr)
-		}
-		
-		// 16-byte log page header + space for up to 64 records
-		logBuf := make([]byte, 16+(64*recordSize))
-		n, err := io.ReadFull(logFile, logBuf)
-		logFile.Close() // Explicitly close file before deleting the temporary controller
-		
-		if err != nil && !errors.Is(err, io.EOF) && !errors.Is(err, io.ErrUnexpectedEOF) {
-			return "", fmt.Errorf("failed to pull complete stream data: %w", err)
-		}
+                subnqnBuf, err := os.ReadFile(filepath.Join(controllerPath, "subsysnqn"))
+                if err != nil {
+                        continue
+                }
 
-		// Clean up the transient discovery controller immediately to avoid host resource leakage
-		deletePath := filepath.Join(controllerPath, "delete_controller")
-		_ = os.WriteFile(deletePath, []byte("1\n"), 0200)
+                // GUARD: Only touch this controller if it strictly matches the discovery NQN
+                if strings.TrimSpace(string(subnqnBuf)) != nvmeDiscoveryNqn {
+                        continue
+                }
 
-		subNqn := parseSubNqnFromDiscoverOutput(logBuf[:n])
-		if subNqn != "" {
-			return subNqn, nil
-		}
-	}
+                logger.Debugf("NVMe-oFC: Found discovery controller candidate: %s", entry.Name())
 
-	return "", fmt.Errorf("no active discovery controller found in sysfs")
+                logPath := filepath.Join(controllerPath, "discovery_log")
+                var logFile *os.File
+                var openErr error
+                for attempts := 0; attempts < 5; attempts++ {
+                        logFile, openErr = os.Open(logPath)
+                        if openErr == nil {
+                                break
+                        }
+                        if os.IsNotExist(openErr) {
+                                time.Sleep(15 * time.Millisecond)
+                                continue
+                        }
+                        return "", fmt.Errorf("failed to open discovery log from %s: %w", entry.Name(), openErr)
+                }
+                if openErr != nil {
+                        return "", fmt.Errorf("kernel failed to expose discovery log path within timeout: %w", openErr)
+                }
+
+                logBuf := make([]byte, 16+(64*recordSize))
+                n, err := io.ReadFull(logFile, logBuf)
+                logFile.Close() 
+
+                if err != nil && !errors.Is(err, io.EOF) && !errors.Is(err, io.ErrUnexpectedEOF) {
+                        return "", fmt.Errorf("failed to pull complete stream data: %w", err)
+                }
+
+                subNqn := parseSubNqnFromDiscoverOutput(logBuf[:n])
+                
+                // CRITICAL FIX: Only delete the controller if we successfully parsed the target NQN
+                // or if we are absolutely certain this is the transient discovery instance we just spawned.
+                if subNqn != "" {
+                        logger.Infof("NVMe-oFC: Successfully parsed subNqn %s. Cleaning up discovery controller %s", subNqn, entry.Name())
+                        deletePath := filepath.Join(controllerPath, "delete_controller")
+                        _ = os.WriteFile(deletePath, []byte("1\n"), 0200)
+                        return subNqn, nil
+                }
+                
+                logger.Debugf("NVMe-oFC: Controller %s did not yield target subNqn, skipping deletion to protect fabric stability", entry.Name())
+        }
+
+        return "", fmt.Errorf("no active discovery controller yielded target operational subnqn")
 }
+
 
 // NVMe Discovery Log Page Entry Structure
 // Compliant with the NVMe Base Specification (1024 bytes per entry).
