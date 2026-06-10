@@ -434,7 +434,7 @@ func (r OsDeviceConnectivityNvmeOFc) discoverSubNqn(ctx context.Context, arrayTa
         }
 
         // Canonical Format for /dev/nvme-fabrics (guaranteed 16 characters each)
-        cmd := fmt.Sprintf("nqn=%s,transport=fc,traddr=nn-%s:pn-%s,host-traddr=nn-%s:pn-%s\n",
+        cmd := fmt.Sprintf("nqn=%s,transport=fc,traddr=nn-%s:pn-%s,host_traddr=nn-%s:pn-%s\n",
                 nvmeDiscoveryNqn, targetNN, targetPN, hostNN, hostPN)
 
         // DEBUG PRINT BLOCK: %q shows exact escape characters like \n and spaces
@@ -644,7 +644,7 @@ func (r OsDeviceConnectivityNvmeOFc) nvmeConnect(ctx context.Context, arrayTarge
         }
 
         // Canonical Format for /dev/nvme-fabrics (guaranteed 16 characters each)
-        options := fmt.Sprintf("nqn=%s,transport=fc,traddr=nn-%s:pn-%s,host-traddr=nn-%s:pn-%s\n",
+        options := fmt.Sprintf("nqn=%s,transport=fc,traddr=nn-%s:pn-%s,host_traddr=nn-%s:pn-%s\n",
                 subNqn, targetNN, targetPN, hostNN, hostPN)
 
         // DEBUG PRINT BLOCK: %q shows exact escape characters like \n and spaces
