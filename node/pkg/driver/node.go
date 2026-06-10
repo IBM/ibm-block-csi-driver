@@ -158,7 +158,9 @@ func (d *NodeService) NodeStageVolume(ctx context.Context, req *csi.NodeStageVol
 	
 	
 	// 1. RUN THE ENCAPSULATED BOOSTER MATRIX
-	mpathDevice, isStaged, skipRescan, _, err := d.OsDeviceConnectivityHelper.IdentityAwarePreScan(ctx, stagingPathWithHostPrefix, volumeUuid)
+	mpathDevice := ""
+	isStaged := false
+	skipRescan := false
 	if err != nil {
 		return nil, err // Propagate Aborted / Internal blocks natively
 	}
