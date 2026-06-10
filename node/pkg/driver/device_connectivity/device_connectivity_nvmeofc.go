@@ -428,14 +428,14 @@ func (r OsDeviceConnectivityNvmeOFc) discoverSubNqn(ctx context.Context, arrayTa
 	if err != nil {
 		return "", err
 	}
-	hostNN, hostPN, err := r.extractCleanHexWWNs(hostPort)
+	_, hostPN, err := r.extractCleanHexWWNs(hostPort)
 	if err != nil {
 		return "", err
 	}
 
-	// Canonical Kernel Format using hyphens (host-traddr)
-	cmd := fmt.Sprintf("nqn=%s,transport=fc,traddr=nn-%s:pn-%s,host-traddr=nn-%s:pn-%s\n", 
-		nvmeDiscoveryNqn, targetNN, targetPN, hostNN, hostPN)
+        cmd := fmt.Sprintf("nqn=%s,transport=fc,traddr=nn-%s:pn-%s,host-traddr=%s\n",
+                nvmeDiscoveryNqn, targetNN, targetPN, hostPN)
+
 
 	// DEBUG PRINT BLOCK: %q shows exact escape characters like \n and spaces
 	logger.Infof("NVMe-oFC DEBUG RAW DISCOVERY STRING: %q", cmd)
@@ -632,15 +632,15 @@ func (r OsDeviceConnectivityNvmeOFc) nvmeConnect(ctx context.Context, arrayTarge
 		logger.Errorf("NVMe-oFC nvmeConnect: target error: %v", err)
 		return false
 	}
-	hostNN, hostPN, err := r.extractCleanHexWWNs(hostPort)
+	_, hostPN, err := r.extractCleanHexWWNs(hostPort)
 	if err != nil {
 		logger.Errorf("NVMe-oFC nvmeConnect: host error: %v", err)
 		return false
 	}
 
-	// Canonical Kernel Format using hyphens (host-traddr)
-	options := fmt.Sprintf("nqn=%s,transport=fc,traddr=nn-%s:pn-%s,host-traddr=nn-%s:pn-%s\n",
-		subNqn, targetNN, targetPN, hostNN, hostPN)
+        options := fmt.Sprintf("nqn=%s,transport=fc,traddr=nn-%s:pn-%s,host-traddr=%s\n",
+                subNqn, targetNN, targetPN, hostPN)
+
 
 	// DEBUG PRINT BLOCK: %q shows exact escape characters like \n and spaces
 	logger.Infof("NVMe-oFC DEBUG RAW CONNECT STRING: %q", options)
