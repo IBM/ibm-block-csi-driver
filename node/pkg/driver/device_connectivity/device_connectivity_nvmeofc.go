@@ -424,16 +424,21 @@ func (r OsDeviceConnectivityNvmeOFc) extractRawWWNs(portStr string) (string, str
 // and returns the storage subsystem NQN. Returns ("", nil) if no path exists.
 // discoverSubNqn manages target subsystem discovery commands sequentially.
 func (r OsDeviceConnectivityNvmeOFc) discoverSubNqn(ctx context.Context, arrayTargetPort, hostPort string) (string, error) {
-	targetNN, targetPN, err := r.extractCleanHexWWNs(arrayTargetPort)
-	if err != nil {
-		return "", err
-	}
-        cmd := fmt.Sprintf("nqn=%s,transport=fc,traddr=nn-%s:pn-%s\n",
-                nvmeDiscoveryNqn, targetNN, targetPN)
+        targetNN, targetPN, err := r.extractCleanHexWWNs(arrayTargetPort)
+        if err != nil {
+                return "", err
+        }
+        hostNN, hostPN, err := r.extractCleanHexWWNs(hostPort)
+        if err != nil {
+                return "", err
+        }
 
+        // Canonical Format for /dev/nvme-fabrics (guaranteed 16 characters each)
+        cmd := fmt.Sprintf("nqn=%s,transport=fc,traddr=nn-%s:pn-%s,host-traddr=nn-%s:pn-%s\n",
+                nvmeDiscoveryNqn, targetNN, targetPN, hostNN, hostPN)
 
-	// DEBUG PRINT BLOCK: %q shows exact escape characters like \n and spaces
-	logger.Infof("NVMe-oFC DEBUG RAW DISCOVERY STRING: %q", cmd)
+        // DEBUG PRINT BLOCK: %q shows exact escape characters like \n and spaces
+        logger.Infof("NVMe-oFC DEBUG RAW DISCOVERY STRING: %q", cmd)
 
 	rawOutput, err := executer.ExecuteUninterruptible(
 		ctx, 
@@ -627,17 +632,24 @@ func parseSubNqnFromDiscoverOutput(rawBytes []byte) string {
 
 // nvmeConnect executes direct writes onto the /dev/nvme-fabrics channel
 func (r OsDeviceConnectivityNvmeOFc) nvmeConnect(ctx context.Context, arrayTargetPort, hostPort, subNqn string) bool {
-	targetNN, targetPN, err := r.extractCleanHexWWNs(arrayTargetPort)
-	if err != nil {
-		logger.Errorf("NVMe-oFC nvmeConnect: target error: %v", err)
-		return false
-	}
+        targetNN, targetPN, err := r.extractCleanHexWWNs(arrayTargetPort)
+        if err != nil {
+                logger.Errorf("NVMe-oFC nvmeConnect: target error: %v", err)
+                return false
+        }
+        hostNN, hostPN, err := r.extractCleanHexWWNs(hostPort)
+        if err != nil {
+                logger.Errorf("NVMe-oFC nvmeConnect: host error: %v", err)
+                return false
+        }
 
-        options := fmt.Sprintf("nqn=%s,transport=fc,traddr=nn-%s:pn-%s\n",
-                subNqn, targetNN, targetPN)
+        // Canonical Format for /dev/nvme-fabrics (guaranteed 16 characters each)
+        options := fmt.Sprintf("nqn=%s,transport=fc,traddr=nn-%s:pn-%s,host-traddr=nn-%s:pn-%s\n",
+                subNqn, targetNN, targetPN, hostNN, hostPN)
 
-	// DEBUG PRINT BLOCK: %q shows exact escape characters like \n and spaces
-	logger.Infof("NVMe-oFC DEBUG RAW CONNECT STRING: %q", options)
+        // DEBUG PRINT BLOCK: %q shows exact escape characters like \n and spaces
+        logger.Infof("NVMe-oFC DEBUG RAW CONNECT STRING: %q", options)
+
 
 	resourceKey := fmt.Sprintf("connect-%s-%s", subNqn, arrayTargetPort)
 	
@@ -706,7 +718,10 @@ func (r OsDeviceConnectivityNvmeOFc) extractCleanHexWWNs(portStr string) (string
 		return "", "", fmt.Errorf("parsed empty WWN values from string: %s", portStr)
 	}
 
-	return nn, pn, nil
+        paddedNN := fmt.Sprintf("%016s", nn)
+        paddedPN := fmt.Sprintf("%016s", pn)
+
+        return paddedNN, paddedPN, nil
 }
 
 
