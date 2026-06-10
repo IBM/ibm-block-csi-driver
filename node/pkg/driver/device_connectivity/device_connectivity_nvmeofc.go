@@ -712,7 +712,7 @@ func (r OsDeviceConnectivityNvmeOFc) extractCleanHexWWNs(portStr string) (string
 		return "", "", fmt.Errorf("parsed empty WWN values from string: %s", portStr)
 	}
 
-	return "0x" + nn, "0x" + pn, nil
+	return nn, pn, nil
 }
 
 
