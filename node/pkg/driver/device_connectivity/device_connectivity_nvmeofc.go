@@ -504,71 +504,82 @@ func (r OsDeviceConnectivityNvmeOFc) executeKernelDiscovery(cmd string) (string,
 }
 
 func (r OsDeviceConnectivityNvmeOFc) findDiscoverySubNqnFromSysfs() (string, error) {
-	const sysPath = "/sys/class/nvme"
+        const sysPath = "/sys/class/nvme"
 
-	entries, err := os.ReadDir(sysPath)
-	if err != nil {
-		return "", fmt.Errorf("failed to read %s: %w", sysPath, err)
-	}
+        entries, err := os.ReadDir(sysPath)
+        if err != nil {
+                return "", fmt.Errorf("failed to read %s: %w", sysPath, err)
+        }
 
-	for _, entry := range entries {
-		if !strings.HasPrefix(entry.Name(), "nvme") {
-			continue
-		}
+        for _, entry := range entries {
+                if !strings.HasPrefix(entry.Name(), "nvme") {
+                        continue
+                }
 
-		controllerPath := filepath.Join(sysPath, entry.Name())
+                controllerPath := filepath.Join(sysPath, entry.Name())
 
-		subnqnBuf, err := os.ReadFile(filepath.Join(controllerPath, "subsysnqn"))
-		if err != nil {
-			continue
-		}
+                subnqnBuf, err := os.ReadFile(filepath.Join(controllerPath, "subsysnqn"))
+                if err != nil {
+                        continue
+                }
 
-		// GUARD 1: Only look at transient discovery targets, never operational subsystems
-		if strings.TrimSpace(string(subnqnBuf)) != nvmeDiscoveryNqn {
-			continue
-		}
+                // GUARD 1: Only look at transient discovery targets, never operational subsystems
+                if strings.TrimSpace(string(subnqnBuf)) != nvmeDiscoveryNqn {
+                        continue
+                }
 
-		logPath := filepath.Join(controllerPath, "discovery_log")
-		var logFile *os.File
-		var openErr error
+                logPath := filepath.Join(controllerPath, "discovery_log")
+                var logFile *os.File
+                var openErr error
 
-		// Retry handling to account for asynchronous sysfs log generation windows
-		for attempts := 0; attempts < 15; attempts++ {
-			logFile, openErr = os.Open(logPath)
-			if openErr == nil {
-				break
-			}
-			if os.IsNotExist(openErr) {
-				time.Sleep(30 * time.Millisecond)
-				continue
-			}
-			return "", fmt.Errorf("failed to open discovery log from %s: %w", entry.Name(), openErr)
-		}
-		if openErr != nil {
-			return "", fmt.Errorf("kernel failed to expose discovery log path within timeout: %w", openErr)
-		}
+                // Retry handling to account for asynchronous sysfs log generation windows
+                for attempts := 0; attempts < 15; attempts++ {
+                        logFile, openErr = os.Open(logPath)
+                        if openErr == nil {
+                                break
+                        }
+                        if os.IsNotExist(openErr) {
+                                time.Sleep(30 * time.Millisecond)
+                                continue
+                        }
+                        return "", fmt.Errorf("failed to open discovery log from %s: %w", entry.Name(), openErr)
+                }
+                if openErr != nil {
+                        return "", fmt.Errorf("kernel failed to expose discovery log path within timeout: %w", openErr)
+                }
 
-		logBuf := make([]byte, 16+(64*recordSize))
-		n, err := io.ReadFull(logFile, logBuf)
-		logFile.Close()
+                // Use the constant recordSize (typically 1024 for nvme fabrics entries)
+                logBuf := make([]byte, 16+(64*recordSize))
+                n, err := io.ReadFull(logFile, logBuf)
+                logFile.Close()
 
-		if err != nil && !errors.Is(err, io.EOF) && !errors.Is(err, io.ErrUnexpectedEOF) {
-			return "", fmt.Errorf("failed to pull complete stream data: %w", err)
-		}
+                // FIX 1: io.ErrUnexpectedEOF is normal here because the kernel sysfs stream 
+                // matches actual discovered records, which might be shorter than our max array buffer.
+                if err != nil && !errors.Is(err, io.EOF) && !errors.Is(err, io.ErrUnexpectedEOF) {
+                        return "", fmt.Errorf("failed to pull complete stream data: %w", err)
+                }
 
-		// GUARD 2: Only clear the node once we verify it contains readable subsystem records
-		subNqnCheck := parseSubNqnFromDiscoverOutput(logBuf[:n])
-		if subNqnCheck != "" {
-			logger.Infof("NVMe-oFC: Successfully verified discovery target contents on %s. Triggering cleanup.", entry.Name())
-			deletePath := filepath.Join(controllerPath, "delete_controller")
-			_ = os.WriteFile(deletePath, []byte("1\n"), 0200)
+                // GUARD 2: Only clear the node once we verify it contains readable subsystem records
+                // Pass the actual number of bytes read (n) rather than expecting a full static buffer match.
+                subNqnCheck := parseSubNqnFromDiscoverOutput(logBuf[:n])
+                if subNqnCheck != "" {
+                        logger.Infof("NVMe-oFC: Successfully verified discovery target contents on %s. Triggering cleanup.", entry.Name())
+                        
+                        deletePath := filepath.Join(controllerPath, "delete_controller")
+                        _ = os.WriteFile(deletePath, []byte("1\n"), 0200)
 
-			// Return raw binary layout back up to main framework caller frame
-			return string(logBuf[:n]), nil
-		}
-	}
+                        // FIX 2: Mandatory baseline pacing delay. 
+                        // Deleting a controller in Linux is completely asynchronous. If we return 
+                        // immediately, the next loop or operational connection will hit an EBUSY or 
+                        // device locked state while the kernel is still performing fabric teardown.
+                        time.Sleep(100 * time.Millisecond)
 
-	return "", fmt.Errorf("no active discovery controller yielded target operational subnqn")
+                        // Return the slice data that contains the validated logs back to the caller frame
+                        return string(logBuf[:n]), nil
+                }
+        }
+
+        return "", fmt.Errorf("no active discovery controller yielded target operational subnqn")
 }
 
 
@@ -646,72 +657,63 @@ func parseSubNqnFromDiscoverOutput(rawBytes []byte) string {
 
 // ensureFCTargetDiscovery forces a target sync and reliably polls sysfs until the hardware link is active.
 func (r OsDeviceConnectivityNvmeOFc) ensureFCTargetDiscovery(hostPN, targetPN string) error {
-	cleanHostPN := strings.ToLower(strings.TrimPrefix(hostPN, "0x"))
-	cleanTargetPN := strings.ToLower(strings.TrimPrefix(targetPN, "0x"))
+        cleanHostPN := strings.ToLower(strings.TrimPrefix(hostPN, "0x"))
+        cleanTargetPN := strings.ToLower(strings.TrimPrefix(targetPN, "0x"))
 
-	// 1. Locate and trigger the asynchronous fabric scan on the correct local HBA
-	hosts, err := filepath.Glob("/sys/class/fc_host/host*")
-	if err != nil {
-		return fmt.Errorf("failed to list fc_hosts: %w", err)
-	}
+        hosts, err := filepath.Glob("/sys/class/fc_host/host*")
+        if err != nil {
+                return fmt.Errorf("failed to list fc_hosts: %w", err)
+        }
 
-	hbaTriggered := false
-	for _, hostPath := range hosts {
-		buf, err := os.ReadFile(filepath.Join(hostPath, "port_name"))
-		if err != nil {
-			continue
-		}
-		sysfsPortName := strings.ToLower(strings.TrimPrefix(strings.TrimSpace(string(buf)), "0x"))
+        hbaTriggered := false
+        for _, hostPath := range hosts {
+                buf, err := os.ReadFile(filepath.Join(hostPath, "port_name"))
+                if err != nil {
+                        continue
+                }
+                sysfsPortName := strings.ToLower(strings.TrimPrefix(strings.TrimSpace(string(buf)), "0x"))
 
-		logger.Warningf("compare %s with %s", sysfsPortName, cleanHostPN)
+                if sysfsPortName == cleanHostPN {
+                        // NON-DESTRUCTIVE: Use scan instead of issue_lip to avoid dropping active paths
+                        scanPath := filepath.Join(hostPath, "scan")
+                        if err := os.WriteFile(scanPath, []byte("- - -\n"), 0200); err != nil {
+                                return fmt.Errorf("failed to trigger fabric scan: %w", err)
+                        }
+                        hbaTriggered = true
+                        break
+                }
+        }
 
-		if sysfsPortName == cleanHostPN {
-			lipPath := filepath.Join(hostPath, "issue_lip")
-			if err := os.WriteFile(lipPath, []byte("1\n"), 0200); err != nil {
-				return fmt.Errorf("failed to write issue_lip: %w", err)
-			}
-			hbaTriggered = true
-			break
-		}
-	}
+        if !hbaTriggered {
+                return fmt.Errorf("local HBA matching port %s not found", hostPN)
+        }
 
-	if !hbaTriggered {
-		return fmt.Errorf("local HBA matching port %s not found", hostPN)
-	}
+        timeout := 15 * time.Second // Increased slightly to accommodate asynchronous scan registration
+        pollInterval := 150 * time.Millisecond
+        deadline := time.Now().Add(timeout)
+        startTime := time.Now()
 
-	// 2. DETERMINISTIC WAIT LOOP: Poll sysfs to verify when the target port surfaces
-	timeout := 10 * time.Second
-	pollInterval := 100 * time.Millisecond
-	deadline := time.Now().Add(timeout)
-	startTime := time.Now()
+        for time.Now().Before(deadline) {
+                rports, err := filepath.Glob("/sys/class/fc_remote_ports/rport-*")
+                if err == nil {
+                        for _, rportPath := range rports {
+                                pBuf, err := os.ReadFile(filepath.Join(rportPath, "port_name"))
+                                if err != nil {
+                                        continue
+                                }
+                                discoveredWWPN := strings.ToLower(strings.TrimPrefix(strings.TrimSpace(string(pBuf)), "0x"))
 
-	for time.Now().Before(deadline) {
-		rports, err := filepath.Glob("/sys/class/fc_remote_ports/rport-*")
-		if err == nil {
-			for _, rportPath := range rports {
-				// Read the remote port name registered by the kernel
-				pBuf, err := os.ReadFile(filepath.Join(rportPath, "port_name"))
-				if err != nil {
-					logger.Warningf("failed to read port name")
-					continue
-				}
-				discoveredWWPN := strings.ToLower(strings.TrimPrefix(strings.TrimSpace(string(pBuf)), "0x"))
+                                if discoveredWWPN == cleanTargetPN {
+                                        logger.Infof("NVMe-oFC: Hardware target %s confirmed online in %v", targetPN, time.Since(startTime))
+                                        return nil
+                                }
+                        }
+                }
+                time.Sleep(pollInterval)
+        }
 
-				// If the target WWPN is now visible in the kernel, we can proceed safely
-
-				logger.Warningf("compare %s with %s", discoveredWWPN, cleanTargetPN)
-				if discoveredWWPN == cleanTargetPN {
-					logger.Infof("NVMe-oFC: Hardware target %s successfully discovered by HBA in %v", targetPN, time.Since(startTime))
-					return nil
-				}
-			}
-		}
-		time.Sleep(pollInterval)
-	}
-
-	return fmt.Errorf("timeout waiting for target port %s to emerge in fabric topology", targetPN)
+        return fmt.Errorf("timeout waiting for target port %s to emerge in fabric topology", targetPN)
 }
-
 
 // nvmeConnect executes direct writes onto the /dev/nvme-fabrics channel
 func (r OsDeviceConnectivityNvmeOFc) nvmeConnect(ctx context.Context, arrayTargetPort, hostPort, subNqn string) bool {
