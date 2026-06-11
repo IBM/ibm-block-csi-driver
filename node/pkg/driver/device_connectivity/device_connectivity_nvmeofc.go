@@ -517,13 +517,11 @@ func (r OsDeviceConnectivityNvmeOFc) findDiscoverySubNqnFromSysfs() (string, err
                 }
 
                 controllerPath := filepath.Join(sysPath, entry.Name())
-
                 subnqnBuf, err := os.ReadFile(filepath.Join(controllerPath, "subsysnqn"))
                 if err != nil {
                         continue
                 }
 
-                // GUARD 1: Only look at transient discovery targets, never operational subsystems
                 if strings.TrimSpace(string(subnqnBuf)) != nvmeDiscoveryNqn {
                         continue
                 }
@@ -532,14 +530,14 @@ func (r OsDeviceConnectivityNvmeOFc) findDiscoverySubNqnFromSysfs() (string, err
                 var logFile *os.File
                 var openErr error
 
-                // Retry handling to account for asynchronous sysfs log generation windows
-                for attempts := 0; attempts < 15; attempts++ {
+                // Extended polling loop to let the single volume target register
+                for attempts := 0; attempts < 60; attempts++ {
                         logFile, openErr = os.Open(logPath)
                         if openErr == nil {
                                 break
                         }
                         if os.IsNotExist(openErr) {
-                                time.Sleep(30 * time.Millisecond)
+                                time.Sleep(50 * time.Millisecond)
                                 continue
                         }
                         return "", fmt.Errorf("failed to open discovery log from %s: %w", entry.Name(), openErr)
@@ -548,41 +546,29 @@ func (r OsDeviceConnectivityNvmeOFc) findDiscoverySubNqnFromSysfs() (string, err
                         return "", fmt.Errorf("kernel failed to expose discovery log path within timeout: %w", openErr)
                 }
 
-                // Use the constant recordSize (typically 1024 for nvme fabrics entries)
                 logBuf := make([]byte, 16+(64*recordSize))
                 n, err := io.ReadFull(logFile, logBuf)
                 logFile.Close()
 
-                // FIX 1: io.ErrUnexpectedEOF is normal here because the kernel sysfs stream 
-                // matches actual discovered records, which might be shorter than our max array buffer.
                 if err != nil && !errors.Is(err, io.EOF) && !errors.Is(err, io.ErrUnexpectedEOF) {
                         return "", fmt.Errorf("failed to pull complete stream data: %w", err)
                 }
 
-                // GUARD 2: Only clear the node once we verify it contains readable subsystem records
-                // Pass the actual number of bytes read (n) rather than expecting a full static buffer match.
                 subNqnCheck := parseSubNqnFromDiscoverOutput(logBuf[:n])
                 if subNqnCheck != "" {
                         logger.Infof("NVMe-oFC: Successfully verified discovery target contents on %s. Triggering cleanup.", entry.Name())
-                        
                         deletePath := filepath.Join(controllerPath, "delete_controller")
                         _ = os.WriteFile(deletePath, []byte("1\n"), 0200)
 
-                        // FIX 2: Mandatory baseline pacing delay. 
-                        // Deleting a controller in Linux is completely asynchronous. If we return 
-                        // immediately, the next loop or operational connection will hit an EBUSY or 
-                        // device locked state while the kernel is still performing fabric teardown.
+                        // Baseline pacing delay to allow asynchronous cleanup to complete
                         time.Sleep(100 * time.Millisecond)
 
-                        // Return the slice data that contains the validated logs back to the caller frame
                         return string(logBuf[:n]), nil
                 }
         }
 
         return "", fmt.Errorf("no active discovery controller yielded target operational subnqn")
 }
-
-
 // NVMe Discovery Log Page Entry Structure
 // Compliant with the NVMe Base Specification (1024 bytes per entry).
 type nvmeDiscoveryLogEntry struct {
