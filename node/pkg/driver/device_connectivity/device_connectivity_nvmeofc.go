@@ -188,6 +188,7 @@ func (r OsDeviceConnectivityNvmeOFc) EnsureLogin(ctx context.Context, ipsByArray
         }
 }
 
+
 // Helper: Normalizes variants like "nn-0x123", "nn-123", or raw "123" strings uniformly to "nn-0x123:pn-0x..."
 func (r OsDeviceConnectivityNvmeOFc) normalizePortString(val string) string {
 	val = strings.ToLower(strings.TrimSpace(val))
@@ -430,130 +431,144 @@ func (r OsDeviceConnectivityNvmeOFc) extractRawWWNs(portStr string) (string, str
 // and returns the storage subsystem NQN. Returns ("", nil) if no path exists.
 // discoverSubNqn manages target subsystem discovery commands sequentially.
 func (r OsDeviceConnectivityNvmeOFc) discoverSubNqn(ctx context.Context, arrayTargetPort, hostPort string) (string, error) {
-        targetNN, targetPN, err := r.extractCleanHexWWNs(arrayTargetPort)
-        if err != nil {
-                return "", err
-        }
-        hostNN, hostPN, err := r.extractCleanHexWWNs(hostPort)
-        if err != nil {
-                return "", err
-        }
+	targetNN, targetPN, err := r.extractCleanHexWWNs(arrayTargetPort)
+	if err != nil {
+		return "", err
+	}
+	hostNN, hostPN, err := r.extractCleanHexWWNs(hostPort)
+	if err != nil {
+		return "", err
+	}
 
-        sysHostNQN := getSystemHostNQN()
-        sysHostID  := getSystemHostID()
+	sysHostNQN := getSystemHostNQN()
+	sysHostID  := getSystemHostID()
 
-        // STRACE VERIFIED PAYLOAD STRING (Using cleaned 16-char values from extractCleanHexWWNs)
-        cmd := fmt.Sprintf("nqn=%s,transport=fc,traddr=nn-%s:pn-%s,host_traddr=nn-%s:pn-%s,hostnqn=%s,hostid=%s,keep_alive_tmo=30,ctrl_loss_tmo=600\n",
-                nvmeDiscoveryNqn, targetNN, targetPN, hostNN, hostPN, sysHostNQN, sysHostID)
+	// STRACE VERIFIED PAYLOAD STRING: Exactly matches working user-space layouts
+	cmd := fmt.Sprintf("nqn=%s,transport=fc,traddr=nn-%s:pn-%s,host_traddr=nn-%s:pn-%s,hostnqn=%s,hostid=%s,keep_alive_tmo=30,ctrl_loss_tmo=600\n",
+		nvmeDiscoveryNqn, targetNN, targetPN, hostNN, hostPN, sysHostNQN, sysHostID)
 
-        logger.Infof("NVMe-oFC DEBUG RAW DISCOVERY STRING: %q", cmd)
+	logger.Infof("NVMe-oFC DEBUG RAW DISCOVERY STRING: %q", cmd)
 
-        // rawOutput now accurately captures the binary log page payload from sysfs
-        rawOutput, err := executer.ExecuteUninterruptible(
-                ctx,
-                r.KeyedGater,
-                fmt.Sprintf("nvme-disc-%s-%s", arrayTargetPort, hostPort),
-                2, 1, 5*time.Second, 15*time.Second,
-                func(wCtx context.Context) (string, error) {
-                        return r.executeKernelDiscovery(cmd)
-                },
-        )
-        if err != nil {
-                logger.Debugf("NVMe-oFC discoverSubNqn: nvme discover failed target=%s host=%s: %v",
-                        arrayTargetPort, hostPort, err)
-                return "", err
-        }
+	rawOutput, err := executer.ExecuteUninterruptible(
+		ctx,
+		r.KeyedGater,
+		fmt.Sprintf("nvme-disc-%s-%s", arrayTargetPort, hostPort),
+		2, 1, 5*time.Second, 15*time.Second,
+		func(wCtx context.Context) (string, error) {
+			return r.executeKernelDiscovery(cmd)
+		},
+	)
+	if err != nil {
+		logger.Debugf("NVMe-oFC discoverSubNqn: nvme discover failed target=%s host=%s: %v",
+			arrayTargetPort, hostPort, err)
+		return "", err
+	}
 
-        // Parse the final NQN from the raw binary array block safely
-        subNqn := parseSubNqnFromDiscoverOutput([]byte(rawOutput))
-        if subNqn != "" {
-                logger.Debugf("NVMe-oFC discoverSubNqn: discovered subnqn=%s target=%s host=%s",
-                        subNqn, arrayTargetPort, hostPort)
-        }
+	// Safely evaluate binary byte slice generated from sysfs reader pass-through
+	subNqn := parseSubNqnFromDiscoverOutput([]byte(rawOutput))
+	if subNqn != "" {
+		logger.Debugf("NVMe-oFC discoverSubNqn: discovered subnqn=%s target=%s host=%s",
+			subNqn, arrayTargetPort, hostPort)
+	}
 
-        return subNqn, nil
+	return subNqn, nil
 }
 
 func (r OsDeviceConnectivityNvmeOFc) executeKernelDiscovery(cmd string) (string, error) {
-        f, err := os.OpenFile("/dev/nvme-fabrics", os.O_WRONLY|os.O_APPEND, 0)
-        if err != nil {
-                return "", fmt.Errorf("open /dev/nvme-fabrics failed: %w", err)
-        }
-        defer f.Close()
+	var f *os.File
+	var err error
 
-        logger.Debugf("NVMe-oFC: Writing discovery string to /dev/nvme-fabrics")
-        if _, err := f.WriteString(cmd); err != nil {
-                return "", fmt.Errorf("write to nvme-fabrics failed: %w", err)
-        }
+	// Handle short settling windows or device busy locks when opening control socket channel
+	for attempts := 0; attempts < 5; attempts++ {
+		f, err = os.OpenFile("/dev/nvme-fabrics", os.O_WRONLY|os.O_APPEND, 0)
+		if err == nil {
+			break
+		}
+		if os.IsNotExist(err) || strings.Contains(err.Error(), "busy") {
+			time.Sleep(30 * time.Millisecond)
+			continue
+		}
+		return "", fmt.Errorf("open /dev/nvme-fabrics failed: %w", err)
+	}
+	if err != nil {
+		return "", fmt.Errorf("fabrics device channel unavailable: %w", err)
+	}
+	defer f.Close()
 
-        // Returns raw bytes as a string to satisfy wrapper signatures
-        return r.findDiscoverySubNqnFromSysfs()
+	logger.Debugf("NVMe-oFC: Writing discovery string to /dev/nvme-fabrics")
+	if _, err := f.WriteString(cmd); err != nil {
+		return "", fmt.Errorf("write to nvme-fabrics failed: %w", err)
+	}
+
+	return r.findDiscoverySubNqnFromSysfs()
 }
 
 func (r OsDeviceConnectivityNvmeOFc) findDiscoverySubNqnFromSysfs() (string, error) {
-        const sysPath = "/sys/class/nvme"
+	const sysPath = "/sys/class/nvme"
 
-        entries, err := os.ReadDir(sysPath)
-        if err != nil {
-                return "", fmt.Errorf("failed to read %s: %w", sysPath, err)
-        }
+	entries, err := os.ReadDir(sysPath)
+	if err != nil {
+		return "", fmt.Errorf("failed to read %s: %w", sysPath, err)
+	}
 
-        for _, entry := range entries {
-                if !strings.HasPrefix(entry.Name(), "nvme") {
-                        continue
-                }
+	for _, entry := range entries {
+		if !strings.HasPrefix(entry.Name(), "nvme") {
+			continue
+		}
 
-                controllerPath := filepath.Join(sysPath, entry.Name())
+		controllerPath := filepath.Join(sysPath, entry.Name())
 
-                subnqnBuf, err := os.ReadFile(filepath.Join(controllerPath, "subsysnqn"))
-                if err != nil {
-                        continue
-                }
+		subnqnBuf, err := os.ReadFile(filepath.Join(controllerPath, "subsysnqn"))
+		if err != nil {
+			continue
+		}
 
-                if strings.TrimSpace(string(subnqnBuf)) != nvmeDiscoveryNqn {
-                        continue
-                }
+		// GUARD 1: Only look at transient discovery targets, never operational subsystems
+		if strings.TrimSpace(string(subnqnBuf)) != nvmeDiscoveryNqn {
+			continue
+		}
 
-                logPath := filepath.Join(controllerPath, "discovery_log")
-                var logFile *os.File
-                var openErr error
+		logPath := filepath.Join(controllerPath, "discovery_log")
+		var logFile *os.File
+		var openErr error
 
-                for attempts := 0; attempts < 10; attempts++ {
-                        logFile, openErr = os.Open(logPath)
-                        if openErr == nil {
-                                break
-                        }
-                        if os.IsNotExist(openErr) {
-                                time.Sleep(20 * time.Millisecond)
-                                continue
-                        }
-                        return "", fmt.Errorf("failed to open discovery log from %s: %w", entry.Name(), openErr)
-                }
-                if openErr != nil {
-                        return "", fmt.Errorf("kernel failed to expose discovery log path within timeout: %w", openErr)
-                }
+		// Retry handling to account for asynchronous sysfs log generation windows
+		for attempts := 0; attempts < 15; attempts++ {
+			logFile, openErr = os.Open(logPath)
+			if openErr == nil {
+				break
+			}
+			if os.IsNotExist(openErr) {
+				time.Sleep(30 * time.Millisecond)
+				continue
+			}
+			return "", fmt.Errorf("failed to open discovery log from %s: %w", entry.Name(), openErr)
+		}
+		if openErr != nil {
+			return "", fmt.Errorf("kernel failed to expose discovery log path within timeout: %w", openErr)
+		}
 
-                logBuf := make([]byte, 16+(64*recordSize))
-                n, err := io.ReadFull(logFile, logBuf)
-                logFile.Close()
+		logBuf := make([]byte, 16+(64*recordSize))
+		n, err := io.ReadFull(logFile, logBuf)
+		logFile.Close()
 
-                if err != nil && !errors.Is(err, io.EOF) && !errors.Is(err, io.ErrUnexpectedEOF) {
-                        return "", fmt.Errorf("failed to pull complete stream data: %w", err)
-                }
+		if err != nil && !errors.Is(err, io.EOF) && !errors.Is(err, io.ErrUnexpectedEOF) {
+			return "", fmt.Errorf("failed to pull complete stream data: %w", err)
+		}
 
-                // FIX: Check if the buffer contains valid data records before destroying the controller context
-                subNqnCheck := parseSubNqnFromDiscoverOutput(logBuf[:n])
-                if subNqnCheck != "" {
-                        logger.Infof("NVMe-oFC: Successfully verified discovery target contents on %s. Triggering teardown.", entry.Name())
-                        deletePath := filepath.Join(controllerPath, "delete_controller")
-                        _ = os.WriteFile(deletePath, []byte("1\n"), 0200)
-                        
-                        // Return the RAW binary string buffer back up to the main parser frame
-                        return string(logBuf[:n]), nil
-                }
-        }
+		// GUARD 2: Only clear the node once we verify it contains readable subsystem records
+		subNqnCheck := parseSubNqnFromDiscoverOutput(logBuf[:n])
+		if subNqnCheck != "" {
+			logger.Infof("NVMe-oFC: Successfully verified discovery target contents on %s. Triggering cleanup.", entry.Name())
+			deletePath := filepath.Join(controllerPath, "delete_controller")
+			_ = os.WriteFile(deletePath, []byte("1\n"), 0200)
 
-        return "", fmt.Errorf("no active discovery controller yielded target operational subnqn")
+			// Return raw binary layout back up to main framework caller frame
+			return string(logBuf[:n]), nil
+		}
+	}
+
+	return "", fmt.Errorf("no active discovery controller yielded target operational subnqn")
 }
 
 
@@ -571,24 +586,22 @@ type nvmeDiscoveryLogEntry struct {
 	Trsvcid     [32]byte  `header:"trsvcid"`     // Transport Service ID (e.g. port number or service port)
 	SubnqnBytes [256]byte `header:"subnqn"`      // The raw, null-padded Target Subsystem NQN we need
 	TraddrBytes [256]byte `header:"traddr"`      // Transport address (e.g. target IP or WWN strings)
-	Tsas        [256]byte `header:"tsas"`        // Transport Specific Address Subtype
+	Tsas        [320]byte `header:"tsas"`        // Transport Specific Address Subtype (256 + padding)
 }
 
 
 // parseSubNqnFromDiscoverOutput extracts the storage subsystem NQN from "nvme discover" output.
 // Skips the discovery controller NQN (nqn.2014-08.org.nvmexpress.discovery).
 func parseSubNqnFromDiscoverOutput(rawBytes []byte) string {
-	// 1. Ensure the raw byte slice can completely fit the 16-byte header block
 	if len(rawBytes) < 16 {
 		return ""
 	}
-	
+
 	numRecords := binary.LittleEndian.Uint64(rawBytes[8:16])
 	if numRecords == 0 {
 		return ""
 	}
 
-	// 2. Validate total expected memory bounds up front to prevent mid-loop breaks
 	expectedMinimumSize := 16 + (int(numRecords) * recordSize)
 	if len(rawBytes) < expectedMinimumSize {
 		return ""
@@ -597,7 +610,6 @@ func parseSubNqnFromDiscoverOutput(rawBytes []byte) string {
 	offset := 16
 
 	for i := uint64(0); i < numRecords; i++ {
-		// Guard array indexing just in case recordSize parameters are shifted
 		if offset+recordSize > len(rawBytes) {
 			break
 		}
@@ -611,25 +623,21 @@ func parseSubNqnFromDiscoverOutput(rawBytes []byte) string {
 
 		offset += recordSize
 
-		// Filter out records that are not standard storage subsystems (subtype 0x2)
 		if entry.Subtype != 0x02 {
 			continue
 		}
 
-		// 3. FIX: Safely parse string up to the very FIRST null byte terminator
+		// Safely stop evaluation at the absolute first occurrence of a null byte
 		endIndex := bytes.IndexByte(entry.SubnqnBytes[:], 0)
 		if endIndex == -1 {
 			endIndex = len(entry.SubnqnBytes)
 		}
-		
-		subNqn := strings.TrimSpace(string(entry.SubnqnBytes[:endIndex]))
 
-		// Ignore empty matches or connections pointing back to the discovery target itself
+		subNqn := strings.TrimSpace(string(entry.SubnqnBytes[:endIndex]))
 		if subNqn == "" || subNqn == nvmeDiscoveryNqn {
 			continue
 		}
 
-		// Successfully extracted the unique operational volume NQN
 		return subNqn
 	}
 
@@ -707,53 +715,70 @@ func (r OsDeviceConnectivityNvmeOFc) ensureFCTargetDiscovery(hostPN, targetPN st
 
 // nvmeConnect executes direct writes onto the /dev/nvme-fabrics channel
 func (r OsDeviceConnectivityNvmeOFc) nvmeConnect(ctx context.Context, arrayTargetPort, hostPort, subNqn string) bool {
-        targetNN, targetPN, err := r.extractCleanHexWWNs(arrayTargetPort)
-        if err != nil {
-                logger.Errorf("NVMe-oFC nvmeConnect: target error: %v", err)
-                return false
-        }
-        hostNN, hostPN, err := r.extractCleanHexWWNs(hostPort)
-        if err != nil {
-                logger.Errorf("NVMe-oFC nvmeConnect: host error: %v", err)
-                return false
-        }
+	targetNN, targetPN, err := r.extractCleanHexWWNs(arrayTargetPort)
+	if err != nil {
+		logger.Errorf("NVMe-oFC nvmeConnect: target error: %v", err)
+		return false
+	}
+	hostNN, hostPN, err := r.extractCleanHexWWNs(hostPort)
+	if err != nil {
+		logger.Errorf("NVMe-oFC nvmeConnect: host error: %v", err)
+		return false
+	}
 
-        if err := r.ensureFCTargetDiscovery(hostPN, targetPN); err != nil {
-                logger.Errorf("NVMe-oFC: Fabric registration halted: %v", err)
-                return false // Or return "", err for the discovery method
-        }
 
-        sysHostNQN := getSystemHostNQN()
-        sysHostID  := getSystemHostID()
+	// 2. RESTORED: Deterministic wait ensuring the target is actively seen by the kernel before connecting
+	if err := r.ensureFCTargetDiscovery(hostPN, targetPN); err != nil {
+		logger.Errorf("NVMe-oFC nvmeConnect: Fabric registration halted: %v", err)
+		return false
+	}
 
-        // Canonical Format for /dev/nvme-fabrics (guaranteed 16 characters each)
-        options := fmt.Sprintf("nqn=%s,transport=fc,traddr=nn-%s:pn-%s,host_traddr=nn-%s:pn-%s,hostnqn=%s,hostid=%s,keep_alive_tmo=30,ctrl_loss_tmo=600\n",
-                subNqn, targetNN, targetPN, hostNN, hostPN, sysHostNQN, sysHostID)
+	// 3. Fetch the machine-specific unique IDs required by the kernel
+	sysHostNQN := getSystemHostNQN()
+	sysHostID  := getSystemHostID()
 
-        // DEBUG PRINT BLOCK: %q shows exact escape characters like \n and spaces
-        logger.Infof("NVMe-oFC DEBUG RAW CONNECT STRING: %q", options)
+	// 4. STRACE VERIFIED PAYLOAD STRING: Finalized for nvmeConnect
+	options := fmt.Sprintf("nqn=%s,transport=fc,traddr=nn-%s:pn-%s,host_traddr=nn-%s:pn-%s,hostnqn=%s,hostid=%s,keep_alive_tmo=30,ctrl_loss_tmo=600\n",
+		subNqn, targetNN, targetPN, hostNN, hostPN, sysHostNQN, sysHostID)
 
+	logger.Infof("NVMe-oFC DEBUG RAW CONNECT STRING: %q", options)
 
 	resourceKey := fmt.Sprintf("connect-%s-%s", subNqn, arrayTargetPort)
-	
+
 	out, err := executer.ExecuteUninterruptible(
 		ctx,
 		r.KeyedGater, resourceKey, 1, 1, 5*time.Second, 30*time.Second,
 		func(wCtx context.Context) (string, error) {
-			f, err := os.OpenFile("/dev/nvme-fabrics", os.O_WRONLY|os.O_APPEND, 0)
-			if err != nil {
-				return "", fmt.Errorf("failed to open fabrics device: %w", err)
+			var f *os.File
+			var oErr error
+
+			for attempts := 0; attempts < 5; attempts++ {
+				f, oErr = os.OpenFile("/dev/nvme-fabrics", os.O_WRONLY|os.O_APPEND, 0)
+				if oErr == nil {
+					break
+				}
+				if os.IsNotExist(oErr) {
+					time.Sleep(50 * time.Millisecond)
+					continue
+				}
+				return "", fmt.Errorf("failed to open fabrics device: %w", oErr)
+			}
+			if oErr != nil {
+				return "", fmt.Errorf("fabrics interface control device node missing: %w", oErr)
 			}
 			defer f.Close()
 
-			_, err = f.WriteString(options)
-			if err != nil {
-				// BUG FIX 2: Implement robust POSIX error identification using errors.Is instead of text matching
-				if errors.Is(err, syscall.EALREADY) || errors.Is(err, syscall.EEXIST) || errors.Is(err, syscall.EBUSY) {
+			_, writeErr := f.WriteString(options)
+			if writeErr != nil {
+				// Handle native POSIX lifecycle active connection states gracefully
+				if errors.Is(writeErr, syscall.EALREADY) || errors.Is(writeErr, syscall.EEXIST) || errors.Is(writeErr, syscall.EBUSY) {
 					return "already_connected", nil
 				}
-				return "", err
+				return "", writeErr
 			}
+			
+			// Mandatory baseline pacing delay to prevent multi-path lock overlap
+			time.Sleep(100 * time.Millisecond)
 			return "success", nil
 		},
 	)
@@ -763,7 +788,7 @@ func (r OsDeviceConnectivityNvmeOFc) nvmeConnect(ctx context.Context, arrayTarge
 			subNqn, arrayTargetPort, hostPort, err, out)
 		return false
 	}
-	
+
 	logger.Infof("NVMe-oFC nvmeConnect: connected NQN=%s target=%s host=%s result=%s", subNqn, arrayTargetPort, hostPort, out)
 	return true
 }
