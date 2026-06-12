@@ -764,6 +764,24 @@ func (r OsDeviceConnectivityNvmeOFc) nvmeConnect(ctx context.Context, arrayTarge
 				}
 				return "", writeErr
 			}
+
+logger.Infof("NVMe-oFC: Connection string pushed. Verifying path registration for NQN: %s", subNqn)
+
+deadline := time.Now().Add(5 * time.Second)
+verified := false
+
+for time.Now().Before(deadline) {
+        // Check if the subsystem NQN is now recognized as active in sysfs
+        if isSubnqnActiveInSysfs(subNqn) {
+                verified = true
+                break
+        }
+        time.Sleep(150 * time.Millisecond) // Give the HBA firmware room to process index 0
+}
+
+if !verified {
+        logger.Warningf("NVMe-oFC: Association window exceeded for NQN %s. Kernel transport may retry.", subNqn)
+}
 			
 			// Mandatory baseline pacing delay to prevent multi-path lock overlap
 			time.Sleep(100 * time.Millisecond)
@@ -780,6 +798,28 @@ func (r OsDeviceConnectivityNvmeOFc) nvmeConnect(ctx context.Context, arrayTarge
 	logger.Infof("NVMe-oFC nvmeConnect: connected NQN=%s target=%s host=%s result=%s", subNqn, arrayTargetPort, hostPort, out)
 	return true
 }
+
+func isSubnqnActiveInSysfs(targetSubNqn string) bool {
+        entries, err := os.ReadDir("/sys/class/nvme")
+        if err != nil {
+                return false
+        }
+        for _, entry := range entries {
+                if !strings.HasPrefix(entry.Name(), "nvme") {
+                        continue
+                }
+                buf, err := os.ReadFile(filepath.Join("/sys/class/nvme", entry.Name(), "subsysnqn"))
+                // If the subsystem NQN matches and its state is 'live' or configured, it's safe to proceed
+                if err == nil && strings.TrimSpace(string(buf)) == targetSubNqn {
+                        stateBuf, err := os.ReadFile(filepath.Join("/sys/class/nvme", entry.Name(), "state"))
+                        if err == nil && strings.TrimSpace(string(stateBuf)) == "live" {
+                                return true
+                        }
+                }
+        }
+        return false
+}
+
 
 func (r OsDeviceConnectivityNvmeOFc) extractPreservedWWNs(portStr string) (string, string, error) {
 	parts := strings.Split(strings.ToLower(strings.TrimSpace(portStr)), ":")
