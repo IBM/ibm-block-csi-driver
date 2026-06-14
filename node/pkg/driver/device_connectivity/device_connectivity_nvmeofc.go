@@ -444,7 +444,7 @@ func (r OsDeviceConnectivityNvmeOFc) discoverSubNqn(ctx context.Context, arrayTa
 	sysHostID  := getSystemHostID()
 
 	// STRACE VERIFIED PAYLOAD STRING: Exactly matches working user-space layouts
-	cmd := fmt.Sprintf("nqn=%s,transport=fc,traddr=nn-%s:pn-%s,host_traddr=nn-%s:pn-%s,hostnqn=%s,hostid=%s,keep_alive_tmo=30,ctrl_loss_tmo=600\n",
+	cmd := fmt.Sprintf("nqn=%s,transport=fc,traddr=nn-%s:pn-%s,host_traddr=nn-%s:pn-%s,hostnqn=%s,hostid=%s,keep_alive_tmo=30,ctrl_loss_tmo=600",
 		nvmeDiscoveryNqn, targetNN, targetPN, hostNN, hostPN, sysHostNQN, sysHostID)
 
 	logger.Infof("NVMe-oFC DEBUG RAW DISCOVERY STRING: %q", cmd)
@@ -480,7 +480,7 @@ func (r OsDeviceConnectivityNvmeOFc) executeKernelDiscovery(cmd string) (string,
 
 	// Handle short settling windows or device busy locks when opening control socket channel
 	for attempts := 0; attempts < 5; attempts++ {
-		f, err = os.OpenFile("/dev/nvme-fabrics", os.O_WRONLY|os.O_APPEND, 0)
+		f, err = os.OpenFile("/dev/nvme-fabrics", os.O_WRONLY, 0)
 		if err == nil {
 			break
 		}
@@ -493,12 +493,14 @@ func (r OsDeviceConnectivityNvmeOFc) executeKernelDiscovery(cmd string) (string,
 	if err != nil {
 		return "", fmt.Errorf("fabrics device channel unavailable: %w", err)
 	}
-	defer f.Close()
 
 	logger.Debugf("NVMe-oFC: Writing discovery string to /dev/nvme-fabrics")
 	if _, err := f.WriteString(cmd); err != nil {
+		f.Close()
 		return "", fmt.Errorf("write to nvme-fabrics failed: %w", err)
 	}
+
+	f.Close()			// Close immeidately
 
 	return r.findDiscoverySubNqnFromSysfs()
 }
@@ -726,7 +728,7 @@ func (r OsDeviceConnectivityNvmeOFc) nvmeConnect(ctx context.Context, arrayTarge
 	sysHostID  := getSystemHostID()
 
 	// 4. STRACE VERIFIED PAYLOAD STRING: Finalized for nvmeConnect
-	options := fmt.Sprintf("nqn=%s,transport=fc,traddr=nn-%s:pn-%s,host_traddr=nn-%s:pn-%s,hostnqn=%s,hostid=%s,keep_alive_tmo=30,ctrl_loss_tmo=600\n",
+	options := fmt.Sprintf("nqn=%s,transport=fc,traddr=nn-%s:pn-%s,host_traddr=nn-%s:pn-%s,hostnqn=%s,hostid=%s,keep_alive_tmo=30,ctrl_loss_tmo=600",
 		subNqn, targetNN, targetPN, hostNN, hostPN, sysHostNQN, sysHostID)
 
 	logger.Infof("NVMe-oFC DEBUG RAW CONNECT STRING: %q", options)
@@ -741,7 +743,7 @@ func (r OsDeviceConnectivityNvmeOFc) nvmeConnect(ctx context.Context, arrayTarge
 			var oErr error
 
 			for attempts := 0; attempts < 5; attempts++ {
-				f, oErr = os.OpenFile("/dev/nvme-fabrics", os.O_WRONLY|os.O_APPEND, 0)
+				f, oErr = os.OpenFile("/dev/nvme-fabrics", os.O_WRONLY, 0)
 				if oErr == nil {
 					break
 				}
@@ -754,9 +756,9 @@ func (r OsDeviceConnectivityNvmeOFc) nvmeConnect(ctx context.Context, arrayTarge
 			if oErr != nil {
 				return "", fmt.Errorf("fabrics interface control device node missing: %w", oErr)
 			}
-			defer f.Close()
 
 			_, writeErr := f.WriteString(options)
+			f.Close()			// Close immediately
 			if writeErr != nil {
 				// Handle native POSIX lifecycle active connection states gracefully
 				if errors.Is(writeErr, syscall.EALREADY) || errors.Is(writeErr, syscall.EEXIST) || errors.Is(writeErr, syscall.EBUSY) {
