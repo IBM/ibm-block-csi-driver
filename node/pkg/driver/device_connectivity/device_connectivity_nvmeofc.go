@@ -19,6 +19,7 @@ package device_connectivity
 import (
 	"bytes"
 	"context"
+	"crypto/rand"	
 	"encoding/binary"
 	"errors"
 	"fmt"
@@ -433,11 +434,13 @@ func (r OsDeviceConnectivityNvmeOFc) discoverSubNqn(ctx context.Context, arrayTa
 		return "", err
 	}
 
-	// Canonical Kernel Format using hyphens (host-traddr)
-	cmd := fmt.Sprintf("nqn=%s,transport=fc,traddr=nn-%s:pn-%s,host-traddr=nn-%s:pn-%s\n", 
-		nvmeDiscoveryNqn, targetNN, targetPN, hostNN, hostPN)
+	hostNqn := r.getHostNqn()
+	hostId := r.getHostId()
 
-	// DEBUG PRINT BLOCK: %q shows exact escape characters like \n and spaces
+	// FIX: Changed host-traddr to host_traddr, added hostnqn/hostid, removed trailing newline
+	cmd := fmt.Sprintf("nqn=%s,transport=fc,traddr=nn-%s:pn-%s,host_traddr=nn-%s:pn-%s,hostnqn=%s,hostid=%s,ctrl_loss_tmo=600", 
+		nvmeDiscoveryNqn, targetNN, targetPN, hostNN, hostPN, hostNqn, hostId)
+
 	logger.Infof("NVMe-oFC DEBUG RAW DISCOVERY STRING: %q", cmd)
 
 	rawOutput, err := executer.ExecuteUninterruptible(
@@ -456,7 +459,6 @@ func (r OsDeviceConnectivityNvmeOFc) discoverSubNqn(ctx context.Context, arrayTa
 		return "", err 
 	}
 
-	// BUG FIX: Pass the raw payload string converted to bytes to maintain slice compatibility 
 	subNqn := parseSubNqnFromDiscoverOutput([]byte(rawOutput))
 	if subNqn != "" {
 		logger.Debugf("NVMe-oFC discoverSubNqn: discovered subnqn=%s target=%s host=%s",
@@ -468,15 +470,18 @@ func (r OsDeviceConnectivityNvmeOFc) discoverSubNqn(ctx context.Context, arrayTa
 
 // executeKernelDiscovery writes the discovery payload string directly into the kernel fabrics channel.
 func (r OsDeviceConnectivityNvmeOFc) executeKernelDiscovery(cmd string) (string, error) {
-	f, err := os.OpenFile("/dev/nvme-fabrics", os.O_WRONLY|os.O_APPEND, 0)
+	f, err := os.OpenFile("/dev/nvme-fabrics", os.O_WRONLY, 0)
 	if err != nil {
 		return "", fmt.Errorf("open /dev/nvme-fabrics failed: %w", err)
 	}
-	defer f.Close()
 
 	if _, err := f.WriteString(cmd); err != nil {
+		f.Close()
 		return "", fmt.Errorf("write to nvme-fabrics failed: %w", err)
 	}
+	
+	// Close immediately
+	f.Close()
 
 	return r.findDiscoverySubNqnFromSysfs()
 }
@@ -625,7 +630,6 @@ func parseSubNqnFromDiscoverOutput(rawBytes []byte) string {
 }
 
 
-// nvmeConnect executes direct writes onto the /dev/nvme-fabrics channel
 func (r OsDeviceConnectivityNvmeOFc) nvmeConnect(ctx context.Context, arrayTargetPort, hostPort, subNqn string) bool {
 	targetNN, targetPN, err := r.extractCleanHexWWNs(arrayTargetPort)
 	if err != nil {
@@ -638,11 +642,13 @@ func (r OsDeviceConnectivityNvmeOFc) nvmeConnect(ctx context.Context, arrayTarge
 		return false
 	}
 
-	// Canonical Kernel Format using hyphens (host-traddr)
-	options := fmt.Sprintf("nqn=%s,transport=fc,traddr=nn-%s:pn-%s,host-traddr=nn-%s:pn-%s\n",
-		subNqn, targetNN, targetPN, hostNN, hostPN)
+	hostNqn := r.getHostNqn()
+	hostId := r.getHostId()
 
-	// DEBUG PRINT BLOCK: %q shows exact escape characters like \n and spaces
+	// FIX: Changed host-traddr to host_traddr, added hostnqn/hostid, removed trailing newline
+	options := fmt.Sprintf("nqn=%s,transport=fc,traddr=nn-%s:pn-%s,host_traddr=nn-%s:pn-%s,hostnqn=%s,hostid=%s,ctrl_loss_tmo=600",
+		subNqn, targetNN, targetPN, hostNN, hostPN, hostNqn, hostId)
+
 	logger.Infof("NVMe-oFC DEBUG RAW CONNECT STRING: %q", options)
 
 	resourceKey := fmt.Sprintf("connect-%s-%s", subNqn, arrayTargetPort)
@@ -651,7 +657,7 @@ func (r OsDeviceConnectivityNvmeOFc) nvmeConnect(ctx context.Context, arrayTarge
 		ctx,
 		r.KeyedGater, resourceKey, 1, 1, 5*time.Second, 30*time.Second,
 		func(wCtx context.Context) (string, error) {
-			f, err := os.OpenFile("/dev/nvme-fabrics", os.O_WRONLY|os.O_APPEND, 0)
+			f, err := os.OpenFile("/dev/nvme-fabrics", os.O_WRONLY, 0)
 			if err != nil {
 				return "", fmt.Errorf("failed to open fabrics device: %w", err)
 			}
@@ -659,7 +665,6 @@ func (r OsDeviceConnectivityNvmeOFc) nvmeConnect(ctx context.Context, arrayTarge
 
 			_, err = f.WriteString(options)
 			if err != nil {
-				// BUG FIX 2: Implement robust POSIX error identification using errors.Is instead of text matching
 				if errors.Is(err, syscall.EALREADY) || errors.Is(err, syscall.EEXIST) || errors.Is(err, syscall.EBUSY) {
 					return "already_connected", nil
 				}
@@ -678,6 +683,7 @@ func (r OsDeviceConnectivityNvmeOFc) nvmeConnect(ctx context.Context, arrayTarge
 	logger.Infof("NVMe-oFC nvmeConnect: connected NQN=%s target=%s host=%s result=%s", subNqn, arrayTargetPort, hostPort, out)
 	return true
 }
+
 
 func (r OsDeviceConnectivityNvmeOFc) extractPreservedWWNs(portStr string) (string, string, error) {
 	parts := strings.Split(strings.ToLower(strings.TrimSpace(portStr)), ":")
@@ -826,6 +832,52 @@ func (r OsDeviceConnectivityNvmeOFc) readSysfsFC(portPath string) (string, error
 }
 
 
+// generateRandomUUID creates a standard RFC4122 UUID v4 string as a fallback
+func generateRandomUUID() string {
+	b := make([]byte, 16)
+	_, err := rand.Read(b)
+	if err != nil {
+		// Strict fallback if crypto/rand fails
+		return "00000000-0000-0000-0000-000000000000"
+	}
+	// Variant and version bits for UUID v4
+	b[6] = (b[6] & 0x0f) | 0x40
+	b[8] = (b[8] & 0x3f) | 0x80
+
+	return fmt.Sprintf("%x-%x-%x-%x-%x", b[0:4], b[4:6], b[6:8], b[8:10], b[10:])
+}
+
+// getHostNqn dynamically reads the host file or builds a generic fallback NQN
+func (r OsDeviceConnectivityNvmeOFc) getHostNqn() string {
+	data, err := os.ReadFile("/etc/nvme/hostnqn")
+	if err == nil {
+		sanitized := strings.TrimSpace(string(data))
+		if sanitized != "" {
+			logger.Warningf("Host nqn %s", sanitized)
+			return sanitized
+		}
+	}
+	
+	// Generic fallback format if the file is missing or empty
+	fallbackUUID := r.getHostId()
+	return fmt.Sprintf("nqn.2014-08.org.nvmexpress:uuid:%s", fallbackUUID)
+}
+
+// getHostId dynamically reads the host ID or generates a stable runtime fallback
+func (r OsDeviceConnectivityNvmeOFc) getHostId() string {
+	data, err := os.ReadFile("/etc/nvme/hostid")
+	if err == nil {
+		sanitized := strings.TrimSpace(string(data))
+		if sanitized != "" {
+			logger.Warningf("Host ID %s", sanitized)
+			return sanitized
+		}
+	}
+	
+	// Generate a temporary runtime UUID if the host node doesn't have one configured
+	logger.Warning("Random host id")
+	return generateRandomUUID()
+}
 
 
 
