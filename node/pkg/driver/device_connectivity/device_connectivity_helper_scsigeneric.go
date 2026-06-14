@@ -1762,11 +1762,11 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) IdentityAwarePreScan(
 			logger.Warningf("Pre-scan: Identity Collision at %s: Found %s, expected %s", targetPath, res.WWID, normExpected)
 			_ = r.Mounter.UnmountWithTimeout(ctx, targetPath, 30*time.Second)
 			return "", false, false, false, status.Error(codes.Internal, "pre-scan: identity collision detected at target path")
-                       // Verify the collision is cleared
-                       // TODO should we expect the detach to be immediate or add small polling loop a la pollLayerDeleted
-                       //if mounted, _ := r.Mounter.IsMounted(targetPath); mounted {
-                       //              return fmt.Errorf("pre-scan: collision at %s; failed to detach rogue volume %s", targetPath, currentWWID)
-                       //}
+-                       // Verify the collision is cleared
+-                       // TODO should we expect the detach to be immediate or add small polling loop a la pollLayerDeleted
+-                       //if mounted, _ := r.Mounter.IsMounted(targetPath); mounted {
+-                       //              return fmt.Errorf("pre-scan: collision at %s; failed to detach rogue volume %s", targetPath, currentWWID)
+-                       //}
 			
 		}
 	}
@@ -1777,11 +1777,10 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) IdentityAwarePreScan(
 	// INTEGRATED O_EXCL CHECK FOR TIER 2:
 	// evaluateDeviceTopology will call isDeviceMapBusy(mpathName, false) internally.
 	// Since no mount exists, any exclusive open failure (EBUSY) implies an active rescan or kernel hang.
-	// TODO review this:
 	isBusy, isLeftoverTopology, currentDev := r.evaluateDeviceTopology(expectedWWID)
-	//if currentDev == "" && mpathName != "" {
-	//	currentDev = "/dev/" + mpathName
-	//}
+	if currentDev == "" && mpathName != "" {
+		currentDev = "/dev/" + mpathName
+	}
 
 	// Case A: Dead leftover topology mapping shell (0 physical paths/slaves)
 	if isLeftoverTopology {
@@ -1819,7 +1818,143 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) IdentityAwarePreScan(
 	return "", false, false, false, nil
 }
 
-func (r *OsDeviceConnectivityHelperScsiGeneric) evaluateDeviceTopology(volumeWWID []string) (isBusy bool, isLeftover bool, targetDev string) {
+func (r *OsDeviceConnectivityHelperScsiGeneric) IdentityAwarePreScan2(
+	ctx context.Context, 
+	targetPath string, 
+	volumeWWID []string, // Array-driven structure matching your discovery setup
+) (discoveredDev string, isStaged bool, skipRescan bool, isLeftover bool, err error) {
+	if len(volumeWWID) == 0 {
+		return "", false, false, false, status.Error(codes.InvalidArgument, "wwid slice cannot be empty")
+	}
+	
+	scsiID := volumeWWID[0]
+	normExpected := r.Helper.normalizeWWID(scsiID)
+	mpathAlias := r.Helper.findDMByWWID(normExpected)
+
+	// =========================================================================
+	// TIER 0: MOUNTED PATH IDENTITY VERIFICATION & SUCCESS SHORT-CIRCUIT
+	// =========================================================================
+	mounts, _ := r.Mounter.GetMountsForPath(targetPath)
+	if len(mounts) > 0 {
+		res, err := executer.ExecuteUninterruptible[IdentityResult](
+			ctx,
+			r.KeyedGater,
+			"wwid-check",
+			5,
+			20,
+			2*time.Second,
+			10*time.Second,
+			func(ctx context.Context) (IdentityResult, error) {
+				wwid, _ := r.Helper.getWWIDByDev(mounts[0].Major, mounts[0].Minor)
+				hw, _ := r.Helper.GetWwnByScsiInq(ctx, mpathAlias)
+				return IdentityResult{WWID: wwid, HW: hw}, nil
+			},
+		)
+		if err != nil {
+			return "", false, false, false, err
+		}
+
+		if strings.EqualFold(res.WWID, normExpected) && (res.HW == "" || strings.EqualFold(res.HW, normExpected)) {
+			isBusy, isLeftoverTopology, currentDev := r.evaluateDeviceTopology(volumeWWID)
+			isMpathTrapped, _ := r.isDeviceMapBusy(filepath.Base(currentDev), true)
+			
+			if !isLeftoverTopology && !isMpathTrapped && currentDev != "" {
+				logger.Infof("Pre-scan: Volume %s is already staged and healthy at %s.", scsiID, targetPath)
+				r.busyTimestamps.Delete(scsiID)
+				return currentDev, true, true, false, nil
+			}
+
+			logger.Warningf("Pre-scan: Mount exists for %s but pathing is broken. Forcing teardown.", scsiID)
+			err := r.TeardownVolume(ctx, targetPath, false, false, scsiID)
+			if err != nil {
+				return "", false, false, true, fmt.Errorf("pre-scan: failed to clear zombie volume: %w", err)
+			}
+			r.busyTimestamps.Delete(scsiID)
+			return "", false, false, true, nil
+		}
+		// ... Keep identity collision check ...
+	}
+
+	isBusy, isLeftoverTopology, currentDev := r.evaluateDeviceTopology(volumeWWID)
+
+	if isLeftoverTopology {
+		logger.Warningf("Pre-scan: Detected zombie topology for WWID %s. Cleaning up layers.", scsiID)
+		_ = r.cleanupOrphanedTopology(ctx, mpathAlias, scsiID)
+		r.busyTimestamps.Delete(scsiID)
+		return "", false, false, true, nil 
+	}
+
+	if isBusy {
+		now := time.Now()
+		val, loaded := r.busyTimestamps.LoadOrStore(scsiID, now)
+		firstDetected := val.(time.Time)
+
+		if loaded && now.Sub(firstDetected) > 5*time.Minute {
+			logger.Errorf("Pre-scan: Storage permanently stuck for WWID %s. Clearing.", scsiID)
+			r.busyTimestamps.Delete(scsiID)
+			_ = r.cleanupOrphanedTopology(ctx, mpathAlias, scsiID)
+			return "", false, false, true, nil 
+		}
+		return currentDev, false, false, false, status.Error(codes.Aborted, "previous rescan operation is still settling in the kernel. Backing off.")
+	}
+
+	if currentDev != "" && !isBusy && !isLeftoverTopology {
+		r.busyTimestamps.Delete(scsiID)
+		return currentDev, false, true, false, nil
+	}
+
+	r.busyTimestamps.Delete(scsiID)
+	return "", false, false, false, nil
+}
+
+
+func (r *OsDeviceConnectivityHelperScsiGeneric) evaluateDeviceTopology(expectedWWID string) (isBusy bool, isLeftover bool, targetDev string) {
+	normExpected := r.Helper.normalizeWWID(expectedWWID)
+	
+	dmName := r.Helper.findDMByWWID(normExpected) 
+	if dmName != "" {
+		// Pass false because we are calling this from Tier 2 where NO active mount should be present
+		isBusy, err := r.isDeviceMapBusy(dmName, false)
+		if err != nil || isBusy {
+			return true, false, "/dev/" + dmName
+		}
+
+		slavesPath := filepath.Join("/sys/block", dmName, "slaves")
+		if entries, err := os.ReadDir(slavesPath); err == nil && len(entries) == 0 {
+			return false, true, "/dev/" + dmName 
+		}
+		return false, false, "/dev/" + dmName
+	}
+	
+       // Native NVMe uses /sys/class/nvme-subsystem/ or searches nvmeXn1 paths directly
+       isBusy, isLeftover, nvmeDev := r.evaluateNativeNvmeTopology(normExpected)
+       if isBusy || isLeftover {
+               return isBusy, isLeftover, nvmeDev
+		}
+
+       isBusy, rawDev, _ := r.evaluateLowerBlockLayer(normExpected)
+       return isBusy, false, rawDev
+
+	// OR: return false, false, ""
+}
+
+func (r *OsDeviceConnectivityHelperScsiGeneric) evaluateNativeNvmeTopology(expectedWWID string) (bool, bool, string) {
+	// Native NVMe multipath displays names under /sys/class/nvme-subsystem/
+	subsystems, err := os.ReadDir("/sys/class/nvme-subsystem")
+	if err != nil {
+		return false, false, "" // NVMe subsystem module not loaded or not native multipath
+	}
+
+	for _, sub := range subsystems {
+		subName := sub.Name() // e.g., nvme-subsys0
+		wwidPath := filepath.Join("/sys/class/nvme-subsystem", subName, "model") // or serial/wwid if mapped
+		// If matches expected volume
+		_ = wwidPath 
+	}
+	return false, false, ""
+}
+
+func (r *OsDeviceConnectivityHelperScsiGeneric) evaluateDeviceTopology2(volumeWWID []string) (isBusy bool, isLeftover bool, targetDev string) {
 	if len(volumeWWID) == 0 {
 		return false, false, ""
 	}
@@ -1871,6 +2006,130 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) evaluateDeviceTopology(volumeWWI
 	}
 
 	return false, false, "/dev/" + devName
+}
+
+
+func (r *OsDeviceConnectivityHelperScsiGeneric) evaluateLowerBlockLayer(expectedWWID string) (bool, string, error) {
+	blockFiles, err := os.ReadDir("/sys/block")
+	if err != nil {
+		return false, "", fmt.Errorf("failed to read /sys/block: %w", err)
+	}
+
+	normExpected := strings.ToLower(expectedWWID)
+
+	for _, f := range blockFiles {
+		devName := f.Name()
+		
+		isSCSI := strings.HasPrefix(devName, "sd")
+		isNVMe := r.IsNativeNvmeNamespace(devName) // Robust block check replacing the "n" logic
+		isDM := r.IsDeviceMapper(devName)          // Robust DM directory check
+
+		// If it's a structural DM node or an NVMe Controller character device, skip it here.
+		// We handle DM layers explicitly via findDMByWWID.
+		if isDM || (!isSCSI && !isNVMe) {
+			continue
+		}
+
+		// 1. Resolve WWID path dynamically based on protocol
+		var wwidPath string
+		if isSCSI {
+			wwidPath = filepath.Join("/sys/block", devName, "device", "wwid")
+		} else if isNVMe {
+			wwidPath = filepath.Join("/sys/block", devName, "wwid")
+		}
+
+		wwidBytes, err := os.ReadFile(wwidPath)
+		if err != nil {
+			continue 
+		}
+
+		if !strings.Contains(strings.ToLower(string(wwidBytes)), normExpected) {
+			continue
+		}
+
+		// 2. Queue State Evaluation
+		quiescedPath := filepath.Join("/sys/block", devName, "queue", "quiesced")
+		if qBytes, err := os.ReadFile(quiescedPath); err == nil {
+			if strings.TrimSpace(string(qBytes)) == "1" {
+				return true, devName, nil // Queue is locked by a hanging rescan
+			}
+		}
+
+		// 3. Transport State Assessment
+		if isSCSI {
+			statePath := filepath.Join("/sys/block", devName, "device", "state")
+			if sBytes, err := os.ReadFile(statePath); err == nil {
+				state := strings.TrimSpace(string(sBytes))
+				if state == "blocked" || state == "offline" {
+					return true, devName, nil
+				}
+			}
+		} else if isNVMe {
+			// NVMe controllers track link state under device/state relative to the namespace
+			statePath := filepath.Join("/sys/block", devName, "device", "state")
+			if sBytes, err := os.ReadFile(statePath); err == nil {
+				state := strings.TrimSpace(string(sBytes))
+				if state == "connecting" || state == "deleting" {
+					return true, devName, nil
+				}
+			}
+		}
+	}
+	return false, "", nil
+}
+
+func (h *OsDeviceConnectivityHelperScsiGeneric) isDeviceMapBusy(mpathName string) (bool, error) {
+	// mpathName is the alias (e.g., "mpatha") returned by findDMByWWID.
+	// 1. Resolve it back to the actual kernel dm-X name, exactly like your existing logic.
+	fullPath := filepath.Join("/dev/mapper", mpathName)
+	realPath, err := filepath.EvalSymlinks(fullPath)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return false, nil // Map doesn't exist on the filesystem; it cannot be busy.
+		}
+		return false, fmt.Errorf("busy-check: failed to resolve symlink for %s: %w", mpathName, err)
+	}
+	dmKernelName := filepath.Base(realPath) // e.g., "dm-5"
+
+	// Base path to this device-mapper configuration directory in sysfs
+	dmSysfsDir := fmt.Sprintf("/sys/block/%s/dm", dmKernelName)
+
+	// 2. Read the Device Mapper table state
+	// Safe states: "ACTIVE"
+	// Stuck/Transitioning states: "SUSPENDED", "RELOAD"
+	stateBytes, err := os.ReadFile(filepath.Join(dmSysfsDir, "state"))
+	if err != nil {
+		if os.IsNotExist(err) {
+			return false, nil // The sysfs tracking path was removed mid-flight.
+		}
+		return false, fmt.Errorf("busy-check: failed to read dm state for %s: %w", dmKernelName, err)
+	}
+	state := strings.TrimSpace(string(stateBytes))
+
+	// 3. Read the kernel's internal suspension counter
+	// If an operation is suspended or locked waiting for paths, this value will be > 0
+	var isSuspended bool
+	suspendedBytes, err := os.ReadFile(filepath.Join(dmSysfsDir, "suspended"))
+	if err == nil {
+		if count, err := strconv.Atoi(strings.TrimSpace(string(suspendedBytes))); err == nil && count > 0 {
+			isSuspended = true
+		}
+	}
+
+	// 4. Evaluate if a previous operation left the block driver unstable
+	// "RELOAD" means a new table map was loaded by a tool, but the kernel has 
+	// not yet resumed processing I/O on it (classic sign of a hung/timed-out rescan).
+	if state == "SUSPENDED" || state == "RELOAD" || isSuspended {
+		return true, nil
+	}
+
+	// 5. Check if the block layer queues are actively quiesced (frozen) by the driver
+	quiescedBytes, err := os.ReadFile(fmt.Sprintf("/sys/block/%s/queue/quiesced", dmKernelName))
+	if err == nil && strings.TrimSpace(string(quiescedBytes)) == "1" {
+		return true, nil
+	}
+
+	return false, nil
 }
 
 func (r *OsDeviceConnectivityHelperScsiGeneric) isDeviceMapBusy(mpathName string, expectActiveMount bool) (bool, error) {
@@ -3101,6 +3360,61 @@ func (o *OsDeviceConnectivityHelperGeneric) findDMByWWID(wwid string) string {
 		return ""
 	}
 
+	// Use your central helper to clean the incoming target WWID string
+	normWwid := normalizeWWID(wwid)
+
+	for _, file := range files {
+		name := file.Name()
+		if name == "control" {
+			continue
+		}
+
+		fullPath := filepath.Join("/dev/mapper", name)
+		
+		fi, err := os.Lstat(fullPath)
+		if err != nil {
+			continue
+		}
+
+		var dmKernelName string
+		if fi.Mode()&os.ModeSymlink != 0 {
+			realPath, err := filepath.EvalSymlinks(fullPath)
+			if err != nil {
+				continue
+			}
+			dmKernelName = filepath.Base(realPath) // e.g., "dm-5"
+		} else {
+			statT, ok := fi.Sys().(*syscall.Stat_t)
+			if !ok {
+				continue
+			}
+			minor := statT.Rdev & 0xff
+			dmKernelName = fmt.Sprintf("dm-%d", minor)
+		}
+
+		uuidPath := filepath.Join("/sys/block", dmKernelName, "dm", "uuid")
+		content, err := os.ReadFile(uuidPath)
+		if err != nil {
+			continue
+		}
+
+		// FIXED: Pass the raw kernel sysfs string through your multi-pass cleaner
+		extractedWwid := normalizeWWID(string(content))
+
+		// Perfect equality match guaranteed by symmetric cleaning
+		if extractedWwid == normWwid {
+			return name 
+		}
+	}
+	return ""
+}
+
+func (o *OsDeviceConnectivityHelperGeneric) findDMByWWID2(wwid string) string {
+	files, err := os.ReadDir("/dev/mapper")
+	if err != nil {
+		return ""
+	}
+
 	normWwid := normalizeWWID(wwid)
 
 	for _, file := range files {
@@ -3137,7 +3451,6 @@ func (o *OsDeviceConnectivityHelperGeneric) findDMByWWID(wwid string) string {
 			continue
 		}
 
-		//if extractedWwid == normWwid {
 		if normalizeWWID(string(content)) == normWwid {
 			return name 
 		}
@@ -3556,17 +3869,41 @@ func (o GetDmsPathHelperGeneric) safeSettle(path string) error {
 	return fmt.Errorf("device %s failed to settle read tests", path)
 }
 
+
+func (o GetDmsPathHelperGeneric) getSlaveCount(path string) int {
+	name := filepath.Base(path)
+
+	// DM: Count /sys/block/dm-X/slaves/*
+	if strings.HasPrefix(name, "dm-") {
+		entries, _ := os.ReadDir(fmt.Sprintf("/sys/block/%s/slaves", name))
+		return len(entries)
+	}
+
+	// NVMe: Count controllers in the subsystem
+	if strings.HasPrefix(name, "nvme") {
+		// Native NVMe Multipath devices usually look like nvme-subsys0n1
+		// Their paths are controllers (nvme0, nvme1) linked in the subsystem dir
+		subsysDir := fmt.Sprintf("/sys/block/%s/device", name)
+		entries, _ := os.ReadDir(subsysDir)
+		count := 0
+		for _, e := range entries {
+			if strings.HasPrefix(e.Name(), "nvme") && !strings.Contains(e.Name(), "n") {
+				count++ // Count 'nvme0', skip 'nvme0n1'
+			}
+		}
+		return count
+	}
+	return 1
+}
+
 func (r *OsDeviceConnectivityHelperScsiGeneric) getSlaveCount(devName string) int {
-	// if strings.HasPrefix(name, "dm-") {
 	if r.IsDeviceMapper(devName) {
 		entries, _ := os.ReadDir(filepath.Join("/sys/block", devName, "slaves"))
 		return len(entries)
 	}
 
-	//if strings.HasPrefix(name, "nvme") {
 	if r.IsNativeNvmeNamespace(devName) {
 		// Native NVMe Multipath (ANA): Count real host controller attachments
-		// subsysDir := fmt.Sprintf("/sys/block/%s/device", name)
 		entries, _ := os.ReadDir(filepath.Join("/sys/block", devName, "device"))
 		count := 0
 		for _, e := range entries {
@@ -3579,6 +3916,7 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) getSlaveCount(devName string) in
 	}
 	return 1
 }
+
 
 
 /*
@@ -3735,11 +4073,8 @@ func (o GetDmsPathHelperGeneric) performDiscovery(volumeWWID []string) (string, 
 	}
 
 	// Clean out any formatting characters for raw comparisons
-	//scsiID := strings.ToLower(strings.ReplaceAll(volumeWWID[0], "-", "")) 
-	//nvmeID := strings.ToLower(strings.ReplaceAll(volumeWWID[1], "-", "")) 
-	scsiID := normalizeWWID(volumeWWID[0])
-	nvmeID := normalizeWWID(volumeWWID[1])
-
+	scsiID := strings.ToLower(strings.ReplaceAll(volumeWWID[0], "-", "")) 
+	nvmeID := strings.ToLower(strings.ReplaceAll(volumeWWID[1], "-", "")) 
 
 	// =========================================================================
 	// STRATEGY A: DM-Multipath (SCSI or NVMe-over-DM) via udev
@@ -3780,6 +4115,42 @@ func (o GetDmsPathHelperGeneric) performDiscovery(volumeWWID []string) (string, 
 	return "", fmt.Errorf("block device not found after exhaustive scan routines")
 }
 
+func (o GetDmsPathHelperGeneric) performDiscovery2(volumeWWID []string) (string, error) {
+	if len(volumeWWID) < 2 {
+		return "", fmt.Errorf("insufficient identifiers provided: expected [scsi_id, nvme_id]")
+	}
+
+	scsiID := normalizeWWID(volumeWWID[0])
+	nvmeID := normalizeWWID(volumeWWID[1])
+
+	// Strategy A: DM-Multipath udev verification
+	if dev, err := o.verifyDevice(fmt.Sprintf("/dev/disk/by-id/dm-uuid-mpath-%s", scsiID)); err == nil {
+		return dev, nil
+	}
+	if dev, err := o.verifyDevice(fmt.Sprintf("/dev/disk/by-id/dm-uuid-mpath-nvme-%s", nvmeID)); err == nil {
+		return dev, nil
+	}
+
+	// Strategy B: Native Kernel NVMe Multipathing (ANA) udev verification
+	if dev, err := o.verifyDevice(fmt.Sprintf("/dev/disk/by-id/nvme-%s", nvmeID)); err == nil {
+		return dev, nil
+	}
+
+	// Strategy C: Structural Sysfs Fallbacks
+	if dev, err := o.scanDMSubsystem(scsiID); err == nil {
+		return dev, nil
+	}
+	if dev, err := o.scanDMSubsystem(nvmeID); err == nil {
+		return dev, nil
+	}
+	if dev, err := o.scanNVMeSubsystem(nvmeID); err == nil {
+		return dev, nil
+	}
+
+	return "", fmt.Errorf("block device not found after exhaustive scan routines")
+}
+
+
 func (o GetDmsPathHelperGeneric) verifyDevice(path string) (string, error) {
 	if _, err := os.Stat(path); err != nil {
 		return "", err
@@ -3797,8 +4168,49 @@ func (o GetDmsPathHelperGeneric) scanDMSubsystem(targetID string) (string, error
 		return "", err
 	}
 
+	target := strings.ToLower(strings.ReplaceAll(targetID, "-", ""))
+
+	for _, m := range matches {
+		content, err := os.ReadFile(m)
+		if err != nil {
+			continue
+		}
+
+		rawUuid := strings.ToLower(strings.TrimSpace(string(content)))
+
+		// Safe Strip: Strip infrastructure prefix ("mpath-", "mpath-nvme-") cleanly
+		var extractedWwid string
+		if idx := strings.LastIndex(rawUuid, "-"); idx != -1 {
+			extractedWwid = rawUuid[idx+1:]
+		} else {
+			extractedWwid = rawUuid
+		}
+		extractedWwid = strings.ReplaceAll(extractedWwid, "-", "")
+
+		if extractedWwid == target {
+			// Extract dm-X from path segments safely
+			parts := strings.Split(m, "/")
+			if len(parts) < 4 {
+				continue
+			}
+			dmName := parts[3] // /sys/block/[dm-X]/dm/uuid
+			devPath := filepath.Join("/dev", dmName)
+			
+			if _, err := os.Stat(devPath); err == nil {
+				return devPath, nil
+			}
+		}
+	}
+	return "", fmt.Errorf("dm device not found for string token %s", targetID)
+}
+
+func (o GetDmsPathHelperGeneric) scanDMSubsystem2(targetID string) (string, error) {
+	matches, err := filepath.Glob("/sys/block/dm-*/dm/uuid")
+	if err != nil {
+		return "", err
+	}
+
 	// Centralized cleaning
-	// target := strings.ToLower(strings.ReplaceAll(targetID, "-", ""))
 	target := normalizeWWID(targetID)
 
 	for _, m := range matches {
@@ -3809,8 +4221,6 @@ func (o GetDmsPathHelperGeneric) scanDMSubsystem(targetID string) (string, error
 
 		// FIXED: Use your central normalization rule here as well
 		foundUUID := normalizeWWID(string(content))
-		
-		//rawUuid := strings.ToLower(strings.TrimSpace(string(content)))
 
 		if foundUUID == target {
 			parts := strings.Split(m, "/")
@@ -3831,14 +4241,44 @@ func (o GetDmsPathHelperGeneric) scanDMSubsystem(targetID string) (string, error
 
 func (o GetDmsPathHelperGeneric) scanNVMeSubsystem(targetID string) (string, error) {
 	matches, _ := filepath.Glob("/sys/block/nvme*n*")
-	// target := strings.ToLower(strings.ReplaceAll(targetID, "-", ""))
+	target := strings.ToLower(strings.ReplaceAll(targetID, "-", ""))
+
+	for _, m := range matches {
+		name := filepath.Base(m)
+
+		// Check the NGUID identifier 
+		if data, err := os.ReadFile(filepath.Join(m, "nguid")); err == nil {
+			foundID := strings.ToLower(strings.TrimSpace(strings.ReplaceAll(string(data), "-", "")))
+			
+			if foundID == target {
+				// Safety Switch: If it is marked hidden, it is a sub-path controller namespace.
+				// We want to return its parent Multipath Head or resolve it to the standard /dev path.
+				devPath := filepath.Join("/dev", name)
+				
+				// Handle ANA Multipath Head routing:
+				if hiddenData, err := os.ReadFile(filepath.Join(m, "hidden")); err == nil && strings.TrimSpace(string(hiddenData)) == "1" {
+					// Fallback to checking the subsystem head if udev mapping fails
+					// /sys/block/nvmeXn1/device/subsystem/ contains the public head links
+					continue // Let loop find the master unhidden Head entry instead of the path leg
+				}
+
+				if _, err := os.Stat(devPath); err == nil {
+					return devPath, nil
+				}
+			}
+		}
+	}
+	return "", fmt.Errorf("matching active NVMe namespace handle missing for NGUID %s", targetID)
+}
+
+func (o GetDmsPathHelperGeneric) scanNVMeSubsystem2(targetID string) (string, error) {
+	matches, _ := filepath.Glob("/sys/block/nvme*n*")
 	target := normalizeWWID(targetID)
 
 	for _, m := range matches {
 		name := filepath.Base(m)
 
 		if data, err := os.ReadFile(filepath.Join(m, "nguid")); err == nil {
-			// foundID := strings.ToLower(strings.TrimSpace(strings.ReplaceAll(string(data), "-", "")))
 			if normalizeWWID(string(data)) == target {
 				devPath := filepath.Join("/dev", name)
 				
@@ -3855,15 +4295,56 @@ func (o GetDmsPathHelperGeneric) scanNVMeSubsystem(targetID string) (string, err
 	return "", fmt.Errorf("matching active NVMe namespace handle missing for NGUID %s", targetID)
 }
 
-func (func (o GetDmsPathHelperGeneric) validateDMIntegrity(dmPath string) (string, error) {
+
+
+func (o GetDmsPathHelperGeneric) validateDMIntegrity(dmPath string) (string, error) {
+	dmName := filepath.Base(dmPath)
+	
+	// If it's a native NVMe namespace path instead of DM, bypass DM validation completely
+	if strings.HasPrefix(dmName, "nvme") {
+		return dmPath, nil
+	}
+
+	slavesPath := fmt.Sprintf("/sys/block/%s/slaves", dmName)
+	slaves, err := os.ReadDir(slavesPath)
+	if err != nil || len(slaves) == 0 {
+		return "", fmt.Errorf("dm device %s has no active slave legs attached", dmName)
+	}
+
+	// Protocol-Agnostic Path State Validation
+	var activePaths int
+	for _, s := range slaves {
+		slaveName := s.Name()
+		
+		if strings.HasPrefix(slaveName, "sd") {
+			// SCSI Leg validation
+			state, _ := os.ReadFile(fmt.Sprintf("/sys/block/%s/device/state", slaveName))
+			if strings.TrimSpace(string(state)) == "running" {
+				activePaths++
+			}
+		} else if strings.HasPrefix(slaveName, "nvme") {
+			// NVMe Leg validation (NVMe namespaces trace link status via parent controller)
+			state, _ := os.ReadFile(fmt.Sprintf("/sys/block/%s/device/device/state", slaveName))
+			if err != nil {
+				activePaths++ // Fallback if specific controller states are unmapped
+				continue
+			}
+			if strings.TrimSpace(string(state)) == "live" {
+				activePaths++
+			}
+		}
+	}
+
+	if activePaths == 0 {
+		return "", fmt.Errorf("dm device %s has slaves configured but zero operational paths", dmName)
+	}
+
+	return dmPath, nil
+}
+
+func (o GetDmsPathHelperGeneric) validateDMIntegrity2(dmPath string) (string, error) {
 	dmName := filepath.Base(dmPath)
 	helper := &OsDeviceConnectivityHelperScsiGeneric{}
-	
-		// If it's a native NVMe namespace path instead of DM, bypass DM validation completely
-	//if strings.HasPrefix(dmName, "nvme") {
-	//	return dmPath, nil
-	//}
-
 	
 	if helper.IsNativeNvmeNamespace(dmName) {
 		return dmPath, nil
