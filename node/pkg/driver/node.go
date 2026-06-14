@@ -209,6 +209,7 @@ func (d *NodeService) NodeStageVolume(ctx context.Context, req *csi.NodeStageVol
         // the block layer is completely un-suspended, read-write, and stable.
         mpathDevice, err = d.OsDeviceConnectivityHelper.GetMpathDevice(ctx, volumeUuid)
         if err != nil {
+		logger.Errorf("Error while discovering the device : {%v}", err.Error())
                 // If the 30-second gRPC context context deadline expires here, we return DeadlineExceeded.
                 // On the next retry, IdentityAwarePreScan will flag the device as transitioning,
                 // bypass the rescan phase automatically, and fall back right here to resume polling.
@@ -223,6 +224,7 @@ func (d *NodeService) NodeStageVolume(ctx context.Context, req *csi.NodeStageVol
 	volumeCap := req.GetVolumeCapability()
 	switch volumeCap.GetAccessType().(type) {
 	case *csi.VolumeCapability_Block:
+		logger.Debugf("NodeStageVolume Finished: multipath device [%s] is ready to be mounted by NodePublishVolume API", mpathDevice)
 		return &csi.NodeStageVolumeResponse{}, nil
 	}
 
@@ -230,6 +232,7 @@ func (d *NodeService) NodeStageVolume(ctx context.Context, req *csi.NodeStageVol
 	baseDevice := path.Base(mpathDevice)
 	sysDevices, err := d.NodeUtils.GetSysDevicesFromMpath(ctx, baseDevice)
 	if err != nil {
+		logger.Errorf("Error while trying to get sys devices : {%v}", err.Error())
 		return nil, status.Error(codes.Internal, err.Error())
 	}
 	
@@ -239,15 +242,18 @@ func (d *NodeService) NodeStageVolume(ctx context.Context, req *csi.NodeStageVol
 
 	existingFormat, err := d.Mounter.GetDiskFormat(mpathDevice)
 	if err != nil {
+		logger.Errorf("Could not determine if disk {%v} is formatted, error: %v", mpathDevice, err)
 		return nil, status.Error(codes.Internal, err.Error())
 	}
 
 	fsTypeForMount, err := d.resolveFsTypeForMount(volumeCap.GetMount().FsType, existingFormat)
 	if err != nil {
+		logger.Errorf("Error while resolving type of filesystem to mount : {%v}", err.Error())
 		return nil, err
 	}
 	
 	if err = os.MkdirAll(stagingPathWithHostPrefix, 0750); err != nil {
+		logger.Errorf("failed to create target directory %s: %v", stagingPathWithHostPrefix, err)
 		return nil, err
 	}	
 
@@ -255,6 +261,7 @@ func (d *NodeService) NodeStageVolume(ctx context.Context, req *csi.NodeStageVol
 		return nil, status.Error(codes.Internal, err.Error())
 	}
 
+	logger.Debugf("NodeStageVolume Finished: staging path [%s] is ready to be mounted by NodePublishVolume API", stagingPath)
 	return &csi.NodeStageVolumeResponse{}, nil
 }
 
