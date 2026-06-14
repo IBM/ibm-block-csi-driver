@@ -1700,11 +1700,13 @@ type IdentityResult struct {
 }
 
 // TODO call FinalWwidPurge
-func (s *NodeServer) IdentityAwarePreScan(
+func (r *OsDeviceConnectivityHelperScsiGeneric) IdentityAwarePreScan(
 	ctx context.Context, 
 	targetPath string, 
-	volumeWWID []string,
+	volumeId string,
 ) (discoveredDev string, isStaged bool, skipRescan bool, isLeftover bool, err error) {
+
+	volumeWWID := r.Helper.GetVolumeIdVariations(volumeId)
 	
 	// Safely map and normalize candidate identifiers based on your positional contract
 	normIds := make([]string, 2)
@@ -1714,10 +1716,10 @@ func (s *NodeServer) IdentityAwarePreScan(
 	// Dynamic lookup: Locate a Device Mapper mapping using whichever protocol is actually active
 	var mpathAlias string
 	if normIds[0] != "" {
-		mpathAlias = s.Helper.findDMByWWID(normIds[0])
+		mpathAlias = r.Helper.findDMByWWID(normIds[0])
 	}
 	if mpathAlias == "" && normIds[1] != "" {
-		mpathAlias = s.Helper.findDMByWWID(normIds[1]) // Evaluates NVMe over DM targets
+		mpathAlias = r.Helper.findDMByWWID(normIds[1]) // Evaluates NVMe over DM targets
 	}
 
 	// CRITICAL RESOLUTION RESTORED: Translate the alias into a raw dm-X name early
@@ -1731,16 +1733,16 @@ func (s *NodeServer) IdentityAwarePreScan(
 	// =========================================================================
 	// CASE 0: MOUNTED PATH IDENTITY VERIFICATION & SHORT-CIRCUIT
 	// =========================================================================
-	mounts, _ := s.mounter.GetMountsForPath(targetPath)
+	mounts, _ := r.Mounter.GetMountsForPath(targetPath)
 	if len(mounts) > 0 {
 		// 1. Sysfs mapping lookup using mount minor descriptors
-		currentWWID, _ := s.Helper.getWWIDByDev(mounts[0].Major, mounts[0].Minor)
+		currentWWID, _ := r.Helper.getWWIDByDev(mounts[0].Major, mounts[0].Minor)
 		currentWWID = normalizeWWID(currentWWID)
 
 		// 2. Raw Hardware Controller INQUIRY check on the active DM target
 		var hwWWID string
 		if mpathAlias != "" {
-			hwWWID, _ = s.Helper.GetWwnByScsiInq(ctx, mpathAlias)
+			hwWWID, _ = r.Helper.GetWwnByScsiInq(ctx, mpathAlias)
 			hwWWID = normalizeWWID(hwWWID)
 		}
 
@@ -1751,18 +1753,19 @@ func (s *NodeServer) IdentityAwarePreScan(
 		if isMatch {
 			// Zombie Safeguard inside Mount Block: Ensure a ghost map with 0 paths isn't corrupting things
 			helper := GetDmsPathHelperGeneric{}
-			slaveCount := helper.getSlaveCount(mpathName) // Uses our resolved name variable safely
+			slaveCount := helper.GetSlaveCount(mpathName) // Uses our resolved name variable safely
 			if helper.IsDeviceMapper(mpathName) && slaveCount == 0 {
 				logger.Warningf("Pre-scan: Mount exists for %s but underlying device mapper shell has 0 active paths. Forcing cleanup.", volumeWWID)
-				_ = s.TeardownVolume(ctx, targetPath, false, false, volumeWWID)
-				s.busyTimestamps.Delete(volumeWWID[0])
+				// TODO NVME
+				_ = r.TeardownVolume(ctx, targetPath, false, false, volumeWWID[0])
+				r.busyTimestamps.Delete(volumeWWID[0])
 				return "", false, false, true, nil
 			}
 
 			logger.Infof("Pre-scan: Volume %v is already safely staged, verified via hardware inquiry, and healthy at %s.", volumeWWID, targetPath)
-			s.busyTimestamps.Delete(volumeWWID[0])
+			r.busyTimestamps.Delete(volumeWWID[0])
 			
-			devNode := mounts[0].Device
+			devNode := mounts[0].MountSource
 			if devNode == "" && mpathName != "" {
 				devNode = "/dev/" + mpathName
 			}
@@ -1771,8 +1774,8 @@ func (s *NodeServer) IdentityAwarePreScan(
 
 		// IDENTITY COLLISION SHIELD: The folder is occupied by a different volume entirely
 		logger.Warningf("Pre-scan: Identity Collision at %s: Found dev-WWID %s (HW-WWID %s), expected candidates %v. Forcing unmount.", targetPath, currentWWID, hwWWID, normIds)
-		_ = s.mounter.UnmountWithTimeout(ctx, targetPath, 30*time.Second)
-		s.busyTimestamps.Delete(volumeWWID[0])
+		_ = r.Mounter.UnmountWithTimeout(ctx, targetPath, 30*time.Second)
+		r.busyTimestamps.Delete(volumeWWID[0])
 		return "", false, false, false, status.Error(codes.Internal, "pre-scan: identity collision detected at target path")
 	}
 
@@ -1785,25 +1788,25 @@ func (s *NodeServer) IdentityAwarePreScan(
 
 	if hasDevice {
 		// A: ZOMBIE TOPOLOGY PROTECTION
-		slaveCount := helper.getSlaveCount(devName)
+		slaveCount := helper.GetSlaveCount(devName)
 		if helper.IsDeviceMapper(devName) && slaveCount == 0 {
 			logger.Warningf("Pre-scan: Detected zombie orphan topology shell for %s. Forcing teardown.", devName)
-			_ = s.cleanupOrphanedTopology(ctx, mpathName, volumeWWID[0]) // Pass target pointers to purge block
-			s.busyTimestamps.Delete(volumeWWID[0])
+			_ = r.cleanupOrphanedTopology(ctx, mpathName, volumeWWID[0]) // Pass target pointers to purge block
+			r.busyTimestamps.Delete(volumeWWID[0])
 			return "", false, false, true, nil 
 		}
 
 		// B: DISCOVERY IS IN-PROGRESS / TRANSITIONING
 		if isPending {
 			now := time.Now()
-			val, loaded := s.busyTimestamps.LoadOrStore(devName, now)
+			val, loaded := r.busyTimestamps.LoadOrStore(devName, now)
 			firstDetected := val.(time.Time)
 
 			const maxKernelSettleDuration = 5 * time.Minute
 			if loaded && now.Sub(firstDetected) > maxKernelSettleDuration {
 				logger.Errorf("Pre-scan: Storage permanently stuck for device %s for %v. Invoking active cleanup.", devName, now.Sub(firstDetected))
-				s.busyTimestamps.Delete(volumeWWID[0])
-				_ = s.cleanupOrphanedTopology(ctx, mpathName, volumeWWID[0])
+				r.busyTimestamps.Delete(volumeWWID[0])
+				_ = r.cleanupOrphanedTopology(ctx, mpathName, volumeWWID[0])
 				return "", false, false, true, nil 
 			}
 			
@@ -1813,7 +1816,7 @@ func (s *NodeServer) IdentityAwarePreScan(
 
 		// C: IDLE & HEALTHY COMPLETED DISCOVERY
 		logger.Infof("Pre-scan: Device %s discovered from previous attempt and ready. Bypassing rescan phase.", devName)
-		s.busyTimestamps.Delete(volumeWWID[0])
+		r.busyTimestamps.Delete(volumeWWID[0])
 		return "/dev/" + devName, false, true, false, nil
 	}
 
@@ -1821,7 +1824,7 @@ func (s *NodeServer) IdentityAwarePreScan(
 	// CASE 2: CLEAN SLATE (No device, no mount)
 	// =========================================================================
 	logger.Infof("Pre-scan: Clean slate for candidates %v. Full host storage fabric rescan required.", volumeWWID)
-	s.busyTimestamps.Delete(volumeWWID[0])
+	r.busyTimestamps.Delete(volumeWWID[0])
 	return "", false, false, false, nil
 }
 
@@ -1859,10 +1862,11 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) cleanupOrphanedTopology(ctx cont
 func (r *OsDeviceConnectivityHelperScsiGeneric) disableNativeNvmeQueueing(expectedWWID string) error {
 	blockFiles, _ := os.ReadDir("/sys/block")
 	normExpected := normalizeWWID(expectedWWID)
+	helper := GetDmsPathHelperGeneric{}
 
 	for _, f := range blockFiles {
 		devName := f.Name()
-		if !r.IsNativeNvmeNamespace(devName) {
+		if !helper.IsNativeNvmeNamespace(devName) {
 			continue
 		}
 
@@ -1899,11 +1903,12 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) disableNativeNvmeQueueing(expect
 func (r *OsDeviceConnectivityHelperScsiGeneric) purgeStuckPhysicalPaths(expectedWWID string) error {
 	blockFiles, _ := os.ReadDir("/sys/block")
 	normExpected := normalizeWWID(expectedWWID)
+	helper := GetDmsPathHelperGeneric{}
 
 	for _, f := range blockFiles {
 		devName := f.Name()
 		isSCSI := strings.HasPrefix(devName, "sd")
-		isNVMe := r.IsNativeNvmeNamespace(devName)
+		isNVMe := helper.IsNativeNvmeNamespace(devName)
 
 		if !isSCSI && !isNVMe {
 			continue
@@ -1948,39 +1953,6 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) purgeStuckPhysicalPaths(expected
 		}
 	}
 	return nil
-}
-
-
-// IsDeviceMapper verifies if a block entry is truly a Device Mapper device 
-// by checking for the existence of the "dm" subsystem directory inside its sysfs tree.
-func (r *OsDeviceConnectivityHelperScsiGeneric) IsDeviceMapper(devName string) bool {
-	// Real DM entries always have a /sys/block/<dev>/dm directory containing uuid and table states
-	dmPath := filepath.Join("/sys/block", devName, "dm")
-	_, err := os.Stat(dmPath)
-	return err == nil
-}
-
-// IsNativeNvmeNamespace ensures a device is a concrete block namespace device (like nvme0n1)
-// rather than a controller character interface (like nvme0) by checking for a valid block size.
-//func (r *OsDeviceConnectivityHelperScsiGeneric) IsNativeNvmeNamespace(devName string) bool {
-//	if !strings.HasPrefix(devName, "nvme") {
-//		return false
-//	}
-	
-//	// Controller nodes are character devices and lack a block/size entry.
-//	// Actual namespaces are block devices and always expose their sector size here.
-//	sizePath := filepath.Join("/sys/block", devName, "size")
-//	_, err := os.Stat(sizePath)
-//	return err == nil
-//}
-
-func (r *OsDeviceConnectivityHelperScsiGeneric) IsNativeNvmeNamespace(devName string) bool {
-	if !strings.HasPrefix(devName, "nvme") {
-		return false
-	}
-	// Namespaces always contain 'n' followed by a digit (e.g., nvme0n1, nvme1n2)
-	// This immediately differentiates them from base controllers (nvme0) or subsystems (nvme-subsys0)
-	return strings.Contains(devName, "n")
 }
 
 
@@ -3354,6 +3326,7 @@ func (r *OsDeviceConnectivityHelperGeneric) readSysfs(path string) (string, erro
 
 type GetDmsPathHelperInterface interface {
 	WaitForDmToExist(ctx context.Context, volumeIdVariations []string, maxRetries int, intervalSeconds int) (string, error)
+	GetSlaveCount(devName string) int
 }
 
 type GetDmsPathHelperGeneric struct {
@@ -3374,15 +3347,6 @@ func convertScsiIdToNguid(scsiId string) string {
 	return finalNguid
 }
 
-
-type MultipathDeviceNotFoundForVolumeError struct {
-	WWID string
-}
-
-func (e *MultipathDeviceNotFoundForVolumeError) Error() string {
-	return fmt.Sprintf("multipath device path not found for volume WWID %s", e.WWID)
-}
-
 func (o GetDmsPathHelperGeneric) WaitForDmToExist(ctx context.Context, volumeWWID []string, maxRetries int, intervalSeconds int) (string, error) {
 	if err := ctx.Err(); err != nil {
 		return "", err
@@ -3390,6 +3354,14 @@ func (o GetDmsPathHelperGeneric) WaitForDmToExist(ctx context.Context, volumeWWI
 	var lastCount int
 	var lastRo string
 	var stableCycles int
+
+	// Pre-declare variables to keep the Go compiler happy with the goto jumps
+	var name string
+	var path string
+	var ro string
+	var count int
+	var hasDevice bool
+	var isPending bool
 
 	norm := make([]string, len(volumeWWID))
 	for i, wwid := range volumeWWID {
@@ -3406,7 +3378,7 @@ func (o GetDmsPathHelperGeneric) WaitForDmToExist(ctx context.Context, volumeWWI
 	for i := 0; i < maxRetries; i++ {
 		// 1. Evaluate current block layer using our strict settlement engine rules
 		// Pass checkPendingOnly = false because we mandate a fully usable, live, R/W presentation
-		hasDevice, isPending, name := o.EvaluateSysfsTopology(norm, false)
+		hasDevice, isPending, name = o.EvaluateSysfsTopology(norm, false)
 
 		if !hasDevice {
 			// Case C/D Fallback: Paths disappeared entirely or udev rules are still processing topology
@@ -3426,10 +3398,9 @@ func (o GetDmsPathHelperGeneric) WaitForDmToExist(ctx context.Context, volumeWWI
 		}
 
 		// 2. Read runtime stability attributes once the kernel block layer is structural
-		helper := &OsDeviceConnectivityHelperScsiGeneric{}
-		count := helper.getSlaveCount(name)
-		path := filepath.Join("/dev", name)
-		ro := o.getRoStatus(path)
+		path = filepath.Join("/dev", name)
+		count = o.GetSlaveCount(name)
+		ro = o.getRoStatus(path)
 
 		// 3. Evaluate state stability across polling periods
 		if count > 0 && count == lastCount && ro == lastRo {
@@ -3459,8 +3430,63 @@ func (o GetDmsPathHelperGeneric) WaitForDmToExist(ctx context.Context, volumeWWI
 		}
 	}
 	
-	return "", &MultipathDeviceNotFoundForVolumeError{VolumeID: volumeWWID[0]}
+	return "", &MultipathDeviceNotFoundForVolumeError{volumeWWID[0]}
 }
+
+func (o *GetDmsPathHelperGeneric) GetSlaveCount(devName string) int {
+	// 1. Device Mapper Check
+	if o.IsDeviceMapper(devName) {
+		entries, _ := os.ReadDir(filepath.Join("/sys/block", devName, "slaves"))
+		return len(entries)
+	}
+
+	// 2. Native NVMe Namespace Check
+	if o.IsNativeNvmeNamespace(devName) {
+		entries, _ := os.ReadDir(filepath.Join("/sys/block", devName, "device"))
+		count := 0
+		for _, e := range entries {
+			name := e.Name()
+			if strings.HasPrefix(name, "nvme") && !strings.Contains(name, "n") && !strings.Contains(name, "-") {
+				count++
+			}
+		}
+		return count
+	}
+	return 1
+}
+
+// IsDeviceMapper verifies if a block entry is truly a Device Mapper device
+// by checking for the existence of the "dm" subsystem directory inside its sysfs tree.
+func (r *GetDmsPathHelperGeneric) IsDeviceMapper(devName string) bool {
+        // Real DM entries always have a /sys/block/<dev>/dm directory containing uuid and table states
+        dmPath := filepath.Join("/sys/block", devName, "dm")
+        _, err := os.Stat(dmPath)
+        return err == nil
+}
+
+// IsNativeNvmeNamespace ensures a device is a concrete block namespace device (like nvme0n1)
+// rather than a controller character interface (like nvme0) by checking for a valid block size.
+//func (r *OsDeviceConnectivityHelperScsiGeneric) IsNativeNvmeNamespace(devName string) bool {
+//      if !strings.HasPrefix(devName, "nvme") {
+//              return false
+//      }
+
+//      // Controller nodes are character devices and lack a block/size entry.
+//      // Actual namespaces are block devices and always expose their sector size here.
+//      sizePath := filepath.Join("/sys/block", devName, "size")
+//      _, err := os.Stat(sizePath)
+//      return err == nil
+//}
+
+func (r *GetDmsPathHelperGeneric) IsNativeNvmeNamespace(devName string) bool {
+        if !strings.HasPrefix(devName, "nvme") {
+                return false
+        }
+        // Namespaces always contain 'n' followed by a digit (e.g., nvme0n1, nvme1n2)
+        // This immediately differentiates them from base controllers (nvme0) or subsystems (nvme-subsys0)
+        return strings.Contains(devName, "n")
+}
+
 
 // EvaluateSysfsTopology unified your relaxed pre-scan check and your strict settlement check.
 // If checkPendingOnly is true, it returns isPending=true if the device exists and is transitioning.
@@ -3573,10 +3599,9 @@ func (o GetDmsPathHelperGeneric) getRoStatus(path string) string {
 
 func (o GetDmsPathHelperGeneric) safeSettle(path string) error {
 	name := filepath.Base(path)
-	helper := &OsDeviceConnectivityHelperScsiGeneric{}
 
 	for i := 0; i < 10; i++ {
-		if helper.IsDeviceMapper(name) {
+		if o.IsDeviceMapper(name) {
 			suspended, err := os.ReadFile(filepath.Join("/sys/block", name, "dm", "suspended"))
 			if err == nil && strings.TrimSpace(string(suspended)) == "0" {
 				f, err := os.OpenFile(path, os.O_RDONLY, 0)
@@ -3606,33 +3631,8 @@ func (o GetDmsPathHelperGeneric) safeSettle(path string) error {
 	return fmt.Errorf("device %s failed to settle read tests", path)
 }
 
-func (r *OsDeviceConnectivityHelperScsiGeneric) getSlaveCount(devName string) int {
-	// if strings.HasPrefix(name, "dm-") {
-	if r.IsDeviceMapper(devName) {
-		entries, _ := os.ReadDir(filepath.Join("/sys/block", devName, "slaves"))
-		return len(entries)
-	}
-
-	//if strings.HasPrefix(name, "nvme") {
-	if r.IsNativeNvmeNamespace(devName) {
-		// Native NVMe Multipath (ANA): Count real host controller attachments
-		// subsysDir := fmt.Sprintf("/sys/block/%s/device", name)
-		entries, _ := os.ReadDir(filepath.Join("/sys/block", devName, "device"))
-		count := 0
-		for _, e := range entries {
-			// Count 'nvme0', 'nvme1', etc. Avoid matching self namespaces ('nvme0n1')
-			if strings.HasPrefix(e.Name(), "nvme") && !strings.Contains(e.Name(), "n") {
-				count++
-			}
-		}
-		return count
-	}
-	return 1
-}
-
-
 /*
-func (o GetDmsPathHelperGeneric) getSlaveCount(path string) int {
+func (o GetDmsPathHelperGeneric) GetSlaveCount(path string) int {
 	name := filepath.Base(path)
 
 	// DM: Protocol and distribution agnostic path counting (RHEL 7+)
@@ -3907,14 +3907,13 @@ func (o GetDmsPathHelperGeneric) scanNVMeSubsystem(targetID string) (string, err
 
 func (o GetDmsPathHelperGeneric) validateDMIntegrity(dmPath string) (string, error) {
 	dmName := filepath.Base(dmPath)
-	helper := &OsDeviceConnectivityHelperScsiGeneric{}
 	
 	//if strings.HasPrefix(dmName, "nvme") {
 	//	return dmPath, nil
 	//}
 	
 	// Native NVMe namespace paths bypass Device Mapper rules completely
-	if helper.IsNativeNvmeNamespace(dmName) {
+	if o.IsNativeNvmeNamespace(dmName) {
 		return dmPath, nil
 	}
 
