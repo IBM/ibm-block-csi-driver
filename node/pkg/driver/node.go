@@ -18,6 +18,7 @@ package driver
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"path"
@@ -155,45 +156,71 @@ func (d *NodeService) NodeStageVolume(ctx context.Context, req *csi.NodeStageVol
 	if isMounted { // idempotent case
 		return &csi.NodeStageVolumeResponse{}, nil
 	}
-	
-	
-	// 1. RUN PRE-SCAN CONTROLLER MAPPING
-	mpathDevice, isStaged, skipRescan, _, err := d.OsDeviceConnectivityHelper.IdentityAwarePreScan(ctx, stagingPathWithHostPrefix, volumeUuid)
-	if err != nil {
-		return nil, err
-	}
 
-	if isStaged {
-		logger.Infof("NodeStageVolume Complete: Already fully staged.")
-		return &csi.NodeStageVolumeResponse{}, nil
-	}
 
-	// 2. DISCOVERY OR STABILIZATION ROUTING
-	if !skipRescan {
-		logger.Infof("Device missing or recently purged for WWID %v. Initiating fabric discovery.", volumeWWID)
-		osDeviceConnectivity.EnsureLogin(ctx, ipsByArrayInitiator)
 
-		_ = d.OsDeviceConnectivityHelper.RemoveGhostDevice(ctx, volumeUuid, lun, arrayInitiators)
-		if err := osDeviceConnectivity.RescanDevices(lun, arrayInitiators); err != nil {
-			return nil, status.Error(codes.Internal, err.Error())
-		}
-		_ = d.OsDeviceConnectivityHelper.RemoveGhostDevice(ctx, volumeUuid, lun, arrayInitiators)
 
-		// CALL YOUR DISCOVERY SETTLEMENT ROUTINE
-		// This uses performDiscovery, safeSettle, fingerprinting loops to guarantee readability.
-		mpathDevice, err = d.OsDeviceConnectivityHelper.WaitForDmToExist(ctx, volumeWWID, 15, 2)
-		if err != nil {
-			return nil, status.Errorf(codes.Internal, "device fingerprint stabilization failed: %v", err)
-		}
-	} else {
-		logger.Infof("Optimization: Healthy node %s found. Checking settlement directly.", mpathDevice)
-		// Ensure even the cached short-circuit dev path handles a quick safeSettle read before formatting
-		if err := d.OsDeviceConnectivityHelper.safeSettle(mpathDevice); err != nil {
-			return nil, status.Errorf(codes.Internal, "existing cached device failed to settle: %v", err)
-		}
-	}
 
+
+
+
+
+        // =========================================================================
+        // 1. EVALUATE IDENTITY AND KERNEL TOPOLOGY PRE-SCAN
+        // =========================================================================
+        mpathDevice, isStaged, skipRescan, _, preScanErr := d.OsDeviceConnectivityHelper.IdentityAwarePreScan(ctx, stagingPathWithHostPrefix, volumeUuid)
+        
+        // Handle explicit unrecoverable failures, but allow 'Aborted' transitions to fall through
+        if preScanErr != nil && status.Code(preScanErr) != codes.Aborted {
+                return nil, preScanErr
+        }
+
+        if isStaged {
+                logger.Infof("NodeStageVolume Complete: Already fully staged and verified via hardware inquiry.")
+                return &csi.NodeStageVolumeResponse{}, nil
+        }
+
+        // =========================================================================
+        // 2. DISCOVERY OR STABILIZATION ROUTING
+        // =========================================================================
+        if !skipRescan {
+                logger.Infof("Device missing or recently purged for WWID %v. Initiating fabric discovery.", volumeUuid)
+                osDeviceConnectivity.EnsureLogin(ctx, ipsByArrayInitiator)
+
+                _ = d.OsDeviceConnectivityHelper.RemoveGhostDevice(ctx, volumeUuid, lun, arrayInitiators)
+                if err := osDeviceConnectivity.RescanDevices(lun, arrayInitiators); err != nil {
+                        return nil, status.Error(codes.Internal, err.Error())
+                }
+                _ = d.OsDeviceConnectivityHelper.RemoveGhostDevice(ctx, volumeUuid, lun, arrayInitiators)
+        } else {
+                // If preScanErr is codes.Aborted, it means skipRescan is true because discovery is ongoing
+                if preScanErr != nil && status.Code(preScanErr) == codes.Aborted {
+                        logger.Infof("Optimization: Active kernel transition detected for %v. Bypassing rescan and entering poll loop.", volumeUuid)
+                } else {
+                         logger.Infof("Optimization: Healthy idle block device %s found in sysfs. Bypassing rescan phase.", mpathDevice)
+                }
+        }
+
+        // =========================================================================
+        // 3. CORE POLLING AND MULTI-PATH STABILIZATION
+        // =========================================================================
+        // Whether we did a fresh rescan OR skipped it because a device is transitioning/idle,
+        // we run WaitForDmToExist. It uses our strict EvaluateSysfsTopology rules to guarantee 
+        // the block layer is completely un-suspended, read-write, and stable.
+        mpathDevice, err = d.OsDeviceConnectivityHelper.GetMpathDevice(ctx, volumeUuid)
+        if err != nil {
+                // If the 30-second gRPC context context deadline expires here, we return DeadlineExceeded.
+                // On the next retry, IdentityAwarePreScan will flag the device as transitioning,
+                // bypass the rescan phase automatically, and fall back right here to resume polling.
+                if errors.Is(ctx.Err(), context.DeadlineExceeded) || status.Code(err) == codes.DeadlineExceeded {
+                        return nil, status.Errorf(codes.DeadlineExceeded, "temporary discovery loop timeout: %v", err)
+                }
+                return nil, status.Errorf(codes.Internal, "device fingerprint stabilization failed: %v", err)
+        }
+
+        logger.Infof("Device discovery finalized and settled successfully at path: %s", mpathDevice)
 	// 3. BLOCK VOLUME EXIT
+	volumeCap := req.GetVolumeCapability()
 	switch volumeCap.GetAccessType().(type) {
 	case *csi.VolumeCapability_Block:
 		return &csi.NodeStageVolumeResponse{}, nil
@@ -220,7 +247,6 @@ func (d *NodeService) NodeStageVolume(ctx context.Context, req *csi.NodeStageVol
 		return nil, err
 	}
 	
-	stagingPathWithHostPrefix := d.getHostPrefixPath(stagingPath) 
 	if err = os.MkdirAll(stagingPathWithHostPrefix, 0750); err != nil {
 		return nil, err
 	}	
