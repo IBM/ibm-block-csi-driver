@@ -1708,16 +1708,24 @@ func (s *NodeServer) IdentityAwarePreScan(
 	
 	// Safely map and normalize candidate identifiers based on your positional contract
 	normIds := make([]string, 2)
-	if len(volumeWWID) > 0 && volumeWWID[0] != "" {
-		normIds[0] = normalizeWWID(volumeWWID[0]) // SCSI ID candidate
+	normIds[0] = normalizeWWID(volumeWWID[0]) // SCSI ID candidate
+	normIds[1] = normalizeWWID(volumeWWID[1]) // NVMe NGUID candidate
+
+	// Dynamic lookup: Locate a Device Mapper mapping using whichever protocol is actually active
+	var mpathAlias string
+	if normIds[0] != "" {
+		mpathAlias = s.Helper.findDMByWWID(normIds[0])
 	}
-	if len(volumeWWID) > 1 && volumeWWID[1] != "" {
-		normIds[1] = normalizeWWID(volumeWWID[1]) // NVMe NGUID candidate
+	if mpathAlias == "" && normIds[1] != "" {
+		mpathAlias = s.Helper.findDMByWWID(normIds[1]) // Evaluates NVMe over DM targets
 	}
 
-	// Guard against uninitialized or blank token arrays
-	if normIds[0] == "" && normIds[1] == "" {
-		return "", false, false, false, fmt.Errorf("pre-scan: no valid volume identifiers provided for verification")
+	// CRITICAL RESOLUTION RESTORED: Translate the alias into a raw dm-X name early
+	var mpathName string
+	if mpathAlias != "" {
+		if realPath, err := filepath.EvalSymlinks(filepath.Join("/dev/mapper", mpathAlias)); err == nil {
+			mpathName = filepath.Base(realPath) // e.g., "dm-5"
+		}
 	}
 
 	// =========================================================================
@@ -1725,36 +1733,28 @@ func (s *NodeServer) IdentityAwarePreScan(
 	// =========================================================================
 	mounts, _ := s.mounter.GetMountsForPath(targetPath)
 	if len(mounts) > 0 {
-
-		// Extract the actual WWID string from the sysfs entry matching the mount's major/minor numbers
+		// 1. Sysfs mapping lookup using mount minor descriptors
 		currentWWID, _ := s.Helper.getWWIDByDev(mounts[0].Major, mounts[0].Minor)
 		currentWWID = normalizeWWID(currentWWID)
 
-		// Cross-check: Perform a raw hardware inquiry check on the device mapper alias target if it exists
-		mpathAlias := s.Helper.findDMByWWID(normIds[0]) // check SCSI ID alias matching our target
+		// 2. Raw Hardware Controller INQUIRY check on the active DM target
 		var hwWWID string
 		if mpathAlias != "" {
 			hwWWID, _ = s.Helper.GetWwnByScsiInq(ctx, mpathAlias)
 			hwWWID = normalizeWWID(hwWWID)
 		}
 
-		// Verify that the mounted device or the raw inquiry explicitly matches one of our candidate identifiers
+		// Verify if the mounted storage identity corresponds with either candidate
 		isMatch := (normIds[0] != "" && (strings.EqualFold(currentWWID, normIds[0]) || strings.EqualFold(hwWWID, normIds[0]))) ||
-			       (normIds[1] != "" && strings.EqualFold(currentWWID, normIds[1]))
+			       (normIds[1] != "" && (strings.EqualFold(currentWWID, normIds[1]) || strings.EqualFold(hwWWID, normIds[1])))
 
 		if isMatch {
-			// Double-check topology before declaring total victory (ensure it's not a zombie with 0 slaves holding a ghost mount)
-			var mpathName string
-			if mpathAlias != "" {
-				if realPath, err := filepath.EvalSymlinks(filepath.Join("/dev/mapper", mpathAlias)); err == nil {
-					mpathName = filepath.Base(realPath)
-				}
-			}
-			
-			slaveCount := helper.getSlaveCount(mpathName)
-			if s.Helper.IsDeviceMapper(mpathName) && slaveCount == 0 {
-				logger.Warningf("Pre-scan: Mount exists for %s but underlying device mapper shell has 0 active slave legs. Forcing cleanup.", volumeWWID[0])
-				_ = s.TeardownVolume(ctx, targetPath, false, false, volumeWWID[0])
+			// Zombie Safeguard inside Mount Block: Ensure a ghost map with 0 paths isn't corrupting things
+			helper := GetDmsPathHelperGeneric{}
+			slaveCount := helper.getSlaveCount(mpathName) // Uses our resolved name variable safely
+			if helper.IsDeviceMapper(mpathName) && slaveCount == 0 {
+				logger.Warningf("Pre-scan: Mount exists for %s but underlying device mapper shell has 0 active paths. Forcing cleanup.", volumeWWID)
+				_ = s.TeardownVolume(ctx, targetPath, false, false, volumeWWID)
 				s.busyTimestamps.Delete(volumeWWID[0])
 				return "", false, false, true, nil
 			}
@@ -1769,7 +1769,7 @@ func (s *NodeServer) IdentityAwarePreScan(
 			return devNode, true, true, false, nil
 		}
 
-		// IDENTITY COLLISION SHIELD: A filesystem is mounted here, but it belongs to a completely different volume!
+		// IDENTITY COLLISION SHIELD: The folder is occupied by a different volume entirely
 		logger.Warningf("Pre-scan: Identity Collision at %s: Found dev-WWID %s (HW-WWID %s), expected candidates %v. Forcing unmount.", targetPath, currentWWID, hwWWID, normIds)
 		_ = s.mounter.UnmountWithTimeout(ctx, targetPath, 30*time.Second)
 		s.busyTimestamps.Delete(volumeWWID[0])
@@ -1780,42 +1780,38 @@ func (s *NodeServer) IdentityAwarePreScan(
 	// CASE 1: TOPOLOGY STATE DETECTION ENGINE (Direct Sysfs Evaluation)
 	// =========================================================================
 	helper := GetDmsPathHelperGeneric{}
-	// Pass checkPendingOnly = true to run our relaxed "shadow scan" for in-flight kernel tasks
+	// Pass checkPendingOnly = true to execute our relaxed shadow-scan for transitional tasks
 	hasDevice, isPending, devName := helper.EvaluateSysfsTopology(normIds, true)
 
 	if hasDevice {
 		// A: ZOMBIE TOPOLOGY PROTECTION
-		// A Device Mapper map exists in the kernel namespace, but lacks backing physical disk legs/slaves
 		slaveCount := helper.getSlaveCount(devName)
 		if helper.IsDeviceMapper(devName) && slaveCount == 0 {
 			logger.Warningf("Pre-scan: Detected zombie orphan topology shell for %s. Forcing teardown.", devName)
-			s.executeStageCleanup(volumeWWID[0], normIds)
+			_ = s.cleanupOrphanedTopology(ctx, mpathName, volumeWWID[0]) // Pass target pointers to purge block
 			s.busyTimestamps.Delete(volumeWWID[0])
 			return "", false, false, true, nil 
 		}
 
 		// B: DISCOVERY IS IN-PROGRESS / TRANSITIONING
 		if isPending {
-			// Apply the Alternative Design's Kernel-Hang Safeguard
 			now := time.Now()
-			val, loaded := s.busyTimestamps.LoadOrStore(volumeWWID[0], now)
+			val, loaded := s.busyTimestamps.LoadOrStore(devName, now)
 			firstDetected := val.(time.Time)
 
 			const maxKernelSettleDuration = 5 * time.Minute
 			if loaded && now.Sub(firstDetected) > maxKernelSettleDuration {
 				logger.Errorf("Pre-scan: Storage permanently stuck for device %s for %v. Invoking active cleanup.", devName, now.Sub(firstDetected))
 				s.busyTimestamps.Delete(volumeWWID[0])
-				s.executeStageCleanup(volumeWWID[0], normIds)
+				_ = s.cleanupOrphanedTopology(ctx, mpathName, volumeWWID[0])
 				return "", false, false, true, nil 
 			}
 			
-			// Within normal timeout window: Back off gRPC thread safely, but skip the disruptive host bus rescan
 			logger.Infof("Pre-scan: Previous discovery loop is actively settling in kernel for %s (Elapsed: %v). Backing off.", devName, now.Sub(firstDetected))
 			return "/dev/" + devName, false, true, false, status.Error(codes.Aborted, "discovery actively running in kernel. Backing off.")
 		}
 
 		// C: IDLE & HEALTHY COMPLETED DISCOVERY
-		// Device exists from a previous timed-out gRPC attempt, completely idle, stable, and healthy.
 		logger.Infof("Pre-scan: Device %s discovered from previous attempt and ready. Bypassing rescan phase.", devName)
 		s.busyTimestamps.Delete(volumeWWID[0])
 		return "/dev/" + devName, false, true, false, nil
@@ -1829,7 +1825,7 @@ func (s *NodeServer) IdentityAwarePreScan(
 	return "", false, false, false, nil
 }
 
-func (r *OsDeviceConnectivityHelperScsiGeneric) executeStageCleanup(ctx context.Context, mpathName string, expectedWWID string) error {
+func (r *OsDeviceConnectivityHelperScsiGeneric) cleanupOrphanedTopology(ctx context.Context, mpathName string, expectedWWID string) error {
 	normExpected := r.Helper.normalizeWWID(expectedWWID)
 
 	// 1. DEVICE MAPPER MANAGEMENT (SCSI & NVMe over DM)
