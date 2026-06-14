@@ -434,7 +434,7 @@ func (r OsDeviceConnectivityNvmeOFc) discoverSubNqn(ctx context.Context, arrayTa
 	}
 
 	// Canonical Kernel Format using hyphens (host-traddr)
-	cmd := fmt.Sprintf("nqn=%s,transport=fc,traddr=nn-%s:pn-%s,host-traddr=nn-%s:pn-%s\n", 
+	cmd := fmt.Sprintf("nqn=%s,transport=fc,traddr=nn-%s:pn-%s,host-traddr=nn-%s:pn-%s", 
 		nvmeDiscoveryNqn, targetNN, targetPN, hostNN, hostPN)
 
 	// DEBUG PRINT BLOCK: %q shows exact escape characters like \n and spaces
@@ -468,15 +468,18 @@ func (r OsDeviceConnectivityNvmeOFc) discoverSubNqn(ctx context.Context, arrayTa
 
 // executeKernelDiscovery writes the discovery payload string directly into the kernel fabrics channel.
 func (r OsDeviceConnectivityNvmeOFc) executeKernelDiscovery(cmd string) (string, error) {
-	f, err := os.OpenFile("/dev/nvme-fabrics", os.O_WRONLY|os.O_APPEND, 0)
+	f, err := os.OpenFile("/dev/nvme-fabrics", os.O_WRONLY, 0)
 	if err != nil {
 		return "", fmt.Errorf("open /dev/nvme-fabrics failed: %w", err)
 	}
-	defer f.Close()
 
 	if _, err := f.WriteString(cmd); err != nil {
+		f.Close()
 		return "", fmt.Errorf("write to nvme-fabrics failed: %w", err)
 	}
+	
+	// Close immediately
+	f.Close()
 
 	return r.findDiscoverySubNqnFromSysfs()
 }
@@ -639,7 +642,7 @@ func (r OsDeviceConnectivityNvmeOFc) nvmeConnect(ctx context.Context, arrayTarge
 	}
 
 	// Canonical Kernel Format using hyphens (host-traddr)
-	options := fmt.Sprintf("nqn=%s,transport=fc,traddr=nn-%s:pn-%s,host-traddr=nn-%s:pn-%s\n",
+	options := fmt.Sprintf("nqn=%s,transport=fc,traddr=nn-%s:pn-%s,host-traddr=nn-%s:pn-%s",
 		subNqn, targetNN, targetPN, hostNN, hostPN)
 
 	// DEBUG PRINT BLOCK: %q shows exact escape characters like \n and spaces
@@ -651,7 +654,7 @@ func (r OsDeviceConnectivityNvmeOFc) nvmeConnect(ctx context.Context, arrayTarge
 		ctx,
 		r.KeyedGater, resourceKey, 1, 1, 5*time.Second, 30*time.Second,
 		func(wCtx context.Context) (string, error) {
-			f, err := os.OpenFile("/dev/nvme-fabrics", os.O_WRONLY|os.O_APPEND, 0)
+			f, err := os.OpenFile("/dev/nvme-fabrics", os.O_WRONLY, 0)
 			if err != nil {
 				return "", fmt.Errorf("failed to open fabrics device: %w", err)
 			}
