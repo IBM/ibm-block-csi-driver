@@ -1700,214 +1700,136 @@ type IdentityResult struct {
 }
 
 // TODO call FinalWwidPurge
-func (r *OsDeviceConnectivityHelperScsiGeneric) IdentityAwarePreScan(
+func (s *NodeServer) IdentityAwarePreScan(
 	ctx context.Context, 
 	targetPath string, 
-	expectedWWID string,
+	volumeWWID []string,
 ) (discoveredDev string, isStaged bool, skipRescan bool, isLeftover bool, err error) {
-	normExpected := r.Helper.normalizeWWID(expectedWWID)
-	mpathName := r.Helper.findDMByWWID(normExpected)
+	
+	// Safely map and normalize candidate identifiers based on your positional contract
+	normIds := make([]string, 2)
+	if len(volumeWWID) > 0 && volumeWWID[0] != "" {
+		normIds[0] = normalizeWWID(volumeWWID[0]) // SCSI ID candidate
+	}
+	if len(volumeWWID) > 1 && volumeWWID[1] != "" {
+		normIds[1] = normalizeWWID(volumeWWID[1]) // NVMe NGUID candidate
+	}
+
+	// Guard against uninitialized or blank token arrays
+	if normIds[0] == "" && normIds[1] == "" {
+		return "", false, false, false, fmt.Errorf("pre-scan: no valid volume identifiers provided for verification")
+	}
 
 	// =========================================================================
-	// TIER 0: MOUNTED PATH IDENTITY VERIFICATION & RETRY SHORT-CIRCUIT
+	// CASE 0: MOUNTED PATH IDENTITY VERIFICATION & SHORT-CIRCUIT
 	// =========================================================================
-	mounts, _ := r.Mounter.GetMountsForPath(targetPath)
+	mounts, _ := s.mounter.GetMountsForPath(targetPath)
 	if len(mounts) > 0 {
-		res, err := executer.ExecuteUninterruptible[IdentityResult](
-			ctx,
-			r.KeyedGater,
-			"wwid-check",
-			5,
-			20,
-			2*time.Second,
-			10*time.Second,
-			func(ctx context.Context) (IdentityResult, error) {
-				wwid, _ := r.Helper.getWWIDByDev(mounts[0].Major, mounts[0].Minor)
-				hw, _ := r.Helper.GetWwnByScsiInq(ctx, mpathName)
 
-				return IdentityResult{WWID: wwid, HW: hw}, nil
-			},
-		)
-		if err != nil {
-			return "", false, false, false, err
+		// Extract the actual WWID string from the sysfs entry matching the mount's major/minor numbers
+		currentWWID, _ := s.Helper.getWWIDByDev(mounts[0].Major, mounts[0].Minor)
+		currentWWID = normalizeWWID(currentWWID)
+
+		// Cross-check: Perform a raw hardware inquiry check on the device mapper alias target if it exists
+		mpathAlias := s.Helper.findDMByWWID(normIds[0]) // check SCSI ID alias matching our target
+		var hwWWID string
+		if mpathAlias != "" {
+			hwWWID, _ = s.Helper.GetWwnByScsiInq(ctx, mpathAlias)
+			hwWWID = normalizeWWID(hwWWID)
 		}
 
-		if strings.EqualFold(res.WWID, normExpected) && (res.HW == "" || strings.EqualFold(res.HW, normExpected)) {
-			// INTEGRATED O_EXCL CHECK FOR TIER 0:
-			// We pass expectActiveMount = true because the device MUST be busy holding up the filesystem.
-			isMpathTrapped, _ := r.isDeviceMapBusy(mpathName, true)
-			
-			// We also check if the structural slaves/paths are missing entirely
-			_, isLeftoverTopology, currentDev := r.evaluateDeviceTopology(expectedWWID)
-			if currentDev == "" && mpathName != "" {
-				currentDev = "/dev/" + mpathName
+		// Verify that the mounted device or the raw inquiry explicitly matches one of our candidate identifiers
+		isMatch := (normIds[0] != "" && (strings.EqualFold(currentWWID, normIds[0]) || strings.EqualFold(hwWWID, normIds[0]))) ||
+			       (normIds[1] != "" && strings.EqualFold(currentWWID, normIds[1]))
+
+		if isMatch {
+			// Double-check topology before declaring total victory (ensure it's not a zombie with 0 slaves holding a ghost mount)
+			var mpathName string
+			if mpathAlias != "" {
+				if realPath, err := filepath.EvalSymlinks(filepath.Join("/dev/mapper", mpathAlias)); err == nil {
+					mpathName = filepath.Base(realPath)
+				}
 			}
 			
-			if !isLeftoverTopology && !isMpathTrapped && currentDev != "" {
-				// The volume is fully mounted, block layer is exclusively locked by mount, and paths are stable.
-				logger.Infof("Pre-scan: Volume %s is already staged and healthy at %s.", expectedWWID, targetPath)
-				r.busyTimestamps.Delete(expectedWWID)
-				return currentDev, true, true, false, nil
+			slaveCount := helper.getSlaveCount(mpathName)
+			if s.Helper.IsDeviceMapper(mpathName) && slaveCount == 0 {
+				logger.Warningf("Pre-scan: Mount exists for %s but underlying device mapper shell has 0 active slave legs. Forcing cleanup.", volumeWWID[0])
+				_ = s.TeardownVolume(ctx, targetPath, false, false, volumeWWID[0])
+				s.busyTimestamps.Delete(volumeWWID[0])
+				return "", false, false, true, nil
 			}
 
-			// Mount exists but failed our exclusive lock match or has zero slaves/paths. Clean it out.
-			logger.Warningf("Pre-scan: Mount exists for %s but block layer lock or topology is broken. Forcing teardown.", expectedWWID)
-			err := r.TeardownVolume(ctx, targetPath, false, false, expectedWWID)
-			if err != nil {
-				return "", false, false, true, fmt.Errorf("pre-scan: failed to clear zombie volume: %w", err)
-			}
-			r.busyTimestamps.Delete(expectedWWID)
-			return "", false, false, true, nil
-		} else {
-			logger.Warningf("Pre-scan: Identity Collision at %s: Found %s, expected %s", targetPath, res.WWID, normExpected)
-			_ = r.Mounter.UnmountWithTimeout(ctx, targetPath, 30*time.Second)
-			return "", false, false, false, status.Error(codes.Internal, "pre-scan: identity collision detected at target path")
-                       // Verify the collision is cleared
-                       // TODO should we expect the detach to be immediate or add small polling loop a la pollLayerDeleted
-                       //if mounted, _ := r.Mounter.IsMounted(targetPath); mounted {
-                       //              return fmt.Errorf("pre-scan: collision at %s; failed to detach rogue volume %s", targetPath, currentWWID)
-                       //}
+			logger.Infof("Pre-scan: Volume %v is already safely staged, verified via hardware inquiry, and healthy at %s.", volumeWWID, targetPath)
+			s.busyTimestamps.Delete(volumeWWID[0])
 			
+			devNode := mounts[0].Device
+			if devNode == "" && mpathName != "" {
+				devNode = "/dev/" + mpathName
+			}
+			return devNode, true, true, false, nil
 		}
+
+		// IDENTITY COLLISION SHIELD: A filesystem is mounted here, but it belongs to a completely different volume!
+		logger.Warningf("Pre-scan: Identity Collision at %s: Found dev-WWID %s (HW-WWID %s), expected candidates %v. Forcing unmount.", targetPath, currentWWID, hwWWID, normIds)
+		_ = s.mounter.UnmountWithTimeout(ctx, targetPath, 30*time.Second)
+		s.busyTimestamps.Delete(volumeWWID[0])
+		return "", false, false, false, status.Error(codes.Internal, "pre-scan: identity collision detected at target path")
 	}
 
 	// =========================================================================
-	// TIER 2: TOPOLOGY STATE DETECTION (SCSI/DM vs NVMe)
+	// CASE 1: TOPOLOGY STATE DETECTION ENGINE (Direct Sysfs Evaluation)
 	// =========================================================================
-	// INTEGRATED O_EXCL CHECK FOR TIER 2:
-	// evaluateDeviceTopology will call isDeviceMapBusy(mpathName, false) internally.
-	// Since no mount exists, any exclusive open failure (EBUSY) implies an active rescan or kernel hang.
-	// TODO review this:
-	isBusy, isLeftoverTopology, currentDev := r.evaluateDeviceTopology(expectedWWID)
-	//if currentDev == "" && mpathName != "" {
-	//	currentDev = "/dev/" + mpathName
-	//}
+	helper := GetDmsPathHelperGeneric{}
+	// Pass checkPendingOnly = true to run our relaxed "shadow scan" for in-flight kernel tasks
+	hasDevice, isPending, devName := helper.EvaluateSysfsTopology(normIds, true)
 
-	// Case A: Dead leftover topology mapping shell (0 physical paths/slaves)
-	if isLeftoverTopology {
-		logger.Warningf("Pre-scan: Detected zombie topology for WWID %s. Cleaning up layers.", expectedWWID)
-		_ = r.cleanupOrphanedTopology(ctx, mpathName, expectedWWID)
-		r.busyTimestamps.Delete(expectedWWID)
-		return "", false, false, true, nil 
-	}
-
-	// Case B: Previous kernel rescan is actively processing or stuck in D-state
-	if isBusy {
-		now := time.Now()
-		val, loaded := r.busyTimestamps.LoadOrStore(expectedWWID, now)
-		firstDetected := val.(time.Time)
-
-		const maxKernelSettleDuration = 5 * time.Minute
-		if loaded && now.Sub(firstDetected) > maxKernelSettleDuration {
-			logger.Errorf("Pre-scan: Storage permanently stuck for WWID %s for %v. Disabling queues and purging.", expectedWWID, now.Sub(firstDetected))
-			r.busyTimestamps.Delete(expectedWWID)
-			_ = r.cleanupOrphanedTopology(ctx, mpathName, expectedWWID)
+	if hasDevice {
+		// A: ZOMBIE TOPOLOGY PROTECTION
+		// A Device Mapper map exists in the kernel namespace, but lacks backing physical disk legs/slaves
+		slaveCount := helper.getSlaveCount(devName)
+		if helper.IsDeviceMapper(devName) && slaveCount == 0 {
+			logger.Warningf("Pre-scan: Detected zombie orphan topology shell for %s. Forcing teardown.", devName)
+			s.executeStageCleanup(volumeWWID[0], normIds)
+			s.busyTimestamps.Delete(volumeWWID[0])
 			return "", false, false, true, nil 
-		} else {
-			return currentDev, false, false, false, status.Error(codes.Aborted, "previous rescan operation is still settling in the kernel. Backing off.")
 		}
+
+		// B: DISCOVERY IS IN-PROGRESS / TRANSITIONING
+		if isPending {
+			// Apply the Alternative Design's Kernel-Hang Safeguard
+			now := time.Now()
+			val, loaded := s.busyTimestamps.LoadOrStore(volumeWWID[0], now)
+			firstDetected := val.(time.Time)
+
+			const maxKernelSettleDuration = 5 * time.Minute
+			if loaded && now.Sub(firstDetected) > maxKernelSettleDuration {
+				logger.Errorf("Pre-scan: Storage permanently stuck for device %s for %v. Invoking active cleanup.", devName, now.Sub(firstDetected))
+				s.busyTimestamps.Delete(volumeWWID[0])
+				s.executeStageCleanup(volumeWWID[0], normIds)
+				return "", false, false, true, nil 
+			}
+			
+			// Within normal timeout window: Back off gRPC thread safely, but skip the disruptive host bus rescan
+			logger.Infof("Pre-scan: Previous discovery loop is actively settling in kernel for %s (Elapsed: %v). Backing off.", devName, now.Sub(firstDetected))
+			return "/dev/" + devName, false, true, false, status.Error(codes.Aborted, "discovery actively running in kernel. Backing off.")
+		}
+
+		// C: IDLE & HEALTHY COMPLETED DISCOVERY
+		// Device exists from a previous timed-out gRPC attempt, completely idle, stable, and healthy.
+		logger.Infof("Pre-scan: Device %s discovered from previous attempt and ready. Bypassing rescan phase.", devName)
+		s.busyTimestamps.Delete(volumeWWID[0])
+		return "/dev/" + devName, false, true, false, nil
 	}
 
-	// Case C: Device exists natively on host, not mounted anywhere yet. Optimize.
-	if currentDev != "" && !isBusy && !isLeftoverTopology {
-		r.busyTimestamps.Delete(expectedWWID)
-		return currentDev, false, true, false, nil
-	}
-
-	// Case D: Complete clean slate (no device, no mount). Run normal discovery.
-	r.busyTimestamps.Delete(expectedWWID)
+	// =========================================================================
+	// CASE 2: CLEAN SLATE (No device, no mount)
+	// =========================================================================
+	logger.Infof("Pre-scan: Clean slate for candidates %v. Full host storage fabric rescan required.", volumeWWID)
+	s.busyTimestamps.Delete(volumeWWID[0])
 	return "", false, false, false, nil
 }
 
-func (r *OsDeviceConnectivityHelperScsiGeneric) evaluateDeviceTopology(volumeWWID []string) (isBusy bool, isLeftover bool, targetDev string) {
-	if len(volumeWWID) == 0 {
-		return false, false, ""
-	}
-
-	// Use your fixed findDMByWWID (which strips prefixes cleanly)
-	scsiID := volumeWWID[0]
-	mpathAlias := r.Helper.findDMByWWID(scsiID)
-	
-	var devName string
-	if mpathAlias != "" {
-		fullPath := filepath.Join("/dev/mapper", mpathAlias)
-		if realPath, err := filepath.EvalSymlinks(fullPath); err == nil {
-			devName = filepath.Base(realPath) // e.g., dm-5
-		}
-	}
-
-	// Fallback to checking native paths or standard paths if alias lookup is blank
-	if devName == "" && len(volumeWWID) >= 2 {
-		// Native NVMe fallback string parsing using your performDiscovery logic
-		nvmeID := strings.ToLower(strings.ReplaceAll(volumeWWID[1], "-", ""))
-		nativeLink := fmt.Sprintf("/dev/disk/by-id/nvme-%s", nvmeID)
-		if realPath, err := filepath.EvalSymlinks(nativeLink); err == nil {
-			devName = filepath.Base(realPath) // e.g., nvme0n1
-		}
-	}
-
-	if devName == "" {
-		return false, false, "" // Truly missing slate
-	}
-
-	// CHECK MATRIX USING YOUR REWRITTEN DISCOVERY FUNCTIONS
-	isSettled := r.isKernelSettled(devName)
-	slaveCount := r.getSlaveCount(devName)
-
-	// Case 1: Zombie Leftover (Map/Namespace shell exists but completely lacks backing physical attachments)
-	if r.IsDeviceMapper(devName) && slaveCount == 0 {
-		return false, true, "/dev/" + devName
-	}
-
-	// Case 2: Kernel is actively busy or reconfiguring/suspended
-	if !isSettled {
-		return true, false, "/dev/" + devName
-	}
-
-	// Pass true to verify exclusive open locks
-	isLocked, _ := r.isDeviceMapBusy(devName, false)
-	if isLocked {
-		return true, false, "/dev/" + devName
-	}
-
-	return false, false, "/dev/" + devName
-}
-
-func (r *OsDeviceConnectivityHelperScsiGeneric) isDeviceMapBusy(mpathName string, expectActiveMount bool) (bool, error) {
-	if mpathName == "" {
-		return false, nil
-	}
-
-	devPath := mpathName
-	if !strings.HasPrefix(devPath, "/dev/") {
-		devPath = "/dev/" + mpathName
-	}
-
-	// Open with O_RDONLY | O_EXCL to test for active locks safely
-	file, err := os.OpenFile(devPath, os.O_RDONLY|syscall.O_EXCL, 0)
-	if err != nil {
-		if errors.Is(err, syscall.EBUSY) {
-			// Device is locked. This is healthy if we expect a mount, but busy if we don't.
-			if expectActiveMount {
-				return false, nil // It's locked by the mount as expected, so it's not "stuck busy"
-			}
-			return true, nil // No mount expected, so it's genuinely trapped or busy with a rescan
-		}
-		return false, err // Return other errors (e.g., file not found)
-	}
-	defer file.Close()
-
-	// If we successfully obtained an exclusive lock, nobody else is using it.
-	if expectActiveMount {
-		// It was supposed to be locked by an active filesystem mount! 
-		// If it's completely open, the mount is broken or a phantom.
-		return true, nil 
-	}
-	return false, nil
-}
-
-
-func (r *OsDeviceConnectivityHelperScsiGeneric) cleanupOrphanedTopology(ctx context.Context, mpathName string, expectedWWID string) error {
+func (r *OsDeviceConnectivityHelperScsiGeneric) executeStageCleanup(ctx context.Context, mpathName string, expectedWWID string) error {
 	normExpected := r.Helper.normalizeWWID(expectedWWID)
 
 	// 1. DEVICE MAPPER MANAGEMENT (SCSI & NVMe over DM)
@@ -1953,16 +1875,30 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) disableNativeNvmeQueueing(expect
 			continue
 		}
 
-		// Mutate fast_io_fail timeout targeting the actual parent interface link to lift blocked locks
-		ctrlPath := filepath.Join("/sys/block", devName, "device") 
-		fastIoFailPath := filepath.Join(ctrlPath, "fast_io_fail_tmo")
-		if _, err := os.Stat(fastIoFailPath); err == nil {
-			_ = os.WriteFile(fastIoFailPath, []byte("0\n"), 0200)
+		// Correctly discover parent controller strings (e.g., "nvme0") by scanning links
+		// inside the subsystem. Or traverse via /sys/block/nvmeXnY/device/
+		realDevicePath, err := filepath.EvalSymlinks(filepath.Join("/sys/block", devName, "device"))
+		if err != nil {
+			continue
+		}
+
+		// Look for standard transport controller siblings inside the subsystem folder
+		// (e.g., /sys/devices/virtual/nvme-subsystem/nvme-subsys0/nvme0)
+		subsysDir := filepath.Dir(realDevicePath)
+		entries, _ := os.ReadDir(subsysDir)
+		for _, e := range entries {
+			name := e.Name()
+			// Target the direct hardware/fabric controller channels strictly (nvme0, nvme1)
+			if strings.HasPrefix(name, "nvme") && !strings.Contains(name, "n") && !strings.Contains(name, "-") {
+				fastIoFailPath := filepath.Join("/sys/class/nvme", name, "fast_io_fail_tmo")
+				if _, err := os.Stat(fastIoFailPath); err == nil {
+					_ = os.WriteFile(fastIoFailPath, []byte("0\n"), 0200)
+				}
+			}
 		}
 	}
 	return nil
 }
-
 
 func (r *OsDeviceConnectivityHelperScsiGeneric) purgeStuckPhysicalPaths(expectedWWID string) error {
 	blockFiles, _ := os.ReadDir("/sys/block")
@@ -1991,11 +1927,26 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) purgeStuckPhysicalPaths(expected
 
 		if strings.Contains(normalizeWWID(string(wwidBytes)), normExpected) {
 			if isSCSI {
+				// SCSI path deletion remains 100% correct
 				_ = os.WriteFile(filepath.Join("/sys/block", devName, "device", "delete"), []byte("1\n"), 0200)
 			} else if isNVMe {
-				deleteTgtPath := filepath.Join("/sys/block", devName, "device", "delete_tgt")
-				if _, err := os.Stat(deleteTgtPath); err == nil {
-					_ = os.WriteFile(deleteTgtPath, []byte("1\n"), 0200)
+				// To forcefully tear down a native NVMe channel connection trapped in a hang,
+				// we must command the host controllers bound to the target namespace to disconnect.
+				realDevicePath, err := filepath.EvalSymlinks(filepath.Join("/sys/block", devName, "device"))
+				if err != nil {
+					continue
+				}
+				
+				subsysDir := filepath.Dir(realDevicePath)
+				entries, _ := os.ReadDir(subsysDir)
+				for _, e := range entries {
+					name := e.Name()
+					if strings.HasPrefix(name, "nvme") && !strings.Contains(name, "n") && !strings.Contains(name, "-") {
+						deleteCtrlPath := filepath.Join("/sys/class/nvme", name, "delete_controller")
+						if _, err := os.Stat(deleteCtrlPath); err == nil {
+							_ = os.WriteFile(deleteCtrlPath, []byte("1\n"), 0200)
+						}
+					}
 				}
 			}
 		}
@@ -3449,7 +3400,7 @@ func (o GetDmsPathHelperGeneric) WaitForDmToExist(ctx context.Context, volumeWWI
 		norm[i] = normalizeWWID(wwid)
 	}
 
-	// Use a reusable ticker or step-timer to eliminate context leaks
+	// High-performance timer instantiation to completely prevent container memory leaks
 	timer := time.NewTimer(time.Duration(intervalSeconds) * time.Second)
 	if !timer.Stop() {
 		<-timer.C
@@ -3457,40 +3408,51 @@ func (o GetDmsPathHelperGeneric) WaitForDmToExist(ctx context.Context, volumeWWI
 	defer timer.Stop()
 
 	for i := 0; i < maxRetries; i++ {
-		path, err := o.performDiscovery(norm)
-		if err == nil {
-			name := filepath.Base(path)
-			helper := &OsDeviceConnectivityHelperScsiGeneric{}
-			
-			if !helper.isKernelSettled(name) {
-				stableCycles = 0
-				// Update state tracking even on unsettled cycles to avoid matching historical flags
-				lastCount = 0
-				lastRo = "unknown"
-				goto waitStep
-			}
+		// 1. Evaluate current block layer using our strict settlement engine rules
+		// Pass checkPendingOnly = false because we mandate a fully usable, live, R/W presentation
+		hasDevice, isPending, name := o.EvaluateSysfsTopology(norm, false)
 
-			count := helper.getSlaveCount(name)
-			ro := o.getRoStatus(path) // Use your centralized helper function here
+		if !hasDevice {
+			// Case C/D Fallback: Paths disappeared entirely or udev rules are still processing topology
+			stableCycles = 0
+			lastCount = 0
+			lastRo = "unknown"
+			goto waitStep
+		}
 
-			if count > 0 && count == lastCount && ro == lastRo {
-				stableCycles++
-			} else {
-				stableCycles = 0 
-			}
+		if isPending {
+			// Device is visible but kernel has it locked/suspended, or it's read-only
+			stableCycles = 0
+			// Proactively update state tracking on unsettled cycles to avoid matching historical/stale flags
+			lastCount = 0
+			lastRo = "unknown"
+			goto waitStep
+		}
 
-			if stableCycles >= 2 {
-				if err := o.safeSettle(path); err == nil {
-					return o.validateDMIntegrity(path)
-				}
-			}
+		// 2. Read runtime stability attributes once the kernel block layer is structural
+		helper := &OsDeviceConnectivityHelperScsiGeneric{}
+		count := helper.getSlaveCount(name)
+		path := filepath.Join("/dev", name)
+		ro := o.getRoStatus(path)
 
-			lastCount = count
-			lastRo = ro
+		// 3. Evaluate state stability across polling periods
+		if count > 0 && count == lastCount && ro == lastRo {
+			stableCycles++
 		} else {
-			// Reset stability stats if the paths disappear entirely during polling
+			stableCycles = 0 
+		}
+
+		// 4. Verification and final locking phase
+		if stableCycles >= 2 {
+			if err := o.safeSettle(path); err == nil {
+				return o.validateDMIntegrity(path)
+			}
+			// If safeSettle block checks fail, reset stability markers and continue loop tracking
 			stableCycles = 0
 		}
+
+		lastCount = count
+		lastRo = ro
 
 	waitStep:
 		timer.Reset(time.Duration(intervalSeconds) * time.Second)
@@ -3500,34 +3462,108 @@ func (o GetDmsPathHelperGeneric) WaitForDmToExist(ctx context.Context, volumeWWI
 		case <-timer.C:
 		}
 	}
+	
 	return "", &MultipathDeviceNotFoundForVolumeError{VolumeID: volumeWWID[0]}
 }
 
-
-func (r *OsDeviceConnectivityHelperScsiGeneric) isKernelSettled(devName string) bool {
-	// 1. Structural Read-Only flag check
-	ro, err := os.ReadFile(filepath.Join("/sys/block", devName, "ro"))
-	if err == nil && strings.TrimSpace(string(ro)) != "0" {
-		logger.Warningf("Device %s failed settlement: read-only flag is active", devName)
-		return false
+// EvaluateSysfsTopology unified your relaxed pre-scan check and your strict settlement check.
+// If checkPendingOnly is true, it returns isPending=true if the device exists and is transitioning.
+// If checkPendingOnly is false, it enforces full data-path readiness (e.g., must be read-write, live, and not suspended).
+func (o *GetDmsPathHelperGeneric) EvaluateSysfsTopology(normIds []string, checkPendingOnly bool) (hasDevice bool, isPending bool, devName string) {
+	if len(normIds) < 2 {
+		return false, false, ""
 	}
+	scsiTarget := normIds[0]
+	nvmeTarget := normIds[1]
 
-	// 2. Structural DM Suspended check
-	if r.IsDeviceMapper(devName) {
-		suspended, err := os.ReadFile(filepath.Join("/sys/block", devName, "dm", "suspended"))
-		return err == nil && strings.TrimSpace(string(suspended)) == "0"
-	}
+	// =========================================================================
+	// 1. EVALUATE DEVICE MAPPER SUBSYSTEM (SCSI DM & NVMe-over-DM candidates)
+	// =========================================================================
+	if scsiTarget != "" || nvmeTarget != "" {
+		dmMatches, _ := filepath.Glob("/sys/block/dm-*/dm/uuid")
+		for _, m := range dmMatches {
+			content, err := os.ReadFile(m)
+			if err != nil {
+				continue
+			}
+			foundUUID := normalizeWWID(string(content))
+			
+			if (scsiTarget != "" && foundUUID == scsiTarget) || (nvmeTarget != "" && foundUUID == nvmeTarget) {
+				parts := strings.Split(m, "/")
+				if len(parts) >= 4 {
+					name := parts[3] // e.g., "dm-5"
+					
+					// Core Check A: Read-Only Flag Evaluation
+					roBytes, err := os.ReadFile(filepath.Join("/sys/block", name, "ro"))
+					isReadOnly := err == nil && strings.TrimSpace(string(roBytes)) != "0"
 
-	// 3. Structural NVMe Subsystem state check
-	if r.IsNativeNvmeNamespace(devName) {
-		state, err := os.ReadFile(filepath.Join("/sys/block", devName, "device", "state"))
-		if err != nil {
-			return os.IsNotExist(err) // If missing on older kernels, treat existence as live
+					// Core Check B: Table Suspension State
+					suspendedBytes, err := os.ReadFile(filepath.Join("/sys/block", name, "dm", "suspended"))
+					isSuspended := err == nil && strings.TrimSpace(string(suspendedBytes)) == "1"
+
+					if checkPendingOnly {
+						// Relaxed Pre-scan Rule: Trapped in transition or held by kernel
+						if isSuspended || isReadOnly {
+							return true, true, name 
+						}
+						return true, false, name // Exists and completely idle
+					} else {
+						// Strict Settlement Rule: Must be active, fully un-suspended, and read-write
+						if isSuspended || isReadOnly {
+							return true, true, name // Still pending settlement
+						}
+						return true, false, name // Fully functional and settled
+					}
+				}
+			}
 		}
-		return strings.TrimSpace(string(state)) == "live"
 	}
 
-	return true
+	// =========================================================================
+	// 2. EVALUATE NATIVE NVME SUBSYSTEM (Native ANA candidates)
+	// =========================================================================
+	if nvmeTarget != "" {
+		nvmeMatches, _ := filepath.Glob("/sys/block/nvme*n*")
+		for _, m := range nvmeMatches {
+			name := filepath.Base(m) // e.g., "nvme0n1"
+
+			if data, err := os.ReadFile(filepath.Join(m, "nguid")); err == nil {
+				if normalizeWWID(string(data)) == nvmeTarget {
+					// Core Check A: Read-Only Flag Evaluation
+					roBytes, err := os.ReadFile(filepath.Join(m, "ro"))
+					isReadOnly := err == nil && strings.TrimSpace(string(roBytes)) != "0"
+
+					// Core Check B: Hidden Layer Evaluation (Active ANA re-routing)
+					hiddenBytes, err := os.ReadFile(filepath.Join(m, "hidden"))
+					isHidden := err == nil && strings.TrimSpace(string(hiddenBytes)) == "1"
+
+					// Core Check C: Parent Fabric Controller Connection State
+					var isControllerTransitioning bool
+					if stateBytes, err := os.ReadFile(filepath.Join(m, "device", "state")); err == nil {
+						state := strings.TrimSpace(string(stateBytes))
+						isControllerTransitioning = state == "resetting" || state == "connecting" || state == "deleting"
+					}
+
+					if checkPendingOnly {
+						// Relaxed Pre-scan Rule: Catch structural flux
+						if isHidden || isControllerTransitioning || isReadOnly {
+							return true, true, name
+						}
+						return true, false, name // Exists and completely idle
+					} else {
+						// Strict Settlement Rule: Must be live, unhidden, read-write, and controller stable
+						if isHidden || isControllerTransitioning || isReadOnly {
+							return true, true, name // Still pending settlement
+						}
+						return true, false, name // Fully functional and settled
+					}
+				}
+			}
+		}
+	}
+
+	// Complete clean slate: No traces found anywhere in sysfs block layer
+	return false, false, ""
 }
 
 
