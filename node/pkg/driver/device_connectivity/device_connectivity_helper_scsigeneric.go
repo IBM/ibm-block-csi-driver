@@ -2015,17 +2015,27 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) IsDeviceMapper(devName string) b
 
 // IsNativeNvmeNamespace ensures a device is a concrete block namespace device (like nvme0n1)
 // rather than a controller character interface (like nvme0) by checking for a valid block size.
+//func (r *OsDeviceConnectivityHelperScsiGeneric) IsNativeNvmeNamespace(devName string) bool {
+//	if !strings.HasPrefix(devName, "nvme") {
+//		return false
+//	}
+	
+//	// Controller nodes are character devices and lack a block/size entry.
+//	// Actual namespaces are block devices and always expose their sector size here.
+//	sizePath := filepath.Join("/sys/block", devName, "size")
+//	_, err := os.Stat(sizePath)
+//	return err == nil
+//}
+
 func (r *OsDeviceConnectivityHelperScsiGeneric) IsNativeNvmeNamespace(devName string) bool {
 	if !strings.HasPrefix(devName, "nvme") {
 		return false
 	}
-	
-	// Controller nodes are character devices and lack a block/size entry.
-	// Actual namespaces are block devices and always expose their sector size here.
-	sizePath := filepath.Join("/sys/block", devName, "size")
-	_, err := os.Stat(sizePath)
-	return err == nil
+	// Namespaces always contain 'n' followed by a digit (e.g., nvme0n1, nvme1n2)
+	// This immediately differentiates them from base controllers (nvme0) or subsystems (nvme-subsys0)
+	return strings.Contains(devName, "n")
 }
+
 
 func (r *OsDeviceConnectivityHelperScsiGeneric) FinalWwidPurge(ctx context.Context, expectedWWID string) error {
 	targetWWID := r.Helper.normalizeWWID(expectedWWID)
@@ -3439,24 +3449,29 @@ func (o GetDmsPathHelperGeneric) WaitForDmToExist(ctx context.Context, volumeWWI
 		norm[i] = normalizeWWID(wwid)
 	}
 
+	// Use a reusable ticker or step-timer to eliminate context leaks
+	timer := time.NewTimer(time.Duration(intervalSeconds) * time.Second)
+	if !timer.Stop() {
+		<-timer.C
+	}
+	defer timer.Stop()
+
 	for i := 0; i < maxRetries; i++ {
 		path, err := o.performDiscovery(norm)
 		if err == nil {
 			name := filepath.Base(path)
-			
-			// Reference your integrated, prefix-free state cleaners
 			helper := &OsDeviceConnectivityHelperScsiGeneric{}
+			
 			if !helper.isKernelSettled(name) {
 				stableCycles = 0
-				goto retry
+				// Update state tracking even on unsettled cycles to avoid matching historical flags
+				lastCount = 0
+				lastRo = "unknown"
+				goto waitStep
 			}
 
 			count := helper.getSlaveCount(name)
-			data, err := os.ReadFile(filepath.Join("/sys/block", name, "ro"))
-			ro := "unknown"
-			if err == nil {
-				ro = strings.TrimSpace(string(data))
-			}
+			ro := o.getRoStatus(path) // Use your centralized helper function here
 
 			if count > 0 && count == lastCount && ro == lastRo {
 				stableCycles++
@@ -3472,18 +3487,21 @@ func (o GetDmsPathHelperGeneric) WaitForDmToExist(ctx context.Context, volumeWWI
 
 			lastCount = count
 			lastRo = ro
+		} else {
+			// Reset stability stats if the paths disappear entirely during polling
+			stableCycles = 0
 		}
 
-	retry:
+	waitStep:
+		timer.Reset(time.Duration(intervalSeconds) * time.Second)
 		select {
 		case <-ctx.Done():
 			return "", ctx.Err()
-		case <-time.After(time.Duration(intervalSeconds) * time.Second):
+		case <-timer.C:
 		}
 	}
-	return "", &MultipathDeviceNotFoundForVolumeError{volumeWWID[0]}
+	return "", &MultipathDeviceNotFoundForVolumeError{VolumeID: volumeWWID[0]}
 }
-
 
 
 func (r *OsDeviceConnectivityHelperScsiGeneric) isKernelSettled(devName string) bool {
@@ -3855,21 +3873,20 @@ func (o GetDmsPathHelperGeneric) scanNVMeSubsystem(targetID string) (string, err
 	return "", fmt.Errorf("matching active NVMe namespace handle missing for NGUID %s", targetID)
 }
 
-func (func (o GetDmsPathHelperGeneric) validateDMIntegrity(dmPath string) (string, error) {
+func (o GetDmsPathHelperGeneric) validateDMIntegrity(dmPath string) (string, error) {
 	dmName := filepath.Base(dmPath)
 	helper := &OsDeviceConnectivityHelperScsiGeneric{}
 	
-		// If it's a native NVMe namespace path instead of DM, bypass DM validation completely
 	//if strings.HasPrefix(dmName, "nvme") {
 	//	return dmPath, nil
 	//}
-
 	
+	// Native NVMe namespace paths bypass Device Mapper rules completely
 	if helper.IsNativeNvmeNamespace(dmName) {
 		return dmPath, nil
 	}
 
-	slavesPath := fmt.Sprintf("/sys/block/%s/slaves", dmName)
+	slavesPath := filepath.Join("/sys/block", dmName, "slaves")
 	slaves, err := os.ReadDir(slavesPath)
 	if err != nil || len(slaves) == 0 {
 		return "", fmt.Errorf("dm device %s has no active slave legs attached", dmName)
@@ -3878,25 +3895,30 @@ func (func (o GetDmsPathHelperGeneric) validateDMIntegrity(dmPath string) (strin
 	var activePaths int
 	for _, s := range slaves {
 		slaveName := s.Name()
+		
 		if strings.HasPrefix(slaveName, "sd") {
-			state, _ := os.ReadFile(fmt.Sprintf("/sys/block/%s/device/state", slaveName))
-			if strings.TrimSpace(string(state)) == "running" {
+			// SCSI underlying device check
+			statePath := filepath.Join("/sys/block", slaveName, "device", "state")
+			state, err := os.ReadFile(statePath)
+			if err == nil && strings.TrimSpace(string(state)) == "running" {
 				activePaths++
 			}
 		} else if strings.HasPrefix(slaveName, "nvme") {
-			// Trace up past the namespace container to find link status via parent controller block
-			state, _ := os.ReadFile(fmt.Sprintf("/sys/block/%s/device/device/state", slaveName))
-			if strings.TrimSpace(string(state)) == "live" {
+			// NVMe over DM check: One single 'device' layer goes from namespace to controller
+			statePath := filepath.Join("/sys/block", slaveName, "device", "state")
+			state, err := os.ReadFile(statePath)
+			if err == nil && strings.TrimSpace(string(state)) == "live" {
 				activePaths++
 			}
 		}
 	}
 
 	if activePaths == 0 {
-		return "", fmt.Errorf("dm device %s has slaves configured but zero operational paths", dmName)
+		return "", fmt.Errorf("dm device %s has %d slaves configured but zero operational paths", dmName, len(slaves))
 	}
 	return dmPath, nil
 }
+
 
 
 // TODO NOTE there's another normalizeWWID!!
