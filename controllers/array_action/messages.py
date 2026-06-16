@@ -95,3 +95,9 @@ SECONDARY_STORAGE_TRANSITION_TO_PRODUCTION_NOT_READY_ERROR_MESSAGE = "Secondary 
 
 ASYNC_DR_REPLICATION_POLICY_NOT_FOUND_MESSAGE = "No async-dr replication policy '{0}' found on storage for " \
     "volume group '{1}'"
+
+OPERATION_ABORTED_ERROR_MESSAGE = "Operation aborted: {0}"
+
+OPERATION_TIMEOUT_ERROR_MESSAGE = "Operation timed out: {0}"
+
+OPERATION_NOT_READY_ERROR_MESSAGE = "Operation not ready: {0}"

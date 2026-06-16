@@ -17,7 +17,9 @@ status_codes_by_exception = {
     array_errors.PermissionDeniedError: grpc.StatusCode.PERMISSION_DENIED,
     array_errors.ObjectIsStillInUseError: grpc.StatusCode.FAILED_PRECONDITION,
     array_errors.CredentialsError: grpc.StatusCode.UNAUTHENTICATED,
-    array_errors.SecondaryStorageTransitionToProductionNotReadyError: grpc.StatusCode.INTERNAL
+    array_errors.SecondaryStorageTransitionToProductionNotReadyError: grpc.StatusCode.INTERNAL,
+    array_errors.OperationAbortedError: grpc.StatusCode.ABORTED,
+    array_errors.OperationNotReadyError: grpc.StatusCode.UNAVAILABLE,
 }
 
 

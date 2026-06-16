@@ -339,3 +339,22 @@ class AsyncDRReplicationPolicyNotFoundError(BaseArrayActionException):
         super().__init__()
         self.message = messages.ASYNC_DR_REPLICATION_POLICY_NOT_FOUND_MESSAGE.format(
             requested_policy_name, volume_group_id)
+
+
+class OperationTimeoutError(BaseArrayActionException):
+
+    def __init__(self, operation_details):  # pylint: disable=unused-argument
+        super().__init__()
+
+
+class OperationAbortedError(BaseArrayActionException):
+
+    def __init__(self, operation_details):
+        super().__init__()
+        self.message = messages.OPERATION_ABORTED_ERROR_MESSAGE.format(operation_details)
+
+
+class OperationNotReadyError(BaseArrayActionException):
+    def __init__(self, operation_details):
+        super().__init__()
+        self.message = messages.OPERATION_NOT_READY_ERROR_MESSAGE.format(operation_details)

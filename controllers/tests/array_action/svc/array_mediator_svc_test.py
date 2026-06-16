@@ -272,11 +272,19 @@ class TestArrayMediatorSVC(unittest.TestCase):
 
     def test_demote_ear_replication_volume(self):
         replication, _ = self._prepare_mocks_for_ear_replication(is_ear_supported=True)
+        # Mock volume group replication with checkpoint achieved
+        mock_vg_replication = Mock(checkpoint_achieved='yes')
+        self.svc.client.svcinfo.lsvolumegroupreplication.return_value = Mock(
+            as_single_element=mock_vg_replication)
+
         self.svc.demote_replication_volume(replication)
-        self.svc.client.svcinfo.lsvolumegroupreplication.assert_not_called()
+
+        # Verify checkpoint was created and status was checked
+        self.svc.client.svctask.chvolumegroupreplication.assert_called_once()
+        self.assertEqual(self.svc.client.svcinfo.lsvolumegroupreplication.call_count, 2)
 
     def test_demote_ear_replication_not_supported(self):
-        replication, _ = self._prepare_mocks_for_ear_replication()
+        replication, _ = self._prepare_mocks_for_ear_replication(is_ear_supported=False)
         self.svc.demote_replication_volume(replication)
         self.svc.client.svcinfo.lsvolumegroupreplication.assert_not_called()
 

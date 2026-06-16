@@ -58,6 +58,7 @@ class Replication:
     replication_type: str
     is_primary: bool
     volume_group_id: str = None
+    volume_group_name: str = None
 
 
 @dataclass
