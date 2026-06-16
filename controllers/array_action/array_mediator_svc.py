@@ -1708,7 +1708,9 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
                            replication_type=array_settings.REPLICATION_TYPE_MIRROR,
                            is_primary=is_primary)
 
-    def _generate_ear_replication_response(self, volume_group_id, volume_group_name, replication_mode, replication_policy):
+    def _generate_ear_replication_response(
+            self, volume_group_id, volume_group_name,
+            replication_mode, replication_policy):
         copy_type = array_settings.REPLICATION_COPY_TYPE_ASYNC
         is_ready = True
         is_primary = (replication_mode == array_settings.ENDPOINT_TYPE_PRODUCTION)
@@ -2153,7 +2155,7 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
 
         # Clear demote state if exists (handles case where K8S gave up on demote and decided to promote)
         if volume_group_id in self._demote_state_map:
-            logger.info(f"Clearing demote state for volume group {volume_group_id} during promote")
+            logger.info("Clearing demote state for volume group %s during promote", volume_group_id)
             self._demote_state_map.pop(volume_group_id, None)
 
         cli_kwargs = {}
@@ -2226,7 +2228,7 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
         if not self._is_earreplication_supported():
             logger.info("EAR replication is not supported on the existing storage")
             return
-        
+
         # Validate volume group exists
         volume_group_replication = self._lsvolumegroupreplication(volume_group_name)
         if not volume_group_replication:
@@ -2245,7 +2247,8 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
             first_attempt_time = self._demote_state_map[volume_group_name]
             elapsed_time = time.time() - first_attempt_time
             logger.info("Retry demote for volume group {}, checking checkpoint status "
-                            "(elapsed time: {:.1f}s)".format(volume_group_name, elapsed_time))
+                        "(elapsed time: {:.1f}s)".format(volume_group_name,
+                                                         elapsed_time))
 
         # Re-fetch after checkpoint creation (or on retry) to get current state
         volume_group_replication = self._lsvolumegroupreplication(volume_group_name)
@@ -2256,11 +2259,10 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
             logger.info("Checkpoint achieved for volume group {}, demote successful".format(volume_group_name))
             self._demote_state_map.pop(volume_group_name, None)
             return
-        else:
-            # Checkpoint not ready - raise error to trigger retry with UNAVAILABLE status
-            logger.info("Checkpoint not yet achieved for volume group {}, will retry".format(volume_group_name))
-            raise array_errors.OperationNotReadyError(
-                f"Checkpoint not yet achieved for volume group {volume_group_name}")
+        # Checkpoint not ready - raise error to trigger retry with UNAVAILABLE status
+        logger.info("Checkpoint not yet achieved for volume group {}, will retry".format(volume_group_name))
+        raise array_errors.OperationNotReadyError(
+            "Checkpoint not yet achieved for volume group {}".format(volume_group_name))
 
     def _get_host_name_if_equal(self, nvme_host, fc_host, iscsi_host):
         unique_names = {nvme_host, iscsi_host, fc_host}
