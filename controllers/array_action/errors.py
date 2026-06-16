@@ -343,7 +343,7 @@ class AsyncDRReplicationPolicyNotFoundError(BaseArrayActionException):
 
 class OperationTimeoutError(BaseArrayActionException):
 
-    def __init__(self, operation_details):
+    def __init__(self, operation_details):  # pylint: disable=unused-argument
         super().__init__()
 
 

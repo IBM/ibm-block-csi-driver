@@ -276,9 +276,9 @@ class TestArrayMediatorSVC(unittest.TestCase):
         mock_vg_replication = Mock(checkpoint_achieved='yes')
         self.svc.client.svcinfo.lsvolumegroupreplication.return_value = Mock(
             as_single_element=mock_vg_replication)
-        
+
         self.svc.demote_replication_volume(replication)
-        
+
         # Verify checkpoint was created and status was checked
         self.svc.client.svctask.chvolumegroupreplication.assert_called_once()
         self.assertEqual(self.svc.client.svcinfo.lsvolumegroupreplication.call_count, 2)
