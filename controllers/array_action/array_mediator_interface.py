@@ -595,6 +595,27 @@ class ArrayMediator(ABC):
         raise NotImplementedError
 
     @abstractmethod
+    def get_replication_destination_info(self, object_id, object_type, object_uid, dr_mediator=None):
+        """
+        Return the destination volume handle string for a volume in the Ramen flow,
+        or None if destination is not yet available.
+
+        Args:
+            object_id   : internal id of the volume, may be empty for DR site volumes
+            object_type : VOLUME_TYPE_NAME only (Ramen PVC dataSource config)
+            object_uid  : vdisk UID, used to resolve internal_id when object_id is empty (DR site)
+            dr_mediator : open mediator connected to secondary storage
+
+        Returns:
+            str: destination volumeHandle (e.g. 'SVC:0;6005076810FD8366F0000000000001CA')
+            None: destination is not yet available, secondary storage is still being provisioned.
+
+        Raises:
+            ObjectNotFoundError
+        """
+        raise NotImplementedError
+
+    @abstractmethod
     def add_io_group_to_host(self, host_name, io_group):
         """
         This function should add io_group to host.

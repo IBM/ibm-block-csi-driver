@@ -44,6 +44,7 @@ OTHER_OBJECT_INTERNAL_ID = "other_object_internal_id"
 SNAPSHOT_OBJECT_TYPE = "snapshot"
 SNAPSHOT_NAME = "snapshot_name"
 SNAPSHOT_VOLUME_UID = "12345678"
+DESTINATION_VOLUME_UID = "123456789"
 SNAPSHOT_VOLUME_NAME = "snapshot_volume"
 INTERNAL_SNAPSHOT_ID = "internal_snapshot_id"
 
