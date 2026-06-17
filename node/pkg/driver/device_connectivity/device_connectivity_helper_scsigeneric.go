@@ -540,12 +540,15 @@ func isSameId(wwn string, volumeIdVariations []string) bool {
 func (r *OsDeviceConnectivityHelperScsiGeneric) flushDeviceBuffers(ctx context.Context, devPath string) error {
 	done := make(chan error, 1)
 	const BLKFLSBUF = 0x1261
+	
+	logger.Warningf("device %s flushDeviceBuffers", devPath)
 
 	go func() {
 		// O_RDONLY allows this block operation to work flawlessly even on read-only/error dm-targets.
 		// O_NONBLOCK prevents thread locks if the storage transport fabric is dropped.
 		f, err := os.OpenFile(devPath, os.O_RDONLY|syscall.O_NONBLOCK, 0)
 		if err != nil {
+			logger.Warningf("device %s flushDeviceBuffers failed to open", devPath)
 			done <- fmt.Errorf("flush: failed to open %s: %w", devPath, err)
 			return
 		}
@@ -560,6 +563,7 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) flushDeviceBuffers(ctx context.C
 
 		// Absorb normal errors arising from already broken hardware or mock targets
 		if errno != 0 && errno != syscall.ENOTTY && errno != syscall.EINVAL && errno != syscall.EIO {
+			logger.Warningf("device %s flushDeviceBuffers flush failed", devPath)
 			done <- fmt.Errorf("flush: ioctl BLKFLSBUF failed: %v", errno)
 			return
 		}
@@ -568,8 +572,10 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) flushDeviceBuffers(ctx context.C
 
 	select {
 	case err := <-done:
+		logger.Warningf("device %s flushDeviceBuffers err %w", devPath), err
 		return err
 	case <-ctx.Done():
+		logger.Warningf("device %s flushDeviceBuffers timed out", devPath)
 		// Escape thread blocking; if kernel is stuck in D-state, the CSI routine exits gracefully
 		return fmt.Errorf("flush: timed out (D-state suspected) on %s: %w", devPath, ctx.Err())
 	}
@@ -588,6 +594,7 @@ func (r OsDeviceConnectivityHelperScsiGeneric) flushDevicesBuffers(ctx context.C
 }
 
 func (r *OsDeviceConnectivityHelperScsiGeneric) RemovePhysicalDevice(ctx context.Context, sysDevices []string) error {
+	logger.Debugf(`Removing scsi device : {%v} by writing "1" to the delete file of each device: {%v}`, sysDevices, fmt.Sprintf(sysDeviceDeletePathFormat, "<deviceName>"))
 	var wg sync.WaitGroup
 
 	for _, deviceName := range sysDevices {
@@ -808,11 +815,17 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) purgeScsiGhosts(ctx context.Cont
 		if os.IsNotExist(err) {
 			return nil
 		}
+		logger.Warningf("failed to read scsi_generic %w", err)
 		return fmt.Errorf("failed to read scsi_generic: %w", err)
 	}
 
 	normLun := r.normalizeLun(fmt.Sprintf("%d", expectedLun))
-	var deleted int
+       var (
+               deleted int
+               notLun  int
+               notPQ   int
+       )
+	
 
 	for _, entry := range sgEntries {
 		sgName := entry.Name()
@@ -821,9 +834,12 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) purgeScsiGhosts(ctx context.Cont
 		// 1. Verify LUN Identity Match
 		lunBytes, err := os.ReadFile(filepath.Join(deviceDir, "lun"))
 		if err != nil {
+			logger.Warningf("failed to read lun %w", err)
 			continue // Device is transitioning out of kernel space
 		}
+		logger.Warningf("compare lun %s with %s", r.normalizeLun(string(lunBytes)), normLun)
 		if r.normalizeLun(string(lunBytes)) != normLun {
+			notLun++
 			continue
 		}
 
@@ -836,9 +852,11 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) purgeScsiGhosts(ctx context.Cont
 		// 3. Low-Level Integrity Evaluation
 		isGhost, _ := r.IsSgDeviceGhost(ctx, sgName)
 		hwSerial, _ := r.getHardwareSerial(deviceDir)
+		isIBM := strings.Contains(vendor, "IBM")
 
 		// General Condition: Delete if path is verified dead or if we own the target path but it holds a mismatched serial
-		shouldDelete := isGhost || (isOurPath && hwSerial != "" && !r.IsSerialMatch(hwSerial, expectedSerial))
+		//shouldDelete := isGhost ||            (isOurPath && hwSerial != "" && !r.IsSerialMatch(hwSerial, expectedSerial))
+		shouldDelete := (isGhost && isIBM) || (isOurPath && (isGhost || !isIBM || (hwSerial != "" && !r.IsSerialMatch(hwSerial, expectedSerial))))
 
 		if shouldDelete {
 			logger.Warningf("Pruning stale SCSI device %s [Vendor: %s, Serial Match: %v]. Executing hot-unplug.", sgName, vendor, r.IsSerialMatch(hwSerial, expectedSerial))
@@ -1111,6 +1129,8 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) getIscsiTargetName(deviceBase st
 
 func (r *OsDeviceConnectivityHelperScsiGeneric) isPathOwnedByMyArray(deviceName string, arrayIdentifiers []string) bool {
 	var targetID string
+	
+	logger.Warningf("isPathOwnedByMyArray %s ", deviceName)
 
 	if strings.HasPrefix(deviceName, "nvme") {
 		// Native NVMe: Source of truth is the subsystem NQN
@@ -1126,6 +1146,8 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) isPathOwnedByMyArray(deviceName 
 		}
 		targetID = r.getScsiTargetID(hctl)
 	}
+	
+	logger.Warningf("isPathOwnedByMyArray %s target %s", deviceName, targetID)
 
 	if targetID == "" {
 		return false
@@ -1134,6 +1156,7 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) isPathOwnedByMyArray(deviceName 
 	targetID = strings.ToLower(strings.TrimPrefix(targetID, "0x"))
 	for _, id := range arrayIdentifiers {
 		normalizedExpected := strings.ToLower(strings.TrimPrefix(id, "0x"))
+		logger.Warningf("isPathOwnedByMyArray %s target %s normalizedExpected %s", deviceName, targetID, normalizedExpected)
 		if targetID == normalizedExpected || strings.Contains(targetID, normalizedExpected) {
 			return true
 		}
@@ -1478,13 +1501,18 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) TeardownVolume(ctx context.Conte
 	var major, minor uint32
 	var hardwareResolved bool
 	var mpathName string
+	
+	logger.Warningf("teardown volume %s", target)	
 
 	// --- PHASE 0: PRE-UNMOUNT HARDWARE HARVEST ---
 	isMounted, err := r.Mounter.IsMounted(target)
 	if err == nil && isMounted {
 		if devPath, err := r.Mounter.getDeviceFromMount(target); err == nil && devPath != "" {
+			logger.Warningf("teardown volume %s devPath", target, devPath)
 			if stat, err := os.Stat(devPath); err == nil {
+				logger.Warningf("teardown volume %s devPath found", target, devPath)
 				if sysObj, ok := stat.Sys().(*syscall.Stat_t); ok {
+					logger.Warningf("teardown volume %s devPath found resolved id", target, devPath)
 					major = uint32((sysObj.Rdev >> 8) & 0xfff)
 					minor = uint32((sysObj.Rdev & 0xff) | ((sysObj.Rdev >> 12) & 0xfff00))
 					hardwareResolved = true
@@ -1510,12 +1538,16 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) TeardownVolume(ctx context.Conte
 		// CRITICAL BARRIER: Ensure the mount point is truly decoupled from VFS namespaces
 		_ = r.Mounter.PollMountDeleted(ctx, target, 10*time.Second)
 	}
+	
+	logger.Warningf("teardown volume %s hardware resolution fallback step", target)	
 
 	// --- PHASE 2: HARDWARE RESOLUTION FALLBACK ---
 	if mpathName == "" && expectedWWID != "" {
+		logger.Warningf("teardown volume %s hardware resolution fallback step needed", target)	
 		mpathName = r.Helper.findDMByWWID(expectedWWID)
 		if mpathName != "" && !hardwareResolved {
 			major, minor, _ = r.Helper.GetMajorMinorFromSysfs(ctx, mpathName)
+					logger.Warningf("teardown volume %s hardware resolution fallback step needed - resolved", target)	
 			hardwareResolved = true
 		}
 	}
@@ -1568,6 +1600,7 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) TeardownVolume(ctx context.Conte
 
 	// --- PHASE 4: PHYSICAL LAYER ---
 	if needRemovePhysical {
+		logger.Warningf("teardown volume %s remove physical", target)	
 		var slaves []string
 		if hardwareResolved && major != 0 {
 			slaves, _ = r.Helper.getSlavesForDevice(major, minor)
@@ -1599,9 +1632,12 @@ func (o *OsDeviceConnectivityHelperGeneric) GetDMNameFromMinor(minor uint32) str
 	// Standard Linux sysfs location for Device Mapper target names
 	// The device-mapper major number on Linux is almost universally 253.
 	sysfsNamePath := fmt.Sprintf("/sys/dev/block/253:%d/dm/name", minor)
+	
+	logger.Warning("GetDMNameFromMinor")
 
 	nameBytes, err := os.ReadFile(sysfsNamePath)
 	if err != nil {
+		logger.Warning("GetDMNameFromMino error %w", err)
 		// Fallback: Check if the device is mapped directly under the /sys/block tree structure
 		// as /sys/block/dm-X/dm/name
 		fallbackPath := fmt.Sprintf("/sys/block/dm-%d/dm/name", minor)
@@ -1798,6 +1834,8 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) TeardownRescue(ctx context.Conte
 
 // getSlavesForDevice returns raw block device names (e.g., "sda", "nvme0n1") from sysfs
 func (o *OsDeviceConnectivityHelperGeneric) getSlavesForDevice(major, minor uint32) ([]string, error) {
+
+	logger.Warning("getSlaveForDevice")
 	slavesPath := fmt.Sprintf("/sys/dev/block/%d:%d/slaves", major, minor)
 
 	entries, err := os.ReadDir(slavesPath)
@@ -1811,6 +1849,7 @@ func (o *OsDeviceConnectivityHelperGeneric) getSlavesForDevice(major, minor uint
 	var results []string
 	for _, entry := range entries {
 		slaveName := entry.Name() // Keeps exact block name like "sda" or "nvme0n1"
+		logger.Warning("getSlaveForDevice entry %s", slaveName)
 		if slaveName != "" {
 			results = append(results, slaveName)
 		}
@@ -1820,6 +1859,7 @@ func (o *OsDeviceConnectivityHelperGeneric) getSlavesForDevice(major, minor uint
 
 // FindSlavesByWWID operates completely decoupled from VFS mounts to locate paths on broken maps
 func (o *OsDeviceConnectivityHelperGeneric) FindSlavesByWWID(expectedWWID string) []string {
+	logger.Warning("FindSlavesByWWID %s", expectedWWID)
 	var slaves []string
 	if expectedWWID == "" {
 		return slaves
@@ -1834,6 +1874,8 @@ func (o *OsDeviceConnectivityHelperGeneric) FindSlavesByWWID(expectedWWID string
 
 	for _, entry := range blockEntries {
 		name := entry.Name()
+		
+		logger.Warningf("FindSlavesByWWID %s entry %s", expectedWWID, name)
 
 		if strings.HasPrefix(name, "loop") || strings.HasPrefix(name, "ram") || strings.HasPrefix(name, "dm-") {
 			continue
@@ -1842,6 +1884,7 @@ func (o *OsDeviceConnectivityHelperGeneric) FindSlavesByWWID(expectedWWID string
 		sysfsPath := filepath.Join("/sys/block", name, "device", "wwid")
 		wwidBytes, err := os.ReadFile(sysfsPath)
 		if err != nil {
+			logger.Warningf("FindSlavesByWWID %s entry %s err %w", expectedWWID, name, err)
 			continue // Skip virtual paths lacking a kernel WWID identifier mapping
 		}
 
@@ -2530,6 +2573,8 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) IsSerialMatch(hwSerial, expected
 
 func (r *OsDeviceConnectivityHelperScsiGeneric) getWWIDBySysfs(deviceName string) (string, error) {
 	name := filepath.Base(deviceName)
+	
+	logger.Warningf("getWWIDBySysfs %s", deviceName)	
 
 	var wwidPath string
 	var isNVMe, isDM bool
@@ -2552,9 +2597,12 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) getWWIDBySysfs(deviceName string
 		// Standard SCSI (sdX)
 		wwidPath = fmt.Sprintf("/sys/block/%s/device/wwid", name)
 	}
+	
+	logger.Warningf("getWWIDBySysfs %s path %s", deviceName, wwidPath)	
 
 	data, err := os.ReadFile(wwidPath)
 	if err != nil {
+		logger.Warningf("getWWIDBySysfs %s path %s fallback", deviceName, wwidPath)	
 		// FIX: Legacy RHEL 7.0-7.3 Fallback for standard SCSI devices lacking a /device/wwid file.
 		// Read the Vital Product Data (VPD) Page 0x83 identifier via scsi_id/vpd tracking alternative.
 		if !isNVMe && !isDM && os.IsNotExist(err) {
