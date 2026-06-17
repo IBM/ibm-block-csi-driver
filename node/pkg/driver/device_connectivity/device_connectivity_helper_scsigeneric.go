@@ -1439,7 +1439,7 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) TeardownVolume(ctx context.Conte
 	// --- PHASE 0: PRE-UNMOUNT HARDWARE HARVEST ---
 	isMounted, err := r.Mounter.IsMounted(target)
 	if err == nil && isMounted {
-		if devPath, err := r.Mounter.getDeviceFromMount(target); err == nil && devPath != "" {
+		if devPath, err := r.Mounter.GetDeviceFromMount(target); err == nil && devPath != "" {
 			logger.Warningf("teardown volume %s devPath", target, devPath)
 			if stat, err := os.Stat(devPath); err == nil {
 				logger.Warningf("teardown volume %s devPath found", target, devPath)
