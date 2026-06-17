@@ -307,9 +307,36 @@ func (m *Mounter) MakeDir(pathname string) error {
 
 func (m *Mounter) UnmountWithTimeout(ctx context.Context, target string, timeout time.Duration) error {
 	now := time.Now()
+	
+   device, _ := m.getDeviceFromMount(target)
+
+   // 1. Resolve Device and Perform Safety Gate Checks
+   device, _ = m.getDeviceFromMount(target)
+   if device != "" {
+		   // HARDWARE GATE: If the kernel workers (jbd2/xfs) are already wedged,
+		   // any further I/O (like unmount or sync) will deadlock the thread.
+		   if m.executer.IsDeviceStillStuck(device) {
+				   // TODO is this safe - or perhaps we should skip
+				   logger.Warningf("Safety-Gate: Device %s is stuck. Skipping to Tier 3 (MNT_DETACH).", device)
+				   return m.EscalateToLazy(target)
+		   }
+
+		   // DAEMON GATE: If multipathd is deadlocked, the socket query will timeout.
+		   isDM := strings.HasPrefix(filepath.Base(device), "dm-")
+		   isNVMe := strings.HasPrefix(filepath.Base(device), "nvme")
+
+		   if isDM || isNVMe {
+				   if _, err := m.executer.IsMultipathdAlive(ctx); err != nil && strings.Contains(err.Error(), "deadlock") {
+							logger.Warning("multipathd deadlock; unmount aborted to prevent hang")
+						   return fmt.Errorf("safety-gate: multipathd deadlock; unmount aborted to prevent hang")
+				   }
+		   }
+   }
+	
 
 	// 1. Idempotency Check
 	if mounted, _ := m.IsMounted(target); !mounted {
+		logger.Warning("Not mounted - immediate exit")
 		m.unmountTracker.Delete(target)
 		return nil
 	}
@@ -355,6 +382,7 @@ func (m *Mounter) UnmountWithTimeout(ctx context.Context, target string, timeout
 	if err != nil {
 		// Idempotency check: if the path is already gone or invalid, clean up tracker and exit
 		if err == syscall.ENOENT || err == syscall.EINVAL {
+			logger.Warningf("already gone %w", err)
 			m.unmountTracker.Delete(target)
 			return nil
 		}
@@ -368,6 +396,7 @@ func (m *Mounter) UnmountWithTimeout(ctx context.Context, target string, timeout
 			// Tier 1 & 2: We are still within the safety windows. Return the error 
 			// to halt the orchestrator and let Kubelet retry on a backoff loop.
 			if tierState == StateGracefulPending || tierState == StateForcePending {
+				logger.Warningf("target %s is busy under %s tier (waiting for Kubelet retry): %w", target, tierState, err)
 				return fmt.Errorf("target %s is busy under %s tier (waiting for Kubelet retry): %w", target, tierState, err)
 			}
 			
@@ -378,6 +407,8 @@ func (m *Mounter) UnmountWithTimeout(ctx context.Context, target string, timeout
 			m.unmountTracker.Delete(target)
 			return nil 
 		}
+		
+		logger.Warningf("target %s unexpected error under %s tier (waiting for Kubelet retry): %w", target, tierState, err)
 
 		// Return any other unexpected hard kernel errors
 		return err
@@ -385,6 +416,7 @@ func (m *Mounter) UnmountWithTimeout(ctx context.Context, target string, timeout
 
 	// Clean Path: Verify the mount actually disappeared from mountinfo
 	if m.PollMountDeleted(ctx, target, 2*time.Second) {
+		logger.Warningf("target %s poll ok", target)
 		m.unmountTracker.Delete(target)
 		return nil
 	}
@@ -414,6 +446,8 @@ func (m *Mounter) tryUnmount(target string, flags int, timeout time.Duration) er
 	// Create a session to track this specific attempt
 	session := &mountSession{target: target, startTime: time.Now()}
 	m.stuckMounts.Store(target, session)
+	
+	logger.Warningf("target %s tryUnmount %d", target, flags)
 
 	go func(path string, f int) {
 		// SYSCALL: May hang indefinitely in D-state if storage paths are down
@@ -431,16 +465,20 @@ func (m *Mounter) tryUnmount(target string, flags int, timeout time.Duration) er
 	select {
 	case err := <-ch:
 		if err == nil || err == syscall.ENOENT || err == syscall.EINVAL {
+			logger.Warningf("target %s tryUnmount gone error", target)
 			return nil
 		}
 		if err == syscall.EBUSY {
+			logger.Warningf("target %s tryUnmount busy", target)
 			// Log cleanly so K8s controller loop knows it's waiting for retry/escalation
 			return fmt.Errorf("target %s is busy: %w", target, err)
 		}
+		logger.Warningf("target %s tryUnmount error %w", target, err)
 		return err
 
 	case <-time.After(timeout):
 		// Safe: Thread is tracked, but buffered channel prevents memory leakage
+		logger.Warningf("target %s tryUnmount timeout", target)
 		m.stuckCount.Add(1)
 		return fmt.Errorf("unmount syscall timeout (%v) for %s - cascading tiers", timeout, target)
 	}
@@ -460,6 +498,8 @@ func (m *Mounter) backgroundSyncfs(ctx context.Context, target string, info *Tra
 	// In Go 1.22+, "targetPath := target" is no longer strictly required for
 	// loop safety, but keeping it as a local copy for the closure is fine.
 	targetPath := target
+	
+	logger.Warningf("target %s backgroundSyncfs", target)
 
 	// Use the generic SyncResult we defined earlier
 	res, err := executer.ExecuteUninterruptible[SyncResult](
@@ -488,6 +528,8 @@ func (m *Mounter) backgroundSyncfs(ctx context.Context, target string, info *Tra
 			return SyncResult{Success: true}, nil
 		},
 	)
+	
+	logger.Warningf("target %s backgroundSyncfs - sync done", target)
 
 	// 2. ALWAYS UPDATE STATE
 	// We wrap this in a defer-like pattern to ensure SyncInProgress is
