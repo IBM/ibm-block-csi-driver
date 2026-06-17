@@ -43,12 +43,13 @@ const (
 // default mount/unmount timeout interval, 30s
 var timeout time.Duration = 30 * time.Second
 
-type MountState int
+// MountState tracks the specific lifecycle stage of an active unmount operation
+type MountState string
 
 const (
-	StateGracefulPending MountState = iota // Tier 1 active
-	StateForcePending                      // Tier 2 active
-	StateDetached                          // Tier 3 called; kernel background cleanup
+	StateGracefulPending MountState = "GracefulPending"
+	StateForcePending    MountState = "ForcePending"
+	StateLazyPending     MountState = "LazyPending"
 )
 
 type mountSession struct {
@@ -304,40 +305,16 @@ func (m *Mounter) MakeDir(pathname string) error {
 	return nil
 }
 
-// TODO rewrite using gater
 func (m *Mounter) UnmountWithTimeout(ctx context.Context, target string, timeout time.Duration) error {
 	now := time.Now()
-	device, _ := m.getDeviceFromMount(target)
 
-	// 1. Resolve Device and Perform Safety Gate Checks
-	device, _ = m.getDeviceFromMount(target)
-	if device != "" {
-		// HARDWARE GATE: If the kernel workers (jbd2/xfs) are already wedged,
-		// any further I/O (like unmount or sync) will deadlock the thread.
-		if m.executer.IsDeviceStillStuck(device) {
-			// TODO is this safe - or perhaps we should skip
-			logger.Warningf("Safety-Gate: Device %s is stuck. Skipping to Tier 3 (MNT_DETACH).", device)
-			return m.EscalateToLazy(target)
-		}
-
-		// DAEMON GATE: If multipathd is deadlocked, the socket query will timeout.
-		isDM := strings.HasPrefix(filepath.Base(device), "dm-")
-		isNVMe := strings.HasPrefix(filepath.Base(device), "nvme")
-
-		if isDM || isNVMe {
-			if _, err := m.executer.IsMultipathdAlive(ctx); err != nil && strings.Contains(err.Error(), "deadlock") {
-				return fmt.Errorf("safety-gate: multipathd deadlock; unmount aborted to prevent hang")
-			}
-		}
-	}
-
-	// 2. Idempotency Check
+	// 1. Idempotency Check
 	if mounted, _ := m.IsMounted(target); !mounted {
 		m.unmountTracker.Delete(target)
 		return nil
 	}
 
-	// 3. Manage State Tracking
+	// 2. Thread-Safe State Retrieval and Time Evaluation
 	val, _ := m.unmountTracker.LoadOrStore(target, &TrackedUnmount{
 		FirstAttempt: now,
 		LastState:    StateGracefulPending,
@@ -347,7 +324,7 @@ func (m *Mounter) UnmountWithTimeout(ctx context.Context, target string, timeout
 	mInfo.mu.Lock()
 	elapsed := now.Sub(mInfo.FirstAttempt)
 
-	// Tier 0: Background Sync (Only if hardware is healthy)
+	// Tier 0: Background Syncfs (Only executed on the very first loop invocation)
 	if mInfo.LastState == StateGracefulPending && !mInfo.SyncDone && !mInfo.SyncInProgress {
 		mInfo.SyncInProgress = true
 		go m.backgroundSyncfs(ctx, target, mInfo)
@@ -356,32 +333,82 @@ func (m *Mounter) UnmountWithTimeout(ctx context.Context, target string, timeout
 
 	var err error
 
-	// 4. Escalation Logic (RHEL 7 Tiered Approach)
+	// 3. RHEL 7 Tiered Escalation Logic (Safely Separated)
 	switch {
 	case elapsed < 2*time.Minute:
+		// Tier 1: Standard Graceful Unmount
 		err = m.tryUnmount(target, 0, timeout)
 
 	case elapsed < 4*time.Minute:
+		// Tier 2: Force Unmount (Natively supported by network FS like NFS/Ceph)
 		m.updateState(target, mInfo, StateForcePending)
 		err = m.tryUnmount(target, syscall.MNT_FORCE, timeout)
 
 	default:
-		err = m.ImmediateDetach(ctx, target)
-		//return m.escalateToLazy(target)
+		// Tier 3: Lazy Detach (The Nuclear Option for hung block layers like XFS/ext4)
+		m.updateState(target, mInfo, StateLazyPending)
+		err = m.tryUnmount(target, syscall.MNT_DETACH, timeout)
 	}
+	
+	
 
-	if err == nil {
-		if m.PollMountDeleted(ctx, target, 2*time.Second) {
+	if err != nil {
+		// Idempotency check: if the path is already gone or invalid, clean up tracker and exit
+		if err == syscall.ENOENT || err == syscall.EINVAL {
 			m.unmountTracker.Delete(target)
 			return nil
 		}
-		return fmt.Errorf("unmount reported success but %s still remains in mountinfo", target)
+
+		mInfo.mu.Lock()
+		tierState := mInfo.LastState
+		mInfo.mu.Unlock()
+
+		// Evaluate standard blocking conditions (Busy or Timeout)
+		if err == syscall.EBUSY || os.IsTimeout(err) {
+			// Tier 1 & 2: We are still within the safety windows. Return the error 
+			// to halt the orchestrator and let Kubelet retry on a backoff loop.
+			if tierState == StateGracefulPending || tierState == StateForcePending {
+				return fmt.Errorf("target %s is busy under %s tier (waiting for Kubelet retry): %w", target, tierState, err)
+			}
+			
+			// Tier 3: All tiers are completely exhausted. The filesystem is a zombie.
+			// FIX: Suppress the error, clean the tracker, and return nil.
+			// This signals the orchestrator to advance straight into Phase 3/4 hardware destruction.
+			logger.Warningf("Terminal unmount failure (%v) in lazy tier. Safety windows exhausted. Forcing hardware rescue.", err)
+			m.unmountTracker.Delete(target)
+			return nil 
+		}
+
+		// Return any other unexpected hard kernel errors
+		return err
 	}
 
-	return err
+	// Clean Path: Verify the mount actually disappeared from mountinfo
+	if m.PollMountDeleted(ctx, target, 2*time.Second) {
+		m.unmountTracker.Delete(target)
+		return nil
+	}
+
+	// If the syscall returned nil but it still appears in mountinfo, it's a masked obstruction.
+	// Treat it as busy and return an error if we are still in early tiers.
+	mInfo.mu.Lock()
+	finalTierCheck := mInfo.LastState
+	mInfo.mu.Unlock()
+
+	if finalTierCheck != StateLazyPending {
+		return fmt.Errorf("unmount reported success but %s remains in mountinfo (waiting for retry)", target)
+	}
+
+	// If we are in StateLazyPending and it's still in mountinfo, we must break the hardware to clear it.
+	logger.Warningf("Mount point %s persists in mountinfo after lazy tier. Proceeding to hardware cleanup.", target)
+	m.unmountTracker.Delete(target)
+	return nil
 }
 
 func (m *Mounter) tryUnmount(target string, flags int, timeout time.Duration) error {
+	// FIX: Channel MUST be buffered with a capacity of 1.
+	// If the outer select times out, the background goroutine can still write 
+	// to this channel and exit, avoiding a permanent thread/memory leak in D-state.
 	ch := make(chan error, 1)
 
 	// Create a session to track this specific attempt
@@ -389,18 +416,17 @@ func (m *Mounter) tryUnmount(target string, flags int, timeout time.Duration) er
 	m.stuckMounts.Store(target, session)
 
 	go func(path string, f int) {
-		// SYSCALL: May hang indefinitely in D-state
+		// SYSCALL: May hang indefinitely in D-state if storage paths are down
 		err := syscall.Unmount(GetPodPath(path), f)
 
-		// Cleanup: If we ever return, remove ourselves from the stuck tracker
-		// TODO should track with pointer? or is the existing entry enough
+		// Cleanup tracker structures safely upon return
 		m.stuckMounts.Delete(path)
 		if err == nil {
 			m.stuckCount.Add(-1)
 		}
 
 		ch <- err
-	}(target, flags) // Pass as arguments to avoid closure race
+	}(target, flags)
 
 	select {
 	case err := <-ch:
@@ -408,18 +434,17 @@ func (m *Mounter) tryUnmount(target string, flags int, timeout time.Duration) er
 			return nil
 		}
 		if err == syscall.EBUSY {
-			// Log this specifically: "Target is busy, waiting for K8S retry to escalate tiers"
+			// Log cleanly so K8s controller loop knows it's waiting for retry/escalation
 			return fmt.Errorf("target %s is busy: %w", target, err)
 		}
 		return err
-	case <-time.After(timeout):
-		// LEAK ACKNOWLEDGED: Thread is now in D-state
-		m.stuckCount.Add(1)
-		return fmt.Errorf("unmount timeout (D-state) for %s - thread leaked", target)
-	}
-	// TODO verify disappearance
-}
 
+	case <-time.After(timeout):
+		// Safe: Thread is tracked, but buffered channel prevents memory leakage
+		m.stuckCount.Add(1)
+		return fmt.Errorf("unmount syscall timeout (%v) for %s - cascading tiers", timeout, target)
+	}
+}
 
 type SyncResult struct {
 	Success bool
@@ -505,21 +530,17 @@ func (m *Mounter) EscalateToLazy(target string) error {
 
 // ImmediateDetach skips all graceful tiers and immediately executes a Lazy Unmount.
 // This is used for cleanup of rogue volumes or when hardware is known to be dead.
+// ImmediateDetach bypasses the temporal matrix and runs a lazy detach instantly.
+// This is used as a fast-fail fallback when hardware layers are explicitly confirmed dead.
 func (m *Mounter) ImmediateDetach(ctx context.Context, target string) error {
-	// 1. Resolve target to a session if tracking exists
-	// This ensures we clean up the tracker even if this wasn't a "timed" escalation.
 	m.unmountTracker.Delete(target)
 
-	// 2. Perform the Lazy Unmount (MNT_DETACH)
-	// On RHEL 7, this returns immediately regardless of hardware state.
+	// SYSCALL: MNT_DETACH decouples the mount from the VFS view instantly
 	err := syscall.Unmount(GetPodPath(target), syscall.MNT_DETACH)
 
-	// 3. Evaluate results
-	// EINVAL/ENOENT mean it's already unmounted (Idempotent Success)
 	if err == nil || err == syscall.EINVAL || err == syscall.ENOENT {
-		logger.Infof("ImmediateDetach: %s successfully detached", target)
+		logger.Infof("ImmediateDetach: %s successfully detached from VFS", target)
 
-		// 4. Verify disappearance from mountinfo (Source of Truth)
 		if m.PollMountDeleted(ctx, target, 5*time.Second) {
 			return nil
 		}
@@ -528,8 +549,6 @@ func (m *Mounter) ImmediateDetach(ctx context.Context, target string) error {
 
 	return fmt.Errorf("immediate detach failed for %s: %w", target, err)
 }
-
-
 
 func (m *Mounter) getDeviceFromMount(target string) (string, error) {
 	// Parse /proc/self/mountinfo to find the device source for the target

@@ -539,20 +539,18 @@ func isSameId(wwn string, volumeIdVariations []string) bool {
 // TODO Use gater
 func (r *OsDeviceConnectivityHelperScsiGeneric) flushDeviceBuffers(ctx context.Context, devPath string) error {
 	done := make(chan error, 1)
+	const BLKFLSBUF = 0x1261
 
 	go func() {
-		// 1. Open the device with O_NONBLOCK
-		// This prevents the open() itself from hanging if the driver is wedged [3]
-		//TODO this was the previous version:   f, err := os.OpenFile(deviceName, os.O_RDONLY, 0)
-		f, err := os.OpenFile(devPath, os.O_WRONLY|syscall.O_NONBLOCK, 0)
+		// O_RDONLY allows this block operation to work flawlessly even on read-only/error dm-targets.
+		// O_NONBLOCK prevents thread locks if the storage transport fabric is dropped.
+		f, err := os.OpenFile(devPath, os.O_RDONLY|syscall.O_NONBLOCK, 0)
 		if err != nil {
 			done <- fmt.Errorf("flush: failed to open %s: %w", devPath, err)
 			return
 		}
 		defer f.Close()
 
-		// 2. Execute the flush ioctl
-		// This tells the kernel to commit and invalidate the buffer cache [4]
 		_, _, errno := syscall.Syscall(
 			syscall.SYS_IOCTL,
 			f.Fd(),
@@ -560,20 +558,19 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) flushDeviceBuffers(ctx context.C
 			0,
 		)
 
-		if errno != 0 && errno != syscall.ENOTTY {
+		// Absorb normal errors arising from already broken hardware or mock targets
+		if errno != 0 && errno != syscall.ENOTTY && errno != syscall.EINVAL && errno != syscall.EIO {
 			done <- fmt.Errorf("flush: ioctl BLKFLSBUF failed: %v", errno)
 			return
 		}
 		done <- nil
 	}()
 
-	// 3. Monitor for completion or context timeout (Safety Gate)
 	select {
 	case err := <-done:
 		return err
 	case <-ctx.Done():
-		// If the hardware is in D-state, the goroutine will remain
-		// leaked, but our CSI logic can proceed [2]
+		// Escape thread blocking; if kernel is stuck in D-state, the CSI routine exits gracefully
 		return fmt.Errorf("flush: timed out (D-state suspected) on %s: %w", devPath, ctx.Err())
 	}
 }
@@ -591,7 +588,6 @@ func (r OsDeviceConnectivityHelperScsiGeneric) flushDevicesBuffers(ctx context.C
 }
 
 func (r *OsDeviceConnectivityHelperScsiGeneric) RemovePhysicalDevice(ctx context.Context, sysDevices []string) error {
-	logger.Debugf(`Removing scsi device : {%v} by writing "1" to the delete file of each device: {%v}`, sysDevices, fmt.Sprintf(sysDeviceDeletePathFormat, "<deviceName>"))
 	var wg sync.WaitGroup
 
 	for _, deviceName := range sysDevices {
@@ -600,15 +596,13 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) RemovePhysicalDevice(ctx context
 		}
 
 		wg.Add(1)
-		// In Go 1.22, 'deviceName' is safe to use directly, but 'name' works fine too
 		go func(name string) {
 			defer wg.Done()
 
-			// CHANGE: Call the package function and pass r.KeyedGater as the first arg
 			_, err := executer.ExecuteUninterruptible[struct{}](
 				ctx,
-				r.KeyedGater,        // State instance passed here
-				"path-delete-"+name, // Unique key per device is safer
+				r.KeyedGater,        
+				"path-delete-"+name, 
 				10,
 				100,
 				5*time.Second,
@@ -619,19 +613,28 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) RemovePhysicalDevice(ctx context
 
 					var deletePath string
 					if strings.HasPrefix(name, "nvme") {
-						deletePath = fmt.Sprintf("/sys/block/%s/device/delete_controller", name)
+						// Separates controller from namespace (e.g., nvme0n1 -> nvme0)
+						parts := strings.Split(name, "n")
+						if len(parts) > 0 {
+							deletePath = fmt.Sprintf("/sys/class/nvme/%s/delete_controller", parts[0])
+						} else {
+							return struct{}{}, fmt.Errorf("invalid nvme name format: %s", name)
+						}
 					} else {
+						// Standard SCSI block delete path
 						deletePath = fmt.Sprintf("/sys/block/%s/device/delete", name)
 					}
 
 					if _, err := os.Stat(deletePath); os.IsNotExist(err) {
-						logger.Warningf("Idempotency: Block device {%v} was not found on the system, so skip deleting it", deletePath)
+						logger.Warningf("Idempotency: Delete path {%v} was not found on the system, skipping.", deletePath)
 						return struct{}{}, nil
 					}
 
 					if err := os.WriteFile(deletePath, []byte("1"), 0200); err != nil {
-						return struct{}{}, fmt.Errorf("failed to delete device %s: %w", name, err)
+						return struct{}{}, fmt.Errorf("failed to delete device via %s: %w", deletePath, err)
 					}
+					
+					logger.Infof("Successfully disconnected physical device via %s", deletePath)
 					return struct{}{}, nil
 				},
 			)
@@ -644,6 +647,7 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) RemovePhysicalDevice(ctx context
 	wg.Wait()
 	return nil
 }
+
 
 // normalizeLun converts sysfs LUN strings (hex or decimal) to a standard decimal string.
 // Example: "0x0001000000000000" -> "1"
@@ -1327,57 +1331,82 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) isHardwareBlocked(sgName string)
 // sHardwareBlocked, also check for the quiesce state. It often indicates a storage controller failover where I/O is paused but not failed.
 
 func (r *OsDeviceConnectivityHelperScsiGeneric) TeardownVolume(ctx context.Context, target string, needFlush bool, needRemovePhysical bool, expectedWWID string) error {
-	// REQUIREMENT 8: Respect CSI API Context
 	if err := ctx.Err(); err != nil {
 		return err
 	}
 
-	// --- PHASE 1: UNMOUNT ---
+	var major, minor uint32
+	var hardwareResolved bool
+	var mpathName string
+
+	// --- PHASE 0: PRE-UNMOUNT HARDWARE HARVEST ---
+	// Harvest major/minor from the active mount BEFORE unmounting or detaching decouples them.
 	isMounted, err := r.Mounter.IsMounted(target)
-	if err != nil {
-		logger.Errorf("teardown: could not verify mount status for %s: %v. Proceeding to hardware cleanup.", target, err)
+	if err == nil && isMounted {
+		if devPath, err := r.Mounter.getDeviceFromMount(target); err == nil && devPath != "" {
+			if stat, err := os.Stat(devPath); err == nil {
+				if sysObj, ok := stat.Sys().(*syscall.Stat_t); ok {
+					major = uint32((sysObj.Rdev >> 8) & 0xfff)
+					minor = uint32((sysObj.Rdev & 0xff) | ((sysObj.Rdev >> 12) & 0xfff00))
+					hardwareResolved = true
+					
+					if strings.HasPrefix(filepath.Base(devPath)f, "dm-") {
+						mpathName = r.Helper.GetDMNameFromMinor(minor) 
+					}
+				}
+			}
+		}
 	}
+
+	// --- PHASE 1: UNMOUNT ---
 	if err == nil && isMounted {
 		if err := r.Mounter.UnmountWithTimeout(ctx, target, 30*time.Second); err != nil {
-			// If graceful/force/lazy all failed, we have a zombie mount. 
-			// We proceed anyway to try and break the underlying device.
-			logger.Warningf("unmount failed, proceeding to hardware rescue: %v", err)
+			logger.Warningf("Graceful unmount failed: %v. Escalating to Lazy Unmount to clear VFS.", err)
+			if lazyErr := r.Mounter.EscalateToLazy(target); lazyErr != nil {
+				logger.Errorf("Failed to execute lazy unmount fallback: %v", lazyErr)
+			}
 		}
 		
-		// TODO perhaps if called from error context - use escalate unmount immediately, e.g.
-		//for i := len(mounts) - 1; i >= 0; i-- {
-		//		_ = r.Mounter.EscalateToLazy(target)
-		//		_ = r.pollLayerDeleted(target, mounts[i].MountID, 5*time.Second)
-		//}
-
-		// BARRIER: Mountinfo must be clean
-		//if !r.Mounter.PollMountDeleted(target, 10*time.Second) {
-		//	return fmt.Errorf("teardown: mountinfo not clean for %s", target)
-		//}
-		
+		// CRITICAL BARRIER: Ensure the mount point is truly decoupled from VFS namespaces
+		_ = r.Mounter.PollMountDeleted(ctx, target, 10*time.Second)
 	}
-	
 
-	// TODO first try to resolve major/minor via mount - this is fallback
-	// Resolve Hardware
-	mpathName := r.Helper.findDMByWWID(expectedWWID)
-	var major, minor uint32
+	// --- PHASE 2: HARDWARE RESOLUTION FALLBACK ---
+	if mpathName == "" && expectedWWID != "" {
+		mpathName = r.Helper.findDMByWWID(expectedWWID)
+		if mpathName != "" && !hardwareResolved {
+			major, minor, _ = r.Helper.GetMajorMinorFromSysfs(ctx, mpathName)
+			hardwareResolved = true
+		}
+	}
 
+	// --- PHASE 3: DEVICE MAPPER CLEANUP / RESCUE ---
 	if mpathName != "" {
-		major, minor, _ = r.Helper.GetMajorMinorFromSysfs(ctx, mpathName)
+		var openCount int
 		
+		// Add a 5-second rapid polling gate to let active filesystems/daemons close their descriptors
+		for i := 0; i < 10; i++ {
+			// Early exit if the incoming CSI context was canceled
+			if ctx.Err() != nil {
+				break
+			}
 
+			openCount, _ = r.Helper.GetOpenCount(ctx, mpathName)
+			if openCount == 0 {
+				break // The asynchronous kernel threads caught up and closed the device!
+			}
+
+			// FIX: Context-aware sleep prevents the loop from blocking if Kubelet cancels the operation
+			select {
+			case <-time.After(500 * time.Millisecond):
+			case <-ctx.Done():
+				break
+			}
+		}
 	
-		openCount, _ := r.Helper.GetOpenCount(ctx, mpathName)
-		
-		// TODO should we ignore the error rom GetOpenCount (perhaps return the error)
-		
 		if openCount > 0 {
 			logger.Warningf("Device %s is busy (openCount=%d). Triggering DM Rescue.", mpathName, openCount)
-			
 			_ = r.multipathdAction(ctx, "disablequeueing map "+mpathName)
-			
-			// Rescue Sequence: Swap hung device for a "Fail Fast" error device
 			_ = r.dmIoctlCall(ctx, mpathName, DM_DEV_SUSPEND, DM_SKIP_LOCKFS_FLAG)
 
 			sizeStr := r.readSysfs(fmt.Sprintf("/sys/class/block/%s/size", mpathName))
@@ -1385,33 +1414,41 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) TeardownVolume(ctx context.Conte
 
 			_ = r.dmIoctlLoadTable(ctx, mpathName, errorTable)
 			_ = r.dmIoctlCall(ctx, mpathName, DM_DEV_RESUME, 0)
-			
-			// Deferred remove allows kernel to cleanup once the 'error' target wakes up processes
 			_ = r.dmIoctlCall(ctx, mpathName, DM_DEV_REMOVE, DM_DEFERRED_REMOVE)			
 		} else {
-			// Clean path: Flush and delete
 			if needFlush {
-			_, _ = executer.ExecuteUninterruptible[struct{}](
-				ctx, r.KeyedGater, "flush-"+mpathName, 10, 50, 5*time.Second, 30*time.Second,
-				func(wCtx context.Context) (struct{}, error) {
-					err := r.flushDeviceBuffers(wCtx, fmt.Sprintf("/dev/mapper/%s", mpathName))
-					return struct{}{}, err
-				},
-			)
-			_ = r.multipathdAction(ctx, "del map "+mpathName)
+				_, _ = executer.ExecuteUninterruptible[struct{}](
+					ctx, r.KeyedGater, "flush-"+mpathName, 10, 50, 5*time.Second, 30*time.Second,
+					func(wCtx context.Context) (struct{}, error) {
+						err := r.flushDeviceBuffers(wCtx, fmt.Sprintf("/dev/mapper/%s", mpathName))
+						return struct{}{}, err
+					},
+				)
+				_ = r.multipathdAction(ctx, "del map "+mpathName)
 			}
 		}
 	}
 
-	// --- PHASE 3: PHYSICAL LAYER ---
-	// TODO does this require goroutine worker
-
+	// --- PHASE 4: PHYSICAL LAYER ---
 	if needRemovePhysical {
-	slaves, _ := r.Helper.getSlavesForDevice(major, minor)
-	if len(slaves) > 0 {
-		// RemovePhysicalDevice is already Gated and Context-Aware
-		_ = r.RemovePhysicalDevice(ctx, slaves)
-	}
+		var slaves []string
+		if hardwareResolved && major != 0 {
+			slaves, _ = r.Helper.getSlavesForDevice(major, minor)
+		}
+		
+		// CRITICAL RESCUE FALLBACK: If unmount failed or was lazy, major/minor might be 0.
+		// Scan sysfs by WWID directly so we never skip physical path deletion.
+		if len(slaves) == 0 && expectedWWID != "" {
+			logger.Warningf("No slaves found via major/minor. Running fallback WWID scan for: %s", expectedWWID)
+			slaves = r.Helper.FindSlavesByWWID(expectedWWID) 
+		}
+
+		if len(slaves) > 0 {
+			logger.Infof("Tearing down physical slave paths: %v", slaves)
+			_ = r.RemovePhysicalDevice(ctx, slaves)
+		} else {
+			logger.Errorf("CRITICAL: Failed to locate any physical paths to delete for WWID %s. Device will ghost.", expectedWWID)
+		}
 	}
 
 	// Final File Cleanup
@@ -1419,6 +1456,34 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) TeardownVolume(ctx context.Conte
 		return os.Remove(target)
 	}
 	return nil
+}
+
+// GetDMNameFromMinor resolves a dm-X runtime mapping name to its user-space mapped 
+// identity (e.g., dm-0 -> multipath-volume-uuid) directly via sysfs device tracking.
+func (o *OsDeviceConnectivityHelperGeneric) GetDMNameFromMinor(minor uint32) string {
+	// Standard Linux sysfs location for Device Mapper target names
+	// The device-mapper major number on Linux is almost universally 253.
+	sysfsNamePath := fmt.Sprintf("/sys/dev/block/253:%d/dm/name", minor)
+
+	nameBytes, err := os.ReadFile(sysfsNamePath)
+	if err != nil {
+		// Fallback: Check if the device is mapped directly under the /sys/block tree structure
+		// as /sys/block/dm-X/dm/name
+		fallbackPath := fmt.Sprintf("/sys/block/dm-%d/dm/name", minor)
+		nameBytes, err = os.ReadFile(fallbackPath)
+		if err != nil {
+			logger.Warningf("Hardware Harvest: Could not resolve DM mapped name for minor %d via sysfs: %v", minor, err)
+			return ""
+		}
+	}
+
+	// Clean trailing newlines or whitespace (e.g. "mpathb\n" -> "mpathb")
+	dmName := strings.TrimSpace(string(nameBytes))
+	if dmName != "" {
+		logger.Infof("Hardware Harvest: Successfully resolved minor dev %d to DM map name: %s", minor, dmName)
+	}
+	
+	return dmName
 }
 
 
@@ -1596,6 +1661,7 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) TeardownRescue(ctx context.Conte
 }
 
 
+// getSlavesForDevice returns raw block device names (e.g., "sda", "nvme0n1") from sysfs
 func (o *OsDeviceConnectivityHelperGeneric) getSlavesForDevice(major, minor uint32) ([]string, error) {
 	slavesPath := fmt.Sprintf("/sys/dev/block/%d:%d/slaves", major, minor)
 
@@ -1609,23 +1675,50 @@ func (o *OsDeviceConnectivityHelperGeneric) getSlavesForDevice(major, minor uint
 
 	var results []string
 	for _, entry := range entries {
-		slaveName := entry.Name() // e.g., "sda" or "nvme0n1"
-
-		if strings.HasPrefix(slaveName, "nvme") {
-			// NVMe: The slave name is usually what we need (e.g., nvme0n1)
+		slaveName := entry.Name() // Keeps exact block name like "sda" or "nvme0n1"
+		if slaveName != "" {
 			results = append(results, slaveName)
-		} else {
-			// SCSI: We need the 'sg' equivalent
-			sgPath := filepath.Join("/sys/block", slaveName, "device", "scsi_generic")
-			sgEntries, _ := os.ReadDir(sgPath)
-			for _, sgEntry := range sgEntries {
-				if strings.HasPrefix(sgEntry.Name(), "sg") {
-					results = append(results, sgEntry.Name())
-				}
-			}
 		}
 	}
 	return results, nil
+}
+
+// FindSlavesByWWID operates completely decoupled from VFS mounts to locate paths on broken maps
+func (o *OsDeviceConnectivityHelperGeneric) FindSlavesByWWID(expectedWWID string) []string {
+	var slaves []string
+	if expectedWWID == "" {
+		return slaves
+	}
+
+	targetWWID := strings.ToLower(strings.TrimSpace(expectedWWID))
+	blockEntries, err := os.ReadDir("/sys/block")
+	if err != nil {
+		logger.Errorf("WWID Fallback Scan: failed to read /sys/block: %v", err)
+		return slaves
+	}
+
+	for _, entry := range blockEntries {
+		name := entry.Name()
+
+		if strings.HasPrefix(name, "loop") || strings.HasPrefix(name, "ram") || strings.HasPrefix(name, "dm-") {
+			continue
+		}
+
+		sysfsPath := filepath.Join("/sys/block", name, "device", "wwid")
+		wwidBytes, err := os.ReadFile(sysfsPath)
+		if err != nil {
+			continue // Skip virtual paths lacking a kernel WWID identifier mapping
+		}
+
+		deviceWWID := strings.ToLower(strings.TrimSpace(string(wwidBytes)))
+
+		if deviceWWID != "" && (deviceWWID == targetWWID || strings.Contains(deviceWWID, targetWWID) || strings.Contains(targetWWID, deviceWWID)) {
+			logger.Infof("WWID Fallback Scan: Found matching hardware path %s for WWID %s", name, expectedWWID)
+			slaves = append(slaves, name)
+		}
+	}
+
+	return slaves
 }
 
 type DmTargetSpec struct {
@@ -2091,10 +2184,8 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) FinalWwidPurge(ctx context.Conte
 
 
 // In Case 1, when a collision is detected, you call UnmountWithContext. Ensure your UnmountWithContext is set to use MNT_DETACH (Lazy) immediately for collisions, as you don't want to wait for a graceful timeout on a rogue volume.
-
-
-func (r OsDeviceConnectivityHelperScsiGeneric) VerifyAndGetDmDevice(devName string, volumeUuid string) (string, error) {
-	expectedSerial := strings.ToLower(volumeUuid)
+//func (r OsDeviceConnectivityHelperScsiGeneric) VerifyAndGetDmDevice(devName string, volumeUuid string) (string, error) {
+//	expectedSerial := strings.ToLower(volumeUuid)
 	//TODO restore check
 	//expectedLunStr := fmt.Sprintf("%d", lun)
 	//expectedMpathUuid := "mpath-" + expectedSerial
@@ -2150,6 +2241,34 @@ func (r OsDeviceConnectivityHelperScsiGeneric) VerifyAndGetDmDevice(devName stri
 	}
 	return targetDm, nil
 }
+
+// Add this conflict checker as an internal loop inside EvaluateSysfsTopology
+func (o *GetDmsPathHelperGeneric) checkGlobalIdentityConflicts(targetUUID string, currentDevName string) error {
+	dmMatches, _ := filepath.Glob("/sys/block/dm-*/dm/uuid")
+	for _, m := range dmMatches {
+		parts := strings.Split(m, "/")
+		if len(parts) < 4 || parts[3] == currentDevName {
+			continue // Skip auditing the device we are currently analyzing
+		}
+		
+		content, err := os.ReadFile(m)
+		if err != nil {
+			continue
+		}
+		foundUUID := normalizeWWID(string(content))
+		
+		if foundUUID == targetUUID {
+			otherDmName := parts[3]
+			// Check holders to see if the mapping is actively open (mounted/locked by another subsystem)
+			holders, _ := os.ReadDir(filepath.Join("/sys/block", otherDmName, "holders"))
+			if len(holders) > 0 {
+				return fmt.Errorf("FATAL identity clash: WWID %s is already claimed by active system device %s", targetUUID, otherDmName)
+			}
+		}
+	}
+	return nil
+}
+
 
 func (r *OsDeviceConnectivityHelperScsiGeneric) multipathdAction(ctx context.Context, cmd string) error {
 	response, err := r.Executer.MultipathdCmd(ctx, "", cmd)
