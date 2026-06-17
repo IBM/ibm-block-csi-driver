@@ -380,7 +380,7 @@ func (m *Mounter) UnmountWithTimeout(ctx context.Context, target string, timeout
 	if err != nil {
 		// Idempotency check: if the path is already gone or invalid, clean up tracker and exit
 		if err == syscall.ENOENT || err == syscall.EINVAL {
-			logger.Warningf("already gone %w", err)
+			logger.Warningf("already gone %v", err)
 			m.unmountTracker.Delete(target)
 			return nil
 		}
@@ -394,7 +394,7 @@ func (m *Mounter) UnmountWithTimeout(ctx context.Context, target string, timeout
 			// Tier 1 & 2: We are still within the safety windows. Return the error 
 			// to halt the orchestrator and let Kubelet retry on a backoff loop.
 			if tierState == StateGracefulPending || tierState == StateForcePending {
-				logger.Warningf("target %s is busy under %s tier (waiting for Kubelet retry): %w", target, tierState, err)
+				logger.Warningf("target %s is busy under %s tier (waiting for Kubelet retry): %v", target, tierState, err)
 				return fmt.Errorf("target %s is busy under %s tier (waiting for Kubelet retry): %w", target, tierState, err)
 			}
 			
@@ -406,7 +406,7 @@ func (m *Mounter) UnmountWithTimeout(ctx context.Context, target string, timeout
 			return nil 
 		}
 		
-		logger.Warningf("target %s unexpected error under %s tier (waiting for Kubelet retry): %w", target, tierState, err)
+		logger.Warningf("target %s unexpected error under %s tier (waiting for Kubelet retry): %v", target, tierState, err)
 
 		// Return any other unexpected hard kernel errors
 		return err
@@ -471,7 +471,7 @@ func (m *Mounter) tryUnmount(target string, flags int, timeout time.Duration) er
 			// Log cleanly so K8s controller loop knows it's waiting for retry/escalation
 			return fmt.Errorf("target %s is busy: %w", target, err)
 		}
-		logger.Warningf("target %s tryUnmount error %w", target, err)
+		logger.Warningf("target %s tryUnmount error %v", target, err)
 		return err
 
 	case <-time.After(timeout):
