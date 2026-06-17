@@ -572,7 +572,7 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) flushDeviceBuffers(ctx context.C
 
 	select {
 	case err := <-done:
-		logger.Warningf("device %s flushDeviceBuffers err %w", devPath), err
+		logger.Warningf("device %s flushDeviceBuffers err %w", devPath, err)
 		return err
 	case <-ctx.Done():
 		logger.Warningf("device %s flushDeviceBuffers timed out", devPath)
@@ -823,7 +823,7 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) purgeScsiGhosts(ctx context.Cont
        var (
                deleted int
                notLun  int
-               notPQ   int
+               //notPQ   int
        )
 	
 
@@ -1354,7 +1354,7 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) checkPQviaIoctl(sgName string) (
 
 		var errno syscall.Errno
 		for i := 0; i < 3; i++ {
-			_, _, errno = syscall.Syscall(SYS_IOCTL, uintptr(fd), SG_IO, uintptr(unsafe.Pointer(&header)))
+			_, _, errno = syscall.Syscall(syscall.SYS_IOCTL, uintptr(fd), SG_IO, uintptr(unsafe.Pointer(&header)))
 			if errno != syscall.EAGAIN && errno != syscall.EBUSY {
 				break
 			}
@@ -1481,16 +1481,6 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) RemovePhysicalDevice(ctx context
 	return nil
 }
 
-// Utility method proxying system calls safely
-func (r *OsDeviceConnectivityHelperScsiGeneric) readSysfs(path string) string {
-	data, err := os.ReadFile(path)
-	if err != nil {
-		return ""
-	}
-	return strings.TrimSpace(string(data))
-}
-
-
 // sHardwareBlocked, also check for the quiesce state. It often indicates a storage controller failover where I/O is paused but not failed.
 
 func (r *OsDeviceConnectivityHelperScsiGeneric) TeardownVolume(ctx context.Context, target string, needFlush bool, needRemovePhysical bool, expectedWWID string) error {
@@ -1519,7 +1509,7 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) TeardownVolume(ctx context.Conte
 					
 					// FIX: Syntax typo 'devPath)f' removed
 					if strings.HasPrefix(filepath.Base(devPath), "dm-") {
-						mpathName = r.Helper.GetDMNameFromMinor(minor) 
+						mpathName = r.GetDMNameFromMinor(minor) 
 					}
 				}
 			}
@@ -1554,7 +1544,7 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) TeardownVolume(ctx context.Conte
 
 	// --- PHASE 3: DEVICE MAPPER CLEANUP / RESCUE ---
 	if mpathName != "" {
-		var openCount int
+		var openCount int32
 		
 		for i := 0; i < 10; i++ {
 			if ctx.Err() != nil {
@@ -1626,35 +1616,35 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) TeardownVolume(ctx context.Conte
 	return nil
 }
 
-// GetDMNameFromMinor resolves a dm-X runtime mapping name to its user-space mapped 
+// GetDMNameFromMinor resolves a dm-X runtime mapping name to its user-space mapped
 // identity (e.g., dm-0 -> multipath-volume-uuid) directly via sysfs device tracking.
-func (o *OsDeviceConnectivityHelperGeneric) GetDMNameFromMinor(minor uint32) string {
-	// Standard Linux sysfs location for Device Mapper target names
-	// The device-mapper major number on Linux is almost universally 253.
-	sysfsNamePath := fmt.Sprintf("/sys/dev/block/253:%d/dm/name", minor)
-	
-	logger.Warning("GetDMNameFromMinor")
+func (o *OsDeviceConnectivityHelperScsiGeneric) GetDMNameFromMinor(minor uint32) string {
+        // Standard Linux sysfs location for Device Mapper target names
+        // The device-mapper major number on Linux is almost universally 253.
+        sysfsNamePath := fmt.Sprintf("/sys/dev/block/253:%d/dm/name", minor)
 
-	nameBytes, err := os.ReadFile(sysfsNamePath)
-	if err != nil {
-		logger.Warning("GetDMNameFromMino error %w", err)
-		// Fallback: Check if the device is mapped directly under the /sys/block tree structure
-		// as /sys/block/dm-X/dm/name
-		fallbackPath := fmt.Sprintf("/sys/block/dm-%d/dm/name", minor)
-		nameBytes, err = os.ReadFile(fallbackPath)
-		if err != nil {
-			logger.Warningf("Hardware Harvest: Could not resolve DM mapped name for minor %d via sysfs: %v", minor, err)
-			return ""
-		}
-	}
+        logger.Warning("GetDMNameFromMinor")
 
-	// Clean trailing newlines or whitespace (e.g. "mpathb\n" -> "mpathb")
-	dmName := strings.TrimSpace(string(nameBytes))
-	if dmName != "" {
-		logger.Infof("Hardware Harvest: Successfully resolved minor dev %d to DM map name: %s", minor, dmName)
-	}
-	
-	return dmName
+        nameBytes, err := os.ReadFile(sysfsNamePath)
+        if err != nil {
+                logger.Warning("GetDMNameFromMino error %w", err)
+                // Fallback: Check if the device is mapped directly under the /sys/block tree structure
+                // as /sys/block/dm-X/dm/name
+                fallbackPath := fmt.Sprintf("/sys/block/dm-%d/dm/name", minor)
+                nameBytes, err = os.ReadFile(fallbackPath)
+                if err != nil {
+                        logger.Warningf("Hardware Harvest: Could not resolve DM mapped name for minor %d via sysfs: %v", minor, err)
+                        return ""
+                }
+        }
+
+        // Clean trailing newlines or whitespace (e.g. "mpathb\n" -> "mpathb")
+        dmName := strings.TrimSpace(string(nameBytes))
+        if dmName != "" {
+                logger.Infof("Hardware Harvest: Successfully resolved minor dev %d to DM map name: %s", minor, dmName)
+        }
+
+        return dmName
 }
 
 
@@ -2362,8 +2352,9 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) FinalWwidPurge(ctx context.Conte
 
 
 // In Case 1, when a collision is detected, you call UnmountWithContext. Ensure your UnmountWithContext is set to use MNT_DETACH (Lazy) immediately for collisions, as you don't want to wait for a graceful timeout on a rogue volume.
-//func (r OsDeviceConnectivityHelperScsiGeneric) VerifyAndGetDmDevice(devName string, volumeUuid string) (string, error) {
-//	expectedSerial := strings.ToLower(volumeUuid)
+// VerifyAndGetDmDevice replaced by VerifyAndGetDmDevice
+func (r OsDeviceConnectivityHelperScsiGeneric) VerifyAndGetDmDevice(devName string, volumeUuid string) (string, error) {
+	expectedSerial := strings.ToLower(volumeUuid)
 	//TODO restore check
 	//expectedLunStr := fmt.Sprintf("%d", lun)
 	//expectedMpathUuid := "mpath-" + expectedSerial
