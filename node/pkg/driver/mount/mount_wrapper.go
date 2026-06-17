@@ -308,10 +308,8 @@ func (m *Mounter) MakeDir(pathname string) error {
 func (m *Mounter) UnmountWithTimeout(ctx context.Context, target string, timeout time.Duration) error {
 	now := time.Now()
 	
-   device, _ := m.getDeviceFromMount(target)
-
    // 1. Resolve Device and Perform Safety Gate Checks
-   device, _ = m.getDeviceFromMount(target)
+   device, _ := m.GetDeviceFromMount(target)
    if device != "" {
 		   // HARDWARE GATE: If the kernel workers (jbd2/xfs) are already wedged,
 		   // any further I/O (like unmount or sync) will deadlock the thread.
@@ -490,7 +488,7 @@ type SyncResult struct {
 
 func (m *Mounter) backgroundSyncfs(ctx context.Context, target string, info *TrackedUnmount) {
 	// 1. RE-VERIFY Hardware inside Goroutine
-	device, _ := m.getDeviceFromMount(target)
+	device, _ := m.GetDeviceFromMount(target)
 	if device != "" && m.executer.IsDeviceStillStuck(device) {
 		logger.Warningf("Background Sync aborted for %s: device %s is already wedged", target, device)
 	}
@@ -592,7 +590,7 @@ func (m *Mounter) ImmediateDetach(ctx context.Context, target string) error {
 	return fmt.Errorf("immediate detach failed for %s: %w", target, err)
 }
 
-func (m *Mounter) getDeviceFromMount(target string) (string, error) {
+func (m *Mounter) GetDeviceFromMount(target string) (string, error) {
 	// Parse /proc/self/mountinfo to find the device source for the target
 	// This is standard for CSI mounter implementations
 	mounts, err := m.Mounter.List()
