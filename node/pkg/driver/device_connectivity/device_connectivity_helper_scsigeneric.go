@@ -1422,64 +1422,6 @@ PROCESS_PQ:
 	return false, nil
 }
 
-// Fixed framework function incorporating our historical fixes
-func (r *OsDeviceConnectivityHelperScsiGeneric) RemovePhysicalDevice(ctx context.Context, sysDevices []string) error {
-	var wg sync.WaitGroup
-
-	for _, deviceName := range sysDevices {
-		if deviceName == "" {
-			continue
-		}
-
-		wg.Add(1)
-		go func(name string) {
-			defer wg.Done()
-
-			_, err := executer.ExecuteUninterruptible[struct{}](
-				ctx,
-				r.KeyedGater,        
-				"path-delete-"+name, 
-				10,
-				100,
-				5*time.Second,
-				30*time.Second,
-				func(ctx context.Context) (struct{}, error) {
-					devPath := fmt.Sprintf("/dev/%s", name)
-					_ = r.flushDeviceBuffers(ctx, devPath)
-
-					var deletePath string
-					if strings.HasPrefix(name, "nvme") {
-						parts := strings.Split(name, "n")
-						if len(parts) > 0 {
-							// FIX: Access index 0 directly to prevent string formatting slice panics
-							deletePath = fmt.Sprintf("/sys/class/nvme/%s/delete_controller", parts[0])
-						} else {
-							return struct{}{}, fmt.Errorf("invalid nvme tracking name layout: %s", name)
-						}
-					} else {
-						deletePath = fmt.Sprintf("/sys/block/%s/device/delete", name)
-					}
-
-					if _, err := os.Stat(deletePath); os.IsNotExist(err) {
-						logger.Warningf("Idempotency: Block device path {%s} absent, skipping teardown", deletePath)
-						return struct{}{}, nil
-					}
-
-					if err := os.WriteFile(deletePath, []byte("1"), 0200); err != nil {
-						return struct{}{}, fmt.Errorf("failed write transaction to path %s: %w", deletePath, err)
-					}
-					return struct{}{}, nil
-				},
-			)
-			if err != nil {
-				logger.Errorf("Gater failed execution on target path %s: %v", name, err)
-			}
-		}(deviceName)
-	}
-
-	wg.Wait()
-	return nil
-}
 
 // sHardwareBlocked, also check for the quiesce state. It often indicates a storage controller failover where I/O is paused but not failed.
 
@@ -1598,7 +1540,7 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) TeardownVolume(ctx context.Conte
 		
 		if len(slaves) == 0 && expectedWWID != "" {
 			logger.Warningf("No slaves found via major/minor. Running fallback WWID scan for: %s", expectedWWID)
-			slaves = r.Helper.FindSlavesByWWID(expectedWWID) 
+			slaves = r.FindSlavesByWWID(expectedWWID) 
 		}
 
 		if len(slaves) > 0 {
@@ -1615,6 +1557,49 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) TeardownVolume(ctx context.Conte
 	}
 	return nil
 }
+
+// FindSlavesByWWID operates completely decoupled from VFS mounts to locate paths on broken maps
+func (o *OsDeviceConnectivityHelperScsiGeneric) FindSlavesByWWID(expectedWWID string) []string {
+	logger.Warning("FindSlavesByWWID %s", expectedWWID)
+	var slaves []string
+	if expectedWWID == "" {
+		return slaves
+	}
+
+	targetWWID := strings.ToLower(strings.TrimSpace(expectedWWID))
+	blockEntries, err := os.ReadDir("/sys/block")
+	if err != nil {
+		logger.Errorf("WWID Fallback Scan: failed to read /sys/block: %v", err)
+		return slaves
+	}
+
+	for _, entry := range blockEntries {
+		name := entry.Name()
+		
+		logger.Warningf("FindSlavesByWWID %s entry %s", expectedWWID, name)
+
+		if strings.HasPrefix(name, "loop") || strings.HasPrefix(name, "ram") || strings.HasPrefix(name, "dm-") {
+			continue
+		}
+
+		sysfsPath := filepath.Join("/sys/block", name, "device", "wwid")
+		wwidBytes, err := os.ReadFile(sysfsPath)
+		if err != nil {
+			logger.Warningf("FindSlavesByWWID %s entry %s err %w", expectedWWID, name, err)
+			continue // Skip virtual paths lacking a kernel WWID identifier mapping
+		}
+
+		deviceWWID := strings.ToLower(strings.TrimSpace(string(wwidBytes)))
+
+		if deviceWWID != "" && (deviceWWID == targetWWID || strings.Contains(deviceWWID, targetWWID) || strings.Contains(targetWWID, deviceWWID)) {
+			logger.Infof("WWID Fallback Scan: Found matching hardware path %s for WWID %s", name, expectedWWID)
+			slaves = append(slaves, name)
+		}
+	}
+
+	return slaves
+}
+
 
 // GetDMNameFromMinor resolves a dm-X runtime mapping name to its user-space mapped
 // identity (e.g., dm-0 -> multipath-volume-uuid) directly via sysfs device tracking.
@@ -1847,47 +1832,6 @@ func (o *OsDeviceConnectivityHelperGeneric) getSlavesForDevice(major, minor uint
 	return results, nil
 }
 
-// FindSlavesByWWID operates completely decoupled from VFS mounts to locate paths on broken maps
-func (o *OsDeviceConnectivityHelperGeneric) FindSlavesByWWID(expectedWWID string) []string {
-	logger.Warning("FindSlavesByWWID %s", expectedWWID)
-	var slaves []string
-	if expectedWWID == "" {
-		return slaves
-	}
-
-	targetWWID := strings.ToLower(strings.TrimSpace(expectedWWID))
-	blockEntries, err := os.ReadDir("/sys/block")
-	if err != nil {
-		logger.Errorf("WWID Fallback Scan: failed to read /sys/block: %v", err)
-		return slaves
-	}
-
-	for _, entry := range blockEntries {
-		name := entry.Name()
-		
-		logger.Warningf("FindSlavesByWWID %s entry %s", expectedWWID, name)
-
-		if strings.HasPrefix(name, "loop") || strings.HasPrefix(name, "ram") || strings.HasPrefix(name, "dm-") {
-			continue
-		}
-
-		sysfsPath := filepath.Join("/sys/block", name, "device", "wwid")
-		wwidBytes, err := os.ReadFile(sysfsPath)
-		if err != nil {
-			logger.Warningf("FindSlavesByWWID %s entry %s err %w", expectedWWID, name, err)
-			continue // Skip virtual paths lacking a kernel WWID identifier mapping
-		}
-
-		deviceWWID := strings.ToLower(strings.TrimSpace(string(wwidBytes)))
-
-		if deviceWWID != "" && (deviceWWID == targetWWID || strings.Contains(deviceWWID, targetWWID) || strings.Contains(targetWWID, deviceWWID)) {
-			logger.Infof("WWID Fallback Scan: Found matching hardware path %s for WWID %s", name, expectedWWID)
-			slaves = append(slaves, name)
-		}
-	}
-
-	return slaves
-}
 
 type DmTargetSpec struct {
     SectorStart uint64
