@@ -447,28 +447,28 @@ func (d *NodeService) NodeUnstageVolume(ctx context.Context, req *csi.NodeUnstag
 	}
 
 
-	
-	
-	
-	
-	
-	
-	
-	
 	err = d.OsDeviceConnectivityHelper.TeardownVolume(ctx, stagingTargetPath, needFlush, needRemovePhysical, volumeUuid)
+	if err != nil {
+		// FIX: Propagate the error back to Kubelet. 
+		// If this is wrapped in our safety tiers, Kubelet will exponentially back off and retry.
+		// No metadata or host directory changes will occur until the tiers pass or hardware is rescued.
+		return nil, status.Errorf(codes.Internal, "failed to teardown staging target %s: %v", stagingTargetPath, err)
+	}
 
-	// TODO resurrected?
+	// 2. Clear Stage Info Metadata (Only safely executable if hardware/VFS layers are verified clean)
 	stageInfoPath := path.Join(stagingTargetPath, StageInfoFilename)
 	if d.NodeUtils.StageInfoFileIsExist(stageInfoPath) {
 		if err := d.NodeUtils.ClearStageInfoFile(stageInfoPath); err != nil {
-			return nil, status.Errorf(codes.Internal, "Fail to clear the stage info file: error %v", err)
+			return nil, status.Errorf(codes.Internal, "fail to clear the stage info file: error %v", err)
 		}
 	}
 
-	err = os.Remove(stagingPathWithHostPrefix)
+	// 3. Wipe target path registration
+	if err := os.Remove(stagingPathWithHostPrefix); err != nil && !os.IsNotExist(err) {
+		return nil, status.Errorf(codes.Internal, "failed to remove staging host path: %v", err)
+	}
 
-	logger.Debugf("NodeUnStageVolume Finished: multipath device removed from host")
-
+	logger.Infof("NodeUnstageVolume Finished Successfully: volume %s completely removed from host", volumeUuid)
 	return &csi.NodeUnstageVolumeResponse{}, nil
 }
 
