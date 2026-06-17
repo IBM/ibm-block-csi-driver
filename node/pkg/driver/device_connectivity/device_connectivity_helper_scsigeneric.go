@@ -572,7 +572,7 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) flushDeviceBuffers(ctx context.C
 
 	select {
 	case err := <-done:
-		logger.Warningf("device %s flushDeviceBuffers err %w", devPath, err)
+		logger.Warningf("device %s flushDeviceBuffers err %v", devPath, err)
 		return err
 	case <-ctx.Done():
 		logger.Warningf("device %s flushDeviceBuffers timed out", devPath)
@@ -815,7 +815,7 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) purgeScsiGhosts(ctx context.Cont
 		if os.IsNotExist(err) {
 			return nil
 		}
-		logger.Warningf("failed to read scsi_generic %w", err)
+		logger.Warningf("failed to read scsi_generic %v", err)
 		return fmt.Errorf("failed to read scsi_generic: %w", err)
 	}
 
@@ -834,7 +834,7 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) purgeScsiGhosts(ctx context.Cont
 		// 1. Verify LUN Identity Match
 		lunBytes, err := os.ReadFile(filepath.Join(deviceDir, "lun"))
 		if err != nil {
-			logger.Warningf("failed to read lun %w", err)
+			logger.Warningf("failed to read lun %v", err)
 			continue // Device is transitioning out of kernel space
 		}
 		logger.Warningf("compare lun %s with %s", r.normalizeLun(string(lunBytes)), normLun)
@@ -1585,11 +1585,13 @@ func (o *OsDeviceConnectivityHelperScsiGeneric) FindSlavesByWWID(expectedWWID st
 		sysfsPath := filepath.Join("/sys/block", name, "device", "wwid")
 		wwidBytes, err := os.ReadFile(sysfsPath)
 		if err != nil {
-			logger.Warningf("FindSlavesByWWID %s entry %s err %w", expectedWWID, name, err)
+			logger.Warningf("FindSlavesByWWID %s entry %s err %v", expectedWWID, name, err)
 			continue // Skip virtual paths lacking a kernel WWID identifier mapping
 		}
 
 		deviceWWID := strings.ToLower(strings.TrimSpace(string(wwidBytes)))
+		
+		logger.Warningf("FindSlavesByWWID %s entry %s value %s", expectedWWID, deviceWWID)
 
 		if deviceWWID != "" && (deviceWWID == targetWWID || strings.Contains(deviceWWID, targetWWID) || strings.Contains(targetWWID, deviceWWID)) {
 			logger.Infof("WWID Fallback Scan: Found matching hardware path %s for WWID %s", name, expectedWWID)
@@ -1612,7 +1614,7 @@ func (o *OsDeviceConnectivityHelperScsiGeneric) GetDMNameFromMinor(minor uint32)
 
         nameBytes, err := os.ReadFile(sysfsNamePath)
         if err != nil {
-                logger.Warning("GetDMNameFromMino error %w", err)
+                logger.Warning("GetDMNameFromMino error %v", err)
                 // Fallback: Check if the device is mapped directly under the /sys/block tree structure
                 // as /sys/block/dm-X/dm/name
                 fallbackPath := fmt.Sprintf("/sys/block/dm-%d/dm/name", minor)
