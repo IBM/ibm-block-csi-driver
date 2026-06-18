@@ -835,6 +835,7 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) purgeScsiGhosts(ctx context.Cont
 		// 1. Resolve absolute HCTL path to avoid text file missing bugs on RHEL 7
 		realPath, err := filepath.EvalSymlinks(deviceDir)
 		if err != nil {
+			logger.Warning("Symlink err")
 			// Path is in the middle of being deleted by the kernel; skip safely
 			continue 
 		}
@@ -843,18 +844,20 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) purgeScsiGhosts(ctx context.Cont
 		hctl := filepath.Base(realPath)
 		parts := strings.Split(hctl, ":")
 		if len(parts) < 4 {
+			logger.Warning("split err")
 			continue // Invalid layout or not a standard SCSI endpoint
 		}
 		
 		// Extract the LUN component from the HCTL layout (the 4th element)
 		deviceLun := parts[3] 
-		logger.Warningf("compare lun %s with %s", r.normalizeLun(string(lunBytes)), deviceLun)
 		
 		kernelLun, err := strconv.Atoi(deviceLun)
 		if err != nil {
+			logger.Warning("atoi error")
 			continue // If the kernel string fails to parse as a number, skip safely
-		}		
-		if kernelLun != normLun {
+		}	
+		logger.Warningf("compare lun %d with %d", kernelLun, expectedLun)	
+		if kernelLun != expectedLun {
 			notLun++		
 			continue // Mismatched LUN; ignore this device node safely
 		}
