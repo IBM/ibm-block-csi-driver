@@ -187,11 +187,11 @@ func (d *NodeService) NodeStageVolume(ctx context.Context, req *csi.NodeStageVol
                 logger.Infof("Device missing or recently purged for WWID %v. Initiating fabric discovery.", volumeUuid)
                 osDeviceConnectivity.EnsureLogin(ctx, ipsByArrayInitiator)
 
-                _ = d.OsDeviceConnectivityHelper.RemoveGhostDevice(ctx, volumeUuid, lun, arrayInitiators)
+                //_ = d.OsDeviceConnectivityHelper.RemoveGhostDevice(ctx, volumeUuid, lun, arrayInitiators)
                 if err := osDeviceConnectivity.RescanDevices(lun, arrayInitiators); err != nil {
                         return nil, status.Error(codes.Internal, err.Error())
                 }
-                _ = d.OsDeviceConnectivityHelper.RemoveGhostDevice(ctx, volumeUuid, lun, arrayInitiators)
+                //_ = d.OsDeviceConnectivityHelper.RemoveGhostDevice(ctx, volumeUuid, lun, arrayInitiators)
         } else {
                 // If preScanErr is codes.Aborted, it means skipRescan is true because discovery is ongoing
                 if preScanErr != nil && status.Code(preScanErr) == codes.Aborted {
