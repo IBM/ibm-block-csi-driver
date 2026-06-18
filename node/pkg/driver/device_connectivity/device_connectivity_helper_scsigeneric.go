@@ -737,6 +737,7 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) ValidateLun(ctx context.Context,
 				continue
 			}
 
+			// TODO compare with ghost device detection
 			// LUN Discovery
 			actualLun = r.normalizeLun(r.readSysfs(fmt.Sprintf("/sys/block/%s/device/lun", deviceName)))
 			if actualLun == "" {
@@ -819,7 +820,6 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) purgeScsiGhosts(ctx context.Cont
 		return fmt.Errorf("failed to read scsi_generic: %w", err)
 	}
 
-	normLun := r.normalizeLun(fmt.Sprintf("%d", expectedLun))
        var (
                deleted int
                notLun  int
@@ -830,17 +830,33 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) purgeScsiGhosts(ctx context.Cont
 	for _, entry := range sgEntries {
 		sgName := entry.Name()
 		deviceDir := filepath.Join("/sys/class/scsi_generic", sgName, "device")
+		
 
-		// 1. Verify LUN Identity Match
-		lunBytes, err := os.ReadFile(filepath.Join(deviceDir, "lun"))
+		// 1. Resolve absolute HCTL path to avoid text file missing bugs on RHEL 7
+		realPath, err := filepath.EvalSymlinks(deviceDir)
 		if err != nil {
-			logger.Warningf("failed to read lun %v", err)
-			continue // Device is transitioning out of kernel space
+			// Path is in the middle of being deleted by the kernel; skip safely
+			continue 
 		}
-		logger.Warningf("compare lun %s with %s", r.normalizeLun(string(lunBytes)), normLun)
-		if r.normalizeLun(string(lunBytes)) != normLun {
-			notLun++
-			continue
+
+		// The final directory name is the HCTL string (e.g., "host:channel:target:lun")
+		hctl := filepath.Base(realPath)
+		parts := strings.Split(hctl, ":")
+		if len(parts) < 4 {
+			continue // Invalid layout or not a standard SCSI endpoint
+		}
+		
+		// Extract the LUN component from the HCTL layout (the 4th element)
+		deviceLun := parts[3] 
+		logger.Warningf("compare lun %s with %s", r.normalizeLun(string(lunBytes)), deviceLun)
+		
+		kernelLun, err := strconv.Atoi(deviceLun)
+		if err != nil {
+			continue // If the kernel string fails to parse as a number, skip safely
+		}		
+		if kernelLun != normLun {
+			notLun++		
+			continue // Mismatched LUN; ignore this device node safely
 		}
 
 		// 2. Validate Ownership Scope
@@ -1560,7 +1576,7 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) TeardownVolume(ctx context.Conte
 
 // FindSlavesByWWID operates completely decoupled from VFS mounts to locate paths on broken maps
 func (o *OsDeviceConnectivityHelperScsiGeneric) FindSlavesByWWID(expectedWWID string) []string {
-	logger.Warning("FindSlavesByWWID %s", expectedWWID)
+	logger.Warningf("FindSlavesByWWID %s", expectedWWID)
 	var slaves []string
 	if expectedWWID == "" {
 		return slaves
@@ -1589,9 +1605,10 @@ func (o *OsDeviceConnectivityHelperScsiGeneric) FindSlavesByWWID(expectedWWID st
 			continue // Skip virtual paths lacking a kernel WWID identifier mapping
 		}
 
-		deviceWWID := strings.ToLower(strings.TrimSpace(string(wwidBytes)))
+		deviceWWID := normalizeWWID(string(wwidBytes))
 		
-		logger.Warningf("FindSlavesByWWID %s entry %s value %s", expectedWWID, deviceWWID)
+		
+		logger.Warningf("FindSlavesByWWID %s entry %s", expectedWWID, deviceWWID)
 
 		if deviceWWID != "" && (deviceWWID == targetWWID || strings.Contains(deviceWWID, targetWWID) || strings.Contains(targetWWID, deviceWWID)) {
 			logger.Infof("WWID Fallback Scan: Found matching hardware path %s for WWID %s", name, expectedWWID)
