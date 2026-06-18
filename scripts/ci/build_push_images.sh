@@ -14,7 +14,7 @@ specific_tag="${IMAGE_VERSION}_b${BUILD_NUMBER}_${branch}"
 [ "$GIT_BRANCH" = "develop" -o "$GIT_BRANCH" = "origin/develop" -o "$GIT_BRANCH" = "master" ] && is_tag_latest="true" || is_tag_latest="false"
 
 images_file=$1
-[ -n "$images_file" ] && printf "" > $images_file || :
+[ -n "$images_file" ] && { mkdir -p "$(dirname "$images_file")" && printf "" > $images_file; } || :
 
 build_and_push (){
     repository=$1
