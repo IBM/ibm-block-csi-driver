@@ -1840,14 +1840,16 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
 
     def _get_recovery_location_index(self, vg_replication):
         partition_name = self._getattr_as_str(vg_replication, 'partition_name', '')
+        local_location = self._getattr_as_str(vg_replication, 'local_location', '1')
 
         if partition_name:
-            recovery_idx = '3'
-            logger.info("Partition VG (partition_name='{}') -> "
-                        "DR location = '{}'".format(partition_name, recovery_idx))
+            recovery_idx = '3' if local_location == '1' else '1'
+            logger.info("Partition VG (partition_name='{}', local_location='{}') -> "
+                        "DR location = '{}'".format(partition_name, local_location, recovery_idx))
         else:
-            recovery_idx = '2'
-            logger.info("Non-partition VG -> DR location = '{}'".format(recovery_idx))
+            recovery_idx = '2' if local_location == '1' else '1'
+            logger.info("Non-partition VG (local_location='{}') -> "
+                        "DR location = '{}'".format(local_location, recovery_idx))
 
         return recovery_idx
 
@@ -1896,31 +1898,73 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
         source_thin_volume = self._generate_thin_volume_response(raw_cli_volume)
         source_volume_handle = get_volume_id(source_thin_volume, None)
 
+        if Version(self._code_level) >= Version(array_settings.SVC_DR_SANDBOX_BUILD):
+            return self._get_destination_volume_handle_from_replication_fields(raw_cli_volume)
+
         if dr_mediator is None:
             logger.info("DR mediator not provided, returning source handle '{}' as destination".format(
                 source_volume_handle))
             return source_volume_handle
 
-        destination_volume_handle = self._get_destination_volume_handle(source_thin_volume.name, dr_mediator)
-
-        if destination_volume_handle is None:
+        destination_vol_handle = self._get_destination_volume_handle_from_remote(source_thin_volume.name, dr_mediator)
+        if destination_vol_handle is None:
             logger.warning("destination volume not yet available on secondary storage "
                            "for volume '{}'".format(source_thin_volume.name))
             return None
 
-        return destination_volume_handle
+        return destination_vol_handle
+
+    def _get_destination_volume_handle_from_replication_fields(self, raw_cli_volume):
+        if not hasattr(raw_cli_volume, 'remote_volume_uid'):
+            logger.info("storage does not support replication destination fields for volume '{}', "
+                        "skipping replication fields lookup".format(raw_cli_volume.name))
+            return None
+
+        volume_group_id = self._getattr_as_str(raw_cli_volume, 'volume_group_id', '')
+        if not volume_group_id:
+            logger.info("volume '{}' is not part of a volume group, skipping replication fields lookup".format(
+                raw_cli_volume.name))
+            return None
+
+        vg_replication = self._lsvolumegroupreplication(volume_group_id)
+        if not vg_replication:
+            logger.info("volume group '{}' has no replication policy, "
+                        "skipping replication fields lookup".format(volume_group_id))
+            return None
+
+        recovery_idx = self._get_recovery_location_index(vg_replication)
+        remote_internal_id = self._getattr_as_str(raw_cli_volume, 'location{}_volume_id'.format(recovery_idx), '')
+        remote_uid = self._getattr_as_str(raw_cli_volume, 'remote_volume_uid', '')
+
+        if not remote_internal_id or not remote_uid:
+            logger.info("replication fields not yet available for volume '{}' "
+                        "(location{}_volume_id='{}', remote_volume_uid='{}')".format(
+                            raw_cli_volume.name, recovery_idx, remote_internal_id, remote_uid))
+            return None
+
+        dest_thin_volume = ThinVolume(
+            capacity_bytes=int(raw_cli_volume.capacity),
+            id=remote_uid,
+            internal_id=remote_internal_id,
+            name=raw_cli_volume.name,
+            array_type=self.array_type
+        )
+        handle = get_volume_id(dest_thin_volume, None)
+        logger.info("destination volume handle '{}' resolved from replication fields for volume '{}'".format(
+            handle, raw_cli_volume.name))
+        return handle
 
     @staticmethod
-    def _get_destination_volume_handle(volume_name, dr_mediator):
+    def _get_destination_volume_handle_from_remote(volume_name, dr_mediator):
         try:
             dest_cli_volume = dr_mediator._get_cli_volume(volume_name, not_exist_err=False)
         except Exception as ex:
-            logger.warning("failed to fetch volume '{}' from secondary storage: {}".format(
+            logger.warning("failed to fetch replicated volume '{}' from remote array: {}".format(
                 volume_name, ex))
             return None
 
         if not dest_cli_volume:
-            logger.warning("volume '{}' not found on secondary storage".format(volume_name))
+            logger.warning("replicated volume '{}' not found on remote array".format(volume_name))
             return None
 
         dest_thin_volume = dr_mediator._generate_thin_volume_response(dest_cli_volume)

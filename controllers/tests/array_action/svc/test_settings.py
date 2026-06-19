@@ -18,11 +18,13 @@ ACTIVE_STATE = "active"
 INACTIVE_STATE = "inactive"
 
 LSSYSTEM_LOCATION_ATTR_KEY = "location"
+LSSYSTEM_CODE_LEVEL_ATTR_KEY = "code_level"
 LSSYSTEM_ID_ALIAS_ATTR_KEY = "id_alias"
 LSSYSTEM_CODE_LEVEL_ALIAS_ATTR_KEY = "code_level"
 
 LOCAL_LOCATION = "local"
 DUMMY_ID_ALIAS = "fake_identifier"
+CODE_LEVEL = '9.2.0.0'
 
 NODE_ID_KEY = "node_id"
 IP_ADDRESS_KEY = "IP_address"
