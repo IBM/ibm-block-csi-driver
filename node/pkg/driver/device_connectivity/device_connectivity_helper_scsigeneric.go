@@ -3842,28 +3842,6 @@ func (o GetDmsPathHelperGeneric) WaitForDmToExist(ctx context.Context, volumeWWI
 func (o *GetDmsPathHelperGeneric) GetSlaveCount(devName string) int {
 	// 1. Device Mapper Check
 	if o.IsDeviceMapper(devName) {
-		entries, _ := os.ReadDir(filepath.Join("/sys/block", devName, "slaves"))
-		return len(entries)
-	}
-
-	// 2. Native NVMe Namespace Check
-	if o.IsNativeNvmeNamespace(devName) {
-		entries, _ := os.ReadDir(filepath.Join("/sys/block", devName, "device"))
-		count := 0
-		for _, e := range entries {
-			name := e.Name()
-			if strings.HasPrefix(name, "nvme") && !strings.Contains(name, "n") && !strings.Contains(name, "-") {
-				count++
-			}
-		}
-		return count
-	}
-	return 1
-}
-
-func (o *GetDmsPathHelperGeneric) GetSlaveCount(devName string) int {
-	// 1. Device Mapper Check
-	if o.IsDeviceMapper(devName) {
 		slavesDir := filepath.Join("/sys/block", devName, "slaves")
 		entries, err := os.ReadDir(slavesDir)
 		if err != nil {
