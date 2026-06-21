@@ -872,6 +872,14 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) purgeScsiGhosts(ctx context.Cont
 		isGhost, _ := r.IsSgDeviceGhost(ctx, sgName)
 		hwSerial, _ := r.getHardwareSerial(deviceDir)
 		isIBM := strings.Contains(vendor, "IBM")
+		
+		if isGhost {
+			logger.Warning("ghost - retry")
+			// Let the kernel finish building block structures
+			time.Sleep(200 * time.Millisecond) 
+			// Re-evaluate the ghost state
+			isGhost, _ = r.IsSgDeviceGhost(ctx, sgName) 
+		}		
 
 		// General Condition: Delete if path is verified dead or if we own the target path but it holds a mismatched serial
 		//shouldDelete := isGhost ||            (isOurPath && hwSerial != "" && !r.IsSerialMatch(hwSerial, expectedSerial))
@@ -1125,6 +1133,7 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) GetHCTLFromSg(sgName string) (st
 	return hctl, nil
 }
 
+/*
 func (r *OsDeviceConnectivityHelperScsiGeneric) getIscsiTargetName(deviceBase string) string {
 	// On RHEL 7, the session directory is a child of the SCSI device directory
 	files, err := os.ReadDir(deviceBase)
@@ -1143,27 +1152,33 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) getIscsiTargetName(deviceBase st
 	}
 	return ""
 }
-
+*/
 
 
 func (r *OsDeviceConnectivityHelperScsiGeneric) isPathOwnedByMyArray(deviceName string, arrayIdentifiers []string) bool {
 	var targetID string
-	
 	logger.Warningf("isPathOwnedByMyArray %s ", deviceName)
 
-	if strings.HasPrefix(deviceName, "nvme") {
-		// Native NVMe: Source of truth is the subsystem NQN
-		nqnPath := fmt.Sprintf("/sys/block/%s/device/subsysnqn", deviceName)
-		if data, err := os.ReadFile(nqnPath); err == nil {
-			targetID = strings.TrimSpace(string(data))
+	// Fix: Add a retry loop to handle slow sysfs population during early discovery
+	maxRetries := 5
+	for i := 0; i < maxRetries; i++ {
+		if strings.HasPrefix(deviceName, "nvme") {
+			nqnPath := fmt.Sprintf("/sys/block/%s/device/subsysnqn", deviceName)
+			if data, err := os.ReadFile(nqnPath); err == nil {
+				targetID = strings.TrimSpace(string(data))
+			}
+		} else {
+			hctl, err := r.GetHCTLFromSg(deviceName)
+			if err == nil {
+				targetID = r.getScsiTargetID(hctl)
+			}
 		}
-	} else {
-		// SCSI: Parse HCTL mapping
-		hctl, err := r.GetHCTLFromSg(deviceName)
-		if err != nil {
-			return false
+
+		if targetID != "" {
+			break
 		}
-		targetID = r.getScsiTargetID(hctl)
+		// Settle window for kernel/udev to write sysfs properties
+		time.Sleep(100 * time.Millisecond) 
 	}
 	
 	logger.Warningf("isPathOwnedByMyArray %s target %s", deviceName, targetID)
@@ -1185,9 +1200,8 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) isPathOwnedByMyArray(deviceName 
 
 
 
-
-
 // Internal helper for SCSI logic (FC/iSCSI/SAS)
+/*
 func (r *OsDeviceConnectivityHelperScsiGeneric) getScsiTargetID(hctl string) string {
 	parts := strings.Split(hctl, ":")
 	if len(parts) < 4 {
@@ -1218,8 +1232,118 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) getScsiTargetID(hctl string) str
 	deviceBase := fmt.Sprintf("/sys/class/scsi_device/%s/device", hctl)
 	return r.getIscsiTargetName(deviceBase)
 }
+*/
 
+func (r *OsDeviceConnectivityHelperScsiGeneric) getScsiTargetID(hctl string) string {
+	parts := strings.Split(hctl, ":")
+	if len(parts) < 4 {
+		return ""
+	}
 
+	hct := strings.Join(parts[:3], ":")
+	targetDirName := fmt.Sprintf("target%s", hct)
+	deviceLink := fmt.Sprintf("/sys/class/scsi_device/%s/device", hctl)
+
+	var realDevicePath string
+	var err error
+
+	// 1. Initial Settle Window: Ensure the kernel link itself is fully instantiated
+	for i := 0; i < 5; i++ {
+		realDevicePath, err = filepath.EvalSymlinks(deviceLink)
+		if err == nil {
+			break
+		}
+		time.Sleep(50 * time.Millisecond)
+	}
+
+	if err != nil {
+		logger.Warningf("[Target-ID-Scan] [%s] Failed to resolve base device symlink: %v", hctl, err)
+		return ""
+	}
+
+	// Safely isolate the parent target folder to bypass the duplicate string layout bug
+	parentTargetBase := filepath.Dir(realDevicePath)
+	if filepath.Base(parentTargetBase) != targetDirName {
+		parentTargetBase = filepath.Join(realDevicePath, "..")
+	}
+
+	// --- 1. Fibre Channel (FC) Strategy ---
+	// Cleaned up single lookup: transport attributes consistently live under the parent target directory
+	fcPath := filepath.Join(parentTargetBase, "fc_transport", targetDirName, "port_name")
+	if data, err := os.ReadFile(fcPath); err == nil {
+		logger.Warning("found port_name")
+		return strings.TrimSpace(string(data))
+	}
+
+	// --- 2. Serial Attached SCSI (SAS) Strategy ---
+	sasPath := filepath.Join(parentTargetBase, "sas_device", targetDirName, "sas_address")
+	if data, err := os.ReadFile(sasPath); err == nil {
+		logger.Warning("found sas_address")
+		return strings.TrimSpace(string(data))
+	}
+
+	// --- 3. iSCSI Strategy ---
+	// Delegate processing to the dynamic, timing-safe iSCSI target name resolver
+	return r.getIscsiTargetName(realDevicePath)
+}
+
+func (r *OsDeviceConnectivityHelperScsiGeneric) getIscsiTargetName(deviceBase string) string {
+	var files []os.DirEntry
+	var err error
+	
+	logger.Warningf("found getIscsiTargetName %s", deviceBase)
+
+	// 2. iSCSI Subsystem Settle Window: Wait for asynchronous session creation
+	for i := 0; i < 6; i++ {
+		files, err = os.ReadDir(deviceBase)
+		if err == nil && len(files) > 0 {
+			hasSession := false
+			for _, f := range files {
+				if strings.HasPrefix(f.Name(), "session") {
+					hasSession = true
+					break
+				}
+			}
+			if hasSession {
+				break
+			}
+		}
+		time.Sleep(50 * time.Millisecond)
+	}
+
+	if err != nil {
+		logger.Warningf("[iSCSI-Target-Scan] Failed to scan base device directory %s: %v", deviceBase, err)
+		return ""
+	}
+
+	for _, f := range files {
+		if !strings.HasPrefix(f.Name(), "session") {
+			continue
+		}
+
+		// Modern Linux-safe path compilation using explicit dynamic folder iteration
+		iscsiSessionDir := filepath.Join(deviceBase, f.Name(), "iscsi_session")
+		subDirs, err := os.ReadDir(iscsiSessionDir)
+		if err != nil {
+			logger.Warningf("[iSCSI-Target-Scan] Encountered session structural collision on %s: %v", iscsiSessionDir, err)
+			continue
+		}
+
+		for _, subDir := range subDirs {
+			targetNamePath := filepath.Join(iscsiSessionDir, subDir.Name(), "targetname")
+			logger.Warningf("check targetNamePath %s", targetNamePath)
+			if data, err := os.ReadFile(targetNamePath); err == nil {
+				targetName := strings.TrimSpace(string(data))
+				if targetName != "" {
+					return targetName
+				}
+			}
+		}
+	}
+
+	logger.Warningf("[Target-ID-Scan] Node path verified but no valid protocol signature (FC/iSCSI) populated yet under %s", deviceBase)
+	return ""
+}
 
 
 
@@ -3734,6 +3858,74 @@ func (o *GetDmsPathHelperGeneric) GetSlaveCount(devName string) int {
 		}
 		return count
 	}
+	return 1
+}
+
+func (o *GetDmsPathHelperGeneric) GetSlaveCount(devName string) int {
+	// 1. Device Mapper Check
+	if o.IsDeviceMapper(devName) {
+		slavesDir := filepath.Join("/sys/block", devName, "slaves")
+		entries, err := os.ReadDir(slavesDir)
+		if err != nil {
+			logger.Warningf("[DM-Slave-Scan] [%s] Failed to read slaves directory: %v", devName, err)
+			return 0
+		}
+
+		logger.Infof("[DM-Slave-Scan] [%s] Found %d total structural slaves in sysfs. Inspecting state...", devName, len(entries))
+		
+		for _, entry := range entries {
+			slaveName := entry.Name() // e.g., sdX
+			slaveDeviceDir := filepath.Join("/sys/block", devName, "slaves", slaveName, "device")
+			
+			// Resolve symlink to get HCTL
+			realPath, err := filepath.EvalSymlinks(slaveDeviceDir)
+			hctl := "UNKNOWN"
+			if err == nil {
+				hctl = filepath.Base(realPath)
+			}
+
+			// Read Vendor details
+			vendorBytes, _ := os.ReadFile(filepath.Join(slaveDeviceDir, "vendor"))
+			vendor := strings.ToUpper(strings.TrimSpace(string(vendorBytes)))
+
+			// Check for block link existence (the primary failure reason in your ghost logic)
+			// Note: For block devices under /sys/block/dm-X/slaves/sdX, the block directory 
+			// is usually present if it's integrated, but let's log its visibility.
+			blockLinkPath := filepath.Join("/sys/block", devName, "slaves", slaveName, "block")
+			_, blockErr := os.Stat(blockLinkPath)
+			hasBlockLink := blockErr == nil
+
+			logger.Warningf("[DM-Slave-Scan] -> Slave: %s | HCTL: %s | Vendor: %s | Has Block Link: %v", 
+				slaveName, hctl, vendor, hasBlockLink)
+		}
+		return len(entries)
+	}
+
+	// 2. Native NVMe Namespace Check
+	if o.IsNativeNvmeNamespace(devName) {
+		deviceDir := filepath.Join("/sys/block", devName, "device")
+		entries, _ := os.ReadDir(deviceDir)
+		count := 0
+		
+		logger.Infof("[NVMe-Slave-Scan] [%s] Inspecting paths in %s...", devName, deviceDir)
+		
+		for _, e := range entries {
+			name := e.Name()
+			if strings.HasPrefix(name, "nvme") && !strings.Contains(name, "n") && !strings.Contains(name, "-") {
+				count++
+				
+				// Read subsystem NQN for ownership matching context
+				nqnPath := filepath.Join(deviceDir, name, "subsysnqn")
+				nqnBytes, _ := os.ReadFile(nqnPath)
+				nqn := strings.TrimSpace(string(nqnBytes))
+				
+				logger.Warningf("[NVMe-Slave-Scan] -> Controller Path: %s | Subsystem NQN: %s", name, nqn)
+			}
+		}
+		return count
+	}
+	
+	logger.Infof("[Slave-Scan] [%s] Non-multipath physical or virtual device. Defaulting count to 1.", devName)
 	return 1
 }
 
