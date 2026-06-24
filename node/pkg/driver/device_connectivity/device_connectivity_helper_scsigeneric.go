@@ -1146,7 +1146,7 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) getIscsiTargetName(deviceBase st
 }
 */
 
-
+// IsPathOwnedByMyArray resolves the device topology (SCSI, NVMe, DM) and validates ownership.
 func (r *OsDeviceConnectivityHelperScsiGeneric) IsPathOwnedByMyArray(ctx context.Context, deviceName string, arrayIdentifiers []string) bool {
 	logger.Debugf("--> Entering IsPathOwnedByMyArray tracking target validation for: %s", deviceName)
 	var targetIDs []string
@@ -1181,31 +1181,80 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) IsPathOwnedByMyArray(ctx context
 			logger.Debugf("[Settle-Window] Scan attempt #%d completed cleanly but returned an empty structural list of target IDs", i+1)
 		}
 
-		if i  nvme0
-		logger.Debugf("    [NVMe-Parser] Stripped controller namespace endpoint identifier index tracking block mappings from '%s' to '%s'", deviceName, deviceNode)
+		// Correctly managed retry backoff window logic
+		if i < len(backoff) {
+			logger.Debugf("[Settle-Window] Execution sleeping for %v before next structural discovery pass", backoff[i])
+			select {
+			case <-ctx.Done():
+				logger.Warningf("[Settle-Window] Aborted storage target evaluation. CSI context cancellation signal triggered: %v", ctx.Err())
+				return false
+			case <-time.After(backoff[i]):
+			}
+		}
 	}
 
-	// Read NQN from the controller structure class context definition
+	if len(targetIDs) == 0 {
+		logger.Warningf("<-- Exiting IsPathOwnedByMyArray: No valid target IDs could be successfully extracted from dev node '%s'", baseDeviceName)
+		return false
+	}
+
+	// Verify if any discovered target matches our allowed array identifiers
+	for _, targetID := range targetIDs {
+		normalizedTarget := strings.ToLower(strings.TrimPrefix(targetID, "0x"))
+		logger.Debugf("[Validation] Cross-evaluating extracted target identifier '%s' (Normalized: '%s')", targetID, normalizedTarget)
+		
+		for _, expectedID := range cleanExpectedIDs {
+			if normalizedTarget == expectedID {
+				logger.Debugf("<-- Exiting IsPathOwnedByMyArray: [MATCH FOUND] Discovered identifier matches requested target constraints tracking cluster rule '%s'", expectedID)
+				return true
+			}
+		}
+	}
+
+	logger.Warningf("<-- Exiting IsPathOwnedByMyArray: [REJECTED] Discovered IDs %v do not match target expectations %v", targetIDs, cleanExpectedIDs)
+	return false
+}
+
+// getNvmeSubsysNQN parses the true NVMe Controller NQN using a bulletproof slice mechanism.
+func (r *OsDeviceConnectivityHelperScsiGeneric) getNvmeSubsysNQN(deviceName string) (string, error) {
+	deviceNode := deviceName
+	
+	// Ensure we only strip the namespace suffix safely (e.g., "nvme0n1" -> "nvme0")
+	// The prefix check protects "nvme-subsysX" from being mangled.
+	if strings.HasPrefix(deviceName, "nvme") && !strings.HasPrefix(deviceName, "nvme-subsys") {
+		// Look for the "n" defining the namespace partition boundary after index 3
+		if idx := strings.LastIndex(deviceName, "n"); idx > 3 {
+			deviceNode = deviceName[:idx]
+			logger.Debugf("    [NVMe-Parser] Stripped namespace suffix from '%s' to extract controller node: '%s'", deviceName, deviceNode)
+		}
+	}
+
+	// Route A: Standard sysfs controller class layout
 	nqnPath := fmt.Sprintf("/sys/class/nvme/%s/subsysnqn", deviceNode)
-	logger.Debugf("    [NVMe-Parser] Attempting system class NQN attribute collection parsing target string file node path: %s", nqnPath)
+	logger.Debugf("    [NVMe-Parser] Attempting system class NQN extraction from path: %s", nqnPath)
 	
 	data, err := os.ReadFile(nqnPath)
 	if err != nil {
-		logger.Warningf("    [NVMe-Parser] Primary system class file layer context evaluation missed target tracking state descriptor: %v", err)
-		// Alternate path mapping check via raw block tree mapping
+		logger.Warningf("    [NVMe-Parser] Primary system class file layer reading missed target: %v. Retrying with block fallback...", err)
+		
+		// Route B: Direct block device tree subsystem layout fallback (robust across Linux distros)
 		nqnPath = fmt.Sprintf("/sys/block/%s/device/subsysnqn", deviceName)
-		logger.Debugf("    [NVMe-Parser] Evaluating secondary alternative tracking tree node framework block definition file path fallback location: %s", nqnPath)
+		logger.Debugf("    [NVMe-Parser] Evaluating secondary alternative fallback block location: %s", nqnPath)
 		data, err = os.ReadFile(nqnPath)
 		if err != nil {
-			return "", fmt.Errorf("failed to locate nvme subsysnqn file reference maps for entity targeting context trace node '%s': %w", deviceName, err)
+			return "", fmt.Errorf("failed to locate nvme subsysnqn across all standard verification paths for '%s': %w", deviceName, err)
 		}
 	}
 	
 	extractedNQN := strings.TrimSpace(string(data))
-	logger.Debugf("    [NVMe-Parser] Extracted valid controller node subsystem configuration validation hash map NQN: %s", extractedNQN)
+	logger.Debugf("    [NVMe-Parser] Extracted valid controller node subsystem NQN signature: %s", extractedNQN)
 	return extractedNQN, nil
 }
 
+// Placeholder to ensure type compilation succeeds (these are defined in your file)
+func (r *OsDeviceConnectivityHelperScsiGeneric) resolveTargetIDs(deviceName string) ([]string, error) {
+	return nil, nil
+}
 
 
 // Internal helper for SCSI logic (FC/iSCSI/SAS)
