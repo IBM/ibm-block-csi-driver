@@ -863,7 +863,7 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) purgeScsiGhosts(ctx context.Cont
 		}
 
 		// 2. Validate Ownership Scope
-		isOurPath := r.isPathOwnedByMyArray(sgName, arrayIdentifiers)
+		isOurPath := r.isPathOwnedByMyArray(ctx, sgName, arrayIdentifiers)
 
 		vendorBytes, _ := os.ReadFile(filepath.Join(deviceDir, "vendor"))
 		vendor := strings.ToUpper(strings.TrimSpace(string(vendorBytes)))
@@ -930,7 +930,7 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) purgeNvmeGhosts(ctx context.Cont
 		deviceDir := filepath.Join("/sys/block", name, "device")
 		
 		// Verify structural ownership via NQN mappings
-		if !r.isPathOwnedByMyArray(name, arrayIdentifiers) {
+		if !r.isPathOwnedByMyArray(ctx, name, arrayIdentifiers) {
 			continue
 		}
 
@@ -1147,7 +1147,7 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) getIscsiTargetName(deviceBase st
 */
 
 // IsPathOwnedByMyArray resolves the device topology (SCSI, NVMe, DM) and validates ownership.
-func (r *OsDeviceConnectivityHelperScsiGeneric) IsPathOwnedByMyArray(ctx context.Context, deviceName string, arrayIdentifiers []string) bool {
+func (r *OsDeviceConnectivityHelperScsiGeneric) isPathOwnedByMyArray(ctx context.Context, deviceName string, arrayIdentifiers []string) bool {
 	logger.Debugf("--> Entering IsPathOwnedByMyArray tracking target validation for: %s", deviceName)
 	var targetIDs []string
 
