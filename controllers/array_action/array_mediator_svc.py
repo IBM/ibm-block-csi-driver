@@ -563,6 +563,9 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
         cli_volume = self._get_cli_volume(name)
         return self._generate_volume_response(cli_volume, is_virt_snap_func)
 
+    def _is_chvolume_supported(self):
+        return hasattr(self.client.svctask, "chvolume")
+
     def _get_object_fcmaps(self, object_name):
         all_fcmaps = []
         fcmap_as_target = self._get_fcmap_as_target_if_exists(object_name)
@@ -570,45 +573,6 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
             all_fcmaps.append(fcmap_as_target)
         all_fcmaps.extend(self._get_fcmaps_as_source_if_exist(object_name))
         return all_fcmaps
-
-    def _expand_cli_volume(self, cli_volume, increase_in_bytes, is_hyperswap):
-        volume_name = cli_volume.name
-        try:
-            if is_hyperswap:
-                self.client.svctask.expandvolume(object_id=volume_name, unit='b', size=increase_in_bytes)
-            else:
-                self.client.svctask.expandvdisksize(vdisk_id=volume_name, unit='b', size=increase_in_bytes)
-        except (svc_errors.CommandExecutionError, CLIFailureError) as ex:
-            logger.debug("Error running {} -{} {} -unit b -size {}".format(
-                "expandvolume" if is_hyperswap else "expandvdisksize",
-                "object_id" if is_hyperswap else "vdisk_id", volume_name, increase_in_bytes))
-            if is_warning_message(ex.my_message):
-                logger.warning("exception encountered during volume expansion of {}: {}".format(volume_name,
-                                                                                                ex.my_message))
-            else:
-                logger.error("Failed to expand volume {}".format(volume_name))
-                if OBJ_NOT_FOUND in ex.my_message or VOL_NOT_FOUND in ex.my_message:
-                    raise array_errors.ObjectNotFoundError(volume_name)
-                if NOT_ENOUGH_EXTENTS_IN_POOL_EXPAND in ex.my_message:
-                    raise array_errors.NotEnoughSpaceInPool(id_or_name=cli_volume.mdisk_grp_name)
-                raise ex
-
-    def _change_volume_size(self, cli_volume, size_in_bytes):  # This is a partition-only function
-        volume_name = cli_volume.name
-        try:
-            self.client.svctask.chvolume(size=size_in_bytes, unit='b', vdisk_id=volume_name)
-        except (svc_errors.CommandExecutionError, CLIFailureError) as ex:
-            logger.debug("Error running chvolume -size {} -unit b -vdisk_id {}".format(size_in_bytes, volume_name))
-            if is_warning_message(ex.my_message):
-                logger.warning("exception encountered during volume expansion of {}: {}".format(volume_name,
-                                                                                                ex.my_message))
-            else:
-                logger.error("Failed to expand volume {}".format(volume_name))
-                if OBJ_NOT_FOUND in ex.my_message or VOL_NOT_FOUND in ex.my_message:
-                    raise array_errors.ObjectNotFoundError(volume_name)
-                if NOT_ENOUGH_EXTENTS_IN_POOL_EXPAND in ex.my_message:
-                    raise array_errors.NotEnoughSpaceInPool(id_or_name=cli_volume.mdisk_grp_name)
-                raise ex
 
     def expand_volume(self, volume_id, required_bytes, partition_name=None):
         logger.info("Expanding volume with id : {0} to {1} bytes".format(volume_id, required_bytes))
@@ -619,17 +583,39 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
         if final_size < current_size:
             raise array_errors.InvalidArgumentError("New volume size smaller than current")
         increase_in_bytes = final_size - current_size
-        if partition_name:
-            self._change_volume_size(cli_volume, final_size)
-        else:
-            fcmaps = self._get_object_fcmaps(volume_name)
-            self._safe_delete_fcmaps(volume_name, fcmaps)
-            is_hyperswap = any(self._is_in_remote_copy_relationship(fcmap) for fcmap in fcmaps)
-
-            self._expand_cli_volume(cli_volume, increase_in_bytes, is_hyperswap)
+        command = ""
+        try:
+            if self._is_chvolume_supported():
+                command = "chvolume"
+                self.client.svctask.chvolume(size=final_size, unit='b', vdisk_id=volume_name)
+            else:
+                fcmaps = self._get_object_fcmaps(volume_name)
+                is_hyperswap = any(self._is_in_remote_copy_relationship(fcmap) for fcmap in fcmaps)
+                if is_hyperswap:
+                    command = "expandvolume"
+                    self.client.svctask.expandvolume(object_id=volume_name, unit='b', size=increase_in_bytes)
+                else:
+                    command = "expandvdisksize"
+                    self.client.svctask.expandvdisksize(vdisk_id=volume_name, unit='b', size=increase_in_bytes)
+        except (svc_errors.CommandExecutionError, CLIFailureError) as ex:
+            logger.debug("Error running {} -unit b -size {} -{} {}".format(
+                command,
+                final_size if command == "chvolume" else increase_in_bytes,
+                "object_id" if command == "expandvolume" else "vdisk_id", volume_name))
+            if is_warning_message(ex.my_message):
+                logger.warning("exception encountered during volume expansion of {}: {}".format(volume_name,
+                                                                                                ex.my_message))
+            else:
+                logger.error("Failed to expand volume {}".format(volume_name))
+                if OBJ_NOT_FOUND in ex.my_message or VOL_NOT_FOUND in ex.my_message:
+                    raise array_errors.ObjectNotFoundError(volume_name)
+                if NOT_ENOUGH_EXTENTS_IN_POOL_EXPAND in ex.my_message:
+                    raise array_errors.NotEnoughSpaceInPool(id_or_name=cli_volume.mdisk_grp_name)
+                raise ex
 
         logger.info(
-            "Finished volume expansion. id : {0}. volume increased by {1} bytes".format(volume_id, increase_in_bytes))
+            "Finished volume expansion with {0}. id : {1}. volume expanded to {2} bytes".format(
+                command, volume_id, final_size))
 
     def _get_fcmaps(self, volume_name, endpoint_type):
         """
