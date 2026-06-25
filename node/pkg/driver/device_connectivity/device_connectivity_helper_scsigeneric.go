@@ -1251,9 +1251,86 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) getNvmeSubsysNQN(deviceName stri
 	return extractedNQN, nil
 }
 
-// Placeholder to ensure type compilation succeeds (these are defined in your file)
+// resolveTargetIDs automatically detects and extracts underlying identifiers based on device type.
+// Hardened to succeed if at least one multipath leg is readable.
 func (r *OsDeviceConnectivityHelperScsiGeneric) resolveTargetIDs(deviceName string) ([]string, error) {
-	return nil, nil
+	logger.Debugf("  [Routing] Processing resolution pipeline branch layer for entity element node: %s", deviceName)
+
+	// 1. Device Mapper Path (nvme over dm or scsi over dm)
+	if strings.HasPrefix(deviceName, "dm-") {
+		slavesPath := fmt.Sprintf("/sys/block/%s/slaves", deviceName)
+		logger.Debugf("  [Branch-Multipath] Identified Device Mapper layout. Scanning path slaves: %s", slavesPath)
+		
+		entries, err := os.ReadDir(slavesPath)
+		if err != nil {
+			return nil, fmt.Errorf("failed to read dm slaves path tree layout: %w", err)
+		}
+
+		var collectedIDs []string
+		var lastErr error
+
+		for _, entry := range entries {
+			logger.Debugf("  [Branch-Multipath] Sub-level hardware mapper child disk discovered: %s", entry.Name())
+			
+			// Recursively extract identifiers from the underlying path
+			ids, err := r.resolveTargetIDs(entry.Name())
+			if err != nil {
+				// We log the warning, but don't abort! A single dead path shouldn't fail the whole volume.
+				logger.Warningf("  [Branch-Multipath] Slave leg '%s' target extraction failed (device might be offline): %v", entry.Name(), err)
+				lastErr = err
+				continue
+			}
+			
+			if len(ids) > 0 {
+				logger.Debugf("  [Branch-Multipath] Captured valid identifiers from leg '%s': %v", entry.Name(), ids)
+				collectedIDs = append(collectedIDs, ids...)
+			}
+		}
+
+		// Production Guardrail: If we found at least one working path, treat the volume as healthy and valid
+		if len(collectedIDs) > 0 {
+			logger.Debugf("  [Branch-Multipath] Multipath resolution successful. Found %d valid path identification signatures.", len(collectedIDs))
+			return collectedIDs, nil
+		}
+
+		// If ALL legs failed, only then do we fail the resolution
+		if lastErr != nil {
+			return nil, fmt.Errorf("all multipath slave legs failed target identification. Last error: %w", lastErr)
+		}
+		return nil, fmt.Errorf("multipath device %s has no identifiable slave legs", deviceName)
+	}
+
+	// 2. Native NVMe Path (e.g., nvme0n1)
+	if strings.HasPrefix(deviceName, "nvme") {
+		logger.Debugf("  [Branch-NVMe] Native NVMe configuration node layout identified: %s", deviceName)
+		nqn, err := r.getNvmeSubsysNQN(deviceName)
+		if err != nil {
+			return nil, err
+		}
+		return []string{nqn}, nil
+	}
+
+	// 3. SCSI Generic / Standard SCSI Device Path (e.g., sg2, sdX)
+	var hctl string
+	var err error
+	if strings.HasPrefix(deviceName, "sg") {
+		hctl, err = r.GetHCTLFromSg(deviceName)
+	} else if strings.HasPrefix(deviceName, "sd") {
+		hctl, err = r.getHCTLFromSd(deviceName)
+	} else {
+		return nil, fmt.Errorf("unsupported storage interface node structure: %s", deviceName)
+	}
+
+	if err != nil {
+		return nil, err
+	}
+
+	targetID := r.getScsiTargetID(hctl)
+	if targetID == "" {
+		return nil, fmt.Errorf("scsi target registration layout mapping state attributes not ready for address %s", hctl)
+	}
+
+	return []string{targetID}, nil
 }
 
 
@@ -1318,12 +1395,10 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) getScsiTargetID(hctl string) str
 		return ""
 	}
 
-	// Isolate the Host, Channel, and Target components (H:C:T)
-	hostID := parts[0] // e.g., "3" from "3:0:0:1"
+	hostID := parts[0] // e.g., "13"
 	hct := strings.Join(parts[:3], ":")
 	targetDirName := fmt.Sprintf("target%s", hct)
 	deviceLink := fmt.Sprintf("/sys/class/scsi_device/%s/device", hctl)
-	logger.Debugf("    [SCSI-Target-Inspector] Triggering lookup workflow process tree analysis targeting sysfs node anchor layout: %s", deviceLink)
 
 	realDevicePath, err := filepath.EvalSymlinks(deviceLink)
 	if err != nil {
@@ -1332,72 +1407,76 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) getScsiTargetID(hctl string) str
 	}
 	logger.Debugf("    [SCSI-Target-Inspector] Symlink verification mapping resolved explicitly to real endpoint tracking location: %s", realDevicePath)
 
+	// --- PROTOCOL INDEPENDENT ROOT TREE EXTRACTION ---
 	var parentTargetBase string
 	curr := realDevicePath
 	for curr != "/" && curr != "." {
 		if filepath.Base(curr) == targetDirName {
 			parentTargetBase = curr
-			logger.Debugf("    [SCSI-Target-Inspector] Dynamically located the correct target node container path: %s", parentTargetBase)
 			break
 		}
 		curr = filepath.Dir(curr)
 	}
 	if parentTargetBase == "" {
 		parentTargetBase = filepath.Dir(realDevicePath)
-		logger.Debugf("    [SCSI-Target-Inspector] Fallback branch executed. Defaulting container processing anchor directory space reference to: %s", parentTargetBase)
 	}
 
 	// 1. Fibre Channel Strategy
 	fcPath := filepath.Join(parentTargetBase, "fc_transport", targetDirName, "port_name")
-	logger.Debugf("    [SCSI-Target-Inspector] Testing operational mapping signature validation for Fibre Channel layout rule tracking: %s", fcPath)
 	if data, err := os.ReadFile(fcPath); err == nil {
-		sigID := strings.TrimSpace(string(data))
-		logger.Debugf("    [SCSI-Target-Inspector] [FC PATH CHOSEN] Valid transport layout signature identity captured successfully: %s", sigID)
-		return sigID
+		return strings.TrimSpace(string(data))
 	}
 
 	// 2. SAS Strategy
 	sasPath := filepath.Join(parentTargetBase, "sas_device", targetDirName, "sas_address")
-	logger.Debugf("    [SCSI-Target-Inspector] Testing operational mapping signature validation for Serial Attached SCSI framework parameters: %s", sasPath)
 	if data, err := os.ReadFile(sasPath); err == nil {
-		sigID := strings.TrimSpace(string(data))
-		logger.Debugf("    [SCSI-Target-Inspector] [SAS PATH CHOSEN] Valid transport layout signature identity captured successfully: %s", sigID)
-		return sigID
+		return strings.TrimSpace(string(data))
 	}
 
-	// 3. iSCSI Strategy (Correctly passing the singular hostID string snippet now)
-	logger.Debugf("    [SCSI-Target-Inspector] Storage layout attributes not found for FC/SAS protocols. Routing downstream target to iSCSI parsing framework routines.")
-	return r.getIscsiTargetName(realDevicePath, hostID)
+	// 3. iSCSI Strategy (Pass both the device path tree and the target HCT parent tracker)
+	return r.getIscsiTargetName(realDevicePath, parentTargetBase, hostID)
 }
 
-func (r *OsDeviceConnectivityHelperScsiGeneric) getIscsiTargetName(realDevicePath string, hostID string) string {
-	logger.Debugf("      [iSCSI-Subsystem-Scout] Entering dynamic session tracking pipeline scanning underlying directory layout elements: %s", realDevicePath)
+func (r *OsDeviceConnectivityHelperScsiGeneric) getIscsiTargetName(realDevicePath string, parentTargetBase string, hostID string) string {
+	logger.Debugf("      [iSCSI-Subsystem-Scout] Entering dynamic session tracking pipeline.")
 	
-	// Strategy A: Local device tree scanning
-	files, err := os.ReadDir(realDevicePath)
-	if err == nil {
-		for _, f := range files {
-			if strings.HasPrefix(f.Name(), "session") {
-				targetNamePath := filepath.Join(realDevicePath, f.Name(), "iscsi_session", f.Name(), "targetname")
-				logger.Debugf("      [iSCSI-Subsystem-Scout] [Strategy-A] Inspecting local transport directory mapping reference node file: %s", targetNamePath)
-				if data, err := os.ReadFile(targetNamePath); err == nil {
-					sigID := strings.TrimSpace(string(data))
-					logger.Debugf("      [iSCSI-Subsystem-Scout] [Strategy-A MATCH] Extracted signature string verification target directly via node details map: %s", sigID)
-					return sigID
-				}
+	// Strategy A: Trace backward through the device path tree to find the correct active session context folder
+	// Example realDevicePath: /sys/devices/platform/host13/session1/target13:0:0/13:0:0:30
+	curr := realDevicePath
+	for curr != "/" && curr != "." {
+		base := filepath.Base(curr)
+		if strings.HasPrefix(base, "session") {
+			targetNamePath := filepath.Join(curr, "iscsi_session", base, "targetname")
+			logger.Debugf("      [iSCSI-Subsystem-Scout] [Strategy-A] Verifying resolved tree target path location: %s", targetNamePath)
+			if data, err := os.ReadFile(targetNamePath); err == nil {
+				sigID := strings.TrimSpace(string(data))
+				logger.Debugf("      [iSCSI-Subsystem-Scout] [Strategy-A SUCCESS] Extracted IQN identifier string: %s", sigID)
+				return sigID
 			}
 		}
-	} else {
-		logger.Warningf("      [iSCSI-Subsystem-Scout] [Strategy-A FAILED] Read operation collapsed during raw node workspace exploration routines: %v", err)
+		curr = filepath.Dir(curr)
 	}
 
-	// Strategy B: Class Map Fallback Strategy using global subsystem references
+	// Strategy B: Trace alternative context using parent target node structure if directory depth varies
+	// Example parentTargetBase: /sys/devices/platform/host13/session1/target13:0:0
+	sessionDir := filepath.Dir(parentTargetBase) // should map straight to the sessionX folder block
+	if strings.HasPrefix(filepath.Base(sessionDir), "session") {
+		targetNamePath := filepath.Join(sessionDir, "iscsi_session", filepath.Base(sessionDir), "targetname")
+		logger.Debugf("      [iSCSI-Subsystem-Scout] [Strategy-B] Verifying resolved session folder path location: %s", targetNamePath)
+		if data, err := os.ReadFile(targetNamePath); err == nil {
+			sigID := strings.TrimSpace(string(data))
+			logger.Debugf("      [iSCSI-Subsystem-Scout] [Strategy-B SUCCESS] Extracted IQN identifier string: %s", sigID)
+			return sigID
+		}
+	}
+
+	// Strategy C: Global System Class Map Fallback (Best for deeply isolated overlay containers)
 	sessionClassPath := "/sys/class/iscsi_session"
-	logger.Debugf("      [iSCSI-Subsystem-Scout] [Strategy-B] Activating fallback mapping pipeline routine scanning global framework: %s", sessionClassPath)
+	logger.Debugf("      [iSCSI-Subsystem-Scout] [Strategy-C] Activating backup scanning pipeline via global system endpoint class mapping.")
 	
 	sessions, err := os.ReadDir(sessionClassPath)
 	if err != nil {
-		logger.Warningf("      [iSCSI-Subsystem-Scout] [Strategy-B CRITICAL] Core storage registration framework mapping tree structurally missing or execution profile restricted: %v", err)
+		logger.Warningf("      [iSCSI-Subsystem-Scout] [Strategy-C FAILED] System framework interface class folder missing or inaccessible: %v", err)
 		return ""
 	}
 
@@ -1410,20 +1489,18 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) getIscsiTargetName(realDevicePat
 		
 		deviceLinkMappingPath := filepath.Join(sessionClassPath, s.Name(), "device")
 		if hostPath, err := filepath.EvalSymlinks(deviceLinkMappingPath); err == nil {
-			matchToken := fmt.Sprintf("host%s", hostID) // This now cleanly evaluates to strings like "host3"
-			logger.Debugf("      [iSCSI-Subsystem-Scout] [Strategy-B Evaluation] Correlating active session target mapping '%s' matching token requirement sequence '%s' inside system layout string path: %s", s.Name(), matchToken, hostPath)
+			matchToken := fmt.Sprintf("host%s", hostID)
 			if strings.Contains(hostPath, matchToken) {
 				sigID := strings.TrimSpace(string(data))
-				logger.Debugf("      [iSCSI-Subsystem-Scout] [Strategy-B MATCH FOUND] Correlated session properties validation targeted mapping successfully mapping to signature target name: %s", sigID)
+				logger.Debugf("      [iSCSI-Subsystem-Scout] [Strategy-C SUCCESS] Valid target correlated matching host token %s: %s", matchToken, sigID)
 				return sigID
 			}
 		}
 	}
 	
-	logger.Warningf("      [iSCSI-Subsystem-Scout] Complete lookup sequence processing completed entirely across tracking structures without validating protocol attributes framework references.")
+	logger.Warningf("      [iSCSI-Subsystem-Scout] Failed to isolate target iSCSI name matching HCTL profile dependencies across all strategies.")
 	return ""
 }
-
 
 // getHardwareSerial safely retrieves the serial, returning error if path is blocked
 func (r *OsDeviceConnectivityHelperScsiGeneric) getHardwareSerial(deviceDir string) (string, error) {
