@@ -1808,7 +1808,11 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
 
         # Get volume group name from ID
         volume_group = self._lsvolumegroup(volume_group_id)
-        volume_group_name = volume_group.name if volume_group else volume_group_id
+        if volume_group and hasattr(volume_group, 'name'):
+            volume_group_name = volume_group.name
+        else:
+            logger.warning("Volume group object not found or missing 'name' attribute for ID: {}, using ID as fallback".format(volume_group_id))
+            volume_group_name = volume_group_id
 
         logger.info("found ear replication: {} in mode: {}".format(volume_group_id,
                                                                    replication_mode))
