@@ -588,48 +588,56 @@ func (r OsDeviceConnectivityNvmeOFc) findDiscoverySubNqnFromSysfs() (string, err
 		if strings.TrimSpace(string(subnqnBuf)) != nvmeDiscoveryNqn {
 			continue
 		}
-		
+
+		// SELF-HEALING STEP: Check the actual state of this controller first
+		stateBuf, err := os.ReadFile(filepath.Join(controllerPath, "state"))
+		if err == nil {
+			state := strings.TrimSpace(string(stateBuf))
+			// If it's stuck reconnecting from a previous version, clean it automatically
+			if state == "reconnecting" {
+				logger.Warningf("NVMe-oFC: Automatically cleaning stale reconnecting controller %s on host", entry.Name())
+				deletePath := filepath.Join(controllerPath, "delete_controller")
+				_ = os.WriteFile(deletePath, []byte("1\n"), 0200)
+				continue // Skip it, it's dead
+			}
+		}
+
 		logPath := filepath.Join(controllerPath, "discovery_log")
 		
 		var logFile *os.File
 		var openErr error
 		
-		// FIX: Increase attempts to 100 (100 * 30ms = 3 Seconds maximum wait window)
-		for attempts := 0; attempts < 100; attempts++ {
+		// Poll briefly to see if this specific controller is the fresh, healthy one populating data
+		for attempts := 0; attempts < 5; attempts++ {
 			logFile, openErr = os.Open(logPath)
 			if openErr == nil {
 				break
 			}
-			
-			// If the log page isn't ready yet, back off and retry
 			if os.IsNotExist(openErr) {
-				time.Sleep(30 * time.Millisecond)
+				time.Sleep(15 * time.Millisecond)
 				continue
 			}
-			
-			// If it's a permission or system block error, exit immediately
-			return "", fmt.Errorf("fatal open error on discovery log from %s: %w", entry.Name(), openErr)
+			break
 		}
 		
-		// Evaluate timeout strictly AFTER the loop finishes all iterations
 		if openErr != nil {
-			logger.Errorf("NVMe-oFC Critical Timeout: Target discovery controller found under %s, "+
-				"but the low-level Fibre Channel handshake failed to populate the log page within 3 seconds. "+
-				"Internal OS Error: %v", controllerPath, openErr)
-				
-			return "", fmt.Errorf("fabric_timeout: connection initiated but kernel failed to expose log page")
+			// 🌟 THE CRITICAL CRASH FIX: 
+			// Instead of returning a fatal error and breaking the CSI driver, we log a warning
+			// and CONTINUE to the next folder. This completely bypasses old dead entries!
+			logger.Warningf("NVMe-oFC: Skipping controller %s (unable to open discovery log: %v)", entry.Name(), openErr)
+			continue 
 		}
-				
-		// 16-byte log page header + space for up to 64 records
+		
+		// If we reached here, we successfully found the fresh, live controller!
 		logBuf := make([]byte, 16+(64*recordSize))
 		n, err := io.ReadFull(logFile, logBuf)
-		logFile.Close() // Explicitly close file before deleting the temporary controller
+		logFile.Close() // Explicitly close file handle
 		
 		if err != nil && !errors.Is(err, io.EOF) && !errors.Is(err, io.ErrUnexpectedEOF) {
 			return "", fmt.Errorf("failed to pull complete stream data: %w", err)
 		}
 
-		// Clean up the transient discovery controller immediately to avoid host resource leakage
+		// Clean up this dynamic discovery controller now that data is safe in Go memory
 		deletePath := filepath.Join(controllerPath, "delete_controller")
 		_ = os.WriteFile(deletePath, []byte("1\n"), 0200)
 
@@ -639,7 +647,7 @@ func (r OsDeviceConnectivityNvmeOFc) findDiscoverySubNqnFromSysfs() (string, err
 		}
 	}
 
-	return "", fmt.Errorf("no active discovery controller found in sysfs")
+	return "", fmt.Errorf("no active healthy discovery controller found in sysfs after evaluating all nodes")
 }
 
 // NVMe Discovery Log Page Entry Structure
