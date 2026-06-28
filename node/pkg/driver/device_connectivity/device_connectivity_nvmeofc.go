@@ -585,7 +585,12 @@ func (r OsDeviceConnectivityNvmeOFc) findDiscoverySubNqnFromSysfs() (string, err
 			continue
 		}
 		
-		if strings.TrimSpace(string(subnqnBuf)) != nvmeDiscoveryNqn {
+		// FIX: Use strings.Contains instead of a strict equality match 
+		// This ensures that any trailing kernel metadata or hostnqn attachments don't break validation
+		
+		logger.Warningf("Compare %s with %s", string(subnqnBuf), nvmeDiscoveryNqn)
+		
+		if !strings.Contains(string(subnqnBuf), nvmeDiscoveryNqn) {
 			continue
 		}
 
@@ -671,18 +676,19 @@ type nvmeDiscoveryLogEntry struct {
 // parseSubNqnFromDiscoverOutput extracts the storage subsystem NQN from "nvme discover" output.
 // Skips the discovery controller NQN (nqn.2014-08.org.nvmexpress.discovery).
 func parseSubNqnFromDiscoverOutput(rawBytes []byte) string {
-	if len(rawBytes) < 16 { // Ensure header preamble minimum exists
-		return ""
-	}
+	logger.Warningf("NVMe-oFC PARSER START: Received total buffer size of %d bytes", len(rawBytes))
 
-	// The first 16 bytes contain the Discovery Log Page Header
-	// Generation Counter (uint64) + Number of Records (uint64)
-	if len(rawBytes) < 16 {
+	if len(rawBytes) < 16 { // Ensure header preamble minimum exists
+		logger.Warningf("NVMe-oFC PARSER FAILURE: Buffer too short for 16-byte log page header (got %d bytes)", len(rawBytes))
 		return ""
 	}
 	
 	numRecords := binary.LittleEndian.Uint64(rawBytes[8:16])
+	genCounter := binary.LittleEndian.Uint64(rawBytes[0:8])
+	logger.Warningf("NVMe-oFC PARSER HEADER INFO: Generation Counter=%d, Number of Records parsed=%d", genCounter, numRecords)
+
 	if numRecords == 0 {
+		logger.Warning("NVMe-oFC PARSER FAILURE: Discovery log page claims 0 records are present")
 		return ""
 	}
 
@@ -690,7 +696,11 @@ func parseSubNqnFromDiscoverOutput(rawBytes []byte) string {
 	offset := 16
 
 	for i := uint64(0); i < numRecords; i++ {
+		logger.Warningf("NVMe-oFC PARSER LOOP: Evaluating record index %d at buffer offset %d (recordSize=%d)", i, offset, recordSize)
+
 		if offset+recordSize > len(rawBytes) {
+			logger.Warningf("NVMe-oFC PARSER BREAK: Remaining buffer size (%d bytes) is smaller than required recordSize (%d bytes)", 
+				len(rawBytes)-offset, recordSize)
 			break
 		}
 
@@ -698,14 +708,20 @@ func parseSubNqnFromDiscoverOutput(rawBytes []byte) string {
 		buffer := bytes.NewReader(rawBytes[offset : offset+recordSize])
 		err := binary.Read(buffer, binary.LittleEndian, &entry)
 		if err != nil {
+			logger.Errorf("NVMe-oFC PARSER ERROR: binary.Read failed on record %d: %v", i, err)
 			return ""
 		}
 
 		// Advance pointer to the next record block
 		offset += recordSize
 
+		// Log entry metadata for transport debugging
+		logger.Warningf("NVMe-oFC RECORD %d METADATA: Subtype=0x%x, TransportType=0x%x, PortID=%d", 
+			i, entry.Subtype, entry.Trtype, entry.Portid)
+
 		// Filter out records that are not standard storage subsystems (subtype 0x2)
 		if entry.Subtype != 0x02 {
+			logger.Warningf("NVMe-oFC RECORD %d SKIPPED: Subtype is 0x%x (expected standard subsystem 0x02)", i, entry.Subtype)
 			continue
 		}
 
@@ -713,17 +729,27 @@ func parseSubNqnFromDiscoverOutput(rawBytes []byte) string {
 		subNqn := string(bytes.Trim(entry.SubnqnBytes[:], "\x00"))
 		subNqn = strings.TrimSpace(subNqn)
 
+		logger.Warningf("NVMe-oFC RECORD %d RAW STRING EXTRACTED: %q", i, subNqn)
+
 		// Ignore empty matches or connections pointing back to the discovery target itself
-		if subNqn == "" || subNqn == nvmeDiscoveryNqn {
+		if subNqn == "" {
+			logger.Warningf("NVMe-oFC RECORD %d SKIPPED: Extracted subNQN is empty string", i)
+			continue
+		}
+		if subNqn == nvmeDiscoveryNqn {
+			logger.Warningf("NVMe-oFC RECORD %d SKIPPED: Extracted subNQN matches the discovery service string itself (%s)", i, nvmeDiscoveryNqn)
 			continue
 		}
 
 		// Successfully extracted the unique operational volume NQN
+		logger.Warningf("NVMe-oFC PARSER SUCCESS: Found target valid subsystem NQN: %s", subNqn)
 		return subNqn
 	}
 
+	logger.Warning("NVMe-oFC PARSER FAILURE: Evaluated all records but none met the active storage validation rules")
 	return ""
 }
+
 
 
 func (r OsDeviceConnectivityNvmeOFc) nvmeConnect(ctx context.Context, arrayTargetPort, hostPort, subNqn string) bool {
