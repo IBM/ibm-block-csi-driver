@@ -523,6 +523,31 @@ func findNewController(pre, post []os.DirEntry) string {
 
 // executeKernelDiscovery writes the discovery payload string directly into the kernel fabrics channel.
 func (r OsDeviceConnectivityNvmeOFc) executeKernelDiscovery(cmd string) (string, error) {
+	const sysPath = "/sys/class/nvme"
+
+	// 1. Proactive Scrubbing Pass: Clean any existing stale discovery controllers first
+	if entries, err := os.ReadDir(sysPath); err == nil {
+		for _, entry := range entries {
+			if !strings.HasPrefix(entry.Name(), "nvme") {
+				continue
+			}
+			controllerPath := filepath.Join(sysPath, entry.Name())
+			
+			// Verify if this is an orphaned discovery controller
+			if subnqnBuf, err := os.ReadFile(filepath.Join(controllerPath, "subsysnqn")); err == nil {
+				if strings.TrimSpace(string(subnqnBuf)) == nvmeDiscoveryNqn {
+					deletePath := filepath.Join(controllerPath, "delete_controller")
+					logger.Warningf("NVMe-oFC: Cleaning stale discovery controller %s before execution", entry.Name())
+					_ = os.WriteFile(deletePath, []byte("1\n"), 0200)
+					
+					// Small pause to allow the kernel thread to detach the subsystem memory map cleanly
+					time.Sleep(30 * time.Millisecond) 
+				}
+			}
+		}
+	}
+
+	// 2. Open and trigger the transaction stream write
 	f, err := os.OpenFile("/dev/nvme-fabrics", os.O_WRONLY, 0)
 	if err != nil {
 		return "", fmt.Errorf("open /dev/nvme-fabrics failed: %w", err)
@@ -532,10 +557,10 @@ func (r OsDeviceConnectivityNvmeOFc) executeKernelDiscovery(cmd string) (string,
 		f.Close()
 		return "", fmt.Errorf("write to nvme-fabrics failed: %w", err)
 	}
-	
 	// Close immediately
 	f.Close()
 
+	// 3. Proceed safely to parse the fresh sysfs dataset page
 	return r.findDiscoverySubNqnFromSysfs()
 }
 
