@@ -438,7 +438,7 @@ func (r OsDeviceConnectivityNvmeOFc) discoverSubNqn(ctx context.Context, arrayTa
 	hostId := r.getHostId()
 
 	// FIX: Changed host-traddr to host_traddr, added hostnqn/hostid, removed trailing newline
-	cmd := fmt.Sprintf("nqn=%s,transport=fc,traddr=nn-%s:pn-%s,host_traddr=nn-%s:pn-%s,hostnqn=%s,hostid=%s,ctrl_loss_tmo=600", 
+	cmd := fmt.Sprintf("nqn=%s,transport=fc,traddr=nn-%s:pn-%s,host_traddr=nn-%s:pn-%s,hostnqn=%s,hostid=%s", 
 		nvmeDiscoveryNqn, targetNN, targetPN, hostNN, hostPN, hostNqn, hostId)
 
 	logger.Infof("NVMe-oFC DEBUG RAW DISCOVERY STRING: %q", cmd)
@@ -563,28 +563,38 @@ func (r OsDeviceConnectivityNvmeOFc) findDiscoverySubNqnFromSysfs() (string, err
 		if strings.TrimSpace(string(subnqnBuf)) != nvmeDiscoveryNqn {
 			continue
 		}
-
+		
 		logPath := filepath.Join(controllerPath, "discovery_log")
 		
-		// FIX: Add a polling backoff mechanism to wait for the kernel's async sysfs population
 		var logFile *os.File
 		var openErr error
-		for attempts := 0; attempts < 5; attempts++ {
+		
+		// FIX: Increase attempts to 100 (100 * 30ms = 3 Seconds maximum wait window)
+		for attempts := 0; attempts < 100; attempts++ {
 			logFile, openErr = os.Open(logPath)
 			if openErr == nil {
 				break
 			}
-			// If it's a "not found" error, wait 15ms and try again
+			
+			// If the log page isn't ready yet, back off and retry
 			if os.IsNotExist(openErr) {
-				time.Sleep(15 * time.Millisecond)
+				time.Sleep(30 * time.Millisecond)
 				continue
 			}
-			return "", fmt.Errorf("failed to open discovery log from %s: %w", entry.Name(), openErr)
-		}
-		if openErr != nil {
-			return "", fmt.Errorf("kernel failed to expose discovery log path within timeout: %w", openErr)
+			
+			// If it's a permission or system block error, exit immediately
+			return "", fmt.Errorf("fatal open error on discovery log from %s: %w", entry.Name(), openErr)
 		}
 		
+		// Evaluate timeout strictly AFTER the loop finishes all iterations
+		if openErr != nil {
+			logger.Errorf("NVMe-oFC Critical Timeout: Target discovery controller found under %s, "+
+				"but the low-level Fibre Channel handshake failed to populate the log page within 3 seconds. "+
+				"Internal OS Error: %v", controllerPath, openErr)
+				
+			return "", fmt.Errorf("fabric_timeout: connection initiated but kernel failed to expose log page")
+		}
+				
 		// 16-byte log page header + space for up to 64 records
 		logBuf := make([]byte, 16+(64*recordSize))
 		n, err := io.ReadFull(logFile, logBuf)
@@ -699,8 +709,8 @@ func (r OsDeviceConnectivityNvmeOFc) nvmeConnect(ctx context.Context, arrayTarge
 	hostId := r.getHostId()
 
 	// FIX: Changed host-traddr to host_traddr, added hostnqn/hostid, removed trailing newline
-	options := fmt.Sprintf("nqn=%s,transport=fc,traddr=nn-%s:pn-%s,host_traddr=nn-%s:pn-%s,hostnqn=%s,hostid=%s,ctrl_loss_tmo=600",
-		subNqn, targetNN, targetPN, hostNN, hostPN, hostNqn, hostId)
+		options := fmt.Sprintf("nqn=%s,transport=fc,traddr=nn-%s:pn-%s,host_traddr=nn-%s:pn-%s,hostnqn=%s,hostid=%s,ctrl_loss_tmo=600",
+			subNqn, targetNN, targetPN, hostNN, hostPN, hostNqn, hostId)
 
 	logger.Infof("NVMe-oFC DEBUG RAW CONNECT STRING: %q", options)
 
