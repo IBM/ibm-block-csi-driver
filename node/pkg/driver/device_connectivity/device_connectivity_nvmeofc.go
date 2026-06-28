@@ -443,13 +443,48 @@ func (r OsDeviceConnectivityNvmeOFc) discoverSubNqn(ctx context.Context, arrayTa
 
 	logger.Infof("NVMe-oFC DEBUG RAW DISCOVERY STRING: %q", cmd)
 
+
 	rawOutput, err := executer.ExecuteUninterruptible(
-		ctx, 
-		r.KeyedGater,
-		fmt.Sprintf("nvme-disc-%s-%s", arrayTargetPort, hostPort),
-		2, 1, 5*time.Second, 15*time.Second,
+		ctx, r.KeyedGater, fmt.Sprintf("nvme-disc-%s-%s", arrayTargetPort, hostPort), 2, 1, 5*time.Second, 15*time.Second,
 		func(wCtx context.Context) (string, error) {
-			return r.executeKernelDiscovery(cmd)
+			// 1. Pre-write scan: If it doesn't exist, treat as an empty list (0 active controllers)
+			preControllers, err := os.ReadDir("/sys/class/nvme")
+			if err != nil && !os.IsNotExist(err) {
+				return "", fmt.Errorf("failed to scan pre-write nvme sysfs: %w", err)
+			}
+
+			// 2. Trigger the discovery controller association string write
+			out, writeErr := r.executeKernelDiscovery(cmd)
+			if writeErr != nil {
+				return "", writeErr
+			}
+
+			// 3. Post-write scan: If it doesn't exist NOW, the controller creation failed completely
+			postControllers, err := os.ReadDir("/sys/class/nvme")
+			if err != nil {
+				if os.IsNotExist(err) {
+					return "", fmt.Errorf("kernel accepted fabrics write but failed to generate sysfs entry under /sys/class/nvme (driver initialization failure)")
+				}
+				return "", fmt.Errorf("failed to scan post-write nvme sysfs: %w", err)
+			}
+
+			// 4. Find the newborn controller name
+			newControllerName := findNewController(preControllers, postControllers)
+
+			// 5. Tear it down immediately to unlock the kernel fabric loop
+			if newControllerName != "" {
+				defer func() {
+					deletePath := fmt.Sprintf("/sys/class/nvme/%s/delete_controller", newControllerName)
+					
+					// Safe check: Only write if the sysfs node exists
+					if _, statErr := os.Stat(deletePath); statErr == nil {
+						_ = os.WriteFile(deletePath, []byte("1"), 0200)
+						logger.Warningf("NVMe-oFC DEBUG CLEANUP: Deleted temporary discovery instance %s", newControllerName)
+					}
+				}()
+			}
+
+			return out, nil
 		},
 	)
 
@@ -467,6 +502,24 @@ func (r OsDeviceConnectivityNvmeOFc) discoverSubNqn(ctx context.Context, arrayTa
 
 	return subNqn, nil
 }
+
+// Simple, pointer-safe helper to find the newly allocated controller name string
+func findNewController(pre, post []os.DirEntry) string {
+	preMap := make(map[string]bool)
+	for _, entry := range pre {
+		if entry != nil {
+			preMap[entry.Name()] = true
+		}
+	}
+	for _, entry := range post {
+		if entry != nil && !preMap[entry.Name()] {
+			return entry.Name()
+		}
+	}
+	return ""
+}
+
+
 
 // executeKernelDiscovery writes the discovery payload string directly into the kernel fabrics channel.
 func (r OsDeviceConnectivityNvmeOFc) executeKernelDiscovery(cmd string) (string, error) {
