@@ -849,7 +849,7 @@ func generateRandomUUID() string {
 
 // getHostNqn dynamically reads the host file or builds a generic fallback NQN
 func (r OsDeviceConnectivityNvmeOFc) getHostNqn() string {
-	data, err := os.ReadFile("/etc/nvme/hostnqn")
+	data, err := os.ReadFile("/host/etc/nvme/hostnqn")
 	if err == nil {
 		sanitized := strings.TrimSpace(string(data))
 		if sanitized != "" {
@@ -865,7 +865,7 @@ func (r OsDeviceConnectivityNvmeOFc) getHostNqn() string {
 
 // getHostId dynamically reads the host ID or generates a stable runtime fallback
 func (r OsDeviceConnectivityNvmeOFc) getHostId() string {
-	data, err := os.ReadFile("/etc/nvme/hostid")
+	data, err := os.ReadFile("/host/etc/nvme/hostid")
 	if err == nil {
 		sanitized := strings.TrimSpace(string(data))
 		if sanitized != "" {
