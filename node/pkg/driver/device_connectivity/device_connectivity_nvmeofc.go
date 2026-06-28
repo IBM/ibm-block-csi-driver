@@ -443,45 +443,43 @@ func (r OsDeviceConnectivityNvmeOFc) discoverSubNqn(ctx context.Context, arrayTa
 
 	logger.Infof("NVMe-oFC DEBUG RAW DISCOVERY STRING: %q", cmd)
 
-
 	rawOutput, err := executer.ExecuteUninterruptible(
 		ctx, r.KeyedGater, fmt.Sprintf("nvme-disc-%s-%s", arrayTargetPort, hostPort), 2, 1, 5*time.Second, 15*time.Second,
 		func(wCtx context.Context) (string, error) {
-			// 1. Pre-write scan: If it doesn't exist, treat as an empty list (0 active controllers)
-			preControllers, err := os.ReadDir("/sys/class/nvme")
-			if err != nil && !os.IsNotExist(err) {
-				return "", fmt.Errorf("failed to scan pre-write nvme sysfs: %w", err)
-			}
+			preControllers, _ := os.ReadDir("/sys/class/nvme")
 
-			// 2. Trigger the discovery controller association string write
 			out, writeErr := r.executeKernelDiscovery(cmd)
 			if writeErr != nil {
 				return "", writeErr
 			}
 
-			// 3. Post-write scan: If it doesn't exist NOW, the controller creation failed completely
-			postControllers, err := os.ReadDir("/sys/class/nvme")
-			if err != nil {
-				if os.IsNotExist(err) {
-					return "", fmt.Errorf("kernel accepted fabrics write but failed to generate sysfs entry under /sys/class/nvme (driver initialization failure)")
-				}
-				return "", fmt.Errorf("failed to scan post-write nvme sysfs: %w", err)
-			}
-
-			// 4. Find the newborn controller name
+			postControllers, _ := os.ReadDir("/sys/class/nvme")
 			newControllerName := findNewController(preControllers, postControllers)
 
-			// 5. Tear it down immediately to unlock the kernel fabric loop
 			if newControllerName != "" {
-				defer func() {
-					deletePath := fmt.Sprintf("/sys/class/nvme/%s/delete_controller", newControllerName)
-					
-					// Safe check: Only write if the sysfs node exists
-					if _, statErr := os.Stat(deletePath); statErr == nil {
-						_ = os.WriteFile(deletePath, []byte("1"), 0200)
-						logger.Warningf("NVMe-oFC DEBUG CLEANUP: Deleted temporary discovery instance %s", newControllerName)
+				deletePath := fmt.Sprintf("/sys/class/nvme/%s/delete_controller", newControllerName)
+				// 1. Send the delete signal to the kernel
+				_ = os.WriteFile(deletePath, []byte("1\n"), 0200)
+				logger.Warningf("NVMe-oFC: Issued delete signal to transient controller %s", newControllerName)
+
+				// 2. CRITICAL SYNC GUARD: Wait for the directory to physically vanish from the host SAN layer
+				timeout := time.After(2 * time.Second)
+				ticker := time.NewTicker(10 * time.Millisecond)
+				defer ticker.Stop()
+
+			WaitForTeardown:
+				for {
+					select {
+					case <-timeout:
+						logger.Warningf("Timeout waiting for discovery controller %s to unmap", newControllerName)
+						break WaitForTeardown
+					case <-ticker.C:
+						// If the directory node is gone, the Fibre Channel link is fully unlocked and safe
+						if _, err := os.Stat(fmt.Sprintf("/sys/class/nvme/%s", newControllerName)); os.IsNotExist(err) {
+							break WaitForTeardown
+						}
 					}
-				}()
+				}
 			}
 
 			return out, nil
