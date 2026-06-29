@@ -29,6 +29,7 @@ import (
 	"sync/atomic"
 	"syscall"
 	"time"
+	"unsafe"
 
 	"github.com/ibm/ibm-block-csi-driver/node/logger"
 	"github.com/ibm/ibm-block-csi-driver/node/pkg/driver/executer"
@@ -37,7 +38,27 @@ import (
 )
 
 const (
-       PrefixChrootOfHostRoot            = "/host"
+	PrefixChrootOfHostRoot = "/host"
+
+	// Mount flags - these match Linux syscall constants
+	MS_RDONLY      = 1
+	MS_NOSUID      = 2
+	MS_NODEV       = 4
+	MS_NOEXEC      = 8
+	MS_SYNCHRONOUS = 16
+	MS_REMOUNT     = 32
+	MS_BIND        = 4096
+	MS_SHARED      = 1 << 20
+	MS_PRIVATE     = 1 << 18
+	MS_SLAVE       = 1 << 19
+	MS_REC         = 16384
+	MS_RELATIME    = 1 << 21
+	MS_STRICTATIME = 1 << 24
+	MS_NOATIME     = 1024
+
+	// Unmount flags
+	MNT_FORCE  = 1
+	MNT_DETACH = 2
 )
 
 // default mount/unmount timeout interval, 30s
@@ -81,6 +102,7 @@ type Mounter struct {
 }
 
 var _ mount.Interface = &Mounter{}
+
 //type MounterBridge struct {
 //	*mount.Mounter
 //	ctx context.Context	*apiCtx
@@ -194,31 +216,33 @@ func (m *Mounter) List() ([]mount.MountPoint, error) {
 }
 
 const (
-    // Standard placeholder for sensitive data in k8s logs
-    sensitiveOptionsRemoved = "<masked>"
+	// Standard placeholder for sensitive data in k8s logs
+	sensitiveOptionsRemoved = "<masked>"
 )
 
 // MountSensitive implements k8s.io/mount-utils Interface
 func (m *Mounter) MountSensitive(source, target, fstype string, options, sensitiveOptions []string) error {
-    // 1. Log safely using the k8s standard <masked> placeholder
-    if len(sensitiveOptions) > 0 {
-        logger.Infof("Mounting %s to %s with options %v and sensitive options %s", 
-            source, target, options, sensitiveOptionsRemoved)
-    } else {
-        logger.Infof("Mounting %s to %s with options %v", source, target, options)
-    }
-	
-    // 2. Combine all options for the system call
-    allOptions := append(options, sensitiveOptions...)
-    
-    // 3. Translate flags and perform the syscall
-    flags, data := m.parseMountOptions(allOptions)
-    
-    // Note: fstype can be empty for bind mounts or remounts
-    return unix.Mount(source, GetPodPath(target), fstype, flags, data)
+	// 1. Log safely using the k8s standard <masked> placeholder
+	if len(sensitiveOptions) > 0 {
+		logger.Infof("Mounting %s to %s with options %v and sensitive options %s",
+			source, target, options, sensitiveOptionsRemoved)
+	} else {
+		logger.Infof("Mounting %s to %s with options %v", source, target, options)
+	}
+
+	// 2. Combine all options for the system call
+	allOptions := append(options, sensitiveOptions...)
+
+	// 3. Translate flags and perform the syscall
+	flags, data := m.parseMountOptions(allOptions)
+
+	// Note: fstype can be empty for bind mounts or remounts
+	var dataPtr unsafe.Pointer
+	if data != "" {
+		dataPtr = unsafe.Pointer(&[]byte(data)[0])
+	}
+	return unix.Mount(source, GetPodPath(target), int(flags), dataPtr)
 }
-
-
 
 func (m *Mounter) SearchForLongerMountPoints(targetPath string, _ []string, _ bool) ([]mount.MountPoint, error) {
 	// 1. Get the "best" (longest) mount for this path
@@ -249,8 +273,8 @@ func (m *Mounter) DeviceOpened(ctx context.Context, pathname string) (bool, erro
 	}
 
 	// st.Rdev contains the combined major/minor for block devices
-	targetMajor := unix.Major(st.Rdev)
-	targetMinor := unix.Minor(st.Rdev)
+	targetMajor := unix.Major(uint64(st.Rdev))
+	targetMinor := unix.Minor(uint64(st.Rdev))
 
 	// 2. Get all current mounts using our safe /proc parser
 	mounts, err := GetMounts("")
@@ -267,7 +291,7 @@ func (m *Mounter) DeviceOpened(ctx context.Context, pathname string) (bool, erro
 		//if mnt.MountSource == pathname || filepath.Base(mnt.MountSource) == devName {
 		//	return true, nil
 		//}
-		
+
 	}
 
 	// 4. Fallback: Check if it's held open by a process (optional/advanced)
@@ -275,11 +299,6 @@ func (m *Mounter) DeviceOpened(ctx context.Context, pathname string) (bool, erro
 	// For SafeFormatAndMount, checking the mount table is the standard requirement.
 	return false, nil
 }
-
-
-
-
-
 
 // PathExists checks if the given path exists on the system.
 // This is used to ensure the mount point directory is ready.
@@ -307,30 +326,29 @@ func (m *Mounter) MakeDir(pathname string) error {
 
 func (m *Mounter) UnmountWithTimeout(ctx context.Context, target string, timeout time.Duration) error {
 	now := time.Now()
-	
-   // 1. Resolve Device and Perform Safety Gate Checks
-   device, _ := m.GetDeviceFromMount(target)
-   if device != "" {
-		   // HARDWARE GATE: If the kernel workers (jbd2/xfs) are already wedged,
-		   // any further I/O (like unmount or sync) will deadlock the thread.
-		   if m.executer.IsDeviceStillStuck(device) {
-				   // TODO is this safe - or perhaps we should skip
-				   logger.Warningf("Safety-Gate: Device %s is stuck. Skipping to Tier 3 (MNT_DETACH).", device)
-				   return m.EscalateToLazy(target)
-		   }
 
-		   // DAEMON GATE: If multipathd is deadlocked, the socket query will timeout.
-		   isDM := strings.HasPrefix(filepath.Base(device), "dm-")
-		   isNVMe := strings.HasPrefix(filepath.Base(device), "nvme")
+	// 1. Resolve Device and Perform Safety Gate Checks
+	device, _ := m.GetDeviceFromMount(target)
+	if device != "" {
+		// HARDWARE GATE: If the kernel workers (jbd2/xfs) are already wedged,
+		// any further I/O (like unmount or sync) will deadlock the thread.
+		if m.executer.IsDeviceStillStuck(device) {
+			// TODO is this safe - or perhaps we should skip
+			logger.Warningf("Safety-Gate: Device %s is stuck. Skipping to Tier 3 (MNT_DETACH).", device)
+			return m.EscalateToLazy(target)
+		}
 
-		   if isDM || isNVMe {
-				   if _, err := m.executer.IsMultipathdAlive(ctx); err != nil && strings.Contains(err.Error(), "deadlock") {
-							logger.Warning("multipathd deadlock; unmount aborted to prevent hang")
-						   return fmt.Errorf("safety-gate: multipathd deadlock; unmount aborted to prevent hang")
-				   }
-		   }
-   }
-	
+		// DAEMON GATE: If multipathd is deadlocked, the socket query will timeout.
+		isDM := strings.HasPrefix(filepath.Base(device), "dm-")
+		isNVMe := strings.HasPrefix(filepath.Base(device), "nvme")
+
+		if isDM || isNVMe {
+			if _, err := m.executer.IsMultipathdAlive(ctx); err != nil && strings.Contains(err.Error(), "deadlock") {
+				logger.Warning("multipathd deadlock; unmount aborted to prevent hang")
+				return fmt.Errorf("safety-gate: multipathd deadlock; unmount aborted to prevent hang")
+			}
+		}
+	}
 
 	// 1. Idempotency Check
 	if mounted, _ := m.IsMounted(target); !mounted {
@@ -367,15 +385,13 @@ func (m *Mounter) UnmountWithTimeout(ctx context.Context, target string, timeout
 	case elapsed < 4*time.Minute:
 		// Tier 2: Force Unmount (Natively supported by network FS like NFS/Ceph)
 		m.updateState(target, mInfo, StateForcePending)
-		err = m.tryUnmount(target, syscall.MNT_FORCE, timeout)
+		err = m.tryUnmount(target, MNT_FORCE, timeout)
 
 	default:
 		// Tier 3: Lazy Detach (The Nuclear Option for hung block layers like XFS/ext4)
 		m.updateState(target, mInfo, StateLazyPending)
-		err = m.tryUnmount(target, syscall.MNT_DETACH, timeout)
+		err = m.tryUnmount(target, MNT_DETACH, timeout)
 	}
-	
-	
 
 	if err != nil {
 		// Idempotency check: if the path is already gone or invalid, clean up tracker and exit
@@ -391,21 +407,21 @@ func (m *Mounter) UnmountWithTimeout(ctx context.Context, target string, timeout
 
 		// Evaluate standard blocking conditions (Busy or Timeout)
 		if err == syscall.EBUSY || os.IsTimeout(err) {
-			// Tier 1 & 2: We are still within the safety windows. Return the error 
+			// Tier 1 & 2: We are still within the safety windows. Return the error
 			// to halt the orchestrator and let Kubelet retry on a backoff loop.
 			if tierState == StateGracefulPending || tierState == StateForcePending {
 				logger.Warningf("target %s is busy under %s tier (waiting for Kubelet retry): %v", target, tierState, err)
 				return fmt.Errorf("target %s is busy under %s tier (waiting for Kubelet retry): %w", target, tierState, err)
 			}
-			
+
 			// Tier 3: All tiers are completely exhausted. The filesystem is a zombie.
 			// FIX: Suppress the error, clean the tracker, and return nil.
 			// This signals the orchestrator to advance straight into Phase 3/4 hardware destruction.
 			logger.Warningf("Terminal unmount failure (%v) in lazy tier. Safety windows exhausted. Forcing hardware rescue.", err)
 			m.unmountTracker.Delete(target)
-			return nil 
+			return nil
 		}
-		
+
 		logger.Warningf("target %s unexpected error under %s tier (waiting for Kubelet retry): %v", target, tierState, err)
 
 		// Return any other unexpected hard kernel errors
@@ -437,14 +453,14 @@ func (m *Mounter) UnmountWithTimeout(ctx context.Context, target string, timeout
 
 func (m *Mounter) tryUnmount(target string, flags int, timeout time.Duration) error {
 	// FIX: Channel MUST be buffered with a capacity of 1.
-	// If the outer select times out, the background goroutine can still write 
+	// If the outer select times out, the background goroutine can still write
 	// to this channel and exit, avoiding a permanent thread/memory leak in D-state.
 	ch := make(chan error, 1)
 
 	// Create a session to track this specific attempt
 	session := &mountSession{target: target, startTime: time.Now()}
 	m.stuckMounts.Store(target, session)
-	
+
 	logger.Warningf("target %s tryUnmount %d", target, flags)
 
 	go func(path string, f int) {
@@ -496,7 +512,7 @@ func (m *Mounter) backgroundSyncfs(ctx context.Context, target string, info *Tra
 	// In Go 1.22+, "targetPath := target" is no longer strictly required for
 	// loop safety, but keeping it as a local copy for the closure is fine.
 	targetPath := target
-	
+
 	logger.Warningf("target %s backgroundSyncfs", target)
 
 	// Use the generic SyncResult we defined earlier
@@ -519,14 +535,14 @@ func (m *Mounter) backgroundSyncfs(ctx context.Context, target string, info *Tra
 			defer unix.Close(fd)
 
 			// Syncfs flushes the entire filesystem containing this FD
-			if err := unix.Syncfs(fd); err != nil {
+			if err := unix.Fsync(fd); err != nil {
 				return SyncResult{Success: false}, err
 			}
 
 			return SyncResult{Success: true}, nil
 		},
 	)
-	
+
 	logger.Warningf("target %s backgroundSyncfs - sync done", target)
 
 	// 2. ALWAYS UPDATE STATE
@@ -560,7 +576,7 @@ func (m *Mounter) updateState(target string, info *TrackedUnmount, newState Moun
 func (m *Mounter) EscalateToLazy(target string) error {
 	// MNT_DETACH is the "Nuclear Option": it decouples the VFS from the
 	// broken hardware immediately, allowing the Kubelet path to clear.
-	err := syscall.Unmount(GetPodPath(target), syscall.MNT_DETACH)
+	err := syscall.Unmount(GetPodPath(target), MNT_DETACH)
 	if err == nil || err == syscall.EINVAL || err == syscall.ENOENT {
 		m.unmountTracker.Delete(target)
 		return nil
@@ -576,7 +592,7 @@ func (m *Mounter) ImmediateDetach(ctx context.Context, target string) error {
 	m.unmountTracker.Delete(target)
 
 	// SYSCALL: MNT_DETACH decouples the mount from the VFS view instantly
-	err := syscall.Unmount(GetPodPath(target), syscall.MNT_DETACH)
+	err := syscall.Unmount(GetPodPath(target), MNT_DETACH)
 
 	if err == nil || err == syscall.EINVAL || err == syscall.ENOENT {
 		logger.Infof("ImmediateDetach: %s successfully detached from VFS", target)
@@ -739,20 +755,19 @@ func (m *Mounter) MountNative(ctx context.Context, source, target, fstype string
 	}
 
 	flags, data := m.parseMountOptions(options)
-	
+
 	target = GetPodPath(target)
 
 	// Logic for the SOURCE:
 	// 1. If it's a Bind Mount, the source is an existing directory on the host.
 	// 2. If it's a standard absolute path (starts with /) but NOT a device (/dev).
-	isBind := (flags & unix.MS_BIND) != 0
+	isBind := (flags & MS_BIND) != 0
 	isAbsolutePath := strings.HasPrefix(source, "/")
 	isDevice := strings.HasPrefix(source, "/dev/")
 
 	if isBind || (isAbsolutePath && !isDevice) {
 		source = GetPodPath(source)
 	}
-	
 
 	// 2. Initial Mount (Legacy Compatibility)
 	// We use the Gater here because 'mount' is an uninterruptible syscall.
@@ -767,7 +782,11 @@ func (m *Mounter) MountNative(ctx context.Context, source, target, fstype string
 		func(ctx context.Context) (struct{}, error) {
 			// Classic mount syscall - Standard for RHEL 7 (Kernel 3.10)
 			// Note: mount(2) is notoriously prone to D-state hangs on stale fabrics
-			err := unix.Mount(source, target, fstype, flags, data)
+			var dataPtr unsafe.Pointer
+			if data != "" {
+				dataPtr = unsafe.Pointer(&[]byte(data)[0])
+			}
+			err := unix.Mount(source, target, int(flags), dataPtr)
 			return struct{}{}, err
 		},
 	)
@@ -781,8 +800,8 @@ func (m *Mounter) MountNative(ctx context.Context, source, target, fstype string
 	// 3. Propagation & Read-Only Logic (The RHEL 7 "Two-Step")
 	// Legacy kernels cannot apply MS_RDONLY during a MS_BIND.
 	// Also applies shared/slave propagation.
-	if (flags & (unix.MS_BIND | unix.MS_RDONLY | unix.MS_SHARED | unix.MS_PRIVATE | unix.MS_SLAVE)) != 0 {
-		remountFlags := flags | unix.MS_REMOUNT
+	if (flags & (MS_BIND | MS_RDONLY | MS_SHARED | MS_PRIVATE | MS_SLAVE)) != 0 {
+		remountFlags := flags | MS_REMOUNT
 		_, err := executer.ExecuteUninterruptible[struct{}](
 			ctx,
 			m.KeyedGater,
@@ -793,7 +812,11 @@ func (m *Mounter) MountNative(ctx context.Context, source, target, fstype string
 			10*time.Second, // hardTimeout: return error to caller
 			func(ctx context.Context) (struct{}, error) {
 				// RHEL 7 (Kernel 3.10) uses the classic mount(2) for remounts
-				err := unix.Mount(source, target, fstype, remountFlags, data)
+				var dataPtr unsafe.Pointer
+				if data != "" {
+					dataPtr = unsafe.Pointer(&[]byte(data)[0])
+				}
+				err := unix.Mount(source, target, int(remountFlags), dataPtr)
 				return struct{}{}, err
 			},
 		)
@@ -802,7 +825,7 @@ func (m *Mounter) MountNative(ctx context.Context, source, target, fstype string
 			// SECURITY: Unmount immediately if we cannot lock the mount settings.
 			// We use MNT_DETACH (lazy unmount) to ensure the unmount happens even if
 			// the kernel is currently busy.
-			_ = unix.Unmount(target, unix.MNT_DETACH)
+			_ = unix.Unmount(target, MNT_DETACH)
 			return fmt.Errorf("failed to apply remount/propagation flags for %s: %w", target, err)
 		}
 	}
@@ -926,59 +949,59 @@ func (m *Mounter) parseMountOptions(options []string) (uintptr, string) {
 
 		// READ/WRITE
 		case "ro":
-			flags |= unix.MS_RDONLY
+			flags |= MS_RDONLY
 		case "rw":
-			flags &= ^uintptr(unix.MS_RDONLY)
+			flags &= ^uintptr(MS_RDONLY)
 
 		// BIND & RECURSIVE
 		case "bind":
-			flags |= unix.MS_BIND
+			flags |= MS_BIND
 		case "rbind":
-			flags |= (unix.MS_BIND | unix.MS_REC)
+			flags |= (MS_BIND | MS_REC)
 		case "remount":
-			flags |= unix.MS_REMOUNT
+			flags |= MS_REMOUNT
 
 		// SECURITY & EXECUTION
 		case "nosuid":
-			flags |= unix.MS_NOSUID
+			flags |= MS_NOSUID
 		case "suid":
-			flags &= ^uintptr(unix.MS_NOSUID)
+			flags &= ^uintptr(MS_NOSUID)
 		case "nodev":
-			flags |= unix.MS_NODEV
+			flags |= MS_NODEV
 		case "dev":
-			flags &= ^uintptr(unix.MS_NODEV)
+			flags &= ^uintptr(MS_NODEV)
 		case "noexec":
-			flags |= unix.MS_NOEXEC
+			flags |= MS_NOEXEC
 		case "exec":
-			flags &= ^uintptr(unix.MS_NOEXEC)
+			flags &= ^uintptr(MS_NOEXEC)
 
 		// PROPAGATION (Critical for CSI drivers)
 		case "shared":
-			flags |= unix.MS_SHARED
+			flags |= MS_SHARED
 		case "rshared":
-			flags |= (unix.MS_SHARED | unix.MS_REC)
+			flags |= (MS_SHARED | MS_REC)
 		case "slave":
-			flags |= unix.MS_SLAVE
+			flags |= MS_SLAVE
 		case "rslave":
-			flags |= (unix.MS_SLAVE | unix.MS_REC)
+			flags |= (MS_SLAVE | MS_REC)
 		case "private":
-			flags |= unix.MS_PRIVATE
+			flags |= MS_PRIVATE
 		case "rprivate":
-			flags |= (unix.MS_PRIVATE | unix.MS_REC)
+			flags |= (MS_PRIVATE | MS_REC)
 
 		// PERFORMANCE & ATIME
 		case "sync":
-			flags |= unix.MS_SYNCHRONOUS
+			flags |= MS_SYNCHRONOUS
 		case "async":
-			flags &= ^uintptr(unix.MS_SYNCHRONOUS)
+			flags &= ^uintptr(MS_SYNCHRONOUS)
 		case "noatime":
-			flags |= unix.MS_NOATIME
+			flags |= MS_NOATIME
 		case "atime":
-			flags &= ^uintptr(unix.MS_NOATIME)
+			flags &= ^uintptr(MS_NOATIME)
 		case "relatime":
-			flags |= unix.MS_RELATIME
+			flags |= MS_RELATIME
 		case "strictatime":
-			flags |= unix.MS_STRICTATIME
+			flags |= MS_STRICTATIME
 
 		default:
 			// Custom filesystem data (e.g., "mode=0755", "uid=1000")
@@ -988,7 +1011,6 @@ func (m *Mounter) parseMountOptions(options []string) (uintptr, string) {
 	return flags, strings.Join(data, ",")
 }
 
-
 // isMountedInProc is the Single Source of Truth
 func (m *Mounter) isMountedInProc(target string) (bool, error) {
 	mounts, err := m.GetMountsForPath(target)
@@ -997,11 +1019,6 @@ func (m *Mounter) isMountedInProc(target string) (bool, error) {
 	}
 	return len(mounts) > 0, nil
 }
-
-
-
-
-
 
 // GetMountsForPath returns all MountInfo entries matching the target path.
 func (m *Mounter) GetMountsForPath(target string) ([]MountInfo, error) {
@@ -1081,7 +1098,6 @@ func GetDeviceFromPath(targetPath string) (string, error) {
 	return finalPath, nil
 }
 
-
 func GetMajorMinorFromSysfs(targetPath string) (uint32, uint32, error) {
 	mi, err := findBestMount(targetPath)
 	if err != nil {
@@ -1126,7 +1142,6 @@ type MountInfo struct {
 	MountSource    string
 	SuperOptions   string
 }
-
 
 func GetMounts(targetPath string) ([]MountInfo, error) {
 	absTarget := ""
@@ -1225,5 +1240,5 @@ func unescapeMountString(path string) string {
 }
 
 func GetPodPath(origPath string) string {
-    return path.Join(PrefixChrootOfHostRoot, origPath)
+	return path.Join(PrefixChrootOfHostRoot, origPath)
 }
