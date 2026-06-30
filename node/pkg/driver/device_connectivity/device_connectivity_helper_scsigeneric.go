@@ -687,7 +687,7 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) ValidateLun(ctx context.Context,
 	logger.Debugf("Validating LUN {%v} on devices: {%v}", expectedLun, sysDevices)
 
 	normExpectedLun := r.normalizeLun(strconv.Itoa(expectedLun))
-	normExpectedSerial := r.Helper.normalizeWWID(expectedSerial)
+	normExpectedSerial := r.Helper.NormalizeWWID(expectedSerial)
 	validPathsFound := 0
 	hctlRegex := regexp.MustCompile(`(\d+):(\d+):(\d+):(\d+)$`)
 
@@ -720,7 +720,7 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) ValidateLun(ctx context.Context,
 			if sysfsId == "" {
 				sysfsId = r.readSysfs(fmt.Sprintf("/sys/block/%s/device/serial", deviceName))
 			}
-			hwId = r.Helper.normalizeWWID(sysfsId)
+			hwId = r.Helper.NormalizeWWID(sysfsId)
 		} else {
 			// SCSI Health Check
 			state := r.readSysfs(fmt.Sprintf("/sys/block/%s/device/state", deviceName))
@@ -740,7 +740,7 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) ValidateLun(ctx context.Context,
 				}
 			}
 
-			sysfsId = r.Helper.normalizeWWID(r.readSysfs(fmt.Sprintf("/sys/block/%s/device/wwid", deviceName)))
+			sysfsId = r.Helper.NormalizeWWID(r.readSysfs(fmt.Sprintf("/sys/block/%s/device/wwid", deviceName)))
 
 			// Hardware Inquiry
 			hwId, err = executer.ExecuteUninterruptible[string](
@@ -754,7 +754,7 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) ValidateLun(ctx context.Context,
 				// TODO maybe fail?
 				continue // Skip path, don't abort yet
 			}
-			hwId = r.Helper.normalizeWWID(hwId)
+			hwId = r.Helper.NormalizeWWID(hwId)
 		}
 
 		// 3. Validation Logic
@@ -992,7 +992,7 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) PruneNvmeGhosts(ctx context.Cont
 		return err
 	}
 
-	normExpected := r.Helper.normalizeWWID(expectedWWID)
+	normExpected := r.Helper.NormalizeWWID(expectedWWID)
 	var deleted int
 
 	for _, entry := range entries {
@@ -1036,7 +1036,7 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) PruneNvmeGhosts(ctx context.Cont
 			state = r.readSysfs(filepath.Join(deviceDir, "state"))
 		}
 
-		isMismatch := (wwid != "" && r.Helper.normalizeWWID(wwid) != normExpected)
+		isMismatch := (wwid != "" && r.Helper.NormalizeWWID(wwid) != normExpected)
 
 		if isGhost || isMismatch {
 			logger.Warningf("Ghost Scrubber: Pruning stale NVMe device %s. State: %s, WWID Match: %v", name, state, !isMismatch)
@@ -1745,7 +1745,7 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) TeardownVolume(ctx context.Conte
 	// --- PHASE 2: HARDWARE RESOLUTION FALLBACK ---
 	if mpathName == "" && expectedWWID != "" {
 		logger.Warningf("teardown volume %s hardware resolution fallback step needed", target)
-		mpathName = r.Helper.findDMByWWID(expectedWWID)
+		mpathName = r.Helper.FindDMByWWID(expectedWWID)
 		if mpathName != "" && !hardwareResolved {
 			major, minor, _ = r.Helper.GetMajorMinorFromSysfs(ctx, mpathName)
 			logger.Warningf("teardown volume %s hardware resolution fallback step needed - resolved", target)
@@ -1804,7 +1804,7 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) TeardownVolume(ctx context.Conte
 		logger.Warningf("teardown volume %s remove physical", target)
 		var slaves []string
 		if hardwareResolved && major != 0 {
-			slaves, _ = r.Helper.getSlavesForDevice(major, minor)
+			slaves, _ = r.Helper.GetSlavesForDevice(major, minor)
 		}
 
 		if len(slaves) == 0 && expectedWWID != "" {
@@ -2075,8 +2075,8 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) TeardownRescue(ctx context.Conte
 	return r.dmIoctlCall(ctx, mpathName, DM_DEV_REMOVE, DM_DEFERRED_REMOVE)
 }
 
-// getSlavesForDevice returns raw block device names (e.g., "sda", "nvme0n1") from sysfs
-func (o *OsDeviceConnectivityHelperGeneric) getSlavesForDevice(major, minor uint32) ([]string, error) {
+// GetSlavesForDevice returns raw block device names (e.g., "sda", "nvme0n1") from sysfs
+func (o *OsDeviceConnectivityHelperGeneric) GetSlavesForDevice(major, minor uint32) ([]string, error) {
 
 	logger.Warning("getSlaveForDevice")
 	slavesPath := fmt.Sprintf("/sys/dev/block/%d:%d/slaves", major, minor)
@@ -2187,10 +2187,10 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) IdentityAwarePreScan(
 	// Dynamic lookup: Locate a Device Mapper mapping using whichever protocol is actually active
 	var mpathAlias string
 	if normIds[0] != "" {
-		mpathAlias = r.Helper.findDMByWWID(normIds[0])
+		mpathAlias = r.Helper.FindDMByWWID(normIds[0])
 	}
 	if mpathAlias == "" && normIds[1] != "" {
-		mpathAlias = r.Helper.findDMByWWID(normIds[1]) // Evaluates NVMe over DM targets
+		mpathAlias = r.Helper.FindDMByWWID(normIds[1]) // Evaluates NVMe over DM targets
 	}
 
 	// CRITICAL RESOLUTION RESTORED: Translate the alias into a raw dm-X name early
@@ -2207,7 +2207,7 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) IdentityAwarePreScan(
 	mounts, _ := r.Mounter.GetMountsForPath(targetPath)
 	if len(mounts) > 0 {
 		// 1. Sysfs mapping lookup using mount minor descriptors
-		currentWWID, _ := r.Helper.getWWIDByDev(mounts[0].Major, mounts[0].Minor)
+		currentWWID, _ := r.Helper.GetWWIDByDev(mounts[0].Major, mounts[0].Minor)
 		currentWWID = normalizeWWID(currentWWID)
 
 		// 2. Raw Hardware Controller INQUIRY check on the active DM target
@@ -2300,7 +2300,7 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) IdentityAwarePreScan(
 }
 
 func (r *OsDeviceConnectivityHelperScsiGeneric) cleanupOrphanedTopology(ctx context.Context, mpathName string, expectedWWID string) error {
-	normExpected := r.Helper.normalizeWWID(expectedWWID)
+	normExpected := r.Helper.NormalizeWWID(expectedWWID)
 
 	// 1. DEVICE MAPPER MANAGEMENT (SCSI & NVMe over DM)
 	if mpathName != "" {
@@ -2426,10 +2426,10 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) purgeStuckPhysicalPaths(expected
 }
 
 func (r *OsDeviceConnectivityHelperScsiGeneric) FinalWwidPurge(ctx context.Context, expectedWWID string) error {
-	targetWWID := r.Helper.normalizeWWID(expectedWWID)
+	targetWWID := r.Helper.NormalizeWWID(expectedWWID)
 
 	// 1. CLEANUP MULTIPATH LAYER
-	mpathName := r.Helper.findDMByWWID(targetWWID)
+	mpathName := r.Helper.FindDMByWWID(targetWWID)
 	if mpathName != "" {
 		_, err := executer.ExecuteUninterruptible[struct{}](
 			ctx,
@@ -2460,7 +2460,7 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) FinalWwidPurge(ctx context.Conte
 	dmUUIDs, _ := filepath.Glob("/sys/block/dm-*/dm/uuid")
 	for _, path := range dmUUIDs {
 		data, err := os.ReadFile(path)
-		if err == nil && strings.Contains(r.Helper.normalizeWWID(string(data)), targetWWID) {
+		if err == nil && strings.Contains(r.Helper.NormalizeWWID(string(data)), targetWWID) {
 			dmName := filepath.Base(filepath.Dir(filepath.Dir(path)))
 			_, err := executer.ExecuteUninterruptible[struct{}](
 				ctx,
@@ -2518,7 +2518,7 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) FinalWwidPurge(ctx context.Conte
 			func(ctx context.Context) (struct{}, error) {
 				// 1. Identity Check (Sysfs is safer than ioctl, but can still hang if bus is reset)
 				currentWWID, _ := r.getWWIDBySysfs(name)
-				if !strings.EqualFold(r.Helper.normalizeWWID(currentWWID), targetWWID) {
+				if !strings.EqualFold(r.Helper.NormalizeWWID(currentWWID), targetWWID) {
 					return struct{}{}, nil
 				}
 
@@ -2839,12 +2839,12 @@ type OsDeviceConnectivityHelperInterface interface {
 	GetVolumeIdVariations(volumeUuid string) []string
 	GetMpathDeviceName(ctx context.Context, volumePath string) (string, error)
 	GetMpathVolumeId(ctx context.Context, mpathDeviceName string) (string, error)
-	normalizeWWID(raw string) string
-	findDMByWWID(wwid string) string
-	getSlavesForDevice(major, minor uint32) ([]string, error)
+	NormalizeWWID(raw string) string
+	FindDMByWWID(wwid string) string
+	GetSlavesForDevice(major, minor uint32) ([]string, error)
 	GetOpenCount(ctx context.Context, dmName string) (int32, error)
 	GetMajorMinorFromSysfs(ctx context.Context, devicePath string) (major uint32, minor uint32, err error)
-	getWWIDByDev(major, minor uint32) (string, error)
+	GetWWIDByDev(major, minor uint32) (string, error)
 	WaitForDmToExist(ctx context.Context, volumeIdVariations []string, maxRetries int, intervalSeconds int) (string, error)
 }
 
@@ -3538,7 +3538,7 @@ func (o *OsDeviceConnectivityHelperGeneric) ResolveToKernelName(ctx context.Cont
 	return deviceName, nil
 }
 
-func (o *OsDeviceConnectivityHelperGeneric) findDMByWWID(wwid string) string {
+func (o *OsDeviceConnectivityHelperGeneric) FindDMByWWID(wwid string) string {
 	files, err := os.ReadDir("/dev/mapper")
 	if err != nil {
 		return ""
@@ -3599,7 +3599,7 @@ func (o OsDeviceConnectivityHelperGeneric) normalizeWWID(raw string) string {
 	return strings.ReplaceAll(s, "-", "")
 }
 
-func (o *OsDeviceConnectivityHelperGeneric) getWWIDByDev(major, minor uint32) (string, error) {
+func (o *OsDeviceConnectivityHelperGeneric) GetWWIDByDev(major, minor uint32) (string, error) {
 	basePath := fmt.Sprintf("/sys/dev/block/%d:%d", major, minor)
 
 	// Order of operations: DM -> NVMe -> SCSI
@@ -4558,4 +4558,9 @@ func normalizeWWID(raw string) string {
 	s = strings.TrimPrefix(s, "0x")
 
 	return s
+}
+
+// NormalizeWWID is a wrapper method that calls the standalone normalizeWWID function
+func (o *OsDeviceConnectivityHelperGeneric) NormalizeWWID(raw string) string {
+	return normalizeWWID(raw)
 }

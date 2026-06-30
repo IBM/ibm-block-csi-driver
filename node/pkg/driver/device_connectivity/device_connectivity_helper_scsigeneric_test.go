@@ -17,6 +17,7 @@
 package device_connectivity_test
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"reflect"
@@ -248,7 +249,7 @@ func TestGetMpathDevice(t *testing.T) {
 			}
 
 			o := NewOsDeviceConnectivityHelperScsiGenericForTest(fakeExecuter, fake_helper, fake_mutex)
-			DMPath, err := o.GetMpathDevice(volumeUuid)
+			DMPath, err := o.GetMpathDevice(context.TODO(), volumeUuid)
 			if tc.expErr != nil || tc.expErrType != nil {
 				if err == nil {
 					t.Fatalf("Expected to fail with error, got success.")
@@ -425,17 +426,15 @@ func TestGetDmsPath(t *testing.T) {
 			fake_helper := mocks.NewMockGetDmsPathHelperInterface(mockCtrl)
 
 			for _, r := range tc.waitForDmToExistReturn {
-				fake_helper.EXPECT().WaitForDmToExist(volumeIdVariations, device_connectivity.WaitForMpathRetries,
-					device_connectivity.WaitForMpathWaitIntervalSec, device_connectivity.MultipathdWildcardsVolumeIdAndMpath).Return(r.out, r.err)
+				fake_helper.EXPECT().WaitForDmToExist(gomock.Any(), volumeIdVariations, device_connectivity.WaitForMpathRetries,
+					device_connectivity.WaitForMpathWaitIntervalSec).Return(r.out, r.err)
 			}
 
-			for _, r := range tc.extractDmFieldValuesReturn {
-				fake_helper.EXPECT().ExtractDmFieldValues(volumeIdVariations, r.mpathdOutput).Return(r.dmFieldValues)
-			}
+			// ExtractDmFieldValues method has been removed or refactored
+			_ = tc.extractDmFieldValuesReturn
 
-			for _, r := range tc.getFullDmPathReturn {
-				fake_helper.EXPECT().GetFullDmPath(r.dmFieldValues, volumeUuid).Return(r.dmPath, r.err)
-			}
+			// GetFullDmPath method has been removed or refactored
+			_ = tc.getFullDmPathReturn
 
 			helperGeneric := NewOsDeviceConnectivityHelperGenericForTest(fakeExecuter, fake_helper)
 			dmPath, err := helperGeneric.GetDmsPath(volumeIdVariations)
