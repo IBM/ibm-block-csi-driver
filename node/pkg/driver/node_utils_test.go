@@ -17,6 +17,7 @@
 package driver_test
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"io/ioutil"
@@ -200,7 +201,7 @@ func TestParseFCPortsName(t *testing.T) {
 			fakeExecuter := mocks.NewMockExecuterInterface(mockCtrl)
 			devicePath := "/sys/class/fc_host/host*/port_name"
 			fakeExecuter.EXPECT().FilepathGlob(devicePath).Return(fpaths, tc.err)
-			nodeUtils := driver.NewNodeUtils(fakeExecuter, nil, ConfigYaml, nil)
+			nodeUtils := driver.NewNodeUtils(fakeExecuter, nil, nil, ConfigYaml, nil)
 
 			fcs, err := nodeUtils.ParseFCPorts()
 
@@ -324,7 +325,7 @@ func TestGetVolumeUuid(t *testing.T) {
 			defer mockCtrl.Finish()
 
 			fakeExecuter := mocks.NewMockExecuterInterface(mockCtrl)
-			nodeUtils := driver.NewNodeUtils(fakeExecuter, nil, ConfigYaml, nil)
+			nodeUtils := driver.NewNodeUtils(fakeExecuter, nil, nil, ConfigYaml, nil)
 
 			volumeUuid := nodeUtils.GetVolumeUuid(tc.volumeId)
 
@@ -387,15 +388,15 @@ func TestGetBlockVolumeStats(t *testing.T) {
 
 			fakeExecuter := mocks.NewMockExecuterInterface(mockCtrl)
 			mockOsDeviceConHelper := mocks.NewMockOsDeviceConnectivityHelperScsiGenericInterface(mockCtrl)
-			nodeUtils := driver.NewNodeUtils(fakeExecuter, nil, ConfigYaml, mockOsDeviceConHelper)
+			nodeUtils := driver.NewNodeUtils(fakeExecuter, nil, nil, ConfigYaml, mockOsDeviceConHelper)
 			args := []string{"--getsize64", tc.mpathDevice}
 
-			mockOsDeviceConHelper.EXPECT().GetMpathDevice(tc.volumeUuid).Return(tc.mpathDevice, tc.mpathDeviceErr)
+			mockOsDeviceConHelper.EXPECT().GetMpathDevice(gomock.Any(), tc.volumeUuid).Return(tc.mpathDevice, tc.mpathDeviceErr)
 			if tc.mpathDevice != "" {
 				fakeExecuter.EXPECT().ExecuteWithTimeoutSilently(
 					device_connectivity.TimeOutBlockDevCmd, driver.BlockDevCmd, args).Return(tc.outInBytes, tc.outInBytesErr)
 			}
-			volumestats, err := nodeUtils.GetBlockVolumeStats(tc.volumeUuid)
+			volumestats, err := nodeUtils.GetBlockVolumeStats(context.Background(), tc.volumeUuid)
 
 			if volumestats != tc.volumeStats {
 				t.Fatalf("wrong volumestats: expected %v, got %v", tc.volumeStats, volumestats)

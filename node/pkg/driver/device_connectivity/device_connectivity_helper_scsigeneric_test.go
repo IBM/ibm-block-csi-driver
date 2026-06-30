@@ -437,7 +437,7 @@ func TestGetDmsPath(t *testing.T) {
 			_ = tc.getFullDmPathReturn
 
 			helperGeneric := NewOsDeviceConnectivityHelperGenericForTest(fakeExecuter, fake_helper)
-			dmPath, err := helperGeneric.GetDmsPath(volumeIdVariations)
+			dmPath, err := helperGeneric.WaitForDmToExist(context.Background(), volumeIdVariations, 1, 1)
 			if tc.expErr != nil || tc.expErrType != nil {
 				if err == nil {
 					t.Fatalf("Expected to fail with error, got success.")
@@ -501,8 +501,7 @@ func TestHelperWaitForDmToExist(t *testing.T) {
 			fakeExecuter.EXPECT().ExecuteWithTimeout(device_connectivity.TimeOutMultipathdCmd,
 				"multipathd", args).Return([]byte(tc.devices), tc.cmdReturnErr)
 			helperGeneric := device_connectivity.NewGetDmsPathHelperGeneric(fakeExecuter)
-			devices, err := helperGeneric.WaitForDmToExist(volumeIdVariations, 1, 1,
-				device_connectivity.MultipathdWildcardsVolumeIdAndMpath)
+			devices, err := helperGeneric.WaitForDmToExist(context.Background(), volumeIdVariations, 1, 1)
 			if err != nil {
 				if err.Error() != tc.expErr.Error() {
 					t.Fatalf("Expected error code %s, got %s", tc.expErr, err.Error())
@@ -583,8 +582,8 @@ func TestHelperGetWwnByScsiInq(t *testing.T) {
 				fakeExecuter.EXPECT().ExecuteWithTimeout(device_connectivity.TimeOutSgInqCmd, sgInqCmd, args).Return(tc.cmdReturn, tc.cmdReturnErr)
 			}
 
-			helperGeneric := device_connectivity.NewOsDeviceConnectivityHelperGeneric(fakeExecuter)
-			wwn, err := helperGeneric.GetWwnByScsiInq(device)
+			helperGeneric := device_connectivity.NewOsDeviceConnectivityHelperGeneric(fakeExecuter, nil, nil)
+			wwn, err := helperGeneric.GetWwnByScsiInq(context.Background(), device)
 			if tc.expErr != nil || tc.expErrType != nil {
 				if err == nil {
 					t.Fatalf("Expected to fail with error, got success.")
@@ -742,9 +741,9 @@ func TestGetHostsIdByArrayIdentifier(t *testing.T) {
 			}
 			gomock.InOrder(mcalls...)
 
-			helperGeneric := device_connectivity.NewOsDeviceConnectivityHelperGeneric(fakeExecuter)
+			helperGeneric := device_connectivity.NewOsDeviceConnectivityHelperGeneric(fakeExecuter, nil, nil)
 
-			returnHostList, err := helperGeneric.GetHostsIdByArrayIdentifier(tc.arrayIdentifier)
+			returnHostList, err := helperGeneric.GetHostsIdByArrayIdentifiers(tc.arrayIdentifier)
 			if tc.expErr != nil || tc.expErrType != nil {
 				if err == nil {
 					t.Fatalf("Expected to fail with error, got success.")
@@ -904,9 +903,9 @@ func TestGetHostsIdByArrayIdentifier(t *testing.T) {
 			}
 			gomock.InOrder(mcalls...)
 
-			helperGeneric := device_connectivity.NewOsDeviceConnectivityHelperGeneric(fakeExecuter)
+			helperGeneric := device_connectivity.NewOsDeviceConnectivityHelperGeneric(fakeExecuter, nil, nil)
 
-			returnHostList, err := helperGeneric.GetHostsIdByArrayIdentifier(tc.arrayIdentifier)
+			returnHostList, err := helperGeneric.GetHostsIdByArrayIdentifiers(tc.arrayIdentifier)
 			if tc.expErr != nil || tc.expErrType != nil {
 				if err == nil {
 					t.Fatalf("Expected to fail with error, got success.")
