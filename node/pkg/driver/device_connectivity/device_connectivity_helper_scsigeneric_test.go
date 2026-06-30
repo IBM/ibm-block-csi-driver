@@ -993,22 +993,13 @@ func TestIsVolumePathMatchesVolumeId(t *testing.T) {
 			o := NewOsDeviceConnectivityHelperScsiGenericForTest(fakeExecuter, mockOsDeviceConHelper, nil)
 
 			mockOsDeviceConHelper.EXPECT().GetVolumeIdVariations(tc.volumeUuid).Return(volumeIdVariations)
-			mockOsDeviceConHelper.EXPECT().GetMpathDeviceName(tc.volumePath).Return(tc.mpathDeviceName, tc.mpathDeviceNameErr)
-			if tc.mpathDeviceName != "" {
-				mockOsDeviceConHelper.EXPECT().IsDmName(tc.mpathDeviceName).Return(tc.isDmName)
-				mockOsDeviceConHelper.EXPECT().GetMpathdOutputForVolume(volumeIdVariations,
-					device_connectivity.MultipathdWildcardsMpathNameAndVolumeId).Return(tc.mpathdOutput, tc.mpathdOutputErr)
-			}
+			mockOsDeviceConHelper.EXPECT().GetMpathDeviceName(context.Background(), tc.volumePath).Return(tc.mpathDeviceName, tc.mpathDeviceNameErr)
 			if tc.mpathdOutput != "" {
 				mockOsDeviceConHelper.EXPECT().GetMpathVolumeId(
-					tc.mpathdOutput, tc.mpathDeviceName, device_connectivity.DevMapperPath).Return(
+					context.Background(), tc.mpathDeviceName).Return(
 					tc.volumeIdByVolumePath, tc.matchingVolumeIdErr)
 			}
-			if tc.volumeIdByVolumePath != "" {
-				mockOsDeviceConHelper.EXPECT().IsAnyVariationInMpathVolumeId(tc.volumeIdByVolumePath, volumeIdVariations).Return(
-					tc.isVolumePathMatchesVolumeId)
-			}
-			isVolumePathMatchesVolumeId, err := o.IsVolumePathMatchesVolumeId(tc.volumeUuid, tc.volumePath)
+			isVolumePathMatchesVolumeId, err := o.IsVolumePathMatchesVolumeId(context.Background(), tc.volumeUuid, tc.volumePath)
 
 			if isVolumePathMatchesVolumeId != tc.isVolumePathMatchesVolumeId {
 				t.Fatalf("wrong volumestats: expected %v, got %v", tc.isVolumePathMatchesVolumeId, isVolumePathMatchesVolumeId)

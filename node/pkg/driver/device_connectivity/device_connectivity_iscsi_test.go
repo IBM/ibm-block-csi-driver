@@ -197,7 +197,7 @@ func TestEnsureLogin(t *testing.T) {
 			}
 
 			o := NewOsDeviceConnectivityIscsiForTest(fakeExecuter, fakeHelper)
-			o.EnsureLogin(tc.portalsByTarget)
+			o.EnsureLogin(gomock.Any(), tc.portalsByTarget)
 		})
 	}
 }
