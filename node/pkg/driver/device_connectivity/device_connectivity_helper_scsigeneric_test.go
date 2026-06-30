@@ -616,7 +616,7 @@ func TestGetHostsIdByArrayIdentifier(t *testing.T) {
 	testCasesIscsi := []struct {
 		name                  string
 		ioutilReadFileReturns []ioutilReadFileReturn
-		arrayIdentifier       string
+		arrayIdentifier       []string
 
 		expErrType        reflect.Type
 		expErr            error
@@ -626,7 +626,7 @@ func TestGetHostsIdByArrayIdentifier(t *testing.T) {
 	}{
 		{
 			name:              "Should fail when FilepathGlob return error",
-			arrayIdentifier:   "iqn.1986-03.com.ibm:2145.v7k194.node2",
+			arrayIdentifier:   []string{"iqn.1986-03.com.ibm:2145.v7k194.node2"},
 			globReturnMatches: nil,
 			globReturnErr:     fmt.Errorf("error"),
 			expErr:            fmt.Errorf("error"),
@@ -634,7 +634,7 @@ func TestGetHostsIdByArrayIdentifier(t *testing.T) {
 		},
 		{
 			name:              "Should fail when FilepathGlob return without any hosts target files at all",
-			arrayIdentifier:   "iqn.1986-03.com.ibm:2145.v7k194.node2",
+			arrayIdentifier:   []string{"iqn.1986-03.com.ibm:2145.v7k194.node2"},
 			globReturnMatches: nil,
 			globReturnErr:     nil,
 
@@ -655,7 +655,7 @@ func TestGetHostsIdByArrayIdentifier(t *testing.T) {
 					err:           nil,
 				},
 			},
-			arrayIdentifier: "iqn.1986-03.com.ibm:2145.v7k194.node2",
+			arrayIdentifier: []string{"iqn.1986-03.com.ibm:2145.v7k194.node2"},
 			globReturnMatches: []string{
 				"/sys/class/iscsi_host/host1/device/session1/iscsi_session/session1/targetname",
 				"/sys/class/iscsi_host/host2/device/session2/iscsi_session/session2/targetname",
@@ -674,7 +674,7 @@ func TestGetHostsIdByArrayIdentifier(t *testing.T) {
 					err:           nil,
 				},
 			},
-			arrayIdentifier: "iqn.1986-03.com.ibm:2145.v7k194.node2",
+			arrayIdentifier: []string{"iqn.1986-03.com.ibm:2145.v7k194.node2"},
 
 			globReturnMatches: []string{
 				"/sys/class/iscsi_host/hostX/device/session1/iscsi_session/session1/targetname",
@@ -709,7 +709,7 @@ func TestGetHostsIdByArrayIdentifier(t *testing.T) {
 					err:           fmt.Errorf("error"),
 				},
 			},
-			arrayIdentifier: "iqn.1986-03.com.ibm:2145.v7k194.node2",
+			arrayIdentifier: []string{"iqn.1986-03.com.ibm:2145.v7k194.node2"},
 
 			globReturnMatches: []string{
 				"/sys/class/iscsi_host/host1/device/session1/iscsi_session/session1/targetname",
@@ -771,7 +771,7 @@ func TestGetHostsIdByArrayIdentifier(t *testing.T) {
 	testCasesFc := []struct {
 		name                  string
 		ioutilReadFileReturns []ioutilReadFileReturn
-		arrayIdentifier       string
+		arrayIdentifier       []string
 
 		expErrType        reflect.Type
 		expErr            error
@@ -781,7 +781,7 @@ func TestGetHostsIdByArrayIdentifier(t *testing.T) {
 	}{
 		{
 			name:              "Should fail when FilepathGlob return error",
-			arrayIdentifier:   "fakeWWN",
+			arrayIdentifier:   []string{"fakeWWN"},
 			globReturnMatches: nil,
 			globReturnErr:     fmt.Errorf("error"),
 			expErr:            fmt.Errorf("error"),
@@ -789,7 +789,7 @@ func TestGetHostsIdByArrayIdentifier(t *testing.T) {
 		},
 		{
 			name:              "Should fail when FilepathGlob return without any hosts target files at all",
-			arrayIdentifier:   "fakeWWN",
+			arrayIdentifier:   []string{"fakeWWN"},
 			globReturnMatches: nil,
 			globReturnErr:     nil,
 
@@ -810,7 +810,7 @@ func TestGetHostsIdByArrayIdentifier(t *testing.T) {
 					err:           nil,
 				},
 			},
-			arrayIdentifier: "fakeWWN",
+			arrayIdentifier: []string{"fakeWWN"},
 			globReturnMatches: []string{
 				"/sys/class/fc_remote_ports/rport-3:0-0/port_name",
 				"/sys/class/fc_remote_ports/rport-4:0-0/port_name",
@@ -845,7 +845,7 @@ func TestGetHostsIdByArrayIdentifier(t *testing.T) {
 					err:           fmt.Errorf("error"),
 				},
 			},
-			arrayIdentifier: "fakeWWN",
+			arrayIdentifier: []string{"fakeWWN"},
 
 			globReturnMatches: []string{
 				"/sys/class/fc_remote_ports/rport-33:0-0/port_name",
@@ -873,7 +873,7 @@ func TestGetHostsIdByArrayIdentifier(t *testing.T) {
 					err:           nil,
 				},
 			},
-			arrayIdentifier: "fakeWWN",
+			arrayIdentifier: []string{"fakeWWN"},
 
 			globReturnMatches: []string{
 				"/sys/class/fc_remote_ports/rport-5:0-0/port_name",
