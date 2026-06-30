@@ -329,7 +329,7 @@ func TestGetVolumeUuid(t *testing.T) {
 
 			volumeUuid := nodeUtils.GetVolumeUuid(tc.volumeId)
 
-			expectedVolumeUuid := "volumeUuid"
+			expectedVolumeUuid := "3volumeUuid"
 			if volumeUuid != expectedVolumeUuid {
 				t.Fatalf("wrong volumeUuid: expected %v, got %v", expectedVolumeUuid, volumeUuid)
 			}
@@ -387,8 +387,9 @@ func TestGetBlockVolumeStats(t *testing.T) {
 			defer mockCtrl.Finish()
 
 			fakeExecuter := mocks.NewMockExecuterInterface(mockCtrl)
+			keyedGater := executer.NewKeyedGater(100)
 			mockOsDeviceConHelper := mocks.NewMockOsDeviceConnectivityHelperScsiGenericInterface(mockCtrl)
-			nodeUtils := driver.NewNodeUtils(fakeExecuter, nil, nil, ConfigYaml, mockOsDeviceConHelper)
+			nodeUtils := driver.NewNodeUtils(fakeExecuter, keyedGater, nil, ConfigYaml, mockOsDeviceConHelper)
 			args := []string{"--getsize64", tc.mpathDevice}
 
 			mockOsDeviceConHelper.EXPECT().GetMpathDevice(gomock.Any(), tc.volumeUuid).Return(tc.mpathDevice, tc.mpathDeviceErr)

@@ -254,6 +254,8 @@ func TestNodeStageVolume(t *testing.T) {
 
 				mockNodeUtils.EXPECT().GetPodPath(stagingPath).Return(stagingPathWithHostPrefix)
 				mockNodeUtils.EXPECT().IsPathExists(stagingPathWithHostPrefix).Return(true)
+				mockNodeUtils.EXPECT().GetVolumeUuid(volId).Return(volId)
+				mockOsDeviceConHelper.EXPECT().IdentityAwarePreScan(gomock.Any(), stagingPathWithHostPrefix, volId).Return("", false, false, nil, nil)
 				mockNodeUtils.EXPECT().GetInfoFromPublishContext(stagingRequest.PublishContext).Return(conType, lun, ipsByArrayInitiator, nil).AnyTimes()
 				mockNodeUtils.EXPECT().GetArrayInitiators(ipsByArrayInitiator).Return(arrayInitiators)
 				mockOsDeviceCon.EXPECT().EnsureLogin(gomock.Any(), ipsByArrayInitiator)
@@ -277,6 +279,8 @@ func TestNodeStageVolume(t *testing.T) {
 
 				mockNodeUtils.EXPECT().GetPodPath(stagingPath).Return(stagingPathWithHostPrefix)
 				mockNodeUtils.EXPECT().IsPathExists(stagingPathWithHostPrefix).Return(true)
+				mockNodeUtils.EXPECT().GetVolumeUuid(volId).Return(volId)
+				mockOsDeviceConHelper.EXPECT().IdentityAwarePreScan(gomock.Any(), stagingPathWithHostPrefix, volId).Return("", false, false, nil, nil)
 				mockNodeUtils.EXPECT().GetInfoFromPublishContext(stagingRequest.PublishContext).Return(conType, lun, ipsByArrayInitiator, nil).AnyTimes()
 				mockNodeUtils.EXPECT().GetArrayInitiators(ipsByArrayInitiator).Return(arrayInitiators)
 				mockOsDeviceCon.EXPECT().EnsureLogin(gomock.Any(), ipsByArrayInitiator)
@@ -302,6 +306,8 @@ func TestNodeStageVolume(t *testing.T) {
 
 				mockNodeUtils.EXPECT().GetPodPath(stagingPath).Return(stagingPathWithHostPrefix)
 				mockNodeUtils.EXPECT().IsPathExists(stagingPathWithHostPrefix).Return(true)
+				mockNodeUtils.EXPECT().GetVolumeUuid(volId).Return(volId)
+				mockOsDeviceConHelper.EXPECT().IdentityAwarePreScan(gomock.Any(), stagingPathWithHostPrefix, volId).Return("", false, false, nil, nil)
 				mockNodeUtils.EXPECT().GetInfoFromPublishContext(stagingRequest.PublishContext).Return(conType, lun, ipsByArrayInitiator, nil).AnyTimes()
 				mockNodeUtils.EXPECT().GetArrayInitiators(ipsByArrayInitiator).Return(arrayInitiators)
 				mockOsDeviceCon.EXPECT().EnsureLogin(gomock.Any(), ipsByArrayInitiator)
@@ -330,6 +336,8 @@ func TestNodeStageVolume(t *testing.T) {
 
 				mockNodeUtils.EXPECT().GetPodPath(stagingPath).Return(stagingPathWithHostPrefix)
 				mockNodeUtils.EXPECT().IsPathExists(stagingPathWithHostPrefix).Return(true)
+				mockNodeUtils.EXPECT().GetVolumeUuid(volId).Return(volId)
+				mockOsDeviceConHelper.EXPECT().IdentityAwarePreScan(gomock.Any(), stagingPathWithHostPrefix, volId).Return("", false, false, nil, nil)
 				mockNodeUtils.EXPECT().GetInfoFromPublishContext(stagingRequest.PublishContext).Return(conType, lun, ipsByArrayInitiator, nil).AnyTimes()
 				mockNodeUtils.EXPECT().GetArrayInitiators(ipsByArrayInitiator).Return(arrayInitiators)
 				mockOsDeviceCon.EXPECT().EnsureLogin(gomock.Any(), ipsByArrayInitiator)
@@ -364,6 +372,8 @@ func TestNodeStageVolume(t *testing.T) {
 
 				mockNodeUtils.EXPECT().GetPodPath(stagingPath).Return(stagingPathWithHostPrefix)
 				mockNodeUtils.EXPECT().IsPathExists(stagingPathWithHostPrefix).Return(true)
+				mockNodeUtils.EXPECT().GetVolumeUuid(volId).Return(volId)
+				mockOsDeviceConHelper.EXPECT().IdentityAwarePreScan(gomock.Any(), stagingPathWithHostPrefix, volId).Return("", false, false, nil, nil)
 				mockNodeUtils.EXPECT().GetInfoFromPublishContext(stagingRequest.PublishContext).Return(conType, lun, ipsByArrayInitiator, nil).AnyTimes()
 				mockNodeUtils.EXPECT().GetArrayInitiators(ipsByArrayInitiator).Return(arrayInitiators)
 				mockOsDeviceCon.EXPECT().EnsureLogin(gomock.Any(), ipsByArrayInitiator)
@@ -397,6 +407,8 @@ func TestNodeStageVolume(t *testing.T) {
 
 				mockNodeUtils.EXPECT().GetPodPath(stagingPath).Return(stagingPathWithHostPrefix)
 				mockNodeUtils.EXPECT().IsPathExists(stagingPathWithHostPrefix).Return(true)
+				mockNodeUtils.EXPECT().GetVolumeUuid(volId).Return(volId)
+				mockOsDeviceConHelper.EXPECT().IdentityAwarePreScan(gomock.Any(), stagingPathWithHostPrefix, volId).Return("", false, false, nil, nil)
 				mockNodeUtils.EXPECT().GetInfoFromPublishContext(stagingRequest.PublishContext).Return(conType, lun, ipsByArrayInitiator, nil).AnyTimes()
 				mockNodeUtils.EXPECT().GetArrayInitiators(ipsByArrayInitiator).Return(arrayInitiators)
 				mockOsDeviceCon.EXPECT().EnsureLogin(gomock.Any(), ipsByArrayInitiator)
@@ -430,6 +442,8 @@ func TestNodeStageVolume(t *testing.T) {
 
 				mockNodeUtils.EXPECT().GetPodPath(stagingPath).Return(stagingPathWithHostPrefix)
 				mockNodeUtils.EXPECT().IsPathExists(stagingPathWithHostPrefix).Return(true)
+				mockNodeUtils.EXPECT().GetVolumeUuid(volId).Return(volId)
+				mockOsDeviceConHelper.EXPECT().IdentityAwarePreScan(gomock.Any(), stagingPathWithHostPrefix, volId).Return("", false, false, nil, nil)
 				mockNodeUtils.EXPECT().GetInfoFromPublishContext(stagingRequest.PublishContext).Return(conType, lun, ipsByArrayInitiator, nil).AnyTimes()
 				mockNodeUtils.EXPECT().GetArrayInitiators(ipsByArrayInitiator).Return(arrayInitiators)
 				mockOsDeviceCon.EXPECT().EnsureLogin(gomock.Any(), ipsByArrayInitiator)
@@ -506,7 +520,7 @@ func TestNodeUnstageVolume(t *testing.T) {
 				mockNodeUtils.EXPECT().GetPodPath(stagingPath).Return(stagingPathWithHostPrefix)
 				mockNodeUtils.EXPECT().IsNotMountPoint(stagingPathWithHostPrefix).Return(true, nil)
 				mockNodeUtils.EXPECT().GetVolumeUuid(volId).Return(volId)
-				mockOsDeviceConHelper.EXPECT().GetMpathDevice(gomock.Any(), volId).Return("", dummyError)
+				mockOsDeviceConHelper.EXPECT().GetExistingMpathDevice(gomock.Any(), volId, stagingPathWithHostPrefix).Return("", dummyError)
 
 				_, err := node.NodeUnstageVolume(context.TODO(), unstageRequest)
 				assertError(t, err, codes.Internal)
@@ -545,6 +559,8 @@ func TestNodeUnstageVolume(t *testing.T) {
 				mockNodeUtils.EXPECT().GetPodPath(stagingPath).Return(stagingPathWithHostPrefix)
 				mockNodeUtils.EXPECT().IsNotMountPoint(stagingPathWithHostPrefix).Return(true, nil)
 				mockNodeUtils.EXPECT().GetVolumeUuid(volId).Return(volId)
+				mockOsDeviceConHelper.EXPECT().GetExistingMpathDevice(gomock.Any(), volId, stagingPathWithHostPrefix).Return("", nil)
+				mockNodeUtils.EXPECT().GetVolumeUuid(volId).Return(volId)
 				mockOsDeviceConHelper.EXPECT().GetMpathDevice(gomock.Any(), volId).Return("", dmNotFoundError)
 
 				_, err := node.NodeUnstageVolume(context.TODO(), unstageRequest)
@@ -563,7 +579,6 @@ func TestNodeUnstageVolume(t *testing.T) {
 				mockMounter := mocks.NewMockNodeMounter(mockCtl)
 				node := newTestNodeServiceStaging(mockNodeUtils, nil, mockOsDeviceConHelper, mockMounter)
 
-				mockNodeUtils.EXPECT().GetPodPath(stagingPath).Return(stagingPathWithHostPrefix)
 				mockNodeUtils.EXPECT().GetPodPath(stagingPath).Return(stagingPathWithHostPrefix)
 				mockNodeUtils.EXPECT().GetVolumeUuid(volId).Return(volId)
 				mockOsDeviceConHelper.EXPECT().GetExistingMpathDevice(gomock.Any(), volId, stagingPathWithHostPrefix).Return(dmSysFsName, nil)
@@ -1107,6 +1122,7 @@ func TestNodeExpandVolume(t *testing.T) {
 	d := newTestNodeService(nil, nil, nil)
 	volId := "someStorageType:vol-test"
 	volumePath := "/test/path"
+	volumePathWithHostPrefix := "/host/test/path"
 	stagingTargetPath := "/staging/test/path"
 	expandRequest := &csi.NodeExpandVolumeRequest{
 		VolumeId:          volId,
@@ -1160,7 +1176,8 @@ func TestNodeExpandVolume(t *testing.T) {
 				node := newTestNodeServiceExpand(mockNodeUtils, mockOsDeviceConHelper, mockMounter)
 
 				mockNodeUtils.EXPECT().GetVolumeUuid(volId).Return(volId)
-				mockOsDeviceConHelper.EXPECT().GetMpathDevice(gomock.Any(), volId).Return("", dummyError)
+				mockNodeUtils.EXPECT().GetPodPath(volumePath).Return(volumePathWithHostPrefix)
+				mockOsDeviceConHelper.EXPECT().GetExistingMpathDevice(gomock.Any(), volId, volumePathWithHostPrefix).Return("", dummyError)
 
 				_, err := node.NodeExpandVolume(context.TODO(), expandRequest)
 				assertError(t, err, codes.Internal)
@@ -1177,7 +1194,8 @@ func TestNodeExpandVolume(t *testing.T) {
 				node := newTestNodeServiceExpand(mockNodeUtils, mockOsDeviceConHelper, mockMounter)
 
 				mockNodeUtils.EXPECT().GetVolumeUuid(volId).Return(volId)
-				mockOsDeviceConHelper.EXPECT().GetMpathDevice(gomock.Any(), volId).Return(mpathDevice, nil)
+				mockNodeUtils.EXPECT().GetPodPath(volumePath).Return(volumePathWithHostPrefix)
+				mockOsDeviceConHelper.EXPECT().GetExistingMpathDevice(gomock.Any(), volId, volumePathWithHostPrefix).Return(mpathDevice, nil)
 				mockNodeUtils.EXPECT().DevicesAreNvme(gomock.Any(), dmSysFsName).Return(driver.NotNVMe, nil)
 				mockNodeUtils.EXPECT().GetSysDevicesFromMpath(context.TODO(), dmSysFsName).Return(nil, dummyError)
 
@@ -1196,7 +1214,8 @@ func TestNodeExpandVolume(t *testing.T) {
 				node := newTestNodeServiceExpand(mockNodeUtils, mockOsDeviceConHelper, mockMounter)
 
 				mockNodeUtils.EXPECT().GetVolumeUuid(volId).Return(volId)
-				mockOsDeviceConHelper.EXPECT().GetMpathDevice(gomock.Any(), volId).Return(mpathDevice, nil)
+				mockNodeUtils.EXPECT().GetPodPath(volumePath).Return(volumePathWithHostPrefix)
+				mockOsDeviceConHelper.EXPECT().GetExistingMpathDevice(gomock.Any(), volId, volumePathWithHostPrefix).Return(mpathDevice, nil)
 				mockNodeUtils.EXPECT().DevicesAreNvme(gomock.Any(), dmSysFsName).Return(driver.NotNVMe, nil)
 				mockNodeUtils.EXPECT().GetSysDevicesFromMpath(context.TODO(), dmSysFsName).Return(sysDevices, nil)
 				mockNodeUtils.EXPECT().RescanPhysicalDevices(gomock.Any(), sysDevices).Return(dummyError)
@@ -1216,7 +1235,8 @@ func TestNodeExpandVolume(t *testing.T) {
 				node := newTestNodeServiceExpand(mockNodeUtils, mockOsDeviceConHelper, mockMounter)
 
 				mockNodeUtils.EXPECT().GetVolumeUuid(volId).Return(volId)
-				mockOsDeviceConHelper.EXPECT().GetMpathDevice(gomock.Any(), volId).Return(mpathDevice, nil)
+				mockNodeUtils.EXPECT().GetPodPath(volumePath).Return(volumePathWithHostPrefix)
+				mockOsDeviceConHelper.EXPECT().GetExistingMpathDevice(gomock.Any(), volId, volumePathWithHostPrefix).Return(mpathDevice, nil)
 				mockNodeUtils.EXPECT().DevicesAreNvme(gomock.Any(), dmSysFsName).Return(driver.NotNVMe, nil)
 				mockNodeUtils.EXPECT().GetSysDevicesFromMpath(context.TODO(), dmSysFsName).Return(sysDevices, nil)
 				mockNodeUtils.EXPECT().RescanPhysicalDevices(gomock.Any(), sysDevices).Return(nil)
@@ -1237,7 +1257,8 @@ func TestNodeExpandVolume(t *testing.T) {
 				node := newTestNodeServiceExpand(mockNodeUtils, mockOsDeviceConHelper, mockMounter)
 
 				mockNodeUtils.EXPECT().GetVolumeUuid(volId).Return(volId)
-				mockOsDeviceConHelper.EXPECT().GetMpathDevice(gomock.Any(), volId).Return(mpathDevice, nil)
+				mockNodeUtils.EXPECT().GetPodPath(volumePath).Return(volumePathWithHostPrefix)
+				mockOsDeviceConHelper.EXPECT().GetExistingMpathDevice(gomock.Any(), volId, volumePathWithHostPrefix).Return(mpathDevice, nil)
 				mockNodeUtils.EXPECT().DevicesAreNvme(gomock.Any(), dmSysFsName).Return(driver.NotNVMe, nil)
 				mockNodeUtils.EXPECT().GetSysDevicesFromMpath(context.TODO(), dmSysFsName).Return(sysDevices, nil)
 				mockNodeUtils.EXPECT().RescanPhysicalDevices(gomock.Any(), sysDevices).Return(nil)
@@ -1259,7 +1280,8 @@ func TestNodeExpandVolume(t *testing.T) {
 				node := newTestNodeServiceExpand(mockNodeUtils, mockOsDeviceConHelper, mockMounter)
 
 				mockNodeUtils.EXPECT().GetVolumeUuid(volId).Return(volId)
-				mockOsDeviceConHelper.EXPECT().GetMpathDevice(gomock.Any(), volId).Return(mpathDevice, nil)
+				mockNodeUtils.EXPECT().GetPodPath(volumePath).Return(volumePathWithHostPrefix)
+				mockOsDeviceConHelper.EXPECT().GetExistingMpathDevice(gomock.Any(), volId, volumePathWithHostPrefix).Return(mpathDevice, nil)
 				mockNodeUtils.EXPECT().DevicesAreNvme(gomock.Any(), dmSysFsName).Return(driver.NotNVMe, nil)
 				mockNodeUtils.EXPECT().GetSysDevicesFromMpath(context.TODO(), dmSysFsName).Return(sysDevices, nil)
 				mockNodeUtils.EXPECT().RescanPhysicalDevices(gomock.Any(), sysDevices).Return(nil)
@@ -1282,7 +1304,8 @@ func TestNodeExpandVolume(t *testing.T) {
 				node := newTestNodeServiceExpand(mockNodeUtils, mockOsDeviceConHelper, mockMounter)
 
 				mockNodeUtils.EXPECT().GetVolumeUuid(volId).Return(volId)
-				mockOsDeviceConHelper.EXPECT().GetMpathDevice(gomock.Any(), volId).Return(mpathDevice, nil)
+				mockNodeUtils.EXPECT().GetPodPath(volumePath).Return(volumePathWithHostPrefix)
+				mockOsDeviceConHelper.EXPECT().GetExistingMpathDevice(gomock.Any(), volId, volumePathWithHostPrefix).Return(mpathDevice, nil)
 				mockNodeUtils.EXPECT().DevicesAreNvme(gomock.Any(), dmSysFsName).Return(driver.NVMeNonNative, nil)
 				mockNodeUtils.EXPECT().ExpandMpathDevice(gomock.Any(), dmSysFsName).Return(nil)
 				mockMounter.EXPECT().GetDiskFormat(mpathDevice).Return(fsType, nil)
@@ -1305,7 +1328,8 @@ func TestNodeExpandVolume(t *testing.T) {
 				node := newTestNodeServiceExpand(mockNodeUtils, mockOsDeviceConHelper, mockMounter)
 
 				mockNodeUtils.EXPECT().GetVolumeUuid(volId).Return(volId)
-				mockOsDeviceConHelper.EXPECT().GetMpathDevice(gomock.Any(), volId).Return(mpathDevice, nil)
+				mockNodeUtils.EXPECT().GetPodPath(volumePath).Return(volumePathWithHostPrefix)
+				mockOsDeviceConHelper.EXPECT().GetExistingMpathDevice(gomock.Any(), volId, volumePathWithHostPrefix).Return(mpathDevice, nil)
 				mockNodeUtils.EXPECT().DevicesAreNvme(gomock.Any(), dmSysFsName).Return(driver.NotNVMe, nil)
 				mockNodeUtils.EXPECT().GetSysDevicesFromMpath(context.TODO(), dmSysFsName).Return(sysDevices, nil)
 				mockNodeUtils.EXPECT().RescanPhysicalDevices(gomock.Any(), sysDevices).Return(nil)

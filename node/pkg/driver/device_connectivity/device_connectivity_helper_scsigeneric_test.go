@@ -437,7 +437,7 @@ func TestGetDmsPath(t *testing.T) {
 			_ = tc.getFullDmPathReturn
 
 			helperGeneric := NewOsDeviceConnectivityHelperGenericForTest(fakeExecuter, fake_helper)
-			dmPath, err := helperGeneric.WaitForDmToExist(context.Background(), volumeIdVariations, 1, 1)
+			dmPath, err := helperGeneric.WaitForDmToExist(context.Background(), volumeIdVariations, device_connectivity.WaitForMpathRetries, device_connectivity.WaitForMpathWaitIntervalSec)
 			if tc.expErr != nil || tc.expErrType != nil {
 				if err == nil {
 					t.Fatalf("Expected to fail with error, got success.")

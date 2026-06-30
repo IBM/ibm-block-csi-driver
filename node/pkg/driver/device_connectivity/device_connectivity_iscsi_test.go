@@ -17,13 +17,15 @@
 package device_connectivity_test
 
 import (
+	"context"
 	"errors"
 	"fmt"
+	"testing"
+
 	"github.com/golang/mock/gomock"
 	"github.com/ibm/ibm-block-csi-driver/node/mocks"
 	"github.com/ibm/ibm-block-csi-driver/node/pkg/driver/device_connectivity"
 	"github.com/ibm/ibm-block-csi-driver/node/pkg/driver/executer"
-	"testing"
 )
 
 var (
@@ -197,7 +199,7 @@ func TestEnsureLogin(t *testing.T) {
 			}
 
 			o := NewOsDeviceConnectivityIscsiForTest(fakeExecuter, fakeHelper)
-			o.EnsureLogin(gomock.Any(), tc.portalsByTarget)
+			o.EnsureLogin(context.Background(), tc.portalsByTarget)
 		})
 	}
 }
