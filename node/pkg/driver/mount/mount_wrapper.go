@@ -29,7 +29,6 @@ import (
 	"sync/atomic"
 	"syscall"
 	"time"
-	"unsafe"
 
 	"github.com/ibm/ibm-block-csi-driver/node/logger"
 	"github.com/ibm/ibm-block-csi-driver/node/pkg/driver/executer"
@@ -164,7 +163,8 @@ func (m *Mounter) GetMountRefs(pathname string) ([]string, error) {
 // 3. OVERRIDE: Mount
 
 func (m *Mounter) Mount(source string, target string, fstype string, options []string) error {
-	ctx, _ := context.WithTimeout(context.Background(), time.Duration(30)*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), time.Duration(30)*time.Second)
+	defer cancel()
 	return m.MountNative(ctx, source, target, fstype, options)
 }
 
@@ -237,11 +237,7 @@ func (m *Mounter) MountSensitive(source, target, fstype string, options, sensiti
 	flags, data := m.parseMountOptions(allOptions)
 
 	// Note: fstype can be empty for bind mounts or remounts
-	var dataPtr unsafe.Pointer
-	if data != "" {
-		dataPtr = unsafe.Pointer(&[]byte(data)[0])
-	}
-	return unix.Mount(source, GetPodPath(target), int(flags), dataPtr)
+	return unix.Mount(source, GetPodPath(target), fstype, uintptr(flags), data)
 }
 
 func (m *Mounter) SearchForLongerMountPoints(targetPath string, _ []string, _ bool) ([]mount.MountPoint, error) {
@@ -782,11 +778,7 @@ func (m *Mounter) MountNative(ctx context.Context, source, target, fstype string
 		func(ctx context.Context) (struct{}, error) {
 			// Classic mount syscall - Standard for RHEL 7 (Kernel 3.10)
 			// Note: mount(2) is notoriously prone to D-state hangs on stale fabrics
-			var dataPtr unsafe.Pointer
-			if data != "" {
-				dataPtr = unsafe.Pointer(&[]byte(data)[0])
-			}
-			err := unix.Mount(source, target, int(flags), dataPtr)
+			err := unix.Mount(source, target, fstype, uintptr(flags), data)
 			return struct{}{}, err
 		},
 	)
@@ -812,11 +804,7 @@ func (m *Mounter) MountNative(ctx context.Context, source, target, fstype string
 			10*time.Second, // hardTimeout: return error to caller
 			func(ctx context.Context) (struct{}, error) {
 				// RHEL 7 (Kernel 3.10) uses the classic mount(2) for remounts
-				var dataPtr unsafe.Pointer
-				if data != "" {
-					dataPtr = unsafe.Pointer(&[]byte(data)[0])
-				}
-				err := unix.Mount(source, target, int(remountFlags), dataPtr)
+				err := unix.Mount(source, target, fstype, uintptr(remountFlags), data)
 				return struct{}{}, err
 			},
 		)

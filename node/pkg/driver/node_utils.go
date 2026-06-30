@@ -194,7 +194,9 @@ func (n NodeUtils) ClearStageInfoFile(filePath string) error {
 }
 
 func (n NodeUtils) GetSysDevicesFromMpath(ctx context.Context, baseDevice string) ([]string, error) {
-    if err := ctx.Err(); err != nil { return nil, err }
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
 
 	// baseDevice is expected to be "dm-X" or "nvmeXnY"
 	logger.Debugf("GetSysDevicesFromMpath with param: {%v}", baseDevice)
@@ -239,7 +241,7 @@ func (n NodeUtils) GetSysDevicesFromMpath(ctx context.Context, baseDevice string
 		}
 		return pathNames, nil
 	}
-	
+
 	if strings.HasPrefix(baseDevice, "nvme") {
 		// Use LastIndex to safely split "nvme0n1" or "nvme-subsys0n1"
 		nIdx := strings.LastIndex(baseDevice, "n")
@@ -256,9 +258,11 @@ func (n NodeUtils) GetSysDevicesFromMpath(ctx context.Context, baseDevice string
 
 		var pathNames []string
 		for _, ctrl := range controllers {
-			if ctx.Err() != nil { return nil, ctx.Err() }
+			if ctx.Err() != nil {
+				return nil, ctx.Err()
+			}
 
-			// In NVMe, the paths are children of the controllers 
+			// In NVMe, the paths are children of the controllers
 			// named like: [controllerName][namespaceID] -> "nvme0" + "n1"
 			pathName := ctrl.Name() + nsID
 
@@ -268,7 +272,7 @@ func (n NodeUtils) GetSysDevicesFromMpath(ctx context.Context, baseDevice string
 			}
 		}
 		return pathNames, nil
-	}	
+	}
 
 	return nil, fmt.Errorf("unsupported device type: %s", baseDevice)
 }
@@ -532,27 +536,25 @@ func (n NodeUtils) ExpandFilesystem(ctx context.Context, devicePath string, volu
 
 func (n NodeUtils) ExpandMpathDevice(ctx context.Context, mpathDevice string) error {
 	logger.Infof("ExpandMpathDevice: [%s] ", mpathDevice)
-	
+
 	// REQUIREMENT 6: Guard against expanding a device that is already wedged
 	if n.Executer.IsDeviceStillStuck(mpathDevice) {
 		return fmt.Errorf("expand-safety: device %s is currently stuck in D-state; aborting resize", mpathDevice)
-	}	
-	
+	}
+
 	// REQUIREMENT 4: Use socket instead of 'multipathd' process
 	cmd := fmt.Sprintf("resize map %s", mpathDevice)
 	_, err := n.Executer.MultipathdCmd(ctx, mpathDevice, cmd)
 	if err != nil {
 		return fmt.Errorf("multipathd resize map failed: %w", err)
 	}
-	
 
-// if resize map fails:
-//slaves, _ := n.GetSysDevicesFromMpath(ctx, mpathDevice)
-//for _, slave := range slaves {
-//    // Echo 1 to /sys/block/sdX/device/rescan (Fork-free Requirement 4)
-//    _ = os.WriteFile(fmt.Sprintf("/sys/block/%s/device/rescan", slave), []byte("1"), 0644)
-//}
-	
+	// if resize map fails:
+	//slaves, _ := n.GetSysDevicesFromMpath(ctx, mpathDevice)
+	//for _, slave := range slaves {
+	//    // Echo 1 to /sys/block/sdX/device/rescan (Fork-free Requirement 4)
+	//    _ = os.WriteFile(fmt.Sprintf("/sys/block/%s/device/rescan", slave), []byte("1"), 0644)
+	//}
 
 	// 2. REQUIREMENT 7: Avoid 'reconfigure' if possible.
 	// 'reconfigure' parses /etc/multipath.conf and reloads EVERY map on the host.
@@ -571,9 +573,6 @@ func (n NodeUtils) ExpandMpathDevice(ctx context.Context, mpathDevice string) er
 	//	return fmt.Errorf("multipathd reconfigure failed: %v\narguments: %v\nOutput: %s\n", err, args, string(output))
 	//}
 }
-
-
-
 
 func (n NodeUtils) rescanPhysicalDevice(deviceName string) error {
 	filename := fmt.Sprintf("/sys/block/%s/device/rescan", deviceName)
@@ -626,7 +625,7 @@ func (n NodeUtils) RescanPhysicalDevices(ctx context.Context, sysDevices []strin
 				return struct{}{}, n.rescanPhysicalDevice(deviceName)
 			},
 		)
-		
+
 		if err != nil {
 			logger.Errorf("Rescan failed for %s: %v", deviceName, err)
 			// We continue to other devices even if one fails (Resiliency)
@@ -635,7 +634,6 @@ func (n NodeUtils) RescanPhysicalDevices(ctx context.Context, sysDevices []strin
 	logger.Debugf("Rescan : finish rescan on sys devices : {%v}", sysDevices)
 	return nil
 }
-
 
 //Use os.WriteFile for brevity unless your Executer wrapper specifically requires the OsOpenFile flow for tracking. os.WriteFile is inherently safer as it handles the close even on early errors.
 
@@ -782,10 +780,10 @@ func (n NodeUtils) IsBlock(ctx context.Context, devicePath string) (bool, error)
 
 	res, err := executer.ExecuteUninterruptible[bool](
 		// Pass the ctx into the gater/executor
-		ctx, 
+		ctx,
 		n.KeyedGater,
 		"is-block-"+devicePath,
-		10, 50, 
+		10, 50,
 		1*time.Second, 5*time.Second,
 		func(wCtx context.Context) (bool, error) {
 			var stat unix.Stat_t
@@ -884,7 +882,6 @@ func (n NodeUtils) GetBlockVolumeStats(ctx context.Context, devicePath string) (
 		///UsedBytes:      0, // Or same as TotalBytes depending on CSI expectations
 	}, nil
 }
-
 
 func (d NodeUtils) GetVolumeUuid(volumeId string) string {
 	volumeIdParts := strings.Split(volumeId, d.ConfigYaml.Parameters.Object_id_info.Delimiter)

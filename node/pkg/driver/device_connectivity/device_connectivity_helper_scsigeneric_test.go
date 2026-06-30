@@ -233,18 +233,16 @@ func TestGetMpathDevice(t *testing.T) {
 			fake_helper.EXPECT().GetVolumeIdVariations(volumeUuid).Return(volumeIdVariations)
 
 			for _, r := range tc.getDmsPathReturn {
-				fake_helper.EXPECT().GetDmsPath(volumeIdVariations).Return(
+				fake_helper.EXPECT().WaitForDmToExist(gomock.Any(), volumeIdVariations, gomock.Any(), gomock.Any()).Return(
 					r.dmPath,
 					r.err)
 			}
 
-			for _, r := range tc.reloadMultipathReturn {
-				fake_helper.EXPECT().ReloadMultipath().Return(
-					r.err)
-			}
+			// ReloadMultipath method removed - skip this expectation
+			_ = tc.reloadMultipathReturn
 
 			for _, r := range tc.getWwnByScsiInqReturn {
-				fake_helper.EXPECT().GetWwnByScsiInq("/dev/dm-1").Return(
+				fake_helper.EXPECT().GetWwnByScsiInq(gomock.Any(), "/dev/dm-1").Return(
 					r.wwn,
 					r.err)
 			}

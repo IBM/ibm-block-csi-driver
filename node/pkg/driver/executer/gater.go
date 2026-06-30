@@ -48,7 +48,7 @@ func (g *KeyedGater) Acquire(ctx context.Context, key string, maxRuns int, timeo
 	g.mu.Unlock()
 
 	// REQUIREMENT 8: Respect the CSI API context + local timeout
-	// This ensures we stop waiting if either the request is canceled 
+	// This ensures we stop waiting if either the request is canceled
 	// OR we hit our local threshold.
 	waitCtx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
@@ -59,7 +59,7 @@ func (g *KeyedGater) Acquire(ctx context.Context, key string, maxRuns int, timeo
 	case <-waitCtx.Done():
 		// Cleanup: must use the thread-safe Release fixed in Bug #1
 		g.Release(key)
-		
+
 		if errors.Is(waitCtx.Err(), context.DeadlineExceeded) {
 			return fmt.Errorf("gater: timeout (%v) key=%s", timeout, key)
 		}
@@ -76,7 +76,7 @@ func (g *KeyedGater) Release(key string) {
 		return
 	}
 
-	// Attempt to drain a slot, but don't block if Release was 
+	// Attempt to drain a slot, but don't block if Release was
 	// called due to an Acquire timeout before a slot was taken.
 	select {
 	case <-gt.ch:
@@ -88,11 +88,6 @@ func (g *KeyedGater) Release(key string) {
 		delete(g.semaphoreGates, key)
 	}
 }
-
-
-
-
-
 
 type Result[T any] struct {
 	Data T
@@ -165,27 +160,27 @@ func baseExecute[T any](
 ) (T, error) {
 	g.suicideIfLeaked()
 
-    if err := ctx.Err(); err != nil {
-        var zero T
-        return zero, err
-    }
+	if err := ctx.Err(); err != nil {
+		var zero T
+		return zero, err
+	}
 
 	// 1. ATOMIC INITIALIZATION
 	val, _ := g.resources.LoadOrStore(resourceName, &ResourcePool{})
 	pool := val.(*ResourcePool)
 	pool.init(maxRunning, maxSpare)
-	
-    // 2. Queue for slot (Respecting CSI Context)
-    select {
-    case pool.running <- struct{}{}:
-    case <-ctx.Done():
-        var zero T
-        return zero, ctx.Err()
-    case <-time.After(30 * time.Second):
-        var zero T
-        return zero, fmt.Errorf("queue congestion")
-    }
-	
+
+	// 2. Queue for slot (Respecting CSI Context)
+	select {
+	case pool.running <- struct{}{}:
+	case <-ctx.Done():
+		var zero T
+		return zero, ctx.Err()
+	case <-time.After(30 * time.Second):
+		var zero T
+		return zero, fmt.Errorf("queue congestion")
+	}
+
 	pool.activeOps.Add(1)
 	done := make(chan Result[T], 1)
 	switched := make(chan struct{})

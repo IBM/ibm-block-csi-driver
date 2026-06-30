@@ -40,14 +40,14 @@ const (
 
 type OsDeviceConnectivityIscsi struct {
 	Executer          executer.ExecuterInterface
-	KeyedGater      *executer.KeyedGater
+	KeyedGater        *executer.KeyedGater
 	HelperScsiGeneric OsDeviceConnectivityHelperScsiGenericInterface
 }
 
 func NewOsDeviceConnectivityIscsi(executer executer.ExecuterInterface, KeyedGater *executer.KeyedGater, Mounter *mount.Mounter, clean_scsi_device bool) OsDeviceConnectivityInterface {
 	return &OsDeviceConnectivityIscsi{
 		Executer:          executer,
-		KeyedGater: KeyedGater,
+		KeyedGater:        KeyedGater,
 		HelperScsiGeneric: NewOsDeviceConnectivityHelperScsiGeneric(executer, KeyedGater, Mounter, clean_scsi_device),
 	}
 }
@@ -59,7 +59,6 @@ func (r OsDeviceConnectivityIscsi) iscsiCmd(args ...string) (string, error) {
 	out, err := r.Executer.ExecuteWithTimeout(int(IscsiCmdTimeout.Seconds()*1000), "iscsiadm", args)
 	return string(out), err
 }
-
 
 func (r OsDeviceConnectivityIscsi) iscsiDiscover(ctx context.Context, portal string) error {
 	lockScope := r.getDiscoveryScopeKey(portal)
@@ -85,10 +84,10 @@ func (r OsDeviceConnectivityIscsi) iscsiLogin(ctx context.Context, targetName, p
 		return fmt.Errorf("concurrency timeout waiting for login slot on portal IP %s: %w", ipKey, err)
 	}
 	defer r.KeyedGater.Release("login-" + ipKey)
-	
+
 	cliPortal := r.EnsurePort(portal)
 	logger.Infof("Executing iSCSI login for target %s via portal %s", targetName, cliPortal)
-	
+
 	output, err := r.iscsiCmd("-m", "node", "-p", cliPortal, "-T", targetName, "--login")
 	if err != nil {
 		if exitCode, isExitError := r.Executer.GetExitCode(err); isExitError {
@@ -110,8 +109,6 @@ func (r OsDeviceConnectivityIscsi) iscsiLogin(ctx context.Context, targetName, p
 	logger.Infof("Successfully logged into target %s via portal %s", targetName, cliPortal)
 	return nil
 }
-
-
 
 // iscsiGetRawSessions now reads from /sys/class/iscsi_session
 // It returns lines in the format: "tcp: [1] 192.168.1.100:3260,1 iqn.target.name"
@@ -146,7 +143,7 @@ func (r OsDeviceConnectivityIscsi) iscsiGetRawSessions(ctx context.Context) ([]s
 		portBuf, errP := os.ReadFile(filepath.Join(connPath, "port"))
 		if errA != nil || errP != nil {
 			logger.Debugf("Skipping incomplete connection configuration %s", c.Name())
-			continue 
+			continue
 		}
 
 		portal := net.JoinHostPort(
@@ -154,7 +151,7 @@ func (r OsDeviceConnectivityIscsi) iscsiGetRawSessions(ctx context.Context) ([]s
 			strings.TrimSpace(string(portBuf)),
 		)
 
-		// Climb up to find the parent session ID. 
+		// Climb up to find the parent session ID.
 		// The connection path contains a symlink named "subsystem" or sits inside a parent session folder.
 		// A reliable way is reading the actual device symlink destination path.
 		evalPath, err := filepath.EvalSymlinks(connPath)
@@ -174,7 +171,7 @@ func (r OsDeviceConnectivityIscsi) iscsiGetRawSessions(ctx context.Context) ([]s
 
 		// Read targetname from the sibling session path using the extracted sessionID
 		sessionPath := fmt.Sprintf("/sys/class/iscsi_session/session%s", sessionID)
-		
+
 		stateBuf, errS := r.readSysfs(filepath.Join(sessionPath, "state"))
 		targetBuf, errT := r.readSysfs(filepath.Join(sessionPath, "targetname"))
 		if errS != nil || errT != nil {
@@ -186,7 +183,7 @@ func (r OsDeviceConnectivityIscsi) iscsiGetRawSessions(ctx context.Context) ([]s
 		}
 
 		targetName := strings.TrimSpace(string(targetBuf))
-		
+
 		logger.Debugf("Discovered active sysfs session: [%s] target: %s portal: %s", sessionID, targetName, portal)
 		results = append(results, fmt.Sprintf("tcp: [%s] %s %s", sessionID, portal, targetName))
 	}
@@ -220,7 +217,7 @@ func (r OsDeviceConnectivityIscsi) getAllSessions(ctx context.Context) (map[stri
 			return nil, fmt.Errorf("failed to safely parse active raw session list: truncation detected")
 		}
 
-		// Fix: Extracted elements using explicit slice indexes 
+		// Fix: Extracted elements using explicit slice indexes
 		targetName := strings.ToLower(parts[3])
 		ipKey := r.ExtractIP(parts[2])
 
@@ -235,7 +232,7 @@ func (r OsDeviceConnectivityIscsi) getAllSessions(ctx context.Context) (map[stri
 // filterLoggedIn isolates targets and portals that do not have active sessions
 func (r OsDeviceConnectivityIscsi) filterLoggedIn(ctx context.Context, portalsByTarget map[string][]string) (map[string][]string, error) {
 	logger.Debug("Querying kernel sysfs to identify existing active iSCSI links")
-	
+
 	// Fetch active sessions from sysfs (Keys are lowercased IQNs and portless IPs)
 	loggedInPortalsByTarget, err := r.getAllSessions(ctx)
 	if err != nil {
@@ -272,7 +269,7 @@ func (r OsDeviceConnectivityIscsi) discoverAndLogin(ctx context.Context, portals
 	// 1. Surgical Scan: Load existing target folders from the local database on disk.
 	dbCache := r.loadRelevantTargets(portalsByTarget)
 	discoveredPortals := make(map[string]bool)
-	
+
 	// Track targets/portals that are confirmed ready for login
 	validTargetsForLogin := make(map[string][]string)
 
@@ -293,7 +290,7 @@ func (r OsDeviceConnectivityIscsi) discoverAndLogin(ctx context.Context, portals
 			// If the target record isn't in the database, execute discovery
 			if !discoveredPortals[ipKey] {
 				logger.Infof("Target %s portal IP %s missing from DB, triggering discovery sequence...", targetName, ipKey)
-				
+
 				// Pass the full unmutated portal string (IP:Port) for iscsiadm execution
 				if err := r.iscsiDiscover(ctx, portal); err == nil {
 					discoveredPortals[ipKey] = true
@@ -303,7 +300,7 @@ func (r OsDeviceConnectivityIscsi) discoverAndLogin(ctx context.Context, portals
 						dbCache[normalizedTarget] = make(map[string]bool)
 					}
 					dbCache[normalizedTarget][ipKey] = true
-					
+
 					validTargetsForLogin[targetName] = append(validTargetsForLogin[targetName], portal)
 				} else {
 					logger.Errorf("Discovery failed for portal %s. Target data will not be available for login.", portal)
@@ -324,7 +321,7 @@ func (r OsDeviceConnectivityIscsi) discoverAndLogin(ctx context.Context, portals
 	for targetName, portals := range validTargetsForLogin {
 		for _, portal := range portals {
 			logger.Infof("Routing attachment request to login subsystem for target %s via %s", targetName, portal)
-			
+
 			// Assume r.iscsiLogin is updated to return an error when login fails
 			if err := r.iscsiLogin(ctx, targetName, portal); err != nil {
 				// Check for exit status 15 (already logged in) inside your iscsiLogin execution block
@@ -345,7 +342,6 @@ func (r OsDeviceConnectivityIscsi) discoverAndLogin(ctx context.Context, portals
 	return nil
 }
 
-
 func (r OsDeviceConnectivityIscsi) loadRelevantTargets(requestedTargets map[string][]string) map[string]map[string]bool {
 	db := make(map[string]map[string]bool)
 	basePath := "/etc/iscsi/nodes"
@@ -355,7 +351,7 @@ func (r OsDeviceConnectivityIscsi) loadRelevantTargets(requestedTargets map[stri
 		// Normalizing here ensures targetPath matches the Linux filesystem exactly.
 		normalizedTarget := strings.ToLower(targetName)
 		targetPath := filepath.Join(basePath, normalizedTarget)
-		
+
 		// Changed to Debug level to prevent system log pollution
 		logger.Debugf("Checking target directory path: %s", targetPath)
 
@@ -382,9 +378,9 @@ func (r OsDeviceConnectivityIscsi) loadRelevantTargets(requestedTargets map[stri
 			if len(parts) >= 2 {
 				// Isolate raw IP address by removing brackets if present via ExtractIP
 				ipKey := r.ExtractIP(parts[0])
-				
+
 				logger.Debugf("Successfully mapped normalized IP key: %s for target: %s", ipKey, normalizedTarget)
-				
+
 				db[normalizedTarget][ipKey] = true
 			}
 		}
@@ -438,7 +434,7 @@ func (r OsDeviceConnectivityIscsi) EnsureLogin(ctx context.Context, allPortalsBy
 	}
 
 	logger.Infof("%d targets have paths requiring active discovery or login operations", len(portalsToLogin))
-	
+
 	// 3. Trigger discovery and execute the login pipeline
 	if err := r.discoverAndLogin(ctx, portalsToLogin); err != nil {
 		logger.Errorf("iSCSI storage attachment pipeline failed: %v", err)
@@ -447,8 +443,6 @@ func (r OsDeviceConnectivityIscsi) EnsureLogin(ctx context.Context, allPortalsBy
 
 	logger.Info("Successfully completed all required iSCSI target login procedures.")
 }
-
-
 
 type activeSession struct {
 	sourceIQN string
@@ -501,7 +495,7 @@ func (r OsDeviceConnectivityIscsi) parseActiveSessions() ([]activeSession, error
 	var sessions []activeSession
 	for _, entry := range entries {
 		sessionPath := filepath.Join(sessionBaseDir, entry.Name())
-		
+
 		logger.Errorf("Session path %s", sessionPath)
 
 		// 1. STATE CHECK (using the helper from before)
@@ -530,7 +524,7 @@ func (r OsDeviceConnectivityIscsi) parseActiveSessions() ([]activeSession, error
 			sourceIQN: initiatorIQN,
 			hostNum:   hostNum,
 		})
-		
+
 		logger.Errorf("Add init %s host %s", initiatorIQN, hostName)
 	}
 	return sessions, nil
@@ -673,14 +667,12 @@ func cleanSysfsData(data []byte) string {
 }
 
 func (r *OsDeviceConnectivityIscsi) readSysfs(path string) (string, error) {
-        data, err := os.ReadFile(path)
-        if err != nil {
-                return "", err
-         }
-        return strings.Trim(string(data), " \n\r\t\x00"), nil
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return "", err
+	}
+	return strings.Trim(string(data), " \n\r\t\x00"), nil
 }
-
-
 
 // -------------------------------------------------------------------------
 // Helper Utilities for Format Extraction & Key Isolation
@@ -688,12 +680,12 @@ func (r *OsDeviceConnectivityIscsi) readSysfs(path string) (string, error) {
 
 func (r OsDeviceConnectivityIscsi) ExtractIP(portal string) string {
 	portal = strings.ToLower(strings.TrimSpace(portal))
-	
+
 	// If the portal string contains a port via colon separator, split it cleanly
 	if host, _, err := net.SplitHostPort(portal); err == nil {
 		return strings.Trim(host, "[]")
 	}
-	
+
 	// Fallback handling for raw strings or already split open-iscsi filesystem inputs
 	return strings.Trim(portal, "[]")
 }
@@ -706,25 +698,24 @@ func (r OsDeviceConnectivityIscsi) EnsurePort(portal string) string {
 	return net.JoinHostPort(portal, "3260")
 }
 
-
 // getDiscoveryScopeKey groups locks by subnet prefix to avoid write collisions on the same storage array
 func (r OsDeviceConnectivityIscsi) getDiscoveryScopeKey(portal string) string {
-        ipStr := r.ExtractIP(portal)
-        ip := net.ParseIP(ipStr)
-        if ip == nil {
-                return ipStr
-        }
-        if ipv4 := ip.To4(); ipv4 != nil {
-                return fmt.Sprintf("%d.%d.%d", ipv4[0], ipv4[1], ipv4[2]) // /24 grouping
-        }
-        if ipv6 := ip.To16(); ipv6 != nil {
-                // FIX: Combine adjacent bytes to construct the first four 16-bit blocks of a standard IPv6 /64 prefix
-                block1 := uint16(ipv6[0])<<8 | uint16(ipv6[1])
-                block2 := uint16(ipv6[2])<<8 | uint16(ipv6[3])
-                block3 := uint16(ipv6[4])<<8 | uint16(ipv6[5])
-                block4 := uint16(ipv6[6])<<8 | uint16(ipv6[7])
+	ipStr := r.ExtractIP(portal)
+	ip := net.ParseIP(ipStr)
+	if ip == nil {
+		return ipStr
+	}
+	if ipv4 := ip.To4(); ipv4 != nil {
+		return fmt.Sprintf("%d.%d.%d", ipv4[0], ipv4[1], ipv4[2]) // /24 grouping
+	}
+	if ipv6 := ip.To16(); ipv6 != nil {
+		// FIX: Combine adjacent bytes to construct the first four 16-bit blocks of a standard IPv6 /64 prefix
+		block1 := uint16(ipv6[0])<<8 | uint16(ipv6[1])
+		block2 := uint16(ipv6[2])<<8 | uint16(ipv6[3])
+		block3 := uint16(ipv6[4])<<8 | uint16(ipv6[5])
+		block4 := uint16(ipv6[6])<<8 | uint16(ipv6[7])
 
-                return fmt.Sprintf("%x:%x:%x:%x", block1, block2, block3, block4) // /64 grouping
-        }
-        return ipStr
+		return fmt.Sprintf("%x:%x:%x:%x", block1, block2, block3, block4) // /64 grouping
+	}
+	return ipStr
 }

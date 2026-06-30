@@ -35,7 +35,7 @@ import (
 )
 
 var (
-	nodeUtils    = driver.NewNodeUtils(&executer.Executer{}, nil, ConfigYaml, device_connectivity.OsDeviceConnectivityHelperScsiGeneric{})
+	nodeUtils    = driver.NewNodeUtils(&executer.Executer{}, nil, nil, ConfigYaml, &device_connectivity.OsDeviceConnectivityHelperScsiGeneric{})
 	hostName     = "test-hostname"
 	longHostName = strings.Repeat(hostName, 25)
 	nvmeNQN      = "nqn.2014-08.org.nvmexpress:uuid:b57708c7-5bb6-46a0-b2af-9d824bf539e1"

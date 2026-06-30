@@ -332,7 +332,7 @@ func NewOsDeviceConnectivityHelperScsiGeneric(executer executer.ExecuterInterfac
 	}
 }
 
-func (r OsDeviceConnectivityHelperScsiGeneric) IsVolumePathMatchesVolumeId(ctx context.Context, volumeUuid string, volumePath string) (bool, error) {
+func (r *OsDeviceConnectivityHelperScsiGeneric) IsVolumePathMatchesVolumeId(ctx context.Context, volumeUuid string, volumePath string) (bool, error) {
 	logger.Infof("IsVolumePathMatchesVolumeId: Searching matching volume id for volume path: [%s] ", volumePath)
 	volumeIdVariations := r.Helper.GetVolumeIdVariations(volumeUuid)
 
@@ -353,7 +353,7 @@ func (r OsDeviceConnectivityHelperScsiGeneric) IsVolumePathMatchesVolumeId(ctx c
 	return true, nil
 }
 
-func (r OsDeviceConnectivityHelperScsiGeneric) GetExistingMpathDevice(ctx context.Context, volumeUuid string, volumePath string) (string, error) {
+func (r *OsDeviceConnectivityHelperScsiGeneric) GetExistingMpathDevice(ctx context.Context, volumeUuid string, volumePath string) (string, error) {
 	logger.Infof("GetExistingMpathDevice: Searching matching volume id for volume path: [%s] ", volumePath)
 	//volumeIdVariations := r.Helper.GetVolumeIdVariations(volumeUuid)
 
@@ -364,7 +364,7 @@ func (r OsDeviceConnectivityHelperScsiGeneric) GetExistingMpathDevice(ctx contex
 	return mpathDeviceName, nil
 }
 
-func (r OsDeviceConnectivityHelperScsiGeneric) RescanDevicesGetHostIds(lunId int, arrayIdentifiers []string) (map[int]bool, error) {
+func (r *OsDeviceConnectivityHelperScsiGeneric) RescanDevicesGetHostIds(lunId int, arrayIdentifiers []string) (map[int]bool, error) {
 	logger.Debugf("Rescan : Start rescan on specific lun, on lun : {%v}, with array identifiers : {%v}", lunId, arrayIdentifiers)
 	if len(arrayIdentifiers) == 0 {
 		e := &ErrorNotFoundArrayIdentifiers{lunId}
@@ -375,7 +375,7 @@ func (r OsDeviceConnectivityHelperScsiGeneric) RescanDevicesGetHostIds(lunId int
 	return r.Helper.GetHostsIdByArrayIdentifiers(arrayIdentifiers)
 }
 
-func (r OsDeviceConnectivityHelperScsiGeneric) RescanDevices(lunId int, arrayIdentifiers []string, hostIDs map[int]bool) error {
+func (r *OsDeviceConnectivityHelperScsiGeneric) RescanDevices(lunId int, arrayIdentifiers []string, hostIDs map[int]bool) error {
 	for hostNumber := range hostIDs {
 
 		filename := fmt.Sprintf("/sys/class/scsi_host/host%d/scan", hostNumber)
@@ -487,7 +487,7 @@ func isNvmeDevice(dmPath string, executer executer.ExecuterInterface) bool {
 	return result
 }
 
-func (r OsDeviceConnectivityHelperScsiGeneric) GetMpathDevice(ctx context.Context, volumeId string) (string, error) {
+func (r *OsDeviceConnectivityHelperScsiGeneric) GetMpathDevice(ctx context.Context, volumeId string) (string, error) {
 
 	logger.Infof("GetMpathDevice: Searching multipath devices for volume : [%s] ", volumeId)
 	//dmPath, _ := r.Helper.GetMpathDeviceName(volumeId)
@@ -574,7 +574,7 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) flushDeviceBuffers(ctx context.C
 	}
 }
 
-func (r OsDeviceConnectivityHelperScsiGeneric) flushDevicesBuffers(ctx context.Context, deviceNames []string) error {
+func (r *OsDeviceConnectivityHelperScsiGeneric) flushDevicesBuffers(ctx context.Context, deviceNames []string) error {
 	logger.Debugf("executing commands : {%v %v} on devices : {%v} and timeout : {%v} mseconds", blockDevCmd, flushBufsFlag, deviceNames, TimeOutBlockDevCmd)
 	for _, deviceName := range deviceNames {
 		err := r.flushDeviceBuffers(ctx, deviceName)
@@ -1709,11 +1709,11 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) TeardownVolume(ctx context.Conte
 	isMounted, err := r.Mounter.IsMounted(target)
 	if err == nil && isMounted {
 		if devPath, err := r.Mounter.GetDeviceFromMount(target); err == nil && devPath != "" {
-			logger.Warningf("teardown volume %s devPath", target, devPath)
+			logger.Warningf("teardown volume %s devPath %s", target, devPath)
 			if stat, err := os.Stat(devPath); err == nil {
-				logger.Warningf("teardown volume %s devPath found", target, devPath)
+				logger.Warningf("teardown volume %s devPath found %s", target, devPath)
 				if sysObj, ok := stat.Sys().(*syscall.Stat_t); ok {
-					logger.Warningf("teardown volume %s devPath found resolved id", target, devPath)
+					logger.Warningf("teardown volume %s devPath found resolved id %s", target, devPath)
 					major = uint32((sysObj.Rdev >> 8) & 0xfff)
 					minor = uint32((sysObj.Rdev & 0xff) | ((sysObj.Rdev >> 12) & 0xfff00))
 					hardwareResolved = true
@@ -1882,7 +1882,7 @@ func (o *OsDeviceConnectivityHelperScsiGeneric) GetDMNameFromMinor(minor uint32)
 
 	nameBytes, err := os.ReadFile(sysfsNamePath)
 	if err != nil {
-		logger.Warning("GetDMNameFromMino error %v", err)
+		logger.Warningf("GetDMNameFromMino error %v", err)
 		// Fallback: Check if the device is mapped directly under the /sys/block tree structure
 		// as /sys/block/dm-X/dm/name
 		fallbackPath := fmt.Sprintf("/sys/block/dm-%d/dm/name", minor)
@@ -2092,7 +2092,7 @@ func (o *OsDeviceConnectivityHelperGeneric) getSlavesForDevice(major, minor uint
 	var results []string
 	for _, entry := range entries {
 		slaveName := entry.Name() // Keeps exact block name like "sda" or "nvme0n1"
-		logger.Warning("getSlaveForDevice entry %s", slaveName)
+		logger.Warningf("getSlaveForDevice entry %s", slaveName)
 		if slaveName != "" {
 			results = append(results, slaveName)
 		}
@@ -2559,7 +2559,7 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) FinalWwidPurge(ctx context.Conte
 
 // In Case 1, when a collision is detected, you call UnmountWithContext. Ensure your UnmountWithContext is set to use MNT_DETACH (Lazy) immediately for collisions, as you don't want to wait for a graceful timeout on a rogue volume.
 // VerifyAndGetDmDevice replaced by VerifyAndGetDmDevice
-func (r OsDeviceConnectivityHelperScsiGeneric) VerifyAndGetDmDevice(devName string, volumeUuid string) (string, error) {
+func (r *OsDeviceConnectivityHelperScsiGeneric) VerifyAndGetDmDevice(devName string, volumeUuid string) (string, error) {
 	expectedSerial := strings.ToLower(volumeUuid)
 	//TODO restore check
 	//expectedLunStr := fmt.Sprintf("%d", lun)

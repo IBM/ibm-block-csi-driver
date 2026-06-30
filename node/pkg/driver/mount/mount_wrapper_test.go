@@ -61,7 +61,7 @@ func TestMounterUnmount(t *testing.T) {
 				ExecuteWithTimeout(int(timeout.Seconds()*1000), "umount", []string{target}).
 				Return(output, tc.execErr)
 
-			mounter := mount.NewWithExecutor("", fake_executer)
+			mounter := mount.NewWithExecutor("", fake_executer, nil, 0)
 			err := mounter.Unmount(target)
 
 			if tc.expReturn == nil {
