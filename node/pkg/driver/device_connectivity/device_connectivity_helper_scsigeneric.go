@@ -1775,25 +1775,27 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) checkPQviaIoctl(sgName string) (
 	return false, fmt.Errorf("exhausted storage path verification inquiry attempts under load queue pressure")
 
 PROCESS_PAGE_0x83:
-	// Verify that byte 1 matches the Vital Product Data page code we requested
-	if inqResp[1] != 0x83 {
-		logger.Warningf("[%s] Payload Parsing Error: Device returned invalid page code identifier (0x%02x) instead of 0x83. Flagging as ghost slot.", sgName, inqResp[1])
-		return true, nil 
-	}
+        if inqResp[1] != 0x83 {
+                logger.Warningf("[%s] Payload Parsing Error: Device returned invalid page code identifier (0x%02x) instead of 0x83. Flagging as ghost slot.", sgName, inqResp[1])
+                return true, nil
+        }
 
-	// Read bytes 2 and 3 for the returned descriptor payload boundary bounds
-	pageLen := (int(inqResp[2])  5) & 0x07
-	devType := inqResp[0] & 0x1f
-	logger.Debugf("[%s] Payload Parsing: Extracted Peripheral Qualifier (PQ): %d, Peripheral Device Type: %d", sgName, pq, devType)
+        // 1. Calculate the Page Length and extract PQ / DevType variables explicitly
+        pageLen := (int(inqResp[2]) << 8) | int(inqResp[3])
+        pq := (inqResp[0] >> 5) & 0x07 // <-- ADD THIS LINE TO FIX THE COMPILE ERROR
+        devType := inqResp[0] & 0x1f
 
-	// PQ 1 or 3 implies a hardware detached map or missing logical assignment endpoint
-	if pq == 1 || pq == 3 || devType == 0x1f {
-		logger.Warningf("[%s] Payload Parsing: Identity mapping mismatch discovered [PQ=%d, Type=%d]. Confirmed dead squatter path. Flagging as ghost slot.", sgName, pq, devType)
-		return true, nil
-	}
+        // 2. Include pageLen in the logs so the compiler accepts the declared variable
+        logger.Debugf("[%s] Payload Parsing: VPD Page Code verified (0x83). Length: %d bytes. PQ: %d, Type: %d", sgName, pageLen, pq, devType)
 
-	logger.Debugf("[%s] Payload Parsing: Target validation check complete. Hardware transport link reports clean, active connectivity.", sgName)
-	return false, nil
+        // PQ 1 or 3 implies a hardware detached map or missing logical assignment endpoint
+        if pq == 1 || pq == 3 || devType == 0x1f {
+                logger.Warningf("[%s] Payload Parsing: Identity mapping mismatch discovered [PQ=%d, Type=%d]. Confirmed dead squatter path. Flagging as ghost slot.", sgName, pq, devType)
+                return true, nil
+        }
+
+        logger.Debugf("[%s] Payload Parsing: Target validation check complete. Hardware transport link reports clean, active connectivity.", sgName)
+        return false, nil
 }
 
 // sHardwareBlocked, also check for the quiesce state. It often indicates a storage controller failover where I/O is paused but not failed.
