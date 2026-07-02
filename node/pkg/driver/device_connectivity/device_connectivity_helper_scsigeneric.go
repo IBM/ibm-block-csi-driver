@@ -4001,14 +4001,6 @@ func (o GetDmsPathHelperGeneric) WaitForDmToExist(ctx context.Context, volumeWWI
 	var lastRo string
 	var stableCycles int
 
-	// Pre-declare variables to keep the Go compiler happy with the goto jumps
-	var name string
-	var path string
-	var ro string
-	var count int
-	var hasDevice bool
-	var isPending bool
-
 	norm := make([]string, len(volumeWWID))
 	for i, wwid := range volumeWWID {
 		norm[i] = normalizeWWID(wwid)
@@ -4021,8 +4013,8 @@ func (o GetDmsPathHelperGeneric) WaitForDmToExist(ctx context.Context, volumeWWI
 	}
 	defer timer.Stop()
 
-	// Loop continuously until the context expires or a result is found
-	for {
+	// Track actual retry attempts to respect maxRetries and avoid endless loops
+	for attempt := 0; attempt < maxRetries; attempt++ {
 		// Ensure the context hasn't expired before executing a heavy topology evaluation loop
 		if err := ctx.Err(); err != nil {
 			return "", err
@@ -4030,32 +4022,35 @@ func (o GetDmsPathHelperGeneric) WaitForDmToExist(ctx context.Context, volumeWWI
 
 		// 1. Evaluate current block layer using our strict settlement engine rules
 		// Pass checkPendingOnly = false because we mandate a fully usable, live, R/W presentation
-		hasDevice, isPending, name = o.EvaluateSysfsTopology(norm, false)
+		hasDevice, isPending, name := o.EvaluateSysfsTopology(norm, false)
 
-		if !hasDevice {
-			// Case C/D Fallback: Paths disappeared entirely or udev rules are still processing topology
+		if !hasDevice || isPending {
+			// Reset tracking markers for unsettled or missing devices
 			stableCycles = 0
 			lastCount = 0
 			lastRo = "unknown"
-			goto waitStep
-		}
-
-		if isPending {
-			// Device is visible but kernel has it locked/suspended, or it's read-only
-			stableCycles = 0
-			// Proactively update state tracking on unsettled cycles to avoid matching historical/stale flags
-			lastCount = 0
-			lastRo = "unknown"
-			goto waitStep
+			
+			// Wait out the polling interval before checking the block layer again
+			if err := o.waitInterval(ctx, timer, intervalSeconds); err != nil {
+				return "", err
+			}
+			continue
 		}
 
 		// 2. Read runtime stability attributes once the kernel block layer is structural
-		path = filepath.Join("/dev", name)
-		count = o.GetSlaveCount(name)
-		ro = o.getRoStatus(path)
+		path := filepath.Join("/dev", name)
+		
+		// Bypass slave-count requirements if it's a Native NVMe ANA device (which has 0 slaves)
+		isDM := o.IsDeviceMapper(name)
+		count := 0
+		if isDM {
+			count = o.GetSlaveCount(name)
+		}
+		ro := o.getRoStatus(path)
 
 		// 3. Evaluate state stability across polling periods
-		if count > 0 && count == lastCount && ro == lastRo {
+		isStableCount := (isDM && count > 0 && count == lastCount) || (!isDM && count == 0)
+		if isStableCount && ro == lastRo {
 			stableCycles++
 		} else {
 			stableCycles = 0 
@@ -4073,15 +4068,25 @@ func (o GetDmsPathHelperGeneric) WaitForDmToExist(ctx context.Context, volumeWWI
 		lastCount = count
 		lastRo = ro
 
-	waitStep:
-		timer.Reset(time.Duration(intervalSeconds) * time.Second)
-		select {
-		case <-ctx.Done():
-			return "", ctx.Err()
-		case <-timer.C:
+		// Wait out the polling interval before stepping into the next evaluation retry loop
+		if err := o.waitInterval(ctx, timer, intervalSeconds); err != nil {
+			return "", err
 		}
 	}
+
+	// Graceful fallback when the device fails to settle or emerge within the allocated window
 	return "", &MultipathDeviceNotFoundForVolumeError{volumeWWID[0]}
+}
+
+// waitInterval encapsulates the timer/context blocking logic cleanly without using labels or goto
+func (o GetDmsPathHelperGeneric) waitInterval(ctx context.Context, timer *time.Timer, intervalSeconds int) error {
+	timer.Reset(time.Duration(intervalSeconds) * time.Second)
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	case <-timer.C:
+		return nil
+	}
 }
 
 func (o *GetDmsPathHelperGeneric) GetSlaveCount(devName string) int {
@@ -4678,6 +4683,7 @@ func (o GetDmsPathHelperGeneric) validateDMIntegrity(dmPath string) (string, err
 
 
 // TODO NOTE there's another normalizeWWID!!
+/*
 func normalizeWWID(raw string) string {
 	// 1. Lowercase and clean whitespace/newlines
 	s := strings.ToLower(strings.TrimSpace(raw))
@@ -4712,4 +4718,27 @@ func normalizeWWID(raw string) string {
 	s = strings.TrimPrefix(s, "0x")
 
 	return s
+}
+*/
+
+func normalizeWWID(raw string) string {
+	s := strings.ToLower(strings.TrimSpace(raw))
+
+	// If evaluating a host device mapper UUID file, slice away the kernel namespace tags
+	// example: "mpath-nvme-nguid.112233445566..." -> "112233445566..."
+	if strings.HasPrefix(s, "mpath-") || strings.HasPrefix(s, "uuid-") {
+		if idx := strings.LastIndex(s, "."); idx != -1 {
+			s = s[idx+1:]
+		} else if idx := strings.LastIndex(s, "-"); idx != -1 {
+			s = s[idx+1:]
+		}
+	}
+
+	// Peeling off standard individual transport prefixes cleanly
+	standardPrefixes := []string{"naa.", "uuid.", "nvme.", "t10.", "eui.", "0x"}
+	for _, p := range standardPrefixes {
+		s = strings.TrimPrefix(s, p)
+	}
+
+	return strings.TrimSpace(s)
 }
