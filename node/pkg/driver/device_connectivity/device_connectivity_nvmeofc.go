@@ -19,7 +19,10 @@ package device_connectivity
 import (
 	"context"
 	"fmt"
+	"os"
+	"path/filepath"
 	"strings"
+	"strconv"
 
 	"github.com/ibm/ibm-block-csi-driver/node/logger"
 	"github.com/ibm/ibm-block-csi-driver/node/pkg/driver/executer"
@@ -140,7 +143,7 @@ func (r OsDeviceConnectivityNvmeOFc) EnsureLogin(ctx context.Context, ipsByArray
                 return
         }
         if !nativeMpath && finalPathCount < nvmeMinPathsForNonNativeDmMultipath {
-                findMpathsOn, err := r.isFindMultipathsOn()
+                findMpathsOn, err := r.isFindMultipathsOn(ctx)
                 if err != nil {
                         logger.Warningf("NVMe-oFC EnsureLogin: could not read find_multipaths setting: %v", err)
                         return
