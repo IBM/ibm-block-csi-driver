@@ -2534,6 +2534,22 @@ class TestArrayMediatorSVC(unittest.TestCase):
             object_id=common_settings.INTERNAL_VOLUME_GROUP_ID)
         self.assertEqual(0, len(volume_group.volumes))
 
+    def test_get_volume_group_id_uses_uid_when_present(self):
+        cli_vg = self._mock_cli_volume_group(uid=common_settings.VOLUME_GROUP_UID)
+        self.svc.client.svcinfo.lsvolumegroup.return_value = Mock(as_single_element=cli_vg)
+
+        volume_group = self.svc.get_volume_group(common_settings.INTERNAL_VOLUME_GROUP_ID)
+
+        self.assertEqual(common_settings.VOLUME_GROUP_UID, volume_group.id)
+
+    def test_get_volume_group_id_falls_back_to_id_when_uid_absent(self):
+        cli_vg = self._mock_cli_volume_group()  # no uid field — older array firmware
+        self.svc.client.svcinfo.lsvolumegroup.return_value = Mock(as_single_element=cli_vg)
+
+        volume_group = self.svc.get_volume_group(common_settings.INTERNAL_VOLUME_GROUP_ID)
+
+        self.assertEqual(common_settings.INTERNAL_VOLUME_GROUP_ID, volume_group.id)
+
     def test_get_volume_group_not_found_failed(self):
         self._prepare_lsvolumegroup(no_return=True)
         with self.assertRaises(array_errors.ObjectNotFoundError):

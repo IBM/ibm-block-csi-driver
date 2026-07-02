@@ -15,7 +15,7 @@ STALE_LOCK_TIMEOUT = 600  # 10 minutes in seconds
 
 def _add_to_ids_in_use(lock_key, object_id):
     ids_in_use[lock_key].add(object_id)
-    ids_last_access[(lock_key, object_id)] = time.time()
+    ids_last_access[(lock_key, object_id)] = time.monotonic()
 
 
 def _remove_from_ids_in_use(lock_key, object_id):
@@ -28,7 +28,7 @@ def _remove_from_ids_in_use(lock_key, object_id):
 
 def _cleanup_stale_locks():
     """Remove lock entries that haven't been accessed recently."""
-    current_time = time.time()
+    current_time = time.monotonic()
     stale_entries = []
 
     for (lock_key, object_id), last_access in ids_last_access.items():
@@ -64,11 +64,6 @@ class SyncLock:
             ("trying to acquire lock for action {} with {}: {}".format(self.action_name, self.lock_key,
                                                                        self.object_id)))
         with ids_in_use_lock:
-            # Clean up stale locks before acquiring new one
-            stale_count = _cleanup_stale_locks()
-            if stale_count > 0:
-                logger.info("Cleaned up {} stale lock(s)".format(stale_count))
-
             if self.object_id in ids_in_use[self.lock_key]:
                 logger.error(
                     "lock for action {} with {}: {} is already in use by another thread".format(self.action_name,

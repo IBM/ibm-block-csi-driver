@@ -1808,11 +1808,7 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
 
         # Get volume group name from ID
         volume_group = self._lsvolumegroup(volume_group_id)
-        if volume_group and hasattr(volume_group, 'name'):
-            volume_group_name = volume_group.name
-        else:
-            logger.warning("Volume group object not found or missing 'name' attribute for ID: {}, using ID as fallback".format(volume_group_id))
-            volume_group_name = volume_group_id
+        volume_group_name = volume_group.name if volume_group else volume_group_id
 
         logger.info("found ear replication: {} in mode: {}".format(volume_group_id,
                                                                    replication_mode))
@@ -2246,14 +2242,14 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
         # Check if this is first demote attempt or retry
         if volume_group_name not in self._demote_state_map:
             # First attempt - create checkpoint and track state
-            self._demote_state_map[volume_group_name] = time.time()
+            self._demote_state_map[volume_group_name] = time.monotonic()
 
             logger.info("First demote attempt for volume group {}, creating checkpoint".format(volume_group_name))
             self._chvolumegroupreplication(volume_group_name, checkpoint=array_settings.CHECKPOINT)
         else:
             # Retry - checkpoint already created, just check status
             first_attempt_time = self._demote_state_map[volume_group_name]
-            elapsed_time = time.time() - first_attempt_time
+            elapsed_time = time.monotonic() - first_attempt_time
             logger.info("Retry demote for volume group {}, checking checkpoint status "
                         "(elapsed time: {:.1f}s)".format(volume_group_name,
                                                          elapsed_time))
