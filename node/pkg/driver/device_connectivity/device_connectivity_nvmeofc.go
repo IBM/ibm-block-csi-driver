@@ -169,27 +169,93 @@ func countLivePathsForSubsystem(livePaths map[string]bool, ipsByArrayInitiator m
         return count
 }
 
-// isFindMultipathsOn queries multipathd effective config for the find_multipaths setting.
-func (r OsDeviceConnectivityNvmeOFc) isFindMultipathsOn() (bool, error) {
-        out, err := r.Executer.ExecuteWithTimeout(TimeOutMultipathdCmd, multipathdCmd, []string{"show", "config"})
+func (r OsDeviceConnectivityNvmeOFc) updateHostIDs(hostIDs map[int]bool) {
+        // 1. Get a map of HostNumber -> PhysicalIdentifier (PCI or WWPN)
+        hostMap, err := r.mapHostsToPhysicalHardware()
         if err != nil {
-                return false, fmt.Errorf("multipathd show config failed: %w", err)
+                logger.Errorf("Failed to map FC hosts: %v", err)
+                return
         }
-        for _, line := range strings.Split(string(out), "\n") {
+
+        // 2. Identify the hardware IDs associated with the hosts we already have
+        knownHardware := make(map[string]bool)
+        for hostNum := range hostIDs {
+                if hardwareID, exists := hostMap[hostNum]; exists {
+                        knownHardware[hardwareID] = true
+                }
+        }
+
+        // 3. Find siblings: any host sharing the same hardwareID but not yet in our set
+        for hostNum, hardwareID := range hostMap {
+                if knownHardware[hardwareID] && !hostIDs[hostNum] {
+                        hostIDs[hostNum] = true
+                        logger.Infof("Multipath discovery: host%d shares physical hardware %s", hostNum, hardwareID)
+                }
+        }
+}
+
+func (r OsDeviceConnectivityNvmeOFc) mapHostsToPhysicalHardware() (map[int]string, error) {
+        hostMap := make(map[int]string)
+        hosts, err := filepath.Glob("/sys/class/fc_host/host*")
+        if err != nil {
+                return nil, err
+        }
+
+        for _, h := range hosts {
+                hostNumStr := strings.TrimPrefix(filepath.Base(h), "host")
+                hostNum, _ := strconv.Atoi(hostNumStr)
+
+                // Option A: Use PCI Address (Best for Multi-port/Multi-channel cards)
+                // /sys/class/fc_host/hostX/device/ -> ../../../0000:04:00.0
+                pciLink, err := os.Readlink(filepath.Join(h, "device"))
+                if err == nil {
+                        // Extract the PCI slot (e.g., 0000:04:00.0)
+                        hostMap[hostNum] = filepath.Base(pciLink)
+                        continue
+                }
+
+                // Option B: Use Physical WWPN (Best for NPIV)
+                // permanent_port_name is the physical burned-in WWN of the HBA
+                wwpn, err := os.ReadFile(filepath.Join(h, "permanent_port_name"))
+                if err == nil {
+                        hostMap[hostNum] = strings.TrimSpace(string(wwpn))
+                }
+        }
+        return hostMap, nil
+}
+
+// isFindMultipathsOn queries multipathd effective config for the find_multipaths setting.
+func (r OsDeviceConnectivityNvmeOFc) isFindMultipathsOn(ctx context.Context) (bool, error) {
+        // Req 3 & 4: Use the existing socket-based Executer instead of forking 'multipathd'
+        // 'show config' is too large; 'show daemon' or specific queries are lighter if supported,
+        // but using the socket is already a massive win.
+        out, err := r.Executer.MultipathdCmd(ctx, "global", "show config")
+        if err != nil {
+                return false, fmt.Errorf("multipathd socket query failed: %w", err)
+        }
+
+        // Req 8: Context is already respected by your MultipathdCmd infra
+        for _, line := range strings.Split(out, "\n") {
                 trimmed := strings.TrimSpace(line)
                 if !strings.HasPrefix(trimmed, "find_multipaths") {
                         continue
                 }
+
                 fields := strings.Fields(trimmed)
                 if len(fields) < 2 {
                         continue
                 }
-                val := strings.ToLower(fields[1])
-                result := val == "yes" || val == "on"
+
+                // Handle "quoted" values often found in multipathd config
+                val := strings.ToLower(strings.Trim(fields[1], "\""))
+
+                // In RHEL 7 and newer, valid "on" values include yes, on, or smart
+                result := val == "yes" || val == "on" || val == "smart"
+
                 logger.Debugf("NVMe-oFC isFindMultipathsOn: find_multipaths=%s result=%v", val, result)
                 return result, nil
         }
-        // Not found — multipathd default is "no".
+
         return false, nil
 }
 
