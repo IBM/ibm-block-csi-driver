@@ -1935,7 +1935,6 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) TeardownVolume(ctx context.Conte
 
 // FindSlavesByWWID operates completely decoupled from VFS mounts to locate paths on broken maps
 func (o *OsDeviceConnectivityHelperScsiGeneric) FindSlavesByWWID(expectedWWID string) []string {
-	logger.Warningf("FindSlavesByWWID %s", expectedWWID)
 	var slaves []string
 	if expectedWWID == "" {
 		return slaves
@@ -1951,8 +1950,6 @@ func (o *OsDeviceConnectivityHelperScsiGeneric) FindSlavesByWWID(expectedWWID st
 	for _, entry := range blockEntries {
 		name := entry.Name()
 		
-		logger.Warningf("FindSlavesByWWID %s entry %s", expectedWWID, name)
-
 		if strings.HasPrefix(name, "loop") || strings.HasPrefix(name, "ram") || strings.HasPrefix(name, "dm-") {
 			continue
 		}
