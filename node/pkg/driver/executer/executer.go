@@ -659,15 +659,26 @@ func (e *Executer) resolveSocket() (string, bool) {
 
     for _, path := range candidates {
         // --- PROBE 1: MODERN BINARY ---
-        conn, _ := net.DialTimeout("unix", path, 200*time.Millisecond)
+		conn, err := net.DialTimeout("unix", path, 200*time.Millisecond)
+		if err != nil {
+			continue // Skip this path if the connection fails
+		}
+		
         payload := []byte("show status\x00")
-        binary.Write(conn, binary.LittleEndian, uint64(len(payload)))
-        conn.Write(payload)
+		err = binary.Write(conn, binary.LittleEndian, uint64(len(payload)))
+		if err != nil {
+			conn.Close()
+			continue
+		}		
+	   _, err = conn.Write(payload)
+		if err != nil {
+			conn.Close()
+			continue
+		}		
 
         prefix := make([]byte, 4)
         _, err := io.ReadFull(conn, prefix)
         if err == nil {
-                logger.Warningf("Read success %d", (int(prefix[0])))
             isBinary := !(prefix[0] == 0x20 || (prefix[0] >= 0x30 && prefix[0] <= 0x39))
             conn.Close()
             return path, isBinary
@@ -679,13 +690,11 @@ func (e *Executer) resolveSocket() (string, bool) {
         conn.Write(payload) // Raw write
         _, err = io.ReadFull(conn, prefix)
         if err == nil {
-                logger.Warning("Read 2 success")
             conn.Close()
             return path, false // Success with Legacy
         }
         conn.Close()
     }
-        logger.Warning("Use default socket")
     return StandardSocket, false
 }
 
