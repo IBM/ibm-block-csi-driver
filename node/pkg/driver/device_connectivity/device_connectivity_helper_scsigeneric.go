@@ -3971,8 +3971,6 @@ func (o *OsDeviceConnectivityHelperGeneric) GetGaterKey(ctx context.Context, dev
 	return fmt.Sprintf("%d:%d-%s-%s", major, minor, wwid, instanceID)
 }
 
-}
-
 func (o *OsDeviceConnectivityHelperGeneric) GetDeviceWWID(ctx context.Context, dev string) (string, error) {
 	name := filepath.Base(dev)
 
