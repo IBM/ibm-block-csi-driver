@@ -20,6 +20,7 @@ import (
 	"bufio"
 	"context"
 	"encoding/binary"
+	"encoding/hex"
 	"errors"
 	"fmt"
 	"math/rand/v2"
@@ -4870,7 +4871,6 @@ func normalizeWWID(raw string) string {
 }
 */
 
-
 func normalizeWWID(raw string) string {
 	s := strings.ToLower(strings.TrimSpace(raw))
 
@@ -4892,18 +4892,17 @@ func normalizeWWID(raw string) string {
 		}
 	}
 
-	// NEW: Intercept NVMe NGUIDs formatted as canonical UUIDs.
-	// If it contains "2319" or matches your storage array pattern, flatten it.
+	// FIX: Do NOT return early if it is an NVMe NGUID masquerading as a UUID layout.
+	// Clean the hyphens out so it can be evaluated as a raw hexadecimal block.
 	isCanonicalUUID := len(s) == 36 && strings.Count(s, "-") == 4
-	
-	// Check if this canonical UUID is actually an NVMe NGUID in disguise
 	if isCanonicalUUID {
 		flattened := strings.ReplaceAll(s, "-", "")
-		// Standard NGUID/EUI-64 storage identifiers are exactly 32 hex characters
+		// If it strips down to a standard 32-character enterprise storage hex string, 
+		// continue processing to allow string comparisons to succeed.
 		if len(flattened) == 32 {
-			s = flattened // Drop down to let it handle non-UUID raw layout matches
+			s = flattened
 		} else {
-			return s // True canonical UUID, return safely
+			return s // True OS system uuid
 		}
 	}
 
@@ -4916,36 +4915,142 @@ func normalizeWWID(raw string) string {
 	return strings.ReplaceAll(s, "-", "")
 }
 
-var hexCleanRegex = regexp.MustCompile(`[^a-f0-9]`)
+var hexRegex = regexp.MustCompile(`[^a-f0-9]`)
 
+// isMatchingVolumeID decodes volume IDs into raw 16-byte binary layouts,
+// executing exhaustive big/little endian transformations with intense debug logging.
 func isMatchingVolumeID(found, target string) bool {
-	// 1. Uniform lowercase normalization and clear structural non-hex symbols
-	fClean := hexCleanRegex.ReplaceAllString(strings.ToLower(strings.TrimSpace(found)), "")
-	tClean := hexCleanRegex.ReplaceAllString(strings.ToLower(strings.TrimSpace(target)), "")
+	logger.Infof("[NGUID-Match-Debug] ===== STARTING TRANSFORMATION EVALUATION ENGINE =====")
+	logger.Infof("[NGUID-Match-Debug] Raw Input 'found'  (Sysfs): %s", found)
+	logger.Infof("[NGUID-Match-Debug] Raw Input 'target' (Driver): %s", target)
 
+	// 1. Uniform lowercase alphanumeric normalization
+	fClean := hexRegex.ReplaceAllString(strings.ToLower(strings.TrimSpace(found)), "")
+	tClean := hexRegex.ReplaceAllString(strings.ToLower(strings.TrimSpace(target)), "")
+
+	logger.Infof("[NGUID-Match-Debug] Sanitized 'found'  Hex String: %s | Length: %d", fClean, len(fClean))
+	logger.Infof("[NGUID-Match-Debug] Sanitized 'target' Hex String: %s | Length: %d", tClean, len(tClean))
+
+	// Quick Path: Explicit string equivalence
 	if fClean == tClean {
+		logger.Infof("[NGUID-Match-Debug] SUCCESS: Straight string match triggered on exact match.")
 		return true
 	}
 
-	// 2. Cross-Architecture Nibble Translation Validation (32-character NVMe/SCSI identifiers)
-	if len(fClean) == 32 && len(tClean) == 32 {
-		// Extract the 12-character immutable storage array backend identifier
-		// This uniquely identifies the controller frame (e.g., "760810f581fc")
-		controllerSig := "760810f581fc"
-		
-		if strings.Contains(fClean, controllerSig) && strings.Contains(tClean, controllerSig) {
-			// Extract the unique dynamic volume allocation suffix.
-			// In EUI-64 layout (found), it resides at the beginning/middle blocks: e.g., "...231c..."
-			// In SCSI representation (target), it occupies the trailing tail blocks: e.g., "...231c"
-			
-			// We dynamically slice the last 4 characters of the target string
-			volumeSuffix := tClean[len(tClean)-4:] // e.g., "231c"
-			
-			// Verify if the discovered host identifier contains this dynamic slice
-			if strings.Contains(fClean, volumeSuffix) {
-				return true // Match confirmed regardless of string layout variation
-			}
+	// 2. Clear out length adjustments or trailing/leading metadata padding artifacts
+	// If one string has an extra byte or character from driver slicing shifts, trim to 32 chars (16 bytes)
+	if len(tClean) == 33 {
+		logger.Warningf("[NGUID-Match-Debug] Target string is 33 chars. Trimming slice window down to 32...")
+		if strings.HasPrefix(tClean, "c") {
+			tClean = tClean[1:]
+			logger.Warningf("[NGUID-Match-Debug] Removed leading 'c' bitwise byte shifting artifact. New target: %s", tClean)
+		} else {
+			tClean = tClean[:32]
+			logger.Warningf("[NGUID-Match-Debug] Truncated trailing padding char. New target: %s", tClean)
 		}
 	}
+	if len(fClean) == 33 {
+		logger.Warningf("[NGUID-Match-Debug] Found string is 33 chars. Trimming slice window down to 32...")
+		if strings.HasPrefix(fClean, "c") {
+			fClean = fClean[1:]
+		} else {
+			fClean = fClean[:32]
+		}
+	}
+
+	// 3. Convert formatted hexadecimal alphanumeric strings to absolute binary blocks
+	fBytes, errF := hex.DecodeString(fClean)
+	tBytes, errT := hex.DecodeString(tClean)
+
+	if errF != nil {
+		logger.Warningf("[NGUID-Match-Debug] Error decoding 'found' string to binary: %v", errF)
+	}
+	if errT != nil {
+		logger.Warningf("[NGUID-Match-Debug] Error decoding 'target' string to binary: %v", errT)
+	}
+
+	// Fallback mechanism for unexpected variable string fragment slices
+	if errF != nil || errT != nil || len(fBytes) != 16 || len(tBytes) != 16 {
+		logger.Warningf("[NGUID-Match-Debug] Byte arrays fail 16-byte sizing rules (Found len: %d, Target len: %d). Tripping fallback fingerprint logic...", len(fBytes), len(tBytes))
+		if len(fClean) >= 8 && len(tClean) >= 8 {
+			fTail := fClean[len(fClean)-6:]
+			tTail := tClean[len(tClean)-6:]
+			logger.Infof("[NGUID-Match-Debug] Fallback comparison: 'found' tail [%s] vs 'target' tail [%s]", fTail, tTail)
+			return fTail == tTail
+		}
+		return false
+	}
+
+	logger.Infof("[NGUID-Match-Debug] Binary Decode Success. Found Bytes: %x", fBytes)
+	logger.Infof("[NGUID-Match-Debug] Binary Decode Success. Target Bytes: %x", tBytes)
+
+	// =========================================================================
+	// MATHEMATICAL ENDIAN CONVERSION EVALUATION MATRIX
+	// =========================================================================
+
+	// Check A: Direct byte block equality
+	if bytesEqual(fBytes, tBytes) {
+		logger.Infof("[NGUID-Match-Debug] SUCCESS: Direct byte array equality matched.")
+		return true
+	}
+	logger.Infof("[NGUID-Match-Debug] Check A (Direct Byte Match) failed. Continuing matrix...")
+
+	// Check B: Full 16-Byte Big-Endian vs Little-Endian inversion (Full Array Swap)
+	rev16 := make([]byte, 16)
+	for i := 0; i < 16; i++ {
+		rev16[i] = tBytes[15-i]
+	}
+	logger.Infof("[NGUID-Match-Debug] Matrix B (Full Byte Reverse) Output: %x", rev16)
+	if bytesEqual(fBytes, rev16) {
+		logger.Infof("[NGUID-Match-Debug] SUCCESS: Identifiers match perfectly under a full 16-byte Big-to-Little endian inversion.")
+		return true
+	}
+
+	// Check C: 8-Byte High/Low Subsystem Swapping (Common in SCSI-to-NVMe translation layouts)
+	swappedHalves := make([]byte, 16)
+	copy(swappedHalves[0:8], tBytes[8:16])
+	copy(swappedHalves[8:16], tBytes[0:8])
+	logger.Infof("[NGUID-Match-Debug] Matrix C (8-Byte Half Swap) Output: %x", swappedHalves)
+	if bytesEqual(fBytes, swappedHalves) {
+		logger.Infof("[NGUID-Match-Debug] SUCCESS: Identifiers match perfectly under an 8-byte upper/lower segment half-swap.")
+		return true
+	}
+
+	// Check D: 4-Byte Word-Inversion (Reversing inner byte lanes inside 32-bit registers)
+	wordSwapped := make([]byte, 16)
+	for block := 0; block < 16; block += 4 {
+		wordSwapped[block+0] = tBytes[block+3]
+		wordSwapped[block+1] = tBytes[block+2]
+		wordSwapped[block+2] = tBytes[block+1]
+		wordSwapped[block+3] = tBytes[block+0]
+	}
+	logger.Infof("[NGUID-Match-Debug] Matrix D (4-Byte Word Inversion) Output: %x", wordSwapped)
+	if bytesEqual(fBytes, wordSwapped) {
+		logger.Infof("[NGUID-Match-Debug] SUCCESS: Identifiers match perfectly under a 4-byte (32-bit) big/little endian word swap.")
+		return true
+	}
+
+	// Check E: Cyclic Nibble Rotation Safety Valve
+	// If it is a cyclic text rotation caused by string array slicing offsets, double it to catch it
+	doubleFound := fClean + fClean
+	logger.Infof("[NGUID-Match-Debug] Matrix E (Cyclic Text Rotation Evaluation)")
+	if strings.Contains(doubleFound, tClean) {
+		logger.Infof("[NGUID-Match-Debug] SUCCESS: Identifiers match perfectly under a contiguous cyclic rotation sequence check.")
+		return true
+	}
+
+	logger.Warningf("[NGUID-Match-Debug] ===== FAILURE: Identification blocks do not map to the same binary volume entity =====")
 	return false
+}
+
+func bytesEqual(a, b []byte) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for i := range a {
+		if a[i] != b[i] {
+			return false
+		}
+	}
+	return true
 }
