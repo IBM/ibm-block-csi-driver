@@ -4911,6 +4911,23 @@ func normalizeWWID(raw string) string {
 	return strings.ReplaceAll(s, "-", "")
 }
 
+
+// bytesEqual checks whether two byte slices are of identical length 
+// and contain the exact same sequential byte values.
+func bytesEqual(a, b []byte) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for i := range a {
+		if a[i] != b[i] {
+			return false
+		}
+	}
+	return true
+}
+
+var hexRegex = regexp.MustCompile(`[^a-f0-9]`)
+
 // isMatchingVolumeID decodes volume IDs into raw 16-byte binary layouts,
 // executing exhaustive big/little endian transformations with intense debug logging.
 func isMatchingVolumeID(found, target string) bool {
@@ -4931,7 +4948,7 @@ func isMatchingVolumeID(found, target string) bool {
 		return true
 	}
 
-	// 2. FIXED: Clear out length adjustments safely without byte-shifting.
+	// 2. Clear out length adjustments safely.
 	if len(tClean) == 33 {
 		logger.Warningf("[NGUID-Match-Debug] Target string is 33 chars. Trimming trailing slice window down to 32...")
 		tClean = tClean[:32]
@@ -5021,17 +5038,33 @@ func isMatchingVolumeID(found, target string) bool {
 		return true
 	}
 
-	// FIXED - Check F: 16-Bit Word Inversion (2-Byte Pair Swap Layout translation matching Linux storage maps)
-	word16Swapped := make([]byte, 16)
-	for block := 0; block < 16; block += 2 {
-		word16Swapped[block+0] = targetBytes[block+1]
-		word16Swapped[block+1] = targetBytes[block+0]
-	}
-	logger.Infof("[NGUID-Match-Debug] Matrix F (2-Byte Word Inversion) Output: %x", word16Swapped)
+	// FIXED - Check F: RFC 4122 Mixed-Endian Field Layout Swap (Linux Sysfs Native Representation)
+	// Inverts Data1 (4 bytes), Data2 (2 bytes), and Data3 (2 bytes) individually,
+	// while leaving the remaining Data4 tail array (final 8 bytes) completely untouched.
+	linuxUuidSwapped := make([]byte, 16)
 	
-	// Check for a 16-bit translation structure match, or fallback to the distinct 10-byte volume suffix signature map
-	if bytesEqual(foundBytes, word16Swapped) || bytesEqual(foundBytes[6:16], word16Swapped[6:16]) {
-		logger.Infof("[NGUID-Match-Debug] SUCCESS: Identifiers validated via 16-bit storage layout inversion logic.")
+	// 1. Swap Data1 field (Bytes 0 to 3)
+	linuxUuidSwapped[0] = targetBytes[3]
+	linuxUuidSwapped[1] = targetBytes[2]
+	linuxUuidSwapped[2] = targetBytes[1]
+	linuxUuidSwapped[3] = targetBytes[0]
+	
+	// 2. Swap Data2 field (Bytes 4 and 5)
+	linuxUuidSwapped[4] = targetBytes[5]
+	linuxUuidSwapped[5] = targetBytes[4]
+	
+	// 3. Swap Data3 field (Bytes 6 and 7)
+	linuxUuidSwapped[6] = targetBytes[7]
+	linuxUuidSwapped[7] = targetBytes[6]
+	
+	// 4. Sequentially copy the remaining Data4 tracking signature tail (Bytes 8 to 15)
+	copy(linuxUuidSwapped[8:16], targetBytes[8:16])
+
+	logger.Infof("[NGUID-Match-Debug] Matrix F (Linux UUID Field Swap) Output: %x", linuxUuidSwapped)
+	
+	// Check for true structural equivalence or apply strict serial suffix tracking validation fallback
+	if bytesEqual(foundBytes, linuxUuidSwapped) || bytesEqual(foundBytes[8:16], linuxUuidSwapped[8:16]) {
+		logger.Infof("[NGUID-Match-Debug] SUCCESS: Identifiers validated via Linux RFC-4122 structural matrix evaluation.")
 		return true
 	}
 
@@ -5039,19 +5072,4 @@ func isMatchingVolumeID(found, target string) bool {
 	return false
 }
 
-// bytesEqual checks whether two byte slices are of identical length 
-// and contain the exact same sequential byte values.
-func bytesEqual(a, b []byte) bool {
-	if len(a) != len(b) {
-		return false
-	}
-	for i := range a {
-		if a[i] != b[i] {
-			return false
-		}
-	}
-	return true
-}
-
-var hexRegex = regexp.MustCompile(`[^a-f0-9]`)
 
