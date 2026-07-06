@@ -677,7 +677,7 @@ func (e *Executer) resolveSocket() (string, bool) {
 		}		
 
         prefix := make([]byte, 4)
-        _, err := io.ReadFull(conn, prefix)
+        _, err = io.ReadFull(conn, prefix)
         if err == nil {
             isBinary := !(prefix[0] == 0x20 || (prefix[0] >= 0x30 && prefix[0] <= 0x39))
             conn.Close()
