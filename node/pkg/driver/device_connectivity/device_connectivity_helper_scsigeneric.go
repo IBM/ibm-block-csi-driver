@@ -619,10 +619,8 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) RemovePhysicalDevice(ctx context
 					_ = r.flushDeviceBuffers(wCtx, devPath)
 
 					var deletePath string
-					var isNVMe bool
 
 					if strings.HasPrefix(name, "nvme") {
-						isNVMe = true
 						// Tier 1: Modern Kernel path-specific namespace deletion attribute
 						deletePath = fmt.Sprintf("/sys/block/%s/device/delete_id", name)
 						
