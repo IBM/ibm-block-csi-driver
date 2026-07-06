@@ -4364,7 +4364,6 @@ func (o GetDmsPathHelperGeneric) getRoStatus(path string) string {
 func (o GetDmsPathHelperGeneric) safeSettle(path string) error {
 	name := filepath.Base(path)
 	
-	logger.Warningf("safeSettle %s itr %d", name, i)
 
 	for i := 0; i < 10; i++ {
 		if o.IsDeviceMapper(name) {
