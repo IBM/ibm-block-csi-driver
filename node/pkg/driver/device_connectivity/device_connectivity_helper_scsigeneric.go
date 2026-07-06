@@ -4001,6 +4001,7 @@ func (o GetDmsPathHelperGeneric) WaitForDmToExist(ctx context.Context, volumeWWI
 	norm := make([]string, len(volumeWWID))
 	for i, wwid := range volumeWWID {
 		norm[i] = normalizeWWID(wwid)
+		logger.Warningf("convert %s to %s", wwid, norm[i])
 	}
 
 	// High-performance timer instantiation to completely prevent container memory leaks
@@ -4012,14 +4013,18 @@ func (o GetDmsPathHelperGeneric) WaitForDmToExist(ctx context.Context, volumeWWI
 
 	// Track actual retry attempts to respect maxRetries and avoid endless loops
 	for attempt := 0; attempt < maxRetries; attempt++ {
+		logger.Warningf("attempt %d", attempt)
 		// Ensure the context hasn't expired before executing a heavy topology evaluation loop
 		if err := ctx.Err(); err != nil {
+			logger.Warning("Context expired")
 			return "", err
 		}
 
 		// 1. Evaluate current block layer using our strict settlement engine rules
 		// Pass checkPendingOnly = false because we mandate a fully usable, live, R/W presentation
 		hasDevice, isPending, name := o.EvaluateSysfsTopology(norm, false)
+		
+		logger.Warningf("hasDevice %t isPending %t, name %s", hasDevice, isPending, name)
 
 		if !hasDevice || isPending {
 			// Reset tracking markers for unsettled or missing devices
@@ -4027,10 +4032,14 @@ func (o GetDmsPathHelperGeneric) WaitForDmToExist(ctx context.Context, volumeWWI
 			lastCount = 0
 			lastRo = "unknown"
 			
+			logger.Warning("waitInterval - before")
+			
 			// Wait out the polling interval before checking the block layer again
 			if err := o.waitInterval(ctx, timer, intervalSeconds); err != nil {
+				logger.Warning("waitInterval - expired")
 				return "", err
 			}
+			logger.Warning("waitInterval - continue")
 			continue
 		}
 
@@ -4038,12 +4047,18 @@ func (o GetDmsPathHelperGeneric) WaitForDmToExist(ctx context.Context, volumeWWI
 		path := filepath.Join("/dev", name)
 		
 		// Bypass slave-count requirements if it's a Native NVMe ANA device (which has 0 slaves)
+		
+		logger.Warning("before IsDeviceMapper")
 		isDM := o.IsDeviceMapper(name)
 		count := 0
 		if isDM {
+			logger.Warning("IsDeviceMapper true, get count")
 			count = o.GetSlaveCount(name)
+			logger.Warningf("count is %d", count)
 		}
 		ro := o.getRoStatus(path)
+		
+		logger.Warningf("ro status %t", ro)
 
 		// 3. Evaluate state stability across polling periods
 		isStableCount := (isDM && count > 0 && count == lastCount) || (!isDM && count == 0)
@@ -4052,23 +4067,30 @@ func (o GetDmsPathHelperGeneric) WaitForDmToExist(ctx context.Context, volumeWWI
 		} else {
 			stableCycles = 0 
 		}
+		
+		logger.Warningf("stableCycles %d", stableCycles)
 
 		// 4. Verification and final locking phase
 		if stableCycles >= 2 {
+			logger.Warning("2 stable cycles")
 			if err := o.safeSettle(path); err == nil {
 				return o.validateDMIntegrity(path)
 			}
 			// If safeSettle block checks fail, reset stability markers and continue loop tracking
 			stableCycles = 0
+			logger.Warning("reset stableCycles")
 		}
 
 		lastCount = count
 		lastRo = ro
 
 		// Wait out the polling interval before stepping into the next evaluation retry loop
+		logger.Warning("waitInterval2 - before")
 		if err := o.waitInterval(ctx, timer, intervalSeconds); err != nil {
+			logger.Warning("waitInterval2 - expired")
 			return "", err
 		}
+		logger.Warning("waitInterval2 - after")
 	}
 
 	// Graceful fallback when the device fails to settle or emerge within the allocated window
@@ -4219,6 +4241,7 @@ func (r *GetDmsPathHelperGeneric) IsNativeNvmeNamespace(devName string) bool {
 // If checkPendingOnly is true, it returns isPending=true if the device exists and is transitioning.
 // If checkPendingOnly is false, it enforces full data-path readiness (e.g., must be read-write, live, and not suspended).
 func (o *GetDmsPathHelperGeneric) EvaluateSysfsTopology(normIds []string, checkPendingOnly bool) (hasDevice bool, isPending bool, devName string) {
+	logger.Warning("EvaluateSysfsTopology")
 	if len(normIds) < 2 {
 		return false, false, ""
 	}
@@ -4229,18 +4252,28 @@ func (o *GetDmsPathHelperGeneric) EvaluateSysfsTopology(normIds []string, checkP
 	// 1. EVALUATE DEVICE MAPPER SUBSYSTEM (SCSI DM & NVMe-over-DM candidates)
 	// =========================================================================
 	if scsiTarget != "" || nvmeTarget != "" {
+		
 		dmMatches, _ := filepath.Glob("/sys/block/dm-*/dm/uuid")
+		logger.Warning("Evaluate dm matches")
 		for _, m := range dmMatches {
+			logger.Warningf("Evaluate dm %s", m)
 			content, err := os.ReadFile(m)
 			if err != nil {
 				continue
 			}
+
 			foundUUID := normalizeWWID(string(content))
 			
+			logger.Warningf("found id %s convert to %s", string(content), foundUUID)
+			
 			if (scsiTarget != "" && foundUUID == scsiTarget) || (nvmeTarget != "" && foundUUID == nvmeTarget) {
+				
+				logger.Warning("Match")
 				parts := strings.Split(m, "/")
 				if len(parts) >= 4 {
 					name := parts[3] // e.g., "dm-5"
+					
+					logger.Warningf("name %s", name)
 					
 					// Core Check A: Read-Only Flag Evaluation
 					roBytes, err := os.ReadFile(filepath.Join("/sys/block", name, "ro"))
@@ -4272,12 +4305,16 @@ func (o *GetDmsPathHelperGeneric) EvaluateSysfsTopology(normIds []string, checkP
 	// 2. EVALUATE NATIVE NVME SUBSYSTEM (Native ANA candidates)
 	// =========================================================================
 	if nvmeTarget != "" {
+		logger.Warning("Evaluate nvme matches matches")
 		nvmeMatches, _ := filepath.Glob("/sys/block/nvme*n*")
 		for _, m := range nvmeMatches {
+			logger.Warningf("Evaluate nvme %s", m)
 			name := filepath.Base(m) // e.g., "nvme0n1"
 
 			if data, err := os.ReadFile(filepath.Join(m, "nguid")); err == nil {
+				logger.Warningf("found id %s and normalized to %s", string(data), normalizeWWID(string(data)))
 				if normalizeWWID(string(data)) == nvmeTarget {
+					logger.Warning("Match")
 					// Core Check A: Read-Only Flag Evaluation
 					roBytes, err := os.ReadFile(filepath.Join(m, "ro"))
 					isReadOnly := err == nil && strings.TrimSpace(string(roBytes)) != "0"
@@ -4326,9 +4363,12 @@ func (o GetDmsPathHelperGeneric) getRoStatus(path string) string {
 
 func (o GetDmsPathHelperGeneric) safeSettle(path string) error {
 	name := filepath.Base(path)
+	
+	logger.Warningf("safeSettle %s itr %d", name, i)
 
 	for i := 0; i < 10; i++ {
 		if o.IsDeviceMapper(name) {
+			logger.Warningf("safeSettle DM %s itr %d", name, i)
 			suspended, err := os.ReadFile(filepath.Join("/sys/block", name, "dm", "suspended"))
 			if err == nil && strings.TrimSpace(string(suspended)) == "0" {
 				f, err := os.OpenFile(path, os.O_RDONLY, 0)
@@ -4342,6 +4382,7 @@ func (o GetDmsPathHelperGeneric) safeSettle(path string) error {
 				}
 			}
 		} else {
+			logger.Warningf("safeSettle native %s itr %d", name, i)
 			// Native NVMe handles immediate open exercises
 			f, err := os.OpenFile(path, os.O_RDONLY, 0)
 			if err == nil {
@@ -4718,6 +4759,7 @@ func normalizeWWID(raw string) string {
 }
 */
 
+/*
 func normalizeWWID(raw string) string {
 	s := strings.ToLower(strings.TrimSpace(raw))
 
@@ -4738,4 +4780,43 @@ func normalizeWWID(raw string) string {
 	}
 
 	return strings.TrimSpace(s)
+}
+*/
+
+
+
+func normalizeWWID(raw string) string {
+	s := strings.ToLower(strings.TrimSpace(raw))
+
+	// 1. Prioritize compound Linux subsystem prefixes first
+	prefixes := []string{
+		"dm-uuid-mpath-", "dm-uuid-", "mpath-nvme.", "mpath-naa.", 
+		"uuid-mpath-", "uuid-", "uuid.", "mpath-", "mpath.", 
+		"naa.", "nvme.", "t10.", "eui.", "0x",
+	}
+	
+	changed := true
+	for changed {
+		changed = false
+		for _, p := range prefixes {
+			if strings.HasPrefix(s, p) {
+				s = strings.TrimPrefix(s, p)
+				changed = true
+			}
+		}
+	}
+
+	// 2. Exact validation rules for standard 36-character UUIDs
+	isCanonicalUUID := len(s) == 36 && strings.Count(s, "-") == 4
+	if isCanonicalUUID {
+		return s 
+	}
+
+	// 3. Clean trailing disk partitions or kernel extensions (e.g., .part1)
+	if idx := strings.Index(s, "."); idx != -1 {
+		s = s[:idx]
+	}
+
+	// 4. Safe removal of formatting hyphens for non-UUID layouts
+	return strings.ReplaceAll(s, "-", "")
 }
