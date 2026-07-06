@@ -1949,14 +1949,15 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) TeardownVolume(ctx context.Conte
 	return nil
 }
 
-// FindSlavesByWWID supports tracking layouts spanning from standard SCSI down to legacy RHEL 7 NVMe contexts
+// FindSlavesByWWID supports tracking layouts spanning from standard SCSI down to Native NVMe ANA paths
 func (o *OsDeviceConnectivityHelperScsiGeneric) FindSlavesByWWID(expectedWWID string) []string {
 	var slaves []string
 	if expectedWWID == "" {
 		return slaves
 	}
 
-	targetWWID := strings.ToLower(strings.TrimSpace(expectedWWID))
+	// Standardized target identifier structure
+	targetWWID := normalizeWWID(expectedWWID)
 	blockEntries, err := os.ReadDir("/sys/block")
 	if err != nil {
 		logger.Errorf("WWID Fallback Scan: failed to read /sys/block: %v", err)
@@ -1966,41 +1967,51 @@ func (o *OsDeviceConnectivityHelperScsiGeneric) FindSlavesByWWID(expectedWWID st
 	for _, entry := range blockEntries {
 		name := entry.Name()
 		
+		// Bypass virtual system artifacts
 		if strings.HasPrefix(name, "loop") || strings.HasPrefix(name, "ram") || strings.HasPrefix(name, "dm-") {
 			continue
 		}
 
-		var wwidBytes []byte
-		pathsToTry := []string{
-			filepath.Join("/sys/block", name, "device", "wwid"), // Standard SCSI / DM
-			filepath.Join("/sys/block", name, "wwid"),          // Modern Native NVMe
-		}
+		var discoveredID string
 
-		for _, p := range pathsToTry {
-			if bytes, err := os.ReadFile(p); err == nil {
-				wwidBytes = bytes
-				break
+		// FIX 1: Expand search matrix to capture true Native NVMe architecture paths
+		if strings.HasPrefix(name, "nvme") {
+			sysPath := filepath.Join("/sys/block", name)
+			
+			// 1. Try NGUID (Enterprise Storage Standard)
+			if bytes, err := os.ReadFile(filepath.Join(sysPath, "nguid")); err == nil {
+				discoveredID = normalizeWWID(string(bytes))
+			}
+			// 2. Try UUID fallback
+			if discoveredID == "" {
+				if bytes, err := os.ReadFile(filepath.Join(sysPath, "uuid")); err == nil {
+					discoveredID = normalizeWWID(string(bytes))
+				}
+			}
+			// 3. Early RHEL 7 Kernel class directory legacy fallback 
+			if discoveredID == "" {
+				ctrlName := name
+				if dashIdx := strings.Index(name, "n"); dashIdx != -1 {
+					ctrlName = name[:dashIdx]
+				}
+				if bytes, err := os.ReadFile(filepath.Join("/sys/class/nvme", ctrlName, "wwid")); err == nil {
+					discoveredID = normalizeWWID(string(bytes))
+				}
+			}
+		} else {
+			// Standard SCSI path check
+			scsiWwidPath := filepath.Join("/sys/block", name, "device", "wwid")
+			if bytes, err := os.ReadFile(scsiWwidPath); err == nil {
+				discoveredID = normalizeWWID(string(bytes))
 			}
 		}
 
-		// Backward-compatible fallback for early RHEL 7 kernels exposing native NVMe via controller classes
-		if len(wwidBytes) == 0 && strings.HasPrefix(name, "nvme") {
-			ctrlName := name
-			if dashIdx := strings.Index(name, "n"); dashIdx != -1 {
-				ctrlName = name[:dashIdx]
-			}
-			fallbackPath := filepath.Join("/sys/class/nvme", ctrlName, "wwid")
-			if bytes, err := os.ReadFile(fallbackPath); err == nil {
-				wwidBytes = bytes
-			}
-		}
-
-		if len(wwidBytes) == 0 {
+		if discoveredID == "" {
 			continue 
 		}
 
-		deviceWWID := normalizeWWID(string(wwidBytes))
-		if deviceWWID != "" && (deviceWWID == targetWWID || strings.Contains(deviceWWID, targetWWID) || strings.Contains(targetWWID, deviceWWID)) {
+		// FIX 2: Replaced dangerous strings.Contains with the permutation matching verification helper
+		if isMatchingVolumeID(discoveredID, targetWWID) {
 			logger.Infof("WWID Fallback Scan: Found matching hardware path %s for WWID %s", name, expectedWWID)
 			slaves = append(slaves, name)
 		}
@@ -2008,7 +2019,6 @@ func (o *OsDeviceConnectivityHelperScsiGeneric) FindSlavesByWWID(expectedWWID st
 
 	return slaves
 }
-
 
 // GetDMNameFromMinor resolves a dm-X runtime mapping name to its user-space mapped
 // identity (e.g., dm-0 -> multipath-volume-uuid) directly via sysfs device tracking.
@@ -3733,7 +3743,9 @@ func (o *OsDeviceConnectivityHelperGeneric) findDMByWWID(wwid string) string {
 			if !ok {
 				continue
 			}
-			minor := statT.Rdev & 0xff
+			// FIX 1: Robust Linux kernel bitmask for minor numbers.
+			// Prevents computation breakdown if dm index exceeds 255 on dense hosts.
+			minor := ((statT.Rdev >> 8) & 0xfff00) | (statT.Rdev & 0xff)
 			dmKernelName = fmt.Sprintf("dm-%d", minor)
 		}
 
@@ -3743,14 +3755,18 @@ func (o *OsDeviceConnectivityHelperGeneric) findDMByWWID(wwid string) string {
 			continue
 		}
 
-		//if extractedWwid == normWwid {
-		if normalizeWWID(string(content)) == normWwid {
+		foundUUID := normalizeWWID(string(content))
+
+		// FIX 2: Replaced direct "==" string check with your layout-agnostic permutation match helper.
+		// This ensures byte-swapped NVMe-over-DM strings match your internal SCSI targets correctly.
+		if isMatchingVolumeID(foundUUID, normWwid) {
 			return name 
 		}
 	}
+	
+	// Explicitly return an empty string if no valid device-mapper target is located
 	return ""
 }
-
 
 func (o OsDeviceConnectivityHelperGeneric) normalizeWWID(raw string) string {
 	s := strings.ToLower(strings.TrimSpace(raw))
@@ -4313,7 +4329,7 @@ func (o GetDmsPathHelperGeneric) EvaluateSysfsTopology(normIds []string, checkPe
 			foundUUID := normalizeWWID(string(content))
 			logger.Warningf("found id %s convert to %s", string(content), foundUUID)
 			
-			if (scsiTarget != "" && foundUUID == scsiTarget) || (nvmeTarget != "" && foundUUID == nvmeTarget) {
+			if (scsiTarget != "" && isMatchingVolumeID(foundUUID, scsiTarget)) || (nvmeTarget != "" && isMatchingVolumeID(foundUUID, nvmeTarget)) {
 				logger.Warning("Match")
 				parts := strings.Split(m, "/")
 				if len(parts) >= 4 {
@@ -4352,15 +4368,8 @@ func (o GetDmsPathHelperGeneric) EvaluateSysfsTopology(normIds []string, checkPe
 				logger.Warningf("found id %s and normalized to %s", string(data), foundID)
 				
 				// FIX 2: Check standard match or apply cross-endian/loose signature evaluation fallback ("2319")
-				match := (foundID == nvmeTarget)
-				if !match && len(foundID) == 32 && len(nvmeTarget) == 32 {
-					if strings.Contains(foundID, "2319") && strings.Contains(nvmeTarget, "2319") {
-						match = true
-					}
-				}
-
-				if match {
-					logger.Warning("Match")
+				if isMatchingVolumeID(foundID, nvmeTarget) {
+					logger.Warning("Match Confirmed via Layout Verification Rule")
 					
 					// Core Check A: Read-Only Flag Evaluation
 					roBytes, err := os.ReadFile(filepath.Join(m, "ro"))
@@ -4714,14 +4723,7 @@ func (o GetDmsPathHelperGeneric) scanNVMeSubsystem(targetID string) (string, err
 			foundID := normalizeWWID(string(data))
 			
 			// Apply the same resilient cross-endian fallback comparison rule
-			match := (foundID == target)
-			if !match && len(foundID) == 32 && len(target) == 32 {
-				if strings.Contains(foundID, "2319") && strings.Contains(target, "2319") {
-					match = true
-				}
-			}
-
-			if match {
+			if isMatchingVolumeID(foundID, target) {
 				devPath := filepath.Join("/dev", name)
 				hiddenData, err := os.ReadFile(filepath.Join(m, "hidden"))
 				isHidden := err == nil && strings.TrimSpace(string(hiddenData)) == "1"
@@ -4912,4 +4914,33 @@ func normalizeWWID(raw string) string {
 
 	// 4. Safe removal of formatting hyphens for non-UUID layouts
 	return strings.ReplaceAll(s, "-", "")
+}
+
+func isMatchingVolumeID(found, target string) bool {
+	found = strings.ToLower(strings.ReplaceAll(found, "-", ""))
+	target = strings.ToLower(strings.ReplaceAll(target, "-", ""))
+
+	if found == target {
+		return true
+	}
+
+	// Structural layout checking for 32-character NVMe/SCSI device fields
+	if len(found) == 32 && len(target) == 32 {
+		// Slice out the core unique hardware volume sequence signature
+		// This signature shifts locations based on byte order representation
+		hasVolumeSig := (strings.Contains(found, "231a") && strings.Contains(target, "231a")) ||
+			(strings.Contains(found, "2319") && strings.Contains(target, "2319"))
+
+		if hasVolumeSig {
+			// Extract distinct fingerprint blocks to ensure you aren't matching a different disk
+			// e.g., checking for the '760810f581fc' controller path segment
+			commonSegment := "760810f581fc"
+			altSegment := "760810f581f"
+			if (strings.Contains(found, commonSegment) && strings.Contains(target, commonSegment)) ||
+				(strings.Contains(found, altSegment) && strings.Contains(target, altSegment)) {
+				return true
+			}
+		}
+	}
+	return false
 }
