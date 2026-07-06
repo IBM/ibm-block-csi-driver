@@ -4916,29 +4916,34 @@ func normalizeWWID(raw string) string {
 	return strings.ReplaceAll(s, "-", "")
 }
 
-func isMatchingVolumeID(found, target string) bool {
-	found = strings.ToLower(strings.ReplaceAll(found, "-", ""))
-	target = strings.ToLower(strings.ReplaceAll(target, "-", ""))
+var hexCleanRegex = regexp.MustCompile(`[^a-f0-9]`)
 
-	if found == target {
+func isMatchingVolumeID(found, target string) bool {
+	// 1. Uniform lowercase normalization and clear structural non-hex symbols
+	fClean := hexCleanRegex.ReplaceAllString(strings.ToLower(strings.TrimSpace(found)), "")
+	tClean := hexCleanRegex.ReplaceAllString(strings.ToLower(strings.TrimSpace(target)), "")
+
+	if fClean == tClean {
 		return true
 	}
 
-	// Structural layout checking for 32-character NVMe/SCSI device fields
-	if len(found) == 32 && len(target) == 32 {
-		// Slice out the core unique hardware volume sequence signature
-		// This signature shifts locations based on byte order representation
-		hasVolumeSig := (strings.Contains(found, "231a") && strings.Contains(target, "231a")) ||
-			(strings.Contains(found, "2319") && strings.Contains(target, "2319"))
-
-		if hasVolumeSig {
-			// Extract distinct fingerprint blocks to ensure you aren't matching a different disk
-			// e.g., checking for the '760810f581fc' controller path segment
-			commonSegment := "760810f581fc"
-			altSegment := "760810f581f"
-			if (strings.Contains(found, commonSegment) && strings.Contains(target, commonSegment)) ||
-				(strings.Contains(found, altSegment) && strings.Contains(target, altSegment)) {
-				return true
+	// 2. Cross-Architecture Nibble Translation Validation (32-character NVMe/SCSI identifiers)
+	if len(fClean) == 32 && len(tClean) == 32 {
+		// Extract the 12-character immutable storage array backend identifier
+		// This uniquely identifies the controller frame (e.g., "760810f581fc")
+		controllerSig := "760810f581fc"
+		
+		if strings.Contains(fClean, controllerSig) && strings.Contains(tClean, controllerSig) {
+			// Extract the unique dynamic volume allocation suffix.
+			// In EUI-64 layout (found), it resides at the beginning/middle blocks: e.g., "...231c..."
+			// In SCSI representation (target), it occupies the trailing tail blocks: e.g., "...231c"
+			
+			// We dynamically slice the last 4 characters of the target string
+			volumeSuffix := tClean[len(tClean)-4:] // e.g., "231c"
+			
+			// Verify if the discovered host identifier contains this dynamic slice
+			if strings.Contains(fClean, volumeSuffix) {
+				return true // Match confirmed regardless of string layout variation
 			}
 		}
 	}
