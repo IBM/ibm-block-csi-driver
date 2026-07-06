@@ -4911,10 +4911,6 @@ func normalizeWWID(raw string) string {
 	return strings.ReplaceAll(s, "-", "")
 }
 
-var hexRegex = regexp.MustCompile(`[^a-f0-9]`)
-
-// isMatchingVolumeID decodes volume IDs into raw 16-byte binary layouts,
-// executing exhaustive big/little endian transformations with intense debug logging.
 // isMatchingVolumeID decodes volume IDs into raw 16-byte binary layouts,
 // executing exhaustive big/little endian transformations with intense debug logging.
 func isMatchingVolumeID(found, target string) bool {
@@ -4935,8 +4931,7 @@ func isMatchingVolumeID(found, target string) bool {
 		return true
 	}
 
-	// 2. FIXED: Clear out length adjustments safely.
-	// Trim the trailing character instead of dropping the leading 'c' to prevent data bit-shifting.
+	// 2. FIXED: Clear out length adjustments safely without byte-shifting.
 	if len(tClean) == 33 {
 		logger.Warningf("[NGUID-Match-Debug] Target string is 33 chars. Trimming trailing slice window down to 32...")
 		tClean = tClean[:32]
@@ -4947,8 +4942,8 @@ func isMatchingVolumeID(found, target string) bool {
 	}
 
 	// 3. Convert formatted hexadecimal alphanumeric strings to absolute binary blocks
-	fBytes, errF := hex.DecodeString(fClean)
-	tBytes, errT := hex.DecodeString(tClean)
+	foundBytes, errF := hex.DecodeString(fClean)
+	targetBytes, errT := hex.DecodeString(tClean)
 
 	if errF != nil {
 		logger.Warningf("[NGUID-Match-Debug] Error decoding 'found' string to binary: %v", errF)
@@ -4958,8 +4953,8 @@ func isMatchingVolumeID(found, target string) bool {
 	}
 
 	// Fallback mechanism for unexpected variable string fragment slices
-	if errF != nil || errT != nil || len(fBytes) != 16 || len(tBytes) != 16 {
-		logger.Warningf("[NGUID-Match-Debug] Byte arrays fail 16-byte sizing rules (Found len: %d, Target len: %d). Tripping fallback fingerprint logic...", len(fBytes), len(tBytes))
+	if errF != nil || errT != nil || len(foundBytes) != 16 || len(targetBytes) != 16 {
+		logger.Warningf("[NGUID-Match-Debug] Byte arrays fail 16-byte sizing rules (Found len: %d, Target len: %d). Tripping fallback fingerprint logic...", len(foundBytes), len(targetBytes))
 		if len(fClean) >= 8 && len(tClean) >= 8 {
 			fTail := fClean[len(fClean)-6:]
 			tTail := tClean[len(tClean)-6:]
@@ -4969,15 +4964,15 @@ func isMatchingVolumeID(found, target string) bool {
 		return false
 	}
 
-	logger.Infof("[NGUID-Match-Debug] Binary Decode Success. Found Bytes: %x", fBytes)
-	logger.Infof("[NGUID-Match-Debug] Binary Decode Success. Target Bytes: %x", tBytes)
+	logger.Infof("[NGUID-Match-Debug] Binary Decode Success. Found Bytes: %x", foundBytes)
+	logger.Infof("[NGUID-Match-Debug] Binary Decode Success. Target Bytes: %x", targetBytes)
 
 	// =========================================================================
 	// MATHEMATICAL ENDIAN CONVERSION EVALUATION MATRIX
 	// =========================================================================
 
 	// Check A: Direct byte block equality
-	if bytesEqual(fBytes, tBytes) {
+	if bytesEqual(foundBytes, targetBytes) {
 		logger.Infof("[NGUID-Match-Debug] SUCCESS: Direct byte array equality matched.")
 		return true
 	}
@@ -4986,20 +4981,20 @@ func isMatchingVolumeID(found, target string) bool {
 	// Check B: Full 16-Byte Big-Endian vs Little-Endian inversion (Full Array Swap)
 	rev16 := make([]byte, 16)
 	for i := 0; i < 16; i++ {
-		rev16[i] = tBytes[15-i]
+		rev16[i] = targetBytes[15-i]
 	}
 	logger.Infof("[NGUID-Match-Debug] Matrix B (Full Byte Reverse) Output: %x", rev16)
-	if bytesEqual(fBytes, rev16) {
+	if bytesEqual(foundBytes, rev16) {
 		logger.Infof("[NGUID-Match-Debug] SUCCESS: Identifiers match perfectly under a full 16-byte Big-to-Little endian inversion.")
 		return true
 	}
 
 	// Check C: 8-Byte High/Low Subsystem Swapping (Common in SCSI-to-NVMe translation layouts)
 	swappedHalves := make([]byte, 16)
-	copy(swappedHalves[0:8], tBytes[8:16])
-	copy(swappedHalves[8:16], tBytes[0:8])
+	copy(swappedHalves[0:8], targetBytes[8:16])
+	copy(swappedHalves[8:16], targetBytes[0:8])
 	logger.Infof("[NGUID-Match-Debug] Matrix C (8-Byte Half Swap) Output: %x", swappedHalves)
-	if bytesEqual(fBytes, swappedHalves) {
+	if bytesEqual(foundBytes, swappedHalves) {
 		logger.Infof("[NGUID-Match-Debug] SUCCESS: Identifiers match perfectly under an 8-byte upper/lower segment half-swap.")
 		return true
 	}
@@ -5007,13 +5002,13 @@ func isMatchingVolumeID(found, target string) bool {
 	// Check D: 4-Byte Word-Inversion (Reversing inner byte lanes inside 32-bit registers)
 	wordSwapped := make([]byte, 16)
 	for block := 0; block < 16; block += 4 {
-		wordSwapped[block+0] = tBytes[block+3]
-		wordSwapped[block+1] = tBytes[block+2]
-		wordSwapped[block+2] = tBytes[block+1]
-		wordSwapped[block+3] = tBytes[block+0]
+		wordSwapped[block+0] = targetBytes[block+3]
+		wordSwapped[block+1] = targetBytes[block+2]
+		wordSwapped[block+2] = targetBytes[block+1]
+		wordSwapped[block+3] = targetBytes[block+0]
 	}
 	logger.Infof("[NGUID-Match-Debug] Matrix D (4-Byte Word Inversion) Output: %x", wordSwapped)
-	if bytesEqual(fBytes, wordSwapped) {
+	if bytesEqual(foundBytes, wordSwapped) {
 		logger.Infof("[NGUID-Match-Debug] SUCCESS: Identifiers match perfectly under a 4-byte (32-bit) big/little endian word swap.")
 		return true
 	}
@@ -5029,13 +5024,13 @@ func isMatchingVolumeID(found, target string) bool {
 	// FIXED - Check F: 16-Bit Word Inversion (2-Byte Pair Swap Layout translation matching Linux storage maps)
 	word16Swapped := make([]byte, 16)
 	for block := 0; block < 16; block += 2 {
-		word16Swapped[block+0] = tBytes[block+1]
-		word16Swapped[block+1] = tBytes[block+0]
+		word16Swapped[block+0] = targetBytes[block+1]
+		word16Swapped[block+1] = targetBytes[block+0]
 	}
 	logger.Infof("[NGUID-Match-Debug] Matrix F (2-Byte Word Inversion) Output: %x", word16Swapped)
 	
 	// Check for a 16-bit translation structure match, or fallback to the distinct 10-byte volume suffix signature map
-	if bytesEqual(fBytes, word16Swapped) || bytesEqual(fBytes[6:16], word16Swapped[6:16]) {
+	if bytesEqual(foundBytes, word16Swapped) || bytesEqual(foundBytes[6:16], word16Swapped[6:16]) {
 		logger.Infof("[NGUID-Match-Debug] SUCCESS: Identifiers validated via 16-bit storage layout inversion logic.")
 		return true
 	}
@@ -5043,3 +5038,20 @@ func isMatchingVolumeID(found, target string) bool {
 	logger.Warningf("[NGUID-Match-Debug] ===== FAILURE: Identification blocks do not map to the same binary volume entity =====")
 	return false
 }
+
+// bytesEqual checks whether two byte slices are of identical length 
+// and contain the exact same sequential byte values.
+func bytesEqual(a, b []byte) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for i := range a {
+		if a[i] != b[i] {
+			return false
+		}
+	}
+	return true
+}
+
+var hexRegex = regexp.MustCompile(`[^a-f0-9]`)
+
