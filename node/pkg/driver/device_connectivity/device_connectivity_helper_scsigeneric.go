@@ -4358,54 +4358,78 @@ func (o GetDmsPathHelperGeneric) EvaluateSysfsTopology(normIds []string, checkPe
 	// 2. EVALUATE NATIVE NVME SUBSYSTEM (Native ANA candidates)
 	// =========================================================================
 	if nvmeTarget != "" {
-		logger.Warning("Evaluate nvme matches matches")
+		logger.Warning("Evaluate nvme matches %s %s", scsiTarget, nvmeTarget)
 		nvmeMatches, _ := filepath.Glob("/sys/block/nvme*n*")
 		for _, m := range nvmeMatches {
 			logger.Warningf("Evaluate nvme %s", m)
 			name := filepath.Base(m) // e.g., "nvme0n1"
-
+			
+			// Collect all potential unique identifiers exposed by this path
+			var availableIDs []string
+			
+			if data, err := os.ReadFile(filepath.Join(m, "device", "wwid")); err == nil {
+				logger.Warningf("[NVMe-Scan] found wwid %s", string(data))
+				availableIDs = append(availableIDs, string(data))
+			}
+			if data, err := os.ReadFile(filepath.Join(m, "uuid")); err == nil {
+				logger.Warningf("[NVMe-Scan] found uid %s", string(data))
+				availableIDs = append(availableIDs, string(data))
+			}
 			if data, err := os.ReadFile(filepath.Join(m, "nguid")); err == nil {
-				foundID := normalizeWWID(string(data))
-				logger.Warningf("found id %s and normalized to %s", string(data), foundID)
+				logger.Warningf("[NVMe-Scan] found nguid %s", string(data))
+				availableIDs = append(availableIDs, string(data))
+			}
+
+			// Evaluate every discovered attribute to find a match
+			matchFound := false
+			for _, rawID := range availableIDs {
+				foundID := normalizeWWID(rawID)
+				logger.Warningf("[NVMe-Scan] Checking hardware ID variant: raw %s converted to %s", strings.TrimSpace(rawID), foundID)		
 				
-				// FIX 2: Check standard match or apply cross-endian/loose signature evaluation fallback ("2319")
-				if isMatchingVolumeID(foundID, nvmeTarget) {
-					logger.Warning("Match Confirmed via Layout Verification Rule")
-					
-					// Core Check A: Read-Only Flag Evaluation
-					roBytes, err := os.ReadFile(filepath.Join(m, "ro"))
-					isReadOnly := err == nil && strings.TrimSpace(string(roBytes)) != "0"
+				if isMatchingVolumeID(scsiTarget, target) || isMatchingVolumeID(nvmeTarget, target) {
+					logger.Warningf("[NVMe-Scan] Found hardware ID match on variant %s -> %s", strings.TrimSpace(rawID), foundID)		
+					matchFound = true
+					break // Exit internal loop, we found a confirmed match for this device
+				}
+			}
+			
 
-					// Core Check B: Hidden Layer Evaluation (Active ANA re-routing)
-					hiddenBytes, err := os.ReadFile(filepath.Join(m, "hidden"))
-					isHidden := err == nil && strings.TrimSpace(string(hiddenBytes)) == "1"
+			if matchFound {
+				logger.Warning("Match Confirmed via Layout Verification Rule")
+				
+				// Core Check A: Read-Only Flag Evaluation
+				roBytes, err := os.ReadFile(filepath.Join(m, "ro"))
+				isReadOnly := err == nil && strings.TrimSpace(string(roBytes)) != "0"
 
-					// FIX 4: Correctly scan the sibling controller elements inside the parent subsystem folder
-					var isControllerTransitioning bool
-					deviceDir := filepath.Join(m, "device") // e.g., /sys/block/nvme0n1/device (points to subsystem container)
-					if entries, err := os.ReadDir(deviceDir); err == nil {
-						for _, entry := range entries {
-							// Isolate individual controller handles (e.g., nvme0, nvme1) to get their state
-							if strings.HasPrefix(entry.Name(), "nvme") && !strings.Contains(entry.Name(), "n") {
-								statePath := filepath.Join(deviceDir, entry.Name(), "state")
-								if stateBytes, err := os.ReadFile(statePath); err == nil {
-									state := strings.TrimSpace(string(stateBytes))
-									if state == "resetting" || state == "connecting" || state == "deleting" {
-										isControllerTransitioning = true
-										logger.Warningf("[NVMe-Topology] Sibling controller %s is transitioning: %s", entry.Name(), state)
-										break
-									}
+				// Core Check B: Hidden Layer Evaluation (Active ANA re-routing)
+				hiddenBytes, err := os.ReadFile(filepath.Join(m, "hidden"))
+				isHidden := err == nil && strings.TrimSpace(string(hiddenBytes)) == "1"
+
+				// FIX 4: Correctly scan the sibling controller elements inside the parent subsystem folder
+				var isControllerTransitioning bool
+				deviceDir := filepath.Join(m, "device") // e.g., /sys/block/nvme0n1/device (points to subsystem container)
+				if entries, err := os.ReadDir(deviceDir); err == nil {
+					for _, entry := range entries {
+						// Isolate individual controller handles (e.g., nvme0, nvme1) to get their state
+						if strings.HasPrefix(entry.Name(), "nvme") && !strings.Contains(entry.Name(), "n") {
+							statePath := filepath.Join(deviceDir, entry.Name(), "state")
+							if stateBytes, err := os.ReadFile(statePath); err == nil {
+								state := strings.TrimSpace(string(stateBytes))
+								if state == "resetting" || state == "connecting" || state == "deleting" {
+									isControllerTransitioning = true
+									logger.Warningf("[NVMe-Topology] Sibling controller %s is transitioning: %s", entry.Name(), state)
+									break
 								}
 							}
 						}
 					}
-
-					// Combined settlement tracking rules
-					if isHidden || isControllerTransitioning || isReadOnly {
-						return true, true, name // Device is trapped in transition or held by kernel
-					}
-					return true, false, name // Fully functional and settled
 				}
+
+				// Combined settlement tracking rules
+				if isHidden || isControllerTransitioning || isReadOnly {
+					return true, true, name // Device is trapped in transition or held by kernel
+				}
+				return true, false, name // Fully functional and settled
 			}
 		}
 	}
