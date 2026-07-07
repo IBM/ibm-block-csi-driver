@@ -4386,7 +4386,7 @@ func (o GetDmsPathHelperGeneric) EvaluateSysfsTopology(normIds []string, checkPe
 				foundID := normalizeWWID(rawID)
 				logger.Warningf("[NVMe-Scan] Checking hardware ID variant: raw %s converted to %s", strings.TrimSpace(rawID), foundID)		
 				
-				if isMatchingVolumeID(scsiTarget, target) || isMatchingVolumeID(nvmeTarget, target) {
+				if isMatchingVolumeID(scsiTarget, foundID) || isMatchingVolumeID(nvmeTarget, foundID) {
 					logger.Warningf("[NVMe-Scan] Found hardware ID match on variant %s -> %s", strings.TrimSpace(rawID), foundID)		
 					matchFound = true
 					break // Exit internal loop, we found a confirmed match for this device
