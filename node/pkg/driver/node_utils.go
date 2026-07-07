@@ -891,8 +891,8 @@ func (d NodeUtils) GetVolumeUuid(volumeId string) string {
 	idsPart := volumeIdParts[len(volumeIdParts)-1]
 	splittedIdsPart := strings.Split(idsPart, d.ConfigYaml.Parameters.Object_id_info.Ids_delimiter)
 	if len(splittedIdsPart) == 2 {
-		return "3" + splittedIdsPart[1]
+		return splittedIdsPart[1]
 	} else {
-		return "3" + splittedIdsPart[0]
+		return splittedIdsPart[0]
 	}
 }
