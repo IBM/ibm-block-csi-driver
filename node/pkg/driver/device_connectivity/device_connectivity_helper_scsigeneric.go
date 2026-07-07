@@ -781,10 +781,10 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) ValidateLun(ctx context.Context,
 			return fmt.Errorf("FATAL: Hardware Serial mismatch on %s (got %s, exp %s)", deviceName, hwId, normExpectedSerial)
 		}
 
-		if sysfsId != "" && ("3" + sysfsId) != hwId {
+		if sysfsId != "" && sysfsId != hwId {
 			// This is usually a stale kernel path. 
 			// Abort here because using this path could lead to data corruption.
-			return fmt.Errorf("FATAL: Kernel/Hardware Identity Split on %s (Sysfs: %s, HW: %s)", deviceName, "3" + sysfsId, hwId)
+			return fmt.Errorf("FATAL: Kernel/Hardware Identity Split on %s (Sysfs: %s, HW: %s)", deviceName, sysfsId, hwId)
 		}
 
 		validPathsFound++
@@ -4319,6 +4319,7 @@ func (o GetDmsPathHelperGeneric) EvaluateSysfsTopology(normIds []string, checkPe
 	// =========================================================================
 	if scsiTarget != "" || nvmeTarget != "" {
 		dmMatches, _ := filepath.Glob("/sys/block/dm-*/dm/uuid")
+		// TODO also dm/name
 		logger.Warning("Evaluate dm matches")
 		for _, m := range dmMatches {
 			logger.Warningf("Evaluate dm %s", m)
@@ -4379,6 +4380,11 @@ func (o GetDmsPathHelperGeneric) EvaluateSysfsTopology(normIds []string, checkPe
 				logger.Warningf("[NVMe-Scan] found nguid %s", string(data))
 				availableIDs = append(availableIDs, string(data))
 			}
+			if data, err := os.ReadFile(filepath.Join(m, "device", "serial")); err == nil {
+				logger.Warningf("[NVMe-Scan] found serial %s", string(data))
+				availableIDs = append(availableIDs, string(data))
+			}
+			
 
 			// Evaluate every discovered attribute to find a match
 			matchFound := false
