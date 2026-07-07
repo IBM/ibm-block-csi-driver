@@ -4709,9 +4709,8 @@ func (o GetDmsPathHelperGeneric) scanDMSubsystem(targetID string) (string, error
 	return "", fmt.Errorf("dm device not found for WWID token %s", targetID)
 }
 
-// scanNVMeSubsystem loops over active sysfs block layouts to locate and return 
-// the active device path path referencing the targeted volume identifier string.
 func (o GetDmsPathHelperGeneric) scanNVMeSubsystem(targetID string) (string, error) {
+	logger.Warningf("[NVMe-Scan] Scanning %s", targetID)
 	matches, _ := filepath.Glob("/sys/block/nvme*n*")
 	target := normalizeWWID(targetID)
 
@@ -4719,23 +4718,49 @@ func (o GetDmsPathHelperGeneric) scanNVMeSubsystem(targetID string) (string, err
 
 	for _, m := range matches {
 		name := filepath.Base(m)
-
+		logger.Warningf("[NVMe-Scan] Path %s name %s", m, name)		
+		
+		// Collect all potential unique identifiers exposed by this path
+		var availableIDs []string
+		
+		if data, err := os.ReadFile(filepath.Join(m, "device", "wwid")); err == nil {
+			logger.Warningf("[NVMe-Scan] found wwid %s", string(data))
+			availableIDs = append(availableIDs, string(data))
+		}
+		if data, err := os.ReadFile(filepath.Join(m, "uuid")); err == nil {
+			logger.Warningf("[NVMe-Scan] found uid %s", string(data))
+			availableIDs = append(availableIDs, string(data))
+		}
 		if data, err := os.ReadFile(filepath.Join(m, "nguid")); err == nil {
-			foundID := normalizeWWID(string(data))
-			
-			// Apply the same resilient cross-endian fallback comparison rule
-			if isMatchingVolumeID(foundID, target) {
-				devPath := filepath.Join("/dev", name)
-				hiddenData, err := os.ReadFile(filepath.Join(m, "hidden"))
-				isHidden := err == nil && strings.TrimSpace(string(hiddenData)) == "1"
+			logger.Warningf("[NVMe-Scan] found nguid %s", string(data))
+			availableIDs = append(availableIDs, string(data))
+		}
 
-				if _, err := os.Stat(devPath); err == nil {
-					if !isHidden {
-						return devPath, nil // Found an unhidden path/master multipath head node
-					}
-					// FIX 3: Record the hidden leg path option as a viable fallback instead of ignoring it
-					fallbackPath = devPath
+		// Evaluate every discovered attribute to find a match
+		matchFound := false
+		for _, rawID := range availableIDs {
+			foundID := normalizeWWID(rawID)
+			logger.Warningf("[NVMe-Scan] Checking hardware ID variant: raw %s converted to %s", strings.TrimSpace(rawID), foundID)		
+			
+			if isMatchingVolumeID(foundID, target) {
+				logger.Warningf("[NVMe-Scan] Found hardware ID match on variant %s -> %s", strings.TrimSpace(rawID), foundID)		
+				matchFound = true
+				break // Exit internal loop, we found a confirmed match for this device
+			}
+		}
+
+		// Process path if a valid match was found among any of the attributes
+		if matchFound {
+			devPath := filepath.Join("/dev", name)
+			hiddenData, err := os.ReadFile(filepath.Join(m, "hidden"))
+			isHidden := err == nil && strings.TrimSpace(string(hiddenData)) == "1"
+
+			if _, err := os.Stat(devPath); err == nil {
+				if !isHidden {
+					return devPath, nil // Return the active multipath master head node
 				}
+				// Record the hidden leg path option as a viable fallback
+				fallbackPath = devPath
 			}
 		}
 	}
@@ -4745,7 +4770,7 @@ func (o GetDmsPathHelperGeneric) scanNVMeSubsystem(targetID string) (string, err
 		return fallbackPath, nil
 	}
 
-	return "", fmt.Errorf("matching active NVMe namespace handle missing for NGUID %s", targetID)
+	return "", fmt.Errorf("matching active NVMe namespace handle missing for hardware identifier %s", targetID)
 }
 
 func (o GetDmsPathHelperGeneric) validateDMIntegrity(dmPath string) (string, error) {
