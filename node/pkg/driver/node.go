@@ -20,6 +20,8 @@ import (
 	"context"
 	"fmt"
 	"path"
+	"os"
+	"path/filepath"
 	"reflect"
 	"strings"
 
@@ -165,6 +167,76 @@ func (d *NodeService) NodeStageVolume(ctx context.Context, req *csi.NodeStageVol
 		logger.Errorf("Error while discovering the device : {%v}", err.Error())
 		return nil, status.Error(codes.Internal, err.Error())
 	}
+
+scsiTarget := normalizeWWID(volumeUuid)	
+
+// Define target layout rules for discovery scanning
+type ScanTargetRule struct {
+	GlobPattern string
+	IDFiles     []string
+}
+
+rules := []ScanTargetRule{
+	{
+		// Device Mapper tracking layers
+		GlobPattern: "/sys/block/dm-*",
+		IDFiles:     []string{"dm/uuid", "dm/name"},
+	},
+	{
+		// Physical/Native NVMe targets
+		GlobPattern: "/sys/block/nvme*n*",
+		IDFiles:     []string{"device/wwid", "uuid", "nguid", "device/serial"},
+	},
+}
+
+logger.Warningf("Starting Unified Device Scan against Target: %s", scsiTarget)
+
+// Process each block device topology rule sequentially
+for _, rule := range rules {
+	matches, _ := filepath.Glob(rule.GlobPattern)
+	
+	for _, m := range matches {
+		deviceName := filepath.Base(m)
+		logger.Warningf("[Scan] Evaluating subsystem node: %s (Base: %s)", m, deviceName)
+
+		// Collect all existing identity strings for this path
+		var availableIDs []string
+		for _, fileSubPath := range rule.IDFiles {
+			fullPath := filepath.Join(m, fileSubPath)
+			if data, err := os.ReadFile(fullPath); err == nil {
+				cleanData := strings.TrimSpace(string(data))
+				logger.Warningf("[Scan]   -> Found entry in %s: '%s'", fileSubPath, cleanData)
+				availableIDs = append(availableIDs, cleanData)
+			}
+		}
+
+		// Evaluate every discovered identity property variant against the target string
+		matchFound := false
+		for _, rawID := range availableIDs {
+			foundID := normalizeWWID(rawID)
+			logger.Warningf("[Scan]   -> Comparing normalization variant: Raw '%s' -> Converted '%s'", rawID, foundID)
+
+			if scsiTarget != "" && isMatchingVolumeID(foundID, scsiTarget) {
+				logger.Warningf("[Scan] MATCH CONFIRMED on node %s via identifier attribute match!", deviceName)
+				matchFound = true
+				break 
+			}
+		}
+
+		if matchFound {
+			logger.Warningf("[Scan] Verified device %s matches the requested deployment configuration target", deviceName)
+		}
+	}
+}
+
+// Optional layout tracking: Print Device Mapper component dependencies
+if dmSlaves, err := filepath.Glob("/sys/block/dm-*/slaves/*"); err == nil && len(dmSlaves) > 0 {
+	logger.Warning("Logging structural DM component mapping layout...")
+	for _, slavePath := range dmSlaves {
+		logger.Warningf("Found backing path layer layout dependency: %s", slavePath)
+	}
+}
+
 
 	volumeCap := req.GetVolumeCapability()
 	switch volumeCap.GetAccessType().(type) {
@@ -940,3 +1012,48 @@ func isValidVolumeCapabilitiesAccessMode(volCaps []*csi.VolumeCapability) bool {
 
 	return foundAll
 }
+
+// normalizeWWID cleans device paths from sysfs and returns raw hexadecimal string layout blocks.
+func normalizeWWID(raw string) string {
+	s := strings.ToLower(strings.TrimSpace(raw))
+
+	// Prioritize compound Linux subsystem prefixes first
+	prefixes := []string{
+		"dm-uuid-mpath-", "dm-uuid-", "mpath-nvme.", "mpath-naa.", 
+		"uuid-mpath-", "uuid-", "uuid.", "mpath-", "mpath.", 
+		"naa.", "nvme.", "t10.", "eui.", "0x",
+	}
+	
+	changed := true
+	for changed {
+		changed = false
+		for _, p := range prefixes {
+			if strings.HasPrefix(s, p) {
+				s = strings.TrimPrefix(s, p)
+				changed = true
+			}
+		}
+	}
+
+	// Clear out canonical system UUID layouts and return early to preserve length layout strings
+	isCanonicalUUID := len(s) == 36 && strings.Count(s, "-") == 4
+	if isCanonicalUUID {
+		flattened := strings.ReplaceAll(s, "-", "")
+		if len(flattened) == 32 {
+			return flattened 
+		}
+		return s 
+	}
+
+	// Clean trailing disk partitions or kernel extensions (e.g., .part1)
+	if idx := strings.Index(s, "."); idx != -1 {
+		s = s[:idx]
+	}
+
+	return strings.ReplaceAll(s, "-", "")
+}
+
+func isMatchingVolumeID(found, target string) bool {
+	return strings.Contains(found, target) || strings.Contains(target, found)
+}
+
