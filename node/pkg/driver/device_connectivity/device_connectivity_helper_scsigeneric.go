@@ -4984,6 +4984,11 @@ func isMatchingVolumeID(found, target string) bool {
 	logger.Infof("[NGUID-Match-Debug] Raw Input 'found'  (Sysfs): %s", found)
 	logger.Infof("[NGUID-Match-Debug] Raw Input 'target' (Driver): %s", target)
 
+	if strings.Contains(target, found) || strings.Contains(found, target) {
+		logger.Info("Direct match")
+		return true
+	}
+
 	// 1. Uniform lowercase alphanumeric normalization
 	fClean := hexRegex.ReplaceAllString(strings.ToLower(strings.TrimSpace(found)), "")
 	tClean := hexRegex.ReplaceAllString(strings.ToLower(strings.TrimSpace(target)), "")
