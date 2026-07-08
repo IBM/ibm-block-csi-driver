@@ -20,7 +20,6 @@ import (
 	"bufio"
 	"context"
 	"encoding/binary"
-	"encoding/hex"
 	"errors"
 	"fmt"
 	"math/rand/v2"
@@ -365,7 +364,7 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) IsVolumePathMatchesVolumeId(ctx 
 	// 4. Evaluate identity using our prefix-verified, cross-protocol comparison helper.
 	// This cleanly checks SCSI vs NVMe rules without false-positive slicing bugs.
 	if !r.Helper.MatchVolumeToScsiSpec(sgInqWwn, expectedSerial) {
-		return false, &ErrorWrongDeviceFound{mpathDeviceName, volumeUuid, SgInqWwn}
+		return false, &ErrorWrongDeviceFound{mpathDeviceName, volumeUuid, sgInqWwn}
 	}
 
 	logger.Infof("IsVolumePathMatchesVolumeId: Identity verified. Device %s matches volume specification.", mpathDeviceName)
@@ -3923,10 +3922,10 @@ func (o *OsDeviceConnectivityHelperGeneric) ResolveToKernelName(ctx context.Cont
 	return deviceName, nil
 }
 
-// FindDMByWWID scans /dev/mapper to locate a user-friendly device-mapper name (like "mpatha") 
+// findDMByWWID scans /dev/mapper to locate a user-friendly device-mapper name (like "mpatha") 
 // matching an IBM raw 32-character SCSI string. Fully supports both SCSI and NVMe topologies,
 // safely scales past 255 devices, and remains compatible back to RHEL 7.
-func (o *OsDeviceConnectivityHelperGeneric) FindDMByWWID(wwid string) string {
+func (o *OsDeviceConnectivityHelperGeneric) findDMByWWID(wwid string) string {
 	// 1. Initial sanitization of the target raw SCSI asset string
 	rawScsiID := strings.ToLower(strings.TrimSpace(wwid))
 	if len(rawScsiID) != 32 || !strings.HasPrefix(rawScsiID, "6005076") {
