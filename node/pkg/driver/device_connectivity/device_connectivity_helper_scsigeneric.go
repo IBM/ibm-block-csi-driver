@@ -365,11 +365,7 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) IsVolumePathMatchesVolumeId(ctx 
 	// 4. Evaluate identity using our prefix-verified, cross-protocol comparison helper.
 	// This cleanly checks SCSI vs NVMe rules without false-positive slicing bugs.
 	if !r.Helper.MatchVolumeToScsiSpec(sgInqWwn, expectedSerial) {
-		return false, &ErrorWrongDeviceFound{
-			DeviceName:     mpathDeviceName,
-			ExpectedVolume: expectedSerial,
-			FoundVolume:    sgInqWwn,
-		}
+		return false, &ErrorWrongDeviceFound{mpathDeviceName, volumeUuid, SgInqWwn}
 	}
 
 	logger.Infof("IsVolumePathMatchesVolumeId: Identity verified. Device %s matches volume specification.", mpathDeviceName)
@@ -1999,7 +1995,7 @@ func (o *OsDeviceConnectivityHelperScsiGeneric) FindSlavesByWWID(expectedWWID st
 
 	// 1. Sanitize text structure and pre-calculate both protocol target sequences
 	rawScsiTarget := strings.ToLower(strings.TrimSpace(expectedWWID))
-	if len(rawScsiTarget) {
+	if len(rawScsiTarget) != 32 {
 		logger.Errorf("WWID Fallback Scan: invalid IBM SCSI specification target: %s", expectedWWID)
 		return slaves
 	}
@@ -5025,15 +5021,26 @@ func (o GetDmsPathHelperGeneric) scanDMSubsystem(targetID string) (string, error
 	return "", fmt.Errorf("dm device not found for WWID token %s", targetID)
 }
 
+// scanNVMeSubsystem locates an active native NVMe device path (e.g., "/dev/nvme0n1") 
+// corresponding with an IBM raw 32-character SCSI specification identifier. 
+// Uses strict prefix and size-bounded criteria to eliminate false matches.
 func (o GetDmsPathHelperGeneric) scanNVMeSubsystem(targetID string) (string, error) {
 	logger.Warningf("[NVMe-Scan] Scanning %s", targetID)
-	matches, _ := filepath.Glob("/sys/block/nvme*n*")
-	target := normalizeWWID(targetID)
 
+	// 1. Sanitize the target input and assert standard IBM FlashSystem structural constraints
+	rawScsiTarget := strings.ToLower(strings.TrimSpace(targetID))
+	if len(rawScsiTarget) != 32 {
+		return "", fmt.Errorf("scanNVMeSubsystem: invalid IBM SCSI specification target: %s", targetID)
+	}
+
+	// Calculate the expected Little-Endian NVMe layout variant beforehand
+	expectedNvmeTarget := convertScsiIdToNguid(rawScsiTarget)
+
+	matches, _ := filepath.Glob("/sys/block/nvme*n*")
 	var fallbackPath string
 
 	for _, m := range matches {
-		name := filepath.Base(m)
+		name := filepath.Base(m) // e.g., "nvme0n1"
 		logger.Warningf("[NVMe-Scan] Path %s name %s", m, name)		
 		
 		// Collect all potential unique identifiers exposed by this path
@@ -5052,16 +5059,33 @@ func (o GetDmsPathHelperGeneric) scanNVMeSubsystem(targetID string) (string, err
 			availableIDs = append(availableIDs, string(data))
 		}
 
+		// Early RHEL 7 Kernel class subsystem controller directory legacy fallback mapping 
+		ctrlName := name
+		if dashIdx := strings.Index(name, "n"); dashIdx != -1 {
+			ctrlName = name[:dashIdx] // Isolates "nvme0" or "nvme1"
+		}
+		if data, err := os.ReadFile(filepath.Join("/sys/class/nvme", ctrlName, "wwid")); err == nil {
+			logger.Warningf("[NVMe-Scan] found legacy class wwid %s", string(data))
+			availableIDs = append(availableIDs, string(data))
+		}
+
 		// Evaluate every discovered attribute to find a match
 		matchFound := false
 		for _, rawID := range availableIDs {
 			foundID := normalizeWWID(rawID)
 			logger.Warningf("[NVMe-Scan] Checking hardware ID variant: raw %s converted to %s", strings.TrimSpace(rawID), foundID)		
 			
-			if isMatchingVolumeID(foundID, target) {
+			// Enforce strict 32-character hardware block bounds to eliminate substring collisions
+			if len(foundID) != 32 {
+				continue
+			}
+
+			// Since we are strictly looping over physical native NVMe paths, 
+			// the discovered identifier must match our pre-calculated expectedNvmeTarget.
+			if foundID == expectedNvmeTarget {
 				logger.Warningf("[NVMe-Scan] Found hardware ID match on variant %s -> %s", strings.TrimSpace(rawID), foundID)		
 				matchFound = true
-				break // Exit internal loop, we found a confirmed match for this device
+				break 
 			}
 		}
 
@@ -5075,7 +5099,7 @@ func (o GetDmsPathHelperGeneric) scanNVMeSubsystem(targetID string) (string, err
 				if !isHidden {
 					return devPath, nil // Return the active multipath master head node
 				}
-				// Record the hidden leg path option as a viable fallback
+				// Record the hidden leg path option as a viable fallback (e.g., active ANA optimization)
 				fallbackPath = devPath
 			}
 		}
@@ -5088,6 +5112,7 @@ func (o GetDmsPathHelperGeneric) scanNVMeSubsystem(targetID string) (string, err
 
 	return "", fmt.Errorf("matching active NVMe namespace handle missing for hardware identifier %s", targetID)
 }
+
 
 func (o GetDmsPathHelperGeneric) validateDMIntegrity(dmPath string) (string, error) {
 	dmName := filepath.Base(dmPath)
