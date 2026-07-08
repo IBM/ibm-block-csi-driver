@@ -2572,26 +2572,29 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) disableNativeNvmeQueueing(expect
 			continue
 		}
 
-		// Correctly discover parent controller strings (e.g., "nvme0") by scanning links
+		// Correctly discover parent controller strings (e.g., "nvme7c11") by scanning links
 		realDevicePath, err := filepath.EvalSymlinks(filepath.Join("/sys/block", devName, "device"))
 		if err != nil {
 			continue
 		}
 
 		// Look for standard transport controller siblings inside the subsystem folder
-		// (e.g., /sys/devices/virtual/nvme-subsystem/nvme-subsys0/nvme0)
+		// (e.g., /sys/devices/virtual/nvme-subsystem/nvme-subsys0/nvme7c11)
 		subsysDir := filepath.Dir(realDevicePath)
 		entries, _ := os.ReadDir(subsysDir)
 		for _, e := range entries {
 			name := e.Name()
-			// Target the direct hardware/fabric controller channels strictly (nvme0, nvme1)
-			if strings.HasPrefix(name, "nvme") && !strings.Contains(name, "n") && !strings.Contains(name, "-") {
+			
+			// FIX: Hardened fabric controller selection rule.
+			// Matches names starting with "nvme" (like nvme7c11) but safely skips subsystems 
+			// containing dashes, and strictly avoids namespace block nodes (which contain "n1", "n2", etc.)
+			if strings.HasPrefix(name, "nvme") && !strings.Contains(name, "-") && !strings.Contains(name, "n1") && !strings.Contains(name, "n2") {
 				
-				// FIX 1: Modern and Enterprise Standard Path Format (/sys/class/nvme/nvmeX/device/fast_io_fail_tmo)
+				// Modern and Enterprise Standard Path Format (/sys/class/nvme/nvmeX/device/fast_io_fail_tmo)
 				// The fabric driver parameters are embedded inside the bus device sub-layer on modern kernels.
 				fastIoFailPath := filepath.Join("/sys/class/nvme", name, "device", "fast_io_fail_tmo")
 				
-				// FIX 2: Dynamic fallback for older distributions (like early RHEL 7 point-releases)
+				// Dynamic fallback for older distributions (like early RHEL 7 point-releases)
 				if _, err := os.Stat(fastIoFailPath); os.IsNotExist(err) {
 					fastIoFailPath = filepath.Join("/sys/class/nvme", name, "fast_io_fail_tmo")
 				}
@@ -2647,7 +2650,7 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) purgeStuckPhysicalPathsDualProto
 			continue
 		}
 
-		// FIX 1: Protocol-isolated validation routing instead of ambiguous substring matching.
+		// Protocol-isolated validation routing instead of ambiguous substring matching.
 		var isTargetMatch bool
 		if isSCSI {
 			// SCSI path matches directly against the standard Big-Endian layout target
@@ -2674,9 +2677,13 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) purgeStuckPhysicalPathsDualProto
 				entries, _ := os.ReadDir(subsysDir)
 				for _, e := range entries {
 					name := e.Name()
-					if strings.HasPrefix(name, "nvme") && !strings.Contains(name, "n") && !strings.Contains(name, "-") {
+					
+					// FIX: Hardened fabric controller selection rule.
+					// Matches names starting with "nvme" (like nvme7c11) but safely skips subsystems 
+					// containing dashes, and strictly avoids namespace block nodes (which contain "n1", "n2", etc.)
+					if strings.HasPrefix(name, "nvme") && !strings.Contains(name, "-") && !strings.Contains(name, "n1") && !strings.Contains(name, "n2") {
 						
-						// FIX 2: Modern Cross-Platform Path Handling
+						// Modern Cross-Platform Path Handling
 						// Controller deletion endpoints live in /sys/class/nvme/nvmeX/device/delete_controller on modern systems
 						deleteCtrlPath := filepath.Join("/sys/class/nvme", name, "device", "delete_controller")
 						
@@ -4715,26 +4722,34 @@ func (of GetDmsPathHelperGeneric) EvaluateSysfsTopology(rawScsiID string, checkP
 			// Core Check B: Hidden Layer Evaluation (Active ANA re-routing)
 			hiddenBytes, err := os.ReadFile(filepath.Join(m, "hidden"))
 			isHidden := err == nil && strings.TrimSpace(string(hiddenBytes)) == "1"
-
+			
 			// Sibling controller state evaluation 
 			var isControllerTransitioning bool
 			deviceDir := filepath.Join(m, "device") 
+			
 			if entries, err := os.ReadDir(deviceDir); err == nil {
 				for _, entry := range entries {
-					if strings.HasPrefix(entry.Name(), "nvme") && !strings.Contains(entry.Name(), "n") {
-						statePath := filepath.Join(deviceDir, entry.Name(), "state")
+					entryName := entry.Name()
+					
+					// A fabric controller entry name starts with "nvme" but MUST NOT be a namespace disk (which ends in nX or nXpX)
+					// We match controllers (like nvme7c11) safely by ensuring they host an active 'state' attribute file
+					if strings.HasPrefix(entryName, "nvme") && !strings.Contains(entryName, "n1") && !strings.Contains(entryName, "n2") {
+						statePath := filepath.Join(deviceDir, entryName, "state")
+						
 						if stateBytes, err := os.ReadFile(statePath); err == nil {
-							state := strings.TrimSpace(string(stateBytes))
+							state := strings.ToLower(strings.TrimSpace(string(stateBytes)))
+							
+							// Only stall deployment if an operational fabric transition or reset event is actively occurring
 							if state == "resetting" || state == "connecting" || state == "deleting" {
 								isControllerTransitioning = true
-								logger.Warningf("[NVMe-Topology] Sibling controller %s is transitioning: %s", entry.Name(), state)
+								logger.Warningf("[NVMe-Topology] Fabric channel controller %s is transitioning: %s", entryName, state)
 								break
 							}
 						}
 					}
 				}
 			}
-
+			
 			// Combined settlement tracking rules
 			if isHidden || isControllerTransitioning || isReadOnly {
 				return true, true, name // Device is trapped in transition or held by kernel
