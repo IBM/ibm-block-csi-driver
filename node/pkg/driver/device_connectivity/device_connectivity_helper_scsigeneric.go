@@ -83,6 +83,10 @@ var (
 	TimeOutSgInqCmd      = 3 * 1000
 )
 
+// This pattern matches exact namespace block disk patterns like "nvme0n1" or "nvme0c0n1".
+// It checks for a string ending precisely in "n" followed by one or more digits.
+var nvmeNamespaceRegex = regexp.MustCompile(`^nvme\d+(c\d+)?n\d+$`)
+
 // SgIoHeader matches the C struct sg_io_hdr_t for Linux ioctl
 type SgIoHeader struct {
 	InterfaceID    int32
@@ -2585,10 +2589,10 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) disableNativeNvmeQueueing(expect
 		for _, e := range entries {
 			name := e.Name()
 			
-			// FIX: Hardened fabric controller selection rule.
-			// Matches names starting with "nvme" (like nvme7c11) but safely skips subsystems 
-			// containing dashes, and strictly avoids namespace block nodes (which contain "n1", "n2", etc.)
-			if strings.HasPrefix(name, "nvme") && !strings.Contains(name, "-") && !strings.Contains(name, "n1") && !strings.Contains(name, "n2") {
+			// 2. Replace your broken 'if' statement with this safe, precise structural check:
+			isNamespaceVolume := nvmeNamespaceRegex.MatchString(name)
+
+			if strings.HasPrefix(name, "nvme") && !strings.Contains(name, "-") && !isNamespaceVolume {
 				
 				// Modern and Enterprise Standard Path Format (/sys/class/nvme/nvmeX/device/fast_io_fail_tmo)
 				// The fabric driver parameters are embedded inside the bus device sub-layer on modern kernels.
@@ -2678,10 +2682,10 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) purgeStuckPhysicalPathsDualProto
 				for _, e := range entries {
 					name := e.Name()
 					
-					// FIX: Hardened fabric controller selection rule.
-					// Matches names starting with "nvme" (like nvme7c11) but safely skips subsystems 
-					// containing dashes, and strictly avoids namespace block nodes (which contain "n1", "n2", etc.)
-					if strings.HasPrefix(name, "nvme") && !strings.Contains(name, "-") && !strings.Contains(name, "n1") && !strings.Contains(name, "n2") {
+
+					isNamespaceVolume := nvmeNamespaceRegex.MatchString(name)
+
+					if strings.HasPrefix(name, "nvme") && !strings.Contains(name, "-") && !isNamespaceVolume {
 						
 						// Modern Cross-Platform Path Handling
 						// Controller deletion endpoints live in /sys/class/nvme/nvmeX/device/delete_controller on modern systems
@@ -4498,7 +4502,14 @@ func (o *GetDmsPathHelperGeneric) GetSlaveCount(devName string) int {
 			
 			// Hardened NVMe controller matching rule:
 			// Matches individual controllers (nvme0, nvme1) and subsystems (nvme-subsys0)
-			isController := strings.HasPrefix(name, "nvme") && !strings.Contains(name, "n1") && !strings.Contains(name, "n2")
+			
+			// 2. Drop this drop-in replacement into your GetSlaveCount / loops:
+			isNamespaceVolume := nvmeNamespaceRegex.MatchString(name)
+
+			// A valid controller node starts with "nvme", isn't an explicit namespace disk volume,
+			// and can either be an explicit hardware controller channel or a subsystem shell wrapper.
+			isController := strings.HasPrefix(name, "nvme") && !isNamespaceVolume
+			
 			isSubsys := strings.HasPrefix(name, "nvme-subsys")
 
 			if isController || isSubsys {
@@ -4572,7 +4583,6 @@ func (r *GetDmsPathHelperGeneric) IsNativeNvmeNamespace(devName string) bool {
 	// Differentiates namespaces (nvme0n1) from structural base drivers (nvme0)
 	return strings.Contains(devName, "n")
 }
-
 
 // EvaluateSysfsTopology evaluates the current kernel block layer presentation to determine 
 // if a structural match exists for either SCSI or NVMe topologies, validating device health states.
@@ -4727,24 +4737,34 @@ func (of GetDmsPathHelperGeneric) EvaluateSysfsTopology(rawScsiID string, checkP
 			var isControllerTransitioning bool
 			deviceDir := filepath.Join(m, "device") 
 			
+			// FIX: Permanent, scale-independent fabric controller detection block
+			var isControllerTransitioning bool
+			deviceDir := filepath.Join(m, "device") // /sys/block/nvme0c0n1/device
+			
 			if entries, err := os.ReadDir(deviceDir); err == nil {
 				for _, entry := range entries {
 					entryName := entry.Name()
-					
-					// A fabric controller entry name starts with "nvme" but MUST NOT be a namespace disk (which ends in nX or nXpX)
-					// We match controllers (like nvme7c11) safely by ensuring they host an active 'state' attribute file
-					if strings.HasPrefix(entryName, "nvme") && !strings.Contains(entryName, "n1") && !strings.Contains(entryName, "n2") {
-						statePath := filepath.Join(deviceDir, entryName, "state")
-						
-						if stateBytes, err := os.ReadFile(statePath); err == nil {
-							state := strings.ToLower(strings.TrimSpace(string(stateBytes)))
-							
-							// Only stall deployment if an operational fabric transition or reset event is actively occurring
-							if state == "resetting" || state == "connecting" || state == "deleting" {
-								isControllerTransitioning = true
-								logger.Warningf("[NVMe-Topology] Fabric channel controller %s is transitioning: %s", entryName, state)
-								break
-							}
+
+					// 1. Enforce that it must start with "nvme" and skip subsystem wrappers containing "-"
+					if !strings.HasPrefix(entryName, "nvme") || strings.Contains(entryName, "-") {
+						continue
+					}
+
+					// 2. Use the strict regex rule to differentiate Controllers from Namespaces.
+					// If it matches the regex, it is a namespace disk volume (skip it!).
+					// If it does NOT match, it is an authentic fabric controller channel (process it!).
+					if nvmeNamespaceRegex.MatchString(entryName) {
+						continue 
+					}
+
+					// At this point, entryName is guaranteed to be a true controller link (e.g., "nvme7c11", "nvme0c0")
+					statePath := filepath.Join(deviceDir, entryName, "state")
+					if stateBytes, err := os.ReadFile(statePath); err == nil {
+						state := strings.ToLower(strings.TrimSpace(string(stateBytes)))
+						if state == "resetting" || state == "connecting" || state == "deleting" {
+							isControllerTransitioning = true
+							logger.Warningf("[NVMe-Topology] Fabric controller channel %s is transitioning: %s", entryName, state)
+							break
 						}
 					}
 				}
