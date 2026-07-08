@@ -5167,6 +5167,8 @@ func (o GetDmsPathHelperGeneric) scanNVMeSubsystem(targetID string) (string, err
 }
 
 
+// validateDMIntegrity verifies that a given block path is operational and possesses 
+// at least one fully healthy backing hardware transport path.
 func (o GetDmsPathHelperGeneric) validateDMIntegrity(dmPath string) (string, error) {
 	dmName := filepath.Base(dmPath)
 	
@@ -5190,7 +5192,7 @@ func (o GetDmsPathHelperGeneric) validateDMIntegrity(dmPath string) (string, err
 
 	var activePaths int
 	for _, s := range slaves {
-		slaveName := s.Name()
+		slaveName := s.Name() // e.g., "sdb" or "nvme0n2"
 		
 		if strings.HasPrefix(slaveName, "sd") {
 			// SCSI underlying device check (Works perfectly)
@@ -5200,18 +5202,36 @@ func (o GetDmsPathHelperGeneric) validateDMIntegrity(dmPath string) (string, err
 				activePaths++
 			}
 		} else if strings.HasPrefix(slaveName, "nvme") {
-			// FIX: Dynamic controller scanning for NVMe-over-DM paths
-			deviceDir := filepath.Join("/sys/block", slaveName, "device") // Points to subsystem
-			
+			// FIX 1 & 2: Read the universal namespace leg operational state file directly.
+			// This bypasses the fragile nested subdirectory loop entirely.
+			statePath := filepath.Join("/sys/block", slaveName, "device", "state")
+			stateBytes, err := os.ReadFile(statePath)
+			if err == nil {
+				state := strings.ToLower(strings.TrimSpace(string(stateBytes)))
+				// For native NVMe fabric block tracks, the kernel reports healthy paths as "live"
+				if state == "live" {
+					activePaths++
+					continue
+				}
+			}
+
+			// FALLBACK: Sibling controller scanning using regex to protect fabric controllers (like nvme0c0)
+			deviceDir := filepath.Join("/sys/block", slaveName, "device") // Points to subsystem folder
 			if entries, err := os.ReadDir(deviceDir); err == nil {
 				for _, entry := range entries {
-					// Isolate individual controller instances (e.g., nvme0, nvme7) inside the subsystem folder
-					if strings.HasPrefix(entry.Name(), "nvme") && !strings.Contains(entry.Name(), "n") {
-						statePath := filepath.Join(deviceDir, entry.Name(), "state")
-						stateBytes, err := os.ReadFile(statePath)
-						if err == nil && strings.TrimSpace(string(stateBytes)) == "live" {
-							activePaths++
-							break // This slave path has a live controller; move to the next slave
+					entryName := entry.Name()
+					
+					// Filter out sub-namespace objects using the safe regex rule
+					isNamespaceDisk := nvmeNamespaceRegex.MatchString(entryName)
+					
+					if strings.HasPrefix(entryName, "nvme") && !isNamespaceDisk && !strings.Contains(entryName, "-") {
+						ctrlStatePath := filepath.Join(deviceDir, entryName, "state")
+						if ctrlStateBytes, err := os.ReadFile(ctrlStatePath); err == nil {
+							ctrlState := strings.ToLower(strings.TrimSpace(string(ctrlStateBytes)))
+							if ctrlState == "live" {
+								activePaths++
+								break 
+							}
 						}
 					}
 				}
