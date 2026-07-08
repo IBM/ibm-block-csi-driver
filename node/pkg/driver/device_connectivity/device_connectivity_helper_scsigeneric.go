@@ -3641,7 +3641,7 @@ func (o *OsDeviceConnectivityHelperGeneric) parseVPD83(data []byte) (string, err
 				} else {
 					candidates = append(candidates, fmt.Sprintf("8%x", idData))
 				}
-
+			}
 		}
 
 		// Advance to the next descriptor header block
