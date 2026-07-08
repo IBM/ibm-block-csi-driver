@@ -4401,6 +4401,8 @@ func (o GetDmsPathHelperGeneric) waitInterval(ctx context.Context, timer *time.T
 	}
 }
 
+// GetSlaveCount evaluates the target device topology and calculates the true number 
+// of active, healthy operational paths backing it in sysfs.
 func (o *GetDmsPathHelperGeneric) GetSlaveCount(devName string) int {
 	devName = filepath.Base(devName) // Safely clean input paths like /dev/dm-0 -> dm-0
 
@@ -4417,8 +4419,10 @@ func (o *GetDmsPathHelperGeneric) GetSlaveCount(devName string) int {
 
 		logger.Infof("[DM-Slave-Scan] [%s] Found %d total structural slaves in sysfs. Inspecting state...", devName, len(entries))
 		
+		operationalCount := 0
+
 		for _, entry := range entries {
-			slaveName := entry.Name() // e.g., sdX or nvmeXnX
+			slaveName := entry.Name() // e.g., sdX or nvmeXn2
 			slaveDeviceDir := filepath.Join("/sys/block", devName, "slaves", slaveName, "device")
 			
 			// Resolve symlink to fetch true mapping address block
@@ -4429,9 +4433,11 @@ func (o *GetDmsPathHelperGeneric) GetSlaveCount(devName string) int {
 			}
 
 			var hardwareIdentity string
-			if strings.HasPrefix(slaveName, "nvme") {
+			isNvmeSlave := strings.HasPrefix(slaveName, "nvme")
+
+			if isNvmeSlave {
 				// NVMe Slave Path mapping check
-				nqnPath := filepath.Join("/sys/block", devName, "slaves", slaveName, "device", "subsysnqn")
+				nqnPath := filepath.Join(slaveDeviceDir, "subsysnqn")
 				if nqnBytes, err := os.ReadFile(nqnPath); err == nil {
 					hardwareIdentity = fmt.Sprintf("NQN: %s", strings.TrimSpace(string(nqnBytes)))
 				} else {
@@ -4443,15 +4449,27 @@ func (o *GetDmsPathHelperGeneric) GetSlaveCount(devName string) int {
 				hardwareIdentity = fmt.Sprintf("Vendor: %s", strings.ToUpper(strings.TrimSpace(string(vendorBytes))))
 			}
 
-			// Evaluate block linkage layer existence
-			blockLinkPath := filepath.Join("/sys/block", devName, "slaves", slaveName, "block")
-			_, blockErr := os.Stat(blockLinkPath)
-			hasBlockLink := blockErr == nil
+			// FIX 1 & 2: Replace brittle "block" file checks with universal path state validation.
+			// This handles both SCSI ("running") and NVMe Fabric ("live") states correctly.
+			stateBytes, err := os.ReadFile(filepath.Join(slaveDeviceDir, "state"))
+			state := "unknown"
+			isOperational := false
+			
+			if err == nil {
+				state = strings.ToLower(strings.TrimSpace(string(stateBytes)))
+				if state == "running" || state == "live" {
+					isOperational = true
+					operationalCount++
+				}
+			}
 
-			logger.Warningf("[DM-Slave-Scan] -> Slave: %s | Kernel Address Mapping: %s | Hardware Identity: %s | Has Block Link: %v", 
-				slaveName, addrIdentifier, hardwareIdentity, hasBlockLink)
+			logger.Warningf("[DM-Slave-Scan] -> Slave: %s | Kernel Address Mapping: %s | Hardware Identity: %s | State: %s | Operational: %v", 
+				slaveName, addrIdentifier, hardwareIdentity, state, isOperational)
 		}
-		return len(entries)
+
+		// Return the count of truly operational paths to prevent the parent driver 
+		// from falsely flagging the DM device as having 0 live paths.
+		return operationalCount
 	}
 
 	// =========================================================================
@@ -4473,11 +4491,21 @@ func (o *GetDmsPathHelperGeneric) GetSlaveCount(devName string) int {
 			
 			// Hardened NVMe controller matching rule:
 			// Matches individual controllers (nvme0, nvme1) and subsystems (nvme-subsys0)
-			// without choking on the letter 'n' inside "-subsys"
 			isController := strings.HasPrefix(name, "nvme") && !strings.Contains(name, "n1") && !strings.Contains(name, "n2")
 			isSubsys := strings.HasPrefix(name, "nvme-subsys")
 
 			if isController || isSubsys {
+				// Validate path operational health state
+				stateBytes, err := os.ReadFile(filepath.Join(deviceDir, name, "state"))
+				if err == nil {
+					state := strings.ToLower(strings.TrimSpace(string(stateBytes)))
+					// Skip dead, deleting, or failing pathways
+					if state == "dead" || state == "deleting" {
+						logger.Warningf("[NVMe-Slave-Scan] -> Skipping unhealthy controller path: %s (State: %s)", name, state)
+						continue
+					}
+				}
+
 				count++
 				
 				// Correctly resolve the NQN at the parent or target namespace container layer
