@@ -4729,48 +4729,42 @@ func (of GetDmsPathHelperGeneric) EvaluateSysfsTopology(rawScsiID string, checkP
 			roBytes, err := os.ReadFile(filepath.Join(m, "ro"))
 			isReadOnly := err == nil && strings.TrimSpace(string(roBytes)) != "0"
 
-			// Core Check B: Hidden Layer Evaluation (Active ANA re-routing)
+			// FIX: Native Multi-pathing Hidden Attribution Guard.
+			// Being marked as hidden is a normal structural characteristic for subdevice 
+			// endpoints on an NVMe fabric loop; it should not stall volume settlement.
 			hiddenBytes, err := os.ReadFile(filepath.Join(m, "hidden"))
 			isHidden := err == nil && strings.TrimSpace(string(hiddenBytes)) == "1"
-			
-			// FIX: Permanent, scale-independent fabric controller detection block
+			if isHidden {
+				logger.Warningf("[NVMe-Topology] Device path %s is hidden natively by the multi-pathing core layer.", name)
+			}
+
+			// Sibling controller state evaluation using our hardened regex
 			var isControllerTransitioning bool
-			deviceDir := filepath.Join(m, "device") // /sys/block/nvme0c0n1/device
-			
+			deviceDir := filepath.Join(m, "device") 
 			if entries, err := os.ReadDir(deviceDir); err == nil {
 				for _, entry := range entries {
 					entryName := entry.Name()
-
-					// 1. Enforce that it must start with "nvme" and skip subsystem wrappers containing "-"
-					if !strings.HasPrefix(entryName, "nvme") || strings.Contains(entryName, "-") {
-						continue
-					}
-
-					// 2. Use the strict regex rule to differentiate Controllers from Namespaces.
-					// If it matches the regex, it is a namespace disk volume (skip it!).
-					// If it does NOT match, it is an authentic fabric controller channel (process it!).
-					if nvmeNamespaceRegex.MatchString(entryName) {
-						continue 
-					}
-
-					// At this point, entryName is guaranteed to be a true controller link (e.g., "nvme7c11", "nvme0c0")
-					statePath := filepath.Join(deviceDir, entryName, "state")
-					if stateBytes, err := os.ReadFile(statePath); err == nil {
-						state := strings.ToLower(strings.TrimSpace(string(stateBytes)))
-						if state == "resetting" || state == "connecting" || state == "deleting" {
-							isControllerTransitioning = true
-							logger.Warningf("[NVMe-Topology] Fabric controller channel %s is transitioning: %s", entryName, state)
-							break
+					if strings.HasPrefix(entryName, "nvme") && !strings.Contains(entryName, "-") && !nvmeNamespaceRegex.MatchString(entryName) {
+						statePath := filepath.Join(deviceDir, entryName, "state")
+						if stateBytes, err := os.ReadFile(statePath); err == nil {
+							state := strings.ToLower(strings.TrimSpace(string(stateBytes)))
+							if state == "resetting" || state == "connecting" || state == "deleting" {
+								isControllerTransitioning = true
+								logger.Warningf("[NVMe-Topology] Fabric controller %s is transitioning: %s", entryName, state)
+								break
+							}
 						}
 					}
 				}
 			}
-			
-			// Combined settlement tracking rules
-			if isHidden || isControllerTransitioning || isReadOnly {
-				return true, true, name // Device is trapped in transition or held by kernel
+
+			// Combined settlement tracking rules: Removed 'isHidden' from stalling criteria
+			if isControllerTransitioning || isReadOnly {
+				return true, true, name // Device is trapped in an active hardware transition
 			}
-			return true, false, name // Fully functional and settled
+			
+			// Successfully verified as healthy and functional
+			return true, false, name 
 		}
 	}
 
