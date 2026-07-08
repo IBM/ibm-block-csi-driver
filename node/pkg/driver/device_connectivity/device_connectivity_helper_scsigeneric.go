@@ -363,7 +363,7 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) IsVolumePathMatchesVolumeId(ctx 
 
 	// 4. Evaluate identity using our prefix-verified, cross-protocol comparison helper.
 	// This cleanly checks SCSI vs NVMe rules without false-positive slicing bugs.
-	if !r.Helper.MatchVolumeToScsiSpec(sgInqWwn, expectedSerial) {
+	if !r.MatchVolumeToScsiSpec(sgInqWwn, expectedSerial) {
 		return false, &ErrorWrongDeviceFound{mpathDeviceName, volumeUuid, sgInqWwn}
 	}
 
@@ -510,10 +510,10 @@ func (r OsDeviceConnectivityHelperScsiGeneric) GetMpathDevice(ctx context.Contex
 
 	logger.Infof("GetMpathDevice: Searching multipath devices for volume : [%s] ", volumeId)
 	//dmPath, _ := r.Helper.GetMpathDeviceName(volumeId)	
-	volumeIdVariations := r.Helper.GetVolumeIdVariations(volumeId)
+	//volumeIdVariations := r.Helper.GetVolumeIdVariations(volumeId)
 	
 
-	mpathdOutput, err := r.Helper.WaitForDmToExist(ctx, volumeIdVariations, WaitForMpathRetries,
+	mpathdOutput, err := r.Helper.WaitForDmToExist(ctx, volumeId, WaitForMpathRetries,
 		WaitForMpathWaitIntervalSec)
 	if err != nil {
 		return "", err
@@ -2400,7 +2400,7 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) IdentityAwarePreScan(
 	// 2. Dynamic lookup: Locate a Device Mapper mapping using our finalized FindDMByWWID helper.
 	// Since FindDMByWWID now automatically tries both SCSI and NVMe lookups inside its unified loop,
 	// we just pass our clean rawScsiTarget and let the kernel matching engine trace the active map.
-	mpathAlias := r.Helper.FindDMByWWID(rawScsiTarget)
+	mpathAlias := r.Helper.findDMByWWID(rawScsiTarget)
 
 	// Translate the user-friendly alias into a raw dm-X name early
 	var mpathName string
@@ -2429,7 +2429,7 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) IdentityAwarePreScan(
 		// Perform explicit, collision-free identity matching.
 		// Uses our prefix-verified helper on the hardware string, and raw hex checks on the normalized sysfs text.
 		isMatch := (len(currentWWID) == 32 && (currentWWID == rawScsiTarget || currentWWID == rawNvmeTarget)) ||
-			(hwWWID != "" && r.Helper.MatchVolumeToScsiSpec(hwWWID, rawScsiTarget))
+			(hwWWID != "" && r.MatchVolumeToScsiSpec(hwWWID, rawScsiTarget))
 
 		if isMatch {
 			// Zombie Safeguard inside Mount Block: Ensure a ghost map with 0 paths isn't corrupting things
@@ -3103,6 +3103,50 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) getWWIDBySysfs(deviceName string
 	return wwid, nil
 }
 
+// MatchVolumeToScsiSpec matches a transport-tagged string from ParseVPD83 against a raw 32-character SCSI specification string.
+// It uses strict routing to prevent false positives from non-IBM or corrupted descriptors.
+func (o *OsDeviceConnectivityHelperScsiGeneric) MatchVolumeToScsiSpec(parsedID, rawScsiID string) bool {
+	// 1. Standardize text structures
+	parsedID = strings.ToLower(strings.TrimSpace(parsedID))
+	rawScsiID = strings.ToLower(strings.TrimSpace(rawScsiID))
+
+	// 2. Validate the target Raw SCSI string structure (Must be an IBM NAA-6 32-character block)
+	if len(rawScsiID) != 32 {
+		return false
+	}
+
+	// 3. Evaluate the descriptor context using explicit transport prefixes to avoid false matches
+	switch {
+	case strings.HasPrefix(parsedID, "nvme-eui."):
+		// STRATEGY A: Host node is talking to the volume via an NVMe transport layer.
+		// Strip the prefix to isolate the raw 32-character NVMe NGUID byte string.
+		rawNvmeFromHost := strings.TrimPrefix(parsedID, "nvme-eui.")
+		if len(rawNvmeFromHost) != 32 {
+			return false // Malformed NVMe descriptor payload size
+		}
+
+		// Convert the raw target SCSI spec into its expected NVMe sequence
+		expectedNvmeSeq := convertScsiIdToNguid(rawScsiID)
+
+		// Directly evaluate if the NVMe hardware matches our translated target
+		return rawNvmeFromHost == expectedNvmeSeq
+
+	case strings.HasPrefix(parsedID, "3"):
+		// STRATEGY B: Host node is talking to the volume via standard Fibre Channel / iSCSI SCSI.
+		// Strip the '3' prefix appended by udev/scsi_id to expose the raw hex payload.
+		rawScsiFromHost := strings.TrimPrefix(parsedID, "3")
+		
+		// Directly compare the raw host SCSI sequence against our raw target SCSI spec
+		return rawScsiFromHost == rawScsiID
+
+	default:
+		// STRATEGY C: The descriptor belongs to an unrelated format (Type 1, Type 8 text iqn, etc.)
+		// Return false instantly to safeguard against false-positive pattern matching.
+		return false
+	}
+}
+
+
 
 // ============== OsDeviceConnectivityHelperInterface ==========================
 
@@ -3124,7 +3168,7 @@ type OsDeviceConnectivityHelperInterface interface {
 	GetOpenCount(ctx context.Context, dmName string) (int32, error)
 	GetMajorMinorFromSysfs(ctx context.Context, devicePath string) (major uint32, minor uint32, err error)
 	getWWIDByDev(major, minor uint32) (string, error)
-	WaitForDmToExist(ctx context.Context, volumeIdVariations []string, maxRetries int, intervalSeconds int) (string, error)
+	WaitForDmToExist(ctx context.Context, volumeId string, maxRetries int, intervalSeconds int) (string, error)
 }
 
 type OsDeviceConnectivityHelperGeneric struct {
@@ -3143,8 +3187,8 @@ func NewOsDeviceConnectivityHelperGeneric(executer executer.ExecuterInterface, K
 	}
 }
 
-func (o *OsDeviceConnectivityHelperGeneric) WaitForDmToExist(ctx context.Context, volumeIdVariations []string, maxRetries int, intervalSeconds int) (string, error) {
-       return o.Helper.WaitForDmToExist(ctx, volumeIdVariations, maxRetries, intervalSeconds)
+func (o *OsDeviceConnectivityHelperGeneric) WaitForDmToExist(ctx context.Context, volumeId string, maxRetries int, intervalSeconds int) (string, error) {
+       return o.Helper.WaitForDmToExist(ctx, volumeId, maxRetries, intervalSeconds)
 }
 
 func (o *OsDeviceConnectivityHelperGeneric) GetHostsIdByArrayIdentifiers(arrayIdentifier []string) (map[int]bool, error) {
@@ -3660,49 +3704,6 @@ func (o *OsDeviceConnectivityHelperGeneric) parseVPD83(data []byte) (string, err
 	return candidates[0], nil
 }
 
-// MatchVolumeToScsiSpec matches a transport-tagged string from ParseVPD83 against a raw 32-character SCSI specification string.
-// It uses strict routing to prevent false positives from non-IBM or corrupted descriptors.
-func (o *OsDeviceConnectivityHelperGeneric) MatchVolumeToScsiSpec(parsedID, rawScsiID string) bool {
-	// 1. Standardize text structures
-	parsedID = strings.ToLower(strings.TrimSpace(parsedID))
-	rawScsiID = strings.ToLower(strings.TrimSpace(rawScsiID))
-
-	// 2. Validate the target Raw SCSI string structure (Must be an IBM NAA-6 32-character block)
-	if len(rawScsiID) != 32 {
-		return false
-	}
-
-	// 3. Evaluate the descriptor context using explicit transport prefixes to avoid false matches
-	switch {
-	case strings.HasPrefix(parsedID, "nvme-eui."):
-		// STRATEGY A: Host node is talking to the volume via an NVMe transport layer.
-		// Strip the prefix to isolate the raw 32-character NVMe NGUID byte string.
-		rawNvmeFromHost := strings.TrimPrefix(parsedID, "nvme-eui.")
-		if len(rawNvmeFromHost) != 32 {
-			return false // Malformed NVMe descriptor payload size
-		}
-
-		// Convert the raw target SCSI spec into its expected NVMe sequence
-		expectedNvmeSeq := convertScsiIdToNguid(rawScsiID)
-
-		// Directly evaluate if the NVMe hardware matches our translated target
-		return rawNvmeFromHost == expectedNvmeSeq
-
-	case strings.HasPrefix(parsedID, "3"):
-		// STRATEGY B: Host node is talking to the volume via standard Fibre Channel / iSCSI SCSI.
-		// Strip the '3' prefix appended by udev/scsi_id to expose the raw hex payload.
-		rawScsiFromHost := strings.TrimPrefix(parsedID, "3")
-		
-		// Directly compare the raw host SCSI sequence against our raw target SCSI spec
-		return rawScsiFromHost == rawScsiID
-
-	default:
-		// STRATEGY C: The descriptor belongs to an unrelated format (Type 1, Type 8 text iqn, etc.)
-		// Return false instantly to safeguard against false-positive pattern matching.
-		return false
-	}
-}
-
 func (OsDeviceConnectivityHelperGeneric) GetVolumeIdVariations(volumeUuid string) []string {
 	volumeUuidLower := strings.ToLower(volumeUuid)
 	volumeNguid := convertScsiIdToNguid(volumeUuidLower)
@@ -3826,9 +3827,9 @@ func (o *OsDeviceConnectivityHelperGeneric) MatchVolumeWWID(targetWWID string, c
 }
 
 // UNUSED
-func (o *OsDeviceConnectivityHelperGeneric) GetMpathdOutputForVolume(ctx context.Context, volumeIdVariations []string,
+func (o *OsDeviceConnectivityHelperGeneric) GetMpathdOutputForVolume(ctx context.Context, volumeId string,
 	multipathdCommandFormatArgs []string) (string, error) {
-	mpathdOutput, err := o.Helper.WaitForDmToExist(ctx, volumeIdVariations, WaitForMpathRetries,
+	mpathdOutput, err := o.Helper.WaitForDmToExist(ctx, volumeId, WaitForMpathRetries,
 		WaitForMpathWaitIntervalSec)
 	if err != nil {
 		return "", err
@@ -4273,7 +4274,7 @@ func (r *OsDeviceConnectivityHelperGeneric) readSysfs(path string) (string, erro
 //go:generate mockgen -destination=../../../mocks/mock_GetDmsPathHelperInterface.go -package=mocks github.com/ibm/ibm-block-csi-driver/node/pkg/driver/device_connectivity GetDmsPathHelperInterface
 
 type GetDmsPathHelperInterface interface {
-	WaitForDmToExist(ctx context.Context, volumeIdVariations []string, maxRetries int, intervalSeconds int) (string, error)
+	WaitForDmToExist(ctx context.Context, volumeId string, maxRetries int, intervalSeconds int) (string, error)
 	GetSlaveCount(devName string) int
 }
 
@@ -4296,7 +4297,7 @@ func convertScsiIdToNguid(scsiId string) string {
 }
 
 
-func (o GetDmsPathHelperGeneric) WaitForDmToExist(ctx context.Context, volumeWWID []string, maxRetries int, intervalSeconds int) (string, error) {
+func (o GetDmsPathHelperGeneric) WaitForDmToExist(ctx context.Context, volumeWWID string, maxRetries int, intervalSeconds int) (string, error) {
 	if err := ctx.Err(); err != nil {
 		return "", err
 	}
@@ -4306,12 +4307,6 @@ func (o GetDmsPathHelperGeneric) WaitForDmToExist(ctx context.Context, volumeWWI
 
 	if len(volumeWWID) < 2 {
 		return "", fmt.Errorf("missing required identifiers: expected SCSI ID and NGUID")
-	}
-
-	norm := make([]string, len(volumeWWID))
-	for i, wwid := range volumeWWID {
-		norm[i] = normalizeWWID(wwid)
-		logger.Warningf("convert %s to %s", wwid, norm[i])
 	}
 
 	timer := time.NewTimer(time.Duration(intervalSeconds) * time.Second)
@@ -4327,7 +4322,7 @@ func (o GetDmsPathHelperGeneric) WaitForDmToExist(ctx context.Context, volumeWWI
 			return "", err
 		}
 
-		hasDevice, isPending, name := o.EvaluateSysfsTopology(norm, false)
+		hasDevice, isPending, name := o.EvaluateSysfsTopology(volumeWWID, false)
 		logger.Warningf("hasDevice %t isPending %t, name %s", hasDevice, isPending, name)
 
 		if !hasDevice || isPending {
@@ -4392,7 +4387,7 @@ func (o GetDmsPathHelperGeneric) WaitForDmToExist(ctx context.Context, volumeWWI
 		logger.Warning("waitInterval2 - after")
 	}
 
-	return "", &MultipathDeviceNotFoundForVolumeError{volumeWWID[0]}
+	return "", &MultipathDeviceNotFoundForVolumeError{volumeWWID}
 }
 
 // waitInterval encapsulates the timer/context blocking logic cleanly without using labels or goto
