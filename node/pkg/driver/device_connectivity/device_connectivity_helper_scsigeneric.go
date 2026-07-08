@@ -4733,10 +4733,6 @@ func (of GetDmsPathHelperGeneric) EvaluateSysfsTopology(rawScsiID string, checkP
 			hiddenBytes, err := os.ReadFile(filepath.Join(m, "hidden"))
 			isHidden := err == nil && strings.TrimSpace(string(hiddenBytes)) == "1"
 			
-			// Sibling controller state evaluation 
-			var isControllerTransitioning bool
-			deviceDir := filepath.Join(m, "device") 
-			
 			// FIX: Permanent, scale-independent fabric controller detection block
 			var isControllerTransitioning bool
 			deviceDir := filepath.Join(m, "device") // /sys/block/nvme0c0n1/device
