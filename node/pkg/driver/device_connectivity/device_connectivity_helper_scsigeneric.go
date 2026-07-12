@@ -4582,7 +4582,6 @@ func (o *GetDmsPathHelperGeneric) GetSlaveCount(devName string) int {
 	logger.Infof("[Slave-Scan] [%s] Non-multipath physical or virtual device. Defaulting count to 1.", devName)
 	return 1
 }
-}
 
 // IsDeviceMapper verifies if a block entry is truly a Device Mapper device
 // by checking for the existence of the "dm" subsystem directory inside its sysfs tree.
