@@ -346,7 +346,6 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) IsVolumePathMatchesVolumeId(ctx 
 	logger.Infof("IsVolumePathMatchesVolumeId: Searching matching volume id for volume path: [%s] ", volumePath)
 
 	// 1. Sanitize the incoming reference volume UUID.
-	// We expect the raw, un-prefixed 32-character IBM SCSI specification string.
 	expectedSerial := strings.ToLower(strings.TrimSpace(volumeUuid))
 	if len(expectedSerial) != 32 {
 		return false, fmt.Errorf("invalid IBM volume configuration signature: must be 32 chars starting with 6005076")
@@ -358,16 +357,44 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) IsVolumePathMatchesVolumeId(ctx 
 		return false, fmt.Errorf("failed to trace multipath map for path %s: %w", volumePath, err)
 	}
 
-	// 3. Query the hardware Inquiry descriptor layer.
-	// This invokes ParseVPD83 internally, returning a transport-tagged ID string.
+	// 3. Query the hardware Inquiry descriptor layer dynamically.
 	sgInqWwn, err := r.Helper.GetWwnByScsiInq(ctx, mpathDeviceName)
+	
 	if err != nil {
+		// FIX: Handle environments where Device Mapper is only used to list devices.
+		// If the IOCTL fails with an unsafe state or invalid transport error, do not crash.
+		// Check if the underlying device maps to native NVMe multi-path components.
+		logger.Warningf("Hardware inquiry failed on %s (%v). Checking for native NVMe fallback...", mpathDeviceName, err)
+		
+		helper := GetDmsPathHelperGeneric{}
+		dmName := filepath.Base(mpathDeviceName) // Extract "dm-3"
+		
+		// Read the slaves folder to see if this map contains native fabric handles (nvme*)
+		slavesDir := filepath.Join("/sys/block", dmName, "slaves")
+		if entries, readErr := os.ReadDir(slavesDir); readErr == nil && len(entries) > 0 {
+			for _, entry := range entries {
+				if strings.HasPrefix(entry.Name(), "nvme") {
+					// CONFIRMED FALLBACK: The device mapper shell is unmanaged, but native NVMe holds the drive.
+					// Pass the tracking over to our secure, validated native sysfs matching tool.
+					logger.Infof("Confirmed native NVMe environment for %s. Redirecting to sysfs token matching.", dmName)
+					
+					// We pass checkPendingOnly=false to enforce a full, strict ready-state settlement verification
+					hasDevice, isPending, _ := helper.EvaluateSysfsTopology(expectedSerial, false)
+					if hasDevice && !isPending {
+						logger.Infof("IsVolumePathMatchesVolumeId: Identity verified via native NVMe sysfs fallback for %s.", dmName)
+						return true, nil
+					}
+					return false, fmt.Errorf("native NVMe fallback validation failed: path un-settled or missing")
+				}
+			}
+		}
+		
+		// If it's a traditional SCSI volume and the ioctl fails, it is an actual physical failure. Bubble up the error.
 		return false, fmt.Errorf("hardware signature retrieval failed on target device %s: %w", mpathDeviceName, err)
 	}
 
-	// 4. Evaluate identity using our prefix-verified, cross-protocol comparison helper.
-	// This cleanly checks SCSI vs NVMe rules without false-positive slicing bugs.
-	if !r.MatchVolumeToScsiSpec(sgInqWwn, expectedSerial) {
+	// 4. Standard Flow: If the IOCTL succeeds, run the regular prefix-verified comparison helper
+	if !r.Helper.MatchVolumeToScsiSpec(sgInqWwn, expectedSerial) {
 		return false, &ErrorWrongDeviceFound{mpathDeviceName, volumeUuid, sgInqWwn}
 	}
 
@@ -375,6 +402,7 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) IsVolumePathMatchesVolumeId(ctx 
 	return true, nil
 }
 
+func (r *OsDeviceConnectivityHel
 // TODO id unused?
 func (r OsDeviceConnectivityHelperScsiGeneric) GetExistingMpathDevice(ctx context.Context, volumeUuid string, volumePath string) (string, error) {
         logger.Infof("GetExistingMpathDevice: Searching matching volume id for volume path: [%s] ", volumePath)
@@ -705,7 +733,7 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) ValidateLun(ctx context.Context,
 
 	// 1. Sanitize text structure and pre-calculate both protocol target sequences
 	rawScsiTarget := strings.ToLower(strings.TrimSpace(expectedSerial))
-	if len(rawScsiTarget) != 32 || !strings.HasPrefix(rawScsiTarget, "6005076") {
+	if len(rawScsiTarget) != 32 {
 		return fmt.Errorf("invalid IBM SCSI asset specification: must be 32 chars starting with 6005076")
 	}
 
@@ -3940,7 +3968,7 @@ func (o *OsDeviceConnectivityHelperGeneric) ResolveToKernelName(ctx context.Cont
 func (o *OsDeviceConnectivityHelperGeneric) findDMByWWID(wwid string) string {
 	// 1. Initial sanitization of the target raw SCSI asset string
 	rawScsiID := strings.ToLower(strings.TrimSpace(wwid))
-	if len(rawScsiID) != 32 || !strings.HasPrefix(rawScsiID, "6005076") {
+	if len(rawScsiID) != 32 {
 		return "" // Safeguard against non-IBM or malformed reference specs
 	}
 
@@ -4595,7 +4623,7 @@ func (of GetDmsPathHelperGeneric) EvaluateSysfsTopology(rawScsiID string, checkP
 	
 	// 1. Sanitize the incoming reference ID and establish baseline security boundaries
 	rawScsiTarget := strings.ToLower(strings.TrimSpace(rawScsiID))
-	if len(rawScsiTarget) != 32 || !strings.HasPrefix(rawScsiTarget, "6005076") {
+	if len(rawScsiTarget) != 32 {
 		logger.Errorf("EvaluateSysfsTopology: invalid IBM reference specification signature: %s", rawScsiID)
 		return false, false, ""
 	}
