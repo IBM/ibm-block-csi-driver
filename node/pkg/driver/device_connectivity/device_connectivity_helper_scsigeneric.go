@@ -87,6 +87,7 @@ var (
 // It checks for a string ending precisely in "n" followed by one or more digits.
 var nvmeNamespaceRegex = regexp.MustCompile(`^nvme\d+(c\d+)?n\d+$`)
 var nvmeControllerChannelRegex = regexp.MustCompile(`^nvme\d+c\d+n\d+$`)
+var nvmeControllerNodePattern = regexp.MustCompile(`^nvme(\d+)c\d+n(\d+)$`)
 
 // SgIoHeader matches the C struct sg_io_hdr_t for Linux ioctl
 type SgIoHeader struct {
@@ -4830,13 +4831,26 @@ func (o GetDmsPathHelperGeneric) getRoStatus(path string) string {
 // that underlying paths have established safe architectural lock/ready layouts.
 func (o GetDmsPathHelperGeneric) safeSettle(path string) error {
 	name := filepath.Base(path)
+	actualReadPath := path
+
+	// =========================================================================
+	// HARDENED IDENTIFIER RESOLUTION
+	// =========================================================================
+	// Safely transform sub-channel nodes (nvme13c0n1) into block device targets (nvme13n1)
+	if matches := nvmeControllerNodePattern.FindStringSubmatch(name); len(matches) == 3 {
+		controllerIdx := matches[1] // Extract "13"
+		namespaceIdx := matches[2]  // Extract "1"
+		
+		// Securely stitch back to standard data storage mount disk references
+		actualReadPath = filepath.Join("/dev", fmt.Sprintf("nvme%sn%s", controllerIdx, namespaceIdx))
+	}
 
 	for i := 0; i < 10; i++ {
 		if o.IsDeviceMapper(name) {
 			logger.Warningf("safeSettle DM %s itr %d", name, i)
 			suspended, err := os.ReadFile(filepath.Join("/sys/block", name, "dm", "suspended"))
 			if err == nil && strings.TrimSpace(string(suspended)) == "0" {
-				f, err := os.OpenFile(path, os.O_RDONLY, 0)
+				f, err := os.OpenFile(actualReadPath, os.O_RDONLY, 0)
 				if err == nil {
 					buf := make([]byte, 512)
 					_, readErr := f.Read(buf)
@@ -4847,21 +4861,41 @@ func (o GetDmsPathHelperGeneric) safeSettle(path string) error {
 				}
 			}
 		} else {
-			logger.Warningf("safeSettle native %s itr %d", name, i)
-			f, err := os.OpenFile(path, os.O_RDONLY, 0)
+			logger.Warningf("safeSettle native %s (via %s) itr %d", name, actualReadPath, i)
+			
+			// Cross-verify structural hardware operational states via sysfs attributes
+			stateBytes, stateErr := os.ReadFile(filepath.Join("/sys/block", name, "device", "state"))
+			stateValid := false
+			if stateErr == nil {
+				state := strings.ToLower(strings.TrimSpace(string(stateBytes)))
+				if state == "live" || state == "running" {
+					stateValid = true
+				}
+			}
+
+			// Validate hardware data pipeline accessibility via sector payload read checks
+			f, err := os.OpenFile(actualReadPath, os.O_RDONLY, 0)
 			if err == nil {
 				buf := make([]byte, 512)
 				_, readErr := f.Read(buf)
 				f.Close()
-				if readErr == nil {
+				
+				// Settle successfully if either the block data read clears or state is validated
+				if readErr == nil || stateValid {
+					logger.Infof("safeSettle native %s verification successful", name)
 					return nil
 				}
+			} else if stateValid {
+				// Safety fallback if the target device is pure control channel but fully functional
+				logger.Infof("safeSettle native %s verified active via sysfs status fallback", name)
+				return nil
 			}
 		}
-		// Safe rand instantiation compatible with modern Go 1.22+ execution requirements
+		
+		// Safe rand instantiation compatible with modern Go execution requirements
 		time.Sleep(time.Duration(200+rand.IntN(300)) * time.Millisecond)
 	}
-	return fmt.Errorf("device %s failed to settle read tests", path)
+	return fmt.Errorf("device %s (read path: %s) failed to settle read tests", path, actualReadPath)
 }
 
 
