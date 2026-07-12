@@ -970,8 +970,10 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) purgeScsiGhosts(ctx context.Cont
 	return nil
 }
 
+// Structural pattern matching to ensure accurate device name handling across all Linux layers
+var nvmeScrubberControllerPattern = regexp.MustCompile(`^nvme\d+c\d+n\d+$`)
+
 func (r *OsDeviceConnectivityHelperScsiGeneric) purgeNvmeGhosts(ctx context.Context, expectedSerial string, expectedLun int, arrayIdentifiers []string) error {
-	// Sanitize and pre-calculate the expected NVMe byte-swapped target sequence
 	rawScsiTarget := strings.ToLower(strings.TrimSpace(expectedSerial))
 	expectedNvmeTarget := convertScsiIdToNguid(rawScsiTarget)
 
@@ -983,20 +985,19 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) purgeNvmeGhosts(ctx context.Cont
 	var deleted int
 	for _, entry := range blockEntries {
 		name := entry.Name()
-		// Only focus on base NVMe block names (e.g. nvme0n1)
-		if !strings.HasPrefix(name, "nvme") || strings.Contains(name, "p") {
+		
+		// HARDENED FILTERING: Focus strictly on base NVMe block names (nvme0n1), 
+		// explicitly ignore partitions (nvme0n1p1) AND direct channel pathways (nvme13c0n2)
+		if !strings.HasPrefix(name, "nvme") || strings.Contains(name, "p") || nvmeScrubberControllerPattern.MatchString(name) {
 			continue
 		}
 
 		deviceDir := filepath.Join("/sys/block", name, "device")
 		
-		// Verify structural ownership via NQN mappings
 		if !r.isPathOwnedByMyArray(ctx, name, arrayIdentifiers) {
 			continue
 		}
 
-		// FIX 1: Read the true Volume Identifier (WWID/NGUID) instead of the physical chassis serial.
-		// Check both the block device directory and the nested subsystem directory.
 		var sysfsIdRaw string
 		if bytes, err := os.ReadFile(filepath.Join("/sys/block", name, "wwid")); err == nil {
 			sysfsIdRaw = string(bytes)
@@ -1004,7 +1005,6 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) purgeNvmeGhosts(ctx context.Cont
 			sysfsIdRaw = string(bytes)
 		}
 
-		// If the identifier path is entirely missing, evaluate the driver state to check for a Ghost path
 		if sysfsIdRaw == "" {
 			state := r.readSysfs(filepath.Join(deviceDir, "state"))
 			if state == "deleting" || state == "dead" {
@@ -1014,13 +1014,11 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) purgeNvmeGhosts(ctx context.Cont
 			continue
 		}
 
-		// FIX 2: Normalize the discovered string to its raw 32-character hex sequence
 		normHwId := r.Helper.normalizeWWID(sysfsIdRaw)
 
-		// Guard: If it cleans down to a valid 32-character sequence but does NOT match our 
-		// expected NVMe scrambled layout, it belongs to a different volume and must be cleaned up.
+		// Namespace Mismatch Guard: Wipes only the targeted namespace mapping context
 		if len(normHwId) == 32 && normHwId != expectedNvmeTarget {
-			logger.Warningf("Ghost Scrubber: Found rogue NVMe map %s with volume ID mismatch (got %s, exp %s). Forcing detachment.", name, normHwId, expectedNvmeTarget)
+			logger.Warningf("Ghost Scrubber: Found rogue NVMe map %s with volume ID mismatch (got %s, exp %s). Forcing isolated namespace removal.", name, normHwId, expectedNvmeTarget)
 			r.executeNvmeTeardown(ctx, name)
 			deleted++
 		}
@@ -1032,20 +1030,38 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) purgeNvmeGhosts(ctx context.Cont
 	return nil
 }
 
-
 func (r *OsDeviceConnectivityHelperScsiGeneric) executeNvmeTeardown(ctx context.Context, nvmeBlockName string) {
 	_, _ = executer.ExecuteUninterruptible[struct{}](
 		ctx,
 		r.KeyedGater,
 		"nvme-delete-"+nvmeBlockName,
 		1, 10, 2*time.Second, 15*time.Second,
-		func(ctx context.Context) (struct{}, error) {
+		func(wCtx context.Context) (struct{}, error) {
+			// HARDENED EVICTION: Target the specific namespace deletion file instead of the parent controller
+			deleteNsPath := filepath.Join("/sys/block", nvmeBlockName, "device", "delete")
+			
+			if _, err := os.Stat(deleteNsPath); err == nil {
+				logger.Infof("[Purge-Scrubber] Safely deleting isolated namespace node: %s", nvmeBlockName)
+				_ = os.WriteFile(deleteNsPath, []byte("1\n"), 0200)
+				return struct{}{}, nil
+			}
+
+			// RHEL 7 Legacy Fallback: Only unbind the specific controller from the PCI bus 
+			// if it is a single standalone legacy mapping path layout
 			parts := strings.Split(nvmeBlockName, "n")
 			if len(parts) > 0 {
-				deletePath := fmt.Sprintf("/sys/class/nvme/%s/delete_controller", parts[0])
-				_ = os.WriteFile(deletePath, []byte("1"), 0200)
+				ctrlName := parts[0]
+				if pciAddrPath, err := filepath.EvalSymlinks(filepath.Join("/sys/class/nvme", ctrlName, "device")); err == nil {
+					pciAddress := filepath.Base(pciAddrPath)
+					unbindPath := "/sys/bus/pci/drivers/nvme/unbind"
+					if _, err := os.Stat(unbindPath); err == nil {
+						logger.Warningf("[Purge-Scrubber-RHEL7] Unbinding standalone controller %s at PCI %s", ctrlName, pciAddress)
+						_ = os.WriteFile(unbindPath, []byte(pciAddress), 0200)
+						return struct{}{}, nil
+					}
+				}
 			}
-			return struct{}{}, nil
+			return struct{}{}, fmt.Errorf("unable to locate a secure deletion gateway for %s", nvmeBlockName)
 		},
 	)
 }
@@ -1054,19 +1070,14 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) isNvmeGhost(nvmeName string) boo
 	path := fmt.Sprintf("/sys/block/%s/device/state", nvmeName)
 	state, err := os.ReadFile(path)
 	if err != nil {
-		// FIX: If the directory or file is completely gone from sysfs, it is a terminal ghost.
 		if os.IsNotExist(err) {
 			return true
 		}
-		// If it returns an I/O error or timeout, the queue is wedged in the kernel layer.
-		// Returning false prevents the caller from running an unsafe deletion on a live, frozen path.
 		logger.Warningf("isNvmeGhost: Cannot read state path %s due to error: %v. Assuming wedged hardware, skipping.", path, err)
 		return false
 	} 
 
 	s := strings.TrimSpace(string(state))
-	
-	// Only treat as a kernel ghost if explicitly flagged by the subsystem driver
 	return s == "deleting" || s == "dead"
 }
 
@@ -1081,8 +1092,10 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) PruneNvmeGhosts(ctx context.Cont
 
 	for _, entry := range entries {
 		name := entry.Name()
-		// Target only the base namespaces (e.g., nvme0n1), skip partitions (e.g., nvme0n1p1)
-		if !strings.HasPrefix(name, "nvme") || strings.Contains(name, "p") {
+		
+		// HARDENED FILTERING: Focus strictly on base NVMe block names (nvme0n1), 
+		// explicitly ignore partitions (nvme0n1p1) AND direct channel pathways (nvme13c0n2)
+		if !strings.HasPrefix(name, "nvme") || strings.Contains(name, "p") || nvmeScrubberControllerPattern.MatchString(name) {
 			continue
 		}
 
@@ -1090,11 +1103,10 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) PruneNvmeGhosts(ctx context.Cont
 		subsysNqnPath := filepath.Join(deviceDir, "subsysnqn")
 		nqnData, err := os.ReadFile(subsysNqnPath)
 		if err != nil {
-			continue // Path is transitioning or not an active fabrics mapping
+			continue 
 		}
 		currentNqn := strings.TrimSpace(string(nqnData))
 
-		// Ownership Check: Is this NVMe device from our target array group?
 		isOurArray := false
 		for _, nqn := range arrayNqns {
 			if strings.EqualFold(currentNqn, nqn) {
@@ -1106,17 +1118,9 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) PruneNvmeGhosts(ctx context.Cont
 			continue
 		}
 		
-		
-		
-		// 4. Identity & State Check
 		wwid, _ := r.getWWIDBySysfs(name) 
-		
-		// FIX: Call the helper function directly instead of manually parsing the file bytes here.
-		// This applies your robust D-state I/O safety gates to the loop.
 		isGhost := r.isNvmeGhost(name)
 		
-		// Optional: If you still need the raw state string for logging reasons, 
-		// fetch it safely only if it's confirmed a ghost or mismatch.
 		var state string
 		if isGhost {
 			state = r.readSysfs(filepath.Join(deviceDir, "state"))
@@ -1131,31 +1135,32 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) PruneNvmeGhosts(ctx context.Cont
 				ctx,
 				r.KeyedGater,
 				"nvme-delete-"+name,
-				1,
-				10,
-				2*time.Second,
-				15*time.Second,
-				func(ctx context.Context) (struct{}, error) {
-					// FIXED: Extract the raw parent controller name (e.g., nvme0n1 -> nvme0)
-					// to hit /sys/class/nvme/nvmeX/delete_controller accurately on RHEL 7+
-					parts := strings.Split(name, "n")
-					if len(parts) == 0 {
-						return struct{}{}, fmt.Errorf("invalid nvme name layout: %s", name)
-					}
-					ctrlName := parts[0] // "nvme0"
+				1, 10, 2*time.Second, 15*time.Second,
+				func(wCtx context.Context) (struct{}, error) {
+					// HARDENED EVICTION: Safely trigger isolated namespace deletion context
+					deleteNsPath := filepath.Join("/sys/block", name, "device", "delete")
 					
-					deletePath := fmt.Sprintf("/sys/class/nvme/%s/delete_controller", ctrlName)
-
-					if _, err := os.Stat(deletePath); err == nil {
-						if err := os.WriteFile(deletePath, []byte("1"), 0200); err != nil {
-							return struct{}{}, fmt.Errorf("failed writing unplug to %s: %w", deletePath, err)
-						}
-						logger.Infof("Ghost Scrubber: Successfully signaled delete to NVMe controller via %s", deletePath)
-					} else {
-						return struct{}{}, fmt.Errorf("controller delete interface missing at path: %s", deletePath)
+					if _, err := os.Stat(deleteNsPath); err == nil {
+						logger.Infof("Ghost Scrubber: Safely deleting namespace endpoint via %s", deleteNsPath)
+						_ = os.WriteFile(deleteNsPath, []byte("1\n"), 0200)
+						return struct{}{}, nil
 					}
 
-					return struct{}{}, nil
+					// RHEL 7 Legacy Fallback
+					parts := strings.Split(name, "n")
+					if len(parts) > 0 {
+						ctrlName := parts[0]
+						if pciAddrPath, err := filepath.EvalSymlinks(filepath.Join("/sys/class/nvme", ctrlName, "device")); err == nil {
+							pciAddress := filepath.Base(pciAddrPath)
+							unbindPath := "/sys/bus/pci/drivers/nvme/unbind"
+							if _, err := os.Stat(unbindPath); err == nil {
+								logger.Warningf("Ghost Scrubber [RHEL7]: Unbinding controller %s via PCI slot address %s", ctrlName, pciAddress)
+								_ = os.WriteFile(unbindPath, []byte(pciAddress), 0200)
+								return struct{}{}, nil
+							}
+						}
+					}
+					return struct{}{}, fmt.Errorf("controller delete interface missing for target: %s", name)
 				},
 			)
 			if err == nil {
@@ -1165,17 +1170,10 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) PruneNvmeGhosts(ctx context.Cont
 	}
 
 	if deleted > 0 {
-		logger.Infof("Ghost Scrubber: Native NVMe sweep complete. Cleared %d rogue fabric controllers.", deleted)
+		logger.Infof("Ghost Scrubber: Native NVMe sweep complete. Cleared %d rogue fabric resources.", deleted)
 	}
 	return nil
 }
-
-
-
-
-
-
-
 
 
 
