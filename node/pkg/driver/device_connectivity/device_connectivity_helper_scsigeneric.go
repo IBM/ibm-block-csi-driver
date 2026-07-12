@@ -394,7 +394,7 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) IsVolumePathMatchesVolumeId(ctx 
 	}
 
 	// 4. Standard Flow: If the IOCTL succeeds, run the regular prefix-verified comparison helper
-	if !r.Helper.MatchVolumeToScsiSpec(sgInqWwn, expectedSerial) {
+	if !r.MatchVolumeToScsiSpec(sgInqWwn, expectedSerial) {
 		return false, &ErrorWrongDeviceFound{mpathDeviceName, volumeUuid, sgInqWwn}
 	}
 
@@ -402,7 +402,6 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) IsVolumePathMatchesVolumeId(ctx 
 	return true, nil
 }
 
-func (r *OsDeviceConnectivityHel
 // TODO id unused?
 func (r OsDeviceConnectivityHelperScsiGeneric) GetExistingMpathDevice(ctx context.Context, volumeUuid string, volumePath string) (string, error) {
         logger.Infof("GetExistingMpathDevice: Searching matching volume id for volume path: [%s] ", volumePath)
