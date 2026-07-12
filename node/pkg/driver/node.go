@@ -19,6 +19,7 @@ package driver
 import (
 	"context"
 	"errors"
+	"regexp"
 	"fmt"
 	"os"
 	"path"
@@ -237,9 +238,9 @@ func (d *NodeService) NodeStageVolume(ctx context.Context, req *csi.NodeStageVol
 
 	if isNativeNVMe {
 		// Native NVMe Multipathing tracking fallback for dynamic cross-protocol topology matching
-		helper := GetDmsPathHelperGeneric{}
-		slaveCount := helper.GetSlaveCount(baseDevice)
-		logger.Infof("NodeStageVolume: Detected Native NVMe environment for device %s. Subsystem operational controllers counted: %d", baseDevice, slaveCount)
+		//helper := GetDmsPathHelperGeneric{}
+		//slaveCount := helper.GetSlaveCount(baseDevice)
+		//logger.Infof("NodeStageVolume: Detected Native NVMe environment for device %s. Subsystem operational controllers counted: %d", baseDevice, slaveCount)
 		
 		// Map the base device directly into the expected validation sequence
 		sysDevices = []string{baseDevice}
@@ -445,12 +446,20 @@ func (d *NodeService) NodeUnstageVolume(ctx context.Context, req *csi.NodeUnstag
 		// before passing them to the validation utilities
 		if nvmeUnstageControllerPattern.MatchString(baseDevice) {
 			if parts := strings.Split(baseDevice, "n"); len(parts) >= 2 {
-				ctrlPart := parts
-				nsPart := parts
-				if cIdx := strings.Index(ctrlPart, "c"); cIdx != -1 {
-					baseDevice = ctrlPart[:cIdx] + "n" + nsPart
-					logger.Infof("NodeUnstageVolume: Sanitized direct controller path layout down to block device: %s", baseDevice)
-				}
+
+
+
+
+
+		// HARDENED MULTI-PROTOCOL PARSING:
+		// Safely convert character channel paths (nvme13c0n2) to clean data block devices (nvme13n2)
+		if matches := nvmeUnstageControllerPattern.FindStringSubmatch(baseDevice); len(matches) == 3 {
+			// matches[1] captures the controller sequence (e.g., "13")
+			// matches[2] captures the namespace index (e.g., "2")
+			baseDevice = fmt.Sprintf("nvme%sn%s", matches[1], matches[2])
+			logger.Infof("NodeUnstageVolume: Sanitized direct controller path layout down to block device: %s", baseDevice)
+		}
+
 			}
 		}
 
@@ -787,17 +796,17 @@ func (d *NodeService) getVolumeStats(ctx context.Context, path string, volumeId 
 	// If Kubelet targets a block link, check if it points to an unsanitized character control channel.
 	// We evaluate the symlink and re-stitch it to a valid data namespace if necessary.
 	sanitizedPath := path
+	// HARDENED MULTI-PROTOCOL PARSING:
+	// Safely convert character channel paths (nvme13c0n2) to clean data block devices (nvme13n2)
 	if realPath, err := filepath.EvalSymlinks(path); err == nil {
 		baseName := filepath.Base(realPath)
 		if nvmeStatsControllerPattern.MatchString(baseName) {
-			if parts := strings.Split(baseName, "n"); len(parts) >= 2 {
-				ctrlPart := parts
-				nsPart := parts
-				if cIdx := strings.Index(ctrlPart, "c"); cIdx != -1 {
-					sanitizedName := ctrlPart[:cIdx] + "n" + nsPart
-					sanitizedPath = filepath.Join("/dev", sanitizedName)
-					logger.Warningf("NodeGetVolumeStats Sanitization: Redirected tracking path from %s to clean block device %s", realPath, sanitizedPath)
-				}
+			if matches := nvmeStatsControllerPattern.FindStringSubmatch(baseName); len(matches) == 3 {
+				// matches[1] captures the controller sequence (e.g., "13")
+				// matches[2] captures the namespace index (e.g., "2")
+				sanitizedName := fmt.Sprintf("nvme%sn%s", matches[1], matches[2])
+				sanitizedPath = filepath.Join("/dev", sanitizedName)
+				logger.Warningf("NodeGetVolumeStats Sanitization: Redirected tracking path from %s to clean block device %s", realPath, sanitizedPath)
 			}
 		}
 	}
