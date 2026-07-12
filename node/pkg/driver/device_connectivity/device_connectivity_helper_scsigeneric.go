@@ -4439,8 +4439,6 @@ func (o GetDmsPathHelperGeneric) waitInterval(ctx context.Context, timer *time.T
 	}
 }
 
-// GetSlaveCount evaluates the target device topology and calculates the true number 
-// of active, healthy operational paths backing it in sysfs.
 func (o *GetDmsPathHelperGeneric) GetSlaveCount(devName string) int {
 	devName = filepath.Base(devName) // Safely clean input paths like /dev/dm-0 -> dm-0
 
@@ -4487,8 +4485,7 @@ func (o *GetDmsPathHelperGeneric) GetSlaveCount(devName string) int {
 				hardwareIdentity = fmt.Sprintf("Vendor: %s", strings.ToUpper(strings.TrimSpace(string(vendorBytes))))
 			}
 
-			// FIX 1 & 2: Replace brittle "block" file checks with universal path state validation.
-			// This handles both SCSI ("running") and NVMe Fabric ("live") states correctly.
+			// Universal path state validation handling both SCSI ("running") and NVMe Fabric ("live")
 			stateBytes, err := os.ReadFile(filepath.Join(slaveDeviceDir, "state"))
 			state := "unknown"
 			isOperational := false
@@ -4505,8 +4502,6 @@ func (o *GetDmsPathHelperGeneric) GetSlaveCount(devName string) int {
 				slaveName, addrIdentifier, hardwareIdentity, state, isOperational)
 		}
 
-		// Return the count of truly operational paths to prevent the parent driver 
-		// from falsely flagging the DM device as having 0 live paths.
 		return operationalCount
 	}
 
@@ -4514,38 +4509,47 @@ func (o *GetDmsPathHelperGeneric) GetSlaveCount(devName string) int {
 	// 2. NATIVE NVME NAMESPACE SCAN (Native ANA Multipath Controllers)
 	// =========================================================================
 	if o.IsNativeNvmeNamespace(devName) {
-		deviceDir := filepath.Join("/sys/block", devName, "device")
-		entries, err := os.ReadDir(deviceDir)
+		baseBlockDir := filepath.Join("/sys/block", devName)
+		deviceDir := filepath.Join(baseBlockDir, "device")
+		
+		// Pivot to the true subsystem location if this is a native multipath head node
+		subsysSymlink := filepath.Join(deviceDir, "subsystem")
+		realSubsysPath, err := filepath.EvalSymlinks(subsysSymlink)
+		
+		targetScanDir := deviceDir
+		isNativeMultipathHead := (err == nil && strings.Contains(realSubsysPath, "virtual/nvme-subsys"))
+		
+		if isNativeMultipathHead {
+			// For virtual subsystem nodes, the actual physical pathways are linked 
+			// directly inside the evaluated device directory symlink
+			if realDeviceDir, err := filepath.EvalSymlinks(deviceDir); err == nil {
+				targetScanDir = realDeviceDir
+			}
+		}
+
+		entries, err := os.ReadDir(targetScanDir)
 		if err != nil {
 			logger.Warningf("[NVMe-Slave-Scan] [%s] Target NVMe device runtime directory missing or inaccessible: %v", devName, err)
 			return 0
 		}
 		
 		count := 0
-		logger.Infof("[NVMe-Slave-Scan] [%s] Inspecting active controller pathways in tree directory: %s...", devName, deviceDir)
+		logger.Infof("[NVMe-Slave-Scan] [%s] Inspecting active controller pathways in tree directory: %s...", devName, targetScanDir)
 		
 		for _, e := range entries {
 			name := e.Name()
-			
-			// Hardened NVMe controller matching rule:
-			// Matches individual controllers (nvme0, nvme1) and subsystems (nvme-subsys0)
-			
-			// 2. Drop this drop-in replacement into your GetSlaveCount / loops:
 			isNamespaceVolume := nvmeNamespaceRegex.MatchString(name)
 
-			// A valid controller node starts with "nvme", isn't an explicit namespace disk volume,
-			// and can either be an explicit hardware controller channel or a subsystem shell wrapper.
-			isController := strings.HasPrefix(name, "nvme") && !isNamespaceVolume
-			
+			// Valid path controller tracking
+			isController := strings.HasPrefix(name, "nvme") && !isNamespaceVolume && !strings.Contains(name, "c")
 			isSubsys := strings.HasPrefix(name, "nvme-subsys")
 
 			if isController || isSubsys {
-				// Validate path operational health state
-				stateBytes, err := os.ReadFile(filepath.Join(deviceDir, name, "state"))
+				stateBytes, err := os.ReadFile(filepath.Join(targetScanDir, name, "state"))
 				if err == nil {
 					state := strings.ToLower(strings.TrimSpace(string(stateBytes)))
-					// Skip dead, deleting, or failing pathways
-					if state == "dead" || state == "deleting" {
+					// Acceptable operating states for native NVMe controllers
+					if state == "dead" || state == "deleting" || state == "failing" {
 						logger.Warningf("[NVMe-Slave-Scan] -> Skipping unhealthy controller path: %s (State: %s)", name, state)
 						continue
 					}
@@ -4553,12 +4557,11 @@ func (o *GetDmsPathHelperGeneric) GetSlaveCount(devName string) int {
 
 				count++
 				
-				// Correctly resolve the NQN at the parent or target namespace container layer
-				nqnPath := filepath.Join(deviceDir, name, "subsysnqn")
+				// Resolve NQN identifiers
+				nqnPath := filepath.Join(targetScanDir, name, "subsysnqn")
 				nqnBytes, err := os.ReadFile(nqnPath)
 				if err != nil {
-					// Fallback to absolute namespace subsystem node address reference
-					nqnPath = filepath.Join(deviceDir, "subsysnqn")
+					nqnPath = filepath.Join(targetScanDir, "subsysnqn")
 					nqnBytes, _ = os.ReadFile(nqnPath)
 				}
 				
@@ -4578,6 +4581,7 @@ func (o *GetDmsPathHelperGeneric) GetSlaveCount(devName string) int {
 	// =========================================================================
 	logger.Infof("[Slave-Scan] [%s] Non-multipath physical or virtual device. Defaulting count to 1.", devName)
 	return 1
+}
 }
 
 // IsDeviceMapper verifies if a block entry is truly a Device Mapper device
