@@ -1954,11 +1954,11 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) TeardownVolume(ctx context.Conte
 		}
 	}
 	
-	// --- PHASE 3: DEVICE MAPPER CLEANUP / RESTORED FORCEFUL RESCUE ---
+	// --- PHASE 3: DEVICE MAPPER CLEANUP / SAFELY MODERNIZED RESCUE ---
 	if mpathName != "" && !isNativeNVMe && strings.HasPrefix(mpathName, "dm-") {
 		var openCount int32
 		
-		for i := 0; i < 5; i++ {
+		for i := 0; i < 10; i++ {
 			if ctx.Err() != nil {
 				break
 			}
@@ -1974,14 +1974,24 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) TeardownVolume(ctx context.Conte
 		}
 	
 		if openCount > 0 {
-			// RESTORED INTENT FOR DM: If the unmount loop resorted to MNT_DETACH,
-			// openCount will remain > 0. We trigger a Deferred Removal to tell the 
-			// kernel to dismantle the user-space map table asynchronously, then 
-			// drop directly into Phase 4 to pull the hardware rug out from under the zombie FS.
-			logger.Warningf("Device %s is busy (openCount=%d) after unmount escalation. Triggering safe forceful cleanup via Deferred Removal.", mpathName, openCount)
+			// MODERNIZED FORCEFUL CLEANUP: Matches your original intent for both SCSI and NVMe.
+			// Instead of a risky error table swap, we trigger a safe native Deferred Removal.
+			logger.Warningf("Device %s is busy (openCount=%d) after unmount escalation. Invoking modern Deferred Removal inside ExecuteUninterruptible.", mpathName, openCount)
 			
 			_ = r.multipathdAction(ctx, "disablequeueing map "+mpathName)
-			_ = r.dmIoctlCall(ctx, mpathName, DM_DEV_REMOVE, DM_DEFERRED_REMOVE)
+
+			// Wrap the modern removal inside your uninterruptible framework. If the kernel ioctl blocks 
+			// due to a deadlocked storage layer, your executor will isolate the thread and keep the driver alive.
+			_, _ = executer.ExecuteUninterruptible[struct{}](
+				ctx, r.KeyedGater, "rescue-"+mpathName, 10, 50, 5*time.Second, 15*time.Second,
+				func(wCtx context.Context) (struct{}{}, error) {
+					_ = r.dmIoctlCall(wCtx, mpathName, DM_DEV_REMOVE, DM_DEFERRED_REMOVE)
+					return struct{}{}, nil
+				},
+			)
+			
+			// Execution drops straight into Phase 4, where pulling the physical hardware paths
+			// forces the open counts down to 0, automatically triggering the deferred removal.
 		} else {
 			// Clean Path: Device is fully idle, safe to flush buffers and remove immediately
 			if needFlush {
@@ -1996,8 +2006,6 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) TeardownVolume(ctx context.Conte
 			}
 		}
 	} else if mpathName != "" && isNativeNVMe {
-		// Native NVMe skips DM map deletion but drops directly into Phase 4, where our updated,
-		// namespace-safe eviction code forcefully disconnects the target endpoint.
 		logger.Infof("Target node %s is native NVMe. Bypassing Device Mapper state manipulation to run hardware eviction.", mpathName)
 	}
 
