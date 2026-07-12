@@ -308,29 +308,30 @@ func (m *Mounter) MakeDir(pathname string) error {
 func (m *Mounter) UnmountWithTimeout(ctx context.Context, target string, timeout time.Duration) error {
 	now := time.Now()
 	
-   // 1. Resolve Device and Perform Safety Gate Checks
-   device, _ := m.GetDeviceFromMount(target)
-   if device != "" {
-		   // HARDWARE GATE: If the kernel workers (jbd2/xfs) are already wedged,
-		   // any further I/O (like unmount or sync) will deadlock the thread.
-		   if m.executer.IsDeviceStillStuck(device) {
-				   // TODO is this safe - or perhaps we should skip
-				   logger.Warningf("Safety-Gate: Device %s is stuck. Skipping to Tier 3 (MNT_DETACH).", device)
-				   return m.EscalateToLazy(target)
-		   }
+	// 1. Resolve Device and Perform Safety Gate Checks
+	device, _ := m.GetDeviceFromMount(target)
+	isDeviceStuck := false
 
-		   // DAEMON GATE: If multipathd is deadlocked, the socket query will timeout.
-		   isDM := strings.HasPrefix(filepath.Base(device), "dm-")
-		   isNVMe := strings.HasPrefix(filepath.Base(device), "nvme")
+	if device != "" {
+		// HARDWARE GATE: If the kernel workers (jbd2/xfs) are already wedged,
+		// any further I/O (like unmount or sync) will deadlock the thread.
+		if m.executer.IsDeviceStillStuck(device) {
+			logger.Warningf("Safety-Gate: Device %s is stuck. Skipping cache flush and cascading to Tier 3 (MNT_DETACH).", device)
+			isDeviceStuck = true
+			return m.EscalateToLazy(target)
+		}
 
-		   if isDM || isNVMe {
-				   if _, err := m.executer.IsMultipathdAlive(ctx); err != nil && strings.Contains(err.Error(), "deadlock") {
-							logger.Warning("multipathd deadlock; unmount aborted to prevent hang")
-						   return fmt.Errorf("safety-gate: multipathd deadlock; unmount aborted to prevent hang")
-				   }
-		   }
-   }
-	
+		// DAEMON GATE: If multipathd is deadlocked, the socket query will timeout.
+		isDM := strings.HasPrefix(filepath.Base(device), "dm-")
+		isNVMe := strings.HasPrefix(filepath.Base(device), "nvme")
+
+		if isDM || isNVMe {
+			if _, err := m.executer.IsMultipathdAlive(ctx); err != nil && strings.Contains(err.Error(), "deadlock") {
+				logger.Warning("multipathd deadlock; unmount aborted to prevent hang")
+				return fmt.Errorf("safety-gate: multipathd deadlock; unmount aborted to prevent hang")
+			}
+		}
+	}
 
 	// 1. Idempotency Check
 	if mounted, _ := m.IsMounted(target); !mounted {
@@ -349,10 +350,42 @@ func (m *Mounter) UnmountWithTimeout(ctx context.Context, target string, timeout
 	mInfo.mu.Lock()
 	elapsed := now.Sub(mInfo.FirstAttempt)
 
-	// Tier 0: Background Syncfs (Only executed on the very first loop invocation)
-	if mInfo.LastState == StateGracefulPending && !mInfo.SyncDone && !mInfo.SyncInProgress {
+	// =========================================================================
+	// FIX B INTEGRATION: SYNCHRONOUS PRE-UNMOUNT PAGE CACHE FLUSH
+	// =========================================================================
+	// Execute the sync synchronously ONLY on the very first graceful attempt loop,
+	// and ONLY if the underlying storage layer isn't already bricked/stuck.
+	if mInfo.LastState == StateGracefulPending && !mInfo.SyncDone && !mInfo.SyncInProgress && !isDeviceStuck {
 		mInfo.SyncInProgress = true
-		go m.backgroundSyncfs(ctx, target, mInfo)
+		mInfo.mu.Unlock() // Release lock early during IO execution to prevent thread lockups
+
+		logger.Infof("[Sync-Gate] Synchronously flushing memory maps to storage backend for %s", target)
+		
+		// Wrap inside your ExecuteUninterruptible engine. If the sync system call blocks, 
+		// the worker is cleanly isolated in the background, preventing Kubelet from hanging.
+		_, syncErr := m.executer.ExecuteUninterruptible[struct{}](
+			ctx, m.KeyedGater, "syncfs-"+filepath.Base(target), 1, 10, 2*time.Second, 15*time.Second,
+			func(wCtx context.Context) (struct{}, error) {
+				f, err := os.Open(GetPodPath(target))
+				if err != nil {
+					return struct{}{}, err
+				}
+				defer f.Close()
+				
+				// Natively forces the kernel file subsystem to flush dirty cache pages down to the iSCSI/NVMe fabrics
+				err = syscall.Sync64(int(f.Fd()))
+				return struct{}{}, err
+			},
+		)
+
+		mInfo.mu.Lock()
+		mInfo.SyncInProgress = false
+		if syncErr != nil {
+			logger.Warningf("[Sync-Gate] Cache flush completed with a warning (proceeding to unmount): %v", syncErr)
+		} else {
+			logger.Infof("[Sync-Gate] Cache sync verified successful. Buffers fully committed.")
+			mInfo.SyncDone = true
+		}
 	}
 	mInfo.mu.Unlock()
 
@@ -374,8 +407,6 @@ func (m *Mounter) UnmountWithTimeout(ctx context.Context, target string, timeout
 		m.updateState(target, mInfo, StateLazyPending)
 		err = m.tryUnmount(target, syscall.MNT_DETACH, timeout)
 	}
-	
-	
 
 	if err != nil {
 		// Idempotency check: if the path is already gone or invalid, clean up tracker and exit
@@ -399,7 +430,7 @@ func (m *Mounter) UnmountWithTimeout(ctx context.Context, target string, timeout
 			}
 			
 			// Tier 3: All tiers are completely exhausted. The filesystem is a zombie.
-			// FIX: Suppress the error, clean the tracker, and return nil.
+			// Suppress the error, clean the tracker, and return nil.
 			// This signals the orchestrator to advance straight into Phase 3/4 hardware destruction.
 			logger.Warningf("Terminal unmount failure (%v) in lazy tier. Safety windows exhausted. Forcing hardware rescue.", err)
 			m.unmountTracker.Delete(target)
@@ -1096,13 +1127,19 @@ func findBestMount(targetPath string) (*MountInfo, error) {
 		return nil, err
 	}
 
+	// Ensure our path evaluation variables are completely clean and standardized
+	cleanedTarget := filepath.Clean(targetPath)
+
 	var bestMatch *MountInfo
 	maxLen := -1
-	for _, m := range mounts {
-		if strings.HasPrefix(targetPath, m.MountPoint) {
+	for i := range mounts {
+		m := &mounts[i]
+		
+		// Match exact target paths, or subdirectories under verified mount points
+		if cleanedTarget == m.MountPoint || strings.HasPrefix(cleanedTarget, m.MountPoint+string(filepath.Separator)) {
 			if len(m.MountPoint) > maxLen {
 				maxLen = len(m.MountPoint)
-				bestMatch = &m
+				bestMatch = m
 			}
 		}
 	}
@@ -1110,6 +1147,15 @@ func findBestMount(targetPath string) (*MountInfo, error) {
 	if bestMatch == nil {
 		return nil, fmt.Errorf("no mount found for %s", targetPath)
 	}
+
+	// HARDENED SAFETY GATE: If the lookup matched the host's primary root system partition ('/') 
+	// but the user's specific requested path wasn't exactly the root directory, it means the 
+	// target subdirectory has vanished. Abort fallback tracking to prevent root drive corruption.
+	if bestMatch.MountPoint == "/" && cleanedTarget != "/" {
+		logger.Warningf("Safety-Gate Block: findBestMount intercepted a loose fallback to the host root device for missing path %s. Aborting lookup.", targetPath)
+		return nil, fmt.Errorf("mount point for path %s has vanished from mountinfo", targetPath)
+	}
+
 	return bestMatch, nil
 }
 
