@@ -821,8 +821,8 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) ValidateLun(ctx context.Context,
 		}
 
 		// 2. Normalize all harvested identities down to raw 32-character hex blocks
-		normSysfsId := r.Helper.normalizeWWID(sysfsIdRaw)
-		normHwId := r.Helper.normalizeWWID(hwIdRaw)
+		normSysfsId := normalizeWWID(sysfsIdRaw)
+		normHwId := normalizeWWID(hwIdRaw)
 
 		// 3. Validation Logic
 		if actualLun != normExpectedLun {
