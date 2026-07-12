@@ -88,6 +88,7 @@ var (
 var nvmeNamespaceRegex = regexp.MustCompile(`^nvme\d+(c\d+)?n\d+$`)
 var nvmeControllerChannelRegex = regexp.MustCompile(`^nvme\d+c\d+n\d+$`)
 var nvmeControllerNodePattern = regexp.MustCompile(`^nvme(\d+)c\d+n(\d+)$`)
+var nvmeControllerHeadFormat = regexp.MustCompile(`^nvme(\d+)c\d+n(\d+)$`)
 
 // SgIoHeader matches the C struct sg_io_hdr_t for Linux ioctl
 type SgIoHeader struct {
@@ -4409,6 +4410,16 @@ func (o GetDmsPathHelperGeneric) WaitForDmToExist(ctx context.Context, volumeWWI
 
 		if stableCycles >= 2 {
 			logger.Warning("2 stable cycles")
+			
+			// HARDENED OUTPUT SANITIZATION:
+			// If name is "nvme13c0n2", convert path target to "nvme13n2" before returning to executer
+			if matches := nvmeControllerHeadFormat.FindStringSubmatch(name); len(matches) == 3 {
+				sanitizedName := fmt.Sprintf("nvme%sn%s", matches[1], matches[2])
+				logger.Warningf("[NVMe-Sanitize] Converting runtime target from %s to actual data node %s", name, sanitizedName)
+				name = sanitizedName
+				path = filepath.Join("/dev", name)
+			}
+
 			if err := o.safeSettle(path); err == nil {
 				return o.validateDMIntegrity(path)
 			}
