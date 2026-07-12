@@ -1953,17 +1953,22 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) TeardownVolume(ctx context.Conte
 			}
 		}
 	}
-	
+
+	// =========================================================================
 	// --- PHASE 3: DEVICE MAPPER CLEANUP / SAFELY MODERNIZED RESCUE ---
+	// =========================================================================
+	// Declare tracking variables at the outer function level scope so Phase 4 can read them!
+	var globalOpenCount int32
+	rawScsiTarget := strings.ToLower(strings.TrimSpace(expectedWWID))
+	rawNvmeTarget := convertScsiIdToNguid(rawScsiTarget)
+
 	if mpathName != "" && !isNativeNVMe && strings.HasPrefix(mpathName, "dm-") {
-		var openCount int32
-		
 		for i := 0; i < 10; i++ {
 			if ctx.Err() != nil {
 				break
 			}
-			openCount, _ = r.Helper.GetOpenCount(ctx, mpathName)
-			if openCount == 0 {
+			globalOpenCount, _ = r.Helper.GetOpenCount(ctx, mpathName)
+			if globalOpenCount == 0 {
 				break 
 			}
 			select {
@@ -1973,31 +1978,24 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) TeardownVolume(ctx context.Conte
 			}
 		}
 	
-		if openCount > 0 {
-			// MODERNIZED FORCEFUL CLEANUP: Matches your original intent for both SCSI and NVMe.
-			// Instead of a risky error table swap, we trigger a safe native Deferred Removal.
-			logger.Warningf("Device %s is busy (openCount=%d) after unmount escalation. Invoking modern Deferred Removal inside ExecuteUninterruptible.", mpathName, openCount)
+		if globalOpenCount > 0 {
+			logger.Warningf("Device %s is busy (openCount=%d) after unmount escalation. Invoking modern Deferred Removal inside ExecuteUninterruptible.", mpathName, globalOpenCount)
 			
 			_ = r.multipathdAction(ctx, "disablequeueing map "+mpathName)
 
-			// Wrap the modern removal inside your uninterruptible framework. If the kernel ioctl blocks 
-			// due to a deadlocked storage layer, your executor will isolate the thread and keep the driver alive.
 			_, _ = executer.ExecuteUninterruptible[struct{}](
 				ctx, r.KeyedGater, "rescue-"+mpathName, 10, 50, 5*time.Second, 15*time.Second,
-				func(wCtx context.Context) (struct{}{}, error) {
+				func(wCtx context.Context) (struct{}, error) {
 					_ = r.dmIoctlCall(wCtx, mpathName, DM_DEV_REMOVE, DM_DEFERRED_REMOVE)
 					return struct{}{}, nil
 				},
 			)
-			
-			// Execution drops straight into Phase 4, where pulling the physical hardware paths
-			// forces the open counts down to 0, automatically triggering the deferred removal.
 		} else {
 			// Clean Path: Device is fully idle, safe to flush buffers and remove immediately
 			if needFlush {
 				_, _ = executer.ExecuteUninterruptible[struct{}](
 					ctx, r.KeyedGater, "flush-"+mpathName, 10, 50, 5*time.Second, 30*time.Second,
-					func(wCtx context.Context) (struct{}{}, error) {
+					func(wCtx context.Context) (struct{}, error) {
 						err := r.flushDeviceBuffers(wCtx, fmt.Sprintf("/dev/mapper/%s", mpathName))
 						return struct{}{}, err
 					},
@@ -2009,11 +2007,11 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) TeardownVolume(ctx context.Conte
 		logger.Infof("Target node %s is native NVMe. Bypassing Device Mapper state manipulation to run hardware eviction.", mpathName)
 	}
 
+	// =========================================================================
 	// --- PHASE 4: PHYSICAL LAYER ---
-	if needRemovePhysical || openCount > 0 {
-		// Even if needRemovePhysical was initially false (like in NVMeNonNative), if openCount > 0, 
-		// we FORCE the physical layer purge to break the underlying paths and unblock the host kernel.
-		logger.Warningf("Teardown volume %s: executing hardware path eviction (OpenCount=%d, Force=%v)", target, openCount, needRemovePhysical)	
+	// =========================================================================
+	if needRemovePhysical || globalOpenCount > 0 {
+		logger.Warningf("Teardown volume %s: executing hardware path eviction (OpenCount=%d, Force=%v)", target, globalOpenCount, needRemovePhysical)	
 		
 		var slaves []string
 		if hardwareResolved && major != 0 && !isNativeNVMe {
@@ -2024,15 +2022,19 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) TeardownVolume(ctx context.Conte
 		}
 
 		if len(slaves) > 0 {
-			// Deletes SCSI disks or runs the cross-platform RHEL 7/Modern NVMe namespace-safe purge
 			_ = r.RemovePhysicalDevice(ctx, slaves)
 		} else {
-			// Fallback: Invoke the dual-protocol path check to clean up stray channels or unbind RHEL 7 controllers
 			_ = r.purgeStuckPhysicalPathsDualProtocol(rawScsiTarget, rawNvmeTarget)
 		}
 	}
-	
 
+	// Final File Cleanup and Function Terminal Close
+	if _, err := os.Stat(target); err == nil {
+		return os.Remove(target)
+	}
+
+	// FIXED: Explicitly added the missing closure return requirement
+	return nil
 }
 
 func (o *OsDeviceConnectivityHelperScsiGeneric) FindSlavesByWWID(expectedWWID string) []string {
