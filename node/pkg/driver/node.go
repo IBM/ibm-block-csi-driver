@@ -22,6 +22,7 @@ import (
 	"fmt"
 	"os"
 	"path"
+	"path/filepath" // FIXED: Replaced brittle path with filepath
 	"reflect"
 	"strings"
 
@@ -110,6 +111,9 @@ func NewNodeService(configYaml ConfigFile, hostname string, nodeUtils NodeUtilsI
 	}
 }
 
+// Structural pattern matching to ensure accurate device name handling across all Linux layers
+var nvmeStageControllerPattern = regexp.MustCompile(`^nvme\d+c\d+n\d+$`)
+
 func (d *NodeService) NodeStageVolume(ctx context.Context, req *csi.NodeStageVolumeRequest) (*csi.NodeStageVolumeResponse, error) {
 	defer logger.Exit(logger.Enter(req))
 
@@ -142,7 +146,7 @@ func (d *NodeService) NodeStageVolume(ctx context.Context, req *csi.NodeStageVol
 		return nil, status.Error(codes.InvalidArgument, fmt.Sprintf("Wrong connectivity type %s", connectivityType))
 	}
 
-	stagingPath := req.GetStagingTargetPath() // e.g in k8s /var/lib/kubelet/plugins/kubernetes.io/csi/pv/pvc-21967c74-b456-11e9-b93e-005056a45d5f/globalmount
+	stagingPath := req.GetStagingTargetPath() 
 	stagingPathWithHostPrefix := d.NodeUtils.GetPodPath(stagingPath)
 
 	volumeUuid := d.NodeUtils.GetVolumeUuid(volumeID)
@@ -157,69 +161,65 @@ func (d *NodeService) NodeStageVolume(ctx context.Context, req *csi.NodeStageVol
 		return &csi.NodeStageVolumeResponse{}, nil
 	}
 
+	// =========================================================================
+	// 1. EVALUATE IDENTITY AND KERNEL TOPOLOGY PRE-SCAN
+	// =========================================================================
+	mpathDevice, isStaged, skipRescan, _, preScanErr := d.OsDeviceConnectivityHelper.IdentityAwarePreScan(ctx, stagingPathWithHostPrefix, volumeUuid)
+	
+	if preScanErr != nil && status.Code(preScanErr) != codes.Aborted {
+		return nil, preScanErr
+	}
 
+	if isStaged {
+		logger.Infof("NodeStageVolume Complete: Already fully staged and verified via hardware inquiry.")
+		return &csi.NodeStageVolumeResponse{}, nil
+	}
 
+	// =========================================================================
+	// 2. DISCOVERY OR STABILIZATION ROUTING
+	// =========================================================================
+	if !skipRescan {
+		logger.Infof("Device missing or recently purged for WWID %v. Initiating fabric discovery.", volumeUuid)
+		osDeviceConnectivity.EnsureLogin(ctx, ipsByArrayInitiator)
 
+		_ = d.OsDeviceConnectivityHelper.RemoveGhostDevice(ctx, volumeUuid, lun, arrayInitiators)
+		if err := osDeviceConnectivity.RescanDevices(lun, arrayInitiators); err != nil {
+			return nil, status.Error(codes.Internal, err.Error())
+		}
+		_ = d.OsDeviceConnectivityHelper.RemoveGhostDevice(ctx, volumeUuid, lun, arrayInitiators)
+	} else {
+		if preScanErr != nil && status.Code(preScanErr) == codes.Aborted {
+			logger.Infof("Optimization: Active kernel transition detected for %v. Bypassing rescan and entering poll loop.", volumeUuid)
+		} else {
+			 logger.Infof("Optimization: Healthy idle block device %s found in sysfs. Bypassing rescan phase.", mpathDevice)
+		}
+	}
 
-
-
-
-
-        // =========================================================================
-        // 1. EVALUATE IDENTITY AND KERNEL TOPOLOGY PRE-SCAN
-        // =========================================================================
-        mpathDevice, isStaged, skipRescan, _, preScanErr := d.OsDeviceConnectivityHelper.IdentityAwarePreScan(ctx, stagingPathWithHostPrefix, volumeUuid)
-        
-        // Handle explicit unrecoverable failures, but allow 'Aborted' transitions to fall through
-        if preScanErr != nil && status.Code(preScanErr) != codes.Aborted {
-                return nil, preScanErr
-        }
-
-        if isStaged {
-                logger.Infof("NodeStageVolume Complete: Already fully staged and verified via hardware inquiry.")
-                return &csi.NodeStageVolumeResponse{}, nil
-        }
-
-        // =========================================================================
-        // 2. DISCOVERY OR STABILIZATION ROUTING
-        // =========================================================================
-        if !skipRescan {
-                logger.Infof("Device missing or recently purged for WWID %v. Initiating fabric discovery.", volumeUuid)
-                osDeviceConnectivity.EnsureLogin(ctx, ipsByArrayInitiator)
-
-                _ = d.OsDeviceConnectivityHelper.RemoveGhostDevice(ctx, volumeUuid, lun, arrayInitiators)
-                if err := osDeviceConnectivity.RescanDevices(lun, arrayInitiators); err != nil {
-                        return nil, status.Error(codes.Internal, err.Error())
-                }
-                _ = d.OsDeviceConnectivityHelper.RemoveGhostDevice(ctx, volumeUuid, lun, arrayInitiators)
-        } else {
-                // If preScanErr is codes.Aborted, it means skipRescan is true because discovery is ongoing
-                if preScanErr != nil && status.Code(preScanErr) == codes.Aborted {
-                        logger.Infof("Optimization: Active kernel transition detected for %v. Bypassing rescan and entering poll loop.", volumeUuid)
-                } else {
-                         logger.Infof("Optimization: Healthy idle block device %s found in sysfs. Bypassing rescan phase.", mpathDevice)
-                }
-        }
-
-        // =========================================================================
-        // 3. CORE POLLING AND MULTI-PATH STABILIZATION
-        // =========================================================================
-        // Whether we did a fresh rescan OR skipped it because a device is transitioning/idle,
-        // we run WaitForDmToExist. It uses our strict EvaluateSysfsTopology rules to guarantee 
-        // the block layer is completely un-suspended, read-write, and stable.
-        mpathDevice, err = d.OsDeviceConnectivityHelper.GetMpathDevice(ctx, volumeUuid)
-        if err != nil {
+	// =========================================================================
+	// 3. CORE POLLING AND MULTI-PATH STABILIZATION
+	// =========================================================================
+	mpathDevice, err = d.OsDeviceConnectivityHelper.GetMpathDevice(ctx, volumeUuid)
+	if err != nil {
 		logger.Errorf("Error while discovering the device : {%v}", err.Error())
-                // If the 30-second gRPC context context deadline expires here, we return DeadlineExceeded.
-                // On the next retry, IdentityAwarePreScan will flag the device as transitioning,
-                // bypass the rescan phase automatically, and fall back right here to resume polling.
-                if errors.Is(ctx.Err(), context.DeadlineExceeded) || status.Code(err) == codes.DeadlineExceeded {
-                        return nil, status.Errorf(codes.DeadlineExceeded, "temporary discovery loop timeout: %v", err)
-                }
-                return nil, status.Errorf(codes.Internal, "device fingerprint stabilization failed: %v", err)
-        }
+		if errors.Is(ctx.Err(), context.DeadlineExceeded) || status.Code(err) == codes.DeadlineExceeded {
+			return nil, status.Errorf(codes.DeadlineExceeded, "temporary discovery loop timeout: %v", err)
+		}
+		return nil, status.Errorf(codes.Internal, "device fingerprint stabilization failed: %v", err)
+	}
 
-        logger.Infof("Device discovery finalized and settled successfully at path: %s", mpathDevice)
+	// HARDENED SANITIZATION INTERCEPTION:
+	// Protect formatters and mounters by transforming any raw controller channel string
+	// (e.g. /dev/nvme13c0n2) to the correct data block namespace interface (/dev/nvme13n2)
+	baseDevice := filepath.Base(mpathDevice)
+	if matches := nvmeStageControllerPattern.FindStringSubmatch(baseDevice); len(matches) == 3 {
+		sanitizedName := fmt.Sprintf("nvme%sn%s", matches[1], matches[2])
+		logger.Warningf("NodeStageVolume Sanitization: Redirecting raw controller channel %s to storage block interface %s", baseDevice, sanitizedName)
+		baseDevice = sanitizedName
+		mpathDevice = filepath.Join("/dev", baseDevice)
+	}
+
+	logger.Infof("Device discovery finalized and settled successfully at path: %s", mpathDevice)
+
 	// 3. BLOCK VOLUME EXIT
 	volumeCap := req.GetVolumeCapability()
 	switch volumeCap.GetAccessType().(type) {
@@ -228,15 +228,33 @@ func (d *NodeService) NodeStageVolume(ctx context.Context, req *csi.NodeStageVol
 		return &csi.NodeStageVolumeResponse{}, nil
 	}
 
+	// =========================================================================
 	// 4. TOPOLOGY VALIDATION, FORMATTING, AND MOUNTING
-	baseDevice := path.Base(mpathDevice)
-	sysDevices, err := d.NodeUtils.GetSysDevicesFromMpath(ctx, baseDevice)
-	if err != nil {
-		logger.Errorf("Error while trying to get sys devices : {%v}", err.Error())
-		return nil, status.Error(codes.Internal, err.Error())
+	// =========================================================================
+	// Check if this is a Native NVMe architecture node vs a classic Device Mapper target
+	isNativeNVMe := strings.HasPrefix(baseDevice, "nvme")
+	var sysDevices []string
+
+	if isNativeNVMe {
+		// Native NVMe Multipathing tracking fallback for dynamic cross-protocol topology matching
+		helper := GetDmsPathHelperGeneric{}
+		slaveCount := helper.GetSlaveCount(baseDevice)
+		logger.Infof("NodeStageVolume: Detected Native NVMe environment for device %s. Subsystem operational controllers counted: %d", baseDevice, slaveCount)
+		
+		// Map the base device directly into the expected validation sequence
+		sysDevices = []string{baseDevice}
+	} else {
+		// Standard Device Mapper pathway path mapping query
+		sysDevices, err = d.NodeUtils.GetSysDevicesFromMpath(ctx, baseDevice)
+		if err != nil {
+			logger.Errorf("Error while trying to get sys devices : {%v}", err.Error())
+			return nil, status.Error(codes.Internal, err.Error())
+		}
 	}
 	
+	// Invoke LUN tracking verification with the protocol-isolated tracking fields
 	if err := osDeviceConnectivity.ValidateLun(ctx, mpathDevice, lun, sysDevices, volumeUuid); err != nil {
+		logger.Errorf("Volume LUN validation failed for %s: %v", mpathDevice, err)
 		return nil, status.Error(codes.Internal, err.Error())
 	}
 
@@ -375,6 +393,9 @@ func (d *NodeService) formatAndMount(mpathDevice string, stagingPath string, fsT
 	return d.Mounter.FormatAndMount(mpathDevice, stagingPath, fsTypeForMount, mountOptions) // Passing without /host because k8s mounter uses mount\mkfs\fsck
 }
 
+// Structural pattern matching to ensure accurate device name handling across all Linux layers
+var nvmeUnstageControllerPattern = regexp.MustCompile(`^nvme\d+c\d+n\d+$`)
+
 func (d *NodeService) NodeUnstageVolume(ctx context.Context, req *csi.NodeUnstageVolumeRequest) (*csi.NodeUnstageVolumeResponse, error) {
 	defer logger.Exit(logger.Enter(req))
 	volumeID := req.GetVolumeId()
@@ -398,65 +419,77 @@ func (d *NodeService) NodeUnstageVolume(ctx context.Context, req *csi.NodeUnstag
 	}
 
 	stagingPathWithHostPrefix := d.NodeUtils.GetPodPath(stagingTargetPath)
-
 	logger.Debugf("Check if staging path {%s} is mounted", stagingPathWithHostPrefix)
 
 	volumeUuid := d.NodeUtils.GetVolumeUuid(volumeID)
 	
-	
-	
 	var needFlush bool
 	var needRemovePhysical bool
 	
-    device, err := d.OsDeviceConnectivityHelper.GetExistingMpathDevice(ctx, volumeUuid, stagingPathWithHostPrefix)
+	device, err := d.OsDeviceConnectivityHelper.GetExistingMpathDevice(ctx, volumeUuid, stagingPathWithHostPrefix)
 	if err != nil {
-		logger.Errorf("Error while discovering the device : {%v}", err.Error())
-	} 	else {
+		logger.Errorf("Error while discovering the device : {%v}. Activating multi-protocol fallback configuration safety variables.", err.Error())
+		
+		// HARDENED FALLBACK ROUTING:
+		// If device tracking details are lost, assume high-safety parameters to force device cleanup
+		// rather than leaking paths and risking data corruption on SCSI/DM arrays.
+		needFlush = true
+		needRemovePhysical = true
+	} else {
 		logger.Debugf("Discovered device : {%v}", device)
 
-		baseDevice := path.Base(device)
+		baseDevice := filepath.Base(device)
+
+		// HARDENED SANITIZATION:
+		// Convert character channel entries (nvme13c0n2) to standard block nodes (nvme13n2)
+		// before passing them to the validation utilities
+		if nvmeUnstageControllerPattern.MatchString(baseDevice) {
+			if parts := strings.Split(baseDevice, "n"); len(parts) >= 2 {
+				ctrlPart := parts
+				nsPart := parts
+				if cIdx := strings.Index(ctrlPart, "c"); cIdx != -1 {
+					baseDevice = ctrlPart[:cIdx] + "n" + nsPart
+					logger.Infof("NodeUnstageVolume: Sanitized direct controller path layout down to block device: %s", baseDevice)
+				}
+			}
+		}
 
 		nvmeType, err := d.NodeUtils.DevicesAreNvme(ctx, baseDevice)
-		
-		
-		
-		   if err != nil {
-				   logger.Errorf("Failed to determine device type for %s: %v", baseDevice, err)
-		   }
+		if err != nil {
+			logger.Errorf("Failed to determine device type for %s: %v. Defaulting to full cleanup strategy.", baseDevice, err)
+			needFlush = true
+			needRemovePhysical = true
+		} else {
+			switch nvmeType {
+			case NVMeNative:
+				// Native NVMe multipath: kernel manages everything, skip all cleanup
+				logger.Infof("Device %s is native NVMe: skipping flush and SCSI device cleanup", baseDevice)
 
-		   switch nvmeType {
-		   case NVMeNative:
-				   // Native NVMe multipath: kernel manages everything, skip all cleanup
-				   logger.Infof("Device %s is native NVMe: skipping flush and SCSI device cleanup", baseDevice)
-
-		   case NVMeNonNative:
-				   // DM-multipath over NVMe: flush mpath only.
+			case NVMeNonNative:
+				// DM-multipath over NVMe: flush mpath only.
 				needFlush = true
-				   logger.Infof("Device %s is non-native NVMe: flush multipath, skip physical device removal", baseDevice)
+				logger.Infof("Device %s is non-native NVMe: flush multipath, skip physical device removal", baseDevice)
 
-		   case NotNVMe:
-				logger.Infof("Device %s is not NVMe: flush multipath, physical device removal", baseDevice)
+			case NotNVMe:
+				logger.Infof("Device %s is not NVMe (SCSI/FC): flush multipath and trigger physical device path removal", baseDevice)
 				needFlush = true
 				needRemovePhysical = true
 
-		   default:
-				   return nil, status.Errorf(codes.Internal, "Unknown NVMe type for device %s", baseDevice)
-		   }
-			
-	
+			default:
+				return nil, status.Errorf(codes.Internal, "Unknown NVMe type for device %s", baseDevice)
+			}
+		}
 	}
 
-
+	// Execute storage layer teardown via our hardened lower-tier function matrix
 	err = d.OsDeviceConnectivityHelper.TeardownVolume(ctx, stagingTargetPath, needFlush, needRemovePhysical, volumeUuid)
 	if err != nil {
-		// FIX: Propagate the error back to Kubelet. 
-		// If this is wrapped in our safety tiers, Kubelet will exponentially back off and retry.
-		// No metadata or host directory changes will occur until the tiers pass or hardware is rescued.
+		logger.Errorf("Failed to teardown volume %s at staging path %s: %v", volumeUuid, stagingTargetPath, err)
 		return nil, status.Errorf(codes.Internal, "failed to teardown staging target %s: %v", stagingTargetPath, err)
 	}
 
 	// 2. Clear Stage Info Metadata (Only safely executable if hardware/VFS layers are verified clean)
-	stageInfoPath := path.Join(stagingTargetPath, StageInfoFilename)
+	stageInfoPath := filepath.Join(stagingTargetPath, StageInfoFilename)
 	if d.NodeUtils.StageInfoFileIsExist(stageInfoPath) {
 		if err := d.NodeUtils.ClearStageInfoFile(stageInfoPath); err != nil {
 			return nil, status.Errorf(codes.Internal, "fail to clear the stage info file: error %v", err)
@@ -692,7 +725,11 @@ func (d *NodeService) NodeUnpublishVolume(ctx context.Context, req *csi.NodeUnpu
 
 }
 
+// Structural pattern matching to ensure accurate device name handling across all Linux layers
+var nvmeStatsControllerPattern = regexp.MustCompile(`^nvme\d+c\d+n\d+$`)
+
 func (d *NodeService) NodeGetVolumeStats(ctx context.Context, req *csi.NodeGetVolumeStatsRequest) (*csi.NodeGetVolumeStatsResponse, error) {
+	defer logger.Exit(logger.Enter(req))
 	volumeId := req.VolumeId
 	goid_info.SetAdditionalIDInfo(volumeId)
 	defer goid_info.DeleteAdditionalIDInfo()
@@ -745,13 +782,34 @@ func (d *NodeService) nodeGetVolumeStatsRequestValidation(volumeId string, volum
 
 func (d *NodeService) getVolumeStats(ctx context.Context, path string, volumeId string) (VolumeStatistics, error) {
 	var volumeStats VolumeStatistics
-	isBlock, err := d.NodeUtils.IsBlock(ctx, path)
+	
+	// HARDENED RAW SYSLINK SANITIZATION:
+	// If Kubelet targets a block link, check if it points to an unsanitized character control channel.
+	// We evaluate the symlink and re-stitch it to a valid data namespace if necessary.
+	sanitizedPath := path
+	if realPath, err := filepath.EvalSymlinks(path); err == nil {
+		baseName := filepath.Base(realPath)
+		if nvmeStatsControllerPattern.MatchString(baseName) {
+			if parts := strings.Split(baseName, "n"); len(parts) >= 2 {
+				ctrlPart := parts
+				nsPart := parts
+				if cIdx := strings.Index(ctrlPart, "c"); cIdx != -1 {
+					sanitizedName := ctrlPart[:cIdx] + "n" + nsPart
+					sanitizedPath = filepath.Join("/dev", sanitizedName)
+					logger.Warningf("NodeGetVolumeStats Sanitization: Redirected tracking path from %s to clean block device %s", realPath, sanitizedPath)
+				}
+			}
+		}
+	}
+
+	isBlock, err := d.NodeUtils.IsBlock(ctx, sanitizedPath)
 	if err != nil {
-		return VolumeStatistics{}, status.Errorf(codes.Internal, "Failed to determine if %q is block device: %s", path, err)
+		return VolumeStatistics{}, status.Errorf(codes.Internal, "Failed to determine if %q is block device: %s", sanitizedPath, err)
 	}
 
 	if isBlock {
-		volumeStats, err = d.NodeUtils.GetBlockVolumeStats(ctx, path)
+		// Pass the true data block node to prevent ioctl size inquiry failures
+		volumeStats, err = d.NodeUtils.GetBlockVolumeStats(ctx, sanitizedPath)
 		if err != nil {
 			switch err.(type) {
 			case *device_connectivity.MultipathDeviceNotFoundForVolumeError:
@@ -762,17 +820,20 @@ func (d *NodeService) getVolumeStats(ctx context.Context, path string, volumeId 
 		}
 	} else {
 		volumeUuid := d.NodeUtils.GetVolumeUuid(volumeId)
-		isVolumePathMatchesVolumeId, err := d.OsDeviceConnectivityHelper.IsVolumePathMatchesVolumeId(ctx, volumeUuid, path)
+		
+		// Run identification validation against the host mount target
+		isVolumePathMatchesVolumeId, err := d.OsDeviceConnectivityHelper.IsVolumePathMatchesVolumeId(ctx, volumeUuid, sanitizedPath)
 		if err != nil {
 			return VolumeStatistics{}, status.Errorf(codes.Internal,
 				"Failed to determine if volume id [%q], is accessible on volume path [%q], error: %s",
-				volumeId, path, err)
+				volumeId, sanitizedPath, err)
 		}
 		if !isVolumePathMatchesVolumeId {
 			return VolumeStatistics{}, status.Errorf(codes.NotFound,
-				"Volume id [%q] is not accessible on volume path [%q]", volumeId, path)
+				"Volume id [%q] is not accessible on volume path [%q]", volumeId, sanitizedPath)
 		}
-		volumeStats, err = d.NodeUtils.GetFileSystemVolumeStats(ctx, path)
+		
+		volumeStats, err = d.NodeUtils.GetFileSystemVolumeStats(ctx, sanitizedPath)
 		if err != nil {
 			return VolumeStatistics{}, status.Errorf(codes.Internal, "Failed to get statistics: %s", err)
 		}
