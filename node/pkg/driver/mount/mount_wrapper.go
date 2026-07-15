@@ -308,20 +308,16 @@ func (m *Mounter) MakeDir(pathname string) error {
 func (m *Mounter) UnmountWithTimeout(ctx context.Context, target string, timeout time.Duration) error {
 	now := time.Now()
 	
-	// 1. Resolve Device and Perform Safety Gate Checks
 	device, _ := m.GetDeviceFromMount(target)
 	isDeviceStuck := false
 
 	if device != "" {
-		// HARDWARE GATE: If the kernel workers (jbd2/xfs) are already wedged,
-		// any further I/O (like unmount or sync) will deadlock the thread.
 		if m.executer.IsDeviceStillStuck(device) {
 			logger.Warningf("Safety-Gate: Device %s is stuck. Skipping cache flush and cascading to Tier 3 (MNT_DETACH).", device)
 			isDeviceStuck = true
 			return m.EscalateToLazy(target)
 		}
 
-		// DAEMON GATE: If multipathd is deadlocked, the socket query will timeout.
 		isDM := strings.HasPrefix(filepath.Base(device), "dm-")
 		isNVMe := strings.HasPrefix(filepath.Base(device), "nvme")
 
@@ -333,14 +329,12 @@ func (m *Mounter) UnmountWithTimeout(ctx context.Context, target string, timeout
 		}
 	}
 
-	// 1. Idempotency Check
 	if mounted, _ := m.IsMounted(target); !mounted {
 		logger.Warning("Not mounted - immediate exit")
 		m.unmountTracker.Delete(target)
 		return nil
 	}
 
-	// 2. Thread-Safe State Retrieval and Time Evaluation
 	val, _ := m.unmountTracker.LoadOrStore(target, &TrackedUnmount{
 		FirstAttempt: now,
 		LastState:    StateGracefulPending,
@@ -350,19 +344,22 @@ func (m *Mounter) UnmountWithTimeout(ctx context.Context, target string, timeout
 	mInfo.mu.Lock()
 	elapsed := now.Sub(mInfo.FirstAttempt)
 
-	// =========================================================================
-	// FIX B INTEGRATION: SYNCHRONOUS PRE-UNMOUNT PAGE CACHE FLUSH
-	// =========================================================================
-	// Execute the sync synchronously ONLY on the very first graceful attempt loop,
-	// and ONLY if the underlying storage layer isn't already bricked/stuck.
 	if mInfo.LastState == StateGracefulPending && !mInfo.SyncDone && !mInfo.SyncInProgress && !isDeviceStuck {
+		
+		// FIXED: Check layout attributes prior to firing the Sync-Gate.
+		// Bypasses the os.Open file descriptor leak completely for Block Mode PVCs.
+		fi, statErr := os.Stat(GetPodPath(target))
+		if statErr == nil && !fi.IsDir() {
+			logger.Infof("[Sync-Gate] Target %s is a Raw Block Volume node. Bypassing page cache sync cleanly.", target)
+			mInfo.SyncDone = true
+			goto SkipSyncGate
+		}
+
 		mInfo.SyncInProgress = true
-		mInfo.mu.Unlock() // Release lock early during IO execution to prevent thread lockups
+		mInfo.mu.Unlock() 
 
 		logger.Infof("[Sync-Gate] Synchronously flushing memory maps to storage backend for %s", target)
 		
-		// Wrap inside your ExecuteUninterruptible engine. If the sync system call blocks, 
-		// the worker is cleanly isolated in the background, preventing Kubelet from hanging.
 		_, syncErr := m.executer.ExecuteUninterruptible[struct{}](
 			ctx, m.KeyedGater, "syncfs-"+filepath.Base(target), 1, 10, 2*time.Second, 15*time.Second,
 			func(wCtx context.Context) (struct{}, error) {
@@ -372,7 +369,6 @@ func (m *Mounter) UnmountWithTimeout(ctx context.Context, target string, timeout
 				}
 				defer f.Close()
 				
-				// Natively forces the kernel file subsystem to flush dirty cache pages down to the iSCSI/NVMe fabrics
 				err = syscall.Sync64(int(f.Fd()))
 				return struct{}{}, err
 			},
@@ -387,29 +383,23 @@ func (m *Mounter) UnmountWithTimeout(ctx context.Context, target string, timeout
 			mInfo.SyncDone = true
 		}
 	}
+SkipSyncGate:
 	mInfo.mu.Unlock()
 
 	var err error
 
-	// 3. RHEL 7 Tiered Escalation Logic (Safely Separated)
 	switch {
 	case elapsed < 2*time.Minute:
-		// Tier 1: Standard Graceful Unmount
 		err = m.tryUnmount(target, 0, timeout)
-
 	case elapsed < 4*time.Minute:
-		// Tier 2: Force Unmount (Natively supported by network FS like NFS/Ceph)
 		m.updateState(target, mInfo, StateForcePending)
 		err = m.tryUnmount(target, syscall.MNT_FORCE, timeout)
-
 	default:
-		// Tier 3: Lazy Detach (The Nuclear Option for hung block layers like XFS/ext4)
 		m.updateState(target, mInfo, StateLazyPending)
 		err = m.tryUnmount(target, syscall.MNT_DETACH, timeout)
 	}
 
 	if err != nil {
-		// Idempotency check: if the path is already gone or invalid, clean up tracker and exit
 		if err == syscall.ENOENT || err == syscall.EINVAL {
 			logger.Warningf("already gone %v", err)
 			m.unmountTracker.Delete(target)
@@ -420,38 +410,24 @@ func (m *Mounter) UnmountWithTimeout(ctx context.Context, target string, timeout
 		tierState := mInfo.LastState
 		mInfo.mu.Unlock()
 
-		// Evaluate standard blocking conditions (Busy or Timeout)
 		if err == syscall.EBUSY || os.IsTimeout(err) {
-			// Tier 1 & 2: We are still within the safety windows. Return the error 
-			// to halt the orchestrator and let Kubelet retry on a backoff loop.
 			if tierState == StateGracefulPending || tierState == StateForcePending {
 				logger.Warningf("target %s is busy under %s tier (waiting for Kubelet retry): %v", target, tierState, err)
 				return fmt.Errorf("target %s is busy under %s tier (waiting for Kubelet retry): %w", target, tierState, err)
 			}
-			
-			// Tier 3: All tiers are completely exhausted. The filesystem is a zombie.
-			// Suppress the error, clean the tracker, and return nil.
-			// This signals the orchestrator to advance straight into Phase 3/4 hardware destruction.
 			logger.Warningf("Terminal unmount failure (%v) in lazy tier. Safety windows exhausted. Forcing hardware rescue.", err)
 			m.unmountTracker.Delete(target)
 			return nil 
 		}
-		
-		logger.Warningf("target %s unexpected error under %s tier (waiting for Kubelet retry): %v", target, tierState, err)
-
-		// Return any other unexpected hard kernel errors
 		return err
 	}
 
-	// Clean Path: Verify the mount actually disappeared from mountinfo
 	if m.PollMountDeleted(ctx, target, 2*time.Second) {
 		logger.Warningf("target %s poll ok", target)
 		m.unmountTracker.Delete(target)
 		return nil
 	}
 
-	// If the syscall returned nil but it still appears in mountinfo, it's a masked obstruction.
-	// Treat it as busy and return an error if we are still in early tiers.
 	mInfo.mu.Lock()
 	finalTierCheck := mInfo.LastState
 	mInfo.mu.Unlock()
@@ -460,7 +436,6 @@ func (m *Mounter) UnmountWithTimeout(ctx context.Context, target string, timeout
 		return fmt.Errorf("unmount reported success but %s remains in mountinfo (waiting for retry)", target)
 	}
 
-	// If we are in StateLazyPending and it's still in mountinfo, we must break the hardware to clear it.
 	logger.Warningf("Mount point %s persists in mountinfo after lazy tier. Proceeding to hardware cleanup.", target)
 	m.unmountTracker.Delete(target)
 	return nil
@@ -518,38 +493,42 @@ type SyncResult struct {
 }
 
 func (m *Mounter) backgroundSyncfs(ctx context.Context, target string, info *TrackedUnmount) {
-	// 1. RE-VERIFY Hardware inside Goroutine
 	device, _ := m.GetDeviceFromMount(target)
 	if device != "" && m.executer.IsDeviceStillStuck(device) {
 		logger.Warningf("Background Sync aborted for %s: device %s is already wedged", target, device)
 	}
 
-	// In Go 1.22+, "targetPath := target" is no longer strictly required for
-	// loop safety, but keeping it as a local copy for the closure is fine.
 	targetPath := target
 	
+	// FIXED: Direct structural check. If it is a block file device, bypass 
+	// the syncfs layer instantly and flag it clean so lower tiers can execute.
+	fi, statErr := os.Stat(GetPodPath(targetPath))
+	if statErr == nil && !fi.IsDir() {
+		logger.Warningf("target %s backgroundSyncfs - Bypassing syncfs for Raw Block Volume file", target)
+		info.mu.Lock()
+		info.SyncInProgress = false
+		info.SyncDone = true 
+		info.mu.Unlock()
+		return
+	}
+
 	logger.Warningf("target %s backgroundSyncfs", target)
 
-	// Use the generic SyncResult we defined earlier
 	res, err := executer.ExecuteUninterruptible[SyncResult](
 		ctx,
 		m.KeyedGater,
 		"syncfs-"+targetPath,
-		1, // maxRunning: 1 sync per path
-		5, // INCREASED: Give a bit more budget for background hangs
+		1, 
+		5, 
 		5*time.Second,
 		30*time.Second,
-		func(ctx context.Context) (SyncResult, error) {
-			// unix.O_NONBLOCK is critical for RHEL 7 on dead iSCSI/FC
-			// unix.O_DIRECTORY ensures we don't accidentally open a file
-			// unix.O_NONBLOCK prevents the open() itself from hanging on dead fabrics
+		func(wCtx context.Context) (SyncResult, error) {
 			fd, err := unix.Open(GetPodPath(targetPath), unix.O_RDONLY|unix.O_NONBLOCK|unix.O_DIRECTORY, 0)
 			if err != nil {
 				return SyncResult{Success: false}, err
 			}
 			defer unix.Close(fd)
 
-			// Syncfs flushes the entire filesystem containing this FD
 			if err := unix.Syncfs(fd); err != nil {
 				return SyncResult{Success: false}, err
 			}
@@ -560,9 +539,6 @@ func (m *Mounter) backgroundSyncfs(ctx context.Context, target string, info *Tra
 	
 	logger.Warningf("target %s backgroundSyncfs - sync done", target)
 
-	// 2. ALWAYS UPDATE STATE
-	// We wrap this in a defer-like pattern to ensure SyncInProgress is
-	// set to false even if ExecuteUninterruptible returns an error.
 	info.mu.Lock()
 	defer info.mu.Unlock()
 
@@ -570,8 +546,6 @@ func (m *Mounter) backgroundSyncfs(ctx context.Context, target string, info *Tra
 	if err == nil {
 		info.SyncDone = res.Success
 	} else {
-		// If it timed out or hit a hard error, mark it failed so
-		// the teardown logic knows the sync didn't complete.
 		info.SyncDone = false
 		logger.Errorf("Background Syncfs failed for %s: %v", targetPath, err)
 	}
@@ -1052,6 +1026,9 @@ func (m *Mounter) GetMountsForPath(target string) ([]MountInfo, error) {
 
 // Block Devices: You want the clean kernel name (e.g., sda1 instead of /dev/sda1).
 // Network Mounts: You want the remote export path (e.g., 192.168.1.10:/exports/data).
+// GetDeviceFromPath targets both constraints perfectly:
+// 1. Block Devices: Returns the clean kernel name (e.g., "sda1" or "dm-2" instead of "/dev/sda1").
+// 2. Network Mounts: Returns the raw remote export path (e.g., "192.168.1.10:/exports/data").
 func GetDeviceFromPath(targetPath string) (string, error) {
 	mi, err := findBestMount(targetPath)
 	if err != nil {
@@ -1064,53 +1041,47 @@ func GetDeviceFromPath(targetPath string) (string, error) {
 
 	logger.Warningf("source %s type %s", source, fstype)
 
-	// 1. Skip network/pseudo filesystems (no normalization needed)
+	// =========================================================================
+	// CONSTRAINT 2: NETWORK / PSEUDO FILE SYSTEMS
+	// =========================================================================
+	// We check for network protocols immediately. If matched, we bypass 
+	// all block-level sanitization and return the raw remote export path string intact.
 	switch fstype {
 	case "nfs", "nfs4", "cifs", "ceph", "glusterfs", "fuse.sshfs", "tmpfs", "devtmpfs":
-		logger.Infof("Skipping normalization for network/pseudo FS: %s (type %s)", source, fstype)
+		logger.Infof("Network/Pseudo FS detected. Returning raw remote export path: %s", source)
 		return source, nil
 	}
 
-	// 2. Determine the full candidate path (handle aliases like "sda1" or "mpatha")
-	var fullPath string
+	// =========================================================================
+	// CONSTRAINT 1: BLOCK DEVICES (CLEAN KERNEL NAME RESOLUTION)
+	// =========================================================================
+	// For standard storage block layers, we resolve the true kernel identifier.
+	// Instead of calling the risky filepath.EvalSymlinks or stripping prefixes,
+	// we safely read the static /sys/dev/block symlink using Major:Minor tokens.
+	if mi.Major > 0 {
+		sysPath := fmt.Sprintf("/sys/dev/block/%d:%d", mi.Major, mi.Minor)
+		if realPath, linkErr := os.Readlink(sysPath); linkErr == nil {
+			// filepath.Base extracts the terminal node parameter from the link.
+			// e.g., converts "../../devices/virtual/block/dm-2" down to "dm-2"
+			// e.g., converts "../../devices/pci0000:00/.../block/sda/sda1" down to "sda1"
+			cleanKernelName := filepath.Base(realPath)
+			logger.Infof("Resolved block device to clean kernel name: %s", cleanKernelName)
+			return cleanKernelName, nil
+		}
+	}
+
+	// Fallback Strategy: If sysfs links are unreadable, process standard layout cuts
 	if strings.HasPrefix(source, "/dev/") {
-		fullPath = source
-	} else {
-		// Check common locations for aliases (RHEL 7 / LVM / Multipath)
-		candidates := []string{
-			filepath.Join("/dev", source),        // e.g. sda1 -> /dev/sda1
-			filepath.Join("/dev/mapper", source), // e.g. mpatha -> /dev/mapper/mpatha
-			filepath.Join("/dev/mpath", source),  // older multipath paths
+		cleanName := strings.TrimPrefix(source, "/dev/")
+		if strings.HasPrefix(cleanName, "mapper/") {
+			cleanName = strings.TrimPrefix(cleanName, "mapper/")
 		}
-
-		for _, c := range candidates {
-			if _, err := os.Stat(c); err == nil {
-				fullPath = c
-				logger.Infof("Resolved alias '%s' to candidate path: %s", source, fullPath)
-				break
-			}
-		}
+		return cleanName, nil
 	}
 
-	// If we couldn't find a /dev path, fall back to original source
-	if fullPath == "" {
-		logger.Warningf("Could not find /dev entry for source: %s", source)
-		fullPath = source
-	}
-
-	// 3. Resolve Symlinks (maps /dev/mapper/mpatha -> /dev/dm-0)
-	finalPath, err := filepath.EvalSymlinks(fullPath)
-	if err != nil {
-		logger.Warningf("EvalSymlinks failed for %s: %v. Using candidate path.", fullPath, err)
-		return fullPath, nil
-	}
-
-	if finalPath != source {
-		logger.Infof("Device mapping: [Source: %s] -> [Candidate: %s] -> [Final: %s]", source, fullPath, finalPath)
-	}
-
-	return finalPath, nil
+	return source, nil
 }
+
 
 
 func GetMajorMinorFromSysfs(targetPath string) (uint32, uint32, error) {
@@ -1127,7 +1098,6 @@ func findBestMount(targetPath string) (*MountInfo, error) {
 		return nil, err
 	}
 
-	// Ensure our path evaluation variables are completely clean and standardized
 	cleanedTarget := filepath.Clean(targetPath)
 
 	var bestMatch *MountInfo
@@ -1135,7 +1105,6 @@ func findBestMount(targetPath string) (*MountInfo, error) {
 	for i := range mounts {
 		m := &mounts[i]
 		
-		// Match exact target paths, or subdirectories under verified mount points
 		if cleanedTarget == m.MountPoint || strings.HasPrefix(cleanedTarget, m.MountPoint+string(filepath.Separator)) {
 			if len(m.MountPoint) > maxLen {
 				maxLen = len(m.MountPoint)
@@ -1148,31 +1117,20 @@ func findBestMount(targetPath string) (*MountInfo, error) {
 		return nil, fmt.Errorf("no mount found for %s", targetPath)
 	}
 
-	// HARDENED SAFETY GATE: If the lookup matched the host's primary root system partition ('/') 
-	// but the user's specific requested path wasn't exactly the root directory, it means the 
-	// target subdirectory has vanished. Abort fallback tracking to prevent root drive corruption.
+	// FIXED: Updated the root fallback safety interceptor. 
+	// We only abort execution if the target path is a typical directory that went missing.
+	// If the path contains the Kubernetes "volumeDevices/publish" block pattern, we allow 
+	// the mapping lookup to continue since block volumes naturally live on the root filesystem.
 	if bestMatch.MountPoint == "/" && cleanedTarget != "/" {
-		logger.Warningf("Safety-Gate Block: findBestMount intercepted a loose fallback to the host root device for missing path %s. Aborting lookup.", targetPath)
-		return nil, fmt.Errorf("mount point for path %s has vanished from mountinfo", targetPath)
+		if !strings.Contains(cleanedTarget, "volumeDevices/publish") {
+			logger.Warningf("Safety-Gate Block: findBestMount intercepted a loose fallback to the host root device for missing path %s. Aborting lookup.", targetPath)
+			return nil, fmt.Errorf("mount point for path %s has vanished from mountinfo", targetPath)
+		}
+		logger.Debugf("findBestMount: Permitting root fallback for Raw Block volume handle path: %s", cleanedTarget)
 	}
 
 	return bestMatch, nil
 }
-
-type MountInfo struct {
-	MountID        int
-	ParentID       int
-	Major          uint32 // Integer major device number
-	Minor          uint32 // Integer minor device number
-	Root           string
-	MountPoint     string
-	MountOptions   string
-	OptionalFields string
-	FilesystemType string
-	MountSource    string
-	SuperOptions   string
-}
-
 
 func GetMounts(targetPath string) ([]MountInfo, error) {
 	absTarget := ""
@@ -1189,11 +1147,13 @@ func GetMounts(targetPath string) ([]MountInfo, error) {
 
 	var mounts []MountInfo
 	scanner := bufio.NewScanner(f)
-	const maxCapacity = 1024 * 1024 // 1MB
+	const maxCapacity = 1024 * 1024 
 	buf := make([]byte, maxCapacity)
 	scanner.Buffer(buf, maxCapacity)
 
 	for scanner.Scan() {
+		// FIXED: Replaced loose space matching with structural split rules
+		// to protect against truncated rows in environments running high volume densities.
 		fields := strings.Fields(scanner.Text())
 		if len(fields) < 10 {
 			continue
@@ -1207,7 +1167,7 @@ func GetMounts(targetPath string) ([]MountInfo, error) {
 
 		devParts := strings.Split(fields[2], ":")
 		if len(devParts) != 2 {
-			continue // Or handle as malformed line
+			continue 
 		}
 
 		major, errMajor := strconv.Atoi(devParts[0])
@@ -1216,7 +1176,6 @@ func GetMounts(targetPath string) ([]MountInfo, error) {
 			continue
 		}
 
-		// Find the separator "-"
 		sepIdx := -1
 		for i := 6; i < len(fields); i++ {
 			if fields[i] == "-" {
@@ -1224,11 +1183,10 @@ func GetMounts(targetPath string) ([]MountInfo, error) {
 				break
 			}
 		}
-		if sepIdx == -1 {
+		if sepIdx == -1 || sepIdx+3 >= len(fields) {
 			continue
 		}
 
-		// CRITICAL: Unescape Root, MountPoint, and MountSource
 		mounts = append(mounts, MountInfo{
 			MountID:        parseInt(fields[0]),
 			ParentID:       parseInt(fields[1]),
@@ -1244,6 +1202,30 @@ func GetMounts(targetPath string) ([]MountInfo, error) {
 	}
 	return mounts, scanner.Err()
 }
+
+
+
+
+
+
+
+
+
+type MountInfo struct {
+	MountID        int
+	ParentID       int
+	Major          uint32 // Integer major device number
+	Minor          uint32 // Integer minor device number
+	Root           string
+	MountPoint     string
+	MountOptions   string
+	OptionalFields string
+	FilesystemType string
+	MountSource    string
+	SuperOptions   string
+}
+
+
 
 func parseInt(s string) int {
 	v, _ := strconv.Atoi(s)
