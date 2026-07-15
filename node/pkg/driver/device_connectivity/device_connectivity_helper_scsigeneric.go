@@ -408,16 +408,15 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) IsVolumePathMatchesVolumeId(ctx 
 }
 
 // TODO id unused?
-func (r OsDeviceConnectivityHelperScsiGeneric) GetExistingMpathDevice(ctx context.Context, volumeUuid string, volumePath string) (string, error) {
-        logger.Infof("GetExistingMpathDevice: Searching matching volume id for volume path: [%s] ", volumePath)
-        //volumeIdVariations := r.Helper.GetVolumeIdVariations(volumeUuid)
-
-        mpathDeviceName, err := r.Helper.GetMpathDeviceName(ctx, volumePath)
-        if err != nil {
-               return "", err
-       }
-       return mpathDeviceName, nil
+func (r *OsDeviceConnectivityHelperScsiGeneric) GetExistingMpathDevice(ctx context.Context, volumeUuid string, volumePath string) (string, error) {
+	logger.Infof("GetExistingMpathDevice: Searching matching volume id for volume path: [%s] ", volumePath)
+	mpathDeviceName, err := r.Helper.GetMpathDeviceName(ctx, volumePath)
+	if err != nil {
+		return "", err
+	}
+	return mpathDeviceName, nil
 }
+
 
 func (r OsDeviceConnectivityHelperScsiGeneric) RescanDevicesGetHostIds(lunId int, arrayIdentifiers []string) (map[int]bool, error) {
 	logger.Debugf("Rescan : Start rescan on specific lun, on lun : {%v}, with array identifiers : {%v}", lunId, arrayIdentifiers)
@@ -631,6 +630,8 @@ func (r OsDeviceConnectivityHelperScsiGeneric) flushDevicesBuffers(ctx context.C
 func (r *OsDeviceConnectivityHelperScsiGeneric) RemovePhysicalDevice(ctx context.Context, sysDevices []string) error {
 	logger.Debugf(`Removing storage device : {%v} by writing "1" to the deletion channel of each target`, sysDevices)
 	var wg sync.WaitGroup
+	var globalErr error
+	var errMu sync.Mutex
 
 	for _, deviceName := range sysDevices {
 		if deviceName == "" {
@@ -656,19 +657,20 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) RemovePhysicalDevice(ctx context
 					var deletePath string
 
 					if strings.HasPrefix(name, "nvme") {
-						// Tier 1: Modern Kernel path-specific namespace deletion attribute
 						deletePath = fmt.Sprintf("/sys/block/%s/device/delete_id", name)
 						
-						// Tier 2 Fallback for older kernels (like RHEL 7) where delete_id doesn't exist.
-						// Instead of killing the controller link, target its localized PCIe slot reference.
+						// FIXED: Replaced blocking EvalSymlinks with non-blocking static path composition 
+						// to eliminate thread traps if the device is in an uninterruptible sleep state.
 						if _, err := os.Stat(deletePath); os.IsNotExist(err) {
-							realPath, err := filepath.EvalSymlinks(fmt.Sprintf("/sys/block/%s/device", name))
-							if err == nil {
-								deletePath = filepath.Join(realPath, "remove")
+							deletePath = fmt.Sprintf("/sys/class/nvme/%s/device/remove", name)
+							if !strings.HasPrefix(name, "nvme-") && strings.Contains(name, "n") {
+								if idx := strings.Index(name, "n"); idx != -1 {
+									ctrlName := name[:idx] 
+									deletePath = fmt.Sprintf("/sys/class/nvme/%s/device/remove", ctrlName)
+								}
 							}
 						}
 					} else {
-						// Standard SCSI block delete path
 						deletePath = fmt.Sprintf("/sys/block/%s/device/delete", name)
 					}
 
@@ -677,23 +679,44 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) RemovePhysicalDevice(ctx context
 						return struct{}{}, nil
 					}
 
-					// Write the termination bit to evict the component path cleanly
-					if err := os.WriteFile(deletePath, []byte("1\n"), 0200); err != nil {
-						return struct{}{}, fmt.Errorf("failed to delete device via %s: %w", deletePath, err)
+					// FIXED: Dispatches deletion asynchronously to a detached goroutine to shield your core pool slots.
+					// Then, the function monitors file eviction via a non-blocking user-space polling loop.
+					go func(p string) {
+						_ = os.WriteFile(p, []byte("1\n"), 0200)
+					}(deletePath)
+
+					ticker := time.NewTicker(500 * time.Millisecond)
+					defer ticker.Stop()
+					timeoutTimer := time.NewTimer(5 * time.Second)
+					defer timeoutTimer.Stop()
+
+					for {
+						select {
+						case <-ticker.C:
+							if _, err := os.Stat(deletePath); os.IsNotExist(err) {
+								logger.Infof("Verification Success: Physical device %s completely evicted from kernel tree.", name)
+								return struct{}{}, nil
+							}
+						case <-timeoutTimer.C:
+							logger.Errorf("Verification Failure: Device %s is a zombie path! Write failed or kernel is wedged.", name)
+							return struct{}{}, fmt.Errorf("device path %s failed to evict within safety window; path is a zombie", name)
+						case <-wCtx.Done():
+							return struct{}{}, wCtx.Err()
+						}
 					}
-					
-					logger.Infof("Successfully disconnected physical device via %s", deletePath)
-					return struct{}{}, nil
 				},
 			)
 			if err != nil {
 				logger.Errorf("Gater failed for device %s: %v", name, err)
+				errMu.Lock()
+				globalErr = err
+				errMu.Unlock()
 			}
 		}(deviceName)
 	}
 
 	wg.Wait()
-	return nil
+	return globalErr
 }
 
 
@@ -1900,7 +1923,6 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) TeardownVolume(ctx context.Conte
 			logger.Warningf("teardown volume %s devPath: %s", target, devPath)
 			if stat, err := os.Stat(devPath); err == nil {
 				if sysObj, ok := stat.Sys().(*syscall.Stat_t); ok {
-					logger.Warningf("teardown volume %s devPath found resolved id", target, devPath)
 					major = uint32((sysObj.Rdev >> 8) & 0xfff)
 					minor = uint32((sysObj.Rdev & 0xff) | ((sysObj.Rdev >> 12) & 0xfff00))
 					hardwareResolved = true
@@ -1909,7 +1931,7 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) TeardownVolume(ctx context.Conte
 					if strings.HasPrefix(baseName, "dm-") {
 						mpathName = r.GetDMNameFromMinor(minor) 
 					} else if strings.HasPrefix(baseName, "nvme") {
-						// RHEL 7 & Modern Uniform Sanitization
+						// Uniform Sanitization across enterprise distributions
 						if nvmeControllerChannelPattern.MatchString(baseName) {
 							if parts := strings.Split(baseName, "n"); len(parts) >= 2 {
 								ctrlPart := parts[0]
@@ -1953,14 +1975,14 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) TeardownVolume(ctx context.Conte
 	}
 
 	// =========================================================================
-	// --- PHASE 3: DEVICE MAPPER CLEANUP / SAFELY MODERNIZED RESCUE ---
+	// --- PHASE 3: DEVICE MAPPER CLEANUP / ARMORED REMOVAL SEQUENCE ---
 	// =========================================================================
-	// Declare tracking variables at the outer function level scope so Phase 4 can read them!
 	var globalOpenCount int32
 	rawScsiTarget := strings.ToLower(strings.TrimSpace(expectedWWID))
 	rawNvmeTarget := convertScsiIdToNguid(rawScsiTarget)
 
 	if mpathName != "" && !isNativeNVMe && strings.HasPrefix(mpathName, "dm-") {
+		// Poll to verify if any other background system tasks are holding descriptors
 		for i := 0; i < 10; i++ {
 			if ctx.Err() != nil {
 				break
@@ -1977,6 +1999,7 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) TeardownVolume(ctx context.Conte
 		}
 	
 		if globalOpenCount > 0 {
+			// Path is stuck or busy: trigger deferred deletion boundaries
 			logger.Warningf("Device %s is busy (openCount=%d) after unmount escalation. Invoking modern Deferred Removal inside ExecuteUninterruptible.", mpathName, globalOpenCount)
 			
 			_ = r.multipathdAction(ctx, "disablequeueing map "+mpathName)
@@ -1989,7 +2012,7 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) TeardownVolume(ctx context.Conte
 				},
 			)
 		} else {
-			// Clean Path: Device is fully idle, safe to flush buffers and remove immediately
+			// Clean Path: Device is idle. Flush page cache buffers first.
 			if needFlush {
 				_, _ = executer.ExecuteUninterruptible[struct{}](
 					ctx, r.KeyedGater, "flush-"+mpathName, 10, 50, 5*time.Second, 30*time.Second,
@@ -1998,6 +2021,30 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) TeardownVolume(ctx context.Conte
 						return struct{}{}, err
 					},
 				)
+				
+				// CRITICAL DEVICE LEAK FIX: Invert operations order.
+				// We harvest and safely delete physical SCSI/NVMe slave devices here,
+				// BEFORE telling multipathd to drop the map layout tracking.
+				var slaves []string
+				if hardwareResolved && major != 0 && !isNativeNVMe {
+					slaves, _ = r.Helper.getSlavesForDevice(major, minor)
+				}
+				if len(slaves) == 0 && expectedWWID != "" {
+					slaves = r.FindSlavesByWWID(expectedWWID) 
+				}
+
+				if len(slaves) > 0 {
+					logger.Infof("Inverting sequence: Evicting physical paths (%v) prior to deleting map layout.", slaves)
+					_ = r.RemovePhysicalDevice(ctx, slaves)
+					// Disable the flag so Phase 4 does not replicate or loop over this execution block
+					needRemovePhysical = false 
+				} else {
+					// Fallback global topology sweep
+					_ = r.purgeStuckPhysicalPathsDualProtocol(ctx, rawScsiTarget, rawNvmeTarget)
+					needRemovePhysical = false
+				}
+
+				// Now that all active hardware paths are removed, dropping the map layout is permanent
 				_ = r.multipathdAction(ctx, "del map "+mpathName)
 			}
 		}
@@ -2006,10 +2053,11 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) TeardownVolume(ctx context.Conte
 	}
 
 	// =========================================================================
-	// --- PHASE 4: PHYSICAL LAYER ---
+	// --- PHASE 4: PHYSICAL LAYER FALLBACK ---
 	// =========================================================================
+	// Executed only if Phase 3 clean path was skipped, or if device handles were evaluated busy
 	if needRemovePhysical || globalOpenCount > 0 {
-		logger.Warningf("Teardown volume %s: executing hardware path eviction (OpenCount=%d, Force=%v)", target, globalOpenCount, needRemovePhysical)	
+		logger.Warningf("Teardown volume %s: executing hardware path eviction fallback (OpenCount=%d, Force=%v)", target, globalOpenCount, needRemovePhysical)	
 		
 		var slaves []string
 		if hardwareResolved && major != 0 && !isNativeNVMe {
@@ -2022,7 +2070,7 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) TeardownVolume(ctx context.Conte
 		if len(slaves) > 0 {
 			_ = r.RemovePhysicalDevice(ctx, slaves)
 		} else {
-			_ = r.purgeStuckPhysicalPathsDualProtocol(rawScsiTarget, rawNvmeTarget)
+			_ = r.purgeStuckPhysicalPathsDualProtocol(ctx, rawScsiTarget, rawNvmeTarget)
 		}
 	}
 
@@ -2031,7 +2079,6 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) TeardownVolume(ctx context.Conte
 		return os.Remove(target)
 	}
 
-	// FIXED: Explicitly added the missing closure return requirement
 	return nil
 }
 
@@ -2622,14 +2669,21 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) disableNativeNvmeQueueing(expect
 // Re-use our global regex pattern to isolate channel nodes
 var nvmePurgeControllerPattern = regexp.MustCompile(`^nvme\d+c\d+n\d+$`)
 
-func (r *OsDeviceConnectivityHelperScsiGeneric) purgeStuckPhysicalPathsDualProtocol(rawScsiTarget, rawNvmeTarget string) error {
-	blockFiles, _ := os.ReadDir("/sys/block")
+func (r *OsDeviceConnectivityHelperScsiGeneric) purgeStuckPhysicalPathsDualProtocol(ctx context.Context, rawScsiTarget, rawNvmeTarget string) error {
+	blockFiles, err := os.ReadDir("/sys/block")
+	if err != nil {
+		return fmt.Errorf("failed to scan sysfs block path layer: %w", err)
+	}
 	helper := GetDmsPathHelperGeneric{}
 
-	scsiMatchTarget := normalizeWWID(rawScsiTarget)
-	nvmeMatchTarget := normalizeWWID(rawNvmeTarget)
+	scsiMatchTarget := strings.ToLower(strings.TrimSpace(rawScsiTarget))
+	nvmeMatchTarget := strings.ToLower(strings.TrimSpace(rawNvmeTarget))
 
 	for _, f := range blockFiles {
+		if ctx.Err() != nil {
+			return ctx.Err()
+		}
+
 		devName := f.Name()
 		isSCSI := strings.HasPrefix(devName, "sd")
 		isNVMe := helper.IsNativeNvmeNamespace(devName) || nvmeControllerChannelPattern.MatchString(devName)
@@ -2659,56 +2713,86 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) purgeStuckPhysicalPathsDualProto
 			}
 		}
 
-		wwidBytes, err := os.ReadFile(wwidPath)
+		// FIXED: Replaced standard os.ReadFile with an isolated `timeout` command invocation.
+		// If an unrelated device mapper on the node hangs, this step safely skips it after 2s.
+		readCmd := exec.CommandContext(ctx, "timeout", "2s", "cat", wwidPath)
+		wwidBytes, err := readCmd.Output()
 		if err != nil {
 			continue
 		}
 
-		discoveredID := normalizeWWID(string(wwidBytes))
-		if len(discoveredID) != 32 {
-			continue
+		discoveredID := strings.ToLower(strings.TrimSpace(string(wwidBytes)))
+		if isSCSI && strings.Contains(discoveredID, "naa.") {
+			if idx := strings.Index(discoveredID, "naa."); idx != -1 {
+				discoveredID = discoveredID[idx+4:]
+			}
 		}
 
 		var isTargetMatch bool
 		if isSCSI {
-			isTargetMatch = (discoveredID == scsiMatchTarget)
+			isTargetMatch = strings.Contains(discoveredID, scsiMatchTarget)
 		} else if isNVMe {
-			isTargetMatch = (discoveredID == nvmeMatchTarget)
+			isTargetMatch = strings.Contains(discoveredID, nvmeMatchTarget)
 		}
 
-		if isTargetMatch {
-			if isSCSI {
-				_ = os.WriteFile(filepath.Join("/sys/block", devName, "device", "delete"), []byte("1\n"), 0200)
-			} else if isNVMe {
-				// RHEL 7 to Modern Cross-Platform Namespace-Safe EVICTION
-				deleteNsPath := filepath.Join("/sys/block", devName, "device", "delete")
-				if _, err := os.Stat(deleteNsPath); os.IsNotExist(err) {
-					deleteNsPath = filepath.Join(targetSysDir, "device", "delete")
-				}
+		if !isTargetMatch {
+			continue
+		}
 
-				if _, err := os.Stat(deleteNsPath); err == nil {
-					// Modern Kernel standard: delete the isolated volume mapping context safely
-					_ = os.WriteFile(deleteNsPath, []byte("1\n"), 0200)
-				} else {
-					// RHEL 7 Legacy Fallback: Unbind the controller from the PCI driver bus to disconnect the hanging path
-					ctrlName := devName
-					if dashIdx := strings.Index(devName, "n"); dashIdx != -1 {
-						ctrlName = devName[:dashIdx]
-					}
-					
-					// Read the device link address (e.g., pointing to the PCI address like 0000:00:10.0)
-					if pciAddrPath, err := filepath.EvalSymlinks(filepath.Join("/sys/class/nvme", ctrlName, "device")); err == nil {
-						pciAddress := filepath.Base(pciAddrPath)
-						unbindPath := "/sys/bus/pci/drivers/nvme/unbind"
-						if _, err := os.Stat(unbindPath); err == nil {
-							_ = os.WriteFile(unbindPath, []byte(pciAddress), 0200)
-							logger.Infof("[Purge-RHEL7] Unbound frozen NVMe controller %s via PCI address %s", ctrlName, pciAddress)
+		var deletePath string
+		var useUnbindStrategy bool
+		var pciAddress string
+
+		if isSCSI {
+			deletePath = filepath.Join("/sys/block", devName, "device", "delete")
+		} else if isNVMe {
+			deletePath = filepath.Join("/sys/block", devName, "device", "delete")
+			if _, err := os.Stat(deletePath); os.IsNotExist(err) {
+				deletePath = filepath.Join(targetSysDir, "device", "delete")
+			}
+
+			// FIXED: Replaced blocking EvalSymlinks with cross-platform static parsing 
+			// of the device's plaintext /uevent properties file. Fully backwards-compatible with RHEL 7.
+			if _, err := os.Stat(deletePath); os.IsNotExist(err) {
+				ctrlName := devName
+				if dashIdx := strings.Index(devName, "n"); dashIdx != -1 {
+					ctrlName = devName[:dashIdx]
+				}
+				
+				pciUeventPath := fmt.Sprintf("/sys/class/nvme/%s/device/uevent", ctrlName)
+				if _, err := os.Stat(pciUeventPath); err == nil {
+					readUevent := exec.CommandContext(ctx, "timeout", "2s", "cat", pciUeventPath)
+					if bytes, err := readUevent.Output(); err == nil {
+						for _, line := range strings.Split(string(bytes), "\n") {
+							if strings.HasPrefix(line, "PCI_SLOT_NAME=") {
+								pciAddress = strings.TrimPrefix(line, "PCI_SLOT_NAME=")
+								deletePath = "/sys/bus/pci/drivers/nvme/unbind"
+								useUnbindStrategy = true
+								break
+							}
 						}
 					}
 				}
 			}
 		}
+
+		if deletePath == "" {
+			continue
+		}
+
+		// FIXED: Uses the native fire-and-forget background execution pattern 
+		// to isolate any deletion writes that might block in the kernel.
+		go func(path string, isUnbind bool, payload string) {
+			if isUnbind {
+				_ = os.WriteFile(path, []byte(payload), 0200)
+			} else {
+				_ = os.WriteFile(path, []byte("1\n"), 0200)
+			}
+		}(deletePath, useUnbindStrategy, pciAddress)
+
+		logger.Warningf("Successfully dispatched async cleanup eviction sweep down to target endpoint: %s", deletePath)
 	}
+
 	return nil
 }
 
@@ -3857,71 +3941,78 @@ func (o *OsDeviceConnectivityHelperGeneric) GetMpathdOutputForVolume(ctx context
 // It's quicker to parse than /proc/mounts
 // It also translates aliases to DM names
 func (o *OsDeviceConnectivityHelperGeneric) GetMpathDeviceName(ctx context.Context, volumePath string) (string, error) {
-	// REQUIREMENT 8: Respect CSI API Context
 	if err := ctx.Err(); err != nil {
 		return "", err
 	}
 
 	var stat syscall.Stat_t
-	// REQUIREMENT 4: Direct syscall (no 'lsblk' or 'df' process)
+	// REQUIREMENT 4: Direct, fast system call layer
 	if err := syscall.Stat(volumePath, &stat); err != nil {
 		return "", fmt.Errorf("failed to stat path %s: %w", volumePath, err)
 	}
 
-	// Requirement 5: Major:Minor is the only immutable ID across all protocols
+	// Requirement 5: Immutable Major:Minor identification tracking
 	major := unix.Major(uint64(stat.Rdev))
 	minor := unix.Minor(uint64(stat.Rdev))
 
-	// Tier 1: High-Speed Sysfs Resolution (The "Source of Truth")
+	// Tier 1: High-Speed Sysfs Resolution (The absolute "Source of Truth")
 	if major > 0 {
 		if kernelName, err := o.resolveIdToKernelName(ctx, major, minor); err == nil {
 			return kernelName, nil
 		}
 	}
 	
-	// TODO!! - this is probably the local (to this file) GetMajorMinorFromSysfs
-	// This is the same as GetDeviceFromPath (from mount info)
-	major, minor, err := mount.GetMajorMinorFromSysfs(volumePath)
+	// Fallback to secondary framework lookup tools
+	sysMajor, sysMinor, sysErr := mount.GetMajorMinorFromSysfs(volumePath)
 
-	if err != nil {
-		if kernelName, err := o.resolveIdToKernelName(ctx, major, minor); err == nil {
-				return kernelName, nil
+	// FIXED: Cleared out the inverted error evaluation logic block structure.
+	// We execute the fast kernel device identifier resolution ONLY when the lookup runs clean.
+	if sysErr == nil {
+		if kernelName, err := o.resolveIdToKernelName(ctx, sysMajor, sysMinor); err == nil {
+			return kernelName, nil
 		}
+	} else {
+		logger.Warningf("GetMpathDeviceName: Secondary sysfs fallback parse failed for %s: %v", volumePath, sysErr)
 	}
 	
+	// Final tier fallback option
 	deviceName, err := mount.GetDeviceFromPath(volumePath)
 	if err != nil {
-		return "", err
+		return "", fmt.Errorf("all kernel resolution pathways exhausted for target path %s: %w", volumePath, err)
 	}
-	return deviceName, nil
+	
+	// Ensure that even fallback path names return clean, unmapped strings
+	return filepath.Base(deviceName), nil
 }
 
-
-// resolveIdToKernelName performs the sysfs symlink resolution
+// resolveIdToKernelName performs the safe sysfs symlink resolution matrix
 func (o *OsDeviceConnectivityHelperGeneric) resolveIdToKernelName(ctx context.Context, major, minor uint32) (string, error) {
-	if ctx.Err() != nil { return "", ctx.Err() }
+	if ctx.Err() != nil { 
+		return "", ctx.Err() 
+	}
 
-	// REQUIREMENT 1: /sys/dev/block is available on all RHEL 7 kernels.
+	// REQUIREMENT 1: /sys/dev/block layout is standardized across early RHEL 7 and modern cores
 	sysPath := fmt.Sprintf("/sys/dev/block/%d:%d", major, minor)
 	
-	// Requirement 4: No process forks like 'readlink -f'
 	realPath, err := os.Readlink(sysPath)
 	if err != nil {
 		return "", fmt.Errorf("failed to resolve sysfs link %s: %w", sysPath, err)
 	}
 	
-	return realPath, nil
+	// FIXED: Replaces ghost relative strings ("../../devices/virtual/block/dm-2") 
+	// with the isolated physical base block component label node ("dm-2") 
+	// so lower-tier driver validation layers can consume it cleanly.
+	return filepath.Base(realPath), nil
 }
 
-
 func (o *OsDeviceConnectivityHelperGeneric) ResolveToKernelName(ctx context.Context, deviceName string) (string, error) {
-	if strings.HasPrefix(deviceName, "dm-") || strings.HasPrefix(deviceName, "nvme") {
-		return deviceName, nil
+	cleanName := filepath.Base(deviceName)
+	if strings.HasPrefix(cleanName, "dm-") || strings.HasPrefix(cleanName, "nvme") {
+		return cleanName, nil
 	}
 
 	devPath := deviceName
 	if !strings.HasPrefix(devPath, "/dev/") {
-		// Probing logic for shorthand names
 		searchPaths := []string{
 			deviceName,
 			filepath.Join("/dev/mapper", deviceName),
@@ -3935,8 +4026,10 @@ func (o *OsDeviceConnectivityHelperGeneric) ResolveToKernelName(ctx context.Cont
 		}
 	}
 
-	return deviceName, nil
+	return cleanName, nil
 }
+
+
 
 // findDMByWWID scans /dev/mapper to locate a user-friendly device-mapper name (like "mpatha") 
 // matching an IBM raw 32-character SCSI string. Fully supports both SCSI and NVMe topologies,
