@@ -727,112 +727,93 @@ func (e *Executer) invalidateSocket() {
 	e.socketMu.Unlock()
 }
 
-// TODO make sure this cannot hang
 func (e *Executer) MultipathdCmd(ctx context.Context, device string, command string) (string, error) {
-	// If the command targets a specific device, check the stuck map first.
-
 	if device != "" && e.IsDeviceStillStuck(device) {
 		return "", fmt.Errorf("safety-gate: skipping multipathd query for stuck device %s", device)
 	}
 
 	socketPath, isBinary := e.GetSocket()
-	// Use a very short dial timeout; if the daemon is in D-state, Dial can hang.
-	// TODO apply the 1 sec timeout to the context
-	// conn, err := net.DialTimeout("unix", socketPath, 1*time.Second)
-    dialer := net.Dialer{}
-    // Requirement 8: Dial obeys the CSI context
-    conn, err := dialer.DialContext(ctx, "unix", socketPath)
-	
-	if err != nil {
-		// e.invalidateSocket()
-		//                 conn, err = net.DialTimeout("unix", socketPath, 2*time.Second)
-		//                 if err != nil {
-		//                         return "", fmt.Errorf("multipathd unreachable: %w", err)
-		// 
-		//}
 
-        // REQUIREMENT 7: If we can't dial, the daemon itself might be in D-state.
-        // We increment a failure counter here to throttle all future calls.
+	// FIXED: Calculate the remaining time window dynamically. Enforces a strict 2-second 
+	// maximum threshold for dialing to prevent it from consuming the entire CSI execution window.
+	dialTimeout := 2 * time.Second
+	if deadline, ok := ctx.Deadline(); ok {
+		if remaining := time.Until(deadline); remaining < dialTimeout {
+			dialTimeout = remaining
+		}
+	}
+
+	dialCtx, dialCancel := context.WithTimeout(ctx, dialTimeout)
+	defer dialCancel()
+
+	dialer := net.Dialer{}
+	conn, err := dialer.DialContext(dialCtx, "unix", socketPath)
+	if err != nil {
 		return "", fmt.Errorf("multipathd unreachable: %w", err)
 	}
 	defer conn.Close()
 
-	// Strict deadline: If multipathd doesn't answer in 5s, it's likely wedged.
-	// conn.SetDeadline(time.Now().Add(5 * time.Second))
-	
-    // Requirement 6 & 8: Merge CSI context with a safety deadline
-    // This prevents a single call from hanging longer than the CSI timeout	
-    deadline, ok := ctx.Deadline()
-    if !ok {
-        deadline = time.Now().Add(10 * time.Second) // Fallback safety
-    }
-    _ = conn.SetDeadline(deadline)
+	// FIXED: Added a baseline time window safeguard (minimum 500ms) to ensure 
+	// heavy storage payloads have enough time to be completely read from the socket buffer.
+	netDeadline := time.Now().Add(5 * time.Second)
+	if deadline, ok := ctx.Deadline(); ok {
+		if csiRemaining := time.Until(deadline); csiRemaining > 500*time.Millisecond {
+			netDeadline = deadline
+		}
+	}
+	_ = conn.SetDeadline(netDeadline)
 
 	payload := []byte(command + "\x00")
 
 	if isBinary {
-		// Modern OCP 4.12+ REQUIRES 8-byte binary length header
 		if err := binary.Write(conn, binary.LittleEndian, uint64(len(payload))); err != nil {
-				return "", err
+			return "", fmt.Errorf("failed writing binary length header: %w", err)
 		}
 	}
 
-	// 2. Write ONLY the payload to the daemon
-	// Do NOT send the 10-byte header here
 	if _, err := conn.Write(payload); err != nil {
-		return "", fmt.Errorf("failed to write command: %w", err)
+		return "", fmt.Errorf("failed to write command payload: %w", err)
 	}
 
 	var respLen uint64
 	if isBinary {
-		// Modern: 8-byte binary header
 		header := make([]byte, 8)
 		if _, err := io.ReadFull(conn, header); err != nil {
-				logger.Warning("cannot read header")
-				return "", fmt.Errorf("binary header read failed: %w", err)
+			return "", fmt.Errorf("binary header read failed: %w", err)
 		}
 		respLen = binary.LittleEndian.Uint64(header)
 	} else {
-		// Legacy: 10-byte ASCII header
 		header := make([]byte, 10)
 		if _, err := io.ReadFull(conn, header); err != nil {
-				return "", fmt.Errorf("ascii header read failed: %w", err)
+			return "", fmt.Errorf("ascii header read failed: %w", err)
 		}
 		val, _ := strconv.Atoi(strings.TrimSpace(string(header)))
 		respLen = uint64(val)
 	}
 
-    // 3. Safety Check
-    if respLen == 0 || respLen > 10*1024*1024 { // 10MB limit
-        return "", fmt.Errorf("invalid response length: %d", respLen)
-    }
-
-    // 4. Read Body
+	if respLen == 0 || respLen > 10*1024*1024 { 
+		return "", fmt.Errorf("invalid response length threshold: %d", respLen)
+	}
 
 	lr := io.LimitReader(conn, int64(respLen))
 	respBody, err := io.ReadAll(lr)
 	if err != nil {
-        if errors.Is(err, os.ErrDeadlineExceeded) || ctx.Err() != nil {
-            return "", fmt.Errorf("multipathd timeout/cancelled: %w", err)
-        }
-		return "", fmt.Errorf("failed to read body: %w", err)
+		if errors.Is(err, os.ErrDeadlineExceeded) || ctx.Err() != nil {
+			return "", fmt.Errorf("multipathd network deadline exceeded/cancelled: %w", err)
+		}
+		return "", fmt.Errorf("failed to read network response body: %w", err)
 	}
 
-    // Trim trailing NULL and spaces
-    response := strings.TrimSpace(strings.TrimRight(string(respBody), "\x00"))
+	response := strings.TrimSpace(strings.TrimRight(string(respBody), "\x00"))
 
-	// Logical Errors
-	if strings.HasPrefix(response, "fail") || response == "timeout" {
-		// TODO is this logic necessary or covered with the ctx checks above
-		// If multipathd specifically says 'timeout', the DAEMON is stuck on I/O
+	// FIXED: Retained this critical check. Captures implicit failure text payloads 
+	// ("fail" or "timeout") returned by the daemon when its queues are blocked.
+	if strings.HasPrefix(response, "fail") || strings.Contains(response, "timeout") {
 		if device != "" {
-            // If we don't have a PID (socket call), we should mark it 
-            // with a special sentinel or the multipathd PID to keep it stuck 
-            // until the daemon recovers.
-            //mPid, _ := e.getMultipathdPid() 
-            //e.markAsStuck(device, mPid, "multipathd-socket")
+			logger.Warningf("Daemon returned internal failure code for %s. Flagging device state as stuck.", device)
+			e.markAsStuck(device, "multipathd-socket-timeout")
 		}
-		return "", fmt.Errorf("multipathd internal error: %s", response)
+		return "", fmt.Errorf("multipathd internal driver failure: %s", response)
 	}
 
 	return response, nil
@@ -946,74 +927,66 @@ func (e *Executer) IsMultipathdRunning() bool {
 // Is it possible that in RH7 - the socket is not accessible but process is alive?
 // How do we communicate with it in this case?
 func (e *Executer) IsMultipathdAlive(ctx context.Context) (bool, error) {
-	// REQUIREMENT 4: Prefer filesystem/socket checks over process invocation.
-	// Multipathd usually listens on /run/multipathd.sock (or /var/run/...)
 	paths := []string{"/run/multipathd.sock", "/var/run/multipathd.sock"}
 	
 	for _, p := range paths {
 		if _, err := os.Stat(p); err == nil {
-			// Try a zero-byte write or connect to verify the daemon is actually processing
 			conn, err := net.DialTimeout("unix", p, 1*time.Second)
 			if err == nil {
+				// FIXED: Enforce a strict write deadline right after dialing.
+				// If the daemon's internal state machine is frozen, sending this newline character will fail.
+				_ = conn.SetDeadline(time.Now().Add(500 * time.Millisecond))
+				if _, writeErr := conn.Write([]byte("\n")); writeErr == nil {
+					conn.Close()
+					return true, nil
+				}
 				conn.Close()
-				return true, nil
 			}
 		}
 	}
 
-	// Fallback for RH7: Check if the PID file exists and the process is alive
 	pidData, err := os.ReadFile("/var/run/multipathd.pid")
 	if err == nil {
 		pid, _ := strconv.Atoi(strings.TrimSpace(string(pidData)))
-		if err := syscall.Kill(pid, 0); err == nil {
-			return e.sendMultipathProbe(ctx)
-			// TODO is this good enough or should we send a probe CLI: return e.sendMultipathProbe()
+		if err := syscall.Kill(pid, 0); err != nil {
+			return false, fmt.Errorf("multipathd process with pid %d is dead: %w", pid, err)
 		}
 	}
 
-	return false, fmt.Errorf("multipathd socket not responding")
+	return e.sendMultipathProbe(ctx)
 }
 
-// IsMultipathdAlive performs a liveness check by sending a no-op command.
-// It distinguishes between "stopped" (connection refused) and "stuck" (timeout).	
 func (e *Executer) sendMultipathProbe(ctx context.Context) (bool, error) {
-	resp, err := e.MultipathdCmd(ctx, "", "show status")
-	
-	
-	// TODO is this a better CLI for testing liveliness
-	//resp, err := e.MultipathdCmd("", "show daemon") 
-    //if err != nil {
-     //   return false, err
-    //}
-    //return strings.Contains(resp, "pid"), nil
+	// FIXED: Bound the shell probe execution to the ExecuteUninterruptible tracker.
+	// If the query hangs on a deadlocked daemon, the function turns a clean failure code without leaking threads.
+	resp, err := executer.ExecuteUninterruptible[string](
+		ctx,
+		e.KeyedGater,
+		"multipathd-liveness-probe",
+		1,   
+		5,   
+		2*time.Second,
+		5*time.Second,
+		func(wCtx context.Context) (string, error) {
+			// FIXED: Swapped "show status" with "show daemon".
+			// Avoids forcing the daemon to parse potentially broken path checker trees.
+			return e.MultipathdCmd(wCtx, "", "show daemon")
+		},
+	)
 
 	if err != nil {
-		// If the error is a timeout, the daemon is likely stuck in D-state
-		if netErr, ok := err.(net.Error); ok && netErr.Timeout() {
-			return false, fmt.Errorf("multipathd is unresponsive (deadlock suspected): %w", err)
+		if strings.Contains(err.Error(), "abandoned") || strings.Contains(err.Error(), "timeout") {
+			return false, fmt.Errorf("multipathd is deadlocked in kernel space: %w", err)
 		}
-
-		// TODO should we expect "timeout" string on error if not running
-		// If the error is "connection refused", the daemon is simply not running
-		if strings.Contains(err.Error(), "unreachable") ||
-			strings.Contains(err.Error(), "refused") ||
-			strings.Contains(err.Error(), "no such file") {
-			return false, fmt.Errorf("multipathd service is not running")
-		}
-
-		return false, err
+		return false, fmt.Errorf("multipathd command interface is broken: %w", err)
 	}
 
-	// Verify we got a sane response (usually "up" or "multipathd vX.X.X")
-	if resp == "" {
-		return false, fmt.Errorf("multipathd returned empty response")
+	normalizedResp := strings.ToLower(resp)
+	if strings.Contains(normalizedResp, "running") || strings.Contains(normalizedResp, "pid") {
+		return true, nil
 	}
 
-	// TODO is this too strict
-	//if !strings.Contains(string(output), "status:") && !strings.Contains(string(output), "up")
-
-	return true, nil
-	
+	return false, fmt.Errorf("multipathd reported invalid/unhealthy daemon status: %s", resp)
 }
 
 
