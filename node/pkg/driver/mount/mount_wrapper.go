@@ -363,20 +363,22 @@ func (m *Mounter) UnmountWithTimeout(ctx context.Context, target string, timeout
 		
 		// Wrap inside your ExecuteUninterruptible engine. If the sync system call blocks, 
 		// the worker is cleanly isolated in the background, preventing Kubelet from hanging.
-		_, syncErr := m.executer.ExecuteUninterruptible[struct{}](
-			ctx, m.KeyedGater, "syncfs-"+filepath.Base(target), 1, 10, 2*time.Second, 15*time.Second,
-			func(wCtx context.Context) (struct{}, error) {
-				f, err := os.Open(GetPodPath(target))
-				if err != nil {
-					return struct{}{}, err
-				}
-				defer f.Close()
-				
-				// Natively forces the kernel file subsystem to flush dirty cache pages down to the iSCSI/NVMe fabrics
-				err = syscall.Sync64(int(f.Fd()))
-				return struct{}{}, err
-			},
-		)
+_, syncErr := executer.ExecuteUninterruptible[struct{}](
+        ctx, m.KeyedGater, "syncfs-"+filepath.Base(target), 1, 10, 2*time.Second, 15*time.Second,
+        func(wCtx context.Context) (struct{}, error) {
+                f, err := os.Open(GetPodPath(target))
+                if err != nil {
+                        return struct{}{}, err
+                }
+                defer f.Close()
+
+                // Natively forces the kernel file subsystem to flush dirty cache pages down to the iSCSI/NVMe fabrics
+                // FIX: Invoke the raw syncfs system call trap
+                err = unix.Syncfs(int(f.Fd()))
+                return struct{}{}, err
+        },
+)
+
 
 		mInfo.mu.Lock()
 		mInfo.SyncInProgress = false
