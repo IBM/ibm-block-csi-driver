@@ -1137,6 +1137,21 @@ func findBestMount(targetPath string) (*MountInfo, error) {
 	return bestMatch, nil
 }
 
+type MountInfo struct {
+	MountID        int
+	ParentID       int
+	Major          uint32 // Integer major device number
+	Minor          uint32 // Integer minor device number
+	Root           string
+	MountPoint     string
+	MountOptions   string
+	OptionalFields string
+	FilesystemType string
+	MountSource    string
+	SuperOptions   string
+}
+
+
 func GetMounts(targetPath string) ([]MountInfo, error) {
 	absTarget := ""
 	if targetPath != "" {
@@ -1209,26 +1224,6 @@ func GetMounts(targetPath string) ([]MountInfo, error) {
 }
 
 
-
-
-
-
-
-
-
-type MountInfo struct {
-	MountID        int
-	ParentID       int
-	Major          uint32 // Integer major device number
-	Minor          uint32 // Integer minor device number
-	Root           string
-	MountPoint     string
-	MountOptions   string
-	OptionalFields string
-	FilesystemType string
-	MountSource    string
-	SuperOptions   string
-}
 
 
 
