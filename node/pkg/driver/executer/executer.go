@@ -811,7 +811,8 @@ func (e *Executer) MultipathdCmd(ctx context.Context, device string, command str
 	if strings.HasPrefix(response, "fail") || strings.Contains(response, "timeout") {
 		if device != "" {
 			logger.Warningf("Daemon returned internal failure code for %s. Flagging device state as stuck.", device)
-			e.markAsStuck(device, "multipathd-socket-timeout")
+            //mPid, _ := e.getMultipathdPid()
+            //e.markAsStuck(device, mPid, "multipathd-socket")
 		}
 		return "", fmt.Errorf("multipathd internal driver failure: %s", response)
 	}
@@ -957,22 +958,23 @@ func (e *Executer) IsMultipathdAlive(ctx context.Context) (bool, error) {
 }
 
 func (e *Executer) sendMultipathProbe(ctx context.Context) (bool, error) {
+	resp, err := e.MultipathdCmd(ctx, "", "show daemon")
 	// FIXED: Bound the shell probe execution to the ExecuteUninterruptible tracker.
 	// If the query hangs on a deadlocked daemon, the function turns a clean failure code without leaking threads.
-	resp, err := executer.ExecuteUninterruptible[string](
-		ctx,
-		e.KeyedGater,
-		"multipathd-liveness-probe",
-		1,   
-		5,   
-		2*time.Second,
-		5*time.Second,
-		func(wCtx context.Context) (string, error) {
-			// FIXED: Swapped "show status" with "show daemon".
-			// Avoids forcing the daemon to parse potentially broken path checker trees.
-			return e.MultipathdCmd(wCtx, "", "show daemon")
-		},
-	)
+	//resp, err := ExecuteUninterruptible[string](
+	//	ctx,
+	//	e.KeyedGater,
+	//	"multipathd-liveness-probe",
+	//	1,   
+	//	5,   
+	//	2*time.Second,
+	//	5*time.Second,
+//		func(wCtx context.Context) (string, error) {
+//			// FIXED: Swapped "show status" with "show daemon".
+//			// Avoids forcing the daemon to parse potentially broken path checker trees.
+//			return e.MultipathdCmd(wCtx, "", "show daemon")
+//		},
+//	)
 
 	if err != nil {
 		if strings.Contains(err.Error(), "abandoned") || strings.Contains(err.Error(), "timeout") {
