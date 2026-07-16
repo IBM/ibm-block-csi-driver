@@ -2594,7 +2594,7 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) cleanupOrphanedTopology(ctx cont
 		_ = r.disableNativeNvmeQueueing(rawNvmeTarget)
 	}
 
-	_ = r.purgeStuckPhysicalPathsDualProtocol(rawScsiTarget, rawNvmeTarget)
+	_ = r.purgeStuckPhysicalPathsDualProtocol(ctx, rawScsiTarget, rawNvmeTarget)
 	return nil
 }
 
@@ -2761,21 +2761,33 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) purgeStuckPhysicalPathsDualProto
 				if dashIdx := strings.Index(devName, "n"); dashIdx != -1 {
 					ctrlName = devName[:dashIdx]
 				}
-				
-				pciUeventPath := fmt.Sprintf("/sys/class/nvme/%s/device/uevent", ctrlName)
-				if _, err := os.Stat(pciUeventPath); err == nil {
-					readUevent := exec.CommandContext(ctx, "timeout", "2s", "cat", pciUeventPath)
-					if bytes, err := readUevent.Output(); err == nil {
-						for _, line := range strings.Split(string(bytes), "\n") {
-							if strings.HasPrefix(line, "PCI_SLOT_NAME=") {
-								pciAddress = strings.TrimPrefix(line, "PCI_SLOT_NAME=")
-								deletePath = "/sys/bus/pci/drivers/nvme/unbind"
-								useUnbindStrategy = true
-								break
-							}
+
+                                       // Read the device link address (e.g., pointing to the PCI address like 0000:00:10.0)
+                                       if pciAddrPath, err := filepath.EvalSymlinks(filepath.Join("/sys/class/nvme", ctrlName, "device")); err == nil {
+                                               pciAddress := filepath.Base(pciAddrPath)
+                                               unbindPath := "/sys/bus/pci/drivers/nvme/unbind"
+                                               if _, err := os.Stat(unbindPath); err == nil {
+                                                       _ = os.WriteFile(unbindPath, []byte(pciAddress), 0200)
+                                                       logger.Infof("[Purge-RHEL7] Unbound frozen NVMe controller %s via PCI address %s", ctrlName, pciAddress)
 						}
 					}
-				}
+
+				// TODO can this be trusted:
+			//	
+			//	pciUeventPath := fmt.Sprintf("/sys/class/nvme/%s/device/uevent", ctrlName)
+			//	if _, err := os.Stat(pciUeventPath); err == nil {
+			//		readUevent := exec.CommandContext(ctx, "timeout", "2s", "cat", pciUeventPath)
+			//		if bytes, err := readUevent.Output(); err == nil {
+			//			for _, line := range strings.Split(string(bytes), "\n") {
+			//				if strings.HasPrefix(line, "PCI_SLOT_NAME=") {
+			//					pciAddress = strings.TrimPrefix(line, "PCI_SLOT_NAME=")
+			//					deletePath = "/sys/bus/pci/drivers/nvme/unbind"
+			//					useUnbindStrategy = true
+			//					break
+			//				}
+			//			}
+			//		}
+			//	}
 			}
 		}
 
