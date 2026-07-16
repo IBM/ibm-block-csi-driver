@@ -2364,7 +2364,7 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) TeardownVolume(ctx context.Conte
 				// BEFORE telling multipathd to drop the map layout tracking.
 				var slaves []string
 				if hardwareResolved && major != 0 && !isNativeNVMe {
-					slaves, _ = r.Helper.getSlavesForDevice(major, minor)
+					slaves, _ = r.Helper.getSlavesForDevice(ctx, major, minor)
 				}
 				if len(slaves) == 0 && expectedWWID != "" {
 					slaves = r.FindSlavesByWWID(ctx, expectedWWID) 
@@ -2398,7 +2398,7 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) TeardownVolume(ctx context.Conte
 		
 		var slaves []string
 		if hardwareResolved && major != 0 && !isNativeNVMe {
-			slaves, _ = r.Helper.getSlavesForDevice(major, minor)
+			slaves, _ = r.Helper.getSlavesForDevice(ctx, major, minor)
 		}
 		if len(slaves) == 0 && expectedWWID != "" {
 			slaves = r.FindSlavesByWWID(ctx, expectedWWID) 
@@ -4758,13 +4758,13 @@ func (o *OsDeviceConnectivityHelperGeneric) findDMByWWID(ctx context.Context, ww
 func (o *OsDeviceConnectivityHelperGeneric) readDmUuidWithFallbacks(ctx context.Context, dmKernelName string) (string, error) {
 	// Route A: Standard modern system layout mapping
 	modernPath := filepath.Join("/sys/block", dmKernelName, "dm", "uuid")
-	if bytesStr, err := o.secureReadSysfs(ctx, dmKernelName, modernPath); err == nil && bytesStr != "" {
+	if bytesStr, err := secureReadSysfs(ctx, dmKernelName, modernPath); err == nil && bytesStr != "" {
 		return bytesStr, nil
 	}
 
 	// Route B: Legacy RHEL 7 / early kernel fallback alignment scheme
 	legacyPath := filepath.Join("/sys/block", dmKernelName, "uuid")
-	if bytesStr, err := o.secureReadSysfs(ctx, dmKernelName, legacyPath); err == nil && bytesStr != "" {
+	if bytesStr, err := secureReadSysfs(ctx, dmKernelName, legacyPath); err == nil && bytesStr != "" {
 		return bytesStr, nil
 	}
 
@@ -4795,13 +4795,13 @@ func (o *OsDeviceConnectivityHelperGeneric) getWWIDByDev(ctx context.Context, ma
 	
 	// 1. Device Mapper (Multipath) - Shielded against kernel D-state locks using secureReadSysfs
 	dmUuidPath := filepath.Join(basePath, "dm/uuid")
-	if uuid, err := o.secureReadSysfs(ctx, devKey, dmUuidPath); err == nil && uuid != "" {
+	if uuid, err := secureReadSysfs(ctx, devKey, dmUuidPath); err == nil && uuid != "" {
 		return strings.TrimSpace(uuid), nil
 	}
 
 	// 2. NVMe Topologies (Handles standard setups and includes fallback mappings for channel layers)
 	nvmeWwidPath := filepath.Join(basePath, "wwid")
-	if wwid, err := o.secureReadSysfs(ctx, devKey, nvmeWwidPath); err == nil && wwid != "" {
+	if wwid, err := secureReadSysfs(ctx, devKey, nvmeWwidPath); err == nil && wwid != "" {
 		return strings.TrimSpace(wwid), nil
 	}
 
@@ -4818,7 +4818,7 @@ func (o *OsDeviceConnectivityHelperGeneric) getWWIDByDev(ctx context.Context, ma
 					nsPart := baseBlockName[lastNIdx+1:]
 					// Re-route the target query safely to the base block tracking registry folder layout
 					altNvnPath := fmt.Sprintf("/sys/block/%sn%s/wwid", prefix[:cIdx], nsPart)
-					if wwid, err := o.secureReadSysfs(ctx, baseBlockName, altNvnPath); err == nil && wwid != "" {
+					if wwid, err := secureReadSysfs(ctx, baseBlockName, altNvnPath); err == nil && wwid != "" {
 						return strings.TrimSpace(wwid), nil
 					}
 				}
@@ -4828,7 +4828,7 @@ func (o *OsDeviceConnectivityHelperGeneric) getWWIDByDev(ctx context.Context, ma
 
 	// 3. SCSI (Legacy/Standard SAN Block Tracks)
 	scsiWwidPath := filepath.Join(basePath, "device/wwid")
-	if wwid, err := o.secureReadSysfs(ctx, devKey, scsiWwidPath); err == nil && wwid != "" {
+	if wwid, err := secureReadSysfs(ctx, devKey, scsiWwidPath); err == nil && wwid != "" {
 		return strings.TrimSpace(wwid), nil
 	}
 
@@ -4956,7 +4956,7 @@ func (o *OsDeviceConnectivityHelperGeneric) GetMajorMinorFromSysfs(ctx context.C
 			// ARCHITECTURE FIXED: We trust uevent text streaming entirely. It completely 
 			// bypasses userspace /dev node dependencies, making it robust back to RHEL 7.
 			// It is wrapped inside our context-bounded secureReadSysfs wrapper.
-			data, err := o.secureReadSysfs(ctx, sdName, ueventPath)
+			data, err := secureReadSysfs(ctx, sdName, ueventPath)
 			if err == nil && data != "" {
 				major, minor = o.parseUeventMajorMinor(data)
 			}
@@ -5066,15 +5066,15 @@ func (o *OsDeviceConnectivityHelperGeneric) GetWwnByNvmeSysfs(ctx context.Contex
 	}
 
 	// FIX: Switch to secureReadSysfs across all branches to avoid un-shielded D-state locks on dropped paths
-	if nguid, err := o.secureReadSysfs(ctx, name, filepath.Join(targetSysDir, "nguid")); err == nil && nguid != "" {
+	if nguid, err := secureReadSysfs(ctx, name, filepath.Join(targetSysDir, "nguid")); err == nil && nguid != "" {
 		return o.normalizeWWID(nguid), nil
 	}
 
-	if uuid, err := o.secureReadSysfs(ctx, name, filepath.Join(targetSysDir, "uuid")); err == nil && uuid != "" {
+	if uuid, err := secureReadSysfs(ctx, name, filepath.Join(targetSysDir, "uuid")); err == nil && uuid != "" {
 		return o.normalizeWWID(uuid), nil
 	}
 
-	if serial, err := o.secureReadSysfs(ctx, name, filepath.Join(targetSysDir, "device/serial")); err == nil && serial != "" {
+	if serial, err := secureReadSysfs(ctx, name, filepath.Join(targetSysDir, "device/serial")); err == nil && serial != "" {
 		normSerial := strings.ToLower(strings.TrimSpace(serial))
 		// FIX: Handle ASCII serial outputs. If it does not form a clean 32-character hexadecimal block, 
 		// return it as-is so lower-tier validation layers can process generic string contains validations.
@@ -5142,7 +5142,7 @@ func (o GetDmsPathHelperGeneric) WaitForDmToExist(ctx context.Context, gater *ex
 			return "", err
 		}
 
-		hasDevice, isPending, name := o.EvaluateSysfsTopology(volumeWWID, false)
+		hasDevice, isPending, name := o.EvaluateSysfsTopology(ctx, o.KeyedGater, volumeWWID, false)
 		logger.Warningf("hasDevice %t isPending %t, name %s", hasDevice, isPending, name)
 
 		if !hasDevice || isPending {
@@ -5168,13 +5168,13 @@ func (o GetDmsPathHelperGeneric) WaitForDmToExist(ctx context.Context, gater *ex
 		if isDM || nvmeControllerHeadFormat.MatchString(name) {
 			logger.Warningf("Target layout matching storage interface protocols identified, querying slave count metrics for: %s", name)
 			// FIX: Shield internal slave queries from kernel-level wait loops using the KeyedGater
-			countResult, err := ExecuteUninterruptible[int](
+			countResult, err := executer.ExecuteUninterruptible[int](
 				ctx,
 				gater,
 				fmt.Sprintf("wait-slave-count-%s", name),
 				20, 100, 1*time.Second, 3*time.Second,
 				func(wCtx context.Context) (int, error) {
-					return o.GetSlaveCount(name), nil
+					return o.GetSlaveCount(ctx, name), nil
 				},
 			)
 			if err == nil {
@@ -5184,13 +5184,13 @@ func (o GetDmsPathHelperGeneric) WaitForDmToExist(ctx context.Context, gater *ex
 		}
 		
 		// FIX: Shield read-only status lookups from blocking on degraded pathways
-		ro, err := ExecuteUninterruptible[string](
+		ro, err := executer.ExecuteUninterruptible[string](
 			ctx,
 			gater,
 			fmt.Sprintf("wait-ro-status-%s", name),
 			20, 100, 1*time.Second, 3*time.Second,
 			func(wCtx context.Context) (string, error) {
-				return o.getRoStatus(path), nil
+				return o.getRoStatus(ctx, path), nil
 			},
 		)
 		if err != nil {
@@ -5229,13 +5229,13 @@ func (o GetDmsPathHelperGeneric) WaitForDmToExist(ctx context.Context, gater *ex
 			// FIX: Wrap initialization, block settlement, and integrity verification 
 			// inside context-bounded gater boundaries to prevent D-state lockups
 			err := func() error {
-				_, err := ExecuteUninterruptible[struct{}](
+				_, err := executer.ExecuteUninterruptible[struct{}](
 					ctx,
 					gater,
 					fmt.Sprintf("settle-validate-%s", name),
 					10, 50, 2*time.Second, 10*time.Second,
 					func(wCtx context.Context) (struct{}, error) {
-						if settleErr := o.safeSettle(path); settleErr != nil {
+						if settleErr := o.safeSettle(ctx, path); settleErr != nil {
 							return struct{}{}, settleErr
 						}
 						return struct{}{}, nil
@@ -5245,7 +5245,7 @@ func (o GetDmsPathHelperGeneric) WaitForDmToExist(ctx context.Context, gater *ex
 			}()
 
 			if err == nil {
-				validatedPath, valErr := ExecuteUninterruptible[string](
+				validatedPath, valErr := executer.ExecuteUninterruptible[string](
 					ctx,
 					gater,
 					fmt.Sprintf("validate-integrity-%s", name),
@@ -5304,7 +5304,7 @@ func (o *GetDmsPathHelperGeneric) GetSlaveCount(ctx context.Context, gater *exec
 		slavesDir := filepath.Join("/sys/block", devName, "slaves")
 		
 		// FIX: Use your KeyedGater via ExecuteUninterruptible to perform safe directory scans, avoiding un-shielded loops
-		entries, err := ExecuteUninterruptible[[]os.DirEntry](
+		entries, err := executer.ExecuteUninterruptible[[]os.DirEntry](
 			ctx,
 			gater,
 			fmt.Sprintf("slave-readdir-dm-%s", devName),
@@ -5326,7 +5326,7 @@ func (o *GetDmsPathHelperGeneric) GetSlaveCount(ctx context.Context, gater *exec
 			slaveDeviceDir := filepath.Join("/sys/block", devName, "slaves", slaveName, "device")
 			
 			// FIX: Shield symlink resolution via ExecuteUninterruptible to avoid kernel blocks on dead endpoints
-			realPath, err := ExecuteUninterruptible[string](
+			realPath, err := executer.ExecuteUninterruptible[string](
 				ctx,
 				gater,
 				fmt.Sprintf("slave-readlink-%s-%s", devName, slaveName),
@@ -5387,7 +5387,7 @@ func (o *GetDmsPathHelperGeneric) GetSlaveCount(ctx context.Context, gater *exec
 		deviceDir := filepath.Join(baseBlockDir, "device")
 		
 		subsysSymlink := filepath.Join(deviceDir, "subsystem")
-		realSubsysPath, err := ExecuteUninterruptible[string](
+		realSubsysPath, err := executer.ExecuteUninterruptible[string](
 			ctx,
 			gater,
 			fmt.Sprintf("nvme-subsys-link-%s", devName),
@@ -5426,7 +5426,7 @@ func (o *GetDmsPathHelperGeneric) GetSlaveCount(ctx context.Context, gater *exec
 			return 1
 		}
 		
-		entries, err := ExecuteUninterruptible[[]os.DirEntry](
+		entries, err := executer.ExecuteUninterruptible[[]os.DirEntry](
 			ctx,
 			gater,
 			fmt.Sprintf("nvme-scan-readdir-%s", devName),
@@ -5489,7 +5489,7 @@ func (o *GetDmsPathHelperGeneric) GetSlaveCount(ctx context.Context, gater *exec
 
 // Inline secureReadSysfsFallback wrapper to handle multi-tiered properties extraction with strict gater tracking.
 func secureReadSysfsFallback(ctx context.Context, gater *executer.KeyedGater, devName, sysfsPath string) (string, error) {
-	bytes, err := ExecuteUninterruptible(
+	bytes, err := executer.ExecuteUninterruptible(
 		ctx,
 		gater,
 		fmt.Sprintf("read-slave-sysfs-%s:%s", devName, filepath.Base(sysfsPath)),
@@ -5558,7 +5558,7 @@ func (of GetDmsPathHelperGeneric) EvaluateSysfsTopology(ctx context.Context, gat
 	// =========================================================================
 	
 	// FIX: Shield glob lookups within our non-blocking ExecuteUninterruptible channel structure.
-	dmMatches, err := ExecuteUninterruptible[[]string](
+	dmMatches, err := executer.ExecuteUninterruptible[[]string](
 		ctx,
 		gater,
 		"topology-glob-dm",
@@ -5621,7 +5621,7 @@ func (of GetDmsPathHelperGeneric) EvaluateSysfsTopology(ctx context.Context, gat
 	// =========================================================================
 	logger.Warningf("Evaluate nvme matches %s %s", rawScsiTarget, rawNvmeTarget)
 	
-	nvmeMatches, err := ExecuteUninterruptible[[]string](
+	nvmeMatches, err := executer.ExecuteUninterruptible[[]string](
 		ctx,
 		gater,
 		"topology-glob-nvme",
@@ -5707,7 +5707,7 @@ func (of GetDmsPathHelperGeneric) EvaluateSysfsTopology(ctx context.Context, gat
 			var isControllerTransitioning bool
 			deviceDir := filepath.Join(targetSysDir, "device") 
 			
-			entries, err := ExecuteUninterruptible[[]os.DirEntry](
+			entries, err := executer.ExecuteUninterruptible[[]os.DirEntry](
 				ctx,
 				gater,
 				fmt.Sprintf("topology-readdir-nvme-%s", name),
@@ -5759,7 +5759,7 @@ func (of GetDmsPathHelperGeneric) getRoStatus(ctx context.Context, gater *execut
 
 // Internal wrapper to standardize text properties retrieval across discovery routines
 func (of GetDmsPathHelperGeneric) secureReadSysfsWrapper(ctx context.Context, gater *executer.KeyedGater, devName, sysfsPath string) (string, error) {
-	bytes, err := ExecuteUninterruptible(
+	bytes, err := executer.ExecuteUninterruptible(
 		ctx,
 		gater,
 		fmt.Sprintf("topo-read-%s:%s", devName, filepath.Base(sysfsPath)),
@@ -5817,7 +5817,7 @@ func (o GetDmsPathHelperGeneric) safeSettle(ctx context.Context, gater *executer
 			if err == nil && strings.TrimSpace(suspended) == "0" {
 				// FIX: Shield raw block file opens and payload sector reads inside ExecuteUninterruptible
 				// to completely isolate the calling thread if the disk enters an infinite D-state kernel hang.
-				_, readErr := ExecuteUninterruptible[struct{}](
+				_, readErr := executer.ExecuteUninterruptible[struct{}](
 					ctx,
 					gater,
 					fmt.Sprintf("settle-read-dm-%s", baseBlockName),
@@ -5854,7 +5854,7 @@ func (o GetDmsPathHelperGeneric) safeSettle(ctx context.Context, gater *executer
 			}
 
 			// FIX: Shield block pipeline validation check against dead transport lockups
-			_, readErr := ExecuteUninterruptible[struct{}](
+			_, readErr := executer.ExecuteUninterruptible[struct{}](
 				ctx,
 				gater,
 				fmt.Sprintf("settle-read-native-%s", baseBlockName),
@@ -5890,7 +5890,7 @@ func (o GetDmsPathHelperGeneric) safeSettle(ctx context.Context, gater *executer
 
 // Local helper to map sysfs file checks cleanly under your gater architecture
 func (o GetDmsPathHelperGeneric) secureReadSysfsLocal(ctx context.Context, gater *executer.KeyedGater, devName, sysfsPath string) (string, error) {
-	bytes, err := ExecuteUninterruptible(
+	bytes, err := executer.ExecuteUninterruptible(
 		ctx,
 		gater,
 		fmt.Sprintf("settle-sysfs-%s:%s", devName, filepath.Base(sysfsPath)),
