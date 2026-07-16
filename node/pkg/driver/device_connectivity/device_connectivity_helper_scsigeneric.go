@@ -2676,8 +2676,9 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) purgeStuckPhysicalPathsDualProto
 	}
 	helper := GetDmsPathHelperGeneric{}
 
-	scsiMatchTarget := strings.ToLower(strings.TrimSpace(rawScsiTarget))
-	nvmeMatchTarget := strings.ToLower(strings.TrimSpace(rawNvmeTarget))
+	scsiMatchTarget := normalizeWWID(rawScsiTarget)
+	nvmeMatchTarget := normalizeWWID(rawNvmeTarget)
+	
 
 	for _, f := range blockFiles {
 		if ctx.Err() != nil {
@@ -2713,15 +2714,17 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) purgeStuckPhysicalPathsDualProto
 			}
 		}
 
-		// FIXED: Replaced standard os.ReadFile with an isolated `timeout` command invocation.
+		wwidBytes, err := os.ReadFile(wwidPath)
+		// TODO: consider Replace standard os.ReadFile with an isolated `timeout` command invocation.
 		// If an unrelated device mapper on the node hangs, this step safely skips it after 2s.
-		readCmd := exec.CommandContext(ctx, "timeout", "2s", "cat", wwidPath)
-		wwidBytes, err := readCmd.Output()
+		//readCmd := exec.CommandContext(ctx, "timeout", "2s", "cat", wwidPath)
+		//wwidBytes, err := readCmd.Output()
+		// TODO2 or use executeinterruptable
 		if err != nil {
 			continue
 		}
 
-		discoveredID := strings.ToLower(strings.TrimSpace(string(wwidBytes)))
+		discoveredID := normalizeWWID(string(wwidBytes))
 		if isSCSI && strings.Contains(discoveredID, "naa.") {
 			if idx := strings.Index(discoveredID, "naa."); idx != -1 {
 				discoveredID = discoveredID[idx+4:]
@@ -2730,9 +2733,9 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) purgeStuckPhysicalPathsDualProto
 
 		var isTargetMatch bool
 		if isSCSI {
-			isTargetMatch = strings.Contains(discoveredID, scsiMatchTarget)
+			isTargetMatch = (discoveredID == scsiMatchTarget)
 		} else if isNVMe {
-			isTargetMatch = strings.Contains(discoveredID, nvmeMatchTarget)
+			isTargetMatch = (discoveredID == nvmeMatchTarget)
 		}
 
 		if !isTargetMatch {
