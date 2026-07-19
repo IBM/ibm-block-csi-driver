@@ -334,8 +334,93 @@ func (r OsDeviceConnectivityNvmeOFc) getHostFCPorts() ([]string, error) {
 	return hostPorts, nil
 }
 
-func (r OsDeviceConnectivityNvmeOFc) RescanDevices(_ int, _ []string) error {
+// RescanDevices forces an NVMe namespace rescan on the array's already-connected
+// controllers. nvme connect to an existing controller is a no-op and does not
+// re-enumerate namespaces, so a LUN mapped after the controller was established
+// only appears via a kernel AEN auto-rescan. When that AEN is missed, staging
+// cannot discover the namespace. This mirrors the manual `nvme ns-rescan` recovery:
+// it enumerates the controllers whose traddr matches the array target ports and
+// rescans each, so a missed-AEN namespace becomes visible before GetMpathDevice.
+//
+// Best-effort and non-fatal by design: a rescan that finds nothing (or a transient
+// per-controller failure) must not fail the stage — GetMpathDevice retries after,
+// and the AEN may already have landed. arrayIdentifiers are the array target ports
+// ("nn-WWNN:pn-WWPN"); lunId (NSID) is unused — all namespaces on the array
+// controllers are rescanned, matching the proven manual recovery.
+func (r OsDeviceConnectivityNvmeOFc) RescanDevices(_ int, arrayIdentifiers []string) error {
+	if len(arrayIdentifiers) == 0 {
+		logger.Warningf("NVMe-oFC RescanDevices: no array target ports provided, skipping namespace rescan")
+		return nil
+	}
+
+	controllers := r.getArrayControllers(arrayIdentifiers)
+	if len(controllers) == 0 {
+		logger.Warningf("NVMe-oFC RescanDevices: no connected controllers matched array targets %v, "+
+			"skipping namespace rescan", arrayIdentifiers)
+		return nil
+	}
+
+	for _, controller := range controllers {
+		devicePath := "/dev/" + controller
+		logger.Infof("NVMe-oFC RescanDevices: rescanning namespaces on controller %s", devicePath)
+		if out, err := r.Executer.ExecuteWithTimeout(nvmeCmdTimeout, "nvme", []string{"ns-rescan", devicePath}); err != nil {
+			// Non-fatal: log and continue; GetMpathDevice retries discovery afterwards.
+			logger.Warningf("NVMe-oFC RescanDevices: ns-rescan failed on %s: %v output=%s",
+				devicePath, err, string(out))
+			continue
+		}
+	}
 	return nil
+}
+
+// getArrayControllers parses "nvme list-subsys" and returns the controller device
+// names (e.g. "nvme0") whose traddr matches one of the array target ports. Only the
+// array's controllers are rescanned so the local boot NVMe and unrelated subsystems
+// are left untouched.
+func (r OsDeviceConnectivityNvmeOFc) getArrayControllers(arrayIdentifiers []string) []string {
+	arrayTraddrs := make(map[string]bool, len(arrayIdentifiers))
+	for _, id := range arrayIdentifiers {
+		arrayTraddrs[normalizeTraddr(id)] = true
+	}
+
+	out, err := r.Executer.ExecuteWithTimeout(nvmeCmdTimeout, "nvme", []string{"list-subsys"})
+	if err != nil {
+		logger.Warningf("NVMe-oFC getArrayControllers: nvme list-subsys failed: %v", err)
+		return nil
+	}
+
+	seen := map[string]bool{}
+	var controllers []string
+	for _, line := range strings.Split(string(out), "\n") {
+		trimmed := strings.TrimSpace(line)
+		if !strings.HasPrefix(trimmed, "+-") {
+			continue
+		}
+		fields := strings.Fields(trimmed)
+		// Expected: "+- nvme0 fc traddr=... host_traddr=... live"
+		if len(fields) < 2 {
+			continue
+		}
+		controller := fields[1]
+		traddr := normalizeTraddr(extractNvmeField(trimmed, "traddr="))
+		if traddr == "" || !arrayTraddrs[traddr] {
+			continue
+		}
+		if seen[controller] {
+			continue
+		}
+		seen[controller] = true
+		controllers = append(controllers, controller)
+		logger.Debugf("NVMe-oFC getArrayControllers: matched controller=%s traddr=%s", controller, traddr)
+	}
+	return controllers
+}
+
+// normalizeTraddr lowercases and strips "0x" so target ports from the publish
+// context ("nn-500...:pn-500...") match list-subsys traddrs regardless of whether
+// the kernel emits the hex "0x" prefix.
+func normalizeTraddr(traddr string) string {
+	return strings.ReplaceAll(strings.ToLower(strings.TrimSpace(traddr)), "0x", "")
 }
 
 func (r OsDeviceConnectivityNvmeOFc) GetMpathDevice(volumeId string) (string, error) {
