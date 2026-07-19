@@ -461,7 +461,7 @@ func (r OsDeviceConnectivityHelperScsiGeneric) RescanDevices(lunId int, arrayIde
 	return nil
 }
 
-func (r *OsDeviceConnectivityHelperScsiGeneric) IsNvmeCoreMultipathEnabled(ctx context.Context) (bool, error) {
+func isNvmeCoreMultipathEnabled(ctx context.Context) (bool, error) {
 	if err := ctx.Err(); err != nil {
 		return false, err
 	}
@@ -469,12 +469,13 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) IsNvmeCoreMultipathEnabled(ctx c
 	// Route the live read through the uninterruptible framework.
 	// Since it's a transient check, we use a shared, stable resource name 
 	// ("check-nvme-multipath-core") so workers serialize cleanly instead of saturating pools.
-	return executer.ExecuteUninterruptible[bool](
-		ctx,
-		r.KeyedGater,
-		"check-nvme-multipath-core",
-		5, 20, 1*time.Second, 3*time.Second,
-		func(wCtx context.Context) (bool, error) {
+	// TODO use gater
+	//return executer.ExecuteUninterruptible[bool](
+	//	ctx,
+	//	r.KeyedGater,
+	//	"check-nvme-multipath-core",
+//		5, 20, 1*time.Second, 3*time.Second,
+//		func(wCtx context.Context) (bool, error) {
 			data, err := os.ReadFile(nvmeCoreMultipathParamPath)
 			if err != nil {
 				if os.IsNotExist(err) {
@@ -486,8 +487,8 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) IsNvmeCoreMultipathEnabled(ctx c
 			// Accommodate varied values across legacy and modern storage stacks ("Y" or "1")
 			statusStr := strings.ToUpper(strings.TrimSpace(string(data)))
 			return statusStr == "Y" || statusStr == "1", nil
-		},
-	)
+//		},
+//	)
 }
 
 func (r *OsDeviceConnectivityHelperScsiGeneric) IsNativeNvmeDevice(ctx context.Context, dmPath string) (bool, error) {
