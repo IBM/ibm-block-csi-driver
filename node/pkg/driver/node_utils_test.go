@@ -390,6 +390,9 @@ func TestGetBlockVolumeStats(t *testing.T) {
 			nodeUtils := driver.NewNodeUtils(fakeExecuter, nil, ConfigYaml, mockOsDeviceConHelper)
 			args := []string{"--getsize64", tc.mpathDevice}
 
+			// dm-multipath mode: DiscoverMpathDevice reads the mode then uses the dm helper.
+			fakeExecuter.EXPECT().IoutilReadFile("/sys/module/nvme_core/parameters/multipath").
+				Return([]byte("N"), nil).AnyTimes()
 			mockOsDeviceConHelper.EXPECT().GetMpathDevice(tc.volumeUuid).Return(tc.mpathDevice, tc.mpathDeviceErr)
 			if tc.mpathDevice != "" {
 				fakeExecuter.EXPECT().ExecuteWithTimeoutSilently(
@@ -414,4 +417,73 @@ func assertExpectedError(t *testing.T, expectedError error, responseErr error) {
 	if expectedError != responseErr {
 		t.Fatalf("wrong error: expected %v, got %v", expectedError, responseErr)
 	}
+}
+
+func TestDiscoverMpathDevice(t *testing.T) {
+	const (
+		coreParam = "/sys/module/nvme_core/parameters/multipath"
+		volUID    = "60050768108187245800000000000039"
+		nguid     = "58000000000000390050760810818724"
+		byIdPath  = "/dev/disk/by-id/nvme-eui." + nguid
+	)
+
+	t.Run("native mode resolves the namespace head by NGUID", func(t *testing.T) {
+		mockCtrl := gomock.NewController(t)
+		defer mockCtrl.Finish()
+		exec := mocks.NewMockExecuterInterface(mockCtrl)
+		helper := mocks.NewMockOsDeviceConnectivityHelperScsiGenericInterface(mockCtrl)
+		nu := driver.NewNodeUtils(exec, nil, ConfigYaml, helper)
+
+		exec.EXPECT().IoutilReadFile(coreParam).Return([]byte("Y"), nil)
+		exec.EXPECT().OsReadlink(byIdPath).Return("../../nvme1n1", nil)
+		// dm helper must NOT be called in native mode when the head resolves.
+
+		got, err := nu.DiscoverMpathDevice(volUID)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if got != "/dev/nvme1n1" {
+			t.Fatalf("expected /dev/nvme1n1, got %s", got)
+		}
+	})
+
+	t.Run("native mode miss falls back to dm discovery (SCSI/iSCSI on native host)", func(t *testing.T) {
+		mockCtrl := gomock.NewController(t)
+		defer mockCtrl.Finish()
+		exec := mocks.NewMockExecuterInterface(mockCtrl)
+		helper := mocks.NewMockOsDeviceConnectivityHelperScsiGenericInterface(mockCtrl)
+		nu := driver.NewNodeUtils(exec, nil, ConfigYaml, helper)
+
+		exec.EXPECT().IoutilReadFile(coreParam).Return([]byte("Y"), nil)
+		exec.EXPECT().OsReadlink(byIdPath).Return("", os.ErrNotExist)
+		exec.EXPECT().FilepathGlob("/sys/block/nvme*/wwid").Return([]string{}, nil)
+		helper.EXPECT().GetMpathDevice(volUID).Return("/dev/dm-3", nil)
+
+		got, err := nu.DiscoverMpathDevice(volUID)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if got != "/dev/dm-3" {
+			t.Fatalf("expected dm fallback /dev/dm-3, got %s", got)
+		}
+	})
+
+	t.Run("dm mode uses dm discovery directly", func(t *testing.T) {
+		mockCtrl := gomock.NewController(t)
+		defer mockCtrl.Finish()
+		exec := mocks.NewMockExecuterInterface(mockCtrl)
+		helper := mocks.NewMockOsDeviceConnectivityHelperScsiGenericInterface(mockCtrl)
+		nu := driver.NewNodeUtils(exec, nil, ConfigYaml, helper)
+
+		exec.EXPECT().IoutilReadFile(coreParam).Return([]byte("N"), nil)
+		helper.EXPECT().GetMpathDevice(volUID).Return("/dev/dm-5", nil)
+
+		got, err := nu.DiscoverMpathDevice(volUID)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if got != "/dev/dm-5" {
+			t.Fatalf("expected /dev/dm-5, got %s", got)
+		}
+	})
 }

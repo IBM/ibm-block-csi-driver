@@ -78,6 +78,7 @@ type NodeUtilsInterface interface {
 	GetVolumeUuid(volumeId string) string
 	ReadNvmeNqn() (string, error)
 	IsNativeNVMeMultipathEnabled() (bool, error)
+	DiscoverMpathDevice(volumeUuid string) (string, error)
 	DevicesAreNvme(device string) (NvmeType, error)
 	ParseFCPorts() ([]string, error)
 	ParseIscsiInitiators() (string, error)
@@ -685,7 +686,7 @@ func (d NodeUtils) GetFileSystemVolumeStats(path string) (VolumeStatistics, erro
 
 func (d NodeUtils) GetBlockVolumeStats(volumeId string) (VolumeStatistics, error) {
 	volumeUuid := d.GetVolumeUuid(volumeId)
-	mpathDevice, err := d.getVolumeBlockDevice(volumeUuid)
+	mpathDevice, err := d.DiscoverMpathDevice(volumeUuid)
 	if err != nil {
 		return VolumeStatistics{}, err
 	}
@@ -709,16 +710,23 @@ func (d NodeUtils) GetBlockVolumeStats(volumeId string) (VolumeStatistics, error
 	return volumeStats, nil
 }
 
-// getVolumeBlockDevice resolves the host block device for a volume. NodeGetVolumeStats
-// has no connectivity dispatch, so native NVMe is handled here: resolve the namespace
-// head by NGUID (no dm device exists), otherwise use the shared dm-multipath discovery.
-func (d NodeUtils) getVolumeBlockDevice(volumeUuid string) (string, error) {
+// DiscoverMpathDevice resolves the host block device for a volume, native-aware, for the
+// node RPCs that have no connectivity-type dispatch (unstage, publish raw-block, expand,
+// volume stats). In native NVMe mode it resolves the namespace head by NGUID; a miss
+// falls through to dm-multipath discovery so a SCSI/iSCSI volume on a native-NVMe host
+// still resolves (the two device namespaces are disjoint, so there is no false match).
+// The native lookup is single-shot: at these call sites the device is already staged, so
+// no udev settle wait is needed, and a SCSI volume does not stall before the dm fallback.
+func (d NodeUtils) DiscoverMpathDevice(volumeUuid string) (string, error) {
 	native, err := d.IsNativeNVMeMultipathEnabled()
 	if err != nil {
-		logger.Warningf("getVolumeBlockDevice: could not determine multipath mode: %v; using dm discovery", err)
+		logger.Warningf("DiscoverMpathDevice: could not determine multipath mode: %v; using dm discovery", err)
 	}
 	if native {
-		return device_connectivity.DiscoverNativeNamespaceDevice(d.Executer, volumeUuid)
+		if device, nerr := device_connectivity.DiscoverNativeNamespaceDevice(d.Executer, volumeUuid, 1); nerr == nil {
+			return device, nil
+		}
+		logger.Debugf("DiscoverMpathDevice: no native NVMe namespace for %s, falling back to dm discovery", volumeUuid)
 	}
 	return d.osDeviceConnectivityHelper.GetMpathDevice(volumeUuid)
 }

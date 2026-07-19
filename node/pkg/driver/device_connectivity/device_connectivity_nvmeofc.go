@@ -448,26 +448,31 @@ func (r OsDeviceConnectivityNvmeOFc) GetMpathDevice(volumeId string) (string, er
 		logger.Warningf("NVMe-oFC GetMpathDevice: could not determine multipath mode: %v; using dm discovery", err)
 	}
 	if native {
-		return DiscoverNativeNamespaceDevice(r.Executer, volumeId)
+		// Stage runs right after the namespace rescan, so wait for udev to settle.
+		return DiscoverNativeNamespaceDevice(r.Executer, volumeId, WaitForMpathRetries)
 	}
 	return r.HelperScsiGeneric.GetMpathDevice(volumeId)
 }
 
 // DiscoverNativeNamespaceDevice finds the ANA namespace-head device for the volume by
-// its NGUID, retrying briefly while udev settles after the ns-rescan done in
-// RescanDevices (mirrors the dm path's "wait for dm to exist"). Returns the same
-// MultipathDeviceNotFoundForVolumeError as the dm path when nothing is found, so callers
-// (e.g. idempotent NodeUnstage) behave identically across modes. Exported so node-level
-// callers without a connectivity dispatch (NodeGetVolumeStats block path) can reuse it.
-func DiscoverNativeNamespaceDevice(exec executer.ExecuterInterface, volumeId string) (string, error) {
+// its NGUID. maxRetries bounds the wait while udev settles (stage passes the full retry
+// budget right after an ns-rescan; post-stage callers, whose device already exists, pass
+// 1). Returns the same MultipathDeviceNotFoundForVolumeError as the dm path when nothing
+// is found, so callers (e.g. idempotent NodeUnstage) behave identically across modes.
+// Exported so node-level callers without a connectivity dispatch can reuse it.
+func DiscoverNativeNamespaceDevice(exec executer.ExecuterInterface, volumeId string, maxRetries int) (string, error) {
 	nguid := convertScsiIdToNguid(strings.ToLower(volumeId))
 	logger.Infof("DiscoverNativeNamespaceDevice: resolving native NVMe head for volume %s (nguid=%s)", volumeId, nguid)
-	for i := 0; i < WaitForMpathRetries; i++ {
+	for i := 0; i < maxRetries; i++ {
 		if device := resolveNativeNamespaceOnce(exec, nguid); device != "" {
 			logger.Infof("DiscoverNativeNamespaceDevice: resolved volume %s to %s", volumeId, device)
 			return device, nil
 		}
-		time.Sleep(time.Second * time.Duration(WaitForMpathWaitIntervalSec))
+		// Sleep only between attempts, not after the last — a single-shot lookup
+		// (maxRetries=1, post-stage) returns immediately without a settle wait.
+		if i < maxRetries-1 {
+			time.Sleep(time.Second * time.Duration(WaitForMpathWaitIntervalSec))
+		}
 	}
 	logger.Errorf("DiscoverNativeNamespaceDevice: no native NVMe namespace for volume %s (nguid=%s)", volumeId, nguid)
 	return "", &MultipathDeviceNotFoundForVolumeError{volumeId}

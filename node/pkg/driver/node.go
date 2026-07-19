@@ -378,7 +378,7 @@ func (d *NodeService) NodeUnstageVolume(ctx context.Context, req *csi.NodeUnstag
 	}
 
 	volumeUuid := d.NodeUtils.GetVolumeUuid(volumeID)
-	mpathDevice, err := d.OsDeviceConnectivityHelper.GetMpathDevice(volumeUuid)
+	mpathDevice, err := d.NodeUtils.DiscoverMpathDevice(volumeUuid)
 	if err != nil {
 		switch err.(type) {
 		case *device_connectivity.MultipathDeviceNotFoundForVolumeError:
@@ -518,7 +518,7 @@ func (d *NodeService) NodePublishVolume(ctx context.Context, req *csi.NodePublis
 		err = d.publishFileSystemVolume(stagingPath, targetPath, fsType)
 	} else {
 		volumeUuid := d.NodeUtils.GetVolumeUuid(volumeID)
-		mpathDevice, err := d.OsDeviceConnectivityHelper.GetMpathDevice(volumeUuid)
+		mpathDevice, err := d.NodeUtils.DiscoverMpathDevice(volumeUuid)
 		if err != nil {
 			logger.Errorf("Error while discovering the device : {%v}", err.Error())
 			return nil, status.Error(codes.Internal, err.Error())
@@ -766,7 +766,7 @@ func (d *NodeService) NodeExpandVolume(ctx context.Context, req *csi.NodeExpandV
 	defer d.VolumeIdLocksMap.RemoveVolumeLock(volumeID, "NodeExpandVolume")
 
 	volumeUuid := d.NodeUtils.GetVolumeUuid(volumeID)
-	device, err := d.OsDeviceConnectivityHelper.GetMpathDevice(volumeUuid)
+	device, err := d.NodeUtils.DiscoverMpathDevice(volumeUuid)
 	if err != nil {
 		logger.Errorf("Error while discovering the device : {%v}", err.Error())
 		return nil, status.Error(codes.Internal, err.Error())
