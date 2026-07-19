@@ -804,20 +804,19 @@ func (n NodeUtils) IsBlock(ctx context.Context, devicePath string) (bool, error)
 // If this is used for Multipath or NVMe devices, the stat.Rdev field (which you aren't using here but is available) can be used to get the Major:Minor ID to verify against /proc/self/mountinfo, as we discussed in the Mounter review.
 
 func (n NodeUtils) GetFileSystemVolumeStats(ctx context.Context, path string) (VolumeStatistics, error) {
-	// REQUIREMENT 8: Respect CSI API Context
 	if err := ctx.Err(); err != nil {
 		return VolumeStatistics{}, err
 	}
 
+	gaterKey := fmt.Sprintf("statfs-%s", filepath.Base(path))
+
 	stat, err := executer.ExecuteUninterruptible[unix.Statfs_t](
-		ctx, // Propagate context
+		ctx,
 		n.KeyedGater,
-		"statfs-"+path,
+		gaterKey,
 		5, 20, 1*time.Second, 5*time.Second,
 		func(wCtx context.Context) (unix.Statfs_t, error) {
 			var s unix.Statfs_t
-			// REQUIREMENT 4: Direct syscall (avoid 'df' process)
-			// REQUIREMENT 1: unix.Statfs is stable on RHEL 7 (Kernel 3.10)
 			err := unix.Statfs(path, &s)
 			return s, err
 		},
@@ -826,14 +825,28 @@ func (n NodeUtils) GetFileSystemVolumeStats(ctx context.Context, path string) (V
 	if err != nil {
 		return VolumeStatistics{}, err
 	}
-	bsize := int64(stat.Bsize)
+
+	// Upgrade fields to standard uint64 types independently to eliminate arithmetic overflows
+	blkSize     := uint64(stat.Bsize)
+	totalBlocks := uint64(stat.Blocks)
+	availBlocks := uint64(stat.Bavail)
+	
+	totalFiles  := uint64(stat.Files)
+	freeFiles   := uint64(stat.Ffree)
+
+	// Calculate user-space consumption accurately by tracking available user blocks
+	usedBlocks := totalBlocks - availBlocks
+	if totalBlocks < availBlocks { // Underflow safety edge case protection
+		usedBlocks = 0
+	}
+
 	return VolumeStatistics{
-		AvailableBytes:  int64(stat.Bavail) * bsize,
-		TotalBytes:      int64(stat.Blocks) * bsize,
-		UsedBytes:       (int64(stat.Blocks) - int64(stat.Bfree)) * bsize,
-		AvailableInodes: int64(stat.Ffree),
-		TotalInodes:     int64(stat.Files),
-		UsedInodes:      int64(stat.Files) - int64(stat.Ffree),
+		TotalBytes:      int64(totalBlocks * blkSize),
+		AvailableBytes:  int64(availBlocks * blkSize),
+		UsedBytes:       int64(usedBlocks * blkSize),
+		TotalInodes:     int64(totalFiles),
+		AvailableInodes: int64(freeFiles),
+		UsedInodes:      int64(totalFiles - freeFiles),
 	}, nil
 }
 
@@ -880,8 +893,8 @@ func (n NodeUtils) GetBlockVolumeStats(ctx context.Context, devicePath string) (
 
 	return VolumeStatistics{
 		TotalBytes: int64(size),
-		//AvailableBytes: int64(size),
-		///UsedBytes:      0, // Or same as TotalBytes depending on CSI expectations
+		AvailableBytes: int64(size),
+		UsedBytes:      0,
 	}, nil
 }
 
