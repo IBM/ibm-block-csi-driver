@@ -18,7 +18,9 @@ package device_connectivity
 
 import (
 	"fmt"
+	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/ibm/ibm-block-csi-driver/node/logger"
 	"github.com/ibm/ibm-block-csi-driver/node/pkg/driver/executer"
@@ -31,6 +33,12 @@ const (
 	FCPortPath                          = "/sys/class/fc_host/host*/port_name"
 	nvmeTargetPathCount                 = 3
 	nvmeMinPathsForNonNativeDmMultipath = 2
+	// nvmeByIdEuiPrefix is the stable udev by-id symlink prefix for an NVMe namespace
+	// keyed by its NGUID. Storage Virtualize exposes only an NGUID descriptor (no
+	// EUI-64), which udev labels with the "eui." prefix; the 32-hex value that follows
+	// is exactly what convertScsiIdToNguid derives from the SCSI volume UID.
+	nvmeByIdEuiPrefix    = "/dev/disk/by-id/nvme-eui."
+	sysBlockNvmeWwidGlob = "/sys/block/nvme*/wwid"
 )
 
 type OsDeviceConnectivityNvmeOFc struct {
@@ -423,8 +431,81 @@ func normalizeTraddr(traddr string) string {
 	return strings.ReplaceAll(strings.ToLower(strings.TrimSpace(traddr)), "0x", "")
 }
 
+// GetMpathDevice resolves the host block device for the volume. Under native NVMe
+// multipath (nvme_core.multipath=Y) the kernel presents the volume as a single
+// namespace-head /dev/nvmeXnY with no dm device, so the multipathd-based discovery
+// finds nothing; resolve the head by its NGUID instead. Under dm-multipath (=N)
+// delegate to the shared discovery unchanged. Scoped to NVMe/FC by dispatch, so SCSI
+// and iSCSI volumes on a native-NVMe host are unaffected.
 func (r OsDeviceConnectivityNvmeOFc) GetMpathDevice(volumeId string) (string, error) {
+	native, err := IsNvmeCoreMultipathEnabled(r.Executer)
+	if err != nil {
+		logger.Warningf("NVMe-oFC GetMpathDevice: could not determine multipath mode: %v; using dm discovery", err)
+	}
+	if native {
+		return r.discoverNativeNamespace(volumeId)
+	}
 	return r.HelperScsiGeneric.GetMpathDevice(volumeId)
+}
+
+// discoverNativeNamespace finds the ANA namespace-head device for the volume by its
+// NGUID, retrying briefly while udev settles after the ns-rescan done in RescanDevices
+// (mirrors the dm path's "wait for dm to exist"). Returns the same
+// MultipathDeviceNotFoundForVolumeError as the dm path when nothing is found, so
+// callers (e.g. idempotent NodeUnstage) behave identically across modes.
+func (r OsDeviceConnectivityNvmeOFc) discoverNativeNamespace(volumeId string) (string, error) {
+	nguid := convertScsiIdToNguid(strings.ToLower(volumeId))
+	logger.Infof("NVMe-oFC discoverNativeNamespace: resolving native NVMe head for volume %s (nguid=%s)", volumeId, nguid)
+	for i := 0; i < WaitForMpathRetries; i++ {
+		if device := r.resolveNativeNamespaceOnce(nguid); device != "" {
+			logger.Infof("NVMe-oFC discoverNativeNamespace: resolved volume %s to %s", volumeId, device)
+			return device, nil
+		}
+		time.Sleep(time.Second * time.Duration(WaitForMpathWaitIntervalSec))
+	}
+	logger.Errorf("NVMe-oFC discoverNativeNamespace: no native NVMe namespace for volume %s (nguid=%s)", volumeId, nguid)
+	return "", &MultipathDeviceNotFoundForVolumeError{volumeId}
+}
+
+// resolveNativeNamespaceOnce does one lookup: first the stable by-id symlink
+// /dev/disk/by-id/nvme-eui.<nguid>, then a sysfs scan of /sys/block/nvme*/wwid (in case
+// the udev symlink lags the rescan). Returns "" if the namespace is not yet present.
+func (r OsDeviceConnectivityNvmeOFc) resolveNativeNamespaceOnce(nguid string) string {
+	byIdPath := nvmeByIdEuiPrefix + nguid
+	if target, err := r.Executer.OsReadlink(byIdPath); err == nil && target != "" {
+		device := filepath.Join(DevPath, filepath.Base(target))
+		logger.Debugf("NVMe-oFC resolveNativeNamespaceOnce: %s -> %s", byIdPath, device)
+		return device
+	}
+
+	matches, err := r.Executer.FilepathGlob(sysBlockNvmeWwidGlob)
+	if err != nil {
+		logger.Warningf("NVMe-oFC resolveNativeNamespaceOnce: glob %s failed: %v", sysBlockNvmeWwidGlob, err)
+		return ""
+	}
+	for _, wwidPath := range matches {
+		data, err := r.Executer.IoutilReadFile(wwidPath)
+		if err != nil {
+			continue
+		}
+		if normalizeNguid(string(data)) == nguid {
+			// wwidPath = /sys/block/<dev>/wwid → the device name is the parent dir.
+			device := filepath.Join(DevPath, filepath.Base(filepath.Dir(wwidPath)))
+			logger.Debugf("NVMe-oFC resolveNativeNamespaceOnce: sysfs %s matched -> %s", wwidPath, device)
+			return device
+		}
+	}
+	return ""
+}
+
+// normalizeNguid strips the "eui."/"nguid." prefix, dashes, and case so a sysfs wwid
+// ("eui.5800…724") or a dashed sysfs nguid ("58000000-0000-…") compares equal to the
+// undashed 32-hex NGUID that convertScsiIdToNguid derives from the SCSI volume UID.
+func normalizeNguid(s string) string {
+	s = strings.ToLower(strings.TrimSpace(s))
+	s = strings.TrimPrefix(s, "eui.")
+	s = strings.TrimPrefix(s, "nguid.")
+	return strings.ReplaceAll(s, "-", "")
 }
 
 func (r OsDeviceConnectivityNvmeOFc) FlushMultipathDevice(mpathDevice string) error {
