@@ -17,6 +17,7 @@
 package device_connectivity_test
 
 import (
+	"fmt"
 	"os"
 	"testing"
 
@@ -174,6 +175,82 @@ func TestIsVolumePathMatchesVolumeId_Native(t *testing.T) {
 		}
 		if match {
 			t.Fatalf("expected mismatch for a different volume's wwid")
+		}
+	})
+}
+
+func TestRescanNvmeNamespaceForResize(t *testing.T) {
+	const (
+		nsDevice    = "nvme1n1"
+		nsNqnPath   = "/sys/block/nvme1n1/device/subsysnqn"
+		ctrlGlob    = "/sys/class/nvme/nvme*/subsysnqn"
+		arraySubsys = "nqn.1986-03.com.ibm:nvme:2145.000002042061C916"
+	)
+	expectSubsysRead := func(exec *mocks.MockExecuterInterface, val string, err error) {
+		exec.EXPECT().IoutilReadFile(nsNqnPath).Return([]byte(val), err)
+	}
+
+	t.Run("rescans only the namespace's subsystem controllers", func(t *testing.T) {
+		mockCtrl := gomock.NewController(t)
+		defer mockCtrl.Finish()
+		exec := mocks.NewMockExecuterInterface(mockCtrl)
+		expectSubsysRead(exec, arraySubsys+"\n", nil)
+		exec.EXPECT().FilepathGlob(ctrlGlob).Return([]string{
+			"/sys/class/nvme/nvme0/subsysnqn",
+			"/sys/class/nvme/nvme1/subsysnqn",
+			"/sys/class/nvme/nvme2/subsysnqn",
+		}, nil)
+		exec.EXPECT().IoutilReadFile("/sys/class/nvme/nvme0/subsysnqn").Return([]byte("nqn.local:boot"), nil)
+		exec.EXPECT().IoutilReadFile("/sys/class/nvme/nvme1/subsysnqn").Return([]byte(arraySubsys), nil)
+		exec.EXPECT().IoutilReadFile("/sys/class/nvme/nvme2/subsysnqn").Return([]byte(arraySubsys+"\n"), nil)
+		exec.EXPECT().ExecuteWithTimeout(gomock.Any(), "nvme", []string{"ns-rescan", "/dev/nvme1"}).Return([]byte(""), nil)
+		exec.EXPECT().ExecuteWithTimeout(gomock.Any(), "nvme", []string{"ns-rescan", "/dev/nvme2"}).Return([]byte(""), nil)
+
+		if err := device_connectivity.RescanNvmeNamespaceForResize(exec, nsDevice); err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+	})
+
+	t.Run("subsysnqn unreadable is non-fatal (relies on kernel AEN)", func(t *testing.T) {
+		mockCtrl := gomock.NewController(t)
+		defer mockCtrl.Finish()
+		exec := mocks.NewMockExecuterInterface(mockCtrl)
+		expectSubsysRead(exec, "", os.ErrNotExist)
+		// no glob / rescan expected
+		if err := device_connectivity.RescanNvmeNamespaceForResize(exec, nsDevice); err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+	})
+
+	t.Run("no controller matches the subsystem is non-fatal", func(t *testing.T) {
+		mockCtrl := gomock.NewController(t)
+		defer mockCtrl.Finish()
+		exec := mocks.NewMockExecuterInterface(mockCtrl)
+		expectSubsysRead(exec, arraySubsys, nil)
+		exec.EXPECT().FilepathGlob(ctrlGlob).Return([]string{"/sys/class/nvme/nvme0/subsysnqn"}, nil)
+		exec.EXPECT().IoutilReadFile("/sys/class/nvme/nvme0/subsysnqn").Return([]byte("nqn.local:boot"), nil)
+		// no rescan expected
+		if err := device_connectivity.RescanNvmeNamespaceForResize(exec, nsDevice); err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+	})
+
+	t.Run("per-controller rescan failure is non-fatal and still tries the rest", func(t *testing.T) {
+		mockCtrl := gomock.NewController(t)
+		defer mockCtrl.Finish()
+		exec := mocks.NewMockExecuterInterface(mockCtrl)
+		expectSubsysRead(exec, arraySubsys, nil)
+		exec.EXPECT().FilepathGlob(ctrlGlob).Return([]string{
+			"/sys/class/nvme/nvme1/subsysnqn",
+			"/sys/class/nvme/nvme2/subsysnqn",
+		}, nil)
+		exec.EXPECT().IoutilReadFile("/sys/class/nvme/nvme1/subsysnqn").Return([]byte(arraySubsys), nil)
+		exec.EXPECT().IoutilReadFile("/sys/class/nvme/nvme2/subsysnqn").Return([]byte(arraySubsys), nil)
+		exec.EXPECT().ExecuteWithTimeout(gomock.Any(), "nvme", []string{"ns-rescan", "/dev/nvme1"}).Return([]byte(""), fmt.Errorf("exit status 1"))
+		exec.EXPECT().ExecuteWithTimeout(gomock.Any(), "nvme", []string{"ns-rescan", "/dev/nvme2"}).Return([]byte(""), nil)
+
+		if err := device_connectivity.RescanNvmeNamespaceForResize(exec, nsDevice); err != nil {
+			t.Fatalf("unexpected error: %v", err)
 		}
 	})
 }

@@ -97,6 +97,7 @@ type NodeUtilsInterface interface {
 	ExpandFilesystem(devicePath string, volumePath string, fsType string) error
 	ExpandMpathDevice(mpathDevice string) error
 	RescanPhysicalDevices(sysDevices []string) error
+	RescanNvmeNamespace(namespaceDevice string) error
 	FormatDevice(devicePath string, fsType string)
 	IsNotMountPoint(file string) (bool, error)
 	GetPodPath(filepath string) string
@@ -509,6 +510,13 @@ func (n NodeUtils) RescanPhysicalDevices(sysDevices []string) error {
 	}
 	logger.Debugf("Rescan : finish rescan on sys devices : {%v}", sysDevices)
 	return nil
+}
+
+// RescanNvmeNamespace refreshes a native NVMe namespace's size after an array-side
+// expand by rescanning its subsystem controllers (native multipath has no dm device to
+// resize). Best-effort — see device_connectivity.RescanNvmeNamespaceForResize.
+func (n NodeUtils) RescanNvmeNamespace(namespaceDevice string) error {
+	return device_connectivity.RescanNvmeNamespaceForResize(n.Executer, namespaceDevice)
 }
 
 func (n NodeUtils) FormatDevice(devicePath string, fsType string) {

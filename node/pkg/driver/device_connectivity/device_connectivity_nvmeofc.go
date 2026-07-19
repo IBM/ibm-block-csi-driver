@@ -39,6 +39,11 @@ const (
 	// is exactly what convertScsiIdToNguid derives from the SCSI volume UID.
 	nvmeByIdEuiPrefix    = "/dev/disk/by-id/nvme-eui."
 	sysBlockNvmeWwidGlob = "/sys/block/nvme*/wwid"
+	// sysClassNvmeSubsysNqnGlob enumerates every NVMe controller's subsystem NQN;
+	// sysBlockDeviceSubsysNqnFmt reads a namespace head's subsystem NQN via its
+	// device link. Used to find which controllers carry a given namespace for rescan.
+	sysClassNvmeSubsysNqnGlob  = "/sys/class/nvme/nvme*/subsysnqn"
+	sysBlockDeviceSubsysNqnFmt = "/sys/block/%s/device/subsysnqn"
 )
 
 type OsDeviceConnectivityNvmeOFc struct {
@@ -507,6 +512,60 @@ func normalizeNguid(s string) string {
 	s = strings.TrimPrefix(s, "eui.")
 	s = strings.TrimPrefix(s, "nguid.")
 	return strings.ReplaceAll(s, "-", "")
+}
+
+// RescanNvmeNamespaceForResize triggers an NVMe controller rescan so the kernel re-reads
+// a namespace's size after an array-side expand. Native multipath emits no dm device to
+// resize, and the size only refreshes via a kernel AEN or an explicit rescan; without one
+// the filesystem grow reads a stale size and under-expands. Rescans the controllers of the
+// namespace head's subsystem (matched by subsysnqn, so unrelated subsystems are left
+// alone). Best-effort: a missing subsysnqn or a per-controller failure is logged, not
+// fatal — the subsequent grow still runs against whatever size the kernel reports.
+func RescanNvmeNamespaceForResize(exec executer.ExecuterInterface, namespaceDevice string) error {
+	subsysNqnPath := fmt.Sprintf(sysBlockDeviceSubsysNqnFmt, namespaceDevice)
+	data, err := exec.IoutilReadFile(subsysNqnPath)
+	if err != nil {
+		logger.Warningf("RescanNvmeNamespaceForResize: cannot read %s: %v; relying on kernel AEN", subsysNqnPath, err)
+		return nil
+	}
+	subsysNqn := strings.TrimSpace(string(data))
+
+	controllers := findControllersBySubsysNqn(exec, subsysNqn)
+	if len(controllers) == 0 {
+		logger.Warningf("RescanNvmeNamespaceForResize: no controllers found for subsysnqn %s; relying on kernel AEN", subsysNqn)
+		return nil
+	}
+
+	for _, controller := range controllers {
+		devicePath := "/dev/" + controller
+		logger.Infof("RescanNvmeNamespaceForResize: rescanning %s to refresh namespace %s size", devicePath, namespaceDevice)
+		if out, err := exec.ExecuteWithTimeout(nvmeCmdTimeout, "nvme", []string{"ns-rescan", devicePath}); err != nil {
+			logger.Warningf("RescanNvmeNamespaceForResize: ns-rescan failed on %s: %v output=%s", devicePath, err, string(out))
+		}
+	}
+	return nil
+}
+
+// findControllersBySubsysNqn returns the NVMe controller names (e.g. "nvme1") whose
+// subsystem NQN equals targetNqn.
+func findControllersBySubsysNqn(exec executer.ExecuterInterface, targetNqn string) []string {
+	matches, err := exec.FilepathGlob(sysClassNvmeSubsysNqnGlob)
+	if err != nil {
+		logger.Warningf("findControllersBySubsysNqn: glob %s failed: %v", sysClassNvmeSubsysNqnGlob, err)
+		return nil
+	}
+	var controllers []string
+	for _, nqnPath := range matches {
+		data, err := exec.IoutilReadFile(nqnPath)
+		if err != nil {
+			continue
+		}
+		if strings.TrimSpace(string(data)) == targetNqn {
+			// nqnPath = /sys/class/nvme/<ctrl>/subsysnqn → controller is the parent dir.
+			controllers = append(controllers, filepath.Base(filepath.Dir(nqnPath)))
+		}
+	}
+	return controllers
 }
 
 func (r OsDeviceConnectivityNvmeOFc) FlushMultipathDevice(mpathDevice string) error {

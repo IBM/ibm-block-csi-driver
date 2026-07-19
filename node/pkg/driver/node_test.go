@@ -1338,6 +1338,31 @@ func TestNodeExpandVolume(t *testing.T) {
 			},
 		},
 		{
+			name: "success expand volume, native nvme rescans namespace",
+			testFunc: func(t *testing.T) {
+				mockCtl := gomock.NewController(t)
+				defer mockCtl.Finish()
+				mockNodeUtils := mocks.NewMockNodeUtilsInterface(mockCtl)
+				mockOsDeviceConHelper := mocks.NewMockOsDeviceConnectivityHelperScsiGenericInterface(mockCtl)
+				mockMounter := mocks.NewMockNodeMounter(mockCtl)
+				node := newTestNodeServiceExpand(mockNodeUtils, mockOsDeviceConHelper, mockMounter)
+
+				mockNodeUtils.EXPECT().GetVolumeUuid(volId).Return(volId)
+				mockOsDeviceConHelper.EXPECT().GetMpathDevice(volId).Return(mpathDevice, nil)
+				mockNodeUtils.EXPECT().DevicesAreNvme(dmSysFsName).Return(driver.NVMeNative, nil)
+				// Native NVMe rescans the namespace instead of the dm-multipath device.
+				// No ExpandMpathDevice / GetSysDevicesFromMpath / RescanPhysicalDevices expected.
+				mockNodeUtils.EXPECT().RescanNvmeNamespace(dmSysFsName).Return(nil)
+				mockMounter.EXPECT().GetDiskFormat(mpathDevice).Return(fsType, nil)
+				mockNodeUtils.EXPECT().ExpandFilesystem(mpathDevice, stagingTargetPath, fsType).Return(nil)
+
+				_, err := node.NodeExpandVolume(context.TODO(), expandRequest)
+				if err != nil {
+					t.Fatalf("Expect no error but got: %v", err)
+				}
+			},
+		},
+		{
 			name: "success expand volume",
 			testFunc: func(t *testing.T) {
 				mockCtl := gomock.NewController(t)

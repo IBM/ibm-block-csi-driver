@@ -782,8 +782,13 @@ func (d *NodeService) NodeExpandVolume(ctx context.Context, req *csi.NodeExpandV
 
 	switch nvmeType {
 	case NVMeNative:
-		// Native NVMe → skip multipath/rescan
-		logger.Infof("Device %s is native NVMe: skipping multipath expand/rescan", baseDevice)
+		// Native NVMe → no dm device to resize; rescan the namespace so the kernel picks
+		// up the new size before growing the filesystem (otherwise it under-expands).
+		logger.Infof("Device %s is native NVMe: rescanning namespace to refresh size", baseDevice)
+		err = d.NodeUtils.RescanNvmeNamespace(baseDevice)
+		if err != nil {
+			return nil, status.Error(codes.Internal, err.Error())
+		}
 
 	case NVMeNonNative:
 		// Non-native NVMe → skip rescan, only expand multipath
