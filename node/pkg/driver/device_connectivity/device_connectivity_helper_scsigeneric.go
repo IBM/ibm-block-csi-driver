@@ -110,6 +110,12 @@ func (r OsDeviceConnectivityHelperScsiGeneric) IsVolumePathMatchesVolumeId(volum
 		return false, err
 	}
 
+	// Native NVMe multipath has no dm device; confirm the mounted namespace head matches
+	// the volume by its sysfs NGUID instead of querying multipathd.
+	if native, nerr := IsNvmeCoreMultipathEnabled(r.Executer); nerr == nil && native {
+		return r.isNativeVolumePathMatch(mpathDeviceName, volumeIdVariations), nil
+	}
+
 	dmDirectory := DevPath
 	multipathdCommandFormatArgs := multipathdWildcardsMpathAndVolumeId
 	if r.Helper.IsDmName(mpathDeviceName) {
@@ -129,6 +135,28 @@ func (r OsDeviceConnectivityHelperScsiGeneric) IsVolumePathMatchesVolumeId(volum
 
 	logger.Infof("IsVolumePathMatchesVolumeId: found volume id [%s] for volume path [%s] ", mpathVolumeId, volumePath)
 	return r.Helper.IsAnyVariationInMpathVolumeId(mpathVolumeId, volumeIdVariations), nil
+}
+
+// isNativeVolumePathMatch confirms a mounted native NVMe namespace head matches the
+// volume by comparing its sysfs wwid (NGUID) to the volume id variations. Returns false
+// (not an error) when the device is gone or the id does not match, so the caller reports
+// NotFound rather than Internal.
+func (r OsDeviceConnectivityHelperScsiGeneric) isNativeVolumePathMatch(deviceName string, volumeIdVariations []string) bool {
+	wwidPath := filepath.Join("/sys/block", deviceName, "wwid")
+	data, err := r.Executer.IoutilReadFile(wwidPath)
+	if err != nil {
+		logger.Warningf("isNativeVolumePathMatch: cannot read %s: %v", wwidPath, err)
+		return false
+	}
+	normalized := normalizeNguid(string(data))
+	for _, variation := range volumeIdVariations {
+		if normalized == variation {
+			return true
+		}
+	}
+	logger.Infof("isNativeVolumePathMatch: device %s nguid [%s] does not match volume variations %v",
+		deviceName, normalized, volumeIdVariations)
+	return false
 }
 
 func (r OsDeviceConnectivityHelperScsiGeneric) RescanDevicesGetHostIds(lunId int, arrayIdentifiers []string) (map[int]bool, error) {

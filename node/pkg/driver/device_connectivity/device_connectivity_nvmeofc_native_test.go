@@ -129,3 +129,51 @@ func TestNvmeOFcGetMpathDevice_NonNativeDelegates(t *testing.T) {
 		t.Fatalf("expected /dev/dm-3 (delegated), got %s", got)
 	}
 }
+
+func TestIsVolumePathMatchesVolumeId_Native(t *testing.T) {
+	const volumePath = "/var/lib/kubelet/pods/x/volumes/kubernetes.io~csi/pvc/mount"
+	variations := []string{nativeVolumeUID, nativeNguid}
+
+	t.Run("native head wwid matches the volume", func(t *testing.T) {
+		mockCtrl := gomock.NewController(t)
+		defer mockCtrl.Finish()
+		exec := mocks.NewMockExecuterInterface(mockCtrl)
+		helper := mocks.NewMockOsDeviceConnectivityHelperInterface(mockCtrl)
+		o := NewOsDeviceConnectivityHelperScsiGenericForTest(exec, helper, nil)
+
+		helper.EXPECT().GetVolumeIdVariations(nativeVolumeUID).Return(variations)
+		helper.EXPECT().GetMpathDeviceName(volumePath).Return("nvme1n1", nil)
+		exec.EXPECT().IoutilReadFile(nativeCoreParam).Return([]byte("Y"), nil)
+		exec.EXPECT().IoutilReadFile("/sys/block/nvme1n1/wwid").Return([]byte("eui."+nativeNguid+"\n"), nil)
+
+		match, err := o.IsVolumePathMatchesVolumeId(nativeVolumeUID, volumePath)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if !match {
+			t.Fatalf("expected native wwid to match volume")
+		}
+	})
+
+	t.Run("native head wwid belongs to a different volume", func(t *testing.T) {
+		mockCtrl := gomock.NewController(t)
+		defer mockCtrl.Finish()
+		exec := mocks.NewMockExecuterInterface(mockCtrl)
+		helper := mocks.NewMockOsDeviceConnectivityHelperInterface(mockCtrl)
+		o := NewOsDeviceConnectivityHelperScsiGenericForTest(exec, helper, nil)
+
+		helper.EXPECT().GetVolumeIdVariations(nativeVolumeUID).Return(variations)
+		helper.EXPECT().GetMpathDeviceName(volumePath).Return("nvme2n1", nil)
+		exec.EXPECT().IoutilReadFile(nativeCoreParam).Return([]byte("Y"), nil)
+		exec.EXPECT().IoutilReadFile("/sys/block/nvme2n1/wwid").
+			Return([]byte("eui.99990000000000390050760810818724"), nil)
+
+		match, err := o.IsVolumePathMatchesVolumeId(nativeVolumeUID, volumePath)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if match {
+			t.Fatalf("expected mismatch for a different volume's wwid")
+		}
+	})
+}

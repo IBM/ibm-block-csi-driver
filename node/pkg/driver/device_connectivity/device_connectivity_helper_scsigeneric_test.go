@@ -1000,6 +1000,9 @@ func TestIsVolumePathMatchesVolumeId(t *testing.T) {
 			fakeExecuter := mocks.NewMockExecuterInterface(mockCtrl)
 			o := NewOsDeviceConnectivityHelperScsiGenericForTest(fakeExecuter, mockOsDeviceConHelper, nil)
 
+			// dm-multipath mode: the native NGUID match path is not taken.
+			fakeExecuter.EXPECT().IoutilReadFile("/sys/module/nvme_core/parameters/multipath").
+				Return([]byte("N"), nil).AnyTimes()
 			mockOsDeviceConHelper.EXPECT().GetVolumeIdVariations(tc.volumeUuid).Return(volumeIdVariations)
 			mockOsDeviceConHelper.EXPECT().GetMpathDeviceName(tc.volumePath).Return(tc.mpathDeviceName, tc.mpathDeviceNameErr)
 			if tc.mpathDeviceName != "" {

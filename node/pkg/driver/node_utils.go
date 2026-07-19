@@ -677,7 +677,7 @@ func (d NodeUtils) GetFileSystemVolumeStats(path string) (VolumeStatistics, erro
 
 func (d NodeUtils) GetBlockVolumeStats(volumeId string) (VolumeStatistics, error) {
 	volumeUuid := d.GetVolumeUuid(volumeId)
-	mpathDevice, err := d.osDeviceConnectivityHelper.GetMpathDevice(volumeUuid)
+	mpathDevice, err := d.getVolumeBlockDevice(volumeUuid)
 	if err != nil {
 		return VolumeStatistics{}, err
 	}
@@ -699,6 +699,20 @@ func (d NodeUtils) GetBlockVolumeStats(volumeId string) (VolumeStatistics, error
 	}
 
 	return volumeStats, nil
+}
+
+// getVolumeBlockDevice resolves the host block device for a volume. NodeGetVolumeStats
+// has no connectivity dispatch, so native NVMe is handled here: resolve the namespace
+// head by NGUID (no dm device exists), otherwise use the shared dm-multipath discovery.
+func (d NodeUtils) getVolumeBlockDevice(volumeUuid string) (string, error) {
+	native, err := d.IsNativeNVMeMultipathEnabled()
+	if err != nil {
+		logger.Warningf("getVolumeBlockDevice: could not determine multipath mode: %v; using dm discovery", err)
+	}
+	if native {
+		return device_connectivity.DiscoverNativeNamespaceDevice(d.Executer, volumeUuid)
+	}
+	return d.osDeviceConnectivityHelper.GetMpathDevice(volumeUuid)
 }
 
 func (d NodeUtils) GetVolumeUuid(volumeId string) string {

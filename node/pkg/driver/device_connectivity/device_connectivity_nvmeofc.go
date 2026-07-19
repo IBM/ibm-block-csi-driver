@@ -443,55 +443,56 @@ func (r OsDeviceConnectivityNvmeOFc) GetMpathDevice(volumeId string) (string, er
 		logger.Warningf("NVMe-oFC GetMpathDevice: could not determine multipath mode: %v; using dm discovery", err)
 	}
 	if native {
-		return r.discoverNativeNamespace(volumeId)
+		return DiscoverNativeNamespaceDevice(r.Executer, volumeId)
 	}
 	return r.HelperScsiGeneric.GetMpathDevice(volumeId)
 }
 
-// discoverNativeNamespace finds the ANA namespace-head device for the volume by its
-// NGUID, retrying briefly while udev settles after the ns-rescan done in RescanDevices
-// (mirrors the dm path's "wait for dm to exist"). Returns the same
-// MultipathDeviceNotFoundForVolumeError as the dm path when nothing is found, so
-// callers (e.g. idempotent NodeUnstage) behave identically across modes.
-func (r OsDeviceConnectivityNvmeOFc) discoverNativeNamespace(volumeId string) (string, error) {
+// DiscoverNativeNamespaceDevice finds the ANA namespace-head device for the volume by
+// its NGUID, retrying briefly while udev settles after the ns-rescan done in
+// RescanDevices (mirrors the dm path's "wait for dm to exist"). Returns the same
+// MultipathDeviceNotFoundForVolumeError as the dm path when nothing is found, so callers
+// (e.g. idempotent NodeUnstage) behave identically across modes. Exported so node-level
+// callers without a connectivity dispatch (NodeGetVolumeStats block path) can reuse it.
+func DiscoverNativeNamespaceDevice(exec executer.ExecuterInterface, volumeId string) (string, error) {
 	nguid := convertScsiIdToNguid(strings.ToLower(volumeId))
-	logger.Infof("NVMe-oFC discoverNativeNamespace: resolving native NVMe head for volume %s (nguid=%s)", volumeId, nguid)
+	logger.Infof("DiscoverNativeNamespaceDevice: resolving native NVMe head for volume %s (nguid=%s)", volumeId, nguid)
 	for i := 0; i < WaitForMpathRetries; i++ {
-		if device := r.resolveNativeNamespaceOnce(nguid); device != "" {
-			logger.Infof("NVMe-oFC discoverNativeNamespace: resolved volume %s to %s", volumeId, device)
+		if device := resolveNativeNamespaceOnce(exec, nguid); device != "" {
+			logger.Infof("DiscoverNativeNamespaceDevice: resolved volume %s to %s", volumeId, device)
 			return device, nil
 		}
 		time.Sleep(time.Second * time.Duration(WaitForMpathWaitIntervalSec))
 	}
-	logger.Errorf("NVMe-oFC discoverNativeNamespace: no native NVMe namespace for volume %s (nguid=%s)", volumeId, nguid)
+	logger.Errorf("DiscoverNativeNamespaceDevice: no native NVMe namespace for volume %s (nguid=%s)", volumeId, nguid)
 	return "", &MultipathDeviceNotFoundForVolumeError{volumeId}
 }
 
 // resolveNativeNamespaceOnce does one lookup: first the stable by-id symlink
 // /dev/disk/by-id/nvme-eui.<nguid>, then a sysfs scan of /sys/block/nvme*/wwid (in case
 // the udev symlink lags the rescan). Returns "" if the namespace is not yet present.
-func (r OsDeviceConnectivityNvmeOFc) resolveNativeNamespaceOnce(nguid string) string {
+func resolveNativeNamespaceOnce(exec executer.ExecuterInterface, nguid string) string {
 	byIdPath := nvmeByIdEuiPrefix + nguid
-	if target, err := r.Executer.OsReadlink(byIdPath); err == nil && target != "" {
+	if target, err := exec.OsReadlink(byIdPath); err == nil && target != "" {
 		device := filepath.Join(DevPath, filepath.Base(target))
-		logger.Debugf("NVMe-oFC resolveNativeNamespaceOnce: %s -> %s", byIdPath, device)
+		logger.Debugf("resolveNativeNamespaceOnce: %s -> %s", byIdPath, device)
 		return device
 	}
 
-	matches, err := r.Executer.FilepathGlob(sysBlockNvmeWwidGlob)
+	matches, err := exec.FilepathGlob(sysBlockNvmeWwidGlob)
 	if err != nil {
-		logger.Warningf("NVMe-oFC resolveNativeNamespaceOnce: glob %s failed: %v", sysBlockNvmeWwidGlob, err)
+		logger.Warningf("resolveNativeNamespaceOnce: glob %s failed: %v", sysBlockNvmeWwidGlob, err)
 		return ""
 	}
 	for _, wwidPath := range matches {
-		data, err := r.Executer.IoutilReadFile(wwidPath)
+		data, err := exec.IoutilReadFile(wwidPath)
 		if err != nil {
 			continue
 		}
 		if normalizeNguid(string(data)) == nguid {
 			// wwidPath = /sys/block/<dev>/wwid → the device name is the parent dir.
 			device := filepath.Join(DevPath, filepath.Base(filepath.Dir(wwidPath)))
-			logger.Debugf("NVMe-oFC resolveNativeNamespaceOnce: sysfs %s matched -> %s", wwidPath, device)
+			logger.Debugf("resolveNativeNamespaceOnce: sysfs %s matched -> %s", wwidPath, device)
 			return device
 		}
 	}
