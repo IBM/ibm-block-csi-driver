@@ -360,7 +360,7 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) IsVolumePathMatchesVolumeId(ctx 
 	}
 
 	// 2. Locate the unified device-mapper node name (e.g., "dm-3" or "mpatha")
-	mpathDeviceName, err := r.Helper.GetMpathDeviceName(ctx, volumePath)
+	mpathDeviceName, err := r.Helper.GetMpathDeviceName(ctx, r.KeyedGater, volumePath)
 	if err != nil {
 		return false, fmt.Errorf("failed to trace multipath map for path %s: %w", volumePath, err)
 	}
@@ -413,7 +413,7 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) IsVolumePathMatchesVolumeId(ctx 
 // TODO id unused?
 func (r *OsDeviceConnectivityHelperScsiGeneric) GetExistingMpathDevice(ctx context.Context, volumeUuid string, volumePath string) (string, error) {
 	logger.Infof("GetExistingMpathDevice: Searching matching volume id for volume path: [%s] ", volumePath)
-	mpathDeviceName, err := r.Helper.GetMpathDeviceName(ctx, volumePath)
+	mpathDeviceName, err := r.Helper.GetMpathDeviceName(ctx, r.KeyedGater, volumePath)
 	if err != nil {
 		return "", err
 	}
@@ -652,7 +652,7 @@ func (r OsDeviceConnectivityHelperScsiGeneric) GetMpathDevice(ctx context.Contex
 	//volumeIdVariations := r.Helper.GetVolumeIdVariations(volumeId)
 	
 
-	mpathdOutput, err := r.Helper.WaitForDmToExist(ctx, volumeId, WaitForMpathRetries,
+	mpathdOutput, err := r.Helper.WaitForDmToExist(ctx, r.KeyedGater, volumeId, WaitForMpathRetries,
 		WaitForMpathWaitIntervalSec)
 	if err != nil {
 		return "", err
@@ -4215,7 +4215,7 @@ type OsDeviceConnectivityHelperInterface interface {
 	GetHostsIdByArrayIdentifiers(arrayIdentifier []string) (map[int]bool, error)
 	GetWwnByScsiInq(ctx context.Context, dev string) (string, error)
 	GetVolumeIdVariations(volumeUuid string) []string
-	GetMpathDeviceName(ctx context.Context, volumePath string) (string, error)
+	GetMpathDeviceName(ctx context.Context, gater *executer.KeyedGater, volumePath string) (string, error)
 	GetMpathVolumeId(ctx context.Context, mpathDeviceName string) (string, error)
 	normalizeWWID(raw string) string
 	findDMByWWID(ctx context.Context, wwid string) string
@@ -4223,7 +4223,7 @@ type OsDeviceConnectivityHelperInterface interface {
 	GetOpenCount(ctx context.Context, dmName string) (int32, error)
 	GetMajorMinorFromSysfs(ctx context.Context, devicePath string) (major uint32, minor uint32, err error)
 	getWWIDByDev(ctx context.Context, major, minor uint32) (string, error)
-	WaitForDmToExist(ctx context.Context, volumeId string, maxRetries int, intervalSeconds int) (string, error)
+	WaitForDmToExist(ctx context.Context, gater *executer.KeyedGater, volumeId string, maxRetries int, intervalSeconds int) (string, error)
 }
 
 type OsDeviceConnectivityHelperGeneric struct {
@@ -4242,8 +4242,8 @@ func NewOsDeviceConnectivityHelperGeneric(executer executer.ExecuterInterface, K
 	}
 }
 
-func (o *OsDeviceConnectivityHelperGeneric) WaitForDmToExist(ctx context.Context, volumeId string, maxRetries int, intervalSeconds int) (string, error) {
-       return o.Helper.WaitForDmToExist(ctx, volumeId, maxRetries, intervalSeconds)
+func (o *OsDeviceConnectivityHelperGeneric) WaitForDmToExist(ctx context.Context,  gater *executer.KeyedGater, volumeId string, maxRetries int, intervalSeconds int) (string, error) {
+       return o.Helper.WaitForDmToExist(ctx, gater, volumeId, maxRetries, intervalSeconds)
 }
 
 func (o *OsDeviceConnectivityHelperGeneric) GetHostsIdByArrayIdentifiers(arrayIdentifier []string) (map[int]bool, error) {
@@ -4883,7 +4883,7 @@ func (o *OsDeviceConnectivityHelperGeneric) MatchVolumeWWID(targetWWID string, c
 // UNUSED
 func (o *OsDeviceConnectivityHelperGeneric) GetMpathdOutputForVolume(ctx context.Context, volumeId string,
 	multipathdCommandFormatArgs []string) (string, error) {
-	mpathdOutput, err := o.Helper.WaitForDmToExist(ctx, volumeId, WaitForMpathRetries,
+	mpathdOutput, err := o.Helper.WaitForDmToExist(ctx, o.KeyedGater, volumeId, WaitForMpathRetries,
 		WaitForMpathWaitIntervalSec)
 	if err != nil {
 		return "", err
@@ -4907,7 +4907,7 @@ func (o *OsDeviceConnectivityHelperGeneric) GetMpathdOutputForVolume(ctx context
 
 
 // GetMpathDeviceName cleanly resolves raw storage block devices protected against D-state freezes
-func (o *OsDeviceConnectivityHelperGeneric) GetMpathDeviceName(ctx context.Context, volumePath string) (string, error) {
+func (o *OsDeviceConnectivityHelperGeneric) GetMpathDeviceName(ctx context.Context, gater *executer.KeyedGater, volumePath string) (string, error) {
 	if err := ctx.Err(); err != nil {
 		return "", err
 	}
@@ -4916,7 +4916,7 @@ func (o *OsDeviceConnectivityHelperGeneric) GetMpathDeviceName(ctx context.Conte
 	// Limits concurrency constraints to 5 concurrent worker threads, with a 5s handoff boundary.
 	return executer.ExecuteUninterruptible(
 		ctx,
-		o.Gater,
+		gater,
 		"mpath-resolve:"+volumePath,
 		5,           // maxRunning
 		10,          // maxSpare
@@ -4958,7 +4958,7 @@ func (o *OsDeviceConnectivityHelperGeneric) GetMpathDeviceName(ctx context.Conte
 			}
 
 			if major > 0 {
-				if kernelName, err := o.resolveIdToKernelName(wCtx, major, minor); err == nil {
+				if kernelName, err := o.resolveIdToKernelName(wCtx, gater, major, minor); err == nil {
 					return kernelName, nil
 				}
 			}
@@ -4968,7 +4968,7 @@ func (o *OsDeviceConnectivityHelperGeneric) GetMpathDeviceName(ctx context.Conte
 	)
 }
 
-func (o *OsDeviceConnectivityHelperGeneric) resolveIdToKernelName(ctx context.Context, major, minor uint32) (string, error) {
+func (o *OsDeviceConnectivityHelperGeneric) resolveIdToKernelName(ctx context.Context, gater *executer.KeyedGater, major, minor uint32) (string, error) {
 	if ctx.Err() != nil {
 		return "", ctx.Err()
 	}
@@ -4978,7 +4978,7 @@ func (o *OsDeviceConnectivityHelperGeneric) resolveIdToKernelName(ctx context.Co
 	// Route inner /sys parsing logic through the infrastructure gater to prevent kernel hanging
 	return executer.ExecuteUninterruptible(
 		ctx,
-		o.Gater,
+		gater,
 		fmt.Sprintf("sysfs-read:%d-%d", major, minor),
 		5,
 		10,
@@ -5003,7 +5003,7 @@ func (o *OsDeviceConnectivityHelperGeneric) resolveIdToKernelName(ctx context.Co
 
 
 // ResolveToKernelName standardizes diverse input block names back to core system labels.
-func (o *OsDeviceConnectivityHelperGeneric) ResolveToKernelName(ctx context.Context, deviceName string) (string, error) {
+func (o *OsDeviceConnectivityHelperGeneric) ResolveToKernelName(ctx context.Context, gater *executer.KeyedGater, deviceName string) (string, error) {
 	if ctx.Err() != nil {
 		return "", ctx.Err()
 	}
@@ -5049,7 +5049,7 @@ func (o *OsDeviceConnectivityHelperGeneric) ResolveToKernelName(ctx context.Cont
 			minor := unix.Minor(uint64(stat.Rdev))
 			
 			// Resolve the major:minor tuple cleanly to a kernel label ("dm-2")
-			if kernelName, err := o.resolveIdToKernelName(ctx, major, minor); err == nil {
+			if kernelName, err := o.resolveIdToKernelName(ctx, gater, major, minor); err == nil {
 				return kernelName, nil
 			}
 		}
@@ -5246,7 +5246,7 @@ func (o OsDeviceConnectivityHelperGeneric) normalizeWWID(raw string) string {
 
 // GetWWIDByDev safe-resolves unique identifiers from major/minor device attributes.
 // FIX 1: Capitalised the method name to correctly export it across package boundaries.
-func (o *OsDeviceConnectivityHelperGeneric) GetWWIDByDev(ctx context.Context, major, minor uint32) (string, error) {
+func (o *OsDeviceConnectivityHelperGeneric) getWWIDByDev(ctx context.Context, major, minor uint32) (string, error) {
 	if ctx.Err() != nil {
 		return "", ctx.Err()
 	}
@@ -5539,7 +5539,7 @@ func (o *OsDeviceConnectivityHelperGeneric) GetWwnByNvmeSysfs(ctx context.Contex
 	}
 
 	// FIX: Switch to secureReadSysfs across all branches to avoid un-shielded D-state locks on dropped paths
-	if nguid, err := secureReadSysfs(ctx, r.KeyedGater, name, filepath.Join(targetSysDir, "nguid")); err == nil && nguid != "" {
+	if nguid, err := secureReadSysfs(ctx, o.KeyedGater, name, filepath.Join(targetSysDir, "nguid")); err == nil && nguid != "" {
 		return o.normalizeWWID(nguid), nil
 	}
 
@@ -5547,7 +5547,7 @@ func (o *OsDeviceConnectivityHelperGeneric) GetWwnByNvmeSysfs(ctx context.Contex
 		return o.normalizeWWID(uuid), nil
 	}
 
-	if serial, err := secureReadSysfs(ctx, r.KeyedGater, name, filepath.Join(targetSysDir, "device/serial")); err == nil && serial != "" {
+	if serial, err := secureReadSysfs(ctx, o.KeyedGater, name, filepath.Join(targetSysDir, "device/serial")); err == nil && serial != "" {
 		normSerial := strings.ToLower(strings.TrimSpace(serial))
 		// FIX: Handle ASCII serial outputs. If it does not form a clean 32-character hexadecimal block, 
 		// return it as-is so lower-tier validation layers can process generic string contains validations.
@@ -5573,8 +5573,8 @@ func (r *OsDeviceConnectivityHelperGeneric) readSysfs(path string) (string, erro
 //go:generate mockgen -destination=../../../mocks/mock_GetDmsPathHelperInterface.go -package=mocks github.com/ibm/ibm-block-csi-driver/node/pkg/driver/device_connectivity GetDmsPathHelperInterface
 
 type GetDmsPathHelperInterface interface {
-	WaitForDmToExist(ctx context.Context, volumeId string, maxRetries int, intervalSeconds int) (string, error)
-	GetSlaveCount(devName string) int
+	WaitForDmToExist(ctx context.Context, gater *executer.KeyedGater, volumeId string, maxRetries int, intervalSeconds int) (string, error)
+	GetSlaveCount(ctx context.Context, gater *executer.KeyedGater, devName string) int
 }
 
 type GetDmsPathHelperGeneric struct {
@@ -5615,7 +5615,7 @@ func (o GetDmsPathHelperGeneric) WaitForDmToExist(ctx context.Context, gater *ex
 			return "", err
 		}
 
-		hasDevice, isPending, name := o.EvaluateSysfsTopology(ctx, o.KeyedGater, volumeWWID, false)
+		hasDevice, isPending, name := o.EvaluateSysfsTopology(ctx, gater, volumeWWID, false)
 		logger.Warningf("hasDevice %t isPending %t, name %s", hasDevice, isPending, name)
 
 		if !hasDevice || isPending {
@@ -5647,7 +5647,7 @@ func (o GetDmsPathHelperGeneric) WaitForDmToExist(ctx context.Context, gater *ex
 				fmt.Sprintf("wait-slave-count-%s", name),
 				20, 100, 1*time.Second, 3*time.Second,
 				func(wCtx context.Context) (int, error) {
-					return o.GetSlaveCount(ctx, name), nil
+					return o.GetSlaveCount(ctx, gater, name), nil
 				},
 			)
 			if err == nil {
@@ -5663,7 +5663,7 @@ func (o GetDmsPathHelperGeneric) WaitForDmToExist(ctx context.Context, gater *ex
 			fmt.Sprintf("wait-ro-status-%s", name),
 			20, 100, 1*time.Second, 3*time.Second,
 			func(wCtx context.Context) (string, error) {
-				return o.getRoStatus(ctx, path), nil
+				return o.getRoStatus(ctx, gater, path), nil
 			},
 		)
 		if err != nil {
@@ -5708,7 +5708,7 @@ func (o GetDmsPathHelperGeneric) WaitForDmToExist(ctx context.Context, gater *ex
 					fmt.Sprintf("settle-validate-%s", name),
 					10, 50, 2*time.Second, 10*time.Second,
 					func(wCtx context.Context) (struct{}, error) {
-						if settleErr := safeSettle(ctx, gater, path); settleErr != nil {
+						if settleErr := o.safeSettle(ctx, gater, path); settleErr != nil {
 							return struct{}{}, settleErr
 						}
 						return struct{}{}, nil
