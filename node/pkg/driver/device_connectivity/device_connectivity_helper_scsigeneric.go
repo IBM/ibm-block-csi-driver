@@ -461,7 +461,7 @@ func (r OsDeviceConnectivityHelperScsiGeneric) RescanDevices(lunId int, arrayIde
 	return nil
 }
 
-func IsNvmeCoreMultipathEnabled(ctx context.Context) (bool, error) {
+func (r *OsDeviceConnectivityHelperScsiGeneric) IsNvmeCoreMultipathEnabled(ctx context.Context) (bool, error) {
 	if err := ctx.Err(); err != nil {
 		return false, err
 	}
@@ -471,7 +471,7 @@ func IsNvmeCoreMultipathEnabled(ctx context.Context) (bool, error) {
 	// ("check-nvme-multipath-core") so workers serialize cleanly instead of saturating pools.
 	return executer.ExecuteUninterruptible[bool](
 		ctx,
-		n.KeyedGater,
+		r.KeyedGater,
 		"check-nvme-multipath-core",
 		5, 20, 1*time.Second, 3*time.Second,
 		func(wCtx context.Context) (bool, error) {
@@ -490,7 +490,7 @@ func IsNvmeCoreMultipathEnabled(ctx context.Context) (bool, error) {
 	)
 }
 
-func IsNativeNvmeDevice(ctx context.Context, dmPath string) (bool, error) {
+func (r *OsDeviceConnectivityHelperScsiGeneric) IsNativeNvmeDevice(ctx context.Context, dmPath string) (bool, error) {
 	if err := ctx.Err(); err != nil {
 		return false, err
 	}
@@ -505,7 +505,7 @@ func IsNativeNvmeDevice(ctx context.Context, dmPath string) (bool, error) {
 	// Shield the system interaction loop against low-level storage freezes
 	return executer.ExecuteUninterruptible[bool](
 		ctx,
-		n.KeyedGater,
+		r.KeyedGater,
 		fmt.Sprintf("check-native-nvme-%s", baseDevice),
 		10, 50, 1*time.Second, 3*time.Second,
 		func(wCtx context.Context) (bool, error) {
@@ -538,7 +538,7 @@ func IsNativeNvmeDevice(ctx context.Context, dmPath string) (bool, error) {
 	)
 }
 
-func IsNonNativeNvmeDevice(ctx context.Context, dmPath string) (bool, error) {
+func (r *OsDeviceConnectivityHelperScsiGeneric) IsNonNativeNvmeDevice(ctx context.Context, dmPath string) (bool, error) {
 	if err := ctx.Err(); err != nil {
 		return false, err
 	}
@@ -561,7 +561,7 @@ func IsNonNativeNvmeDevice(ctx context.Context, dmPath string) (bool, error) {
 	// 2. Shield the directory read inside your uninterruptible safety framework
 	return executer.ExecuteUninterruptible[bool](
 		ctx,
-		n.KeyedGater,
+		r.KeyedGater,
 		fmt.Sprintf("check-slaves-nvme-%s", baseDevice),
 		10, 50, 1*time.Second, 3*time.Second,
 		func(wCtx context.Context) (bool, error) {
@@ -591,7 +591,7 @@ func IsNonNativeNvmeDevice(ctx context.Context, dmPath string) (bool, error) {
 
 // IsNvmeDevice determines if a given storage target path is an NVMe layout (native or multi-pathed).
 // Fully portable from RHEL 7 upwards, uses zero forks, and is protected against D-state freezes.
-func IsNvmeDevice(ctx context.Context, dmPath string) (bool, error) {
+func (r *OsDeviceConnectivityHelperScsiGeneric) IsNvmeDevice(ctx context.Context, dmPath string) (bool, error) {
 	if err := ctx.Err(); err != nil {
 		return false, err
 	}
@@ -616,7 +616,7 @@ func IsNvmeDevice(ctx context.Context, dmPath string) (bool, error) {
 		// Shield the directory read loop inside your uninterruptible safety framework
 		return executer.ExecuteUninterruptible[bool](
 			ctx,
-			n.KeyedGater,
+			r.KeyedGater,
 			fmt.Sprintf("is-nvme-block-%s", baseDevice),
 			10, 50, 1*time.Second, 3*time.Second,
 			func(wCtx context.Context) (bool, error) {
@@ -3032,50 +3032,6 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) TeardownRescue(ctx context.Conte
 }
 
 
-// getSlavesForDevice returns raw underlying physical block device names safely shielded from D-state locks.
-func (r *OsDeviceConnectivityHelperScsiGeneric) getSlavesForDevice(ctx context.Context, major, minor uint32) ([]string, error) {
-	logger.Warning("getSlavesForDevice execution tracing initialized")
-
-	if ctx.Err() != nil {
-		return nil, ctx.Err()
-	}
-
-	slavesPath := fmt.Sprintf("/sys/dev/block/%d:%d/slaves", major, minor)
-
-	// FIX: Shield directory mapping discovery inside our non-blocking ExecuteUninterruptible channel structure.
-	// If a storage target drops or wedges during a path failure event, the scanning thread will be isolated safely.
-	entries, err := executer.ExecuteUninterruptible[[]os.DirEntry](
-		ctx,
-		r.KeyedGater,
-		fmt.Sprintf("read-slaves-%d:%d", major, minor),
-		20, // Bounded concurrent pool capacity across the host node
-		100,
-		1*time.Second,
-		3*time.Second,
-		func(wCtx context.Context) ([]os.DirEntry, error) {
-			return os.ReadDir(slavesPath)
-		},
-	)
-
-	if err != nil {
-		if os.IsNotExist(err) {
-			return nil, nil // Return gracefully if device holds no underlying storage slaves
-		}
-		return nil, fmt.Errorf("failed to scan device layout mapper slaves tree configuration layout: %w", err)
-	}
-
-	var results []string
-	for _, entry := range entries {
-		slaveName := entry.Name() // Keeps exact block name like "sda" or "nvme0n1"
-		logger.Warningf("getSlavesForDevice entry discovered: %s", slaveName)
-		
-		// Linux sysfs directories can never return an empty string name payload.
-		// We append the validated block identifier direct to our tracking array structure.
-		results = append(results, slaveName)
-	}
-	return results, nil
-}
-
 
 type DmTargetSpec struct {
     SectorStart uint64
@@ -3362,47 +3318,40 @@ type dmIoctlPacket struct {
 }
 
 // ExecuteDmsetupDeferredRemove handles deferred removals natively in Go with ZERO external process forks.
-func (r *OsDeviceConnectivityHelperScsiGeneric) ExecuteDmsetupDeferredRemove(ctx context.Context, mpathName string) error {
+func (r *OsDeviceConnectivityHelperScsiGeneric) executeDmsetupDeferredRemove(ctx context.Context, mpathName string) error {
 	if err := ctx.Err(); err != nil {
 		return ctx.Err()
 	}
 
 	logger.Infof("[Cleanup-Topology] Initializing native kernel deferred removal pass for map: %s", mpathName)
 
-	// Shield the raw character device interaction inside your safety framework to prevent D-state freezes
-	return executer.ExecuteUninterruptible[error](
+	// FIX 1: Instantiate using struct{} to align return statements with your framework's signature properties
+	_, err := executer.ExecuteUninterruptible[struct{}](
 		ctx,
 		r.KeyedGater,
 		fmt.Sprintf("native-dm-remove-%s", mpathName),
 		10, 50, 1*time.Second, 5*time.Second,
-		func(wCtx context.Context) (error, error) {
-			// Open the primary Device Mapper controller communication link natively (Uses container shared host namespace)
+		func(wCtx context.Context) (struct{}, error) {
+			// Open the primary Device Mapper controller communication link natively
 			controlFd, err := syscall.Open("/dev/mapper/control", syscall.O_RDWR|syscall.O_NONBLOCK, 0)
 			if err != nil {
-				return fmt.Errorf("failed to open device-mapper controller: %w", err), nil
+				return struct{}{}, fmt.Errorf("failed to open device-mapper controller: %w", err)
 			}
 			defer syscall.Close(controlFd)
 
-			// 1. Initialize and size-pad the raw kernel IOCTL packet data frame
 			var packet dmIoctlPacket
 			packet.version[0] = 4 // DM_VERSION_MAJOR
 			packet.version[1] = 0 // DM_VERSION_MINOR
 			packet.version[2] = 0 // DM_VERSION_PATCHLEVEL
 			packet.data_size = uint32(unsafe.Sizeof(packet))
 			packet.data_start = uint32(unsafe.Sizeof(packet))
-			
-			// Inject the modern deferred removal parameter flag directly into the bitmask
 			packet.flags = DM_DEFERRED_REMOVE_FLAG
 
-			// 2. Safely cast the mapping name string into the fixed C-character array buffer
 			copy(packet.name[:], mpathName)
 
-			// Calculate the explicit kernel IOCTL request code block matrix macro
-			// _IOWR(DM_IOCTL_CMD_MAGIC, DM_DEV_REMOVE_CMD, struct dm_ioctl)
-			// On standard Linux x86_64, this systematically resolves to the code 0xc138fd04
 			const DM_DEV_REMOVE_IOCTL_CODE = 0xc138fd04
 
-			// 3. Fire the direct low-level kernel pass-through execution signature
+			// Fire the direct low-level kernel pass-through execution signature
 			_, _, errno := syscall.Syscall(
 				syscall.SYS_IOCTL,
 				uintptr(controlFd),
@@ -3411,13 +3360,16 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) ExecuteDmsetupDeferredRemove(ctx
 			)
 
 			if errno != 0 && errno != syscall.ENXIO { // ENXIO implies device was already deleted (idempotent victory)
-				return fmt.Errorf("native device-mapper removal ioctl call failed (errno %v): %w", errno, errno), nil
+				return struct{}{}, fmt.Errorf("native device-mapper removal ioctl call failed (errno %v): %w", errno, errno)
 			}
 
 			logger.Infof("[Cleanup-Topology] Native kernel deferred removal successfully applied for map %s", mpathName)
-			return nil, nil
+			// FIX 2: Return a clean empty struct allocation alongside a nil operational tracking error
+			return struct{}{}, nil
 		},
 	)
+
+	return err
 }
 
 
@@ -5202,6 +5154,51 @@ func (o *OsDeviceConnectivityHelperGeneric) findDMByWWID(ctx context.Context, ww
 	return ""
 }
 
+
+// getSlavesForDevice returns raw underlying physical block device names safely shielded from D-state locks.
+func (r *OsDeviceConnectivityHelperGeneric) getSlavesForDevice(ctx context.Context, major, minor uint32) ([]string, error) {
+	logger.Warning("getSlavesForDevice execution tracing initialized")
+
+	if ctx.Err() != nil {
+		return nil, ctx.Err()
+	}
+
+	slavesPath := fmt.Sprintf("/sys/dev/block/%d:%d/slaves", major, minor)
+
+	// FIX: Shield directory mapping discovery inside our non-blocking ExecuteUninterruptible channel structure.
+	// If a storage target drops or wedges during a path failure event, the scanning thread will be isolated safely.
+	entries, err := executer.ExecuteUninterruptible[[]os.DirEntry](
+		ctx,
+		r.KeyedGater,
+		fmt.Sprintf("read-slaves-%d:%d", major, minor),
+		20, // Bounded concurrent pool capacity across the host node
+		100,
+		1*time.Second,
+		3*time.Second,
+		func(wCtx context.Context) ([]os.DirEntry, error) {
+			return os.ReadDir(slavesPath)
+		},
+	)
+
+	if err != nil {
+		if os.IsNotExist(err) {
+			return nil, nil // Return gracefully if device holds no underlying storage slaves
+		}
+		return nil, fmt.Errorf("failed to scan device layout mapper slaves tree configuration layout: %w", err)
+	}
+
+	var results []string
+	for _, entry := range entries {
+		slaveName := entry.Name() // Keeps exact block name like "sda" or "nvme0n1"
+		logger.Warningf("getSlavesForDevice entry discovered: %s", slaveName)
+		
+		// Linux sysfs directories can never return an empty string name payload.
+		// We append the validated block identifier direct to our tracking array structure.
+		results = append(results, slaveName)
+	}
+	return results, nil
+}
+
 // readDmUuidWithFallbacks isolates sysfs location adjustments across old and new OS versions with context boundaries.
 func (o *OsDeviceConnectivityHelperGeneric) readDmUuidWithFallbacks(ctx context.Context, dmKernelName string) (string, error) {
 	if ctx.Err() != nil {
@@ -5546,7 +5543,7 @@ func (o *OsDeviceConnectivityHelperGeneric) GetWwnByNvmeSysfs(ctx context.Contex
 		return o.normalizeWWID(nguid), nil
 	}
 
-	if uuid, err := secureReadSysfs(ctx, r.KeyedGater, name, filepath.Join(targetSysDir, "uuid")); err == nil && uuid != "" {
+	if uuid, err := secureReadSysfs(ctx, o.KeyedGater, name, filepath.Join(targetSysDir, "uuid")); err == nil && uuid != "" {
 		return o.normalizeWWID(uuid), nil
 	}
 
