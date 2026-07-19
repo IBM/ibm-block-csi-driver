@@ -173,15 +173,26 @@ func (d *NodeService) NodeStageVolume(ctx context.Context, req *csi.NodeStageVol
 		return &csi.NodeStageVolumeResponse{}, nil
 	}
 	baseDevice := path.Base(mpathDevice)
-	sysDevices, err := d.NodeUtils.GetSysDevicesFromMpath(baseDevice)
+
+	nvmeType, err := d.NodeUtils.DevicesAreNvme(baseDevice)
 	if err != nil {
-		logger.Errorf("Error while trying to get sys devices : {%v}", err.Error())
-		return nil, status.Error(codes.Internal, err.Error())
+		return nil, status.Errorf(codes.Internal, "Failed to determine device type for %s: %v", baseDevice, err)
 	}
-	err = osDeviceConnectivity.ValidateLun(lun, sysDevices)
-	if err != nil {
-		logger.Errorf("Error while trying to validate lun : {%v}", err.Error())
-		return nil, status.Error(codes.Internal, err.Error())
+	// Native NVMe multipath presents a namespace head with no dm slaves to enumerate,
+	// and the kernel manages ANA paths; skip physical-path discovery + lun validation
+	// (ValidateLun is a no-op for NVMe anyway). dm-multipath (SCSI/iSCSI/non-native
+	// NVMe) still validates the physical paths behind the dm device.
+	if nvmeType != NVMeNative {
+		sysDevices, err := d.NodeUtils.GetSysDevicesFromMpath(baseDevice)
+		if err != nil {
+			logger.Errorf("Error while trying to get sys devices : {%v}", err.Error())
+			return nil, status.Error(codes.Internal, err.Error())
+		}
+		err = osDeviceConnectivity.ValidateLun(lun, sysDevices)
+		if err != nil {
+			logger.Errorf("Error while trying to validate lun : {%v}", err.Error())
+			return nil, status.Error(codes.Internal, err.Error())
+		}
 	}
 
 	existingFormat, err := d.Mounter.GetDiskFormat(mpathDevice)
