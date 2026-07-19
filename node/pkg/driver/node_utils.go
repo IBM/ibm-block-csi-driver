@@ -218,15 +218,9 @@ func (n NodeUtils) StageInfoFileIsExist(filePath string) bool {
 }
 
 func (n NodeUtils) IsNativeNVMeMultipathEnabled() (bool, error) {
-	data, err := os.ReadFile("/sys/module/nvme_core/parameters/multipath")
-	if err != nil {
-		if os.IsNotExist(err) {
-			return false, nil
-		}
-		return false, fmt.Errorf("failed to read nvme_core multipath param: %w", err)
-	}
-	val := strings.TrimSpace(string(data))
-	return val == "Y", nil
+	// Delegate to the single source of truth in device_connectivity (Executer-backed,
+	// so it is fake-able in tests and reads the shared sysfs param path constant).
+	return device_connectivity.IsNvmeCoreMultipathEnabled(n.Executer)
 }
 
 func (n NodeUtils) DevicesAreNvme(device string) (NvmeType, error) {

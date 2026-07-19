@@ -187,8 +187,13 @@ func (r OsDeviceConnectivityHelperScsiGeneric) RescanDevices(lunId int, arrayIde
 	return nil
 }
 
-func isNvmeCoreMultipathEnabled() (bool, error) {
-	data, err := os.ReadFile(nvmeCoreMultipathParamPath)
+// IsNvmeCoreMultipathEnabled reports whether the kernel runs native NVMe multipath
+// (nvme_core.multipath=Y) vs dm-multipath (=N). The read is routed through the
+// Executer so it can be faked in unit tests. A missing param file (nvme_core not
+// loaded) is treated as "not native". Single source of truth for mode detection —
+// callers in both the device_connectivity and driver packages delegate here.
+func IsNvmeCoreMultipathEnabled(exec executer.ExecuterInterface) (bool, error) {
+	data, err := exec.IoutilReadFile(nvmeCoreMultipathParamPath)
 	if err != nil {
 		if os.IsNotExist(err) {
 			return false, nil
@@ -252,7 +257,7 @@ func isNonNativeNvmeDevice(dmPath string, executer executer.ExecuterInterface) b
 }
 
 func isNvmeDevice(dmPath string, executer executer.ExecuterInterface) bool {
-	nativeMpath, err := isNvmeCoreMultipathEnabled()
+	nativeMpath, err := IsNvmeCoreMultipathEnabled(executer)
 
 	if err != nil {
 		logger.Warningf("isNvmeDevice: could not read nvme_core param: %v, trying both checks", err)

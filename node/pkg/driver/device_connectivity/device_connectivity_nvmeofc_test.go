@@ -18,6 +18,7 @@ package device_connectivity_test
 
 import (
 	"fmt"
+	"os"
 	"testing"
 
 	"github.com/golang/mock/gomock"
@@ -143,6 +144,45 @@ func TestNvmeOFcRescanDevices(t *testing.T) {
 			}
 			if !tc.wantErr && err != nil {
 				t.Fatalf("expected nil error, got %v", err)
+			}
+		})
+	}
+}
+
+func TestIsNvmeCoreMultipathEnabled(t *testing.T) {
+	const paramPath = "/sys/module/nvme_core/parameters/multipath"
+	testCases := []struct {
+		name       string
+		readReturn []byte
+		readErr    error
+		want       bool
+		wantErr    bool
+	}{
+		{name: "Y -> native", readReturn: []byte("Y"), want: true},
+		{name: "Y with newline -> native (trimmed)", readReturn: []byte("Y\n"), want: true},
+		{name: "N -> dm-multipath", readReturn: []byte("N"), want: false},
+		{name: "empty -> not native", readReturn: []byte(""), want: false},
+		{name: "param file absent (nvme_core not loaded) -> not native, no error", readErr: os.ErrNotExist, want: false},
+		{name: "unexpected read error -> propagated", readErr: fmt.Errorf("permission denied"), want: false, wantErr: true},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			mockCtrl := gomock.NewController(t)
+			defer mockCtrl.Finish()
+
+			exec := mocks.NewMockExecuterInterface(mockCtrl)
+			exec.EXPECT().IoutilReadFile(paramPath).Return(tc.readReturn, tc.readErr)
+
+			got, err := device_connectivity.IsNvmeCoreMultipathEnabled(exec)
+			if tc.wantErr && err == nil {
+				t.Fatalf("expected error, got nil")
+			}
+			if !tc.wantErr && err != nil {
+				t.Fatalf("expected nil error, got %v", err)
+			}
+			if got != tc.want {
+				t.Fatalf("expected %v, got %v", tc.want, got)
 			}
 		})
 	}

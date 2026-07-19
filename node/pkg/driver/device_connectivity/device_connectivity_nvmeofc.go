@@ -128,7 +128,7 @@ func (r OsDeviceConnectivityNvmeOFc) EnsureLogin(ipsByArrayInitiator map[string]
 
 	// Non-native NVMe + find_multipaths=on + < 2 paths: multipathd will not
 	// create a dm device, causing GetMpathDevice to fail.
-	nativeMpath, err := isNvmeCoreMultipathEnabled()
+	nativeMpath, err := IsNvmeCoreMultipathEnabled(r.Executer)
 	if err != nil {
 		logger.Warningf("NVMe-oFC EnsureLogin: could not determine nvme_core multipath mode: %v", err)
 		return
