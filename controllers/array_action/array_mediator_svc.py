@@ -71,6 +71,7 @@ COMMAND_NOT_SUPPORTED = 'CMMVC7205E'
 LUN_ID_IS_NOT_VALID = 'CMMVC5844E'
 EAR_PROMOTE_REMOTE_NOT_READY = 'CMMVC1150E'
 EAR_PROMOTE_REMOTE_INTERNAL_ERROR = 'CMMVC9913E'
+EAR_PROMOTE_REMOTE_NOT_INDEPENDENT = "CMMVC9932E"
 
 HOST_NQN = 'nqn'
 HOST_WWPN = 'WWPN'
@@ -2210,9 +2211,13 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
         try:
             self._chvolumegroupreplication(volume_group_id, mode=array_settings.ENDPOINT_TYPE_PRODUCTION)
         except (svc_errors.CommandExecutionError, CLIFailureError) as ex:
-            is_remote_not_ready = (
-                EAR_PROMOTE_REMOTE_NOT_READY in ex.my_message and
-                EAR_PROMOTE_REMOTE_INTERNAL_ERROR in ex.my_message
+            is_remote_not_ready = any(
+                code in ex.my_message
+                for code in (
+                    EAR_PROMOTE_REMOTE_NOT_READY,
+                    EAR_PROMOTE_REMOTE_INTERNAL_ERROR,
+                    EAR_PROMOTE_REMOTE_NOT_INDEPENDENT,
+                )
             )
             if is_remote_not_ready:
                 logger.warning("remote not ready for volume group '{}', "
