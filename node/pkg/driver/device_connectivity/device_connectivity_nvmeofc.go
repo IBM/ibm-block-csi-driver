@@ -96,7 +96,7 @@ func (r OsDeviceConnectivityNvmeOFc) EnsureLogin(ipsByArrayInitiator map[string]
 				break
 			}
 
-			pathKey := arrayTargetPort + "|" + hostPort
+			pathKey := normalizeTraddr(arrayTargetPort) + "|" + normalizeTraddr(hostPort)
 			if livePaths[pathKey] {
 				logger.Debugf("NVMe-oFC EnsureLogin: path already live target=%s host=%s, skipping",
 					arrayTargetPort, hostPort)
@@ -161,15 +161,21 @@ func (r OsDeviceConnectivityNvmeOFc) EnsureLogin(ipsByArrayInitiator map[string]
 	}
 }
 
-// countLivePathsForSubsystem counts live paths whose traddr matches one of our array target ports.
+// countLivePathsForSubsystem counts live paths whose traddr matches one of our array
+// target ports. Both sides are normalized (strip "0x", lowercase) because the kernel's
+// list-subsys output carries a "0x" prefix the publish-context targets lack.
 func countLivePathsForSubsystem(livePaths map[string]bool, ipsByArrayInitiator map[string][]string) int {
+	arrayTargets := make(map[string]bool, len(ipsByArrayInitiator))
+	for target := range ipsByArrayInitiator {
+		arrayTargets[normalizeTraddr(target)] = true
+	}
 	count := 0
 	for pathKey := range livePaths {
 		parts := strings.SplitN(pathKey, "|", 2)
 		if len(parts) != 2 {
 			continue
 		}
-		if _, ok := ipsByArrayInitiator[parts[0]]; ok {
+		if arrayTargets[normalizeTraddr(parts[0])] {
 			count++
 		}
 	}
@@ -217,7 +223,9 @@ func (r OsDeviceConnectivityNvmeOFc) getLivePathPairs() map[string]bool {
 		traddr := extractNvmeField(trimmed, "traddr=")
 		hostTraddr := extractNvmeField(trimmed, "host_traddr=")
 		if traddr != "" && hostTraddr != "" {
-			livePaths[traddr+"|"+hostTraddr] = true
+			// The kernel emits addresses with a "0x" hex prefix; the publish-context
+			// array targets and sysfs host ports do not. Normalize so the keys compare.
+			livePaths[normalizeTraddr(traddr)+"|"+normalizeTraddr(hostTraddr)] = true
 			logger.Debugf("NVMe-oFC getLivePathPairs: live path traddr=%s host_traddr=%s", traddr, hostTraddr)
 		}
 	}
@@ -295,6 +303,13 @@ func (r OsDeviceConnectivityNvmeOFc) nvmeConnect(arrayTargetPort, hostPort, subN
 	}
 	out, err := r.Executer.ExecuteWithTimeout(nvmeCmdTimeout, "nvme", args)
 	if err != nil {
+		// "already connected" is the steady state when host autoconnect brought the
+		// path up (the norm in native mode) — the path IS live, so count it as success.
+		if strings.Contains(string(out), "already connected") {
+			logger.Debugf("NVMe-oFC nvmeConnect: path already connected NQN=%s target=%s host=%s",
+				subNqn, arrayTargetPort, hostPort)
+			return true
+		}
 		logger.Errorf("NVMe-oFC nvmeConnect: failed NQN=%s target=%s host=%s: %v output=%s",
 			subNqn, arrayTargetPort, hostPort, err, string(out))
 		return false
