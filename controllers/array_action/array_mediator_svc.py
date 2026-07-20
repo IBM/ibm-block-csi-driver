@@ -1799,8 +1799,10 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
             return None
 
         if not replication_policy:
-            logger.info("no replication policy assigned to the volume group in partition, "
-                        "using policy from request '{}'".format(replication_request.replication_policy))
+            logger.info(
+                "no replication policy assigned to volume group '{}', "
+                "using policy from request '{}'".format(volume_group_id,
+                                                        replication_request.replication_policy))
             replication_policy = replication_request.replication_policy
 
         replication_mode = self._get_replication_mode(volume_group_id)
