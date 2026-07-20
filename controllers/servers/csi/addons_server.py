@@ -91,13 +91,13 @@ class ReplicationControllerServicer(pb2_grpc.ControllerServicer):
         return pb2.DisableVolumeReplicationResponse()
 
     @staticmethod
-    def _ensure_volume_role_for_replication(mediator, replication, is_to_promote):
+    def _ensure_volume_role_for_replication(mediator, replication, is_to_promote, force=False):
         if is_to_promote:
             if replication.is_primary:
                 logger.info("idempotent case. volume is already primary")
             else:
                 logger.info("promoting volume for replication {}".format(replication.name))
-                mediator.promote_replication_volume(replication)
+                mediator.promote_replication_volume(replication, force=force)
         else:
             if replication.is_primary or replication.is_primary is None:
                 logger.info("demoting volume for replication {}".format(replication.name))
@@ -138,7 +138,7 @@ class ReplicationControllerServicer(pb2_grpc.ControllerServicer):
             logger.info("found replication {} on system {}".format(replication.name, mediator.identifier))
 
             try:
-                self._ensure_volume_role_for_replication(mediator, replication, is_to_promote)
+                self._ensure_volume_role_for_replication(mediator, replication, is_to_promote, force=request.force)
             except array_errors.OperationNotReadyError as e:
                 # Checkpoint not yet achieved - return UNAVAILABLE to trigger retry
                 logger.info("Operation not ready, will be retried: {}".format(str(e)))
