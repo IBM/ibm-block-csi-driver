@@ -91,13 +91,13 @@ class ReplicationControllerServicer(pb2_grpc.ControllerServicer):
         return pb2.DisableVolumeReplicationResponse()
 
     @staticmethod
-    def _ensure_volume_role_for_replication(mediator, replication, is_to_promote):
+    def _ensure_volume_role_for_replication(mediator, replication, is_to_promote, force=False):
         if is_to_promote:
             if replication.is_primary:
                 logger.info("idempotent case. volume is already primary")
             else:
                 logger.info("promoting volume for replication {}".format(replication.name))
-                mediator.promote_replication_volume(replication)
+                mediator.promote_replication_volume(replication, force=force)
         else:
             if replication.is_primary or replication.is_primary is None:
                 logger.info("demoting volume for replication {}".format(replication.name))
@@ -137,7 +137,7 @@ class ReplicationControllerServicer(pb2_grpc.ControllerServicer):
                 return build_error_response(message, context, grpc.StatusCode.FAILED_PRECONDITION, response_type)
             logger.info("found replication {} on system {}".format(replication.name, mediator.identifier))
 
-            self._ensure_volume_role_for_replication(mediator, replication, is_to_promote)
+            self._ensure_volume_role_for_replication(mediator, replication, is_to_promote, force=request.force)
 
         logger.info("finished {}".format(method_name))
         return response_type()

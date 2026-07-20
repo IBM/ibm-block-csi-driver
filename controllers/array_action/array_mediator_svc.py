@@ -2165,13 +2165,14 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
         self._promote_replication_endpoint(endpoint_type, rcrelationship.name)
 
     @register_csi_plugin()
-    def promote_replication_volume(self, replication):
+    def promote_replication_volume(self, replication, force=False):
         if replication.replication_type == array_settings.REPLICATION_TYPE_MIRROR:
             self._promote_replication_volume(replication.name)
         elif replication.replication_type == array_settings.REPLICATION_TYPE_EAR:
             self._promote_ear_replication_volume(
                 replication.volume_group_id,
-                replication_policy=replication.name
+                replication_policy=replication.name,
+                force=force
             )
 
     def _promote_replication_volume(self, replication_name):
@@ -2182,13 +2183,17 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
         endpoint_type = self._get_replication_endpoint_type(rcrelationship)
         self._ensure_endpoint_is_primary(rcrelationship, endpoint_type)
 
-    def _promote_ear_replication_volume(self, volume_group_id, replication_policy=None):
+    def _promote_ear_replication_volume(self, volume_group_id, replication_policy=None, force=False):
         if not self._is_earreplication_supported():
             logger.info("EAR replication is not supported on the existing storage")
             return
         cli_kwargs = {}
         if self._get_replication_mode(volume_group_id) == array_settings.ENDPOINT_TYPE_RECOVERY:
             cli_kwargs['mode'] = array_settings.ENDPOINT_TYPE_INDEPENDENT
+            if force:
+                cli_kwargs['accessdivergedcopy'] = array_settings.ACCESSDIVERGEDCOPY
+                logger.info("force flag set, adding accessdivergedcopy for recovery to independent transition "
+                            "for volume group '{}'".format(volume_group_id))
             logger.info("Changing the local volume group to be an independent copy")
             self._chvolumegroupreplication(volume_group_id, **cli_kwargs)
 
