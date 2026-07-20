@@ -388,6 +388,7 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) IsVolumePathMatchesVolumeId(ctx 
 					
 					// We pass checkPendingOnly=false to enforce a full, strict ready-state settlement verification
 					hasDevice, isPending, matchedDev := helper.EvaluateSysfsTopology(ctx, r.KeyedGater, expectedSerial, false)
+					logger.Infof("matchDev %s name %s", matchedDev, dmName)
 					if hasDevice && !isPending && matchedDev == dmName { // Enforce specific device match
 						logger.Infof("IsVolumePathMatchesVolumeId: Identity verified via native NVMe sysfs fallback for %s.", dmName)
 						return true, nil
