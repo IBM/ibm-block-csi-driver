@@ -5472,33 +5472,35 @@ func (o *OsDeviceConnectivityHelperGeneric) parseUeventMajorMinor(data string) (
 func (o *OsDeviceConnectivityHelperGeneric) GetGaterKey(ctx context.Context, devicePath string) string {
 	if ctx != nil && ctx.Err() != nil { return "" }
 
+	// Use your safe text-streaming parsing tool to extract identifiers cleanly
 	major, minor, _ := o.GetMajorMinorFromSysfs(ctx, devicePath)
 	wwid, _ := o.GetDeviceWWID(ctx, devicePath)
 
-	var instanceID string
-	sysBlockPath := fmt.Sprintf("/sys/dev/block/%d:%d", major, minor)
-	
-	// FIX: Detect if we are handling a Native NVMe multipath leg
 	name := filepath.Base(devicePath)
+	sysBlockPath := fmt.Sprintf("/sys/dev/block/%d:%d", major, minor)
+	var instanceID string
+
+	// FIX: Execute these fast operations natively without nested ExecuteUninterruptible frames.
+	// This preserves your D-state protection (inherited from the outer caller) while removing the deadlock loop.
 	if strings.HasPrefix(name, "nvme") {
-		// If it's a leg path, look up the parent device's true subsystem link path
-		// e.g., /sys/block/nvme7n1/device/subsystem points back to the shared head grouping
 		subsystemLink := filepath.Join("/sys/block", name, "device")
 		if realSubsysPath, err := filepath.EvalSymlinks(subsystemLink); err == nil {
-			// Anchor the tracking layout instance to the immutable subsystem node inode 
-			// rather than the transient physical connection legs
-			if subsysSt, err := os.Stat(realSubsysPath); err == nil {
-				instanceID = fmt.Sprintf("nvme-subsys-ino-%d", subsysSt.Sys().(*syscall.Stat_t).Ino)
-				// Return early with the globally synchronized volume layout signature
-				return fmt.Sprintf("nvme-shared-%s-%s", wwid, instanceID)
+			if subsysSt, errStat := os.Stat(realSubsysPath); errStat == nil {
+				if statT, ok := subsysSt.Sys().(*syscall.Stat_t); ok {
+					instanceID = fmt.Sprintf("nvme-subsys-ino-%d", statT.Ino)
+					return fmt.Sprintf("nvme-shared-%s-%s", wwid, instanceID)
+				}
 			}
 		}
 	}
 
-	// Standard Fallback for SCSI and Device Mapper paths (RH7/3.10 compatible)
-	if sysSt, err := os.Stat(sysBlockPath); err == nil {
-		instanceID = fmt.Sprintf("ino-%d", sysSt.Sys().(*syscall.Stat_t).Ino)
-	} else {
+	if sysSt, errStat := os.Stat(sysBlockPath); errStat == nil {
+		if statT, ok := sysSt.Sys().(*syscall.Stat_t); ok {
+			instanceID = fmt.Sprintf("ino-%d", statT.Ino)
+		}
+	}
+
+	if instanceID == "" {
 		instanceID = fmt.Sprintf("transient-%d", time.Now().UnixNano())
 	}
 
