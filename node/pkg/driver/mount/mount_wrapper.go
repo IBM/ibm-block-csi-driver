@@ -19,6 +19,7 @@ package mount
 import (
 	"bufio"
 	"context"
+	"errors"
 	"fmt"
 	"os"
 	"path"
@@ -395,13 +396,13 @@ SkipSyncGate:
 
 	switch {
 	case elapsed < 2*time.Minute:
-		err = m.tryUnmount(target, 0, timeout)
+		err = m.tryUnmount(ctx, target, 0, timeout)
 	case elapsed < 4*time.Minute:
 		m.updateState(target, mInfo, StateForcePending)
-		err = m.tryUnmount(target, syscall.MNT_FORCE, timeout)
+		err = m.tryUnmount(ctx, target, syscall.MNT_FORCE, timeout)
 	default:
 		m.updateState(target, mInfo, StateLazyPending)
-		err = m.tryUnmount(target, syscall.MNT_DETACH, timeout)
+		err = m.tryUnmount(ctx, target, syscall.MNT_DETACH, timeout)
 	}
 
 	if err != nil {
@@ -530,13 +531,20 @@ func (m *Mounter) tryUnmount(ctx context.Context, target string, flags int, time
 			if err == syscall.EBUSY {
 				select {
 				case <-wCtx.Done():
-					logger.Warningf("[Mounter-Gate] Context interrupted while path %s was waiting on EBUSY clear.", path)
-					ch <- wCtx.Err()
+					logger.Warningf("[Mounter-Gate] Context interrupted while path %s was waiting on EBUSY clear. Last recorded OS error: %v", path, lastErr)
+					
+					// FIX: If the context is canceled while we are actively fighting an EBUSY or EIO block,
+					// return the actual system failure (lastErr) so the upper layers understand why it timed out.
+					if lastErr != nil {
+						ch <- lastErr
+					} else {
+						ch <- wCtx.Err()
+					}
 					return
 				case <-time.After(retryDelay):
 					retryDelay *= 2
 					if retryDelay > 1*time.Second {
-						retryDelay = 1 * time.Second // Cap sleep intervals to maximize poll frequency
+						retryDelay = 1 * time.Second 
 					}
 					continue
 				}
