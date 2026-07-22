@@ -446,50 +446,133 @@ SkipSyncGate:
 	return nil
 }
 
-func (m *Mounter) tryUnmount(target string, flags int, timeout time.Duration) error {
-	// FIX: Channel MUST be buffered with a capacity of 1.
-	// If the outer select times out, the background goroutine can still write 
-	// to this channel and exit, avoiding a permanent thread/memory leak in D-state.
+func (m *Mounter) tryUnmount(ctx context.Context, target string, flags int, timeout time.Duration) error {
 	ch := make(chan error, 1)
 
-	// Create a session to track this specific attempt
-	session := &mountSession{target: target, startTime: time.Now()}
-	m.stuckMounts.Store(target, session)
-	
-	logger.Warningf("target %s tryUnmount %d", target, flags)
+	// CONDITIONAL LOOKUP GATE: Preserves the cumulative cross-call history clock
+	var session *mountSession
+	if existing, found := m.stuckMounts.Load(target); found {
+		session = existing.(*mountSession)
+		logger.Warningf("[Mounter-Gate] Resuming stuck unmount pass for %s. Cumulative elapsed: %v", 
+			target, time.Since(session.startTime))
+	} else {
+		session = &mountSession{target: target, startTime: time.Now()}
+		m.stuckMounts.Store(target, session)
+		logger.Infof("[Mounter-Gate] Target path %s initiating minute zero tracking session.", target)
+	}
 
-	go func(path string, f int) {
-		// SYSCALL: May hang indefinitely in D-state if storage paths are down
-		err := syscall.Unmount(GetPodPath(path), f)
+	go func(wCtx context.Context, path string, initialFlags int, s *mountSession) {
+		podPath := GetPodPath(path)
+		retryDelay := 100 * time.Millisecond
+		var lastErr error
 
-		// Cleanup tracker structures safely upon return
-		m.stuckMounts.Delete(path)
-		if err == nil {
-			m.stuckCount.Add(-1)
+		for {
+			totalElapsed := time.Since(s.startTime)
+			currentFlags := initialFlags
+
+			// 1. DYNAMIC ESCALATION MATRIX BASED ON CUMULATIVE TIME
+			if totalElapsed >= 4*time.Minute {
+				logger.Errorf("[Mounter-Gate] Critical age exceeded for %s (%v). Forcing syscall.MNT_DETACH.", path, totalElapsed)
+				currentFlags = syscall.MNT_DETACH
+			} else if totalElapsed >= 2*time.Minute && currentFlags == 0 {
+				logger.Warningf("[Mounter-Gate] Path %s has been stuck for %v. Escalating to lazy unmount.", path, totalElapsed)
+				currentFlags = syscall.MNT_DETACH
+			}
+
+			// 2. NATIVE CONTEXT DEADLINE CHECK
+			if deadline, ok := wCtx.Deadline(); ok {
+				if time.Until(deadline) < (500 * time.Millisecond) {
+					if currentFlags == 0 {
+						logger.Errorf("[Mounter-Gate] Context expiring for %s. Escalating to final MNT_DETACH sweep pass...", path)
+						currentFlags = syscall.MNT_DETACH
+						err := syscall.Unmount(podPath, currentFlags)
+						if err == nil || err == syscall.ENOENT || err == syscall.EINVAL {
+							m.stuckMounts.Delete(path)
+							m.stuckCount.Add(-1)
+							ch <- nil
+							return
+						}
+						lastErr = err
+					}
+
+					logger.Warningf("[Mounter-Gate] Context deadline imminent for %s. Yielding back to Kubernetes.", path)
+					ch <- syscall.EBUSY 
+					return
+				}
+			}
+
+			// 3. RUN THE SYSCALL
+			err := syscall.Unmount(podPath, currentFlags)
+			if err == nil {
+				logger.Infof("[Mounter-Gate] Success! Path %s unmounted cleanly after %v total time.", path, totalElapsed)
+				m.stuckMounts.Delete(path) // Clear historical footprint only on definitive victory
+				m.stuckCount.Add(-1)
+				ch <- nil
+				return
+			}
+
+			lastErr = err
+
+			// =========================================================================
+			// NATIVE IDEMPOTENCY LOCK: INTERCEPT EINVAL & ENOENT
+			// =========================================================================
+			// ENOENT = Path directory does not exist on disk.
+			// EINVAL = Path is physically present, but it is already not a mount point.
+			// Both indicate total success for an unmount attempt. Exit cleanly with nil.
+			if err == syscall.ENOENT || err == syscall.EINVAL {
+				logger.Infof("[Mounter-Gate] Target %s already unmounted or missing (Syscall code: %v). Clearing tracking state.", path, err)
+				m.stuckMounts.Delete(path)
+				ch <- nil
+				return
+			}
+
+			// Handle busy contention (EBUSY) with local backoff delays
+			if err == syscall.EBUSY {
+				select {
+				case <-wCtx.Done():
+					logger.Warningf("[Mounter-Gate] Context interrupted while path %s was waiting on EBUSY clear.", path)
+					ch <- wCtx.Err()
+					return
+				case <-time.After(retryDelay):
+					retryDelay *= 2
+					if retryDelay > 1*time.Second {
+						retryDelay = 1 * time.Second // Cap sleep intervals to maximize poll frequency
+					}
+					continue
+				}
+			}
+
+			// Any other structural system fault breaks processing immediately
+			m.stuckMounts.Delete(path)
+			ch <- err
+			return
 		}
-
-		ch <- err
-	}(target, flags)
+	}(ctx, target, flags, session)
 
 	select {
+	case <-ctx.Done():
+		logger.Errorf("[Mounter-Gate] Parent context canceled before unmount completed: %v", ctx.Err())
+		return ctx.Err()
+
 	case err := <-ch:
-		if err == nil || err == syscall.ENOENT || err == syscall.EINVAL {
-			logger.Warningf("target %s tryUnmount gone error", target)
+		// FIX: Restored explicit idempotency checks on the returned channel error.
+		// If the background goroutine returned nil, ENOENT, or EINVAL, the path is clear.
+		if err == nil || errors.Is(err, syscall.ENOENT) || errors.Is(err, syscall.EINVAL) {
+			logger.Infof("[Mounter-Gate] Target %s tryUnmount verified gone or cleared (Error payload: %v).", target, err)
 			return nil
 		}
-		if err == syscall.EBUSY {
-			logger.Warningf("target %s tryUnmount busy", target)
-			// Log cleanly so K8s controller loop knows it's waiting for retry/escalation
+		
+		if errors.Is(err, syscall.EBUSY) {
 			return fmt.Errorf("target %s is busy: %w", target, err)
 		}
-		logger.Warningf("target %s tryUnmount error %v", target, err)
+		
+		logger.Errorf("[Mounter-Gate] Target %s tryUnmount exiting with unhandled error: %v", target, err)
 		return err
 
 	case <-time.After(timeout):
-		// Safe: Thread is tracked, but buffered channel prevents memory leakage
-		logger.Warningf("target %s tryUnmount timeout", target)
+		logger.Errorf("[Mounter-Gate] Target %s hit absolute timeout boundary.", target)
 		m.stuckCount.Add(1)
-		return fmt.Errorf("unmount syscall timeout (%v) for %s - cascading tiers", timeout, target)
+		return fmt.Errorf("unmount timeout (%v) reached for %s", timeout, target)
 	}
 }
 
