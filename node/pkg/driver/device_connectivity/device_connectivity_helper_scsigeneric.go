@@ -351,64 +351,69 @@ func NewOsDeviceConnectivityHelperScsiGeneric(executer executer.ExecuterInterfac
 }
 
 func (r *OsDeviceConnectivityHelperScsiGeneric) IsVolumePathMatchesVolumeId(ctx context.Context, volumeUuid string, volumePath string) (bool, error) {
-	logger.Infof("IsVolumePathMatchesVolumeId: Searching matching volume id for volume path: [%s] ", volumePath)
+	logger.Infof("[Identity-Check] Validating path [%s] for VolumeUUID: [%s]", volumePath, volumeUuid)
 
-	// 1. Sanitize the incoming reference volume UUID.
 	expectedSerial := strings.ToLower(strings.TrimSpace(volumeUuid))
 	if len(expectedSerial) != 32 {
-		return false, fmt.Errorf("invalid IBM volume configuration signature: must be 32 chars starting with 6005076")
+		return false, fmt.Errorf("invalid IBM volume signature length: must reduce to 32 hex characters")
 	}
 
-	// 2. Locate the unified device-mapper node name (e.g., "dm-3" or "mpatha")
 	mpathDeviceName, err := r.Helper.GetMpathDeviceName(ctx, r.KeyedGater, volumePath)
 	if err != nil {
 		return false, fmt.Errorf("failed to trace multipath map for path %s: %w", volumePath, err)
 	}
 
-	// 3. Query the hardware Inquiry descriptor layer dynamically.
-	sgInqWwn, err := r.Helper.GetWwnByScsiInq(ctx, mpathDeviceName)
+	// 1. ANCHOR DEVICE PATH VARIATIONS DEFENSIVELY
+	dmName := filepath.Base(mpathDeviceName) // Isolates naked string node keys like "dm-2"
+	absoluteDevPath := mpathDeviceName
+	if !filepath.IsAbs(absoluteDevPath) {
+		absoluteDevPath = filepath.Join("/dev", dmName) // Safely repairs relative "dm-X" blocks
+	}
+
+	// 2. PRIMARY STRATEGY: Probe traditional SCSI Generic Inquiry IOCTL descriptor channels
+	sgInqWwn, err := r.Helper.GetWwnByScsiInq(ctx, absoluteDevPath)
+	if err == nil {
+		if r.MatchVolumeToScsiSpec(sgInqWwn, expectedSerial) {
+			logger.Infof("[Identity-Check] [%s] Identity successfully verified via raw SCSI generic IOCTL.", dmName)
+			return true, nil
+		}
+		logger.Warningf("[Identity-Check] [%s] SCSI Inquiry string mismatch (Got: %s, Exp: %s).", dmName, sgInqWwn, expectedSerial)
+		return false, &ErrorWrongDeviceFound{absoluteDevPath, volumeUuid, sgInqWwn}
+	}
+
+	// 3. FALLBACK STRATEGY: Handle Native NVMe-over-Fabrics environments gracefully
+	logger.Warningf("[Identity-Check] [%s] Hardware IOCTL inquiry missed (%v). Inspecting NVMe transport states...", dmName, err)
 	
-	if err != nil {
-		// FIX: Handle environments where Device Mapper is only used to list devices.
-		// If the IOCTL fails with an unsafe state or invalid transport error, do not crash.
-		// Check if the underlying device maps to native NVMe multi-path components.
-		logger.Warningf("Hardware inquiry failed on %s (%v). Checking for native NVMe fallback...", mpathDeviceName, err)
-		
-		helper := GetDmsPathHelperGeneric{}
-		dmName := filepath.Base(mpathDeviceName) // Extract "dm-3"
-		
-		// Read the slaves folder to see if this map contains native fabric handles (nvme*)
-		slavesDir := filepath.Join("/sys/block", dmName, "slaves")
-		if entries, readErr := os.ReadDir(slavesDir); readErr == nil && len(entries) > 0 {
-			for _, entry := range entries {
-				if strings.HasPrefix(entry.Name(), "nvme") {
-					// CONFIRMED FALLBACK: The device mapper shell is unmanaged, but native NVMe holds the drive.
-					// Pass the tracking over to our secure, validated native sysfs matching tool.
-					logger.Infof("Confirmed native NVMe environment for %s. Redirecting to sysfs token matching.", dmName)
-					
-					// We pass checkPendingOnly=false to enforce a full, strict ready-state settlement verification
-					hasDevice, isPending, matchedDev := helper.EvaluateSysfsTopology(ctx, r.KeyedGater, expectedSerial, false)
-					logger.Infof("matchDev %s name %s", matchedDev, dmName)
-					if hasDevice && !isPending && matchedDev == dmName { // Enforce specific device match
-						logger.Infof("IsVolumePathMatchesVolumeId: Identity verified via native NVMe sysfs fallback for %s.", dmName)
-						return true, nil
-					}
-					return false, fmt.Errorf("native NVMe fallback validation failed: path un-settled or missing")
+	helper := GetDmsPathHelperGeneric{}
+	slavesDir := filepath.Join("/sys/block", dmName, "slaves")
+	
+	entries, readErr := executer.ExecuteUninterruptible[[]os.DirEntry](
+		ctx, r.KeyedGater, "readdir-slaves-"+dmName, 10, 50, 500*time.Millisecond, 2*time.Second,
+		func(wCtx context.Context) ([]os.DirEntry, error) {
+			return os.ReadDir(slavesDir)
+		},
+	)
+
+	if readErr == nil && len(entries) > 0 {
+		for _, entry := range entries {
+			if strings.HasPrefix(entry.Name(), "nvme") {
+				logger.Infof("[Identity-Check] [%s] NVMe backend discovered via slave channels. Running topology matching engine...", dmName)
+				
+				hasDevice, isPending, matchedDev := helper.EvaluateSysfsTopology(ctx, r.KeyedGater, expectedSerial, false)
+				logger.Infof("[Identity-Check] [%s] Topology evaluation results -> hasDevice: %v, isPending: %v, matchedDev: %s", dmName, hasDevice, isPending, matchedDev)
+				
+				if hasDevice && !isPending && matchedDev == dmName {
+					logger.Infof("[Identity-Check] [%s] Identity successfully verified via native NVMe topology fallback.", dmName)
+					return true, nil
 				}
+				return false, fmt.Errorf("native NVMe fallback validation failed: path un-settled or missing for device %s", dmName)
 			}
 		}
-		
-		// If it's a traditional SCSI volume and the ioctl fails, it is an actual physical failure. Bubble up the error.
-		return false, fmt.Errorf("hardware signature retrieval failed on target device %s: %w", mpathDeviceName, err)
+	} else if readErr != nil {
+		logger.Warningf("[Identity-Check] [%s] Could not inspect sysfs slave folder paths %s: %v", dmName, slavesDir, readErr)
 	}
-
-	// 4. Standard Flow: If the IOCTL succeeds, run the regular prefix-verified comparison helper
-	if !r.MatchVolumeToScsiSpec(sgInqWwn, expectedSerial) {
-		return false, &ErrorWrongDeviceFound{mpathDeviceName, volumeUuid, sgInqWwn}
-	}
-
-	logger.Infof("IsVolumePathMatchesVolumeId: Identity verified. Device %s matches volume specification.", mpathDeviceName)
-	return true, nil
+	
+	return false, fmt.Errorf("hardware signature mapping failed natively across all storage transport types for device %s", absoluteDevPath)
 }
 
 // TODO id unused?
@@ -5607,11 +5612,6 @@ func (o GetDmsPathHelperGeneric) WaitForDmToExist(ctx context.Context, gater *ex
 	var lastRo string
 	var stableCycles int
 
-	// Basic validation tracking parameter footprint constraints
-	if len(volumeWWID) < 2 {
-		return "", fmt.Errorf("missing required identifiers: expected valid unique multi-protocol storage volume mapping token")
-	}
-
 	for attempt := 0; attempt < maxRetries; attempt++ {
 		logger.Warningf("attempt %d", attempt)
 		if err := ctx.Err(); err != nil {
@@ -6054,6 +6054,7 @@ func (of GetDmsPathHelperGeneric) EvaluateSysfsTopology(ctx context.Context, gat
 		}
 
 		name := filepath.Base(dmPath) // Extract "dm-0", "dm-1", etc.
+		logger.Warningf("Evaluate dm %s", name)
 
 		// FIX: Use context-bounded secureReadSysfs across all paths to shield loops from D-state locks
 		var contentBytesStr string
@@ -6071,8 +6072,12 @@ func (of GetDmsPathHelperGeneric) EvaluateSysfsTopology(ctx context.Context, gat
 		if contentBytesStr == "" {
 			continue
 		}
+	
 
 		foundUUID := normalizeWWID(contentBytesStr)
+		
+		logger.Warningf("found id %s convert to %s", contentBytesStr, foundUUID)
+				
 		if len(foundUUID) != 32 {
 			continue
 		}
