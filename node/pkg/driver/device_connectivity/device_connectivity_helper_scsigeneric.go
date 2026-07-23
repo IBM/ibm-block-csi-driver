@@ -3560,9 +3560,13 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) purgeStuckPhysicalPathsDualProto
 		return fmt.Errorf("failed to scan sysfs block path layer under safety frame: %w", errDir)
 	}
 
+	var wg sync.WaitGroup
+	var errMu sync.Mutex
+	var aggregatedErrors []string
+
 	for _, f := range blockFiles {
 		if ctx.Err() != nil {
-			return ctx.Err()
+			break
 		}
 
 		devName := f.Name()
@@ -3575,16 +3579,12 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) purgeStuckPhysicalPathsDualProto
 
 		targetSysDir := filepath.Join("/sys/block", devName)
 		
-		// FIX: DYNAMIC CONTROLLER IDENTIFICATION
-		// Safely strip virtual path channels (e.g., nvme2c0n1 -> nvme2n1) 
-		// while fully preserving the true active controller index number.
 		if isNVMe && strings.Contains(devName, "c") {
 			if lastNIdx := strings.LastIndex(devName, "n"); lastNIdx != -1 {
 				if cIdx := strings.Index(devName, "c"); cIdx != -1 && cIdx < lastNIdx {
-					ctrlPart := devName[:cIdx]  // Extracts the specific active controller, e.g., "nvme2"
-					nsPart := devName[lastNIdx:] // Extracts the namespace layout suffix, e.g., "n1"
-					
-					targetSysDir = filepath.Join("/sys/block", ctrlPart+nsPart) // Resolves perfectly to "/sys/block/nvme2n1"
+					ctrlPart := devName[:cIdx]  
+					nsPart := devName[lastNIdx:] 
+					targetSysDir = filepath.Join("/sys/block", ctrlPart+nsPart) 
 					logger.Debugf("[Purge-Paths] Normalized virtual block node routing path: %s -> %s", devName, targetSysDir)
 				}
 			}
@@ -3608,14 +3608,9 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) purgeStuckPhysicalPathsDualProto
 			}
 		}
 
-		// FIX: Wrap sysfs reads inside secureReadSysfs to completely protect threads from D-state storage freezes
 		var wwidBytesStr string
 		var errRead error
-		if isSCSI {
-			wwidBytesStr, errRead = secureReadSysfs(ctx, r.KeyedGater, devName, wwidPath)
-		} else {
-			wwidBytesStr, errRead = secureReadSysfs(ctx, r.KeyedGater, devName, wwidPath)
-		}
+		wwidBytesStr, errRead = secureReadSysfs(ctx, r.KeyedGater, devName, wwidPath)
 
 		if errRead != nil || wwidBytesStr == "" {
 			continue 
@@ -3727,14 +3722,16 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) purgeStuckPhysicalPathsDualProto
 			payloadBytes = []byte("1\n")
 		}
 
+		// FIX: RUN SYNCHRONOUSLY UNDER THE PARENT GROUP
+		// We execute the kernel unmaps sequentially or inside a bounded WaitGroup 
+		// tied strictly to the parent lifecycle context to enforce proper execution order.
+		wg.Add(1)
 		go func(path string, payload []byte, currentDev string) {
-			// FIX: DYNAMIC LOCK QUEUES
-			// Scaling the lock key dynamically by device name eliminates the global queue bottleneck, 
-			// allowing concurrent path evictions to process without delays.
+			defer wg.Done()
 			gaterKey := fmt.Sprintf("path-purge-write-%s", currentDev)
 
 			_, err := executer.ExecuteUninterruptible[struct{}](
-				context.Background(), 
+				ctx, // Use the active parent context, NOT context.Background()
 				r.KeyedGater,
 				gaterKey,
 				10, 100, 3*time.Second, 10*time.Second,
@@ -3745,12 +3742,23 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) purgeStuckPhysicalPathsDualProto
 			)
 			if err != nil {
 				logger.Errorf("Failed to clear disk path %s: %v", path, err)
+				errMu.Lock()
+				aggregatedErrors = append(aggregatedErrors, fmt.Sprintf("%s: %v", currentDev, err))
+				errMu.Unlock()
 				return
 			}
 			logger.Infof("Successfully cleared path endpoint: %s", path)
 		}(deletePath, payloadBytes, devName)
 	}
 
+	// Block here until all sibling disk channels have fired their deletion codes to the kernel
+	wg.Wait()
+
+	if len(aggregatedErrors) > 0 {
+		return fmt.Errorf("purge failed for target nodes: %s", strings.Join(aggregatedErrors, "; "))
+	}
+
+	logger.Infof("purgeStuckPhysicalPathsDualProtocol successfully synchronized all hardware evictions.")
 	return nil
 }
 
