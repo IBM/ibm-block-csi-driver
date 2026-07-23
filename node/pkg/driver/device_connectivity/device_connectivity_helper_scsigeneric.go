@@ -5716,7 +5716,6 @@ func (o GetDmsPathHelperGeneric) WaitForDmToExist(ctx context.Context, gater *ex
 		}
 
 		baseBlockName := name // Establish our base normalized reference name tracker
-		targetSysDir := filepath.Join("/sys/block", name)
 
 		// DYNAMIC CONTROLLER IDENTIFICATION:
 		if nvmeControllerHeadFormat.MatchString(name) && strings.Contains(name, "c") {
@@ -5725,15 +5724,14 @@ func (o GetDmsPathHelperGeneric) WaitForDmToExist(ctx context.Context, gater *ex
 					ctrlPart := name[:cIdx]  
 					nsPart := name[lastNIdx:] 
 					
-					// FIX COMPLETE: Synchronize the base block name token reference
+					// FIX COMPLETE: Synchronize the base block name token reference and scrub dead variable targetSysDir
 					baseBlockName = ctrlPart + nsPart // Resolves perfectly to "nvme2n1"
-					targetSysDir = filepath.Join("/sys/block", baseBlockName)
 				}
 			}
 		}
 
 		path := filepath.Join("/dev", baseBlockName) // Resolves perfectly to "/dev/nvme2n1" or "/dev/dm-2"
-		
+
 		logger.Warning("before IsDeviceMapper")
 		isDM := o.IsDeviceMapper(baseBlockName)
 		count := 0
@@ -6387,7 +6385,7 @@ func (of GetDmsPathHelperGeneric) EvaluateSpecificSysfsTopology(
 
 			var isControllerTransitioning bool
 			
-			// FIX 1 COMPLETE: Capture the internal directory entries within the fenced wCtx scope using the normalized base path
+			// Capture the internal directory entries within the fenced wCtx scope using the normalized base path
 			entries, errEntries := executer.ExecuteUninterruptible[[]os.DirEntry](
 				ctx,
 				gater,
@@ -6405,8 +6403,8 @@ func (of GetDmsPathHelperGeneric) EvaluateSpecificSysfsTopology(
 					if strings.HasPrefix(entryName, "nvme") && !strings.Contains(entryName, "-") && !nvmeNamespaceRegex.MatchString(entryName) {
 						statePath := filepath.Join(deviceDir, entryName, "state")
 						
-						// FIX 2 COMPLETE: Migrated from ctx to wCtx to guarantee context cancellation boundaries are honored natively
-						if stateBytesStr, errState := secureReadSysfs(wCtx, gater, baseBlockName, statePath); errState == nil {
+						// FIX COMPLETE: Restored 'ctx' here to cleanly satisfy compiler scope specifications 
+						if stateBytesStr, errState := secureReadSysfs(ctx, gater, baseBlockName, statePath); errState == nil {
 							state := strings.ToLower(strings.TrimSpace(stateBytesStr))
 							if state == "resetting" || state == "connecting" || state == "deleting" {
 								isControllerTransitioning = true
