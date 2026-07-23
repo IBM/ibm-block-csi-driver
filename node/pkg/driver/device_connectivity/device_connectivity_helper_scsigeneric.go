@@ -6066,9 +6066,9 @@ func (of GetDmsPathHelperGeneric) EvaluateSysfsTopology(ctx context.Context, gat
 
 		var contentBytesStr string
 		var readErr error
-		if contentBytesStr, readErr = of.secureReadSysfsWrapper(ctx, gater, name, filepath.Join(dmPath, "dm", "uuid")); readErr != nil {
-			if contentBytesStr, readErr = of.secureReadSysfsWrapper(ctx, gater, name, filepath.Join(dmPath, "uuid")); readErr != nil {
-				contentBytesStr, _ = of.secureReadSysfsWrapper(ctx, gater, name, filepath.Join(dmPath, "dm", "name"))
+		if contentBytesStr, readErr = secureReadSysfs(ctx, gater, name, filepath.Join(dmPath, "dm", "uuid")); readErr != nil {
+			if contentBytesStr, readErr = secureReadSysfs(ctx, gater, name, filepath.Join(dmPath, "uuid")); readErr != nil {
+				contentBytesStr, _ = secureReadSysfs(ctx, gater, name, filepath.Join(dmPath, "dm", "name"))
 			}
 		}
 		if contentBytesStr == "" { continue }
@@ -6077,9 +6077,9 @@ func (of GetDmsPathHelperGeneric) EvaluateSysfsTopology(ctx context.Context, gat
 		if len(foundUUID) != 32 { continue }
 
 		if foundUUID == rawScsiTarget || foundUUID == rawNvmeTarget {
-			roBytesStr, err := of.secureReadSysfsWrapper(ctx, gater, name, filepath.Join("/sys/block", name, "ro"))
+			roBytesStr, err := secureReadSysfs(ctx, gater, name, filepath.Join("/sys/block", name, "ro"))
 			isReadOnly := err == nil && strings.TrimSpace(roBytesStr) != "0"
-			suspendedBytesStr, err := of.secureReadSysfsWrapper(ctx, gater, name, filepath.Join("/sys/block", name, "dm", "suspended"))
+			suspendedBytesStr, err := secureReadSysfs(ctx, gater, name, filepath.Join("/sys/block", name, "dm", "suspended"))
 			isSuspended := err == nil && strings.TrimSpace(suspendedBytesStr) == "1"
 
 			if isSuspended || isReadOnly { return true, true, name }
@@ -6110,10 +6110,10 @@ func (of GetDmsPathHelperGeneric) EvaluateSysfsTopology(ctx context.Context, gat
 		}
 		
 		var availableIDs []string
-		if data, err := of.secureReadSysfsWrapper(ctx, gater, name, filepath.Join(targetSysDir, "device", "wwid")); err == nil && data != "" { availableIDs = append(availableIDs, data) }
-		if data, err := of.secureReadSysfsWrapper(ctx, gater, name, filepath.Join(targetSysDir, "uuid")); err == nil && data != "" { availableIDs = append(availableIDs, data) }
-		if data, err := of.secureReadSysfsWrapper(ctx, gater, name, filepath.Join(targetSysDir, "nguid")); err == nil && data != "" { availableIDs = append(availableIDs, data) }
-		if data, err := of.secureReadSysfsWrapper(ctx, gater, name, filepath.Join(targetSysDir, "device", "serial")); err == nil && data != "" { availableIDs = append(availableIDs, data) }
+		if data, err := secureReadSysfs(ctx, gater, name, filepath.Join(targetSysDir, "device", "wwid")); err == nil && data != "" { availableIDs = append(availableIDs, data) }
+		if data, err := secureReadSysfs(ctx, gater, name, filepath.Join(targetSysDir, "uuid")); err == nil && data != "" { availableIDs = append(availableIDs, data) }
+		if data, err := secureReadSysfs(ctx, gater, name, filepath.Join(targetSysDir, "nguid")); err == nil && data != "" { availableIDs = append(availableIDs, data) }
+		if data, err := secureReadSysfs(ctx, gater, name, filepath.Join(targetSysDir, "device", "serial")); err == nil && data != "" { availableIDs = append(availableIDs, data) }
 		
 		// FIX 1: REFACTORED LEGACY CONTROLLER SLICE STRATEGY
 		ctrlName := name
@@ -6123,7 +6123,7 @@ func (of GetDmsPathHelperGeneric) EvaluateSysfsTopology(ctx context.Context, gat
 				ctrlName = ctrlName[:cIdx] // Fully normalizes "nvme2c0" to "nvme2"
 			}
 		}
-		if data, err := of.secureReadSysfsWrapper(ctx, gater, ctrlName, filepath.Join("/sys/class/nvme", ctrlName, "wwid")); err == nil && data != "" {
+		if data, err := secureReadSysfs(ctx, gater, ctrlName, filepath.Join("/sys/class/nvme", ctrlName, "wwid")); err == nil && data != "" {
 			availableIDs = append(availableIDs, data)
 		}
 
@@ -6137,7 +6137,7 @@ func (of GetDmsPathHelperGeneric) EvaluateSysfsTopology(ctx context.Context, gat
 		}
 
 		if matchFound {
-			roBytesStr, err := of.secureReadSysfsWrapper(ctx, gater, name, filepath.Join(targetSysDir, "ro"))
+			roBytesStr, err := secureReadSysfs(ctx, gater, name, filepath.Join(targetSysDir, "ro"))
 			isReadOnly := err == nil && strings.TrimSpace(roBytesStr) != "0"
 
 			var isControllerTransitioning bool
@@ -6160,7 +6160,7 @@ func (of GetDmsPathHelperGeneric) EvaluateSysfsTopology(ctx context.Context, gat
 						if !isNamespace {
 							statePath := filepath.Join(deviceDir, entryName, "state")
 // FIX COMPLETE: Passed the correct pointer object ('gater') into the second parameter slot
-if stateBytesStr, err := of.secureReadSysfsWrapper(ctx, gater, entryName, statePath); err == nil {
+if stateBytesStr, err := secureReadSysfs(ctx, gater, entryName, statePath); err == nil {
 	state := strings.ToLower(strings.TrimSpace(stateBytesStr))
 	if state == "resetting" || state == "connecting" || state == "deleting" {
 		isControllerTransitioning = true
@@ -6228,9 +6228,9 @@ func (of GetDmsPathHelperGeneric) EvaluateSpecificSysfsTopology(
 		var readErr error
 
 		// Read the mapping UUID via your safe wrapper configurations to bypass VFS locks
-		if contentBytesStr, readErr = of.secureReadSysfsWrapper(ctx, gater, dmName, filepath.Join(dmPath, "dm", "uuid")); readErr != nil {
-			if contentBytesStr, readErr = of.secureReadSysfsWrapper(ctx, gater, dmName, filepath.Join(dmPath, "uuid")); readErr != nil {
-				contentBytesStr, _ = of.secureReadSysfsWrapper(ctx, gater, dmName, filepath.Join(dmPath, "dm", "name"))
+		if contentBytesStr, readErr = secureReadSysfs(ctx, gater, dmName, filepath.Join(dmPath, "dm", "uuid")); readErr != nil {
+			if contentBytesStr, readErr = secureReadSysfs(ctx, gater, dmName, filepath.Join(dmPath, "uuid")); readErr != nil {
+				contentBytesStr, _ = secureReadSysfs(ctx, gater, dmName, filepath.Join(dmPath, "dm", "name"))
 			}
 		}
 
@@ -6240,10 +6240,10 @@ func (of GetDmsPathHelperGeneric) EvaluateSpecificSysfsTopology(
 			if foundUUID == rawScsiTarget || foundUUID == rawNvmeTarget {
 				logger.Infof("[Topology-Match] Identity match validated strictly for target %s", dmName)
 
-				roBytesStr, errRo := of.secureReadSysfsWrapper(ctx, gater, dmName, filepath.Join(dmPath, "ro"))
+				roBytesStr, errRo := secureReadSysfs(ctx, gater, dmName, filepath.Join(dmPath, "ro"))
 				isReadOnly := errRo == nil && strings.TrimSpace(roBytesStr) != "0"
 
-				suspendedBytesStr, errSusp := of.secureReadSysfsWrapper(ctx, gater, dmName, filepath.Join(dmPath, "dm", "suspended"))
+				suspendedBytesStr, errSusp := secureReadSysfs(ctx, gater, dmName, filepath.Join(dmPath, "dm", "suspended"))
 				isSuspended := errSusp == nil && strings.TrimSpace(suspendedBytesStr) == "1"
 
 				if isSuspended || isReadOnly {
@@ -6278,13 +6278,13 @@ func (of GetDmsPathHelperGeneric) EvaluateSpecificSysfsTopology(
 		}
 
 		var availableIDs []string
-		if data, err := of.secureReadSysfsWrapper(ctx, gater, dmName, filepath.Join(targetSysDir, "device", "wwid")); err == nil && data != "" {
+		if data, err := secureReadSysfs(ctx, gater, dmName, filepath.Join(targetSysDir, "device", "wwid")); err == nil && data != "" {
 			availableIDs = append(availableIDs, normalizeWWID(data))
 		}
-		if data, err := of.secureReadSysfsWrapper(ctx, gater, dmName, filepath.Join(targetSysDir, "uuid")); err == nil && data != "" {
+		if data, err := secureReadSysfs(ctx, gater, dmName, filepath.Join(targetSysDir, "uuid")); err == nil && data != "" {
 			availableIDs = append(availableIDs, normalizeWWID(data))
 		}
-		if data, err := of.secureReadSysfsWrapper(ctx, gater, dmName, filepath.Join(targetSysDir, "nguid")); err == nil && data != "" {
+		if data, err := secureReadSysfs(ctx, gater, dmName, filepath.Join(targetSysDir, "nguid")); err == nil && data != "" {
 			availableIDs = append(availableIDs, normalizeWWID(data))
 		}
 
@@ -6297,7 +6297,7 @@ func (of GetDmsPathHelperGeneric) EvaluateSpecificSysfsTopology(
 		}
 
 		if matchFound {
-			roBytesStr, errRo := of.secureReadSysfsWrapper(ctx, gater, dmName, filepath.Join(targetSysDir, "ro"))
+			roBytesStr, errRo := secureReadSysfs(ctx, gater, dmName, filepath.Join(targetSysDir, "ro"))
 			isReadOnly := errRo == nil && strings.TrimSpace(roBytesStr) != "0"
 
 			var isControllerTransitioning bool
@@ -6320,7 +6320,7 @@ func (of GetDmsPathHelperGeneric) EvaluateSpecificSysfsTopology(
 					// Ensure target controller node is isolated correctly without dropping its indexing digit
 					if strings.HasPrefix(entryName, "nvme") && !strings.Contains(entryName, "-") && !nvmeNamespaceRegex.MatchString(entryName) {
 						statePath := filepath.Join(deviceDir, entryName, "state")
-						if stateBytesStr, errState := of.secureReadSysfsWrapper(ctx, gater, entryName, statePath); errState == nil {
+						if stateBytesStr, errState := secureReadSysfs(ctx, gater, entryName, statePath); errState == nil {
 							state := strings.ToLower(strings.TrimSpace(stateBytesStr))
 							if state == "resetting" || state == "connecting" || state == "deleting" {
 								isControllerTransitioning = true
@@ -6345,28 +6345,11 @@ func (of GetDmsPathHelperGeneric) EvaluateSpecificSysfsTopology(
 // getRoStatus reads the read-only file attribute for a targeted block device name securely passing contexts.
 func (of GetDmsPathHelperGeneric) getRoStatus(ctx context.Context, gater *executer.KeyedGater, path string) string {
 	name := filepath.Base(path)
-	data, err := of.secureReadSysfsWrapper(ctx, gater, name, fmt.Sprintf("/sys/block/%s/ro", name))
+	data, err := secureReadSysfs(ctx, gater, name, fmt.Sprintf("/sys/block/%s/ro", name))
 	if err != nil {
 		return "unknown"
 	}
 	return strings.TrimSpace(data)
-}
-
-// Internal wrapper to standardize text properties retrieval across discovery routines
-func (of GetDmsPathHelperGeneric) secureReadSysfsWrapper(ctx context.Context, gater *executer.KeyedGater, devName, sysfsPath string) (string, error) {
-	bytes, err := executer.ExecuteUninterruptible(
-		ctx,
-		gater,
-		fmt.Sprintf("topo-read-%s:%s", devName, filepath.Base(sysfsPath)),
-		20, 100, 1*time.Second, 2*time.Second,
-		func(wCtx context.Context) ([]byte, error) {
-			return os.ReadFile(sysfsPath)
-		},
-	)
-	if err != nil {
-		return "", err
-	}
-	return string(bytes), nil
 }
 
 // safeSettle performs verification loops and small data read tests to ensure 
