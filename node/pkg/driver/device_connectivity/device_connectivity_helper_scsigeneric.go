@@ -6098,6 +6098,8 @@ func (of GetDmsPathHelperGeneric) EvaluateSysfsTopology(ctx context.Context, gat
 		if ctx.Err() != nil { return false, false, "" }
 		name := filepath.Base(m)
 		targetSysDir := m
+
+		logger.Warningf("Evaluating %s", name)
 		
 		if strings.Contains(name, "c") {
 			if lastNIdx := strings.LastIndex(name, "n"); lastNIdx != -1 && lastNIdx > 0 {
@@ -6108,6 +6110,8 @@ func (of GetDmsPathHelperGeneric) EvaluateSysfsTopology(ctx context.Context, gat
 				}
 			}
 		}
+
+		logger.Warningf("Evaluating %s target is %s", name, targetSysDir)
 		
 		var availableIDs []string
 		if data, err := secureReadSysfs(ctx, gater, name, filepath.Join(targetSysDir, "device", "wwid")); err == nil && data != "" { availableIDs = append(availableIDs, data) }
@@ -6123,6 +6127,9 @@ func (of GetDmsPathHelperGeneric) EvaluateSysfsTopology(ctx context.Context, gat
 				ctrlName = ctrlName[:cIdx] // Fully normalizes "nvme2c0" to "nvme2"
 			}
 		}
+
+		logger.Warningf("Evaluating %s target is %s controller is %s", name, targetSysDir, ctrlName)
+
 		if data, err := secureReadSysfs(ctx, gater, ctrlName, filepath.Join("/sys/class/nvme", ctrlName, "wwid")); err == nil && data != "" {
 			availableIDs = append(availableIDs, data)
 		}
@@ -6130,6 +6137,7 @@ func (of GetDmsPathHelperGeneric) EvaluateSysfsTopology(ctx context.Context, gat
 		matchFound := false
 		for _, rawID := range availableIDs {
 			foundID := normalizeWWID(rawID)
+			logger.Warningf("evaluate candidate %s", foundID)
 			if len(foundID) == 32 && foundID == rawNvmeTarget {
 				matchFound = true
 				break 
@@ -6151,6 +6159,7 @@ func (of GetDmsPathHelperGeneric) EvaluateSysfsTopology(ctx context.Context, gat
 				for _, entry := range entries {
 					entryName := entry.Name()
 					// FIX 2: REFACTORED SIBLING CHECK GUARD
+					logger.Warningf("check entry %s", entryName)
 					if strings.HasPrefix(entryName, "nvme") && !strings.Contains(entryName, "-") {
 						// To be a parent controller node entry (e.g. nvme0), it must NOT contain a namespace block suffix marker
 						isNamespace := false
@@ -6158,10 +6167,12 @@ func (of GetDmsPathHelperGeneric) EvaluateSysfsTopology(ctx context.Context, gat
 							isNamespace = true
 						}
 						if !isNamespace {
+							logger.Warning("Not namespace")
 							statePath := filepath.Join(deviceDir, entryName, "state")
 // FIX COMPLETE: Passed the correct pointer object ('gater') into the second parameter slot
 if stateBytesStr, err := secureReadSysfs(ctx, gater, entryName, statePath); err == nil {
 	state := strings.ToLower(strings.TrimSpace(stateBytesStr))
+        logger.Warningf("state is %s", state)
 	if state == "resetting" || state == "connecting" || state == "deleting" {
 		isControllerTransitioning = true
 		break
