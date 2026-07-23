@@ -980,28 +980,28 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) ValidateLun(ctx context.Context,
 
 		if isNvmePath {
 			// NVMe Health Check shielded from un-interruptible wait traps
-			state, err := secureReadSysfsLocal(ctx, r.KeyedGater, deviceName, fmt.Sprintf("/sys/block/%s/device/state", deviceName))
+			state, err := secureReadSysfs(ctx, r.KeyedGater, deviceName, fmt.Sprintf("/sys/block/%s/device/state", deviceName))
 			if err != nil || state != "live" {
 				logger.Warningf("NVMe path %s unavailable (state: %s, err: %v); skipping track", deviceName, state, err)
 				continue
 			}
 
-			rawNsid, err := secureReadSysfsLocal(ctx, r.KeyedGater, deviceName, fmt.Sprintf("/sys/block/%s/device/nsid", deviceName))
+			rawNsid, err := secureReadSysfs(ctx, r.KeyedGater, deviceName, fmt.Sprintf("/sys/block/%s/device/nsid", deviceName))
 			if err != nil {
 				continue
 			}
 			actualLun = r.normalizeLun(rawNsid)
 			
 			// Multi-tier fallback validation checks against true block descriptor files
-			sysfsIdRaw, _ = secureReadSysfsLocal(ctx, r.KeyedGater, deviceName, fmt.Sprintf("/sys/block/%s/wwid", deviceName))
+			sysfsIdRaw, _ = secureReadSysfs(ctx, r.KeyedGater, deviceName, fmt.Sprintf("/sys/block/%s/wwid", deviceName))
 			if sysfsIdRaw == "" {
-				sysfsIdRaw, _ = secureReadSysfsLocal(ctx, r.KeyedGater, deviceName, fmt.Sprintf("/sys/block/%s/device/wwid", deviceName))
+				sysfsIdRaw, _ = secureReadSysfs(ctx, r.KeyedGater, deviceName, fmt.Sprintf("/sys/block/%s/device/wwid", deviceName))
 			}
 
 			// If the standard fabric WWID targets are missing, read the device's hardware asset serial
 			var isSerialFallback bool
 			if sysfsIdRaw == "" {
-				sysfsIdRaw, _ = secureReadSysfsLocal(ctx, r.KeyedGater, deviceName, fmt.Sprintf("/sys/block/%s/device/serial", deviceName))
+				sysfsIdRaw, _ = secureReadSysfs(ctx, r.KeyedGater, deviceName, fmt.Sprintf("/sys/block/%s/device/serial", deviceName))
 				isSerialFallback = (sysfsIdRaw != "")
 			}
 			hwIdRaw = sysfsIdRaw
@@ -1020,13 +1020,13 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) ValidateLun(ctx context.Context,
 			}
 		} else {
 			// SCSI Health Check shielded from kernel wait traps
-			state, err := secureReadSysfsLocal(ctx, r.KeyedGater, deviceName, fmt.Sprintf("/sys/block/%s/device/state", deviceName))
+			state, err := secureReadSysfs(ctx, r.KeyedGater, deviceName, fmt.Sprintf("/sys/block/%s/device/state", deviceName))
 			if err != nil || state != "running" {
 				logger.Warningf("SCSI path %s checking phase dropped (state: %s, err: %v); skipping track", deviceName, state, err)
 				continue
 			}
 
-			rawScsiLun, err := secureReadSysfsLocal(ctx, r.KeyedGater, deviceName, fmt.Sprintf("/sys/block/%s/device/lun", deviceName))
+			rawScsiLun, err := secureReadSysfs(ctx, r.KeyedGater, deviceName, fmt.Sprintf("/sys/block/%s/device/lun", deviceName))
 			if err == nil {
 				actualLun = r.normalizeLun(rawScsiLun)
 			}
@@ -2558,6 +2558,7 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) TeardownVolume(ctx context.Conte
 			logger.Errorf("[Teardown-Main] Unmount loop returned failure state for path %s: %v", target, err)
 			return fmt.Errorf("teardown: unmount step is still in progress: %w", err)
 		}
+		// TODO check error in case UnmountWithTimeout completed successfully (not gave up)
 		_ = r.Mounter.PollMountDeleted(ctx, target, 10*time.Second)
 	}
 
@@ -4139,17 +4140,17 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) getWWIDBySysfs(ctx context.Conte
 	var readErr error
 
 	if isNVMe {
-		if data, err := secureReadSysfsLocal(ctx, r.KeyedGater, name, filepath.Join(targetSysDir, "nguid")); err == nil && data != "" {
+		if data, err := secureReadSysfs(ctx, r.KeyedGater, name, filepath.Join(targetSysDir, "nguid")); err == nil && data != "" {
 			discoveredID = normalizeWWID(data)
-		} else if data, err := secureReadSysfsLocal(ctx, r.KeyedGater, name, filepath.Join(targetSysDir, "uuid")); err == nil && data != "" {
+		} else if data, err := secureReadSysfs(ctx, r.KeyedGater, name, filepath.Join(targetSysDir, "uuid")); err == nil && data != "" {
 			discoveredID = normalizeWWID(data)
 		} else {
 			readErr = fmt.Errorf("failed to read nguid or uuid attributes from nvme path: %s", targetSysDir)
 		}
 	} else if isDM {
-		if data, err := secureReadSysfsLocal(ctx, r.KeyedGater, name, filepath.Join(targetSysDir, "dm", "uuid")); err == nil && data != "" {
+		if data, err := secureReadSysfs(ctx, r.KeyedGater, name, filepath.Join(targetSysDir, "dm", "uuid")); err == nil && data != "" {
 			discoveredID = normalizeWWID(data)
-		} else if data, err := secureReadSysfsLocal(ctx, r.KeyedGater, name, filepath.Join(targetSysDir, "uuid")); err == nil && data != "" {
+		} else if data, err := secureReadSysfs(ctx, r.KeyedGater, name, filepath.Join(targetSysDir, "uuid")); err == nil && data != "" {
 			discoveredID = normalizeWWID(data)
 		} else {
 			readErr = fmt.Errorf("failed to read device mapper uuid attributes from path: %s", targetSysDir)
@@ -4159,7 +4160,7 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) getWWIDBySysfs(ctx context.Conte
 		// RESTORED: TRADITIONAL SCSI VPD PAGE 0x83 PARSING LAYER
 		// =========================================================================
 		scsiWwidPath := filepath.Join("/sys/block", name, "device", "wwid")
-		if data, err := secureReadSysfsLocal(ctx, r.KeyedGater, name, scsiWwidPath); err == nil && data != "" {
+		if data, err := secureReadSysfs(ctx, r.KeyedGater, name, scsiWwidPath); err == nil && data != "" {
 			rawContent := strings.TrimSpace(data)
 			
 			// If the raw system content already contains a pre-parsed udev NAA prefix string, 
@@ -4676,15 +4677,15 @@ func (o *OsDeviceConnectivityHelperGeneric) checkNVMeDevice(ctx context.Context,
 	var readErr error
 
 	// Tier A: Native standardized namespace state block path lookup
-	if stateBytesStr, readErr = secureReadSysfsLocal(ctx, gater, cleanNvmeName, filepath.Join(targetSysDir, "device", "state")); readErr != nil {
+	if stateBytesStr, readErr = secureReadSysfs(ctx, gater, cleanNvmeName, filepath.Join(targetSysDir, "device", "state")); readErr != nil {
 		// Tier B: Fallback directly to the naked kernel device state folder layout path
-		if stateBytesStr, readErr = secureReadSysfsLocal(ctx, gater, cleanNvmeName, filepath.Join("/sys/block", cleanNvmeName, "device", "state")); readErr != nil {
+		if stateBytesStr, readErr = secureReadSysfs(ctx, gater, cleanNvmeName, filepath.Join("/sys/block", cleanNvmeName, "device", "state")); readErr != nil {
 			// Tier C: Legacy Subsystem Controller class directory mapping lookup pass
 			ctrlName := cleanNvmeName
 			if dashIdx := strings.Index(cleanNvmeName, "n"); dashIdx != -1 {
 				ctrlName = cleanNvmeName[:dashIdx]
 			}
-			stateBytesStr, readErr = secureReadSysfsLocal(ctx, gater, ctrlName, filepath.Join("/sys/class/nvme", ctrlName, "state"))
+			stateBytesStr, readErr = secureReadSysfs(ctx, gater, ctrlName, filepath.Join("/sys/class/nvme", ctrlName, "state"))
 		}
 	}
 
@@ -6484,7 +6485,7 @@ func (of GetDmsPathHelperGeneric) safeSettle(ctx context.Context, gater *execute
 			logger.Warningf("safeSettle DM %s itr %d", baseBlockName, i)
 			
 			suspendedPath := filepath.Join("/sys/block", baseBlockName, "dm", "suspended")
-			suspended, err := secureReadSysfsLocal(ctx, gater, baseBlockName, suspendedPath)
+			suspended, err := secureReadSysfs(ctx, gater, baseBlockName, suspendedPath)
 			
 			if err == nil && strings.TrimSpace(suspended) == "0" {
 				_, readErr := executer.ExecuteUninterruptible[struct{}](
@@ -6512,7 +6513,7 @@ func (of GetDmsPathHelperGeneric) safeSettle(ctx context.Context, gater *execute
 			logger.Warningf("safeSettle native %s (via %s) itr %d", baseBlockName, actualReadPath, i)
 			
 			statePath := filepath.Join("/sys/block", baseBlockName, "device", "state")
-			stateBytesStr, stateErr := secureReadSysfsLocal(ctx, gater, baseBlockName, statePath)
+			stateBytesStr, stateErr := secureReadSysfs(ctx, gater, baseBlockName, statePath)
 			
 			stateValid := false
 			if stateErr == nil {
@@ -7115,20 +7116,3 @@ func secureReadSysfs(ctx context.Context, KeyedGater      *executer.KeyedGater, 
 	}
 	return strings.TrimSpace(string(bytes)), nil
 }
-
-func secureReadSysfsLocal(ctx context.Context, gater *executer.KeyedGater, devName, sysfsPath string) (string, error) {
-	bytes, err := executer.ExecuteUninterruptible(
-		ctx,
-		gater,
-		fmt.Sprintf("settle-sysfs-%s:%s", devName, filepath.Base(sysfsPath)),
-		20, 100, 1*time.Second, 2*time.Second,
-		func(wCtx context.Context) ([]byte, error) {
-			return os.ReadFile(sysfsPath)
-		},
-	)
-	if err != nil {
-		return "", err
-	}
-	return string(bytes), nil
-}
-
