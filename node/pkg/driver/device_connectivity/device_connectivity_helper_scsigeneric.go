@@ -5683,6 +5683,7 @@ func convertScsiIdToNguid(scsiId string) string {
 	return finalNguid
 }
 
+// WaitForDmToExist blocks securely via uninterruptible loop passes until a storage device establishes a stable, high-integrity node footprint.
 func (o GetDmsPathHelperGeneric) WaitForDmToExist(ctx context.Context, gater *executer.KeyedGater, volumeWWID string, maxRetries int, intervalSeconds int) (string, error) {
 	if err := ctx.Err(); err != nil {
 		return "", err
@@ -5734,11 +5735,9 @@ func (o GetDmsPathHelperGeneric) WaitForDmToExist(ctx context.Context, gater *ex
 		isDM := o.IsDeviceMapper(baseBlockName)
 		count := 0
 		
-		// FIX COMPLETE: Native NVMe is strictly excluded from executing GetSlaveCount.
-		// This matches your original pre-refactor execution paths exactly and removes the 3-second I/O timeout delays.
 		if isDM {
-			logger.Warningf("Target layout matching storage interface protocols identified, querying slave count metrics for: %s", baseBlockName)
-			
+			// Track paths via traditional user-space Device Mapper slave catalogs
+			logger.Warningf("[Topology-PathCheck] Querying DM slave count metrics for: %s", baseBlockName)
 			countResult, err := executer.ExecuteUninterruptible[int](
 				ctx,
 				gater,
@@ -5746,6 +5745,39 @@ func (o GetDmsPathHelperGeneric) WaitForDmToExist(ctx context.Context, gater *ex
 				20, 100, 1*time.Second, 3*time.Second,
 				func(wCtx context.Context) (int, error) {
 					return o.GetSlaveCount(wCtx, gater, baseBlockName), nil
+				},
+			)
+			if err == nil {
+				count = countResult
+			}
+			logger.Warningf("resolved path/slave count is %d", count)
+		} else if strings.HasPrefix(baseBlockName, "nvme") {
+			// Track paths natively via kernel NVMe subsystem controllers framework
+			logger.Warningf("[Topology-PathCheck] Querying Native NVMe transport lane metrics for: %s", baseBlockName)
+			countResult, err := executer.ExecuteUninterruptible[int](
+				ctx,
+				gater,
+				fmt.Sprintf("wait-nvme-path-count-%s", baseBlockName),
+				20, 100, 1*time.Second, 3*time.Second,
+				func(wCtx context.Context) (int, error) {
+					// Route to the true native kernel subsystem folder tree which responds instantly
+					subsysDevicesDir := filepath.Join("/sys/block", baseBlockName, "device")
+					entries, errEntries := os.ReadDir(subsysDevicesDir)
+					if errEntries != nil {
+						return 0, errEntries
+					}
+					
+					nvmeLanes := 0
+					for _, entry := range entries {
+						entryName := entry.Name()
+						// Count valid controller channels (nvme0, nvme2) excluding multi-path namespace nodes
+						if strings.HasPrefix(entryName, "nvme") && !strings.Contains(entryName, "-") {
+							if nIdx := strings.LastIndex(entryName, "n"); nIdx == -1 || nIdx == 0 {
+								nvmeLanes++
+							}
+						}
+					}
+					return nvmeLanes, nil
 				},
 			)
 			if err == nil {
@@ -5768,14 +5800,9 @@ func (o GetDmsPathHelperGeneric) WaitForDmToExist(ctx context.Context, gater *ex
 		}
 		logger.Warningf("ro status %s", ro)
 
-		// Handle path stability validation uniformly across standard, multipath, and native channels
-		var isStableCount bool
-		if isDM {
-			isStableCount = count > 0 && count == lastCount
-		} else {
-			isStableCount = true // Native NVMe skips slave validation tracking natively
-		}
-
+		// UNIFIED PATH STABILITY VALIDATION MATRIX:
+		// Verifies that at least 1 fabric lane or slave block is active and tracks consistently
+		isStableCount := count > 0 && count == lastCount
 		if isStableCount && ro == lastRo && ro != "unknown" {
 			stableCycles++
 		} else {
