@@ -3582,7 +3582,7 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) purgeStuckPhysicalPathsDualProto
 			continue
 		}
 
-		baseBlockName := devName // Establish our base normalized reference name tracker
+		baseBlockName := devName 
 		targetSysDir := filepath.Join("/sys/block", devName)
 		
 		// DYNAMIC CONTROLLER IDENTIFICATION:
@@ -3592,7 +3592,7 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) purgeStuckPhysicalPathsDualProto
 					ctrlPart := devName[:cIdx]  
 					nsPart := devName[lastNIdx:] 
 					
-					baseBlockName = ctrlPart + nsPart // Resolves perfectly to "nvme2n1"
+					baseBlockName = ctrlPart + nsPart 
 					targetSysDir = filepath.Join("/sys/block", baseBlockName) 
 					logger.Debugf("[Purge-Paths] Normalized virtual block node routing path: %s -> %s", devName, targetSysDir)
 				}
@@ -3619,7 +3619,6 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) purgeStuckPhysicalPathsDualProto
 
 		var wwidBytesStr string
 		var errRead error
-		// FIX 1 COMPLETE: Pass 'baseBlockName' to keep all gater lock keys perfectly aligned node-wide
 		wwidBytesStr, errRead = secureReadSysfs(ctx, r.KeyedGater, baseBlockName, wwidPath)
 
 		if errRead != nil || wwidBytesStr == "" {
@@ -3647,6 +3646,7 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) purgeStuckPhysicalPathsDualProto
 		var deletePath string
 		var useUnbindStrategy bool
 		var pciAddress string
+		unbindPath := "/sys/bus/pci/drivers/nvme/unbind" // FIX COMPLETE: Broadly scoped to be visible everywhere below
 
 		if isSCSI {
 			deletePath = filepath.Join("/sys/block", devName, "device", "delete")
@@ -3673,7 +3673,6 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) purgeStuckPhysicalPathsDualProto
 			)
 
 			if !finalDeleteExists {
-				// Standardize on ExtractNvmeControllerBase to protect against index 0 mutations
 				ctrlName := ExtractNvmeControllerBase(devName)
 
 				pciUeventPath := fmt.Sprintf("/sys/class/nvme/%s/device/uevent", ctrlName)
@@ -3686,13 +3685,12 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) purgeStuckPhysicalPathsDualProto
 				)
 
 				if ueventExists {
-					// FIX 2 COMPLETE: Pass 'baseBlockName' to keep all gater lock keys perfectly aligned node-wide
 					ueventBytesStr, errUevent := secureReadSysfs(ctx, r.KeyedGater, baseBlockName, pciUeventPath)
 					if errUevent == nil && ueventBytesStr != "" {
 						for _, line := range strings.Split(ueventBytesStr, "\n") {
 							if strings.HasPrefix(line, "PCI_SLOT_NAME=") {
 								pciAddress = strings.TrimPrefix(line, "PCI_SLOT_NAME=")
-								deletePath = "/sys/bus/pci/drivers/nvme/unbind"
+								deletePath = unbindPath
 								useUnbindStrategy = true
 								break
 							}
@@ -3710,7 +3708,6 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) purgeStuckPhysicalPathsDualProto
 					
 					if errLink == nil {
 						pciAddress = filepath.Base(pciAddrPath)
-						unbindPath = "/sys/bus/pci/drivers/nvme/unbind"
 						if _, err := os.Stat(unbindPath); err == nil {
 							deletePath = unbindPath
 							useUnbindStrategy = true
@@ -3766,8 +3763,6 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) purgeStuckPhysicalPathsDualProto
 	logger.Infof("purgeStuckPhysicalPathsDualProtocol successfully synchronized all hardware evictions.")
 	return nil
 }
-
-
 
 func (r *OsDeviceConnectivityHelperScsiGeneric) FinalWwidPurge(ctx context.Context, expectedWWID string) error {
 	targetWWID := r.Helper.normalizeWWID(expectedWWID)
