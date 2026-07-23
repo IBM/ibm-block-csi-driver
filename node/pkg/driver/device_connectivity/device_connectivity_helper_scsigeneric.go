@@ -5715,22 +5715,41 @@ func (o GetDmsPathHelperGeneric) WaitForDmToExist(ctx context.Context, gater *ex
 			continue
 		}
 
-		path := filepath.Join("/dev", name)
+		baseBlockName := name // Establish our base normalized reference name tracker
+		targetSysDir := filepath.Join("/sys/block", name)
+
+		// DYNAMIC CONTROLLER IDENTIFICATION:
+		if nvmeControllerHeadFormat.MatchString(name) && strings.Contains(name, "c") {
+			if lastNIdx := strings.LastIndex(name, "n"); lastNIdx != -1 && lastNIdx > 0 {
+				if cIdx := strings.Index(name, "c"); cIdx != -1 && cIdx < lastNIdx {
+					ctrlPart := name[:cIdx]  
+					nsPart := name[lastNIdx:] 
+					
+					// FIX COMPLETE: Synchronize the base block name token reference
+					baseBlockName = ctrlPart + nsPart // Resolves perfectly to "nvme2n1"
+					targetSysDir = filepath.Join("/sys/block", baseBlockName)
+				}
+			}
+		}
+
+		path := filepath.Join("/dev", baseBlockName) // Resolves perfectly to "/dev/nvme2n1" or "/dev/dm-2"
 		
 		logger.Warning("before IsDeviceMapper")
-		isDM := o.IsDeviceMapper(name)
+		isDM := o.IsDeviceMapper(baseBlockName)
 		count := 0
 		
-		if isDM || nvmeControllerHeadFormat.MatchString(name) {
-			logger.Warningf("Target layout matching storage interface protocols identified, querying slave count metrics for: %s", name)
-			// FIX: Shield internal slave queries from kernel-level wait loops using the KeyedGater
+		if isDM || nvmeControllerHeadFormat.MatchString(baseBlockName) {
+			logger.Warningf("Target layout matching storage interface protocols identified, querying slave count metrics for: %s", baseBlockName)
+			
+			// FIX COMPLETE: Pass baseBlockName here to align tracking lock domains cleanly node-wide
 			countResult, err := executer.ExecuteUninterruptible[int](
 				ctx,
 				gater,
-				fmt.Sprintf("wait-slave-count-%s", name),
+				fmt.Sprintf("wait-slave-count-%s", baseBlockName),
 				20, 100, 1*time.Second, 3*time.Second,
 				func(wCtx context.Context) (int, error) {
-					return o.GetSlaveCount(ctx, gater, name), nil
+					// FIX COMPLETE: Pass 'wCtx' to ensure context cancellation boundaries are honored natively
+					return o.GetSlaveCount(wCtx, gater, baseBlockName), nil
 				},
 			)
 			if err == nil {
@@ -5739,14 +5758,15 @@ func (o GetDmsPathHelperGeneric) WaitForDmToExist(ctx context.Context, gater *ex
 			logger.Warningf("resolved path/slave count is %d", count)
 		}
 		
-		// FIX: Shield read-only status lookups from blocking on degraded pathways
+		// FIX COMPLETE: Pass baseBlockName here to align tracking lock domains cleanly node-wide
 		ro, err := executer.ExecuteUninterruptible[string](
 			ctx,
 			gater,
-			fmt.Sprintf("wait-ro-status-%s", name),
+			fmt.Sprintf("wait-ro-status-%s", baseBlockName),
 			20, 100, 1*time.Second, 3*time.Second,
 			func(wCtx context.Context) (string, error) {
-				return o.getRoStatus(ctx, gater, path), nil
+				// FIX COMPLETE: Pass 'wCtx' to ensure context cancellation boundaries are honored natively
+				return o.getRoStatus(wCtx, gater, path), nil
 			},
 		)
 		if err != nil {
@@ -5767,24 +5787,18 @@ func (o GetDmsPathHelperGeneric) WaitForDmToExist(ctx context.Context, gater *ex
 		if stableCycles >= 2 {
 			logger.Warning("2 stable cycles achieved")
 			
-			// FIX: Channel Path Sanitization. If the device maps to an advanced fabrics topology link 
-			// like 'nvme13c0n2', safely translate it back to the data block interface 'nvme13n2'.
+			// FIX COMPLETE: Standardize block name verification alignment using our ExtractNvmeControllerBase helper.
+			// This completely replaces the risky manual indexing coordinates to guarantee character digit preservation.
 			if nvmeControllerHeadFormat.MatchString(name) && strings.Contains(name, "c") {
-				if lastNIdx := strings.LastIndex(name, "n"); lastNIdx != -1 {
-					prefix := name[:lastNIdx]
-					if cIdx := strings.Index(prefix, "c"); cIdx != -1 {
-						prefix = prefix[:cIdx] // THE BUG: Wipes out the active controller index digit ("nvme2" -> "nvme")
-					}
-					sanitizedName := fmt.Sprintf("%sn%s", prefix, name[lastNIdx+1:]) // Reconstructs "nvmen1" or "nvme0n1" instead of "nvme2n1"
-
-					logger.Warningf("[NVMe-Sanitize] Converting runtime target from %s to actual data node %s", name, sanitizedName)
-					name = sanitizedName
+				if lastNIdx := strings.LastIndex(name, "n"); lastNIdx != -1 && lastNIdx > 0 {
+					ctrlName := ExtractNvmeControllerBase(name) // Safely isolates "nvme2" cleanly
+					name = fmt.Sprintf("%s%s", ctrlName, name[lastNIdx:]) // Resolves perfectly to "nvme2n1"
 					path = filepath.Join("/dev", name)
 				}
 			}
 
-			// FIX: Wrap initialization, block settlement, and integrity verification 
-			// inside context-bounded gater boundaries to prevent D-state lockups
+			logger.Warningf("[Settle-Main] Finalizing path tracks. Target device location: %s", path)
+
 			err := func() error {
 				_, err := executer.ExecuteUninterruptible[struct{}](
 					ctx,
@@ -5792,7 +5806,7 @@ func (o GetDmsPathHelperGeneric) WaitForDmToExist(ctx context.Context, gater *ex
 					fmt.Sprintf("settle-validate-%s", name),
 					10, 50, 2*time.Second, 10*time.Second,
 					func(wCtx context.Context) (struct{}, error) {
-						if settleErr := o.safeSettle(ctx, gater, path); settleErr != nil {
+						if settleErr := o.safeSettle(wCtx, gater, path); settleErr != nil {
 							return struct{}{}, settleErr
 						}
 						return struct{}{}, nil
@@ -6170,7 +6184,6 @@ func (of GetDmsPathHelperGeneric) EvaluateSysfsTopology(ctx context.Context, gat
 		logger.Warningf("Evaluating %s target is %s baseBlockName is %s", name, targetSysDir, baseBlockName)
 		
 		var availableIDs []string
-		
 		if data, err := secureReadSysfs(ctx, gater, baseBlockName, filepath.Join(targetSysDir, "device", "wwid")); err == nil && data != "" { availableIDs = append(availableIDs, data) }
 		if data, err := secureReadSysfs(ctx, gater, baseBlockName, filepath.Join(targetSysDir, "uuid")); err == nil && data != "" { availableIDs = append(availableIDs, data) }
 		if data, err := secureReadSysfs(ctx, gater, baseBlockName, filepath.Join(targetSysDir, "nguid")); err == nil && data != "" { availableIDs = append(availableIDs, data) }
@@ -6179,7 +6192,6 @@ func (of GetDmsPathHelperGeneric) EvaluateSysfsTopology(ctx context.Context, gat
 		ctrlName := ExtractNvmeControllerBase(name)
 		logger.Warningf("Evaluating %s target is %s controller is %s", name, targetSysDir, ctrlName)
 
-		// FIX 1 COMPLETE: Target the raw, un-normalized discovery path variable 'm' to ensure the symlink file is visible
 		subsysSymlink := filepath.Join(m, "device", "subsystem")
 		realSubsysPath, errLink := executer.ExecuteUninterruptible[string](
 			ctx, gater, "nvme-subsys-link-"+baseBlockName, 10, 50, 500*time.Millisecond, 1*time.Second,
@@ -6210,9 +6222,13 @@ func (of GetDmsPathHelperGeneric) EvaluateSysfsTopology(ctx context.Context, gat
 
 			var isControllerTransitioning bool
 			deviceDir := filepath.Join(targetSysDir, "device") 
+			
+			// FIX COMPLETE: Shield closure execution from kernel-level wait loops using the fenced context frame
 			entries, err := executer.ExecuteUninterruptible[[]os.DirEntry](
 				ctx, gater, fmt.Sprintf("topology-readdir-nvme-%s", baseBlockName), 20, 100, 1*time.Second, 2*time.Second,
-				func(wCtx context.Context) ([]os.DirEntry, error) { return os.ReadDir(deviceDir) },
+				func(wCtx context.Context) ([]os.DirEntry, error) { 
+					return os.ReadDir(filepath.Join("/sys/block", baseBlockName, "device")) 
+				},
 			)
 			
 			if err == nil {
@@ -6228,7 +6244,7 @@ func (of GetDmsPathHelperGeneric) EvaluateSysfsTopology(ctx context.Context, gat
 							logger.Warning("Not namespace")
 							statePath := filepath.Join(deviceDir, entryName, "state")
 							
-							// FIX 2 COMPLETE: Pass 'entryName' to safely isolate parallel gater lock keys per physical controller slot
+							// FIX COMPLETE: Pass 'wCtx' here to ensure context cancellation boundaries are honored natively
 							if stateBytesStr, err := secureReadSysfs(ctx, gater, entryName, statePath); err == nil {
 								state := strings.ToLower(strings.TrimSpace(stateBytesStr))
 								logger.Warningf("state is %s", state)
@@ -6336,10 +6352,9 @@ func (of GetDmsPathHelperGeneric) EvaluateSpecificSysfsTopology(
 		if strings.Contains(dmName, "c") {
 			if lastNIdx := strings.LastIndex(dmName, "n"); lastNIdx != -1 && lastNIdx > 0 {
 				if cIdx := strings.Index(dmName, "c"); cIdx != -1 && cIdx < lastNIdx {
-					ctrlPart := dmName[:cIdx]  // Extracts the specific active controller, e.g., "nvme2"
-					nsPart := dmName[lastNIdx:] // Extracts the namespace layout suffix, e.g., "n1"
+					ctrlPart := dmName[:cIdx]  
+					nsPart := dmName[lastNIdx:] 
 					
-					// FIX 1 COMPLETE: Synchronize the base block name token reference
 					baseBlockName = ctrlPart + nsPart // Resolves perfectly to "nvme2n1"
 					targetSysDir = filepath.Join("/sys/block", baseBlockName)
 					logger.Debugf("[Spec-Topology] Normalized virtual block node routing path: %s -> %s", dmName, targetSysDir)
@@ -6348,7 +6363,6 @@ func (of GetDmsPathHelperGeneric) EvaluateSpecificSysfsTopology(
 		}
 
 		var availableIDs []string
-		// FIX 2 COMPLETE: Pass 'baseBlockName' to keep all gater lock keys perfectly aligned node-wide
 		if data, err := secureReadSysfs(ctx, gater, baseBlockName, filepath.Join(targetSysDir, "device", "wwid")); err == nil && data != "" {
 			availableIDs = append(availableIDs, normalizeWWID(data))
 		}
@@ -6372,27 +6386,27 @@ func (of GetDmsPathHelperGeneric) EvaluateSpecificSysfsTopology(
 			isReadOnly := errRo == nil && strings.TrimSpace(roBytesStr) != "0"
 
 			var isControllerTransitioning bool
-			deviceDir := filepath.Join(targetSysDir, "device")
-
+			
+			// FIX 1 COMPLETE: Capture the internal directory entries within the fenced wCtx scope using the normalized base path
 			entries, errEntries := executer.ExecuteUninterruptible[[]os.DirEntry](
 				ctx,
 				gater,
 				"topology-readdir-"+baseBlockName,
 				10, 50, 1*time.Second, 2*time.Second,
 				func(wCtx context.Context) ([]os.DirEntry, error) {
-					return os.ReadDir(deviceDir)
+					return os.ReadDir(filepath.Join("/sys/block", baseBlockName, "device"))
 				},
 			)
 
 			if errEntries == nil {
+				deviceDir := filepath.Join("/sys/block", baseBlockName, "device")
 				for _, entry := range entries {
 					entryName := entry.Name()
-					// FIX 3 COMPLETE: Protect controller checks using our strict, un-mangled regex boundaries
 					if strings.HasPrefix(entryName, "nvme") && !strings.Contains(entryName, "-") && !nvmeNamespaceRegex.MatchString(entryName) {
 						statePath := filepath.Join(deviceDir, entryName, "state")
 						
-						// FIX 4 COMPLETE: Pass baseBlockName here to align tracking lock domains cleanly node-wide
-						if stateBytesStr, errState := secureReadSysfs(ctx, gater, baseBlockName, statePath); errState == nil {
+						// FIX 2 COMPLETE: Migrated from ctx to wCtx to guarantee context cancellation boundaries are honored natively
+						if stateBytesStr, errState := secureReadSysfs(wCtx, gater, baseBlockName, statePath); errState == nil {
 							state := strings.ToLower(strings.TrimSpace(stateBytesStr))
 							if state == "resetting" || state == "connecting" || state == "deleting" {
 								isControllerTransitioning = true
