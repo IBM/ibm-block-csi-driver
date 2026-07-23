@@ -3415,7 +3415,7 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) IsNativeNvmeNamespace(name strin
 	return nvmeNamespaceRegex.MatchString(name)
 }
 
-// DisableNativeNvmeQueueing applies fast failover constrfunc (r *OsDeviceConnectivityHelperScsiGeneric) disableNativeNvmeQueueing(ctx context.Context, expectedWWID string) error {
+func (r *OsDeviceConnectivityHelperScsiGeneric) disableNativeNvmeQueueing(ctx context.Context, expectedWWID string) error {
 	if err := ctx.Err(); err != nil {
 		return ctx.Err()
 	}
@@ -3538,7 +3538,7 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) IsNativeNvmeNamespace(name strin
 	return nil
 }
 
-func (r *OsDeviceConnectivityHelperScsiGeneric) purgeStucfunc (r *OsDeviceConnectivityHelperScsiGeneric) purgeStuckPhysicalPathsDualProtocol(ctx context.Context, rawScsiTarget, rawNvmeTarget string) error {
+func (r *OsDeviceConnectivityHelperScsiGeneric) purgeStuckPhysicalPathsDualProtocol(ctx context.Context, rawScsiTarget, rawNvmeTarget string) error {
 	if err := ctx.Err(); err != nil {
 		return ctx.Err()
 	}
@@ -4676,8 +4676,8 @@ func (o *OsDeviceConnectivityHelperGeneric) checkNVMeDevice(ctx context.Context,
 	var stateBytesStr string
 	var readErr error
 
-	if stateBytesStr, readErr = o.secureReadSysfsWrapper(ctx, gater, cleanNvmeName, filepath.Join(targetSysDir, "device", "state")); readErr != nil {
-		if stateBytesStr, readErr = o.secureReadSysfsWrapper(ctx, gater, cleanNvmeName, filepath.Join("/sys/block", cleanNvmeName, "device", "state")); readErr != nil {
+	if stateBytesStr, readErr = secureReadSysfs(ctx, gater, cleanNvmeName, filepath.Join(targetSysDir, "device", "state")); readErr != nil {
+		if stateBytesStr, readErr = secureReadSysfs(ctx, gater, cleanNvmeName, filepath.Join("/sys/block", cleanNvmeName, "device", "state")); readErr != nil {
 			
 			// FIX: SOLID CONTROLLER NAME RESOLUTION
 			// We look for the LAST occurrence of "n" to correctly bypass the first letter 
@@ -4687,7 +4687,7 @@ func (o *OsDeviceConnectivityHelperGeneric) checkNVMeDevice(ctx context.Context,
 				ctrlName = cleanNvmeName[:lastNIdx] // Accurately resolves "nvme2n1" to "nvme2"
 			}
 			
-			stateBytesStr, readErr = o.secureReadSysfsWrapper(ctx, gater, ctrlName, filepath.Join("/sys/class/nvme", ctrlName, "state"))
+			stateBytesStr, readErr = secureReadSysfs(ctx, gater, ctrlName, filepath.Join("/sys/class/nvme", ctrlName, "state"))
 		}
 	}
 
