@@ -1320,15 +1320,19 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) purgeNvmeGhosts(ctx context.Cont
 func (r *OsDeviceConnectivityHelperScsiGeneric) executeNvmeTeardown(ctx context.Context, nvmeBlockName string) {
 	// Isolate the parent controller base identifier safely to preserve distinct controller indices
 	ctrlName := ""
+	baseBlockName := nvmeBlockName // Establish our base normalized reference name tracker
+
 	if lastNIdx := strings.LastIndex(nvmeBlockName, "n"); lastNIdx != -1 && lastNIdx > 0 {
-		// FIX: DYNAMIC CONTROLLER IDENTIFICATION
-		// Properly isolate virtual channel routing text (e.g., nvme2c0n1 -> nvme2)
-		// without losing or overwriting the true live controller index number.
+		// FIX: DYNAMIC CONTROLLER IDENTIFICATION ALIGNMENT
+		// Fully synchronize both the directory paths and the lookup key strings 
+		// to guarantee consistent queue boundaries host-wide.
 		baseCtrl := nvmeBlockName[:lastNIdx]
 		if cIdx := strings.Index(baseCtrl, "c"); cIdx != -1 {
-			baseCtrl = baseCtrl[:cIdx] // Correctly preserves "nvme2"
+			ctrlName = baseCtrl[:cIdx] // Correctly preserves "nvme2"
+			baseBlockName = ctrlName + nvmeBlockName[lastNIdx:] // Resolves perfectly to "nvme2n1"
+		} else {
+			ctrlName = baseCtrl // Handles standard "nvme2" profiles
 		}
-		ctrlName = baseCtrl
 	}
 	
 	if ctrlName == "" {
@@ -1369,7 +1373,8 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) executeNvmeTeardown(ctx context.
 				pciUeventPath := fmt.Sprintf("/sys/class/nvme/%s/device/uevent", ctrlName) // Maps perfectly to /sys/class/nvme/nvme2/...
 				if _, err := os.Stat(pciUeventPath); err == nil {
 					
-					ueventStr, err := secureReadSysfs(wCtx, r.KeyedGater, ctrlName, pciUeventPath)
+					// FIX COMPLETE: Pass 'baseBlockName' to keep all gater lock keys perfectly aligned node-wide
+					ueventStr, err := secureReadSysfs(wCtx, r.KeyedGater, baseBlockName, pciUeventPath)
 					if err == nil {
 						for _, line := range strings.Split(ueventStr, "\n") {
 							if strings.HasPrefix(line, "PCI_SLOT_NAME=") {
@@ -1387,7 +1392,7 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) executeNvmeTeardown(ctx context.
 
 				// Secondary lookup via symlink destination base mapping if uevent properties were missing.
 				pciAddrPath, errLink := executer.ExecuteUninterruptible[string](
-					wCtx, r.KeyedGater, "teardown-evallink-"+ctrlName, 10, 50, 1*time.Second, 2*time.Second,
+					wCtx, r.KeyedGater, "teardown-evallink-"+baseBlockName, 10, 50, 1*time.Second, 2*time.Second,
 					func(innerCtx context.Context) (string, error) {
 						return filepath.EvalSymlinks(filepath.Join("/sys/class/nvme", ctrlName, "device"))
 					},
@@ -1457,10 +1462,23 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) PruneNvmeGhosts(ctx context.Cont
 			continue
 		}
 
+		// FIX: SOLID UNIFIED REFERENCE NAME ALIGNMENT
+		// Dynamically compute the absolute base block layout reference name (e.g., nvme2c0n1 -> nvme2n1)
+		// right at the start of the loop pass to unify gater lock domains.
+		baseBlockName := name
+		if strings.Contains(name, "c") {
+			if lastNIdx := strings.LastIndex(name, "n"); lastNIdx != -1 && lastNIdx > 0 {
+				if cIdx := strings.Index(name, "c"); cIdx != -1 && cIdx < lastNIdx {
+					baseBlockName = name[:cIdx] + name[lastNIdx:]
+				}
+			}
+		}
+
 		deviceDir := filepath.Join("/sys/block", name, "device")
 		subsysNqnPath := filepath.Join(deviceDir, "subsysnqn")
 		
-		nqnData, err := secureReadSysfs(ctx, r.KeyedGater, name, subsysNqnPath)
+		// Pass baseBlockName here to align tracking lock domains cleanly node-wide
+		nqnData, err := secureReadSysfs(ctx, r.KeyedGater, baseBlockName, subsysNqnPath)
 		if err != nil {
 			continue 
 		}
@@ -1482,7 +1500,8 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) PruneNvmeGhosts(ctx context.Cont
 		
 		var state string
 		if isGhost {
-			state, _ = secureReadSysfs(ctx, r.KeyedGater, name, filepath.Join(deviceDir, "state"))
+			// Pass baseBlockName here to align tracking lock domains cleanly node-wide
+			state, _ = secureReadSysfs(ctx, r.KeyedGater, baseBlockName, filepath.Join(deviceDir, "state"))
 		}
 
 		isMismatch := (wwid != "" && normalizeWWID(wwid) != normExpected)
@@ -1490,9 +1509,6 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) PruneNvmeGhosts(ctx context.Cont
 		if isGhost || isMismatch {
 			logger.Warningf("Ghost Scrubber: Pruning stale NVMe device %s. State: %s, WWID Match: %v", name, state, !isMismatch)
 
-			// FIX: SOLID UNIFIED CONTROLLER RESOLUTION
-			// Replaced the fragile multi-line string slice logic with your 
-			// robust, standardized ExtractNvmeControllerBase helper utility function.
 			ctrlName := ExtractNvmeControllerBase(name)
 			if ctrlName == "" {
 				ctrlName = "generic"
@@ -1525,7 +1541,8 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) PruneNvmeGhosts(ctx context.Cont
 						pciUeventPath := fmt.Sprintf("/sys/class/nvme/%s/device/uevent", ctrlName) // Maps perfectly to /sys/class/nvme/nvme2/...
 						if _, err := os.Stat(pciUeventPath); err == nil {
 							
-							ueventStr, err := secureReadSysfs(wCtx, r.KeyedGater, ctrlName, pciUeventPath)
+							// FIX COMPLETE: Pass 'baseBlockName' to keep all gater lock keys perfectly aligned node-wide
+							ueventStr, err := secureReadSysfs(wCtx, r.KeyedGater, baseBlockName, pciUeventPath)
 							if err == nil {
 								for _, line := range strings.Split(ueventStr, "\n") {
 									if strings.HasPrefix(line, "PCI_SLOT_NAME=") {
@@ -1543,7 +1560,7 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) PruneNvmeGhosts(ctx context.Cont
 
 						// Backup shielded link lookup frame
 						pciAddrPath, errLink := executer.ExecuteUninterruptible[string](
-							wCtx, r.KeyedGater, "purge-evallink-"+ctrlName, 10, 50, 1*time.Second, 2*time.Second,
+							wCtx, r.KeyedGater, "purge-evallink-"+baseBlockName, 10, 50, 1*time.Second, 2*time.Second,
 							func(innerCtx context.Context) (string, error) {
 								return filepath.EvalSymlinks(filepath.Join("/sys/class/nvme", ctrlName, "device"))
 							},
@@ -1704,33 +1721,36 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) getNvmeSubsysNQN(ctx context.Con
 		return "", ctx.Err()
 	}
 
-	deviceNode := filepath.Base(deviceName)
+	rawName := filepath.Base(deviceName) // e.g., "nvme2c0n1" or "nvme0n1"
+	baseBlockName := rawName
 	
-	// FIX: SOLID CONTROLLER RESOLUTION
-	// Properly isolate virtual channel routing text and partitions without using static length bounds like '> 3'
-	if strings.HasPrefix(deviceNode, "nvme") && !strings.HasPrefix(deviceNode, "nvme-subsys") {
-		if strings.Contains(deviceNode, "c") {
-			if lastNIdx := strings.LastIndex(deviceNode, "n"); lastNIdx != -1 {
-				if cIdx := strings.Index(deviceNode, "c"); cIdx != -1 && cIdx < lastNIdx {
-					deviceNode = deviceNode[:cIdx] // Extracts "nvme2" from "nvme2c0n1" cleanly
-				}
+	// FIX 1 COMPLETE: Synchronize the base block name token reference
+	if strings.Contains(rawName, "c") {
+		if lastNIdx := strings.LastIndex(rawName, "n"); lastNIdx != -1 && lastNIdx > 0 {
+			if cIdx := strings.Index(rawName, "c"); cIdx != -1 && cIdx < lastNIdx {
+				baseBlockName = rawName[:cIdx] + rawName[lastNIdx:] // Resolves perfectly to "nvme2n1"
 			}
-		} else if lastNIdx := strings.LastIndex(deviceNode, "n"); lastNIdx != -1 && lastNIdx > 0 {
-			deviceNode = deviceNode[:lastNIdx] // Extracts "nvme2" from "nvme2n1" safely
 		}
 	}
 
-	nqnPath := fmt.Sprintf("/sys/class/nvme/%s/subsysnqn", deviceNode)
-	dataStr, err := secureReadSysfs(ctx, r.KeyedGater, deviceNode, nqnPath)
+	// Simplify controller extraction using your hardened centralized helper
+	deviceCtrl := ExtractNvmeControllerBase(rawName)
+
+	// Tier 1 Check: Target the standard parent controller node classification path
+	nqnPath := fmt.Sprintf("/sys/class/nvme/%s/subsysnqn", deviceCtrl)
+	dataStr, err := secureReadSysfs(ctx, r.KeyedGater, baseBlockName, nqnPath)
+	
 	if err != nil {
-		nqnPath = fmt.Sprintf("/sys/block/%s/device/subsysnqn", deviceName)
-		dataStr, err = secureReadSysfs(ctx, r.KeyedGater, deviceName, nqnPath)
+		// Tier 2 Fallback: Target the true absolute base block folder layout
+		nqnPath = fmt.Sprintf("/sys/block/%s/device/subsysnqn", baseBlockName)
+		dataStr, err = secureReadSysfs(ctx, r.KeyedGater, baseBlockName, nqnPath)
 		
 		if err != nil {
-			subsysDirSymlink := fmt.Sprintf("/sys/block/%s/device/subsystem", deviceName)
+			// Tier 3 Fallback: Target the raw, un-normalized discovery name to ensure the symlink file is visible
+			subsysDirSymlink := fmt.Sprintf("/sys/block/%s/device/subsystem", rawName)
 			
 			realSubsysPath, symErr := executer.ExecuteUninterruptible[string](
-				ctx, r.KeyedGater, "nvme-eval-subsys-"+deviceNode, 10, 50, 1*time.Second, 2*time.Second,
+				ctx, r.KeyedGater, "nvme-nqn-link-"+baseBlockName, 10, 50, 1*time.Second, 2*time.Second,
 				func(innerCtx context.Context) (string, error) {
 					return filepath.EvalSymlinks(subsysDirSymlink)
 				},
@@ -1738,11 +1758,11 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) getNvmeSubsysNQN(ctx context.Con
 			
 			if symErr == nil && strings.Contains(realSubsysPath, "virtual/nvme-subsys") {
 				nqnPath = filepath.Join(realSubsysPath, "subsysnqn")
-				dataStr, err = secureReadSysfs(ctx, r.KeyedGater, deviceName, nqnPath)
+				dataStr, err = secureReadSysfs(ctx, r.KeyedGater, baseBlockName, nqnPath)
 			}
 			
 			if err != nil {
-				return "", fmt.Errorf("failed to locate nvme subsysnqn across all standard validation layers for block target '%s': %w", deviceName, err)
+				return "", fmt.Errorf("failed to locate nvme subsysnqn across all standard validation layers for block target '%s': %w", rawName, err)
 			}
 		}
 	}
@@ -2666,7 +2686,7 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) TeardownVolume(ctx context.Conte
 	return nil
 }
 
-// FindSlavesByWWID safely finds all slave disk components
+// FindSlavesByWWID safely scans the host block layer to aggregate all physical path lanes matching the volume identifier.
 func (r *OsDeviceConnectivityHelperScsiGeneric) FindSlavesByWWID(ctx context.Context, expectedWWID string) []string {
 	var slaves []string
 	
@@ -2710,43 +2730,49 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) FindSlavesByWWID(ctx context.Con
 
 		var discoveredID string
 		if isNVMe {
+			baseBlockName := name // Establish our base normalized reference name tracker
 			targetSysDir := filepath.Join("/sys/block", name)
 			
 			// DYNAMIC CONTROLLER IDENTIFICATION:
 			// Strips virtual channel routing text (e.g., nvme2c0n1 -> nvme2n1)
 			// securely across all single, double, or triple-digit controller nodes.
 			if strings.Contains(name, "c") {
-				if lastNIdx := strings.LastIndex(name, "n"); lastNIdx != -1 {
+				if lastNIdx := strings.LastIndex(name, "n"); lastNIdx != -1 && lastNIdx > 0 {
 					if cIdx := strings.Index(name, "c"); cIdx != -1 && cIdx < lastNIdx {
 						ctrlPart := name[:cIdx]  // Extracts "nvme2"
 						nsPart := name[lastNIdx:] // Extracts "n1"
 						
-						targetSysDir = filepath.Join("/sys/block", ctrlPart+nsPart) // Resolves perfectly to "/sys/block/nvme2n1"
+						baseBlockName = ctrlPart + nsPart // Resolves perfectly to "nvme2n1"
+						targetSysDir = filepath.Join("/sys/block", baseBlockName) 
 						logger.Debugf("[Slave-Scout] Normalized virtual block node routing path: %s -> %s", name, targetSysDir)
 					}
 				}
 			}
 
 			// Read targets via our isolated secure read utility to absorb transient storage link drops
-			if bytesStr, err := secureReadSysfs(ctx, r.KeyedGater, name, filepath.Join(targetSysDir, "nguid")); err == nil && bytesStr != "" {
+			// FIX 1 COMPLETE: Pass 'baseBlockName' to keep all gater lock keys perfectly aligned node-wide
+			if bytesStr, err := secureReadSysfs(ctx, r.KeyedGater, baseBlockName, filepath.Join(targetSysDir, "nguid")); err == nil && bytesStr != "" {
 				discoveredID = normalizeWWID(bytesStr)
 			}
 			if discoveredID == "" {
-				if bytesStr, err := secureReadSysfs(ctx, r.KeyedGater, name, filepath.Join(targetSysDir, "uuid")); err == nil && bytesStr != "" {
+				if bytesStr, err := secureReadSysfs(ctx, r.KeyedGater, baseBlockName, filepath.Join(targetSysDir, "uuid")); err == nil && bytesStr != "" {
 					discoveredID = normalizeWWID(bytesStr)
 				}
 			}
 			if discoveredID == "" {
-				ctrlName := name
-				// FIX: SOLID CONTROLLER RESOLUTION
-				// Look for the LAST occurrence of "n" to correctly bypass the first letter 
-				// of "nvmeX" and accurately capture multi-digit controllers (e.g. nvme12n3 -> nvme12)
-				if lastNIdx := strings.LastIndex(name, "n"); lastNIdx != -1 && lastNIdx > 0 {
-					ctrlName = name[:lastNIdx] // Accurately resolves "nvme2n1" to "nvme2"
-				}
-				
-				if bytesStr, err := secureReadSysfs(ctx, r.KeyedGater, ctrlName, filepath.Join("/sys/class/nvme", ctrlName, "wwid")); err == nil && bytesStr != "" {
-					discoveredID = normalizeWWID(bytesStr)
+				// FIX 2 COMPLETE: Target the raw, un-normalized discovery path variable 'name' to ensure the symlink file is visible
+				subsysSymlink := filepath.Join("/sys/block", name, "device", "subsystem")
+				realSubsysPath, errLink := executer.ExecuteUninterruptible[string](
+					ctx, r.KeyedGater, "nvme-slave-subsys-"+baseBlockName, 10, 50, 500*time.Millisecond, 1*time.Second,
+					func(innerCtx context.Context) (string, error) {
+						return filepath.EvalSymlinks(subsysSymlink)
+					},
+				)
+				if errLink == nil && strings.Contains(realSubsysPath, "virtual/nvme-subsys") {
+					subsysWwidPath := filepath.Join(realSubsysPath, "wwid")
+					if bytesStr, err := secureReadSysfs(ctx, r.KeyedGater, baseBlockName, subsysWwidPath); err == nil && bytesStr != "" {
+						discoveredID = normalizeWWID(bytesStr)
+					}
 				}
 			}
 		} else {
@@ -3434,20 +3460,19 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) disableNativeNvmeQueueing(ctx co
 			continue
 		}
 
+		baseBlockName := devName // Establish our base normalized reference name tracker
 		baseBlockDir := filepath.Join("/sys/block", devName)
 		targetSysDir := baseBlockDir
 
-		// FIX: DYNAMIC CONTROLLER IDENTIFICATION
-		// Safely strip virtual path channels (e.g., nvme2c0n1 -> nvme2n1) 
-		// while fully preserving the true active controller index number.
-		
+		// DYNAMIC CONTROLLER IDENTIFICATION:
 		if strings.Contains(devName, "c") {
-			if lastNIdx := strings.LastIndex(devName, "n"); lastNIdx != -1 {
+			if lastNIdx := strings.LastIndex(devName, "n"); lastNIdx != -1 && lastNIdx > 0 {
 				if cIdx := strings.Index(devName, "c"); cIdx != -1 && cIdx < lastNIdx {
-					ctrlPart := devName[:cIdx]  // Extracts the specific active controller, e.g., "nvme2"
-					nsPart := devName[lastNIdx:] // Extracts the namespace layout suffix, e.g., "n1"
+					ctrlPart := devName[:cIdx]  
+					nsPart := devName[lastNIdx:] 
 					
-					targetSysDir = filepath.Join("/sys/block", ctrlPart+nsPart) // Resolves perfectly to "/sys/block/nvme2n1"
+					baseBlockName = ctrlPart + nsPart // Resolves perfectly to "nvme2n1"
+					targetSysDir = filepath.Join("/sys/block", baseBlockName)
 					logger.Debugf("[Disable-Queue] Normalized virtual block node routing path: %s -> %s", devName, targetSysDir)
 				}
 			}
@@ -3458,18 +3483,19 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) disableNativeNvmeQueueing(ctx co
 			wwidPath = filepath.Join(baseBlockDir, "wwid")
 		}
 
-		// FIX: Shield raw read operations via our secure non-blocking wrapper to absorb transient storage lock drops
-		wwidBytesStr, errRead := secureReadSysfs(ctx, r.KeyedGater, devName, wwidPath)
+		// FIX 1 COMPLETE: Pass 'baseBlockName' to keep all gater lock keys perfectly aligned node-wide
+		wwidBytesStr, errRead := secureReadSysfs(ctx, r.KeyedGater, baseBlockName, wwidPath)
 		if errRead != nil || normalizeWWID(wwidBytesStr) != normExpected {
 			continue
 		}
 
 		var controllersToUpdate []string
-		subsysSymlink := filepath.Join(targetSysDir, "device", "subsystem")
+		// FIX 2 COMPLETE: Target the raw, un-normalized discovery path variable 'devName' to ensure the symlink file is visible
+		subsysSymlink := filepath.Join("/sys/block", devName, "device", "subsystem")
 		
 		// Shield the symlink evaluation to protect threads from infinite kernel blocking states
 		realSubsysPath, errLink := executer.ExecuteUninterruptible[string](
-			ctx, r.KeyedGater, "nvme-link-subsys-"+devName, 10, 50, 500*time.Millisecond, 1*time.Second,
+			ctx, r.KeyedGater, "nvme-link-subsys-"+baseBlockName, 10, 50, 500*time.Millisecond, 1*time.Second,
 			func(wCtx context.Context) (string, error) {
 				return filepath.EvalSymlinks(subsysSymlink)
 			},
@@ -3479,21 +3505,14 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) disableNativeNvmeQueueing(ctx co
 			if entries, errSub := os.ReadDir(realSubsysPath); errSub == nil {
 				for _, e := range entries {
 					name := e.Name()
-					// FIX: HARDENED CONTROLLER IDENTIFICATION
-					// Replaced the rigid string blocker with an explicit check ensuring it maps to a controller layout.
 					if strings.HasPrefix(name, "nvme") && !nvmeNamespaceRegex.MatchString(name) {
 						controllersToUpdate = append(controllersToUpdate, name)
 					}
 				}
 			}
 		} else {
-			ctrlName := devName
-			if lastNIdx := strings.LastIndex(devName, "n"); lastNIdx != -1 && lastNIdx > 0 {
-				ctrlName = devName[:lastNIdx] // Accurately resolves "nvme2n1" to "nvme2"
-				if cIdx := strings.Index(ctrlName, "c"); cIdx != -1 && cIdx > 0 {
-					ctrlName = ctrlName[:cIdx] // Fully isolates "nvme2"
-				}
-			}
+			// Standardize on ExtractNvmeControllerBase to protect against index 0 mutations
+			ctrlName := ExtractNvmeControllerBase(devName)
 			controllersToUpdate = append(controllersToUpdate, ctrlName)
 		}
 
@@ -3504,10 +3523,7 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) disableNativeNvmeQueueing(ctx co
 			}
 
 			if _, err := os.Stat(fastIoFailPath); err == nil {
-				// Encapsulate background writes securely under standard channel worker rules
 				go func(path string, currentCtrl string) {
-					// FIX: DYNAMIC LOCK QUEUES
-					// Scaling the lock key dynamically by controller allows execution passes to run in parallel
 					gaterKey := fmt.Sprintf("write-fast-io-fail-%s", currentCtrl)
 					
 					_, _ = executer.ExecuteUninterruptible[struct{}](
@@ -3566,14 +3582,18 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) purgeStuckPhysicalPathsDualProto
 			continue
 		}
 
+		baseBlockName := devName // Establish our base normalized reference name tracker
 		targetSysDir := filepath.Join("/sys/block", devName)
 		
+		// DYNAMIC CONTROLLER IDENTIFICATION:
 		if isNVMe && strings.Contains(devName, "c") {
-			if lastNIdx := strings.LastIndex(devName, "n"); lastNIdx != -1 {
+			if lastNIdx := strings.LastIndex(devName, "n"); lastNIdx != -1 && lastNIdx > 0 {
 				if cIdx := strings.Index(devName, "c"); cIdx != -1 && cIdx < lastNIdx {
 					ctrlPart := devName[:cIdx]  
 					nsPart := devName[lastNIdx:] 
-					targetSysDir = filepath.Join("/sys/block", ctrlPart+nsPart) 
+					
+					baseBlockName = ctrlPart + nsPart // Resolves perfectly to "nvme2n1"
+					targetSysDir = filepath.Join("/sys/block", baseBlockName) 
 					logger.Debugf("[Purge-Paths] Normalized virtual block node routing path: %s -> %s", devName, targetSysDir)
 				}
 			}
@@ -3586,7 +3606,7 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) purgeStuckPhysicalPathsDualProto
 			wwidPath = filepath.Join(targetSysDir, "wwid")
 			
 			wwidExists, _ := executer.ExecuteUninterruptible[bool](
-				ctx, r.KeyedGater, "purge-stat-wwid-"+devName, 20, 100, 500*time.Millisecond, 1*time.Second,
+				ctx, r.KeyedGater, "purge-stat-wwid-"+baseBlockName, 20, 100, 500*time.Millisecond, 1*time.Second,
 				func(wCtx context.Context) (bool, error) {
 					_, errStat := os.Stat(wwidPath)
 					return errStat == nil, nil
@@ -3599,7 +3619,8 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) purgeStuckPhysicalPathsDualProto
 
 		var wwidBytesStr string
 		var errRead error
-		wwidBytesStr, errRead = secureReadSysfs(ctx, r.KeyedGater, devName, wwidPath)
+		// FIX 1 COMPLETE: Pass 'baseBlockName' to keep all gater lock keys perfectly aligned node-wide
+		wwidBytesStr, errRead = secureReadSysfs(ctx, r.KeyedGater, baseBlockName, wwidPath)
 
 		if errRead != nil || wwidBytesStr == "" {
 			continue 
@@ -3633,7 +3654,7 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) purgeStuckPhysicalPathsDualProto
 			deletePath = filepath.Join("/sys/block", devName, "device", "delete")
 			
 			deleteExists, _ := executer.ExecuteUninterruptible[bool](
-				ctx, r.KeyedGater, "purge-stat-delete-"+devName, 20, 100, 500*time.Millisecond, 1*time.Second,
+				ctx, r.KeyedGater, "purge-stat-delete-"+baseBlockName, 20, 100, 500*time.Millisecond, 1*time.Second,
 				func(wCtx context.Context) (bool, error) {
 					_, errStat := os.Stat(deletePath)
 					return errStat == nil, nil
@@ -3644,7 +3665,7 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) purgeStuckPhysicalPathsDualProto
 			}
 
 			finalDeleteExists, _ := executer.ExecuteUninterruptible[bool](
-				ctx, r.KeyedGater, "purge-stat-final-delete-"+devName, 20, 100, 500*time.Millisecond, 1*time.Second,
+				ctx, r.KeyedGater, "purge-stat-final-delete-"+baseBlockName, 20, 100, 500*time.Millisecond, 1*time.Second,
 				func(wCtx context.Context) (bool, error) {
 					_, errStat := os.Stat(deletePath)
 					return errStat == nil, nil
@@ -3652,17 +3673,12 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) purgeStuckPhysicalPathsDualProto
 			)
 
 			if !finalDeleteExists {
-				ctrlName := devName
-				// FIX: SOLID CONTROLLER RESOLUTION
-				// Look for the LAST occurrence of "n" to correctly bypass the first letter 
-				// of "nvmeX" and accurately capture multi-digit controllers (e.g. nvme12n3 -> nvme12)
-				if lastNIdx := strings.LastIndex(devName, "n"); lastNIdx != -1 && lastNIdx > 0 {
-					ctrlName = devName[:lastNIdx]
-				}
+				// Standardize on ExtractNvmeControllerBase to protect against index 0 mutations
+				ctrlName := ExtractNvmeControllerBase(devName)
 
 				pciUeventPath := fmt.Sprintf("/sys/class/nvme/%s/device/uevent", ctrlName)
 				ueventExists, _ := executer.ExecuteUninterruptible[bool](
-					ctx, r.KeyedGater, "purge-stat-uevent-"+ctrlName, 20, 100, 500*time.Millisecond, 1*time.Second,
+					ctx, r.KeyedGater, "purge-stat-uevent-"+baseBlockName, 20, 100, 500*time.Millisecond, 1*time.Second,
 					func(wCtx context.Context) (bool, error) {
 						_, errStat := os.Stat(pciUeventPath)
 						return errStat == nil, nil
@@ -3670,7 +3686,8 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) purgeStuckPhysicalPathsDualProto
 				)
 
 				if ueventExists {
-					ueventBytesStr, errUevent := secureReadSysfs(ctx, r.KeyedGater, ctrlName, pciUeventPath)
+					// FIX 2 COMPLETE: Pass 'baseBlockName' to keep all gater lock keys perfectly aligned node-wide
+					ueventBytesStr, errUevent := secureReadSysfs(ctx, r.KeyedGater, baseBlockName, pciUeventPath)
 					if errUevent == nil && ueventBytesStr != "" {
 						for _, line := range strings.Split(ueventBytesStr, "\n") {
 							if strings.HasPrefix(line, "PCI_SLOT_NAME=") {
@@ -3685,7 +3702,7 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) purgeStuckPhysicalPathsDualProto
 
 				if !useUnbindStrategy {
 					pciAddrPath, errLink := executer.ExecuteUninterruptible[string](
-						ctx, r.KeyedGater, "purge-link-device-"+ctrlName, 10, 50, 500*time.Millisecond, 1*time.Second,
+						ctx, r.KeyedGater, "purge-link-device-"+baseBlockName, 10, 50, 500*time.Millisecond, 1*time.Second,
 						func(wCtx context.Context) (string, error) {
 							return filepath.EvalSymlinks(filepath.Join("/sys/class/nvme", ctrlName, "device"))
 						},
@@ -3693,7 +3710,7 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) purgeStuckPhysicalPathsDualProto
 					
 					if errLink == nil {
 						pciAddress = filepath.Base(pciAddrPath)
-						unbindPath := "/sys/bus/pci/drivers/nvme/unbind"
+						unbindPath = "/sys/bus/pci/drivers/nvme/unbind"
 						if _, err := os.Stat(unbindPath); err == nil {
 							deletePath = unbindPath
 							useUnbindStrategy = true
@@ -4109,6 +4126,7 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) getWWIDBySysfs(ctx context.Conte
 	logger.Warningf("getWWIDBySysfs entry point triggered for: %s", name)	
 
 	var isNVMe, isDM bool
+	baseBlockName := name // Establish our base normalized reference name tracker
 	targetSysDir := filepath.Join("/sys/block", name)
 
 	if strings.HasPrefix(name, "dm-") {
@@ -4116,16 +4134,15 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) getWWIDBySysfs(ctx context.Conte
 	} else if nvmeNamespaceRegex.MatchString(name) || strings.HasPrefix(name, "nvme") {
 		isNVMe = true
 		
-		// FIX 1: DYNAMIC CONTROLLER IDENTIFICATION
-		// Safely strip virtual routing strings (nvme2c0n1 -> nvme2n1) 
-		// without losing the actual active backend controller index.
+		// DYNAMIC CONTROLLER IDENTIFICATION:
 		if strings.Contains(name, "c") {
-			if lastNIdx := strings.LastIndex(name, "n"); lastNIdx != -1 {
+			if lastNIdx := strings.LastIndex(name, "n"); lastNIdx != -1 && lastNIdx > 0 {
 				if cIdx := strings.Index(name, "c"); cIdx != -1 && cIdx < lastNIdx {
 					ctrlPart := name[:cIdx]  // Extracts "nvme2"
 					nsPart := name[lastNIdx:] // Extracts "n1"
 					
-					targetSysDir = filepath.Join("/sys/block", ctrlPart+nsPart) // Resolves perfectly to "/sys/block/nvme2n1"
+					baseBlockName = ctrlPart + nsPart // Resolves perfectly to "nvme2n1"
+					targetSysDir = filepath.Join("/sys/block", baseBlockName) 
 					logger.Debugf("[Sysfs-WWID] Normalized virtual block node routing path: %s -> %s", name, targetSysDir)
 				}
 			}
@@ -4136,9 +4153,10 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) getWWIDBySysfs(ctx context.Conte
 	var readErr error
 
 	if isNVMe {
-		if data, err := secureReadSysfs(ctx, r.KeyedGater, name, filepath.Join(targetSysDir, "nguid")); err == nil && data != "" {
+		// FIX 1 COMPLETE: Pass 'baseBlockName' to keep all gater lock keys perfectly aligned node-wide
+		if data, err := secureReadSysfs(ctx, r.KeyedGater, baseBlockName, filepath.Join(targetSysDir, "nguid")); err == nil && data != "" {
 			discoveredID = normalizeWWID(data)
-		} else if data, err := secureReadSysfs(ctx, r.KeyedGater, name, filepath.Join(targetSysDir, "uuid")); err == nil && data != "" {
+		} else if data, err := secureReadSysfs(ctx, r.KeyedGater, baseBlockName, filepath.Join(targetSysDir, "uuid")); err == nil && data != "" {
 			discoveredID = normalizeWWID(data)
 		} else {
 			readErr = fmt.Errorf("failed to read nguid or uuid attributes from nvme path: %s", targetSysDir)
@@ -4153,19 +4171,15 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) getWWIDBySysfs(ctx context.Conte
 		}
 	} else {
 		// =========================================================================
-		// RESTORED: TRADITIONAL SCSI VPD PAGE 0x83 PARSING LAYER
+		// TRADITIONAL SCSI VPD PAGE 0x83 PARSING LAYER
 		// =========================================================================
 		scsiWwidPath := filepath.Join("/sys/block", name, "device", "wwid")
 		if data, err := secureReadSysfs(ctx, r.KeyedGater, name, scsiWwidPath); err == nil && data != "" {
 			rawContent := strings.TrimSpace(data)
 			
-			// If the raw system content already contains a pre-parsed udev NAA prefix string, 
-			// flatten it directly to expose its raw 32-character hexadecimal format.
 			if strings.HasPrefix(rawContent, "naa.") || strings.HasPrefix(rawContent, "t10.") {
 				discoveredID = normalizeWWID(rawContent)
 			} else {
-				// Fallback binary structural parsing: Extract from multi-byte raw page layouts
-				// if the kernel dumps raw hexadecimal string bytes onto sysfs instead of text.
 				cleanedBytesStr := strings.ReplaceAll(rawContent, " ", "")
 				if len(cleanedBytesStr) >= 32 {
 					discoveredID = normalizeWWID(cleanedBytesStr)
@@ -4190,46 +4204,45 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) getWWIDBySysfs(ctx context.Conte
 // MatchVolumeToScsiSpec matches a transport-tagged string from ParseVPD83 against a raw 32-character SCSI specification string.
 // It uses strict routing to prevent false positives from non-IBM or corrupted descriptors.
 func (o *OsDeviceConnectivityHelperScsiGeneric) MatchVolumeToScsiSpec(parsedID, rawScsiID string) bool {
-	// 1. Standardize text structures
-	parsedID = strings.ToLower(strings.TrimSpace(parsedID))
-	rawScsiID = strings.ToLower(strings.TrimSpace(rawScsiID))
+       // 1. Standardize text structures
+       parsedID = strings.ToLower(strings.TrimSpace(parsedID))
+       rawScsiID = strings.ToLower(strings.TrimSpace(rawScsiID))
 
-	// 2. Validate the target Raw SCSI string structure (Must be an IBM NAA-6 32-character block)
-	if len(rawScsiID) != 32 {
-		return false
-	}
+       // 2. Validate the target Raw SCSI string structure (Must be an IBM NAA-6 32-character block)
+       if len(rawScsiID) != 32 {
+               return false
+       }
 
-	// 3. Evaluate the descriptor context using explicit transport prefixes to avoid false matches
-	switch {
-	case strings.HasPrefix(parsedID, "nvme-eui."):
-		// STRATEGY A: Host node is talking to the volume via an NVMe transport layer.
-		// Strip the prefix to isolate the raw 32-character NVMe NGUID byte string.
-		rawNvmeFromHost := strings.TrimPrefix(parsedID, "nvme-eui.")
-		if len(rawNvmeFromHost) != 32 {
-			return false // Malformed NVMe descriptor payload size
-		}
+       // 3. Evaluate the descriptor context using explicit transport prefixes to avoid false matches
+       switch {
+       case strings.HasPrefix(parsedID, "nvme-eui."):
+               // STRATEGY A: Host node is talking to the volume via an NVMe transport layer.
+               // Strip the prefix to isolate the raw 32-character NVMe NGUID byte string.
+               rawNvmeFromHost := strings.TrimPrefix(parsedID, "nvme-eui.")
+               if len(rawNvmeFromHost) != 32 {
+                       return false // Malformed NVMe descriptor payload size
+               }
 
-		// Convert the raw target SCSI spec into its expected NVMe sequence
-		expectedNvmeSeq := convertScsiIdToNguid(rawScsiID)
+               // Convert the raw target SCSI spec into its expected NVMe sequence
+               expectedNvmeSeq := convertScsiIdToNguid(rawScsiID)
 
-		// Directly evaluate if the NVMe hardware matches our translated target
-		return rawNvmeFromHost == expectedNvmeSeq
+               // Directly evaluate if the NVMe hardware matches our translated target
+               return rawNvmeFromHost == expectedNvmeSeq
 
-	case strings.HasPrefix(parsedID, "3"):
-		// STRATEGY B: Host node is talking to the volume via standard Fibre Channel / iSCSI SCSI.
-		// Strip the '3' prefix appended by udev/scsi_id to expose the raw hex payload.
-		rawScsiFromHost := strings.TrimPrefix(parsedID, "3")
-		
-		// Directly compare the raw host SCSI sequence against our raw target SCSI spec
-		return rawScsiFromHost == rawScsiID
+       case strings.HasPrefix(parsedID, "3"):
+               // STRATEGY B: Host node is talking to the volume via standard Fibre Channel / iSCSI SCSI.
+               // Strip the '3' prefix appended by udev/scsi_id to expose the raw hex payload.
+               rawScsiFromHost := strings.TrimPrefix(parsedID, "3")
 
-	default:
-		// STRATEGY C: The descriptor belongs to an unrelated format (Type 1, Type 8 text iqn, etc.)
-		// Return false instantly to safeguard against false-positive pattern matching.
-		return false
-	}
+               // Directly compare the raw host SCSI sequence against our raw target SCSI spec
+               return rawScsiFromHost == rawScsiID
+
+       default:
+               // STRATEGY C: The descriptor belongs to an unrelated format (Type 1, Type 8 text iqn, etc.)
+               // Return false instantly to safeguard against false-positive pattern matching.
+               return false
+       }
 }
-
 
 
 // ============== OsDeviceConnectivityHelperInterface ==========================
@@ -4650,14 +4663,18 @@ func (r *OsDeviceConnectivityHelperGeneric) checkDMDevice(dmName string) bool {
 
 func (o *OsDeviceConnectivityHelperGeneric) checkNVMeDevice(ctx context.Context, gater *executer.KeyedGater, nvmeName string) bool {
 	cleanNvmeName := filepath.Base(nvmeName)
+	baseBlockName := cleanNvmeName // Establish our base normalized reference name tracker
 	targetSysDir := filepath.Join("/sys/block", cleanNvmeName)
 
 	if strings.Contains(cleanNvmeName, "c") {
-		if lastNIdx := strings.LastIndex(cleanNvmeName, "n"); lastNIdx != -1 {
+		if lastNIdx := strings.LastIndex(cleanNvmeName, "n"); lastNIdx != -1 && lastNIdx > 0 {
 			if cIdx := strings.Index(cleanNvmeName, "c"); cIdx != -1 && cIdx < lastNIdx {
 				ctrlPart := cleanNvmeName[:cIdx]  
 				nsPart := cleanNvmeName[lastNIdx:] 
-				targetSysDir = filepath.Join("/sys/block", ctrlPart+nsPart) 
+				
+				// FIX 1 COMPLETE: Synchronize the base block name token reference
+				baseBlockName = ctrlPart + nsPart // Resolves perfectly to "nvme2n1"
+				targetSysDir = filepath.Join("/sys/block", baseBlockName) 
 			}
 		}
 	}
@@ -4665,18 +4682,15 @@ func (o *OsDeviceConnectivityHelperGeneric) checkNVMeDevice(ctx context.Context,
 	var stateBytesStr string
 	var readErr error
 
-	if stateBytesStr, readErr = secureReadSysfs(ctx, gater, cleanNvmeName, filepath.Join(targetSysDir, "device", "state")); readErr != nil {
-		if stateBytesStr, readErr = secureReadSysfs(ctx, gater, cleanNvmeName, filepath.Join("/sys/block", cleanNvmeName, "device", "state")); readErr != nil {
+	// FIX 2 COMPLETE: Pass 'baseBlockName' to keep all gater lock keys perfectly aligned node-wide
+	if stateBytesStr, readErr = secureReadSysfs(ctx, gater, baseBlockName, filepath.Join(targetSysDir, "device", "state")); readErr != nil {
+		if stateBytesStr, readErr = secureReadSysfs(ctx, gater, baseBlockName, filepath.Join("/sys/block", baseBlockName, "device", "state")); readErr != nil {
 			
-			// FIX: SOLID CONTROLLER NAME RESOLUTION
-			// We look for the LAST occurrence of "n" to correctly bypass the first letter 
-			// of "nvmeX" and accurately capture multi-digit controllers (e.g. nvme12n3 -> nvme12)
-			ctrlName := cleanNvmeName
-			if lastNIdx := strings.LastIndex(cleanNvmeName, "n"); lastNIdx != -1 && lastNIdx > 0 {
-				ctrlName = cleanNvmeName[:lastNIdx] // Accurately resolves "nvme2n1" to "nvme2"
-			}
+			// Standardize on ExtractNvmeControllerBase to protect against index 0 mutations
+			ctrlName := ExtractNvmeControllerBase(cleanNvmeName)
 			
-			stateBytesStr, readErr = secureReadSysfs(ctx, gater, ctrlName, filepath.Join("/sys/class/nvme", ctrlName, "state"))
+			// FIX 3 COMPLETE: Pass baseBlockName here to align tracking lock domains cleanly node-wide
+			stateBytesStr, readErr = secureReadSysfs(ctx, gater, baseBlockName, filepath.Join("/sys/class/nvme", ctrlName, "state"))
 		}
 	}
 
@@ -5312,6 +5326,7 @@ func (o *OsDeviceConnectivityHelperGeneric) getWWIDByDev(ctx context.Context, ma
 
 	if errLink == nil {
 		baseBlockName := filepath.Base(realPath)
+		normalizedBlockName := baseBlockName // Establish our base normalized name tracker
 		
 		// FIX: DYNAMIC CONTROLLER IDENTIFICATION
 		// Safely strip virtual path channels (e.g., nvme2c0n1 -> nvme2n1) 
@@ -5322,10 +5337,12 @@ func (o *OsDeviceConnectivityHelperGeneric) getWWIDByDev(ctx context.Context, ma
 					ctrlPart := baseBlockName[:cIdx]  // Extracts the specific active controller, e.g., "nvme2"
 					nsPart := baseBlockName[lastNIdx:] // Extracts the namespace layout suffix, e.g., "n1"
 					
-					// Re-route the target query safely to the true absolute base block folder layout
-					altNvnPath := fmt.Sprintf("/sys/block/%s%s/wwid", ctrlPart, nsPart) // Resolves perfectly to "/sys/block/nvme2n1/wwid"
+					// FIX 1 COMPLETE: Synchronize the base block name token reference
+					normalizedBlockName = ctrlPart + nsPart // Resolves perfectly to "nvme2n1"
+					altNvnPath := fmt.Sprintf("/sys/block/%s/wwid", normalizedBlockName) // Resolves perfectly to "/sys/block/nvme2n1/wwid"
 					
-					if wwid, err := secureReadSysfs(ctx, o.KeyedGater, baseBlockName, altNvnPath); err == nil && wwid != "" {
+					// FIX 2 COMPLETE: Pass 'normalizedBlockName' to keep all gater lock keys perfectly aligned node-wide
+					if wwid, err := secureReadSysfs(ctx, o.KeyedGater, normalizedBlockName, altNvnPath); err == nil && wwid != "" {
 						return strings.TrimSpace(wwid), nil
 					}
 				}
@@ -5556,33 +5573,36 @@ func (o *OsDeviceConnectivityHelperGeneric) GetDeviceWWID(ctx context.Context, g
 // GetWwnByNvmeSysfs extracts NVMe hardware identifiers safely, accommodating fabrics topologies and legacy kernels.
 func (o *OsDeviceConnectivityHelperGeneric) GetWwnByNvmeSysfs(ctx context.Context, gater *executer.KeyedGater, dev string) (string, error) {
 	name := filepath.Base(dev) // e.g. nvme0n1 or nvme2c0n1
+	baseBlockName := name      // Establish our base normalized reference name tracker
 	targetSysDir := filepath.Join("/sys/block", name)
 
 	// FIX: DYNAMIC CONTROLLER IDENTIFICATION
 	// Safely strip virtual path channels (e.g., nvme2c0n1 -> nvme2n1) 
 	// while fully preserving the true active controller index number.
 	if strings.Contains(name, "c") {
-		if lastNIdx := strings.LastIndex(name, "n"); lastNIdx != -1 {
+		if lastNIdx := strings.LastIndex(name, "n"); lastNIdx != -1 && lastNIdx > 0 {
 			if cIdx := strings.Index(name, "c"); cIdx != -1 && cIdx < lastNIdx {
 				ctrlPart := name[:cIdx]  // Extracts the specific active controller, e.g., "nvme2"
 				nsPart := name[lastNIdx:] // Extracts the namespace layout suffix, e.g., "n1"
 				
-				targetSysDir = filepath.Join("/sys/block", ctrlPart+nsPart) // Resolves perfectly to "/sys/block/nvme2n1"
+				// FIX 1 COMPLETE: Synchronize the base block name token reference
+				baseBlockName = ctrlPart + nsPart // Resolves perfectly to "nvme2n1"
+				targetSysDir = filepath.Join("/sys/block", baseBlockName) 
 				logger.Debugf("[NVMe-Sysfs-Wwn] Normalized virtual block node routing path: %s -> %s", name, targetSysDir)
 			}
 		}
 	}
 
-	// Switch to secureReadSysfs across all branches to avoid un-shielded D-state locks on dropped paths
-	if nguid, err := secureReadSysfs(ctx, o.KeyedGater, name, filepath.Join(targetSysDir, "nguid")); err == nil && nguid != "" {
+	// FIX 2 COMPLETE: Pass 'baseBlockName' across all calls to keep all gater lock keys perfectly aligned node-wide
+	if nguid, err := secureReadSysfs(ctx, o.KeyedGater, baseBlockName, filepath.Join(targetSysDir, "nguid")); err == nil && nguid != "" {
 		return o.normalizeWWID(nguid), nil
 	}
 
-	if uuid, err := secureReadSysfs(ctx, o.KeyedGater, name, filepath.Join(targetSysDir, "uuid")); err == nil && uuid != "" {
+	if uuid, err := secureReadSysfs(ctx, o.KeyedGater, baseBlockName, filepath.Join(targetSysDir, "uuid")); err == nil && uuid != "" {
 		return o.normalizeWWID(uuid), nil
 	}
 
-	if serial, err := secureReadSysfs(ctx, o.KeyedGater, name, filepath.Join(targetSysDir, "device/serial")); err == nil && serial != "" {
+	if serial, err := secureReadSysfs(ctx, o.KeyedGater, baseBlockName, filepath.Join(targetSysDir, "device/serial")); err == nil && serial != "" {
 		normSerial := strings.ToLower(strings.TrimSpace(serial))
 		// Handle ASCII serial outputs. If it does not form a clean 32-character hexadecimal block, 
 		// return it as-is so lower-tier validation layers can process generic string contains validations.
@@ -6096,7 +6116,8 @@ func (of GetDmsPathHelperGeneric) EvaluateSysfsTopology(ctx context.Context, gat
 
 	for _, m := range nvmeMatches {
 		if ctx.Err() != nil { return false, false, "" }
-		name := filepath.Base(m)
+		name := filepath.Base(m) // e.g., "nvme2c0n1" or "nvme0n1"
+		baseBlockName := name
 		targetSysDir := m
 
 		logger.Warningf("Evaluating %s", name)
@@ -6106,38 +6127,44 @@ func (of GetDmsPathHelperGeneric) EvaluateSysfsTopology(ctx context.Context, gat
 				if cIdx := strings.Index(name, "c"); cIdx != -1 && cIdx < lastNIdx {
 					ctrlPart := name[:cIdx]     
 					nsPart := name[lastNIdx:]    
-					targetSysDir = filepath.Join("/sys/block", ctrlPart+nsPart)
+					
+					baseBlockName = ctrlPart + nsPart // Resolves perfectly to "nvme2n1"
+					targetSysDir = filepath.Join("/sys/block", baseBlockName)
 				}
 			}
 		}
 
-		logger.Warningf("Evaluating %s target is %s", name, targetSysDir)
+		logger.Warningf("Evaluating %s target is %s baseBlockName is %s", name, targetSysDir, baseBlockName)
 		
 		var availableIDs []string
-		if data, err := secureReadSysfs(ctx, gater, name, filepath.Join(targetSysDir, "device", "wwid")); err == nil && data != "" { availableIDs = append(availableIDs, data) }
-		if data, err := secureReadSysfs(ctx, gater, name, filepath.Join(targetSysDir, "uuid")); err == nil && data != "" { availableIDs = append(availableIDs, data) }
-		if data, err := secureReadSysfs(ctx, gater, name, filepath.Join(targetSysDir, "nguid")); err == nil && data != "" { availableIDs = append(availableIDs, data) }
-		if data, err := secureReadSysfs(ctx, gater, name, filepath.Join(targetSysDir, "device", "serial")); err == nil && data != "" { availableIDs = append(availableIDs, data) }
 		
-		// FIX 1: REFACTORED LEGACY CONTROLLER SLICE STRATEGY
-		ctrlName := name
-		if lastNIdx := strings.LastIndex(name, "n"); lastNIdx != -1 && lastNIdx > 0 {
-			ctrlName = name[:lastNIdx] // Accurately resolves "nvme0n1" to "nvme0" or "nvme2c0n1" to "nvme2c0"
-			if cIdx := strings.Index(ctrlName, "c"); cIdx != -1 && cIdx > 0 {
-				ctrlName = ctrlName[:cIdx] // Fully normalizes "nvme2c0" to "nvme2"
-			}
-		}
-
+		if data, err := secureReadSysfs(ctx, gater, baseBlockName, filepath.Join(targetSysDir, "device", "wwid")); err == nil && data != "" { availableIDs = append(availableIDs, data) }
+		if data, err := secureReadSysfs(ctx, gater, baseBlockName, filepath.Join(targetSysDir, "uuid")); err == nil && data != "" { availableIDs = append(availableIDs, data) }
+		if data, err := secureReadSysfs(ctx, gater, baseBlockName, filepath.Join(targetSysDir, "nguid")); err == nil && data != "" { availableIDs = append(availableIDs, data) }
+		if data, err := secureReadSysfs(ctx, gater, baseBlockName, filepath.Join(targetSysDir, "device", "serial")); err == nil && data != "" { availableIDs = append(availableIDs, data) }
+		
+		ctrlName := ExtractNvmeControllerBase(name)
 		logger.Warningf("Evaluating %s target is %s controller is %s", name, targetSysDir, ctrlName)
 
-		if data, err := secureReadSysfs(ctx, gater, ctrlName, filepath.Join("/sys/class/nvme", ctrlName, "wwid")); err == nil && data != "" {
-			availableIDs = append(availableIDs, data)
+		// FIX 1 COMPLETE: Target the raw, un-normalized discovery path variable 'm' to ensure the symlink file is visible
+		subsysSymlink := filepath.Join(m, "device", "subsystem")
+		realSubsysPath, errLink := executer.ExecuteUninterruptible[string](
+			ctx, gater, "nvme-subsys-link-"+baseBlockName, 10, 50, 500*time.Millisecond, 1*time.Second,
+			func(innerCtx context.Context) (string, error) {
+				return filepath.EvalSymlinks(subsysSymlink)
+			},
+		)
+		if errLink == nil && strings.Contains(realSubsysPath, "virtual/nvme-subsys") {
+			subsysWwidPath := filepath.Join(realSubsysPath, "wwid")
+			if data, err := secureReadSysfs(ctx, gater, baseBlockName, subsysWwidPath); err == nil && data != "" {
+				availableIDs = append(availableIDs, data)
+			}
 		}
 
 		matchFound := false
 		for _, rawID := range availableIDs {
 			foundID := normalizeWWID(rawID)
-			logger.Warningf("evaluate candidate %s", foundID)
+			logger.Warningf("evaluate candidate %s against target %s", foundID, rawNvmeTarget)
 			if len(foundID) == 32 && foundID == rawNvmeTarget {
 				matchFound = true
 				break 
@@ -6145,23 +6172,21 @@ func (of GetDmsPathHelperGeneric) EvaluateSysfsTopology(ctx context.Context, gat
 		}
 
 		if matchFound {
-			roBytesStr, err := secureReadSysfs(ctx, gater, name, filepath.Join(targetSysDir, "ro"))
+			roBytesStr, err := secureReadSysfs(ctx, gater, baseBlockName, filepath.Join(targetSysDir, "ro"))
 			isReadOnly := err == nil && strings.TrimSpace(roBytesStr) != "0"
 
 			var isControllerTransitioning bool
 			deviceDir := filepath.Join(targetSysDir, "device") 
 			entries, err := executer.ExecuteUninterruptible[[]os.DirEntry](
-				ctx, gater, fmt.Sprintf("topology-readdir-nvme-%s", name), 20, 100, 1*time.Second, 2*time.Second,
+				ctx, gater, fmt.Sprintf("topology-readdir-nvme-%s", baseBlockName), 20, 100, 1*time.Second, 2*time.Second,
 				func(wCtx context.Context) ([]os.DirEntry, error) { return os.ReadDir(deviceDir) },
 			)
 			
 			if err == nil {
 				for _, entry := range entries {
 					entryName := entry.Name()
-					// FIX 2: REFACTORED SIBLING CHECK GUARD
 					logger.Warningf("check entry %s", entryName)
 					if strings.HasPrefix(entryName, "nvme") && !strings.Contains(entryName, "-") {
-						// To be a parent controller node entry (e.g. nvme0), it must NOT contain a namespace block suffix marker
 						isNamespace := false
 						if nIdx := strings.LastIndex(entryName, "n"); nIdx != -1 && nIdx > 0 {
 							isNamespace = true
@@ -6169,23 +6194,23 @@ func (of GetDmsPathHelperGeneric) EvaluateSysfsTopology(ctx context.Context, gat
 						if !isNamespace {
 							logger.Warning("Not namespace")
 							statePath := filepath.Join(deviceDir, entryName, "state")
-// FIX COMPLETE: Passed the correct pointer object ('gater') into the second parameter slot
-if stateBytesStr, err := secureReadSysfs(ctx, gater, entryName, statePath); err == nil {
-	state := strings.ToLower(strings.TrimSpace(stateBytesStr))
-        logger.Warningf("state is %s", state)
-	if state == "resetting" || state == "connecting" || state == "deleting" {
-		isControllerTransitioning = true
-		break
-	}
-}
-
+							
+							// FIX 2 COMPLETE: Pass 'entryName' to safely isolate parallel gater lock keys per physical controller slot
+							if stateBytesStr, err := secureReadSysfs(ctx, gater, entryName, statePath); err == nil {
+								state := strings.ToLower(strings.TrimSpace(stateBytesStr))
+								logger.Warningf("state is %s", state)
+								if state == "resetting" || state == "connecting" || state == "deleting" {
+									isControllerTransitioning = true
+									break
+								}
+							}
 						}
 					}
 				}
 			}
 
-			if isControllerTransitioning || isReadOnly { return true, true, name }
-			return true, false, name
+			if isControllerTransitioning || isReadOnly { return true, true, baseBlockName }
+			return true, false, baseBlockName
 		}
 	}
 	return false, false, ""
@@ -6271,31 +6296,33 @@ func (of GetDmsPathHelperGeneric) EvaluateSpecificSysfsTopology(
 	// TARGETED SPECIFIC NATIVE NVME LAYER EVALUATION
 	// =========================================================================
 	if strings.HasPrefix(dmName, "nvme") {
+		baseBlockName := dmName
 		targetSysDir := dmPath
 		
-		// FIX: DYNAMIC CONTROLLER IDENTIFICATION
-		// Safely strip virtual path channels (e.g., nvme2c0n1 -> nvme2n1) 
-		// while fully preserving the true active controller index number.
+		// DYNAMIC CONTROLLER IDENTIFICATION:
 		if strings.Contains(dmName, "c") {
-			if lastNIdx := strings.LastIndex(dmName, "n"); lastNIdx != -1 {
+			if lastNIdx := strings.LastIndex(dmName, "n"); lastNIdx != -1 && lastNIdx > 0 {
 				if cIdx := strings.Index(dmName, "c"); cIdx != -1 && cIdx < lastNIdx {
 					ctrlPart := dmName[:cIdx]  // Extracts the specific active controller, e.g., "nvme2"
 					nsPart := dmName[lastNIdx:] // Extracts the namespace layout suffix, e.g., "n1"
 					
-					targetSysDir = filepath.Join("/sys/block", ctrlPart+nsPart) // Resolves perfectly to "/sys/block/nvme2n1"
+					// FIX 1 COMPLETE: Synchronize the base block name token reference
+					baseBlockName = ctrlPart + nsPart // Resolves perfectly to "nvme2n1"
+					targetSysDir = filepath.Join("/sys/block", baseBlockName)
 					logger.Debugf("[Spec-Topology] Normalized virtual block node routing path: %s -> %s", dmName, targetSysDir)
 				}
 			}
 		}
 
 		var availableIDs []string
-		if data, err := secureReadSysfs(ctx, gater, dmName, filepath.Join(targetSysDir, "device", "wwid")); err == nil && data != "" {
+		// FIX 2 COMPLETE: Pass 'baseBlockName' to keep all gater lock keys perfectly aligned node-wide
+		if data, err := secureReadSysfs(ctx, gater, baseBlockName, filepath.Join(targetSysDir, "device", "wwid")); err == nil && data != "" {
 			availableIDs = append(availableIDs, normalizeWWID(data))
 		}
-		if data, err := secureReadSysfs(ctx, gater, dmName, filepath.Join(targetSysDir, "uuid")); err == nil && data != "" {
+		if data, err := secureReadSysfs(ctx, gater, baseBlockName, filepath.Join(targetSysDir, "uuid")); err == nil && data != "" {
 			availableIDs = append(availableIDs, normalizeWWID(data))
 		}
-		if data, err := secureReadSysfs(ctx, gater, dmName, filepath.Join(targetSysDir, "nguid")); err == nil && data != "" {
+		if data, err := secureReadSysfs(ctx, gater, baseBlockName, filepath.Join(targetSysDir, "nguid")); err == nil && data != "" {
 			availableIDs = append(availableIDs, normalizeWWID(data))
 		}
 
@@ -6308,7 +6335,7 @@ func (of GetDmsPathHelperGeneric) EvaluateSpecificSysfsTopology(
 		}
 
 		if matchFound {
-			roBytesStr, errRo := secureReadSysfs(ctx, gater, dmName, filepath.Join(targetSysDir, "ro"))
+			roBytesStr, errRo := secureReadSysfs(ctx, gater, baseBlockName, filepath.Join(targetSysDir, "ro"))
 			isReadOnly := errRo == nil && strings.TrimSpace(roBytesStr) != "0"
 
 			var isControllerTransitioning bool
@@ -6317,7 +6344,7 @@ func (of GetDmsPathHelperGeneric) EvaluateSpecificSysfsTopology(
 			entries, errEntries := executer.ExecuteUninterruptible[[]os.DirEntry](
 				ctx,
 				gater,
-				"topology-readdir-"+dmName,
+				"topology-readdir-"+baseBlockName,
 				10, 50, 1*time.Second, 2*time.Second,
 				func(wCtx context.Context) ([]os.DirEntry, error) {
 					return os.ReadDir(deviceDir)
@@ -6327,11 +6354,12 @@ func (of GetDmsPathHelperGeneric) EvaluateSpecificSysfsTopology(
 			if errEntries == nil {
 				for _, entry := range entries {
 					entryName := entry.Name()
-					// FIX: SOLID CONTROLLER RESOLUTION
-					// Ensure target controller node is isolated correctly without dropping its indexing digit
+					// FIX 3 COMPLETE: Protect controller checks using our strict, un-mangled regex boundaries
 					if strings.HasPrefix(entryName, "nvme") && !strings.Contains(entryName, "-") && !nvmeNamespaceRegex.MatchString(entryName) {
 						statePath := filepath.Join(deviceDir, entryName, "state")
-						if stateBytesStr, errState := secureReadSysfs(ctx, gater, entryName, statePath); errState == nil {
+						
+						// FIX 4 COMPLETE: Pass baseBlockName here to align tracking lock domains cleanly node-wide
+						if stateBytesStr, errState := secureReadSysfs(ctx, gater, baseBlockName, statePath); errState == nil {
 							state := strings.ToLower(strings.TrimSpace(stateBytesStr))
 							if state == "resetting" || state == "connecting" || state == "deleting" {
 								isControllerTransitioning = true
@@ -6351,7 +6379,6 @@ func (of GetDmsPathHelperGeneric) EvaluateSpecificSysfsTopology(
 
 	return false, false, nil
 }
-
 
 // getRoStatus reads the read-only file attribute for a targeted block device name securely passing contexts.
 func (of GetDmsPathHelperGeneric) getRoStatus(ctx context.Context, gater *executer.KeyedGater, path string) string {
