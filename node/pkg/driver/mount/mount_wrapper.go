@@ -734,63 +734,64 @@ func (m *Mounter) IsMounted(target string) (bool, error) {
 }
 
 // PollMountDeleted safe-monitors the host mount tables until the target link completely vanishes.
-// Returns an explicit error payload if the validation pipeline boundaries are violated.
-func (m *Mounter) PollMountDeleted(ctx context.Context, target string, timeout time.Duration) error {
+// PollMountDeleted safe-monitors the host mount tables until the target link completely vanishes.
+// Returns true if the mount cleared cleanly, or false if it timed out or hit an error.
+func (m *Mounter) PollMountDeleted(ctx context.Context, target string, timeout time.Duration) bool {
 	cleanName := filepath.Base(target)
 	
 	// FIX: DYNAMIC LOCK QUEUES
 	// Grouping the lock namespace dynamically by target path isolates concurrent lookups,
-	// allowing separate volumes to scale across CPU cores without blocking each other.
+	// allowing separate volumes to scan /proc without blocking each other.
 	gaterKey := fmt.Sprintf("mountinfo-poll-%s", cleanName)
-	logger.Infof("[Mounter-Poll] [%s] Initializing mount tree deletion verification scanner.", cleanName)
 
-	_, err := executer.ExecuteUninterruptible[struct{}](
+	res, err := executer.ExecuteUninterruptible[bool](
 		ctx,
 		m.KeyedGater,
 		gaterKey,
-		10,  // Expand maxRunning capacity dynamically for parallel system passes
+		10,  // Expand maxRunning capacity dynamically for parallel multi-volume passes
 		50,  
-		250*time.Millisecond,
+		100*time.Millisecond,
 		timeout, 
-		func(wCtx context.Context) (struct{}, error) {
-			retryDelay := 150 * time.Millisecond
+		func(wCtx context.Context) (bool, error) {
+			retryDelay := 100 * time.Millisecond
+			start := time.Now()
 
-			for {
-				// 1. Native gRPC/Kubelet cancellation verification
-				if err := wCtx.Err(); err != nil {
-					return struct{}{}, err
+			for time.Since(start) < timeout {
+				// Cooperative gRPC/Kubelet cancellation verification
+				if errCtx := wCtx.Err(); errCtx != nil {
+					return false, errCtx
 				}
 
-				// 2. Query the host table registry securely via our non-blocking tracker
-				mounted, err := m.IsMounted(target)
-				if err != nil {
-					logger.Warningf("[Mounter-Poll] [%s] Table read contention encountered: %v. Continuing...", cleanName, err)
+				// Query the host table registry securely via our trimmed secureReadSysfs architecture
+				mounted, errMount := m.IsMounted(target)
+				if errMount != nil {
+					logger.Warningf("[Mounter-Poll] [%s] Table read contention encountered: %v. Continuing...", cleanName, errMount)
 				}
 
-				// Total Success: The VFS link has completely vanished from the node host tables.
-				if err == nil && !mounted {
-					logger.Infof("[Mounter-Poll] [%s] Verification Success! Mount path completely removed from host VFS.", cleanName)
-					return struct{}{}, nil
+				// Success: The VFS link has completely vanished from the node host tables.
+				if errMount == nil && !mounted {
+					return true, nil
 				}
 
-				// 3. Context-bounded interruptible micro-sleep cadence
+				// Context-bounded interruptible micro-sleep cadence
 				select {
 				case <-wCtx.Done():
-					return struct{}{}, wCtx.Err()
+					return false, wCtx.Err()
 				case <-time.After(retryDelay):
-					// Keep the polling cadence tight and predictable under high load
 					continue
 				}
 			}
+			
+			return false, nil // Timeout reached within the worker thread
 		},
 	)
 
 	if err != nil {
-		logger.Errorf("[Mounter-Poll] [%s] Verification Failure: Mount point remains locked or polling timed out: %v", cleanName, err)
-		return fmt.Errorf("mount validation loop failed: path %s remains pinned in VFS mount tables: %w", target, err)
+		// If a hard timeout or a gater capacity drop triggers, res evaluates to false.
+		return false
 	}
 
-	return nil
+	return res
 }
 
 // Wrapper for MountNative the handles tracking of stuck mounts
