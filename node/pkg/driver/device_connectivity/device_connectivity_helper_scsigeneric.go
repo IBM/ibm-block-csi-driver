@@ -5723,8 +5723,6 @@ func (o GetDmsPathHelperGeneric) WaitForDmToExist(ctx context.Context, gater *ex
 				if cIdx := strings.Index(name, "c"); cIdx != -1 && cIdx < lastNIdx {
 					ctrlPart := name[:cIdx]  
 					nsPart := name[lastNIdx:] 
-					
-					// FIX COMPLETE: Synchronize the base block name token reference and scrub dead variable targetSysDir
 					baseBlockName = ctrlPart + nsPart // Resolves perfectly to "nvme2n1"
 				}
 			}
@@ -5736,17 +5734,17 @@ func (o GetDmsPathHelperGeneric) WaitForDmToExist(ctx context.Context, gater *ex
 		isDM := o.IsDeviceMapper(baseBlockName)
 		count := 0
 		
-		if isDM || nvmeControllerHeadFormat.MatchString(baseBlockName) {
+		// FIX COMPLETE: Native NVMe is strictly excluded from executing GetSlaveCount.
+		// This matches your original pre-refactor execution paths exactly and removes the 3-second I/O timeout delays.
+		if isDM {
 			logger.Warningf("Target layout matching storage interface protocols identified, querying slave count metrics for: %s", baseBlockName)
 			
-			// FIX COMPLETE: Pass baseBlockName here to align tracking lock domains cleanly node-wide
 			countResult, err := executer.ExecuteUninterruptible[int](
 				ctx,
 				gater,
 				fmt.Sprintf("wait-slave-count-%s", baseBlockName),
 				20, 100, 1*time.Second, 3*time.Second,
 				func(wCtx context.Context) (int, error) {
-					// FIX COMPLETE: Pass 'wCtx' to ensure context cancellation boundaries are honored natively
 					return o.GetSlaveCount(wCtx, gater, baseBlockName), nil
 				},
 			)
@@ -5756,14 +5754,12 @@ func (o GetDmsPathHelperGeneric) WaitForDmToExist(ctx context.Context, gater *ex
 			logger.Warningf("resolved path/slave count is %d", count)
 		}
 		
-		// FIX COMPLETE: Pass baseBlockName here to align tracking lock domains cleanly node-wide
 		ro, err := executer.ExecuteUninterruptible[string](
 			ctx,
 			gater,
 			fmt.Sprintf("wait-ro-status-%s", baseBlockName),
 			20, 100, 1*time.Second, 3*time.Second,
 			func(wCtx context.Context) (string, error) {
-				// FIX COMPLETE: Pass 'wCtx' to ensure context cancellation boundaries are honored natively
 				return o.getRoStatus(wCtx, gater, path), nil
 			},
 		)
@@ -5773,7 +5769,13 @@ func (o GetDmsPathHelperGeneric) WaitForDmToExist(ctx context.Context, gater *ex
 		logger.Warningf("ro status %s", ro)
 
 		// Handle path stability validation uniformly across standard, multipath, and native channels
-		isStableCount := count > 0 && count == lastCount
+		var isStableCount bool
+		if isDM {
+			isStableCount = count > 0 && count == lastCount
+		} else {
+			isStableCount = true // Native NVMe skips slave validation tracking natively
+		}
+
 		if isStableCount && ro == lastRo && ro != "unknown" {
 			stableCycles++
 		} else {
@@ -5785,11 +5787,9 @@ func (o GetDmsPathHelperGeneric) WaitForDmToExist(ctx context.Context, gater *ex
 		if stableCycles >= 2 {
 			logger.Warning("2 stable cycles achieved")
 			
-			// FIX COMPLETE: Standardize block name verification alignment using our ExtractNvmeControllerBase helper.
-			// This completely replaces the risky manual indexing coordinates to guarantee character digit preservation.
 			if nvmeControllerHeadFormat.MatchString(name) && strings.Contains(name, "c") {
 				if lastNIdx := strings.LastIndex(name, "n"); lastNIdx != -1 && lastNIdx > 0 {
-					ctrlName := ExtractNvmeControllerBase(name) // Safely isolates "nvme2" cleanly
+					ctrlName := ExtractNvmeControllerBase(name) 
 					name = fmt.Sprintf("%s%s", ctrlName, name[lastNIdx:]) // Resolves perfectly to "nvme2n1"
 					path = filepath.Join("/dev", name)
 				}
