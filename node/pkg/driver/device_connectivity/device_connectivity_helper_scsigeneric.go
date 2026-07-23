@@ -6139,8 +6139,6 @@ func (of GetDmsPathHelperGeneric) EvaluateSysfsTopology(ctx context.Context, gat
 		if matchFound {
 			roBytesStr, err := of.secureReadSysfsWrapper(ctx, gater, name, filepath.Join(targetSysDir, "ro"))
 			isReadOnly := err == nil && strings.TrimSpace(roBytesStr) != "0"
-			hiddenBytesStr, err := of.secureReadSysfsWrapper(ctx, gater, name, filepath.Join(targetSysDir, "hidden"))
-			isHidden := err == nil && strings.TrimSpace(hiddenBytesStr) == "1"
 
 			var isControllerTransitioning bool
 			deviceDir := filepath.Join(targetSysDir, "device") 
@@ -6161,13 +6159,15 @@ func (of GetDmsPathHelperGeneric) EvaluateSysfsTopology(ctx context.Context, gat
 						}
 						if !isNamespace {
 							statePath := filepath.Join(deviceDir, entryName, "state")
-							if stateBytesStr, err := of.secureReadSysfsWrapper(ctx, entryName, entryName, statePath); err == nil {
-								state := strings.ToLower(strings.TrimSpace(stateBytesStr))
-								if state == "resetting" || state == "connecting" || state == "deleting" {
-									isControllerTransitioning = true
-									break
-								}
-							}
+// FIX COMPLETE: Passed the correct pointer object ('gater') into the second parameter slot
+if stateBytesStr, err := of.secureReadSysfsWrapper(ctx, gater, entryName, statePath); err == nil {
+	state := strings.ToLower(strings.TrimSpace(stateBytesStr))
+	if state == "resetting" || state == "connecting" || state == "deleting" {
+		isControllerTransitioning = true
+		break
+	}
+}
+
 						}
 					}
 				}
