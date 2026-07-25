@@ -302,22 +302,25 @@ class ArrayMediator(ABC):
             wwn : the wwn of the storage
 
         Raises:
-            None
+            NoFcTargetsFoundError
         """
         raise NotImplementedError
 
     @abstractmethod
-    def get_nvme_target_ports(self):
+    def get_nvme_fc_target_ports(self):
         """
-        This function will return the NVMe FC target port strings
+        This function will return the NVMe-FC target port strings
         of the storage array in format "nn-<wwnn>:pn-<wwpn>".
         Only ports with protocol=nvme and host_io_permitted=yes are returned.
+
         Args:
             None
+
         Returns:
             list of strings: ["nn-<wwnn>:pn-<wwpn>", ...]
+
         Raises:
-            None
+            NoNvmeFcTargetsFoundError
         """
         raise NotImplementedError
 

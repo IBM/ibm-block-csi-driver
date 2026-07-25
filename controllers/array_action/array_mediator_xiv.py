@@ -565,7 +565,7 @@ class XIVArrayMediator(ArrayMediatorAbstract):
     def change_host_protocol(self, host_name, protocol):
         raise NotImplementedError
 
-    def get_nvme_target_ports(self):
+    def get_nvme_fc_target_ports(self):
         raise NotImplementedError
 
     def register_plugin(self, unique_key,  metadata):
