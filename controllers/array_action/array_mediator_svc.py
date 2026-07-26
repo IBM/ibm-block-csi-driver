@@ -2295,6 +2295,11 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
             logger.error("Volume group replication not found for {}".format(volume_group_name))
             raise array_errors.ObjectNotFoundError(volume_group_name)
 
+        if self._get_replication_mode(volume_group_name) == array_settings.ENDPOINT_TYPE_RECOVERY:
+            logger.info("Idempotent case: volume group {} is already in recovery mode, "
+                        "skipping demote".format(volume_group_name))
+            return
+
         # Check if this is first demote attempt or retry
         if volume_group_name not in self._demote_state_map:
             # First attempt - create checkpoint and track state
