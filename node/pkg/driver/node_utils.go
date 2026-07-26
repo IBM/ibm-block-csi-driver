@@ -654,7 +654,7 @@ func (n NodeUtils) FormatDevice(devicePath string, fsType string) error {
 	}
 
 	logger.Debugf("Formatting the device with fs_type = {%v}", fsType)
-	err := n.KeyedGater.ExecuteNodeFs(ctx, func() error {
+	finalErr := n.KeyedGater.ExecuteNodeFs(ctx, func() error {
 		_, err := n.Executer.ExecuteWithTimeout(mkfsTimeoutMilliseconds, "mkfs."+fsType, args)
 		if err != nil {
 			return fmt.Errorf("mkfs.%s execution failed: %v", fsType, err)
@@ -663,9 +663,9 @@ func (n NodeUtils) FormatDevice(devicePath string, fsType string) error {
 		// TODO Brief pause to allow kernel to settle partition table/FS metadata
 		// time.Sleep(2 * time.Second)
 		return nil
-	}
+	})
 	
-	return err
+	return finalErr
 }
 
 func (n NodeUtils) IsNotMountPoint(file string) (bool, error) {

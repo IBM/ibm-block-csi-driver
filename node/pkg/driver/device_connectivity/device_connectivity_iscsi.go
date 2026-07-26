@@ -69,7 +69,7 @@ func (r *OsDeviceConnectivityIscsi) iscsiDiscover(ctx context.Context, portal st
 			return fmt.Errorf("iscsiadm discovery failed for portal %s (output: %s): %w", cliPortal, strings.TrimSpace(output), err)
 		}
 		return nil
-	}
+	})
 	return finalErr
 }
 
@@ -100,7 +100,7 @@ func (r *OsDeviceConnectivityIscsi) iscsiLogin(ctx context.Context, targetName, 
 
 		logger.Infof("Successfully logged into target %s via portal %s", targetName, cliPortal)
 		return nil
-	}
+	})
 	return finalErr	
 }
 
