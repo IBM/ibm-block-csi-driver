@@ -99,7 +99,7 @@ func (r OsDeviceConnectivityNvmeOFc) EnsureLogin(ctx context.Context, ipsByArray
                                 continue
                         }
 
-                        subNqn, err := r.discoverSubNqn(arrayTargetPort, hostPort)
+                        subNqn, err := r.discoverSubNqn(ctx, arrayTargetPort, hostPort)
                         if err != nil {
                                 logger.Debugf("NVMe-oFC EnsureLogin: discover error target=%s host=%s: %v",
                                         arrayTargetPort, hostPort, err)
@@ -113,7 +113,7 @@ func (r OsDeviceConnectivityNvmeOFc) EnsureLogin(ctx context.Context, ipsByArray
 
                         logger.Infof("NVMe-oFC EnsureLogin: connecting NQN=%s target=%s host=%s",
                                 subNqn, arrayTargetPort, hostPort)
-                        if r.nvmeConnect(arrayTargetPort, hostPort, subNqn) {
+                        if r.nvmeConnect(ctx, arrayTargetPort, hostPort, subNqn) {
                                 connectedPaths++
                         }
                 }
@@ -303,7 +303,7 @@ func extractNvmeField(line, field string) string {
 
 // discoverSubNqn runs "nvme discover" for one (arrayTargetPort, hostPort) pair
 // and returns the storage subsystem NQN. Returns ("", nil) if no path exists.
-func (r *OsDeviceConnectivityNvmeOFc) discoverSubNqn(arrayTargetPort, hostPort string) (string, error) {
+func (r *OsDeviceConnectivityNvmeOFc) discoverSubNqn(ctx context.Context, arrayTargetPort, hostPort string) (string, error) {
         args := []string{
                 "discover",
                 "--transport=" + nvmeTransportFC,
@@ -311,7 +311,7 @@ func (r *OsDeviceConnectivityNvmeOFc) discoverSubNqn(arrayTargetPort, hostPort s
                 "--host-traddr=" + hostPort,
         }
 		output := ""
-		err := r.KeyedGater.ExecuteNvmeFabric(ctx, func() error {
+		r.KeyedGater.ExecuteNvmeFabric(ctx, func() error {
 			out, err := r.Executer.ExecuteWithTimeout(nvmeCmdTimeout, "nvme", args)
 			if err != nil {
 					logger.Debugf("NVMe-oFC discoverSubNqn: nvme discover failed target=%s host=%s: %v",
@@ -347,12 +347,12 @@ func parseSubNqnFromDiscoverOutput(output string) string {
                         continue
                 }
                 return nqn
-        })
+        }
         return ""
 }
 
 // nvmeConnect runs "nvme connect" for one (arrayTargetPort, hostPort, subNqn) combination.
-func (r *OsDeviceConnectivityNvmeOFc) nvmeConnect(arrayTargetPort, hostPort, subNqn string) bool {
+func (r *OsDeviceConnectivityNvmeOFc) nvmeConnect(ctx context.Context, arrayTargetPort, hostPort, subNqn string) bool {
         args := []string{
                 "connect",
                 "--transport=" + nvmeTransportFC,
@@ -369,7 +369,7 @@ func (r *OsDeviceConnectivityNvmeOFc) nvmeConnect(arrayTargetPort, hostPort, sub
 			}
 			logger.Infof("NVMe-oFC nvmeConnect: connected NQN=%s target=%s host=%s", subNqn, arrayTargetPort, hostPort)
 			return nil
-		}
+		})
 		return err == nil
 }
 
