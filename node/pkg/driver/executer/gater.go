@@ -113,10 +113,38 @@ func (g *KeyedGater) Execute(ctx context.Context, key string, maxRuns int, timeo
 	}
 	
 	// 2. Ensure release ALWAYS runs after the action completes, completely hidden from the caller
-	defer g.release(key)
+	defer g.Release(key)
 
 	// 3. Run the caller's business logic
 	return action()
+}
+
+func (g *KeyedGater) ExecuteicsiFabric(ctx context.Context, action func() error) error {
+	return g.Execute(ctx, "iscsi-fabric-ops", 1, 30*time.Second, action)
+}
+
+func (g *KeyedGater) ExecuteNvmeFabric(ctx context.Context, action func() error) error {
+	return g.Execute(ctx, "nvme-fabric-ops", 2, 30*time.Second, action)
+}
+
+func (g *KeyedGater) ExecuteFcIscsiFabric(ctx context.Context, action func() error) error {
+	return g.Execute(ctx, "fc-scsi-fabric-ops", 2, 15*time.Second, action)
+}
+
+func (g *KeyedGater) ExecuteNodeFs(ctx context.Context, action func() error) error {
+	return g.Execute(ctx, "node-fs", 2, 60*time.Second, action)
+}
+
+func (g *KeyedGater) ExecutePathTeardown(ctx context.Context, action func() error) error {
+	return g.Execute(ctx, "path-teardown-ops", 2, 5*time.Second, action)
+}
+
+func (g *KeyedGater) ExecuteMultipathd(ctx context.Context, action func() error) error {
+	return g.Execute(ctx, "multipathd-socket", 1, 10*time.Second, action)
+}
+
+func (g *KeyedGater) ExecuteTopologyReads(ctx context.Context, action func() error) error {
+	return g.Execute(ctx, "topology-reads", 4, 5*time.Second, action)
 }
 
 
