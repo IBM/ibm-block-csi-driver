@@ -101,7 +101,7 @@ type NodeUtilsInterface interface {
 	ExpandFilesystem(ctx context.Context, devicePath string, volumePath string, fsType string) error
 	ExpandMpathDevice(ctx context.Context, mpathDevice string) error
 	RescanPhysicalDevices(ctx context.Context, sysDevices []string) error
-	FormatDevice(devicePath string, fsType string) error
+	FormatDevice(ctx context.Context, devicePath string, fsType string) error
 	IsNotMountPoint(file string) (bool, error)
 	GetPodPath(filepath string) string
 	GetTopologyLabels(ctx context.Context, nodeName string) (map[string]string, error)
@@ -641,7 +641,7 @@ func (n NodeUtils) RescanPhysicalDevices(ctx context.Context, sysDevices []strin
 
 //Missing "Rescue" Operation (7): If rescan times out repeatedly, the "rescue" is to check /sys/block/sdX/device/state. If it's blocked, you may need to trigger a link-loss reset at the HBA level (which we can discuss in the FC/iSCSI section).
 
-func (n NodeUtils) FormatDevice(devicePath string, fsType string) error {
+func (n NodeUtils) FormatDevice(ctx context.Context, devicePath string, fsType string) error {
 	// TODO wrap
 	var args []string
 	if fsType == "ext4" {
