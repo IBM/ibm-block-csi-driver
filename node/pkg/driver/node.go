@@ -276,7 +276,7 @@ func (d *NodeService) NodeStageVolume(ctx context.Context, req *csi.NodeStageVol
 		return nil, err
 	}	
 
-	if err = d.formatAndMount(mpathDevice, stagingPath, fsTypeForMount, existingFormat); err != nil {
+	if err = d.formatAndMount(ctx, mpathDevice, stagingPath, fsTypeForMount, existingFormat); err != nil {
 		return nil, status.Error(codes.Internal, err.Error())
 	}
 
@@ -380,9 +380,9 @@ func (d *NodeService) resolveFsTypeForMount(requestedFsType string, existingForm
 	return fsTypeForMount, nil
 }
 
-func (d *NodeService) formatAndMount(mpathDevice string, stagingPath string, fsTypeForMount string, existingFormat string) error {
+func (d *NodeService) formatAndMount(ctx context.Context, mpathDevice string, stagingPath string, fsTypeForMount string, existingFormat string) error {
 	if existingFormat == "" {
-		d.NodeUtils.FormatDevice(mpathDevice, fsTypeForMount)
+		d.NodeUtils.FormatDevice(ctx, mpathDevice, fsTypeForMount)
 	}
 
 	var mountOptions []string
