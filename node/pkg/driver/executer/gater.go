@@ -127,7 +127,7 @@ func (g *KeyedGater) ExecuteNvmeFabric(ctx context.Context, action func() error)
 	return g.Execute(ctx, "nvme-fabric-ops", 2, 30*time.Second, action)
 }
 
-func (g *KeyedGater) ExecuteFcIscsiFabric(ctx context.Context, action func() error) error {
+func (g *KeyedGater) ExecuteFcScsiFabric(ctx context.Context, action func() error) error {
 	return g.Execute(ctx, "fc-scsi-fabric-ops", 2, 15*time.Second, action)
 }
 

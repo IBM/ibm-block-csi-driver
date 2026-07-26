@@ -325,7 +325,7 @@ func (r *OsDeviceConnectivityNvmeOFc) discoverSubNqn(arrayTargetPort, hostPort s
 				output = subNqn
 			}
 			return nil
-		}
+		})
 		return output, nil
 }
 
@@ -347,7 +347,7 @@ func parseSubNqnFromDiscoverOutput(output string) string {
                         continue
                 }
                 return nqn
-        }
+        })
         return ""
 }
 
