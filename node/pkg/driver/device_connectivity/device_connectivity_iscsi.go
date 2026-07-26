@@ -61,54 +61,47 @@ func (r OsDeviceConnectivityIscsi) iscsiCmd(args ...string) (string, error) {
 }
 
 
-func (r OsDeviceConnectivityIscsi) iscsiDiscover(ctx context.Context, portal string) error {
-	lockScope := r.getDiscoveryScopeKey(portal)
-
-	err := r.KeyedGater.Acquire(ctx, "discovery-scope-"+lockScope, 1, 30*time.Second)
-	if err != nil {
-		return fmt.Errorf("timeout waiting for discovery lock scope %s: %w", lockScope, err)
+func (r *OsDeviceConnectivityIscsi) iscsiDiscover(ctx context.Context, portal string) error {
+	finalErr := r.KeyedGater.ExecuteicsiFabric(ctx, func() error {
+		cliPortal := r.EnsurePort(portal)
+		output, err := r.iscsiCmd("-m", "discoverydb", "-t", "sendtargets", "-p", cliPortal, "--discover", "--op=update")
+		if err != nil {
+			return fmt.Errorf("iscsiadm discovery failed for portal %s (output: %s): %w", cliPortal, strings.TrimSpace(output), err)
+		}
+		return nil
 	}
-	defer r.KeyedGater.Release("discovery-scope-" + lockScope)
-
-	cliPortal := r.EnsurePort(portal)
-	output, err := r.iscsiCmd("-m", "discoverydb", "-t", "sendtargets", "-p", cliPortal, "--discover", "--op=update")
-	if err != nil {
-		return fmt.Errorf("iscsiadm discovery failed for portal %s (output: %s): %w", cliPortal, strings.TrimSpace(output), err)
-	}
-	return nil
+	return finalErr
 }
 
-func (r OsDeviceConnectivityIscsi) iscsiLogin(ctx context.Context, targetName, portal string) error {
+func (r *OsDeviceConnectivityIscsi) iscsiLogin(ctx context.Context, targetName, portal string) error {
 	ipKey := r.ExtractIP(portal)
-	err := r.KeyedGater.Acquire(ctx, "login-"+ipKey, 1, 30*time.Second)
-	if err != nil {
-		return fmt.Errorf("concurrency timeout waiting for login slot on portal IP %s: %w", ipKey, err)
-	}
-	defer r.KeyedGater.Release("login-" + ipKey)
 	
-	cliPortal := r.EnsurePort(portal)
-	logger.Infof("Executing iSCSI login for target %s via portal %s", targetName, cliPortal)
-	
-	output, err := r.iscsiCmd("-m", "node", "-p", cliPortal, "-T", targetName, "--login")
-	if err != nil {
-		if exitCode, isExitError := r.Executer.GetExitCode(err); isExitError {
-			// Exit Code 15: ISCSI_ERR_LOGIN_EXIST (Already logged in) -> Safe Success
-			if exitCode == 15 {
-				logger.Debugf("iSCSI session for %s (%s) already active.", targetName, cliPortal)
-				return nil
-			}
+	finalErr := r.KeyedGater.ExecuteicsiFabric(ctx, func() error {
+		cliPortal := r.EnsurePort(portal)
+		logger.Infof("Executing iSCSI login for target %s via portal %s", targetName, cliPortal)
+		
+		output, err := r.iscsiCmd("-m", "node", "-p", cliPortal, "-T", targetName, "--login")
+		if err != nil {
+			if exitCode, isExitError := r.Executer.GetExitCode(err); isExitError {
+				// Exit Code 15: ISCSI_ERR_LOGIN_EXIST (Already logged in) -> Safe Success
+				if exitCode == 15 {
+					logger.Debugf("iSCSI session for %s (%s) already active.", targetName, cliPortal)
+					return nil
+				}
 
-			// Exit Code 24: ISCSI_ERR_SESSION_EXISTS -> Active but needs recovery
-			if exitCode == 24 {
-				logger.Warningf("iSCSI session exists but path requires recovery for %s. Multipath will handle.", cliPortal)
-				return nil
+				// Exit Code 24: ISCSI_ERR_SESSION_EXISTS -> Active but needs recovery
+				if exitCode == 24 {
+					logger.Warningf("iSCSI session exists but path requires recovery for %s. Multipath will handle.", cliPortal)
+					return nil
+				}
 			}
+			return fmt.Errorf("iscsiadm login failed (target: %s, portal: %s, output: %s): %w", targetName, cliPortal, strings.TrimSpace(output), err)
 		}
-		return fmt.Errorf("iscsiadm login failed (target: %s, portal: %s, output: %s): %w", targetName, cliPortal, strings.TrimSpace(output), err)
-	}
 
-	logger.Infof("Successfully logged into target %s via portal %s", targetName, cliPortal)
-	return nil
+		logger.Infof("Successfully logged into target %s via portal %s", targetName, cliPortal)
+		return nil
+	}
+	return finalErr	
 }
 
 
@@ -116,7 +109,7 @@ func (r OsDeviceConnectivityIscsi) iscsiLogin(ctx context.Context, targetName, p
 // iscsiGetRawSessions now reads from /sys/class/iscsi_session
 // It returns lines in the format: "tcp: [1] 192.168.1.100:3260,1 iqn.target.name"
 // matching the output of `iscsiadm -m session`
-func (r OsDeviceConnectivityIscsi) iscsiGetRawSessions(ctx context.Context) ([]string, error) {
+func (r *OsDeviceConnectivityIscsi) iscsiGetRawSessions(ctx context.Context) ([]string, error) {
 	// Querying connection endpoints directly avoids broken symlinks inside session device paths
 	const connClassPath = "/sys/class/iscsi_connection"
 	connections, err := os.ReadDir(connClassPath)
