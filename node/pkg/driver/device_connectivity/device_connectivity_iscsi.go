@@ -74,7 +74,6 @@ func (r *OsDeviceConnectivityIscsi) iscsiDiscover(ctx context.Context, portal st
 }
 
 func (r *OsDeviceConnectivityIscsi) iscsiLogin(ctx context.Context, targetName, portal string) error {
-	ipKey := r.ExtractIP(portal)
 	
 	finalErr := r.KeyedGater.ExecuteicsiFabric(ctx, func() error {
 		cliPortal := r.EnsurePort(portal)
