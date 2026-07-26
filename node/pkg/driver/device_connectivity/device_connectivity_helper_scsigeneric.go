@@ -3944,39 +3944,43 @@ func (r OsDeviceConnectivityHelperScsiGeneric) VerifyAndGetDmDevice(devName stri
 	//TODO restore check
 	//expectedLunStr := fmt.Sprintf("%d", lun)
 	//expectedMpathUuid := "mpath-" + expectedSerial
-
+	
+	err := n.Gater.Execute(ctx, "fc-scsi-fabric-ops", 2, 30*time.Second, func() error {
 	// 1. GLOBAL CONFLICT AUDIT
 	// Ensure the serial isn't already claimed by a DIFFERENT dm device.
 	allDmDirs, _ := filepath.Glob("/sys/block/dm-*")
-	for _, dmDir := range allDmDirs {
-		// TODO need to normalize
-		if dmDir == devName {
-			continue
-		}
-
-		uuidContent, err := os.ReadFile(filepath.Join(dmDir, "dm/uuid"))
-		if err != nil {
-			continue
-		}
-
-		actualUuid := strings.TrimSpace(string(uuidContent))
-		// Check for identity match (handling common mpath-3 / mpath- prefix variations)
-		if r.IsSerialMatch(actualUuid, expectedSerial) {
-			dmName := filepath.Base(dmDir)
-
-			// Check if this is a "zombie" or an active device
-			holders, _ := os.ReadDir(filepath.Join(dmDir, "holders"))
-			if len(holders) > 0 {
-				// If holders exist and it's NOT our current target, we have a fatal safety conflict
-				return "", fmt.Errorf("FATAL: Serial %s is already in use by active device %s", volumeUuid, dmName)
+		for _, dmDir := range allDmDirs {
+			// TODO need to normalize
+			if dmDir == devName {
+				continue
 			}
 
-			// If it's a stale map for our serial, clean it up before proceeding
-			logger.Warningf("Found stale multipath map %s for serial %s. Removing.", dmName, volumeUuid)
-			//forceFlushDM(..)
-			//_, _ = r.Executer.Execute("dmsetup", "remove", "-f", dmName)
+			uuidContent, err := os.ReadFile(filepath.Join(dmDir, "dm/uuid"))
+			if err != nil {
+				continue
+			}
+
+			actualUuid := strings.TrimSpace(string(uuidContent))
+			// Check for identity match (handling common mpath-3 / mpath- prefix variations)
+			if r.IsSerialMatch(actualUuid, expectedSerial) {
+				dmName := filepath.Base(dmDir)
+
+				// Check if this is a "zombie" or an active device
+				holders, _ := os.ReadDir(filepath.Join(dmDir, "holders"))
+				if len(holders) > 0 {
+					// If holders exist and it's NOT our current target, we have a fatal safety conflict
+					return "", fmt.Errorf("FATAL: Serial %s is already in use by active device %s", volumeUuid, dmName)
+				}
+
+				// If it's a stale map for our serial, clean it up before proceeding
+				logger.Warningf("Found stale multipath map %s for serial %s. Removing.", dmName, volumeUuid)
+				//forceFlushDM(..)
+				//_, _ = r.Executer.Execute("dmsetup", "remove", "-f", dmName)
+			}
 		}
-	}
+		return nil
+	})
+	
 
 	// TODO Discover based on uuid (this version) OR discover baese on dm name (and then cleanup is pre-scan step)
 

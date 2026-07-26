@@ -47,9 +47,6 @@ func (g *KeyedGater) Acquire(ctx context.Context, key string, maxRuns int, timeo
 	gt.refCount++
 	g.mu.Unlock()
 
-	// REQUIREMENT 8: Respect the CSI API context + local timeout
-	// This ensures we stop waiting if either the request is canceled 
-	// OR we hit our local threshold.
 	waitCtx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
 
@@ -57,13 +54,30 @@ func (g *KeyedGater) Acquire(ctx context.Context, key string, maxRuns int, timeo
 	case gt.ch <- struct{}{}:
 		return nil
 	case <-waitCtx.Done():
-		// Cleanup: must use the thread-safe Release fixed in Bug #1
-		g.Release(key)
-		
+		g.cleanupFailedAcquire(key)
 		if errors.Is(waitCtx.Err(), context.DeadlineExceeded) {
-			return fmt.Errorf("gater: timeout (%v) key=%s", timeout, key)
+			if ctx.Err() != nil {
+				return fmt.Errorf("gater: API context canceled/expired key=%s: %w", key, ctx.Err())
+			}
+			return fmt.Errorf("gater: local operation timeout (%v) key=%s", timeout, key)
 		}
 		return fmt.Errorf("gater: %w key=%s", waitCtx.Err(), key)
+	}
+}
+
+
+func (g *KeyedGater) cleanupFailedAcquire(key string) {
+	g.mu.Lock()
+	defer g.mu.Unlock()
+
+	gt, exists := g.semaphoreGates[key]
+	if !exists {
+		return
+	}
+
+	gt.refCount--
+	if gt.refCount <= 0 {
+		delete(g.semaphoreGates, key)
 	}
 }
 
@@ -90,8 +104,20 @@ func (g *KeyedGater) Release(key string) {
 }
 
 
+// Execute Binds acquisition, execution, and automatic release into a single method call.
+// The caller provides the business logic via the 'action' callback.
+func (g *KeyedGater) Execute(ctx context.Context, key string, maxRuns int, timeout time.Duration, action func() error) error {
+	// 1. Acquire the slot
+	if err := g.Acquire(ctx, key, maxRuns, timeout); err != nil {
+		return err
+	}
+	
+	// 2. Ensure release ALWAYS runs after the action completes, completely hidden from the caller
+	defer g.release(key)
 
-
+	// 3. Run the caller's business logic
+	return action()
+}
 
 
 type Result[T any] struct {
