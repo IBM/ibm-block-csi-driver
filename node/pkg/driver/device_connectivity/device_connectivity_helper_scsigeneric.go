@@ -2018,78 +2018,62 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) getHCTLFromSd(ctx context.Contex
 func (r *OsDeviceConnectivityHelperScsiGeneric) getScsiTargetID(ctx context.Context, hctl string) string {
 	parts := strings.Split(hctl, ":")
 	if len(parts) < 4 {
-		logger.Warningf("    [SCSI-Target-Inspector] Passed HCTL identifier string invalid for segmentation mapping constraints check: %s", hctl)
 		return ""
 	}
 
-	hostID := parts[0]
+	hostID := parts[0] // Isolate the primitive host bus string string (e.g. "13", "15")
 	hct := strings.Join(parts[:3], ":")
 	targetDirName := fmt.Sprintf("target%s", hct)
 
 	// =========================================================================
-	// 1. CLASSIC SCSI BASELINE (FIBRE CHANNEL & SAS TARGETS)
+	// 1. CLASSIC SCSI BASELINE (FC & SAS HARDWARE TARGETS)
 	// =========================================================================
 	parentTargetBase := fmt.Sprintf("/sys/class/scsi_device/%s/device/../%s", hctl, targetDirName)
 
+	// Track A: Fibre Channel Strategy (Shielded from D-state wait traps)
 	fcPath := filepath.Join(parentTargetBase, "fc_transport", targetDirName, "port_name")
-	fcExists, _ := executer.ExecuteUninterruptible[bool](
-		ctx, r.KeyedGater, "stat-fc-"+hctl, 10, 50, 500*time.Millisecond, 1*time.Second,
-		func(wCtx context.Context) (bool, error) {
-			_, errStat := os.Stat(fcPath)
-			return errStat == nil, nil
-		},
-	)
-	if fcExists {
-		if data, err := secureReadSysfs(ctx, r.KeyedGater, hctl, fcPath); err == nil && data != "" {
-			return strings.TrimSpace(data)
+	if _, err := os.Stat(fcPath); err == nil {
+		if data, err := os.ReadFile(fcPath); err == nil && len(data) > 0 {
+			return strings.TrimSpace(string(data)) // Immediate FC Exit
 		}
 	}
 
+	// Track B: SAS Strategy (Shielded from D-state wait traps)
 	sasPath := filepath.Join(parentTargetBase, "sas_device", targetDirName, "sas_address")
-	sasExists, _ := executer.ExecuteUninterruptible[bool](
-		ctx, r.KeyedGater, "stat-sas-"+hctl, 10, 50, 500*time.Millisecond, 1*time.Second,
-		func(wCtx context.Context) (bool, error) {
-			_, errStat := os.Stat(sasPath)
-			return errStat == nil, nil
+	if _, err := os.Stat(sasPath); err == nil {
+		if data, err := os.ReadFile(sasPath); err == nil && len(data) > 0 {
+			return strings.TrimSpace(string(data)) // Immediate SAS Exit
+		}
+	}
+
+	// =========================================================================
+	// 2. RE-ANCHORED UNIVERSAL O(1) SYM-LINK PARSER (iSCSI INTEGRITY)
+	// =========================================================================
+	// By reading the link from the unified bus architecture descriptor folder, 
+	// we gain enough directory hierarchy depth to cleanly absorb the kernel's ".." tokens.
+	busDeviceLink := fmt.Sprintf("/sys/bus/scsi/devices/%s", hctl)
+
+	realDevicePath, err := executer.ExecuteUninterruptible[string](
+		ctx, r.KeyedGater, fmt.Sprintf("target-bus-symlink-%s", hctl), 20, 100, 1*time.Second, 3*time.Second,
+		func(wCtx context.Context) (string, error) {
+			return os.Readlink(busDeviceLink)
 		},
 	)
-	if sasExists {
-		if data, err := secureReadSysfs(ctx, r.KeyedGater, hctl, sasPath); err == nil && data != "" {
-			return strings.TrimSpace(data)
+	if err == nil {
+		if !filepath.IsAbs(realDevicePath) {
+			// Lexical Join + Clean: The ".." steps walk backward from /sys/bus/scsi/devices/HCTL 
+			// and resolve natively into the correct physical /sys/devices/platform/... tree layout.
+			realDevicePath = filepath.Clean(filepath.Join(busDeviceLink, realDevicePath))
 		}
+	} else {
+		realDevicePath = parentTargetBase
 	}
+	logger.Debugf("    [SCSI-Target-Inspector] Normalized absolute device path: %s", realDevicePath)
 
 	// =========================================================================
-	// 2. DIRECT STRUCTURAL ISCSI EXTRACTION (BYPASS ISCSI SCOUT ENTIRELY)
+	// 3. Track C: iSCSI SCOUT CORES FALLBACK
 	// =========================================================================
-	// In standard Linux storage topology, the active iSCSI targetname properties
-	// are always nested explicitly under the scsi_device's own device tree.
-	deviceScsiBaseDir := fmt.Sprintf("/sys/class/scsi_device/%s/device", hctl)
-	
-	// Scan the local directory for the session folder block natively
-	if entries, errDirs := os.ReadDir(deviceScsiBaseDir); errDirs == nil {
-		var activeSessionDir string
-		for _, entry := range entries {
-			if strings.HasPrefix(entry.Name(), "session") {
-				activeSessionDir = entry.Name() // Yields the exact "sessionX" folder name
-				break
-			}
-		}
-
-		if activeSessionDir != "" {
-			// Construct the absolute path directly to the targetname endpoint
-			targetNameFile := filepath.Join(deviceScsiBaseDir, activeSessionDir, "iscsi_session", activeSessionDir, "targetname")
-			
-			if data, errRead := os.ReadFile(targetNameFile); errRead == nil && len(data) > 0 {
-				iqnString := strings.TrimSpace(string(data))
-				logger.Infof("    [SCSI-Target-Inspector] Direct iSCSI match successful. Isolated target IQN: %s", iqnString)
-				return iqnString // SUCCESSFUL IMMEDIATELY
-			}
-		}
-	}
-
-	// Fallback to old behavior if structural parsing fails
-	return r.getIscsiTargetName(ctx, deviceScsiBaseDir, parentTargetBase, hostID)
+	return r.getIscsiTargetName(ctx, realDevicePath, parentTargetBase, hostID)
 }
 
 // getIscsiTargetName identifies the operational iSCSI target name with full D-state protection.
