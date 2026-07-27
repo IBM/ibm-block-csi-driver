@@ -2015,7 +2015,6 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) getHCTLFromSd(ctx context.Contex
 	return hctl, nil
 }
 
-// getScsiTargetID unifies multi-protocol hardware identification tracking with full context propagation.
 func (r *OsDeviceConnectivityHelperScsiGeneric) getScsiTargetID(ctx context.Context, hctl string) string {
 	parts := strings.Split(hctl, ":")
 	if len(parts) < 4 {
@@ -2023,46 +2022,29 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) getScsiTargetID(ctx context.Cont
 		return ""
 	}
 
-	hostID := parts[0] 
+	hostID := parts[0] // e.g. "15"
 	hct := strings.Join(parts[:3], ":")
 	targetDirName := fmt.Sprintf("target%s", hct)
-	deviceLink := fmt.Sprintf("/sys/class/scsi_device/%s/device", hctl)
 
 	// =========================================================================
 	// 1. CLASSIC SCSI BASELINE LAYOUT BUILDER (FC & SAS CORES)
 	// =========================================================================
-	// Secure, absolute path navigation straight from the uniform scsi_device class node.
-	// This ensures Fibre Channel fc_transport directories map accurately without climbing strings.
 	parentTargetBase := fmt.Sprintf("/sys/class/scsi_device/%s/device/../%s", hctl, targetDirName)
 	logger.Debugf("    [SCSI-Target-Inspector] Canonical hardware path baseline generated: %s", parentTargetBase)
 
 	// =========================================================================
-	// 2. DETAILED SYSFS SYSTEM DEVICE TREE RESOLUTION (iSCSI & DM OVERLAPS)
+	// 2. DETAILED SYSFS SYSTEM DEVICE TREE RESOLUTION (UNIVERSAL ISCSI MATCHING)
 	// =========================================================================
-	// Safely evaluate the underlying real device structure. To prevent the relative 
-	// path math from collapsing inside isolated container frameworks, we anchor it absolutely.
-	realDevicePath, err := executer.ExecuteUninterruptible[string](
-		ctx, r.KeyedGater, fmt.Sprintf("target-symlink-%s", hctl), 20, 100, 1*time.Second, 3*time.Second,
-		func(wCtx context.Context) (string, error) {
-			return os.Readlink(deviceLink)
-		},
-	)
-	if err == nil {
-		if !filepath.IsAbs(realDevicePath) {
-			// FIXED: Reconstruct accurately by anchoring relative back-references 
-			// against the absolute parent folder directory location of the link context itself.
-			realDevicePath = filepath.Clean(filepath.Join(filepath.Dir(deviceLink), realDevicePath))
-		}
-	} else {
-		realDevicePath = deviceLink
-	}
+	// Build the absolute iSCSI session map path directly from the known host ID.
+	// This completely bypasses the fragile os.Readlink loop and resolves flawlessly.
+	realDevicePath := fmt.Sprintf("/sys/class/scsi_host/host%s/device", hostID)
 	logger.Debugf("    [SCSI-Target-Inspector] Absolute device tracking path finalized: %s", realDevicePath)
 
 	// =========================================================================
 	// 3. MULTI-PROTOCOL INTERCEPTION ROUTER
 	// =========================================================================
 
-	// Track A: Fibre Channel Strategy (Shielded from D-state wait traps)
+	// Track A: Fibre Channel Strategy 
 	fcPath := filepath.Join(parentTargetBase, "fc_transport", targetDirName, "port_name")
 	fcExists, _ := executer.ExecuteUninterruptible[bool](
 		ctx, r.KeyedGater, "stat-fc-"+hctl, 10, 50, 500*time.Millisecond, 1*time.Second,
@@ -2073,12 +2055,11 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) getScsiTargetID(ctx context.Cont
 	)
 	if fcExists {
 		if data, err := secureReadSysfs(ctx, r.KeyedGater, hctl, fcPath); err == nil && data != "" {
-			logger.Debugf("    [SCSI-Target-Inspector] [Fibre-Channel-Match] Identified active target WWPN signature: %s", strings.TrimSpace(data))
 			return strings.TrimSpace(data)
 		}
 	}
 
-	// Track B: SAS Strategy (Shielded from D-state wait traps)
+	// Track B: SAS Strategy
 	sasPath := filepath.Join(parentTargetBase, "sas_device", targetDirName, "sas_address")
 	sasExists, _ := executer.ExecuteUninterruptible[bool](
 		ctx, r.KeyedGater, "stat-sas-"+hctl, 10, 50, 500*time.Millisecond, 1*time.Second,
@@ -2089,14 +2070,11 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) getScsiTargetID(ctx context.Cont
 	)
 	if sasExists {
 		if data, err := secureReadSysfs(ctx, r.KeyedGater, hctl, sasPath); err == nil && data != "" {
-			logger.Debugf("    [SCSI-Target-Inspector] [SAS-Match] Identified active target SAS signature: %s", strings.TrimSpace(data))
 			return strings.TrimSpace(data)
 		}
 	}
 
-	// Track C: iSCSI Strategy Fallback (Receives the absolute reconstructed realDevicePath)
-	// Because Native NVMe or Native over DM tracks bypass this SCSI handler block via early 
-	// regex exits inside resolveTargetIDsRecursive, this fallback handles pure iSCSI targets cleanly.
+	// Track C: iSCSI Strategy Fallback
 	return r.getIscsiTargetName(ctx, realDevicePath, parentTargetBase, hostID)
 }
 
