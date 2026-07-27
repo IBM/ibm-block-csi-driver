@@ -256,7 +256,8 @@ class CSIControllerServicer(csi_pb2_grpc.ControllerServicer):
         except (array_errors.LunAlreadyInUseError, array_errors.NoAvailableLunError) as ex:
             return handle_exception(ex, context, grpc.StatusCode.RESOURCE_EXHAUSTED,
                                     csi_pb2.ControllerPublishVolumeResponse)
-        except (array_errors.NoIscsiTargetsFoundError, ObjectIdError, InvalidNodeId) as ex:
+        except (array_errors.NoIscsiTargetsFoundError, array_errors.NoFcTargetsFoundError,
+                array_errors.NoNvmeFcTargetsFoundError, ObjectIdError, InvalidNodeId) as ex:
             return handle_exception(ex, context, grpc.StatusCode.NOT_FOUND, csi_pb2.ControllerPublishVolumeResponse)
         except array_errors.UnsupportedConnectivityTypeError as ex:
             return handle_exception(ex, context, grpc.StatusCode.INVALID_ARGUMENT,

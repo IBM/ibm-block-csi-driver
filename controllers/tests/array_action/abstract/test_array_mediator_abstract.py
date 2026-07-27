@@ -48,7 +48,7 @@ class BaseMediatorAbstractSetUp(unittest.TestCase):
 
         self.mediator.get_host_by_host_identifiers.return_value = (common_settings.HOST_NAME, self.connectivity_type)
         self.mediator.get_array_fc_wwns.return_value = self.fc_ports
-        self.mediator.get_nvme_target_ports.return_value = []
+        self.mediator.get_nvme_fc_target_ports.return_value = []
         self.mediator.map_volume.return_value = self.lun_id
         self.hostname = common_settings.HOST_NAME
         self.iqn = array_settings.DUMMY_NODE1_IQN
@@ -88,6 +88,22 @@ class TestMapVolumeByInitiators(BaseMediatorAbstractSetUp):
         self.mediator.get_iscsi_targets_by_iqn.side_effect = [array_errors.NoIscsiTargetsFoundError('')]
 
         with self.assertRaises(array_errors.NoIscsiTargetsFoundError):
+            self.mediator.map_volume_by_initiators('', self.initiators)
+
+    def test_map_volume_by_initiators_get_array_fc_wwns_exception(self):
+        self.mediator.get_host_by_host_identifiers.return_value = (common_settings.HOST_NAME,
+                                                                   array_settings.FC_CONNECTIVITY_TYPE)
+        self.mediator.get_array_fc_wwns.side_effect = [array_errors.NoFcTargetsFoundError('')]
+
+        with self.assertRaises(array_errors.NoFcTargetsFoundError):
+            self.mediator.map_volume_by_initiators('', self.initiators)
+
+    def test_map_volume_by_initiators_get_nvme_fc_target_ports_exception(self):
+        self.mediator.get_host_by_host_identifiers.return_value = (common_settings.HOST_NAME,
+                                                                   array_settings.NVME_OVER_FC_CONNECTIVITY_TYPE)
+        self.mediator.get_nvme_fc_target_ports.side_effect = [array_errors.NoNvmeFcTargetsFoundError('')]
+
+        with self.assertRaises(array_errors.NoNvmeFcTargetsFoundError):
             self.mediator.map_volume_by_initiators('', self.initiators)
 
     def test_map_volume_by_initiators_get_volume_mappings_more_then_one_mapping(self):
@@ -225,8 +241,8 @@ class TestMapVolumeByInitiators(BaseMediatorAbstractSetUp):
     def test_map_volume_by_initiators_with_connectivity_type_nvme(self):
         self.mediator.get_host_by_host_identifiers.return_value = self.hostname, [
             array_settings.NVME_OVER_FC_CONNECTIVITY_TYPE]
-        self.mediator.get_nvme_target_ports = Mock()
-        self.mediator.get_nvme_target_ports.return_value = [array_settings.DUMMY_NVME_NQN1]
+        self.mediator.get_nvme_fc_target_ports = Mock()
+        self.mediator.get_nvme_fc_target_ports.return_value = [array_settings.DUMMY_NVME_NQN1]
         response = self.mediator.map_volume_by_initiators('', self.initiators)
 
         self.assertEqual(response, (array_settings.DUMMY_LUN_ID, array_settings.NVME_OVER_FC_CONNECTIVITY_TYPE,

@@ -1625,7 +1625,7 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
                          "is: {1}".format(kwargs, ex))
             raise ex
 
-    def get_nvme_target_ports(self):
+    def get_nvme_fc_target_ports(self):
         logger.debug("Getting the connected NVMe FC target ports from array.")
         nvme_ports = []
         all_target_ports = self._lstargetportfc()
@@ -1641,6 +1641,8 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
             # Format required by nvme CLI --traddr flag: nn-<wwnn>:pn-<wwpn>
             nvme_ports.append("nn-{}:pn-{}".format(wwnn.lower(), wwpn.lower()))
         logger.debug("Getting NVMe FC target ports : {}".format(nvme_ports))
+        if not nvme_ports:
+            raise array_errors.NoNvmeFcTargetsFoundError(self.endpoint)
         return nvme_ports
 
     def get_array_fc_wwns(self, host_name):
@@ -1653,6 +1655,8 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
             if state in ('active', 'inactive'):
                 fc_port_wwns.append(wwn.get('local_wwpn', ''))
         logger.debug("Getting fc wwns : {}".format(fc_port_wwns))
+        if not fc_port_wwns:
+            raise array_errors.NoFcTargetsFoundError(self.endpoint)
         return fc_port_wwns
 
     def _get_host_portset_id(self, host_name):
