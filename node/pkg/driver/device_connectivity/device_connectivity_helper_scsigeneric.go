@@ -2017,107 +2017,194 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) getHCTLFromSd(ctx context.Contex
 
 // getScsiTargetID unifies multi-protocol hardware identification tracking with full context propagation.
 func (r *OsDeviceConnectivityHelperScsiGeneric) getScsiTargetID(ctx context.Context, hctl string) string {
-	parts := strings.Split(hctl, ":")
-	if len(parts) < 4 {
+	logger.Infof("[SCSI-Target-Inspector] Entering identification pipeline for target address: [%s]", hctl)
+
+	if err := ctx.Err(); err != nil {
+		logger.Warningf("[SCSI-Target-Inspector] [%s] Aborting execution: incoming context already cancelled: %v", hctl, err)
 		return ""
 	}
 
-	hostID := parts[0] // Isolate the host bus primitive string (e.g., "13")
+	parts := strings.Split(hctl, ":")
+	if len(parts) < 4 {
+		logger.Warningf("[SCSI-Target-Inspector] [%s] Aborting execution: malformed HCTL layout segment footprint", hctl)
+		return ""
+	}
+
+	hostID := parts[0] // Isolate the host bus index primitive string (e.g., "13", "15")
 	hct := strings.Join(parts[:3], ":")
 	targetDirName := fmt.Sprintf("target%s", hct)
 
 	// =========================================================================
-	// 1. PROTOCOL CORE FAST PATHS (FC & SAS HARDWARE TARGETS)
+	// ROUTE 1: BASELINE KERNEL TOPOLOGY PATH (FC & SAS HARDWARE SEARCH)
 	// =========================================================================
 	parentTargetBase := fmt.Sprintf("/sys/class/scsi_device/%s/device/../%s", hctl, targetDirName)
+	logger.Debugf("[SCSI-Target-Inspector] [%s] Evaluating standard baseline kernel topology at: %s", hctl, parentTargetBase)
 
-	// Track A: Fibre Channel Strategy (Shielded from D-state wait traps)
+	// --- TRACK A: FIBRE CHANNEL STRATEGY ---
 	fcPath := filepath.Join(parentTargetBase, "fc_transport", targetDirName, "port_name")
+	logger.Debugf("[SCSI-Target-Inspector] [%s] Probing Fibre Channel transport path layer: %s", hctl, fcPath)
+	
 	if _, err := os.Stat(fcPath); err == nil {
-		if data, err := os.ReadFile(fcPath); err == nil && len(data) > 0 {
+		logger.Debugf("[SCSI-Target-Inspector] [%s] [FC-Match] Found target transport directory. Executing sysfs read pass...", hctl)
+		if data, errRead := os.ReadFile(fcPath); errRead == nil && len(data) > 0 {
 			wwpnString := strings.TrimSpace(string(data))
-			// IMMEDIATE EXIT LOG FOR FIBRE CHANNEL:
-			logger.Infof("    [SCSI-Target-Inspector] [FC-FastPath] Success! Immediate hardware match on HCTL %s. Isolated WWPN: %s", hctl, wwpnString)
-			return wwpnString 
+			logger.Infof("[SCSI-Target-Inspector] [%s] [FC-FastPath SUCCESS] Immediate hardware match. Isolated WWPN: %s", hctl, wwpnString)
+			return wwpnString
+		} else {
+			logger.Warningf("[SCSI-Target-Inspector] [%s] [FC-Read-Failure] Directory exists but file read failed: %v", hctl, errRead)
 		}
+	} else {
+		logger.Debugf("[SCSI-Target-Inspector] [%s] [FC-Skip] Transport path not found (Not a Fibre Channel node or initializing)")
 	}
 
-	// Track B: SAS Strategy (Shielded from D-state wait traps)
+	// --- TRACK B: SERIAL ATTACHED SCSI (SAS) STRATEGY ---
 	sasPath := filepath.Join(parentTargetBase, "sas_device", targetDirName, "sas_address")
+	logger.Debugf("[SCSI-Target-Inspector] [%s] Probing SAS transport path layer: %s", hctl, sasPath)
+	
 	if _, err := os.Stat(sasPath); err == nil {
-		if data, err := os.ReadFile(sasPath); err == nil && len(data) > 0 {
-			sasAddressString := strings.TrimSpace(string(data))
-			// IMMEDIATE EXIT LOG FOR SERIAL ATTACHED SCSI:
-			logger.Infof("    [SCSI-Target-Inspector] [SAS-FastPath] Success! Immediate hardware match on HCTL %s. Isolated SAS Address: %s", hctl, sasAddressString)
-			return sasAddressString 
+		logger.Debugf("[SCSI-Target-Inspector] [%s] [SAS-Match] Found target transport directory. Executing sysfs read pass...", hctl)
+		if data, errRead := os.ReadFile(sasPath); errRead == nil && len(data) > 0 {
+			sasAddressString := strings.TrimSpace(string(string(data)))
+			logger.Infof("[SCSI-Target-Inspector] [%s] [SAS-FastPath SUCCESS] Immediate hardware match. Isolated SAS Address: %s", hctl, sasAddressString)
+			return sasAddressString
+		} else {
+			logger.Warningf("[SCSI-Target-Inspector] [%s] [SAS-Read-Failure] Directory exists but file read failed: %v", hctl, errRead)
 		}
+	} else {
+		logger.Debugf("[SCSI-Target-Inspector] [%s] [SAS-Skip] Transport path not found (Not a SAS node or initializing)")
 	}
 
 	// =========================================================================
-	// 2. TRUE O(1) FLAT ISCSI TARGET ENGINE WITH INTERIM DIAGNOSTIC LOGS
+	// ROUTE 2: RE-ANCHORED UNIVERSAL O(1) BUS LOOKUP (iSCSI OPTIMIZATION)
+	// =========================================================================
+	// We map via the SCSI bus subsystem layout to avoid container lexical truncation loops 
+	// while providing absolute depth to safely absorb the kernel's relative ".." tokens.
+	busDeviceLink := fmt.Sprintf("/sys/bus/scsi/devices/%s", hctl)
+	logger.Debugf("[SCSI-Target-Inspector] [%s] Re-anchoring tracking target via absolute bus directory: %s", hctl, busDeviceLink)
+
+	realDevicePath, errLink := executer.ExecuteUninterruptible[string](
+		ctx, r.KeyedGater, fmt.Sprintf("target-bus-symlink-%s", hctl), 20, 100, 1*time.Second, 3*time.Second,
+		func(wCtx context.Context) (string, error) {
+			return os.Readlink(busDeviceLink)
+		},
+	)
+	
+	if errLink == nil {
+		if !filepath.IsAbs(realDevicePath) {
+			realDevicePath = filepath.Clean(filepath.Join(busDeviceLink, realDevicePath))
+			logger.Debugf("[SCSI-Target-Inspector] [%s] Resolved absolute path via bus link re-anchoring: %s", hctl, realDevicePath)
+		} else {
+			logger.Debugf("[SCSI-Target-Inspector] [%s] Link returned an absolute kernel path: %s", hctl, realDevicePath)
+		}
+	} else {
+		logger.Warningf("[SCSI-Target-Inspector] [%s] Bus readlink execution failed (falling back to parent layout string parameters): %v", hctl, errLink)
+		realDevicePath = parentTargetBase
+	}
+
+	// =========================================================================
+	// ROUTE 3: ZERO-LOG iSCSI HOST INTERCEPTION & EXCLUSION LAYER
 	// =========================================================================
 	iscsiHostTargetFile := fmt.Sprintf("/sys/class/iscsi_host/host%s/targetname", hostID)
-	
-	data, errRead := os.ReadFile(iscsiHostTargetFile)
-	if errRead == nil && len(data) > 0 {
+	logger.Debugf("[SCSI-Target-Inspector] [%s] Probing direct iSCSI class host file: %s", hctl, iscsiHostTargetFile)
+
+	data, errIscsiHost := os.ReadFile(iscsiHostTargetFile)
+	if errIscsiHost == nil && len(data) > 0 {
 		iqnString := strings.TrimSpace(string(data))
-		// IMMEDIATE EXIT LOG FOR ISCSI O(1) LEAF PATHWAY:
-		logger.Infof("    [SCSI-Target-Inspector] [iSCSI-FastPath] Success! Direct match via class targetname file on host%s. Isolated IQN: %s", hostID, iqnString)
-		return iqnString 
+		logger.Infof("[SCSI-Target-Inspector] [%s] [iSCSI-Host-FastPath SUCCESS] Direct match via class targetname file on host%s. Isolated IQN: %s", hctl, hostID, iqnString)
+		return iqnString
 	}
 
-	// INTERIM TELEMETRY CAPTURE BLOCK:
-	// This only prints if the high-efficiency O(1) leaf-file read falls through.
-	if errRead != nil {
-		if os.IsNotExist(errRead) {
-			logger.Debugf("    [SCSI-Target-Inspector] [iSCSI-Host-Skip] Leaf file missing at %s. Target is likely operating on alternate fabric (FC/SAS) or session is in a late stage detachment.", iscsiHostTargetFile)
-		} else {
-			logger.Warningf("    [SCSI-Target-Inspector] [iSCSI-Host-Error] Security boundary lock or filesystem error preventing read access on target descriptor %s: %v", iscsiHostTargetFile, errRead.Error())
-		}
+	// NOISE REDUCTION GUARD DETECTED:
+	// If the file is explicitly missing (os.IsNotExist), the kernel confirms this HCTL does not live 
+	// on a matched software iSCSI host. It is an FC or SAS drive caught inside a global purgeScsiGhosts loop!
+	if errIscsiHost != nil && os.IsNotExist(errIscsiHost) {
+		logger.Debugf("[SCSI-Target-Inspector] [%s] [iSCSI-Host-Skip] Leaf file missing at %s. Target confirmed as alternate fabric (FC/SAS). Exiting silently with empty string to prevent debug loop noise.", hctl, iscsiHostTargetFile)
+		return ""
+	}
+
+	// Catch alternate filesystem anomalies before hitting fallback scouts
+	if errIscsiHost != nil {
+		logger.Warningf("[SCSI-Target-Inspector] [%s] System error accessing iSCSI host parameters (proceeding to dynamic tracker): %v", hctl, errIscsiHost)
 	} else if len(data) == 0 {
-		logger.Warningf("    [SCSI-Target-Inspector] [iSCSI-Host-Anomaly] Target file %s read successfully but returned 0 bytes payload.", iscsiHostTargetFile)
+		logger.Warningf("[SCSI-Target-Inspector] [%s] targetname file read successfully but returned 0 bytes payload.", hctl)
 	}
 
 	// =========================================================================
-	// 3. TRACK C: BACKWARD-COMPATIBLE RUNTIME SCOUT FALLBACK
+	// ROUTE 4: DYNAMIC MULTI-STRATEGY BACKWARD FALLBACK SCOUT
 	// =========================================================================
-	logger.Debugf("    [SCSI-Target-Inspector] Initiating deep layout tracking fallback for address %s", hctl)
-	return r.getIscsiTargetName(ctx, parentTargetBase, parentTargetBase, hostID)
+	deviceScsiBaseDir := fmt.Sprintf("/sys/class/scsi_device/%s/device", hctl)
+	logger.Infof("[SCSI-Target-Inspector] [%s] Leaf evaluations exhausted. Initiating deep dynamic fallback scout using root tracking baseline: %s", hctl, deviceScsiBaseDir)
+	
+	return r.getIscsiTargetName(ctx, realDevicePath, parentTargetBase, hostID)
 }
 
 // getIscsiTargetName identifies the operational iSCSI target name with full D-state protection.
 func (r *OsDeviceConnectivityHelperScsiGeneric) getIscsiTargetName(ctx context.Context, realDevicePath string, parentTargetBase string, hostID string) string {
-	logger.Debugf("      [iSCSI-Subsystem-Scout] Entering dynamic session tracking pipeline.")
+	logger.Infof("      [iSCSI-Subsystem-Scout] [HCTL:%s] Entering dynamic session tracking pipeline. Inputs -> realDevicePath: %s, parentTargetBase: %s", hostID, realDevicePath, parentTargetBase)
 	
-	if ctx.Err() != nil {
+	if err := ctx.Err(); err != nil {
+		logger.Warningf("      [iSCSI-Subsystem-Scout] [HCTL:%s] Aborting scout execution: context already cancelled: %v", hostID, err)
 		return ""
 	}
 
+	// =========================================================================
+	// STRATEGY A: RECURSIVE SYNERGISTIC UPWARD TREE CLIMB
+	// =========================================================================
+	logger.Debugf("      [iSCSI-Subsystem-Scout] [HCTL:%s] [Strategy-A] Starting lexical climbing loop on baseline path: %s", hostID, realDevicePath)
 	curr := realDevicePath
 	for curr != "/" && curr != "." {
+		if ctx.Err() != nil {
+			logger.Warningf("      [iSCSI-Subsystem-Scout] [HCTL:%s] [Strategy-A] Context expired during directory climbing phase.", hostID)
+			return ""
+		}
+
 		base := filepath.Base(curr)
+		logger.Debugf("      [iSCSI-Subsystem-Scout] [HCTL:%s] [Strategy-A] Evaluating path branch element name: %s", hostID, base)
+		
 		if strings.HasPrefix(base, "session") {
 			targetNamePath := filepath.Join(curr, "iscsi_session", base, "targetname")
-			if data, err := secureReadSysfs(ctx, r.KeyedGater, base, targetNamePath); err == nil && data != "" {
-				return strings.TrimSpace(data)
+			logger.Infof("      [iSCSI-Subsystem-Scout] [HCTL:%s] [Strategy-A] Match signature prefix found! Attempting reading leaf data at: %s", hostID, targetNamePath)
+			
+			data, err := secureReadSysfs(ctx, r.KeyedGater, base, targetNamePath)
+			if err == nil && data != "" {
+				iqn := strings.TrimSpace(data)
+				logger.Infof("      [iSCSI-Subsystem-Scout] [HCTL:%s] [Strategy-A SUCCESS] Extracted active target IQN via tree climber path: %s", hostID, iqn)
+				return iqn
 			}
+			logger.Warningf("      [iSCSI-Subsystem-Scout] [HCTL:%s] [Strategy-A Fault] Leaf file read operation failed or empty payload returned under target path %s: %v", hostID, targetNamePath, err)
 		}
 		curr = filepath.Dir(curr)
 	}
+	logger.Debugf("      [iSCSI-Subsystem-Scout] [HCTL:%s] [Strategy-A Finished] Climber loop hit root layout boundaries without matching session identifiers.", hostID)
 
+	// =========================================================================
+	// STRATEGY B: FLAT LOCAL NESTED ANCHOR LOOKUP
+	// =========================================================================
 	sessionDir := filepath.Dir(parentTargetBase)
 	sessionBase := filepath.Base(sessionDir)
+	logger.Debugf("      [iSCSI-Subsystem-Scout] [HCTL:%s] [Strategy-B] Evaluating local base layout framework. sessionDir: %s, sessionBase: %s", hostID, sessionDir, sessionBase)
+	
 	if strings.HasPrefix(sessionBase, "session") {
 		targetNamePath := filepath.Join(sessionDir, "iscsi_session", sessionBase, "targetname")
-		if data, err := secureReadSysfs(ctx, r.KeyedGater, sessionBase, targetNamePath); err == nil && data != "" {
-			return strings.TrimSpace(data)
+		logger.Infof("      [iSCSI-Subsystem-Scout] [HCTL:%s] [Strategy-B] Local configuration segment structure matched! Probing targetname at: %s", hostID, targetNamePath)
+		
+		data, err := secureReadSysfs(ctx, r.KeyedGater, sessionBase, targetNamePath)
+		if err == nil && data != "" {
+			iqn := strings.TrimSpace(data)
+			logger.Infof("      [iSCSI-Subsystem-Scout] [HCTL:%s] [Strategy-B SUCCESS] Extracted active target IQN via local layout path: %s", hostID, iqn)
+			return iqn
 		}
+		logger.Warningf("      [iSCSI-Subsystem-Scout] [HCTL:%s] [Strategy-B Fault] Flat file read operation failed or empty payload returned under path %s: %v", hostID, targetNamePath, err)
+	} else {
+		logger.Debugf("      [iSCSI-Subsystem-Scout] [HCTL:%s] [Strategy-B Skip] Local layout naming baseline footprint %s does not begin with 'session' configuration strings.", hostID, sessionBase)
 	}
 
-	// Strategy C: Global System Class Map Fallback
+	// =========================================================================
+	// STRATEGY C: GLOBAL SYSTEM CLASS MAP MATRIX SWEEP
+	// =========================================================================
 	sessionClassPath := "/sys/class/iscsi_session"
+	logger.Infof("      [iSCSI-Subsystem-Scout] [HCTL:%s] [Strategy-C] Falling back to global system scan over endpoint class boundary path: %s", hostID, sessionClassPath)
 	
-	// FIX 1: Shield the raw directory read inside your safety framework to prevent dead lockups
 	sessions, err := executer.ExecuteUninterruptible[[]os.DirEntry](
 		ctx, r.KeyedGater, "iscsi-readdir-global", 5, 20, 1*time.Second, 2*time.Second,
 		func(wCtx context.Context) ([]os.DirEntry, error) {
@@ -2125,43 +2212,53 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) getIscsiTargetName(ctx context.C
 		},
 	)
 	if err != nil {
-		logger.Warningf("      [iSCSI-Subsystem-Scout] [Strategy-C FAILED] System framework interface class folder missing or inaccessible: %v", err)
+		logger.Warningf("      [iSCSI-Subsystem-Scout] [HCTL:%s] [Strategy-C CRITICAL FAILED] System framework interface class folder missing or inaccessible: %v", hostID, err)
 		return ""
 	}
 
-	// FIX 3: Pre-allocate static match token outside the hot loop to reduce memory allocations
 	matchToken := fmt.Sprintf("host%s", hostID)
+	logger.Debugf("      [iSCSI-Subsystem-Scout] [HCTL:%s] [Strategy-C] Isolated global system session list (Count: %d). Iterating lookup using target search token: %s", hostID, len(sessions), matchToken)
 
 	for _, s := range sessions {
+		if ctx.Err() != nil {
+			logger.Warningf("      [iSCSI-Subsystem-Scout] [HCTL:%s] [Strategy-C] Context expired during global loop traversal passes.", hostID)
+			return ""
+		}
+
 		sessionName := s.Name()
 		targetNamePath := filepath.Join(sessionClassPath, sessionName, "targetname")
+		logger.Debugf("      [iSCSI-Subsystem-Scout] [HCTL:%s] [Strategy-C-Loop] Evaluating global item entry node %s. targetname path: %s", hostID, sessionName, targetNamePath)
 		
 		data, err := secureReadSysfs(ctx, r.KeyedGater, sessionName, targetNamePath)
 		if err != nil || data == "" {
+			logger.Debugf("      [iSCSI-Subsystem-Scout] [HCTL:%s] [Strategy-C-Loop] Skipping entry item %s: failed to read targetname parameters or empty string returned. Err: %v", hostID, sessionName, err)
 			continue
 		}
 		
 		deviceLinkMappingPath := filepath.Join(sessionClassPath, sessionName, "device")
+		logger.Debugf("      [iSCSI-Subsystem-Scout] [HCTL:%s] [Strategy-C-Loop] Resolving system target controller mapping location: %s", hostID, deviceLinkMappingPath)
 		
-		hostPath, err := executer.ExecuteUninterruptible[string](
-			ctx,
-			r.KeyedGater,
-			fmt.Sprintf("iscsi-link-%s", sessionName),
-			20, 100, 1*time.Second, 3*time.Second,
+		hostPath, errLink := executer.ExecuteUninterruptible[string](
+			ctx, r.KeyedGater, fmt.Sprintf("iscsi-link-%s", sessionName), 20, 100, 1*time.Second, 3*time.Second,
 			func(wCtx context.Context) (string, error) {
 				return os.Readlink(deviceLinkMappingPath)
 			},
 		)
-		if err == nil {
-			if strings.Contains(hostPath, matchToken) {
-				sigID := strings.TrimSpace(data)
-				logger.Debugf("      [iSCSI-Subsystem-Scout] [Strategy-C SUCCESS] Valid target correlated matching host token %s: %s", matchToken, sigID)
-				return sigID
-			}
+		if errLink != nil {
+			logger.Warningf("      [iSCSI-Subsystem-Scout] [HCTL:%s] [Strategy-C-Loop] Readlink operation on mapping path element %s failed: %v", hostID, deviceLinkMappingPath, errLink)
+			continue
 		}
+		
+		logger.Debugf("      [iSCSI-Subsystem-Scout] [HCTL:%s] [Strategy-C-Loop] Mapping link text read: [%s]. Checking for match token signature [%s]...", hostID, hostPath, matchToken)
+		if strings.Contains(hostPath, matchToken) {
+			sigID := strings.TrimSpace(data)
+			logger.Infof("      [iSCSI-Subsystem-Scout] [HCTL:%s] [Strategy-C SUCCESS] Valid target correlated matching host token %s on item entry %s: %s", hostID, matchToken, sessionName, sigID)
+			return sigID
+		}
+		logger.Debugf("      [iSCSI-Subsystem-Scout] [HCTL:%s] [Strategy-C-Loop] Evaluation mismatch. Entry link path item %s does not match look-up token signature token %s.", hostID, sessionName, matchToken)
 	}
 	
-	logger.Warningf("      [iSCSI-Subsystem-Scout] Failed to isolate target iSCSI name matching HCTL profile dependencies across all strategies.")
+	logger.Warningf("      [iSCSI-Subsystem-Scout] [HCTL:%s] [OUT OF STRATEGIES] Failed to isolate target iSCSI name matching HCTL profile dependencies across all strategies.", hostID)
 	return ""
 }
 
