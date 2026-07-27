@@ -2015,18 +2015,19 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) getHCTLFromSd(ctx context.Contex
 	return hctl, nil
 }
 
+// getScsiTargetID unifies multi-protocol hardware identification tracking with full context propagation.
 func (r *OsDeviceConnectivityHelperScsiGeneric) getScsiTargetID(ctx context.Context, hctl string) string {
 	parts := strings.Split(hctl, ":")
 	if len(parts) < 4 {
 		return ""
 	}
 
-	hostID := parts[0] // Isolate the primitive host bus string string (e.g. "13", "15")
+	hostID := parts[0] // Isolate the host bus primitive string (e.g., "13")
 	hct := strings.Join(parts[:3], ":")
 	targetDirName := fmt.Sprintf("target%s", hct)
 
 	// =========================================================================
-	// 1. CLASSIC SCSI BASELINE (FC & SAS HARDWARE TARGETS)
+	// 1. PROTOCOL CORE FAST PATHS (FC & SAS HARDWARE TARGETS)
 	// =========================================================================
 	parentTargetBase := fmt.Sprintf("/sys/class/scsi_device/%s/device/../%s", hctl, targetDirName)
 
@@ -2034,7 +2035,10 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) getScsiTargetID(ctx context.Cont
 	fcPath := filepath.Join(parentTargetBase, "fc_transport", targetDirName, "port_name")
 	if _, err := os.Stat(fcPath); err == nil {
 		if data, err := os.ReadFile(fcPath); err == nil && len(data) > 0 {
-			return strings.TrimSpace(string(data)) // Immediate FC Exit
+			wwpnString := strings.TrimSpace(string(data))
+			// IMMEDIATE EXIT LOG FOR FIBRE CHANNEL:
+			logger.Infof("    [SCSI-Target-Inspector] [FC-FastPath] Success! Immediate hardware match on HCTL %s. Isolated WWPN: %s", hctl, wwpnString)
+			return wwpnString 
 		}
 	}
 
@@ -2042,38 +2046,43 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) getScsiTargetID(ctx context.Cont
 	sasPath := filepath.Join(parentTargetBase, "sas_device", targetDirName, "sas_address")
 	if _, err := os.Stat(sasPath); err == nil {
 		if data, err := os.ReadFile(sasPath); err == nil && len(data) > 0 {
-			return strings.TrimSpace(string(data)) // Immediate SAS Exit
+			sasAddressString := strings.TrimSpace(string(data))
+			// IMMEDIATE EXIT LOG FOR SERIAL ATTACHED SCSI:
+			logger.Infof("    [SCSI-Target-Inspector] [SAS-FastPath] Success! Immediate hardware match on HCTL %s. Isolated SAS Address: %s", hctl, sasAddressString)
+			return sasAddressString 
 		}
 	}
 
 	// =========================================================================
-	// 2. RE-ANCHORED UNIVERSAL O(1) SYM-LINK PARSER (iSCSI INTEGRITY)
+	// 2. TRUE O(1) FLAT ISCSI TARGET ENGINE WITH INTERIM DIAGNOSTIC LOGS
 	// =========================================================================
-	// By reading the link from the unified bus architecture descriptor folder, 
-	// we gain enough directory hierarchy depth to cleanly absorb the kernel's ".." tokens.
-	busDeviceLink := fmt.Sprintf("/sys/bus/scsi/devices/%s", hctl)
-
-	realDevicePath, err := executer.ExecuteUninterruptible[string](
-		ctx, r.KeyedGater, fmt.Sprintf("target-bus-symlink-%s", hctl), 20, 100, 1*time.Second, 3*time.Second,
-		func(wCtx context.Context) (string, error) {
-			return os.Readlink(busDeviceLink)
-		},
-	)
-	if err == nil {
-		if !filepath.IsAbs(realDevicePath) {
-			// Lexical Join + Clean: The ".." steps walk backward from /sys/bus/scsi/devices/HCTL 
-			// and resolve natively into the correct physical /sys/devices/platform/... tree layout.
-			realDevicePath = filepath.Clean(filepath.Join(busDeviceLink, realDevicePath))
-		}
-	} else {
-		realDevicePath = parentTargetBase
+	iscsiHostTargetFile := fmt.Sprintf("/sys/class/iscsi_host/host%s/targetname", hostID)
+	
+	data, errRead := os.ReadFile(iscsiHostTargetFile)
+	if errRead == nil && len(data) > 0 {
+		iqnString := strings.TrimSpace(string(data))
+		// IMMEDIATE EXIT LOG FOR ISCSI O(1) LEAF PATHWAY:
+		logger.Infof("    [SCSI-Target-Inspector] [iSCSI-FastPath] Success! Direct match via class targetname file on host%s. Isolated IQN: %s", hostID, iqnString)
+		return iqnString 
 	}
-	logger.Debugf("    [SCSI-Target-Inspector] Normalized absolute device path: %s", realDevicePath)
+
+	// INTERIM TELEMETRY CAPTURE BLOCK:
+	// This only prints if the high-efficiency O(1) leaf-file read falls through.
+	if errRead != nil {
+		if os.IsNotExist(errRead) {
+			logger.Debugf("    [SCSI-Target-Inspector] [iSCSI-Host-Skip] Leaf file missing at %s. Target is likely operating on alternate fabric (FC/SAS) or session is in a late stage detachment.", iscsiHostTargetFile)
+		} else {
+			logger.Warningf("    [SCSI-Target-Inspector] [iSCSI-Host-Error] Security boundary lock or filesystem error preventing read access on target descriptor %s: %v", iscsiHostTargetFile, errRead.Error())
+		}
+	} else if len(data) == 0 {
+		logger.Warningf("    [SCSI-Target-Inspector] [iSCSI-Host-Anomaly] Target file %s read successfully but returned 0 bytes payload.", iscsiHostTargetFile)
+	}
 
 	// =========================================================================
-	// 3. Track C: iSCSI SCOUT CORES FALLBACK
+	// 3. TRACK C: BACKWARD-COMPATIBLE RUNTIME SCOUT FALLBACK
 	// =========================================================================
-	return r.getIscsiTargetName(ctx, realDevicePath, parentTargetBase, hostID)
+	logger.Debugf("    [SCSI-Target-Inspector] Initiating deep layout tracking fallback for address %s", hctl)
+	return r.getIscsiTargetName(ctx, parentTargetBase, parentTargetBase, hostID)
 }
 
 // getIscsiTargetName identifies the operational iSCSI target name with full D-state protection.
