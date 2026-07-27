@@ -2022,7 +2022,7 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) getScsiTargetID(ctx context.Cont
 		return ""
 	}
 
-	hostID := parts[0] // e.g. "15"
+	hostID := parts 
 	hct := strings.Join(parts[:3], ":")
 	targetDirName := fmt.Sprintf("target%s", hct)
 
@@ -2033,18 +2033,32 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) getScsiTargetID(ctx context.Cont
 	logger.Debugf("    [SCSI-Target-Inspector] Canonical hardware path baseline generated: %s", parentTargetBase)
 
 	// =========================================================================
-	// 2. DETAILED SYSFS SYSTEM DEVICE TREE RESOLUTION (UNIVERSAL ISCSI MATCHING)
+	// 2. TARGET-ANCHORED HARDWARE TREE RESOLUTION (UNIVERSAL ISCSI MATCHING)
 	// =========================================================================
-	// Build the absolute iSCSI session map path directly from the known host ID.
-	// This completely bypasses the fragile os.Readlink loop and resolves flawlessly.
-	realDevicePath := fmt.Sprintf("/sys/class/scsi_host/host%s/device", hostID)
+	// Read the symlink of the parent target directory instead of the raw device link.
+	// This yields the deep hardware path directly, bypasses relative path truncation bugs,
+	// and preserves the "sessionX" directory structure that Strategy A expects.
+	realDevicePath, err := executer.ExecuteUninterruptible[string](
+		ctx, r.KeyedGater, fmt.Sprintf("target-dir-symlink-%s", hctl), 20, 100, 1*time.Second, 3*time.Second,
+		func(wCtx context.Context) (string, error) {
+			return os.Readlink(parentTargetBase)
+		},
+	)
+	if err == nil {
+		if !filepath.IsAbs(realDevicePath) {
+			// If it's relative, anchor it safely against the absolute parentTargetBase container location
+			realDevicePath = filepath.Clean(filepath.Join(filepath.Dir(parentTargetBase), realDevicePath))
+		}
+	} else {
+		realDevicePath = parentTargetBase
+	}
 	logger.Debugf("    [SCSI-Target-Inspector] Absolute device tracking path finalized: %s", realDevicePath)
 
 	// =========================================================================
 	// 3. MULTI-PROTOCOL INTERCEPTION ROUTER
 	// =========================================================================
 
-	// Track A: Fibre Channel Strategy 
+	// Track A: Fibre Channel Strategy
 	fcPath := filepath.Join(parentTargetBase, "fc_transport", targetDirName, "port_name")
 	fcExists, _ := executer.ExecuteUninterruptible[bool](
 		ctx, r.KeyedGater, "stat-fc-"+hctl, 10, 50, 500*time.Millisecond, 1*time.Second,
