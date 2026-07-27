@@ -2049,8 +2049,9 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) getScsiTargetID(ctx context.Cont
 	)
 	if err == nil {
 		if !filepath.IsAbs(realDevicePath) {
-			// RE-ANCHOR REGEX SAFETY: Build the exact system class base back up to bypass relative truncation loops
-			realDevicePath = filepath.Clean(filepath.Join("/sys/class/scsi_device", hctl, "device", realDevicePath))
+			// FIXED: Reconstruct accurately by anchoring relative back-references 
+			// against the absolute parent folder directory location of the link context itself.
+			realDevicePath = filepath.Clean(filepath.Join(filepath.Dir(deviceLink), realDevicePath))
 		}
 	} else {
 		realDevicePath = deviceLink
