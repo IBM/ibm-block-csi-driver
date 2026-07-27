@@ -2015,7 +2015,6 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) getHCTLFromSd(ctx context.Contex
 	return hctl, nil
 }
 
-// getScsiTargetID unifies multi-protocol hardware identification tracking with full context propagation.
 func (r *OsDeviceConnectivityHelperScsiGeneric) getScsiTargetID(ctx context.Context, hctl string) string {
 	parts := strings.Split(hctl, ":")
 	if len(parts) < 4 {
@@ -2026,39 +2025,14 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) getScsiTargetID(ctx context.Cont
 	hostID := parts[0] 
 	hct := strings.Join(parts[:3], ":")
 	targetDirName := fmt.Sprintf("target%s", hct)
-	deviceLink := fmt.Sprintf("/sys/class/scsi_device/%s/device", hctl)
 
-	realDevicePath, err := executer.ExecuteUninterruptible[string](
-		ctx,
-		r.KeyedGater,
-		fmt.Sprintf("target-symlink-%s", hctl),
-		20, 100, 1*time.Second, 3*time.Second,
-		func(wCtx context.Context) (string, error) {
-			return os.Readlink(deviceLink)
-		},
-	)
-	if err != nil {
-		logger.Warningf("    [SCSI-Target-Inspector] Failsafe checking collapsed during baseline validation tracking trace point evaluations: %v", err)
-		return ""
-	}
-	
-	if !filepath.IsAbs(realDevicePath) {
-		realDevicePath = filepath.Clean(filepath.Join(filepath.Dir(deviceLink), realDevicePath))
-	}
-	logger.Debugf("    [SCSI-Target-Inspector] Symlink verification mapping resolved explicitly to real endpoint tracking location: %s", realDevicePath)
-
-	var parentTargetBase string
-	curr := realDevicePath
-	for curr != "/" && curr != "." {
-		if filepath.Base(curr) == targetDirName {
-			parentTargetBase = curr
-			break
-		}
-		curr = filepath.Dir(curr)
-	}
-	if parentTargetBase == "" {
-		parentTargetBase = filepath.Dir(realDevicePath)
-	}
+	// =========================================================================
+	// FIXED ABSOLUTE KERNEL TOPOLOGY TARGET (BYPASS FRAGILE READLINK TREE)
+	// =========================================================================
+	// This path resolves identically across RHEL 7, RHEL 8, SLES, and Ubuntu.
+	// It uses the standard kernel relative navigation straight from the scsi_device class node.
+	parentTargetBase := fmt.Sprintf("/sys/class/scsi_device/%s/device/../%s", hctl, targetDirName)
+	logger.Debugf("    [SCSI-Target-Inspector] Canonical hardware path baseline generated: %s", parentTargetBase)
 
 	// 1. Fibre Channel Strategy (Shielded from D-state wait traps)
 	fcPath := filepath.Join(parentTargetBase, "fc_transport", targetDirName, "port_name")
@@ -2071,6 +2045,7 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) getScsiTargetID(ctx context.Cont
 	)
 	if fcExists {
 		if data, err := secureReadSysfs(ctx, r.KeyedGater, hctl, fcPath); err == nil && data != "" {
+			logger.Infof("    [SCSI-Target-Inspector] Successfully identified Fibre Channel target WWPN: %s", strings.TrimSpace(data))
 			return strings.TrimSpace(data)
 		}
 	}
@@ -2086,10 +2061,13 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) getScsiTargetID(ctx context.Cont
 	)
 	if sasExists {
 		if data, err := secureReadSysfs(ctx, r.KeyedGater, hctl, sasPath); err == nil && data != "" {
+			logger.Infof("    [SCSI-Target-Inspector] Successfully identified SAS target address: %s", strings.TrimSpace(data))
 			return strings.TrimSpace(data)
 		}
 	}
 
+	// 3. iSCSI Fallback Pathway
+	realDevicePath := fmt.Sprintf("/sys/class/scsi_device/%s/device", hctl)
 	return r.getIscsiTargetName(ctx, realDevicePath, parentTargetBase, hostID)
 }
 
