@@ -194,83 +194,74 @@ func (n NodeUtils) ClearStageInfoFile(filePath string) error {
 }
 
 func (n NodeUtils) GetSysDevicesFromMpath(ctx context.Context, baseDevice string) ([]string, error) {
-    if err := ctx.Err(); err != nil { return nil, err }
+	if err := ctx.Err(); err != nil { 
+		return nil, err 
+	}
 
-	// baseDevice is expected to be "dm-X" or "nvmeXnY"
 	logger.Debugf("GetSysDevicesFromMpath with param: {%v}", baseDevice)
 
-	// 1. Branching Logic: DM vs NVMe
+	// =========================================================================
+	// BRANCH 1: CLASSIC DEVICE MAPPER (FIBRE CHANNEL / SCSI TARGETS)
+	// =========================================================================
 	if strings.HasPrefix(baseDevice, "dm-") {
-		// Device Mapper Path: /sys/block/dm-X/slaves/
 		deviceSlavePath := filepath.Join("/sys", "block", baseDevice, "slaves")
 		slaves, err := os.ReadDir(deviceSlavePath)
 		if err != nil {
-			logger.Errorf("an error occured while looking for device slaves : {%v}", err.Error())
+			logger.Errorf("An error occurred while looking for device slaves : {%v}", err.Error())
 			return nil, fmt.Errorf("failed to read dm slaves at %s: %w", deviceSlavePath, err)
 		}
 
 		var slavesNames []string
 		for _, slave := range slaves {
-			slavesNames = append(slavesNames, slave.Name())
+			if ctx.Err() != nil {
+				return nil, ctx.Err()
+			}
+			slavesNames = append(slavesNames, slave.Name()) // Yields raw "sdX" paths
 		}
 		return slavesNames, nil
 	}
 
+	// =========================================================================
+	// BRANCH 2: NATIVE NVME MULTIPATH SUBSYSTEM LAYERS
+	// =========================================================================
 	if strings.HasPrefix(baseDevice, "nvme") {
-		// NVMe Native Multipath Path: /sys/block/nvmeXnY/device/subsystem/
-		// Each path is a controller link (e.g., nvme0, nvme1)
+		// Use LastIndex to safely isolate namespace boundary (e.g. "nvme-subsys0n1" -> index of last 'n')
+		nIdx := strings.LastIndex(baseDevice, "n")
+		if nIdx == -1 || nIdx == len(baseDevice)-1 {
+			return nil, fmt.Errorf("invalid nvme device configuration footprint name: %s", baseDevice)
+		}
+		nsID := baseDevice[nIdx:] // Resolves perfectly to "n1", "n2", etc.
+
 		subsysPath := filepath.Join("/sys", "block", baseDevice, "device", "subsystem")
 		controllers, err := os.ReadDir(subsysPath)
 		if err != nil {
-			return nil, fmt.Errorf("failed to read nvme subsystem at %s: %w", subsysPath, err)
+			// Fallback: If it's a standard endpoint rather than a subsystem layout, return itself
+			if _, errStat := os.Stat(filepath.Join("/sys/block", baseDevice)); errStat == nil {
+				return []string{baseDevice}, nil
+			}
+			return nil, fmt.Errorf("failed to read nvme subsystem paths at %s: %w", subsysPath, err)
 		}
 
 		var pathNames []string
 		for _, ctrl := range controllers {
-			// In NVMe, the paths are the namespaces under each controller
-			// e.g., if base is nvme-subsys0n1, paths are nvme0n1, nvme1n1
-			nsID := strings.Split(baseDevice, "n")[1]
-			pathName := fmt.Sprintf("%sn%s", ctrl.Name(), nsID)
+			if ctx.Err() != nil { 
+				return nil, ctx.Err() 
+			}
 
-			// Verify the path exists in /sys/block
-			if _, err := os.Stat(filepath.Join("/sys/block", pathName)); err == nil {
-				pathNames = append(pathNames, pathName)
+			ctrlName := ctrl.Name() // e.g. "nvme0"
+			if strings.HasPrefix(ctrlName, "nvme") && !strings.Contains(ctrlName, "subsys") {
+				// Standard Block Mapping Alignment: controller + namespace suffix -> "nvme0" + "n1"
+				pathName := ctrlName + nsID
+
+				if _, errStat := os.Stat(filepath.Join("/sys/block", pathName)); errStat == nil {
+					pathNames = append(pathNames, pathName)
+				}
 			}
 		}
 		return pathNames, nil
 	}
 	
-	if strings.HasPrefix(baseDevice, "nvme") {
-		// Use LastIndex to safely split "nvme0n1" or "nvme-subsys0n1"
-		nIdx := strings.LastIndex(baseDevice, "n")
-		if nIdx == -1 {
-			return nil, fmt.Errorf("invalid nvme device name: %s", baseDevice)
-		}
-		nsID := baseDevice[nIdx:] // e.g., "n1"
-
-		subsysPath := filepath.Join("/sys", "block", baseDevice, "device", "subsystem")
-		controllers, err := os.ReadDir(subsysPath)
-		if err != nil {
-			return nil, fmt.Errorf("failed to read nvme subsystem: %w", err)
-		}
-
-		var pathNames []string
-		for _, ctrl := range controllers {
-			if ctx.Err() != nil { return nil, ctx.Err() }
-
-			// In NVMe, the paths are children of the controllers 
-			// named like: [controllerName][namespaceID] -> "nvme0" + "n1"
-			pathName := ctrl.Name() + nsID
-
-			// REQUIREMENT 4: Verify path exists without process invocation
-			if _, err := os.Stat(filepath.Join("/sys/block", pathName)); err == nil {
-				pathNames = append(pathNames, pathName)
-			}
-		}
-		return pathNames, nil
-	}	
-
-	return nil, fmt.Errorf("unsupported device type: %s", baseDevice)
+	return nil, fmt.Errorf("unsupported block layer device type layout specification: %s", baseDevice)
 }
 
 func (n NodeUtils) StageInfoFileIsExist(filePath string) bool {
