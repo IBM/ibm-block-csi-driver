@@ -2057,8 +2057,8 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) getScsiTargetID(ctx context.Cont
 	// =========================================================================
 	// 3. MULTI-PROTOCOL INTERCEPTION ROUTER
 	// =========================================================================
-
-	// Track A: Fibre Channel Strategy
+	
+	// Track A: Fibre Channel Strategy 
 	fcPath := filepath.Join(parentTargetBase, "fc_transport", targetDirName, "port_name")
 	fcExists, _ := executer.ExecuteUninterruptible[bool](
 		ctx, r.KeyedGater, "stat-fc-"+hctl, 10, 50, 500*time.Millisecond, 1*time.Second,
@@ -2088,8 +2088,11 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) getScsiTargetID(ctx context.Cont
 		}
 	}
 
+	// =========================================================================
+	// THE FIX: Isolate the first index element to drop string value cleanly
+	// =========================================================================
 	// Track C: iSCSI Strategy Fallback
-	return r.getIscsiTargetName(ctx, realDevicePath, parentTargetBase, hostID)
+	return r.getIscsiTargetName(ctx, realDevicePath, parentTargetBase, hostID[0])
 }
 
 // getIscsiTargetName identifies the operational iSCSI target name with full D-state protection.
