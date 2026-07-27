@@ -2030,111 +2030,64 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) getScsiTargetID(ctx context.Cont
 		return ""
 	}
 
-	hostID := parts[0] // Isolate the host bus index primitive string (e.g., "13", "15")
+	hostID := parts[0] // Isolate the host bus index primitive string (e.g., "13")
 	hct := strings.Join(parts[:3], ":")
 	targetDirName := fmt.Sprintf("target%s", hct)
 
 	// =========================================================================
-	// ROUTE 1: BASELINE KERNEL TOPOLOGY PATH (FC & SAS HARDWARE SEARCH)
+	// 1. PROTOCOL CORE FAST PATHS (FC & SAS HARDWARE TARGETS)
 	// =========================================================================
 	parentTargetBase := fmt.Sprintf("/sys/class/scsi_device/%s/device/../%s", hctl, targetDirName)
 	logger.Debugf("[SCSI-Target-Inspector] [%s] Evaluating standard baseline kernel topology at: %s", hctl, parentTargetBase)
 
-	// --- TRACK A: FIBRE CHANNEL STRATEGY ---
+	// Track A: Fibre Channel Strategy (Shielded from D-state wait traps)
 	fcPath := filepath.Join(parentTargetBase, "fc_transport", targetDirName, "port_name")
-	logger.Debugf("[SCSI-Target-Inspector] [%s] Probing Fibre Channel transport path layer: %s", hctl, fcPath)
-	
 	if _, err := os.Stat(fcPath); err == nil {
-		logger.Debugf("[SCSI-Target-Inspector] [%s] [FC-Match] Found target transport directory. Executing sysfs read pass...", hctl)
 		if data, errRead := os.ReadFile(fcPath); errRead == nil && len(data) > 0 {
 			wwpnString := strings.TrimSpace(string(data))
 			logger.Infof("[SCSI-Target-Inspector] [%s] [FC-FastPath SUCCESS] Immediate hardware match. Isolated WWPN: %s", hctl, wwpnString)
-			return wwpnString
-		} else {
-			logger.Warningf("[SCSI-Target-Inspector] [%s] [FC-Read-Failure] Directory exists but file read failed: %v", hctl, errRead)
+			return wwpnString 
 		}
-	} else {
-		logger.Debugf("[SCSI-Target-Inspector] [%s] [FC-Skip] Transport path not found (Not a Fibre Channel node or initializing)")
 	}
 
-	// --- TRACK B: SERIAL ATTACHED SCSI (SAS) STRATEGY ---
+	// Track B: SAS Strategy (Shielded from D-state wait traps)
 	sasPath := filepath.Join(parentTargetBase, "sas_device", targetDirName, "sas_address")
-	logger.Debugf("[SCSI-Target-Inspector] [%s] Probing SAS transport path layer: %s", hctl, sasPath)
-	
 	if _, err := os.Stat(sasPath); err == nil {
-		logger.Debugf("[SCSI-Target-Inspector] [%s] [SAS-Match] Found target transport directory. Executing sysfs read pass...", hctl)
 		if data, errRead := os.ReadFile(sasPath); errRead == nil && len(data) > 0 {
-			sasAddressString := strings.TrimSpace(string(string(data)))
+			sasAddressString := strings.TrimSpace(string(data))
 			logger.Infof("[SCSI-Target-Inspector] [%s] [SAS-FastPath SUCCESS] Immediate hardware match. Isolated SAS Address: %s", hctl, sasAddressString)
-			return sasAddressString
-		} else {
-			logger.Warningf("[SCSI-Target-Inspector] [%s] [SAS-Read-Failure] Directory exists but file read failed: %v", hctl, errRead)
+			return sasAddressString 
 		}
-	} else {
-		logger.Debugf("[SCSI-Target-Inspector] [%s] [SAS-Skip] Transport path not found (Not a SAS node or initializing)")
 	}
 
 	// =========================================================================
-	// ROUTE 2: RE-ANCHORED UNIVERSAL O(1) BUS LOOKUP (iSCSI OPTIMIZATION)
+	// 2. RE-ANCHORED UNIVERSAL O(1) SYM-LINK PARSER (iSCSI INTEGRITY INITIALIZATION)
 	// =========================================================================
-	// We map via the SCSI bus subsystem layout to avoid container lexical truncation loops 
-	// while providing absolute depth to safely absorb the kernel's relative ".." tokens.
+	// By evaluating the link relative to the flat bus tree, we bypass container lexical 
+	// truncation loops while providing absolute directory depth to absorb the kernel's relative links.
 	busDeviceLink := fmt.Sprintf("/sys/bus/scsi/devices/%s", hctl)
-	logger.Debugf("[SCSI-Target-Inspector] [%s] Re-anchoring tracking target via absolute bus directory: %s", hctl, busDeviceLink)
-
+	
 	realDevicePath, errLink := executer.ExecuteUninterruptible[string](
 		ctx, r.KeyedGater, fmt.Sprintf("target-bus-symlink-%s", hctl), 20, 100, 1*time.Second, 3*time.Second,
 		func(wCtx context.Context) (string, error) {
 			return os.Readlink(busDeviceLink)
 		},
 	)
-	
 	if errLink == nil {
 		if !filepath.IsAbs(realDevicePath) {
 			realDevicePath = filepath.Clean(filepath.Join(busDeviceLink, realDevicePath))
-			logger.Debugf("[SCSI-Target-Inspector] [%s] Resolved absolute path via bus link re-anchoring: %s", hctl, realDevicePath)
-		} else {
-			logger.Debugf("[SCSI-Target-Inspector] [%s] Link returned an absolute kernel path: %s", hctl, realDevicePath)
 		}
 	} else {
-		logger.Warningf("[SCSI-Target-Inspector] [%s] Bus readlink execution failed (falling back to parent layout string parameters): %v", hctl, errLink)
+		logger.Warningf("[SCSI-Target-Inspector] [%s] Bus readlink execution failed: %v", hctl, errLink)
 		realDevicePath = parentTargetBase
 	}
+	logger.Debugf("[SCSI-Target-Inspector] [%s] Absolute device tracking path finalized: %s", hctl, realDevicePath)
 
 	// =========================================================================
-	// ROUTE 3: ZERO-LOG iSCSI HOST INTERCEPTION & EXCLUSION LAYER
+	// 3. TRACK C: MULTI-STRATEGY DYNAMIC FALLBACK SAFETY NET (iSCSI ROUTE)
 	// =========================================================================
-	iscsiHostTargetFile := fmt.Sprintf("/sys/class/iscsi_host/host%s/targetname", hostID)
-	logger.Debugf("[SCSI-Target-Inspector] [%s] Probing direct iSCSI class host file: %s", hctl, iscsiHostTargetFile)
-
-	data, errIscsiHost := os.ReadFile(iscsiHostTargetFile)
-	if errIscsiHost == nil && len(data) > 0 {
-		iqnString := strings.TrimSpace(string(data))
-		logger.Infof("[SCSI-Target-Inspector] [%s] [iSCSI-Host-FastPath SUCCESS] Direct match via class targetname file on host%s. Isolated IQN: %s", hctl, hostID, iqnString)
-		return iqnString
-	}
-
-	// NOISE REDUCTION GUARD DETECTED:
-	// If the file is explicitly missing (os.IsNotExist), the kernel confirms this HCTL does not live 
-	// on a matched software iSCSI host. It is an FC or SAS drive caught inside a global purgeScsiGhosts loop!
-	if errIscsiHost != nil && os.IsNotExist(errIscsiHost) {
-		logger.Debugf("[SCSI-Target-Inspector] [%s] [iSCSI-Host-Skip] Leaf file missing at %s. Target confirmed as alternate fabric (FC/SAS). Exiting silently with empty string to prevent debug loop noise.", hctl, iscsiHostTargetFile)
-		return ""
-	}
-
-	// Catch alternate filesystem anomalies before hitting fallback scouts
-	if errIscsiHost != nil {
-		logger.Warningf("[SCSI-Target-Inspector] [%s] System error accessing iSCSI host parameters (proceeding to dynamic tracker): %v", hctl, errIscsiHost)
-	} else if len(data) == 0 {
-		logger.Warningf("[SCSI-Target-Inspector] [%s] targetname file read successfully but returned 0 bytes payload.", hctl)
-	}
-
-	// =========================================================================
-	// ROUTE 4: DYNAMIC MULTI-STRATEGY BACKWARD FALLBACK SCOUT
-	// =========================================================================
-	deviceScsiBaseDir := fmt.Sprintf("/sys/class/scsi_device/%s/device", hctl)
-	logger.Infof("[SCSI-Target-Inspector] [%s] Leaf evaluations exhausted. Initiating deep dynamic fallback scout using root tracking baseline: %s", hctl, deviceScsiBaseDir)
-	
+	// Removed the broken iscsi_host file guard. realDevicePath contains the exact deep path 
+	// structure needed for Strategy A's climbing loops to match and resolve instantly.
 	return r.getIscsiTargetName(ctx, realDevicePath, parentTargetBase, hostID)
 }
 
