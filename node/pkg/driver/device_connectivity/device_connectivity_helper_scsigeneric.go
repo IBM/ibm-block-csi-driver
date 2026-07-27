@@ -2273,7 +2273,7 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) IsSgDeviceGhost(ctx context.Cont
 		600*time.Millisecond, 
 		2*time.Second,        
 		func(wCtx context.Context) (bool, error) {
-			return r.checkPQviaIoctl(cleanSgName)
+			return r.checkPQviaIoctl(cleanSgName, deviceAge)
 		},
 	)
 	
@@ -2336,7 +2336,8 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) isHardwareBlocked(sgName string)
 	return false
 }
 
-func (r *OsDeviceConnectivityHelperScsiGeneric) checkPQviaIoctl(sgName string) (bool, error) {
+// checkPQviaIoctl performs an age-aware SCSI INQUIRY assessment on a generic node.
+func (r *OsDeviceConnectivityHelperScsiGeneric) checkPQviaIoctl(sgName string, deviceAge time.Duration) (bool, error) {
 	logger.Debugf("[%s] IOCTL Probe: Reading subsystem link type to identify target engine...", sgName)
 	subsystem, _ := os.Readlink(fmt.Sprintf("/sys/class/scsi_generic/%s/device/subsystem", sgName))
 	if strings.Contains(subsystem, "nvme") {
@@ -2418,11 +2419,17 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) checkPQviaIoctl(sgName string) (
 		logger.Debugf("[%s] IOCTL Probe: Execution response received. Host Status: 0x%04x, Driver Status: 0x%04x, SCSI Protocol Status: 0x%02x", 
 			sgName, header.host_status, header.driver_status, header.status)
 
-		// Evaluate Host Transport Status safely using architectural definitions
+		// =========================================================================
+		// 1. TRANSPORT LAYER EVALUATION (INVERTED AGE SAFEGUARD)
+		// =========================================================================
 		if header.host_status != 0 {
 			switch header.host_status {
 			case 0x05, 0x07, 0x0e: // DID_NO_CONNECT, DID_ERROR, DID_TRANSPORT_FAIL_FAST
-				logger.Warningf("[%s] IOCTL Probe: SCSI Transport confirmed unrecoverable death (HostStatus: 0x%02x). Flagging as ghost slot.", sgName, header.host_status)
+				if deviceAge < 30*time.Second {
+					logger.Warningf("[%s] IOCTL Probe: Intercepted transport error (0x%02x) during birth sequence (Age: %v). Retaining path safely.", sgName, header.host_status, deviceAge)
+					return false, nil // Active initialization/fabric registration sequence step
+				}
+				logger.Warningf("[%s] IOCTL Probe: SCSI Transport confirmed unrecoverable death after aging window (HostStatus: 0x%02x). Flagging as ghost slot.", sgName, header.host_status)
 				return true, nil
 			default:
 				logger.Debugf("[%s] IOCTL Probe: Fabric dropped transient congestion code (HostStatus: 0x%02x). Defensively retaining path.", sgName, header.host_status)
@@ -2430,6 +2437,9 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) checkPQviaIoctl(sgName string) (
 			}
 		}
 
+		// =========================================================================
+		// 2. PROTOCOL LAYER EVALUATION (INVERTED AGE SAFEGUARD)
+		// =========================================================================
 		switch header.status {
 		case 0x00: // SCSI STATUS: GOOD
 			logger.Debugf("[%s] IOCTL Probe: SCSI transmission successful. Routing packet to Page 0x83 parser payload layer.", sgName)
@@ -2448,24 +2458,25 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) checkPQviaIoctl(sgName string) (
 					continue 
 				}
 
-				// 0x05/25/00 = Logical Unit Not Supported
-				if senseKey == 0x05 && asc == 0x25 && ascq == 0x00 { 
-					logger.Warningf("[%s] IOCTL Probe: Hardware confirmed LUN is detached (Logical Unit Not Supported). Flagging as ghost slot.", sgName)
+				// Hard Ghost Indicators: These explicitly prove the logical mapping layout is detached or unbacked
+				isHardGhostCondition := (senseKey == 0x02 && asc == 0x3A) || // Medium Not Present
+					(senseKey == 0x05 && asc == 0x24 && ascq == 0x00)       // Invalid Field in CDB
+
+				if isHardGhostCondition {
+					logger.Warningf("[%s] IOCTL Probe: Hard structural ghost confirmed via SCSI Check Condition (%02x/%02x). Flagging as ghost slot.", sgName, senseKey, asc)
 					return true, nil
 				}
-				// 0x02/3A = Medium Not Present (LUN exists but no volume is backed behind it)
-				if senseKey == 0x02 && asc == 0x3A {
-					logger.Warningf("[%s] IOCTL Probe: Hardware confirmed LUN maps to empty storage space (Medium Not Present). Flagging as ghost slot.", sgName)
-					return true, nil
-				}
-				// 0x05/24/00 = Invalid Field in CDB (Target controller does not even map this page space)
-				if senseKey == 0x05 && asc == 0x24 && ascq == 0x00 {
-					logger.Warningf("[%s] IOCTL Probe: Hardware confirmed target controller does not support VPD structures. Flagging as ghost slot.", sgName)
-					return true, nil
+
+				// Preparation/Transient Indicator Rule: If fresh, skip pruning for ALL other unhandled check conditions (e.g. 0x05/0x25)
+				if deviceAge < 30*time.Second {
+					logger.Warningf("[%s] IOCTL Probe: Intercepted transient condition (%02x/%02x) during birth sequence (Age: %v). Retaining path to settle.", sgName, senseKey, asc, deviceAge)
+					return false, nil 
 				}
 			}
-			logger.Debugf("[%s] IOCTL Probe: Unhandled SCSI Check Condition encountered under load. Defensively retaining path.", sgName)
-			return false, fmt.Errorf("unhandled scsi check condition: sense key 0x%02x", senseKey)
+			
+			// If the device is breaching the aging boundary and still failing commands, it's safe to prune
+			logger.Errorf("[%s] IOCTL Probe: Device failing check conditions beyond aging threshold (%v). Enforcing ghost pruning.", sgName, deviceAge)
+			return true, nil
 
 		case 0x08, 0x28: // SCSI STATUS: BUSY or TASK SET FULL
 			logger.Debugf("[%s] IOCTL Probe: Target queue congestion flagged (Status: 0x%02x). Executing 50ms fallback wait...", sgName, header.status)
@@ -2473,36 +2484,41 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) checkPQviaIoctl(sgName string) (
 			continue 
 
 		default:
-			logger.Debugf("[%s] IOCTL Probe: Unexpected SCSI protocol status byte received (0x%02x). Defensively retaining path.", sgName, header.status)
-			return false, fmt.Errorf("unexpected scsi status byte received: 0x%02x", header.status)
+			if deviceAge < 30*time.Second {
+				logger.Warningf("[%s] IOCTL Probe: Unexpected SCSI status byte (0x%02x) during birth sequence. Retaining path.", sgName, header.status)
+				return false, nil
+			}
+			logger.Debugf("[%s] IOCTL Probe: Unexpected SCSI protocol status byte received (0x%02x). Flagging as ghost slot.", sgName, header.status)
+			return true, nil
 		}
 	} 
 
 	logger.Debugf("[%s] IOCTL Probe: Exhausted all hardware command attempts under load pressure. Defensively retaining path.", sgName)
 	return false, fmt.Errorf("exhausted storage path verification inquiry attempts under load queue pressure")
 
+// =========================================================================
+// 3. VPD PAYLOAD EVALUATION
+// =========================================================================
 PROCESS_PAGE_0x83:
-        if inqResp[1] != 0x83 {
-                logger.Warningf("[%s] Payload Parsing Error: Device returned invalid page code identifier (0x%02x) instead of 0x83. Flagging as ghost slot.", sgName, inqResp[1])
-                return true, nil
-        }
+	if inqResp[1] != 0x83 {
+		logger.Warningf("[%s] Payload Parsing Error: Device returned invalid page code identifier (0x%02x) instead of 0x83. Flagging as ghost slot.", sgName, inqResp[1])
+		return true, nil
+	}
 
-        // 1. Calculate the Page Length and extract PQ / DevType variables explicitly
-        pageLen := (int(inqResp[2]) << 8) | int(inqResp[3])
-        pq := (inqResp[0] >> 5) & 0x07 // <-- ADD THIS LINE TO FIX THE COMPILE ERROR
-        devType := inqResp[0] & 0x1f
+	pageLen := (int(inqResp[2]) << 8) | int(inqResp[3])
+	pq := (inqResp[0] >> 5) & 0x07 
+	devType := inqResp[0] & 0x1f
 
-        // 2. Include pageLen in the logs so the compiler accepts the declared variable
-        logger.Debugf("[%s] Payload Parsing: VPD Page Code verified (0x83). Length: %d bytes. PQ: %d, Type: %d", sgName, pageLen, pq, devType)
+	logger.Debugf("[%s] Payload Parsing: VPD Page Code verified (0x83). Length: %d bytes. PQ: %d, Type: %d", sgName, pageLen, pq, devType)
 
-        // PQ 1 or 3 implies a hardware detached map or missing logical assignment endpoint
-        if pq == 1 || pq == 3 || devType == 0x1f {
-                logger.Warningf("[%s] Payload Parsing: Identity mapping mismatch discovered [PQ=%d, Type=%d]. Confirmed dead squatter path. Flagging as ghost slot.", sgName, pq, devType)
-                return true, nil
-        }
+	// PQ 1 or 3 implies a hardware detached map or missing logical assignment endpoint
+	if pq == 1 || pq == 3 || devType == 0x1f {
+		logger.Warningf("[%s] Payload Parsing: Identity mapping mismatch discovered [PQ=%d, Type=%d]. Confirmed dead squatter path. Flagging as ghost slot.", sgName, pq, devType)
+		return true, nil
+	}
 
-        logger.Debugf("[%s] Payload Parsing: Target validation check complete. Hardware transport link reports clean, active connectivity.", sgName)
-        return false, nil
+	logger.Debugf("[%s] Payload Parsing: Target validation check complete. Hardware transport link reports clean, active connectivity.", sgName)
+	return false, nil
 }
 
 // sHardwareBlocked, also check for the quiesce state. It often indicates a storage controller failover where I/O is paused but not failed.
@@ -6941,57 +6957,79 @@ func (o GetDmsPathHelperGeneric) validateDMIntegrity(dmPath string) (string, err
 	}
 
 	var activePaths int
+	var degradedPaths int
+
 	for _, s := range slaves {
 		slaveName := s.Name() // e.g., "sdb" or "nvme0n2"
 		
+		// Traverses directly through the link tree layout to ensure RHEL 7 compatibility
+		slaveDeviceBaseDir := filepath.Join("/sys/block", dmName, "slaves", slaveName, "device")
+		statePath := filepath.Join(slaveDeviceBaseDir, "state")
+
+		// =========================================================================
+		// BRANCH A: CLASSIC SCSI SLAVE REFACTOR (FIBRE CHANNEL)
+		// =========================================================================
 		if strings.HasPrefix(slaveName, "sd") {
-			// SCSI underlying device check (Works perfectly)
-			statePath := filepath.Join("/sys/block", slaveName, "device", "state")
-			state, err := os.ReadFile(statePath)
-			if err == nil && strings.TrimSpace(string(state)) == "running" {
-				activePaths++
-			}
-		} else if strings.HasPrefix(slaveName, "nvme") {
-			// FIX 1 & 2: Read the universal namespace leg operational state file directly.
-			// This bypasses the fragile nested subdirectory loop entirely.
-			statePath := filepath.Join("/sys/block", slaveName, "device", "state")
 			stateBytes, err := os.ReadFile(statePath)
 			if err == nil {
-				state := strings.ToLower(strings.TrimSpace(string(stateBytes)))
-				// For native NVMe fabric block tracks, the kernel reports healthy paths as "live"
-				if state == "live" {
+				stateStr := strings.ToLower(strings.TrimSpace(string(stateBytes)))
+				// STRICT CONDITION: Only count active data carriers
+				if stateStr == "running" {
+					activePaths++
+				} else {
+					degradedPaths++
+				}
+			} else {
+				degradedPaths++
+			}
+
+		// =========================================================================
+		// BRANCH B: NATIVE NVME FABRIC SLAVES
+		// =========================================================================
+		} else if strings.HasPrefix(slaveName, "nvme") {
+			stateBytes, err := os.ReadFile(statePath)
+			if err == nil {
+				stateStr := strings.ToLower(strings.TrimSpace(string(stateBytes)))
+				if stateStr == "live" || stateStr == "running" {
 					activePaths++
 					continue
 				}
 			}
 
-			// FALLBACK: Sibling controller scanning using regex to protect fabric controllers (like nvme0c0)
-			deviceDir := filepath.Join("/sys/block", slaveName, "device") // Points to subsystem folder
-			if entries, err := os.ReadDir(deviceDir); err == nil {
+			// FALLBACK: Sibling controller scanning using regex to protect fabric controllers
+			var controllerPassed bool
+			if entries, err := os.ReadDir(slaveDeviceBaseDir); err == nil {
 				for _, entry := range entries {
 					entryName := entry.Name()
-					
-					// Filter out sub-namespace objects using the safe regex rule
 					isNamespaceDisk := nvmeNamespaceRegex.MatchString(entryName)
 					
 					if strings.HasPrefix(entryName, "nvme") && !isNamespaceDisk && !strings.Contains(entryName, "-") {
-						ctrlStatePath := filepath.Join(deviceDir, entryName, "state")
+						ctrlStatePath := filepath.Join(slaveDeviceBaseDir, entryName, "state")
 						if ctrlStateBytes, err := os.ReadFile(ctrlStatePath); err == nil {
 							ctrlState := strings.ToLower(strings.TrimSpace(string(ctrlStateBytes)))
-							if ctrlState == "live" {
+							if ctrlState == "live" || ctrlState == "running" {
 								activePaths++
+								controllerPassed = true
 								break 
 							}
 						}
 					}
 				}
 			}
+			
+			if !controllerPassed {
+				degradedPaths++
+			}
 		}
 	}
 
+	logger.Infof("[Integrity-Check] [%s] Path analysis complete. Active lines: %d | Degraded/Preparing lines: %d", dmName, activePaths, degradedPaths)
+
+	// Explicit boundary protection: if 100% of slave tracks are offline, block stage mounting
 	if activePaths == 0 {
-		return "", fmt.Errorf("dm device %s has %d slaves configured but zero operational paths", dmName, len(slaves))
+		return "", fmt.Errorf("dm device %s has zero functional operational paths (Total Slaves: %d, Degraded: %d)", dmName, len(slaves), degradedPaths)
 	}
+	
 	return dmPath, nil
 }
 
