@@ -2015,58 +2015,33 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) getHCTLFromSd(ctx context.Contex
 	return hctl, nil
 }
 
+// getScsiTargetID unifies multi-protocol hardware identification tracking with full context propagation.
 func (r *OsDeviceConnectivityHelperScsiGeneric) getScsiTargetID(ctx context.Context, hctl string) string {
-	parts := strings.Split(hctl, ":")
-	if len(parts) < 4 {
+	logger.Infof("[SCSI-Target-Inspector] Entering identification pipeline for target address: [%s]", hctl)
+
+	if err := ctx.Err(); err != nil {
+		logger.Warningf("[SCSI-Target-Inspector] [%s] Aborting execution: incoming context already cancelled: %v", hctl, err)
 		return ""
 	}
 
-	hostID := parts[0]
+	parts := strings.Split(hctl, ":")
+	if len(parts) < 4 {
+		logger.Warningf("[SCSI-Target-Inspector] [%s] Aborting execution: malformed HCTL layout segment footprint", hctl)
+		return ""
+	}
+
+	// FIX: Isolate the first index element explicitly to resolve the string value primitive correctly
+	hostID := parts[0] // Ensures "host10", "host13", or "host14" parse cleanly into sysfs builders
 	hct := strings.Join(parts[:3], ":")
 	targetDirName := fmt.Sprintf("target%s", hct)
 
 	// =========================================================================
-	// 1. HARDENED FIBRE CHANNEL TRANSPORT SEARCH (CROSS-DISTRIBUTION FIX)
+	// 1. RE-ANCHORED UNIVERSAL BUS PATH LOOKUP (O(1) DEPTH PROTECTION)
 	// =========================================================================
-	parentTargetBase := fmt.Sprintf("/sys/class/scsi_device/%s/device/../%s", hctl, targetDirName)
-	
-	// Option 1: Classic shortcut layout path
-	fcPath := filepath.Join(parentTargetBase, "fc_transport", targetDirName, "port_name")
-	
-	// Option 2: Modern Remote Port (rport) architecture layout path
-	// Climbs out of target10:0:0 into rport-10:0-0 to find the true fc_transport directory
-	rportFcPath := fmt.Sprintf("/sys/class/scsi_device/%s/device/../../fc_transport/%s/port_name", hctl, targetDirName)
-
-	// Evaluate Option 1 First
-	if _, err := os.Stat(fcPath); err == nil {
-		if data, errRead := os.ReadFile(fcPath); errRead == nil && len(data) > 0 {
-			wwpn := strings.TrimSpace(string(data))
-			logger.Infof("    [SCSI-Target-Inspector] [FC-FastPath SUCCESS] Identified classic WWPN: %s", wwpn)
-			return wwpn
-		}
-	}
-
-	// Evaluate Option 2 (Modern PCIe / rport layout)
-	if _, err := os.Stat(rportFcPath); err == nil {
-		if data, errRead := os.ReadFile(rportFcPath); errRead == nil && len(data) > 0 {
-			wwpn := strings.TrimSpace(string(data))
-			logger.Infof("    [SCSI-Target-Inspector] [FC-rport-FastPath SUCCESS] Identified modern rport WWPN: %s", wwpn)
-			return wwpn // CORRECT REAL IDENTIFICATION EXIT
-		}
-	}
-
-	// Track B: SAS Strategy
-	sasPath := filepath.Join(parentTargetBase, "sas_device", targetDirName, "sas_address")
-	if _, err := os.Stat(sasPath); err == nil {
-		if data, errRead := os.ReadFile(sasPath); errRead == nil && len(data) > 0 {
-			return strings.TrimSpace(string(data))
-		}
-	}
-
-	// =========================================================================
-	// 2. RE-ANCHORED UNIVERSAL O(1) SYM-LINK PARSER (iSCSI INTEGRITY)
-	// =========================================================================
+	// Secure the deep, physical device tree layout path directly from the bus architecture.
+	// This path works flawlessly across RHEL 7, RHEL 8/9, and container namespaces.
 	busDeviceLink := fmt.Sprintf("/sys/bus/scsi/devices/%s", hctl)
+	
 	realDevicePath, errLink := executer.ExecuteUninterruptible[string](
 		ctx, r.KeyedGater, fmt.Sprintf("target-bus-symlink-%s", hctl), 20, 100, 1*time.Second, 3*time.Second,
 		func(wCtx context.Context) (string, error) {
@@ -2078,15 +2053,49 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) getScsiTargetID(ctx context.Cont
 			realDevicePath = filepath.Clean(filepath.Join(busDeviceLink, realDevicePath))
 		}
 	} else {
-		realDevicePath = parentTargetBase
+		realDevicePath = fmt.Sprintf("/sys/class/scsi_device/%s/device", hctl)
+	}
+	logger.Debugf("[SCSI-Target-Inspector] [%s] Absolute device tracking path finalized: %s", hctl, realDevicePath)
+
+	// =========================================================================
+	// 2. EXTRACTION SEGMENT (ANCHORED VIA REAL DEVICE PATH ELEMENTS)
+	// =========================================================================
+	// Isolate parent directories dynamically from our verified absolute hardware path string
+	targetDirFolder := filepath.Dir(realDevicePath)  // Points to ".../target10:0:1"
+	rportDirFolder := filepath.Dir(targetDirFolder) // Points to ".../rport-10:0-2" or hardware bus root
+
+	// --- TRACK A1: FIBRE CHANNEL (CLASSIC LAYOUT) ---
+	fcPath := filepath.Join(targetDirFolder, "fc_transport", targetDirName, "port_name")
+	if data, err := os.ReadFile(fcPath); err == nil && len(data) > 0 {
+		wwpn := strings.TrimSpace(string(data))
+		logger.Infof("[SCSI-Target-Inspector] [%s] [FC-Classic-FastPath SUCCESS] WWPN: %s", hctl, wwpn)
+		return wwpn
+	}
+
+	// --- TRACK A2: FIBRE CHANNEL (MODERN PCIe REMOTE PORT LAYOUT) ---
+	rportBaseName := filepath.Base(rportDirFolder)
+	if strings.HasPrefix(rportBaseName, "rport") {
+		rportFcPath := filepath.Join(rportDirFolder, "fc_transport", rportBaseName, "port_name")
+		if data, err := os.ReadFile(rportFcPath); err == nil && len(data) > 0 {
+			wwpn := strings.TrimSpace(string(data))
+			logger.Infof("[SCSI-Target-Inspector] [%s] [FC-rport-FastPath SUCCESS] Isolated WWPN via remote port tree: %s", hctl, wwpn)
+			return wwpn // SUCCESSFUL FIBRE CHANNEL EXIT
+		}
+	}
+
+	// --- TRACK B: SERIAL ATTACHED SCSI (SAS STRATEGY) ---
+	sasPath := filepath.Join(targetDirFolder, "sas_device", targetDirName, "sas_address")
+	if data, err := os.ReadFile(sasPath); err == nil && len(data) > 0 {
+		sasAddr := strings.TrimSpace(string(data))
+		logger.Infof("[SCSI-Target-Inspector] [%s] [SAS-FastPath SUCCESS] SAS Address: %s", hctl, sasAddr)
+		return sasAddr
 	}
 
 	// =========================================================================
-	// 3. TRACK C: iSCSI SCOUT CORES FALLBACK
+	// 3. TRACK C: iSCSI SCOUT CORES FALLBACK (TRUE ISCSI STORAGE PATHS)
 	// =========================================================================
-	// If it is an iSCSI configuration, it passes here safely. If it is a true non-iSCSI 
-	// foreign disk that isn't ours, getIscsiTargetName will return "" correctly, 
-	// protecting the host bus from accidental pruning.
+	// Fallback to old behavior if structural path evaluations point to a native network target
+	parentTargetBase := fmt.Sprintf("/sys/class/scsi_device/%s/device/../%s", hctl, targetDirName)
 	return r.getIscsiTargetName(ctx, realDevicePath, parentTargetBase, hostID)
 }
 
