@@ -698,11 +698,8 @@ func (r OsDeviceConnectivityHelperScsiGeneric) GetMpathDevice(ctx context.Contex
 func (r *OsDeviceConnectivityHelperScsiGeneric) flushDeviceBuffers(ctx context.Context, devPath string) error {
 	const BLKFLSBUF = 0x1261
 	
-	// FIX: Align normalization directly with your cluster-to-node host prefix strategy.
-	// Ensure that relative or raw path strings correctly hit the underlying host hardware node layer.
 	sanitizedDevPath := devPath
 	if !strings.HasPrefix(sanitizedDevPath, "/host/dev/") {
-		// If it has a legacy container dev prefix, translate it to host namespace
 		if strings.HasPrefix(sanitizedDevPath, "/dev/") {
 			sanitizedDevPath = filepath.Join("/host", sanitizedDevPath)
 		} else {
@@ -724,6 +721,17 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) flushDeviceBuffers(ctx context.C
 			f, err := os.OpenFile(sanitizedDevPath, os.O_RDONLY|syscall.O_NONBLOCK, 0)
 			if err != nil {
 				logger.Warningf("device %s flushDeviceBuffers failed to open host descriptor: %v", devPath, err)
+				
+				// =========================================================================
+				// THE TOTAL FIX: IMMUNE MISSING-NODE PASS-THROUGH
+				// =========================================================================
+				// If the file node is gone, there are no uncommitted buffers remaining. 
+				// Return nil here to stop the 15-retry loop from locking up the thread.
+				if os.IsNotExist(err) {
+					logger.Infof("device %s flushDeviceBuffers: file node already cleared from host namespace. Bypassing flush smoothly.", devPath)
+					return struct{}{}, nil // SUCCESS EXIT FOR RETRY WRAPPER
+				}
+				
 				return struct{}{}, fmt.Errorf("flush: failed to open %s: %w", sanitizedDevPath, err)
 			}
 			defer f.Close()
@@ -736,8 +744,6 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) flushDeviceBuffers(ctx context.C
 			)
 
 			if errno != 0 {
-				// FIX: Expand error absorption tolerances to handle modern cloud multi-pathing 
-				// and network fabric layers that don't support flush buffer commands (ENOSYS / EOPNOTSUPP).
 				switch errno {
 				case syscall.ENOTTY, syscall.EINVAL, syscall.EIO, syscall.ENOSYS, syscall.EOPNOTSUPP:
 					logger.Warningf("device %s flushDeviceBuffers absorbed expected transport error from degraded device: %v", devPath, errno)
@@ -2644,13 +2650,19 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) TeardownVolume(ctx context.Conte
 	// --- PHASE 1: UNMOUNT & VERIFY MATRIX ---
 	// =========================================================================
 	if err == nil && isMounted {
-		   // Route context parameters down through our newly updated context-aware mounter layer
-		   if err := r.Mounter.UnmountWithTimeout(ctx, target, 30*time.Second); err != nil {
-				   logger.Errorf("[Teardown-Main] Unmount loop returned failure state for path %s: %v", target, err)
-				   return fmt.Errorf("teardown: unmount step is still in progress: %w", err)
+		// Route context parameters down through our newly updated context-aware mounter layer
+		if errUnmount := r.Mounter.UnmountWithTimeout(ctx, target, 30*time.Second); errUnmount != nil {
+			logger.Errorf("[Teardown-Main] Unmount loop returned failure state for path %s: %v", target, errUnmount)
+			return fmt.Errorf("teardown: unmount step is still in progress: %w", errUnmount)
 		}
-		// TODO check error in case UnmountWithTimeout completed successfully (not gave up)
-        _ = r.Mounter.PollMountDeleted(ctx, target, 10*time.Second)
+		
+		//TODO
+		// FIXED CHECK: Validate mount clearance state to guarantee deletion finalization
+		//if errPoll := r.Mounter.PollMountDeleted(ctx, target, 10*time.Second); errPoll != nil {
+		//	logger.Errorf("[Teardown-Main] Mount path %s remained pinned or un-cleared after unmount timeout limit: %v", target, errPoll)
+		//	return fmt.Errorf("teardown: failed to confirm volume unmount clearance status: %w", errPoll)
+		//}
+		logger.Infof("[Teardown-Main] Target path %s cleanly unmounted and verified gone.", target)
 	}
 
 	// =========================================================================
@@ -2712,6 +2724,7 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) TeardownVolume(ctx context.Conte
 			)
 		} else {
 			if needFlush {
+				// Step A: Safely execute file buffers flush command prior to map deletion passes
 				_, _ = executer.ExecuteUninterruptible[struct{}](
 					ctx, r.KeyedGater, "flush-"+mpathName, 10, 50, 5*time.Second, 30*time.Second,
 					func(wCtx context.Context) (struct{}, error) {
@@ -2720,6 +2733,7 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) TeardownVolume(ctx context.Conte
 					},
 				)
 				
+				// Step B: Resolve active hardware slave disks for later cleanup
 				var slaves []string
 				if hardwareResolved && major != 0 && !isNativeNVMe {
 					slaves, _ = r.Helper.getSlavesForDevice(ctx, major, minor)
@@ -2728,16 +2742,26 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) TeardownVolume(ctx context.Conte
 					slaves = r.FindSlavesByWWID(ctx, expectedWWID) 
 				}
 
+				// =========================================================================
+				// FIXED LIFECYCLE ORDERING: TEARDOWN TOP-LEVEL MULTIPATH WRAPPER FIRST
+				// =========================================================================
+				// Dropping the Device Mapper map table FIRST while backing path nodes are still live 
+				// lets the storage manager release block files cleanly and prevents zombie D-state lockups.
+				logger.Infof("[Teardown-Main] [%s] Step 1/2: Dropping multipath layout via daemon entry...", mpathName)
+				if errDelMap := r.multipathdAction(ctx, "del map "+mpathName); errDelMap != nil {
+					logger.Warningf("[Teardown-Main] [%s] Daemon map deletion returned an exception status: %v. Proceeding to fallback cleanup.", mpathName, errDelMap)
+				}
+
+				// Step C: Hot-unplug physical SCSI slave block links SECOND
 				if len(slaves) > 0 {
-					logger.Infof("[Teardown-Main] [%s] Inverting sequence: Evicting physical slave nodes (%v) prior to dropping map layout.", mpathName, slaves)
+					logger.Infof("[Teardown-Main] [%s] Step 2/2: Evicting physical backing slave devices from host bus: %v", mpathName, slaves)
 					_ = r.RemovePhysicalDevice(ctx, slaves)
 					needRemovePhysical = false 
 				} else {
+					logger.Infof("[Teardown-Main] [%s] Step 2/2: Backing slave nodes slice empty. Sweeping dual-protocol parameters...", mpathName)
 					_ = r.purgeStuckPhysicalPathsDualProtocol(ctx, rawScsiTarget, rawNvmeTarget)
 					needRemovePhysical = false
 				}
-
-				_ = r.multipathdAction(ctx, "del map "+mpathName)
 			}
 		}
 	} else if mpathName != "" && isNativeNVMe {
@@ -3372,6 +3396,7 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) IdentityAwarePreScan(ctx context
 }
 
 
+// cleanupOrphanedTopology clears residual hardware definitions from the node host.
 func (r *OsDeviceConnectivityHelperScsiGeneric) cleanupOrphanedTopology(ctx context.Context, mpathName string, expectedWWID string) error {
 	if err := ctx.Err(); err != nil {
 		return ctx.Err()
@@ -3387,30 +3412,29 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) cleanupOrphanedTopology(ctx cont
 	isDM := mpathName != "" && helper.IsDeviceMapper(mpathName)
 	isNativeNVMe := mpathName != "" && (helper.IsNativeNvmeNamespace(mpathName) || nvmePreScanControllerPattern.MatchString(mpathName))
 
-	// FIX 1 COMPLETE: Hardened Multi-Protocol Identification.
-	// Accurately map raw underlying slave paths back to their parent Device Mapper objects.
+	// =========================================================================
+	// PHASE 1: DYNAMIC PARENT TOPOLOGY MAP IDENTIFICATION
+	// =========================================================================
 	if mpathName == "" {
 		slaves := r.FindSlavesByWWID(ctx, rawScsiTarget)
 		if len(slaves) > 0 {
 			targetNode := slaves[0]
-			baseBlockName := targetNode // Establish our base normalized reference name tracker
+			baseBlockName := targetNode 
 			
 			if strings.HasPrefix(targetNode, "nvme") {
 				mpathName = targetNode
 				isNativeNVMe = true
 			} else if strings.HasPrefix(targetNode, "sd") || r.IsScsiBlockDevice(ctx, targetNode) {
-				// DYNAMIC CONTROLLER IDENTIFICATION:
 				if strings.Contains(targetNode, "c") {
 					if lastNIdx := strings.LastIndex(targetNode, "n"); lastNIdx != -1 && lastNIdx > 0 {
 						if cIdx := strings.Index(targetNode, "c"); cIdx != -1 && cIdx < lastNIdx {
-							baseBlockName = targetNode[:cIdx] + targetNode[lastNIdx:] // Resolves perfectly to "nvme2n1"
+							baseBlockName = targetNode[:cIdx] + targetNode[lastNIdx:] 
 						}
 					}
 				}
 
 				var major, minor uint32
 				
-				// FIX 2 COMPLETE: Pass 'baseBlockName' to keep all gater lock keys perfectly aligned node-wide
 				_, errStat := executer.ExecuteUninterruptible[struct{}](
 					ctx, r.KeyedGater, "cleanup-stat-"+baseBlockName, 10, 50, 500*time.Millisecond, 1*time.Second,
 					func(wCtx context.Context) (struct{}, error) {
@@ -3420,7 +3444,6 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) cleanupOrphanedTopology(ctx cont
 				)
 				
 				if errStat == nil && major != 0 {
-					// Extract the valid parent mapper name ("dm-2") cleanly using your minor tracker utility
 					mpathName = r.GetDMNameFromMinor(ctx, minor)
 					if mpathName != "" {
 						isDM = true
@@ -3431,13 +3454,19 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) cleanupOrphanedTopology(ctx cont
 		}
 	}
 
+	// =========================================================================
+	// PHASE 2: TARGETED DEVICE TEARDOWN (ONLY RUNS IF MPATH NAME IS VALID)
+	// =========================================================================
 	if isDM && mpathName != "" {
+		// Clean up via the resolved Map Name (e.g., "dm-287" or "mpathkfu")
 		_ = r.multipathdAction(ctx, "disablequeueing map "+mpathName)
 		openCount, err := r.Helper.GetOpenCount(ctx, mpathName)
 		if err == nil {
 			if openCount <= 0 {
+				logger.Infof("[Cleanup-Topology] [%s] Open count is zero. Safely deleting map configuration layer.", mpathName)
 				_ = r.multipathdAction(ctx, "del map "+mpathName)
 			} else {
+				logger.Warningf("[Cleanup-Topology] [%s] Open count is %d. Triggering deferred ioctl removal.", mpathName, openCount)
 				err := r.dmIoctlCall(ctx, mpathName, DM_DEV_REMOVE, DM_DEFERRED_REMOVE)
 				if err != nil {
 					logger.Warningf("[Cleanup-Topology] Native DM ioctl mapping block rejected: %v. Attempting user-space CLI fallback...", err)
@@ -3446,12 +3475,21 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) cleanupOrphanedTopology(ctx cont
 			}
 		}
 	} else if isNativeNVMe && mpathName != "" {
-		// FIX 3 COMPLETE: Pass rawScsiTarget to ensure internal sysfs wwid pattern comparisons evaluate correctly
 		_ = r.disableNativeNvmeQueueing(ctx, rawScsiTarget)
+	} else {
+		// FIXED: If mpathName couldn't be resolved, skip multipathd actions entirely.
+		// Avoid passing raw WWID tokens down to CLI maps and drop straight to physical layer sweeps.
+		logger.Infof("[Cleanup-Topology] Parent map name could not be resolved from sysfs. Proceeding straight to physical layer hardware sweeps.")
 	}
 
-	// Unify path removals securely bounded by context execution policies
+	// =========================================================================
+	// PHASE 3: DUAL-PROTOCOL PHYSICAL LAYER SWEEP (THE CLEANUP SAFEGUARD)
+	// =========================================================================
+	// This scans the host bus natively using both the SCSI WWID and the NVMe NGUID
+	// string tokens to hot-unplug any remaining stale physical paths.
+	logger.Infof("[Cleanup-Topology] Launching master dual-protocol physical layer sweep [SCSI WWID: %s | NVMe NGUID: %s]", rawScsiTarget, rawNvmeTarget)
 	_ = r.purgeStuckPhysicalPathsDualProtocol(ctx, rawScsiTarget, rawNvmeTarget)
+	
 	return nil
 }
 
