@@ -2015,58 +2015,58 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) getHCTLFromSd(ctx context.Contex
 	return hctl, nil
 }
 
-// getScsiTargetID unifies multi-protocol hardware identification tracking with full context propagation.
 func (r *OsDeviceConnectivityHelperScsiGeneric) getScsiTargetID(ctx context.Context, hctl string) string {
-	logger.Infof("[SCSI-Target-Inspector] Entering identification pipeline for target address: [%s]", hctl)
-
-	if err := ctx.Err(); err != nil {
-		logger.Warningf("[SCSI-Target-Inspector] [%s] Aborting execution: incoming context already cancelled: %v", hctl, err)
-		return ""
-	}
-
 	parts := strings.Split(hctl, ":")
 	if len(parts) < 4 {
-		logger.Warningf("[SCSI-Target-Inspector] [%s] Aborting execution: malformed HCTL layout segment footprint", hctl)
 		return ""
 	}
 
-	hostID := parts[0] // Isolate the host bus index primitive string (e.g., "13")
+	hostID := parts[0]
 	hct := strings.Join(parts[:3], ":")
 	targetDirName := fmt.Sprintf("target%s", hct)
 
 	// =========================================================================
-	// 1. PROTOCOL CORE FAST PATHS (FC & SAS HARDWARE TARGETS)
+	// 1. HARDENED FIBRE CHANNEL TRANSPORT SEARCH (CROSS-DISTRIBUTION FIX)
 	// =========================================================================
 	parentTargetBase := fmt.Sprintf("/sys/class/scsi_device/%s/device/../%s", hctl, targetDirName)
-	logger.Debugf("[SCSI-Target-Inspector] [%s] Evaluating standard baseline kernel topology at: %s", hctl, parentTargetBase)
-
-	// Track A: Fibre Channel Strategy (Shielded from D-state wait traps)
+	
+	// Option 1: Classic shortcut layout path
 	fcPath := filepath.Join(parentTargetBase, "fc_transport", targetDirName, "port_name")
+	
+	// Option 2: Modern Remote Port (rport) architecture layout path
+	// Climbs out of target10:0:0 into rport-10:0-0 to find the true fc_transport directory
+	rportFcPath := fmt.Sprintf("/sys/class/scsi_device/%s/device/../../fc_transport/%s/port_name", hctl, targetDirName)
+
+	// Evaluate Option 1 First
 	if _, err := os.Stat(fcPath); err == nil {
 		if data, errRead := os.ReadFile(fcPath); errRead == nil && len(data) > 0 {
-			wwpnString := strings.TrimSpace(string(data))
-			logger.Infof("[SCSI-Target-Inspector] [%s] [FC-FastPath SUCCESS] Immediate hardware match. Isolated WWPN: %s", hctl, wwpnString)
-			return wwpnString 
+			wwpn := strings.TrimSpace(string(data))
+			logger.Infof("    [SCSI-Target-Inspector] [FC-FastPath SUCCESS] Identified classic WWPN: %s", wwpn)
+			return wwpn
 		}
 	}
 
-	// Track B: SAS Strategy (Shielded from D-state wait traps)
+	// Evaluate Option 2 (Modern PCIe / rport layout)
+	if _, err := os.Stat(rportFcPath); err == nil {
+		if data, errRead := os.ReadFile(rportFcPath); errRead == nil && len(data) > 0 {
+			wwpn := strings.TrimSpace(string(data))
+			logger.Infof("    [SCSI-Target-Inspector] [FC-rport-FastPath SUCCESS] Identified modern rport WWPN: %s", wwpn)
+			return wwpn // CORRECT REAL IDENTIFICATION EXIT
+		}
+	}
+
+	// Track B: SAS Strategy
 	sasPath := filepath.Join(parentTargetBase, "sas_device", targetDirName, "sas_address")
 	if _, err := os.Stat(sasPath); err == nil {
 		if data, errRead := os.ReadFile(sasPath); errRead == nil && len(data) > 0 {
-			sasAddressString := strings.TrimSpace(string(data))
-			logger.Infof("[SCSI-Target-Inspector] [%s] [SAS-FastPath SUCCESS] Immediate hardware match. Isolated SAS Address: %s", hctl, sasAddressString)
-			return sasAddressString 
+			return strings.TrimSpace(string(data))
 		}
 	}
 
 	// =========================================================================
-	// 2. RE-ANCHORED UNIVERSAL O(1) SYM-LINK PARSER (iSCSI INTEGRITY INITIALIZATION)
+	// 2. RE-ANCHORED UNIVERSAL O(1) SYM-LINK PARSER (iSCSI INTEGRITY)
 	// =========================================================================
-	// By evaluating the link relative to the flat bus tree, we bypass container lexical 
-	// truncation loops while providing absolute directory depth to absorb the kernel's relative links.
 	busDeviceLink := fmt.Sprintf("/sys/bus/scsi/devices/%s", hctl)
-	
 	realDevicePath, errLink := executer.ExecuteUninterruptible[string](
 		ctx, r.KeyedGater, fmt.Sprintf("target-bus-symlink-%s", hctl), 20, 100, 1*time.Second, 3*time.Second,
 		func(wCtx context.Context) (string, error) {
@@ -2078,16 +2078,15 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) getScsiTargetID(ctx context.Cont
 			realDevicePath = filepath.Clean(filepath.Join(busDeviceLink, realDevicePath))
 		}
 	} else {
-		logger.Warningf("[SCSI-Target-Inspector] [%s] Bus readlink execution failed: %v", hctl, errLink)
 		realDevicePath = parentTargetBase
 	}
-	logger.Debugf("[SCSI-Target-Inspector] [%s] Absolute device tracking path finalized: %s", hctl, realDevicePath)
 
 	// =========================================================================
-	// 3. TRACK C: MULTI-STRATEGY DYNAMIC FALLBACK SAFETY NET (iSCSI ROUTE)
+	// 3. TRACK C: iSCSI SCOUT CORES FALLBACK
 	// =========================================================================
-	// Removed the broken iscsi_host file guard. realDevicePath contains the exact deep path 
-	// structure needed for Strategy A's climbing loops to match and resolve instantly.
+	// If it is an iSCSI configuration, it passes here safely. If it is a true non-iSCSI 
+	// foreign disk that isn't ours, getIscsiTargetName will return "" correctly, 
+	// protecting the host bus from accidental pruning.
 	return r.getIscsiTargetName(ctx, realDevicePath, parentTargetBase, hostID)
 }
 
