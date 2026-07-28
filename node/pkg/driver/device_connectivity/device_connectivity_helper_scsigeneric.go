@@ -2017,86 +2017,90 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) getHCTLFromSd(ctx context.Contex
 
 // getScsiTargetID unifies multi-protocol hardware identification tracking with full context propagation.
 func (r *OsDeviceConnectivityHelperScsiGeneric) getScsiTargetID(ctx context.Context, hctl string) string {
-	logger.Infof("[SCSI-Target-Inspector] Entering identification pipeline for target address: [%s]", hctl)
-
 	if err := ctx.Err(); err != nil {
-		logger.Warningf("[SCSI-Target-Inspector] [%s] Aborting execution: incoming context already cancelled: %v", hctl, err)
 		return ""
 	}
 
 	parts := strings.Split(hctl, ":")
 	if len(parts) < 4 {
-		logger.Warningf("[SCSI-Target-Inspector] [%s] Aborting execution: malformed HCTL layout segment footprint", hctl)
 		return ""
 	}
 
-	// FIX: Isolate the first index element explicitly to resolve the string value primitive correctly
-	hostID := parts[0] // Ensures "host10", "host13", or "host14" parse cleanly into sysfs builders
+	hostID := parts[0] // Isolate the host bus number primitive (e.g., "10")
 	hct := strings.Join(parts[:3], ":")
 	targetDirName := fmt.Sprintf("target%s", hct)
 
 	// =========================================================================
-	// 1. RE-ANCHORED UNIVERSAL BUS PATH LOOKUP (O(1) DEPTH PROTECTION)
+	// 1. FIBRE CHANNEL RESOLUTION LAYER (FLAT REMOTE PORT CLASS STRATEGY)
 	// =========================================================================
-	// Secure the deep, physical device tree layout path directly from the bus architecture.
-	// This path works flawlessly across RHEL 7, RHEL 8/9, and container namespaces.
-	busDeviceLink := fmt.Sprintf("/sys/bus/scsi/devices/%s", hctl)
-	
-	realDevicePath, errLink := executer.ExecuteUninterruptible[string](
-		ctx, r.KeyedGater, fmt.Sprintf("target-bus-symlink-%s", hctl), 20, 100, 1*time.Second, 3*time.Second,
-		func(wCtx context.Context) (string, error) {
-			return os.Readlink(busDeviceLink)
-		},
-	)
-	if errLink == nil {
-		if !filepath.IsAbs(realDevicePath) {
-			realDevicePath = filepath.Clean(filepath.Join(busDeviceLink, realDevicePath))
+	// Modern kernels decouple the transport layer from the scsi_target hierarchy.
+	// We locate the remote ports directly within the fc_remote_ports class system.
+	// We use a fast wildcard lookup to catch the remote port index allocated by the HBA.
+	fcClassPattern := fmt.Sprintf("/sys/class/fc_remote_ports/rport-%s:*", hostID)
+	if matches, errGlob := filepath.Glob(fcClassPattern); errGlob == nil && len(matches) > 0 {
+		for _, rportPath := range matches {
+			// Locate the port_name node file inside this specific remote port context
+			fcPortFile := filepath.Join(rportPath, "port_name")
+			if data, errRead := os.ReadFile(fcPortFile); errRead == nil && len(data) > 0 {
+				wwpn := strings.TrimSpace(string(data))
+				logger.Infof("[SCSI-Target-Inspector] [FC-Class-FastPath SUCCESS] Isolated WWPN: %s", wwpn)
+				return wwpn // IMMEDIATE FIBRE CHANNEL EXIT
+			}
 		}
-	} else {
-		realDevicePath = fmt.Sprintf("/sys/class/scsi_device/%s/device", hctl)
 	}
-	logger.Debugf("[SCSI-Target-Inspector] [%s] Absolute device tracking path finalized: %s", hctl, realDevicePath)
 
-	// =========================================================================
-	// 2. EXTRACTION SEGMENT (ANCHORED VIA REAL DEVICE PATH ELEMENTS)
-	// =========================================================================
-	// Isolate parent directories dynamically from our verified absolute hardware path string
-	targetDirFolder := filepath.Dir(realDevicePath)  // Points to ".../target10:0:1"
-	rportDirFolder := filepath.Dir(targetDirFolder) // Points to ".../rport-10:0-2" or hardware bus root
-
-	// --- TRACK A1: FIBRE CHANNEL (CLASSIC LAYOUT) ---
-	fcPath := filepath.Join(targetDirFolder, "fc_transport", targetDirName, "port_name")
-	if data, err := os.ReadFile(fcPath); err == nil && len(data) > 0 {
+	// Fallback to classic scsi_target layout for older generations (RHEL 7)
+	fcClassicPath := fmt.Sprintf("/sys/class/scsi_target/%s/fc_transport/%s/port_name", targetDirName, targetDirName)
+	if data, errRead := os.ReadFile(fcClassicPath); errRead == nil && len(data) > 0 {
 		wwpn := strings.TrimSpace(string(data))
-		logger.Infof("[SCSI-Target-Inspector] [%s] [FC-Classic-FastPath SUCCESS] WWPN: %s", hctl, wwpn)
+		logger.Infof("[SCSI-Target-Inspector] [FC-Classic-FastPath SUCCESS] Isolated WWPN: %s", wwpn)
 		return wwpn
 	}
 
-	// --- TRACK A2: FIBRE CHANNEL (MODERN PCIe REMOTE PORT LAYOUT) ---
-	rportBaseName := filepath.Base(rportDirFolder)
-	if strings.HasPrefix(rportBaseName, "rport") {
-		rportFcPath := filepath.Join(rportDirFolder, "fc_transport", rportBaseName, "port_name")
-		if data, err := os.ReadFile(rportFcPath); err == nil && len(data) > 0 {
-			wwpn := strings.TrimSpace(string(data))
-			logger.Infof("[SCSI-Target-Inspector] [%s] [FC-rport-FastPath SUCCESS] Isolated WWPN via remote port tree: %s", hctl, wwpn)
-			return wwpn // SUCCESSFUL FIBRE CHANNEL EXIT
-		}
-	}
-
-	// --- TRACK B: SERIAL ATTACHED SCSI (SAS STRATEGY) ---
-	sasPath := filepath.Join(targetDirFolder, "sas_device", targetDirName, "sas_address")
-	if data, err := os.ReadFile(sasPath); err == nil && len(data) > 0 {
+	// =========================================================================
+	// 2. SERIAL ATTACHED SCSI RESOLUTION LAYER (SAS STRATEGY)
+	// =========================================================================
+	sasClassicPath := fmt.Sprintf("/sys/class/scsi_target/%s/sas_device/%s/sas_address", targetDirName, targetDirName)
+	if data, errRead := os.ReadFile(sasClassicPath); errRead == nil && len(data) > 0 {
 		sasAddr := strings.TrimSpace(string(data))
-		logger.Infof("[SCSI-Target-Inspector] [%s] [SAS-FastPath SUCCESS] SAS Address: %s", hctl, sasAddr)
+		logger.Infof("[SCSI-Target-Inspector] [SAS-Class-FastPath SUCCESS] Isolated SAS Address: %s", sasAddr)
 		return sasAddr
 	}
 
 	// =========================================================================
-	// 3. TRACK C: iSCSI SCOUT CORES FALLBACK (TRUE ISCSI STORAGE PATHS)
+	// 3. iSCSI RESOLUTION LAYER (FLAT SUBSYSTEM SESSION LOOKUP)
 	// =========================================================================
-	// Fallback to old behavior if structural path evaluations point to a native network target
-	parentTargetBase := fmt.Sprintf("/sys/class/scsi_device/%s/device/../%s", hctl, targetDirName)
-	return r.getIscsiTargetName(ctx, realDevicePath, parentTargetBase, hostID)
+	// Every genuine iSCSI host path exposes its active target properties inside 
+	// the iscsi_session class map directory tree.
+	sessionClassPath := "/sys/class/iscsi_session"
+	if sessions, errDirs := os.ReadDir(sessionClassPath); errDirs == nil {
+		// Use a fast local match block using the host ID token to filter sessions
+		matchToken := fmt.Sprintf("host%s", hostID)
+		
+		for _, s := range sessions {
+			sessionName := s.Name() // e.g., "session4"
+			
+			// Verify that this session belongs to our target host interface to prevent cross-talk
+			deviceMappingLink := filepath.Join(sessionClassPath, sessionName, "device")
+			if hostPath, errLink := os.Readlink(deviceMappingLink); errLink == nil {
+				// Fallback: handle short relative links ("../../../session4") by matching our HCTL parameters
+				if strings.Contains(hostPath, matchToken) || strings.Contains(parentTargetBase, sessionName) {
+					targetNameFile := filepath.Join(sessionClassPath, sessionName, "targetname")
+					if data, errRead := os.ReadFile(targetNameFile); errRead == nil && len(data) > 0 {
+						iqnString := strings.TrimSpace(string(data))
+						logger.Infof("[SCSI-Target-Inspector] [iSCSI-Class-FastPath SUCCESS] Isolated IQN: %s", iqnString)
+						return iqnString // IMMEDIATE iSCSI EXIT
+					}
+				}
+			}
+		}
+	}
+
+	// =========================================================================
+	// 4. FALLBACK LAYER
+	// =========================================================================
+	logger.Debugf("[SCSI-Target-Inspector] Class lookups exhausted for address %s. Direct pathing unavailable.", hctl)
+	return ""
 }
 
 // getIscsiTargetName identifies the operational iSCSI target name with full D-state protection.
