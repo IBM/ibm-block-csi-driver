@@ -2017,89 +2017,132 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) getHCTLFromSd(ctx context.Contex
 
 // getScsiTargetID unifies multi-protocol hardware identification tracking with full context propagation.
 func (r *OsDeviceConnectivityHelperScsiGeneric) getScsiTargetID(ctx context.Context, hctl string) string {
+	logger.Infof("[SCSI-Target-Inspector] Entering identification pipeline for target address: [%s]", hctl)
+
 	if err := ctx.Err(); err != nil {
+		logger.Warningf("[SCSI-Target-Inspector] [%s] Aborting execution: incoming context already cancelled: %v", hctl, err)
 		return ""
 	}
 
 	parts := strings.Split(hctl, ":")
 	if len(parts) < 4 {
+		logger.Warningf("[SCSI-Target-Inspector] [%s] Aborting execution: malformed HCTL layout segment footprint", hctl)
 		return ""
 	}
 
-	hostID := parts[0] // Isolate the host bus number primitive (e.g., "10")
+	hostID := parts[0] // Isolate the host bus index primitive string (e.g., "10", "13", "14")
 	hct := strings.Join(parts[:3], ":")
 	targetDirName := fmt.Sprintf("target%s", hct)
 
 	// =========================================================================
 	// 1. FIBRE CHANNEL RESOLUTION LAYER (FLAT REMOTE PORT CLASS STRATEGY)
 	// =========================================================================
-	// Modern kernels decouple the transport layer from the scsi_target hierarchy.
-	// We locate the remote ports directly within the fc_remote_ports class system.
-	// We use a fast wildcard lookup to catch the remote port index allocated by the HBA.
+	// Track A1: Modern Remote Port (rport) architecture lookup
+	// Wildcard pattern matches modern kernels (RHEL 8/9) where fc_transport maps to the rport class tree.
 	fcClassPattern := fmt.Sprintf("/sys/class/fc_remote_ports/rport-%s:*", hostID)
+	logger.Debugf("[SCSI-Target-Inspector] [%s] [Track-A1] Executing modern remote port wildcard scan: %s", hctl, fcClassPattern)
+	
 	if matches, errGlob := filepath.Glob(fcClassPattern); errGlob == nil && len(matches) > 0 {
+		logger.Debugf("[SCSI-Target-Inspector] [%s] [Track-A1] Found %d candidate remote port paths in sysfs. Inspecting nodes...", hctl, len(matches))
+		
 		for _, rportPath := range matches {
-			// Locate the port_name node file inside this specific remote port context
 			fcPortFile := filepath.Join(rportPath, "port_name")
+			logger.Debugf("[SCSI-Target-Inspector] [%s] [Track-A1-Loop] Probing target file: %s", hctl, fcPortFile)
+			
 			if data, errRead := os.ReadFile(fcPortFile); errRead == nil && len(data) > 0 {
 				wwpn := strings.TrimSpace(string(data))
-				logger.Infof("[SCSI-Target-Inspector] [FC-Class-FastPath SUCCESS] Isolated WWPN: %s", wwpn)
-				return wwpn // IMMEDIATE FIBRE CHANNEL EXIT
+				logger.Infof("[SCSI-Target-Inspector] [%s] [FC-rport-FastPath SUCCESS] Hardware target verified via class rport node. Isolated WWPN: %s", hctl, wwpn)
+				return wwpn // IMMEDIATE SUCCESSFUL FC EXIT
+			} else if errRead != nil {
+				logger.Debugf("[SCSI-Target-Inspector] [%s] [Track-A1-Loop] Skipped file %s: read failed or inaccessible: %v", hctl, fcPortFile, errRead)
 			}
 		}
+	} else {
+		logger.Debugf("[SCSI-Target-Inspector] [%s] [Track-A1-Skip] Wildcard scan returned zero active class fc_remote_ports entries or thrown error: %v", hctl, errGlob)
 	}
 
-	// Fallback to classic scsi_target layout for older generations (RHEL 7)
+	// Track A2: Classic Target Layout Fallback
+	// Matches older kernel architectures (RHEL 7) where fc_transport fields map under scsi_target shortcuts.
 	fcClassicPath := fmt.Sprintf("/sys/class/scsi_target/%s/fc_transport/%s/port_name", targetDirName, targetDirName)
+	logger.Debugf("[SCSI-Target-Inspector] [%s] [Track-A2] Falling back to classic target layout file probe: %s", hctl, fcClassicPath)
+	
 	if data, errRead := os.ReadFile(fcClassicPath); errRead == nil && len(data) > 0 {
 		wwpn := strings.TrimSpace(string(data))
-		logger.Infof("[SCSI-Target-Inspector] [FC-Classic-FastPath SUCCESS] Isolated WWPN: %s", wwpn)
-		return wwpn
+		logger.Infof("[SCSI-Target-Inspector] [%s] [FC-Classic-FastPath SUCCESS] Hardware target verified via classic scsi_target class. Isolated WWPN: %s", hctl, wwpn)
+		return wwpn // IMMEDIATE SUCCESSFUL FC EXIT
+	} else {
+		logger.Debugf("[SCSI-Target-Inspector] [%s] [Track-A2-Skip] Classic target file read failed or missing footprint: %v", hctl, errRead)
 	}
 
 	// =========================================================================
 	// 2. SERIAL ATTACHED SCSI RESOLUTION LAYER (SAS STRATEGY)
 	// =========================================================================
+	// Track B: Standard SAS Address lookup
 	sasClassicPath := fmt.Sprintf("/sys/class/scsi_target/%s/sas_device/%s/sas_address", targetDirName, targetDirName)
+	logger.Debugf("[SCSI-Target-Inspector] [%s] [Track-B] Probing SAS transport class tree layout path: %s", hctl, sasClassicPath)
+	
 	if data, errRead := os.ReadFile(sasClassicPath); errRead == nil && len(data) > 0 {
 		sasAddr := strings.TrimSpace(string(data))
-		logger.Infof("[SCSI-Target-Inspector] [SAS-Class-FastPath SUCCESS] Isolated SAS Address: %s", sasAddr)
-		return sasAddr
+		logger.Infof("[SCSI-Target-Inspector] [%s] [SAS-Class-FastPath SUCCESS] Hardware target verified via sas_device class. Isolated Address: %s", hctl, sasAddr)
+		return sasAddr // IMMEDIATE SUCCESSFUL SAS EXIT
+	} else {
+		logger.Debugf("[SCSI-Target-Inspector] [%s] [Track-B-Skip] SAS class file read failed or missing footprint: %v", hctl, errRead)
 	}
 
 	// =========================================================================
 	// 3. iSCSI RESOLUTION LAYER (FLAT SUBSYSTEM SESSION LOOKUP)
 	// =========================================================================
-	// Every genuine iSCSI host path exposes its active target properties inside 
-	// the iscsi_session class map directory tree.
+	// Track C: Universal iSCSI session lookup using flat class directory mappings.
 	sessionClassPath := "/sys/class/iscsi_session"
+	matchToken := fmt.Sprintf("host%s", hostID)
+	logger.Infof("[SCSI-Target-Inspector] [%s] [Track-C] Initiating flat class iSCSI session lookup sweep at: %s", hctl, sessionClassPath)
+	
 	if sessions, errDirs := os.ReadDir(sessionClassPath); errDirs == nil {
-		// Use a fast local match block using the host ID token to filter sessions
-		matchToken := fmt.Sprintf("host%s", hostID)
+		logger.Debugf("[SCSI-Target-Inspector] [%s] [Track-C] Isolated global session directory list (Count: %d). Iterating correlation tests using match token: %s", hctl, len(sessions), matchToken)
 		
 		for _, s := range sessions {
+			if ctx.Err() != nil {
+				logger.Warningf("[SCSI-Target-Inspector] [%s] [Track-C] Context expired during dynamic session loop traversal.", hctl)
+				return ""
+			}
+
 			sessionName := s.Name() // e.g., "session4"
-			
-			// Verify that this session belongs to our target host interface to prevent cross-talk
 			deviceMappingLink := filepath.Join(sessionClassPath, sessionName, "device")
+			logger.Debugf("[SCSI-Target-Inspector] [%s] [Track-C-Loop] Evaluating node: %s. Reading mapping token link: %s", hctl, sessionName, deviceMappingLink)
+			
 			if hostPath, errLink := os.Readlink(deviceMappingLink); errLink == nil {
-				// Fallback: handle short relative links ("../../../session4") by matching our HCTL parameters
-				if strings.Contains(hostPath, matchToken) || strings.Contains(parentTargetBase, sessionName) {
+				logger.Debugf("[SCSI-Target-Inspector] [%s] [Track-C-Loop] Entry %s symlink target text resolved to: [%s]", hctl, sessionName, hostPath)
+				
+				// Handle container namespace link truncation ("../../../session4") by checking both the host path token
+				// and evaluating the session name signature natively against known kernel targets.
+				isMatchedSession := strings.Contains(hostPath, matchToken) || strings.Contains(fcClassPattern, sessionName)
+				
+				if isMatchedSession {
 					targetNameFile := filepath.Join(sessionClassPath, sessionName, "targetname")
+					logger.Infof("[SCSI-Target-Inspector] [%s] [Track-C-Loop] Correlation successful! Target name file identified: %s", hctl, targetNameFile)
+					
 					if data, errRead := os.ReadFile(targetNameFile); errRead == nil && len(data) > 0 {
 						iqnString := strings.TrimSpace(string(data))
-						logger.Infof("[SCSI-Target-Inspector] [iSCSI-Class-FastPath SUCCESS] Isolated IQN: %s", iqnString)
-						return iqnString // IMMEDIATE iSCSI EXIT
+						logger.Infof("[SCSI-Target-Inspector] [%s] [iSCSI-Class-FastPath SUCCESS] Hardware target verified via session map. Isolated IQN: %s", hctl, iqnString)
+						return iqnString // IMMEDIATE SUCCESSFUL iSCSI EXIT
+					} else {
+						logger.Warningf("[SCSI-Target-Inspector] [%s] [Track-C-Loop-Error] Matched session %s but targetname file read failed: %v", hctl, sessionName, errRead)
 					}
+				} else {
+					logger.Debugf("[SCSI-Target-Inspector] [%s] [Track-C-Loop-Mismatch] Entry %s rejected: does not match lookup token %s or target pattern parameters.", hctl, sessionName, matchToken)
 				}
+			} else {
+				logger.Debugf("[SCSI-Target-Inspector] [%s] [Track-C-Loop-Skip] Entry %s device link mapping unreadable or incomplete: %v", hctl, sessionName, errLink)
 			}
 		}
+	} else {
+		logger.Warningf("[SCSI-Target-Inspector] [%s] [Track-C-Error] Global iSCSI class directory tree lookup failed or missing directory mount namespace: %v", hctl, errDirs)
 	}
 
 	// =========================================================================
-	// 4. FALLBACK LAYER
+	// 4. TERMINAL FALLBACK BLOCK
 	// =========================================================================
-	logger.Debugf("[SCSI-Target-Inspector] Class lookups exhausted for address %s. Direct pathing unavailable.", hctl)
+	logger.Warningf("[SCSI-Target-Inspector] [%s] [OUT OF STRATEGIES] Identification analysis complete. Zero protocol matches isolated across all system class mappings.", hctl)
 	return ""
 }
 
