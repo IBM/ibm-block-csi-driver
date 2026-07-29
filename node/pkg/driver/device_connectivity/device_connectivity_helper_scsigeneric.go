@@ -1181,22 +1181,18 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) purgeScsiGhosts(ctx context.Cont
 		
 		logger.Warningf("purgeScsiGhosts - entry %s", sgName)
 		deviceDir := filepath.Join("/sys/class/scsi_generic", sgName, "device")
-
-		// FIX: Shield filepath.EvalSymlinks inside ExecuteUninterruptible.
-		// If the SCSI target device is hung or transitioning, the worker slot will be freed.
-		realPath, err := executer.ExecuteUninterruptible[string](
-			ctx, r.KeyedGater, "purge-eval-link-"+sgName, 10, 50, 1*time.Second, 2*time.Second,
-			func(wCtx context.Context) (string, error) {
-				return filepath.EvalSymlinks(deviceDir)
-			},
-		)
+		
+		// 1. FAST: Pure memory read of the symlink text. No hangs, no blocking I/O.
+		targetPath, err := os.Readlink(deviceDir)
 		if err != nil {
-			logger.Warningf("Ghost Scrubber: evaluate %s - link or path locked up, skipping safely", sgName)
+			logger.Warningf("Ghost Scrubber: readlink failed for %s, skipping: %v", sgName, err)
 			continue
 		}
 
-		hctl := filepath.Base(realPath)
-		parts := strings.Split(hctl, ":")
+		// 2. Extracted from relative path (e.g., "../../devices/pci0000:00/0000:00:01.0/host0/target0:0:0/0:0:0:1")
+		hctl := filepath.Base(targetPath)
+		parts := strings.Split(hctl, ":")		
+
 		if len(parts) < 4 {
 			logger.Warningf("Ghost Scrubber: split error on hctl target %s", hctl)
 			continue 
