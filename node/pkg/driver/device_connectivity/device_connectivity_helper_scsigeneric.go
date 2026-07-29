@@ -1172,12 +1172,14 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) purgeScsiGhosts(ctx context.Cont
 
 	for _, entry := range sgEntries {
 	
-		logger.Warning("purgeScsiGhosts - entry")
+		logger.Warningf("purgeScsiGhosts - entry")
 		if ctx.Err() != nil {
 			return ctx.Err()
 		}
 
 		sgName := entry.Name()
+		
+		logger.Warningf("purgeScsiGhosts - entry %s", sgName)
 		deviceDir := filepath.Join("/sys/class/scsi_generic", sgName, "device")
 
 		// FIX: Shield filepath.EvalSymlinks inside ExecuteUninterruptible.
@@ -1206,11 +1208,15 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) purgeScsiGhosts(ctx context.Cont
 			logger.Warningf("Ghost Scrubber: atoi validation error on LUN string %s", deviceLun)
 			continue 
 		}	
+		
+		logger.Warningf("purgeScsiGhosts - entry %s luns %d %d", sgName, kernelLun, expectedLun)
 
 		if kernelLun != expectedLun {
 			atomic.AddInt64(&notLunCount, 1)
 			continue 
 		}
+		
+		logger.Warningf("purgeScsiGhosts - entry %s luns %d %d - actual check", sgName, kernelLun, expectedLun)
 
 		isOurPath := r.isPathOwnedByMyArray(ctx, sgName, arrayIdentifiers)
 
