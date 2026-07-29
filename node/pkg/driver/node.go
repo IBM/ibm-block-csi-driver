@@ -182,12 +182,18 @@ func (d *NodeService) NodeStageVolume(ctx context.Context, req *csi.NodeStageVol
 	if !skipRescan {
 		logger.Infof("Device missing or recently purged for WWID %v. Initiating fabric discovery.", volumeUuid)
 		osDeviceConnectivity.EnsureLogin(ctx, ipsByArrayInitiator)
+		
+		logger.Infof("Device missing or recently purged for WWID %v. Initiating fabric discovery - 1.", volumeUuid)
 
 		_ = d.OsDeviceConnectivityHelper.RemoveGhostDevice(ctx, volumeUuid, lun, arrayInitiators)
+		
+		logger.Infof("Device missing or recently purged for WWID %v. Initiating fabric discovery - 2.", volumeUuid)
 		if err := osDeviceConnectivity.RescanDevices(lun, arrayInitiators); err != nil {
 			return nil, status.Error(codes.Internal, err.Error())
 		}
+		logger.Infof("Device missing or recently purged for WWID %v. Initiating fabric discovery - 3.", volumeUuid)
 		_ = d.OsDeviceConnectivityHelper.RemoveGhostDevice(ctx, volumeUuid, lun, arrayInitiators)
+		logger.Infof("Device missing or recently purged for WWID %v. Initiating fabric discovery - 4.", volumeUuid)
 	} else {
 		if preScanErr != nil && status.Code(preScanErr) == codes.Aborted {
 			logger.Infof("Optimization: Active kernel transition detected for %v. Bypassing rescan and entering poll loop.", volumeUuid)
@@ -199,7 +205,9 @@ func (d *NodeService) NodeStageVolume(ctx context.Context, req *csi.NodeStageVol
 	// =========================================================================
 	// 3. CORE POLLING AND MULTI-PATH STABILIZATION
 	// =========================================================================
+	logger.Infof("Device missing or recently purged for WWID %v. Initiating fabric discovery - 5.", volumeUuid)
 	mpathDevice, err = d.OsDeviceConnectivityHelper.GetMpathDevice(ctx, volumeUuid)
+	logger.Infof("Device missing or recently purged for WWID %v. Initiating fabric discovery - 6.", volumeUuid)
 	if err != nil {
 		logger.Errorf("Error while discovering the device : {%v}", err.Error())
 		if errors.Is(ctx.Err(), context.DeadlineExceeded) || status.Code(err) == codes.DeadlineExceeded {
@@ -235,6 +243,8 @@ func (d *NodeService) NodeStageVolume(ctx context.Context, req *csi.NodeStageVol
 	// Check if this is a Native NVMe architecture node vs a classic Device Mapper target
 	isNativeNVMe := strings.HasPrefix(baseDevice, "nvme")
 	var sysDevices []string
+	
+	logger.Infof("Device missing or recently purged for WWID %v. Initiating fabric discovery - 7.", volumeUuid)
 
 	if isNativeNVMe {
 		// Native NVMe Multipathing tracking fallback for dynamic cross-protocol topology matching
@@ -253,11 +263,15 @@ func (d *NodeService) NodeStageVolume(ctx context.Context, req *csi.NodeStageVol
 		}
 	}
 	
+	logger.Infof("Device missing or recently purged for WWID %v. Initiating fabric discovery - 8.", volumeUuid)
+	
 	// Invoke LUN tracking verification with the protocol-isolated tracking fields
 	if err := osDeviceConnectivity.ValidateLun(ctx, mpathDevice, lun, sysDevices, volumeUuid); err != nil {
 		logger.Errorf("Volume LUN validation failed for %s: %v", mpathDevice, err)
 		return nil, status.Error(codes.Internal, err.Error())
 	}
+	
+	logger.Infof("Device missing or recently purged for WWID %v. Initiating fabric discovery - 9.", volumeUuid)
 
 	existingFormat, err := d.Mounter.GetDiskFormat(mpathDevice)
 	if err != nil {
