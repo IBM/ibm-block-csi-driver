@@ -454,6 +454,8 @@ func (r OsDeviceConnectivityHelperScsiGeneric) RescanDevicesGetHostIds(lunId int
 
 func (r OsDeviceConnectivityHelperScsiGeneric) RescanDevices(lunId int, arrayIdentifiers []string, hostIDs map[int]bool) error {
 	for hostNumber := range hostIDs {
+	
+		logger.Warning("RescanDevices iter")
 
 		filename := fmt.Sprintf("/sys/class/scsi_host/host%d/scan", hostNumber)
 		f, err := r.Executer.OsOpenFile(filename, os.O_APPEND|os.O_WRONLY, 0200)
@@ -1139,9 +1141,13 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) RemoveGhostDevice(ctx context.Co
 }
 
 func (r *OsDeviceConnectivityHelperScsiGeneric) purgeScsiGhosts(ctx context.Context, expectedSerial string, expectedLun int, arrayIdentifiers []string) error {
+
+	logger.Warning("purgeScsiGhosts")
 	if err := ctx.Err(); err != nil {
 		return ctx.Err()
 	}
+	
+	logger.Warning("purgeScsiGhosts - read dir")
 
 	// 1. Shield the initial directory scan from kernel block situations
 	sgEntries, err := executer.ExecuteUninterruptible[[]os.DirEntry](
@@ -1165,6 +1171,8 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) purgeScsiGhosts(ctx context.Cont
 	)
 
 	for _, entry := range sgEntries {
+	
+		logger.Warning("purgeScsiGhosts - entry")
 		if ctx.Err() != nil {
 			return ctx.Err()
 		}
@@ -1249,6 +1257,8 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) purgeScsiGhosts(ctx context.Cont
 			}
 		}
 	}
+	
+	logger.Warning("purgeScsiGhosts - done")
 
 	if finalDeleted := atomic.LoadInt64(&deletedCount); finalDeleted > 0 {
 		logger.Infof("Ghost Scrubber: Successfully removed %d dead SCSI device nodes.", finalDeleted)
