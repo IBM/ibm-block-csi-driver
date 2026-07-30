@@ -484,29 +484,35 @@ func (r OsDeviceConnectivityHelperScsiGeneric) RescanDevicesGetHostIds(lunId int
 
 func (r OsDeviceConnectivityHelperScsiGeneric) RescanDevices(lunId int, arrayIdentifiers []string, hostIDs map[int]bool) error {
 	for hostNumber := range hostIDs {
-	
-		logger.Warning("RescanDevices iter")
+		// Encapsulate each loop iteration to enforce immediate defer execution
+		err := func() error {
+			logger.Warning("RescanDevices iter")
 
-		filename := fmt.Sprintf("/sys/class/scsi_host/host%d/scan", hostNumber)
-		f, err := r.Executer.OsOpenFile(filename, os.O_APPEND|os.O_WRONLY, 0200)
+			filename := fmt.Sprintf("/sys/class/scsi_host/host%d/scan", hostNumber)
+			f, err := r.Executer.OsOpenFile(filename, os.O_APPEND|os.O_WRONLY, 0200)
+			if err != nil {
+				logger.Errorf("Rescan Error: could not open filename : {%v}. err : {%v}", filename, err)
+				return err
+			}
+			defer f.Close() // Triggers instantly when this inner function block exits
+
+			scanCmd := fmt.Sprintf("- - %d", lunId)
+			logger.Debugf("Rescan host device : echo %s > %s", scanCmd, filename)
+			if written, err := r.Executer.FileWriteString(f, scanCmd); err != nil {
+				logger.Errorf("Rescan Error: could not write to rescan file :{%v}, error : {%v}", filename, err)
+				return err
+			} else if written == 0 {
+				e := &ErrorNothingWasWrittenToScanFileError{filename}
+				logger.Errorf("%s", e.Error())
+				return e
+			}
+			return nil
+		}()
+
+		// If an individual host scan breaks, bubble up the error immediately
 		if err != nil {
-			logger.Errorf("Rescan Error: could not open filename : {%v}. err : {%v}", filename, err)
 			return err
 		}
-
-		defer f.Close()
-
-		scanCmd := fmt.Sprintf("- - %d", lunId)
-		logger.Debugf("Rescan host device : echo %s > %s", scanCmd, filename)
-		if written, err := r.Executer.FileWriteString(f, scanCmd); err != nil {
-			logger.Errorf("Rescan Error: could not write to rescan file :{%v}, error : {%v}", filename, err)
-			return err
-		} else if written == 0 {
-			e := &ErrorNothingWasWrittenToScanFileError{filename}
-			logger.Errorf("%s", e.Error())
-			return e
-		}
-
 	}
 
 	logger.Debugf("Rescan : finish rescan lun on lun id : {%v}, with array identifiers : {%v}", lunId, arrayIdentifiers)
