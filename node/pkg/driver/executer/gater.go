@@ -1,6 +1,8 @@
 package executer
 
 import (
+	"github.com/ibm/ibm-block-csi-driver/node/goid_info"
+	"github.com/ibm/ibm-block-csi-driver/node/util"
 	"context"
 	"errors"
 	"fmt"
@@ -249,15 +251,17 @@ func baseExecute[T any](
 	workerCtx, cancelWorker := context.WithCancel(context.Background())
 	defer cancelWorker()
 
-	// Capture parent logging context before entering the goroutine
-	parentLogFields := logEntry(0).Data
+	// Capture the raw parent goroutine values before executing the go statement
+	parentGoID := util.GetGoID()
+	parentAdditionalID, _ := goid_info.GetAdditionalIDInfo()
 
 	// 3. WORKER LAUNCH
 	go func() {
 		defer pool.activeOps.Add(-1)
 
-		// Create a local logger instance that preserves the parent's contextual fields
-		_ = parentLogFields // Available for any local logging explicitly inside this block if needed.
+		// Visual anchors for your understanding:
+		// These variables hold the raw parent values inside the goroutine block.
+		_, _ = parentGoID, parentAdditionalID
 
 		// The task should check workerCtx.Err() to be "cooperative"
 		data, err := worker(workerCtx)
