@@ -198,33 +198,48 @@ func (r OsDeviceConnectivityNvmeOFc) updateHostIDs(hostIDs map[int]bool) {
 }
 
 func (r OsDeviceConnectivityNvmeOFc) mapHostsToPhysicalHardware() (map[int]string, error) {
-        hostMap := make(map[int]string)
-        hosts, err := filepath.Glob("/sys/class/fc_host/host*")
-        if err != nil {
-                return nil, err
-        }
+	hostMap := make(map[int]string)
+	baseClassPath := "/sys/class/fc_host"
 
-        for _, h := range hosts {
-                hostNumStr := strings.TrimPrefix(filepath.Base(h), "host")
-                hostNum, _ := strconv.Atoi(hostNumStr)
+	// OPTIMIZED: Replace the heavy wildcard filepath.Glob sequence with an ultra-fast, 
+	// direct directory list of the flat in-memory class folder.
+	entries, err := os.ReadDir(baseClassPath)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return hostMap, nil // Return empty map smoothly if FC is unmounted/absent
+		}
+		return nil, err
+	}
 
-                // Option A: Use PCI Address (Best for Multi-port/Multi-channel cards)
-                // /sys/class/fc_host/hostX/device/ -> ../../../0000:04:00.0
-                pciLink, err := os.Readlink(filepath.Join(h, "device"))
-                if err == nil {
-                        // Extract the PCI slot (e.g., 0000:04:00.0)
-                        hostMap[hostNum] = filepath.Base(pciLink)
-                        continue
-                }
+	for _, entry := range entries {
+		name := entry.Name()
+		// Match precisely against exactly named target host slots
+		if !strings.HasPrefix(name, "host") {
+			continue
+		}
 
-                // Option B: Use Physical WWPN (Best for NPIV)
-                // permanent_port_name is the physical burned-in WWN of the HBA
-                wwpn, err := os.ReadFile(filepath.Join(h, "permanent_port_name"))
-                if err == nil {
-                        hostMap[hostNum] = strings.TrimSpace(string(wwpn))
-                }
-        }
-        return hostMap, nil
+		hostNumStr := strings.TrimPrefix(name, "host")
+		hostNum, _ := strconv.Atoi(hostNumStr)
+
+		h := filepath.Join(baseClassPath, name)
+
+		// Option A: Use PCI Address (Best for Multi-port/Multi-channel cards)
+		// /sys/class/fc_host/hostX/device/ -> ../../../0000:04:00.0
+		pciLink, err := os.Readlink(filepath.Join(h, "device"))
+		if err == nil {
+			// Extract the PCI slot (e.g., 0000:04:00.0)
+			hostMap[hostNum] = filepath.Base(pciLink)
+			continue
+		}
+
+		// Option B: Use Physical WWPN (Best for NPIV)
+		// permanent_port_name is the physical burned-in WWN of the HBA
+		wwpn, err := os.ReadFile(filepath.Join(h, "permanent_port_name"))
+		if err == nil {
+			hostMap[hostNum] = strings.TrimSpace(string(wwpn))
+		}
+	}
+	return hostMap, nil
 }
 
 // isFindMultipathsOn queries multipathd effective config for the find_multipaths setting.
