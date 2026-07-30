@@ -45,35 +45,49 @@ func (r OsDeviceConnectivityFc) EnsureLogin(_ context.Context, _ map[string][]st
 }
 
 func (r OsDeviceConnectivityFc) updateFCHostIDs(hostIDs map[int]bool) {
-    // Map host numbers to their physical PCI anchor
-    // host0 -> 0000:04:00.0, host1 -> 0000:04:00.0
-    pciMap := make(map[int]string)
+	// Map host numbers to their physical PCI anchor
+	// host0 -> 0000:04:00.0, host1 -> 0000:04:00.0
+	pciMap := make(map[int]string)
+	baseClassPath := "/sys/class/fc_host"
     
-    hosts, _ := filepath.Glob("/sys/class/fc_host/host*")
-    for _, h := range hosts {
-        hostNum, _ := strconv.Atoi(strings.TrimPrefix(filepath.Base(h), "host"))
+	// OPTIMIZED: Replace the dynamic wildcard Glob with a high-speed, direct 
+	// directory listing of the flat in-memory class directory.
+	entries, err := os.ReadDir(baseClassPath)
+	if err != nil {
+		// Fallback smoothly if FC is unmounted, absent, or disabled on the node
+		return
+	}
+
+	for _, entry := range entries {
+		name := entry.Name()
+		// Match precisely against exactly named target host slots
+		if !strings.HasPrefix(name, "host") {
+			continue
+		}
+
+		hostNum, _ := strconv.Atoi(strings.TrimPrefix(name, "host"))
         
-        // Req 4: Use os.Readlink to follow the 'device' symlink
-        if link, err := os.Readlink(filepath.Join(h, "device")); err == nil {
-            pciMap[hostNum] = filepath.Base(link)
-        }
-    }
+		// Req 4: Use os.Readlink to follow the 'device' symlink
+		if link, err := os.Readlink(filepath.Join(baseClassPath, name, "device")); err == nil {
+			pciMap[hostNum] = filepath.Base(link)
+		}
+	}
 
-    // Capture the PCI addresses already in our "active" set
-    targetHardware := make(map[string]bool)
-    for id := range hostIDs {
-        if pci, exists := pciMap[id]; exists {
-            targetHardware[pci] = true
-        }
-    }
+	// KEEP ORIGINAL: Capture the PCI addresses already in our "active" set
+	targetHardware := make(map[string]bool)
+	for id := range hostIDs {
+		if pci, exists := pciMap[id]; exists {
+			targetHardware[pci] = true
+		}
+	}
 
-    // Add siblings: If we're scanning one "slice" of a PCI device, scan them all
-    for id, pci := range pciMap {
-        if targetHardware[pci] && !hostIDs[id] {
-            hostIDs[id] = true
-            logger.Infof("FC Sibling: associated host%d with shared HBA %s", id, pci)
-        }
-    }
+	// KEEP ORIGINAL: Add siblings: If we're scanning one "slice" of a PCI device, scan them all
+	for id, pci := range pciMap {
+		if targetHardware[pci] && !hostIDs[id] {
+			hostIDs[id] = true
+			logger.Infof("FC Sibling: associated host%d with shared HBA %s", id, pci)
+		}
+	}
 }
 
 

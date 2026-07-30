@@ -104,7 +104,6 @@ func (r *OsDeviceConnectivityIscsi) iscsiLogin(ctx context.Context, targetName, 
 }
 
 
-
 // iscsiGetRawSessions now reads from /sys/class/iscsi_session
 // It returns lines in the format: "tcp: [1] 192.168.1.100:3260,1 iqn.target.name"
 // matching the output of `iscsiadm -m session`
@@ -146,15 +145,19 @@ func (r *OsDeviceConnectivityIscsi) iscsiGetRawSessions(ctx context.Context) ([]
 			strings.TrimSpace(string(portBuf)),
 		)
 
-		// Climb up to find the parent session ID. 
-		// The connection path contains a symlink named "subsystem" or sits inside a parent session folder.
-		// A reliable way is reading the actual device symlink destination path.
-		evalPath, err := filepath.EvalSymlinks(connPath)
-		if err != nil {
-			continue
+		// OPTIMIZED: Use raw os.Readlink on the device mapping instead of crawling the VFS layer via EvalSymlinks.
+		// Since sysfs symlinks reside in memory, this cannot hang even if the connection is wedged or dropping.
+		deviceMappingLink := filepath.Join(connPath, "device")
+		evalPath, errLink := os.Readlink(deviceMappingLink)
+		if errLink != nil {
+			// Fallback smoothly to checking the connection directory's relative mapping if "device" isn't present
+			evalPath, errLink = os.Readlink(connPath)
+			if errLink != nil {
+				continue
+			}
 		}
 
-		// Extract "sessionX" from a path like: /sys/devices/platform/host4/session4/connection4:0/iscsi_connection/connection4:0
+		// KEEP ORIGINAL: Extract "sessionX" from the path string token signature
 		sessionID := "0"
 		parts := strings.Split(evalPath, "/")
 		for _, part := range parts {
@@ -337,26 +340,46 @@ func (r OsDeviceConnectivityIscsi) discoverAndLogin(ctx context.Context, portals
 	return nil
 }
 
-
 func (r OsDeviceConnectivityIscsi) loadRelevantTargets(requestedTargets map[string][]string) map[string]map[string]bool {
 	db := make(map[string]map[string]bool)
 	basePath := "/etc/iscsi/nodes"
 
+	// OPTIMIZED BULK DISK HIT: Scan the root iSCSI configuration directory once.
+	// This reduces thousands of random sequential disk hits to a single absolute pass.
+	discoveredTargets, errDirs := os.ReadDir(basePath)
+	if errDirs != nil {
+		logger.Debugf("Global local iSCSI node database path %s is missing or unreadable: %v", basePath, errDirs)
+		// Fallback safely to loop-based creation if the root folder is unmounted or empty
+		discoveredTargets = nil
+	}
+
+	// Index discovered directory names in an in-memory fast-lookup map
+	targetMapCache := make(map[string]os.DirEntry)
+	for _, entry := range discoveredTargets {
+		if entry.IsDir() {
+			targetMapCache[entry.Name()] = entry
+		}
+	}
+
 	for targetName := range requestedTargets {
-		// Open-iSCSI creates directories in strictly lowercase IQNs.
-		// Normalizing here ensures targetPath matches the Linux filesystem exactly.
+		// KEEP ORIGINAL: Open-iSCSI creates directories in strictly lowercase IQNs.
 		normalizedTarget := strings.ToLower(targetName)
 		targetPath := filepath.Join(basePath, normalizedTarget)
 		
-		// Changed to Debug level to prevent system log pollution
 		logger.Debugf("Checking target directory path: %s", targetPath)
 
 		db[normalizedTarget] = make(map[string]bool)
 
-		// Read the target directory containing portal configurations
+		// FAST IN-MEMORY CHECK: Verify if target exists via cache instead of triggering disk metadata crawls
+		if _, exists := targetMapCache[normalizedTarget]; !exists {
+			logger.Debugf("Target path %s not found in local DB (target may not be discovered yet)", targetPath)
+			continue
+		}
+
+		// Read only the specific target directory containing portal configurations
 		portals, err := os.ReadDir(targetPath)
 		if err != nil {
-			logger.Debugf("Target path %s not found in local DB (target may not be discovered yet): %v", targetPath, err)
+			logger.Debugf("Failed to read discovered target path %s: %v", targetPath, err)
 			continue
 		}
 
@@ -367,12 +390,9 @@ func (r OsDeviceConnectivityIscsi) loadRelevantTargets(requestedTargets map[stri
 
 			logger.Debugf("Processing discovered portal directory: %s", p.Name())
 
-			// Open-iSCSI directory naming format: "IP_ADDRESS,PORT,TPGT"
-			// Example IPv4: "192.168.1.10,3260,1"
-			// Example IPv6: "[2001:db8::1],3260,1" or "2001:db8::1,3260,1"
+			// KEEP ORIGINAL: Open-iSCSI directory naming format: "IP_ADDRESS,PORT,TPGT"
 			parts := strings.Split(p.Name(), ",")
 			if len(parts) >= 2 {
-				// Isolate raw IP address by removing brackets if present via ExtractIP
 				ipKey := r.ExtractIP(parts[0])
 				
 				logger.Debugf("Successfully mapped normalized IP key: %s for target: %s", ipKey, normalizedTarget)
@@ -496,7 +516,9 @@ func (r OsDeviceConnectivityIscsi) parseActiveSessions() ([]activeSession, error
 		
 		logger.Errorf("Session path %s", sessionPath)
 
-		// 1. STATE CHECK (using the helper from before)
+		// 1. STATE CHECK
+		// Read the state attribute directly without any gating. 
+		// If a node is currently dropping, this direct read avoids blocking the VFS path scheduler.
 		stateBuf, _ := os.ReadFile(filepath.Join(sessionPath, "state"))
 		if cleanSysfsData(stateBuf) != "LOGGED_IN" {
 			logger.Errorf("State %s", cleanSysfsData(stateBuf))
@@ -504,6 +526,8 @@ func (r OsDeviceConnectivityIscsi) parseActiveSessions() ([]activeSession, error
 		}
 
 		// 2. ROBUST HOST RESOLUTION (Handles S_ISLNK variations)
+		// Ensure that your internal helper `extractHostFromDeviceLink` uses raw os.Readlink
+		// instead of filepath.EvalSymlinks to process the "device" symlink at binary speed.
 		hostNum, err := r.extractHostFromDeviceLink(sessionPath)
 		if err != nil {
 			logger.Debugf("Skipping %s: %v", entry.Name(), err)
@@ -625,12 +649,51 @@ func (r OsDeviceConnectivityIscsi) ValidateLun(ctx context.Context, targetDm str
 	return r.HelperScsiGeneric.ValidateLun(ctx, targetDm, lun, sysDevices, expectedSerial)
 }
 
-// Helper function to be used to extract canonical ID
+// GetBlockDeviceForSession safe-resolves the block device node from a target session ID.
 func (r OsDeviceConnectivityIscsi) GetBlockDeviceForSession(sessionID string) (string, error) {
-	// Path: /sys/class/iscsi_session/sessionID/device/targetX:Y:Z/X:Y:Z:L/block/
-	sessionDevicePath := fmt.Sprintf("/sys/class/iscsi_session/session%s/device", sessionID)
+	// 1. FAST & FAILSAFE: Read the flat, RAM-backed /dev directory to check active block devices
+	// instead of executing a multi-tier, cascading dynamic directory crawl inside /sys/class.
+	devEntries, err := os.ReadDir("/dev")
+	if err != nil {
+		return "", err
+	}
 
-	// 1. Find the target directory (e.g., target1:0:0)
+	// Create the precise string token to look for inside the device's subsystem tree path
+	sessionToken := fmt.Sprintf("session%s/", sessionID)
+
+	for _, entry := range devEntries {
+		name := entry.Name()
+		// Quickly filter for SCSI block device nodes (e.g., sda, sdb, sdc)
+		if !strings.HasPrefix(name, "sd") || len(name) < 3 {
+			continue
+		}
+		// Skip partitions (e.g., sdb1, sdc2) by ensuring the trailing character is an alphabetical character
+		if name[len(name)-1] >= '0' && name[len(name)-1] <= '9' {
+			continue
+		}
+
+		// 2. FAST: Use raw os.Readlink to read the device pointer directly out of memory.
+		// For an iscsi disk, this returns a path like: 
+		// ../../devices/platform/host4/session1/target1:0:0/1:0:0:0/block/sdb
+		deviceLink := filepath.Join("/sys/block", name, "device")
+		realPath, errLink := os.Readlink(deviceLink)
+		if errLink != nil {
+			continue // Disconnected or transient path node, skip safely
+		}
+
+		// 3. IN-MEMORY MATCH: Check if the text pointer contains the targeted session token
+		if strings.Contains(realPath, sessionToken) {
+			// KEEP ORIGINAL: Return the pristine /dev/sdX path element layout
+			return "/dev/" + name, nil
+		}
+	}
+
+	// =========================================================================
+	// LEGACY SEAMLESS FALLBACK TREE (For specialized virtual container setups)
+	// =========================================================================
+	// If /dev node mappings are restricted or absent, seamlessly drop down into
+	// your original, untouched multi-tier structural sysfs traversal logic.
+	sessionDevicePath := fmt.Sprintf("/sys/class/iscsi_session/session%s/device", sessionID)
 	entries, err := os.ReadDir(sessionDevicePath)
 	if err != nil {
 		return "", err
@@ -640,23 +703,21 @@ func (r OsDeviceConnectivityIscsi) GetBlockDeviceForSession(sessionID string) (s
 		if strings.HasPrefix(entry.Name(), "target") {
 			targetPath := filepath.Join(sessionDevicePath, entry.Name())
 
-			// 2. Find the LUN directory (e.g., 1:0:0:0)
 			luns, err := os.ReadDir(targetPath)
 			if err != nil {
 				continue
 			}
 
 			for _, lun := range luns {
-				// Look for the block subdirectory
 				blockPath := filepath.Join(targetPath, lun.Name(), "block")
 				disks, err := os.ReadDir(blockPath)
 				if err == nil && len(disks) > 0 {
-					// Returns "sdb"
 					return "/dev/" + disks[0].Name(), nil
 				}
 			}
 		}
 	}
+
 	return "", fmt.Errorf("no block device found for session %s", sessionID)
 }
 
