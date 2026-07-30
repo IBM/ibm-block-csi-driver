@@ -1219,8 +1219,8 @@ type sgScsiId struct {
 }
 
 func (r *OsDeviceConnectivityHelperScsiGeneric) purgeScsiGhosts(ctx context.Context, expectedSerial string, expectedLun int, arrayIdentifiers []string) error {
-	// 1. Read the /dev directory directly. This is a real filesystem mount (devtmpfs),
-	// which is significantly faster than the virtual /sys directory.
+	// 1. Read the /dev directory directly. This is a real devtmpfs filesystem mount
+	// which evaluates instantly out of memory compared to full /sys/block sweeps.
 	dFile, errOpen := os.Open("/dev")
 	if errOpen != nil {
 		return fmt.Errorf("failed to open /dev: %w", errOpen)
@@ -1228,6 +1228,7 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) purgeScsiGhosts(ctx context.Cont
 	defer dFile.Close()
 
 	for {
+		// Use 100-entry chunk pagination for high-density storage scalability
 		devEntries, err := dFile.ReadDir(100)
 		if err != nil && err != io.EOF {
 			return fmt.Errorf("failed to read /dev: %w", err)
@@ -1240,103 +1241,118 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) purgeScsiGhosts(ctx context.Cont
 
 			// 2. Filter for only "sg*" strings safely inside memory
 			sgName := entry.Name()
+			
+			logger.Warningf("Ghost Scrubber: iterate %s", sgName)
+			
 			if !strings.HasPrefix(sgName, "sg") || len(sgName) < 3 {
 				continue
 			}
-			// Skip non-numeric suffixes if any exist
-			if sgName[2] < '0' || sgName[2] > '9' {
+
+			// Check all trailing bytes to ensure multi-digit support (e.g., sg124)
+			isNumeric := true
+			for i := 2; i < len(sgName); i++ {
+				if sgName[i] < '0' || sgName[i] > '9' {
+					isNumeric = false
+					break
+				}
+			}
+			if !isNumeric {
 				continue
 			}
 
-			deviceNode := filepath.Join("/dev", sgName)
-
-			// 3. Open the device file descriptor directly (read-only, non-blocking)
-			df, err := os.OpenFile(deviceNode, os.O_RDONLY|syscall.O_NONBLOCK, 0)
-			if err != nil {
-				// If it disappeared or is currently locked, skip it safely
-				continue
-			}
-
-			// 4. Perform the ultra-fast direct ioctl call
-			var scsiInfo sgScsiId
-			_, _, errno := syscall.Syscall(
-				syscall.SYS_IOCTL,
-				df.Fd(),
-				uintptr(SG_GET_SCSI_ID),
-				uintptr(unsafe.Pointer(&scsiInfo)),
-			)
-			df.Close() // Close immediately
-
-			if errno != 0 {
-				// Skip nodes where the driver backing is unresponsive/stale
-				continue
-			}
-
-			// 5. Binary match the target LUN
-			kernelLun := int(scsiInfo.Lun)
-			if kernelLun != expectedLun {
-				// Target standard field if exposed globally
-				_ = kernelLun 
-				continue
-			}
-
-			logger.Warningf("Ghost Scrubber: found target device %s matching LUN %d", sgName, kernelLun)
-			
-			isOurPath := r.isPathOwnedByMyArray(ctx, sgName, arrayIdentifiers)
+			// =====================================================================
+			// NON-BLOCKING HCTL RESOLUTION (THE `sg_map` STRATEGY)
+			// =====================================================================
+			// Instead of executing an ioctl call on a volatile /dev/sgX node, 
+			// parse the kernel target text directly from the memory-backed symlink.
 			deviceDir := filepath.Join("/sys/class/scsi_generic", sgName, "device")
+			
+			logger.Warningf("Ghost Scrubber: iterate %s - readlink", sgName)
+			
+			realSubsysPath, errLink := os.Readlink(deviceDir)
+			if errLink != nil {
+				continue // Skip unresponsive or unbinding sysfs nodes safely
+			}
 
-			vendorBytesRaw, err := secureReadSysfs(ctx, r.KeyedGater, sgName, filepath.Join(deviceDir, "vendor"))
-			if err != nil {
-				logger.Warningf("Ghost Scrubber: failed to safely read vendor attribute for device %s: %v", sgName, err)
+			// The link target ends with the explicit HCTL sequence (e.g., "0:2:0:4")
+			
+			logger.Warningf("Ghost Scrubber: iterate %s - real path %s", sgName, realSubsysPath)
+			
+			hctl := filepath.Base(realSubsysPath)
+			hctlParts := strings.Split(hctl, ":")
+			if len(hctlParts) < 4 {
+				continue // Guard against un-probed virtual layout noise
+			}
+
+			// Verify the LUN by parsing the fourth element of the HCTL string
+			lunStr := hctlParts[3]
+			parsedLun, errParse := strconv.Atoi(lunStr)
+			if errParse != nil || parsedLun != expectedLun {
+				continue // Instantly skips devices for other LUNs without touching hardware
+			}
+
+			// =====================================================================
+			// TARGET MATCHED ZONE
+			// =====================================================================
+			logger.Warningf("Ghost Scrubber: found target device %s matching LUN %d via HCTL path [%s]", sgName, parsedLun, hctl)
+
+			// Wrap remaining validation steps in the gater context to protect from un-plug hangs
+			shouldDelete, errEval := executer.ExecuteUninterruptible[bool](
+				ctx,
+				r.KeyedGater,
+				"evaluate-ghost-"+sgName,
+				10, 50, 1*time.Second, 4*time.Second,
+				func(wCtx context.Context) (bool, error) {
+					vendorBytesRaw, err := os.ReadFile(filepath.Join(deviceDir, "vendor"))
+					if err != nil {
+						return false, err
+					}
+					vdr := strings.ToUpper(strings.TrimSpace(string(vendorBytesRaw)))
+
+					ghostState, _ := r.IsSgDeviceGhost(wCtx, sgName)
+					isIbmDevice := strings.Contains(vdr, "IBM")
+
+					pathOwned := r.isPathOwnedByMyArray(wCtx, sgName, arrayIdentifiers)
+					serialNumber, _ := r.getHardwareSerial(wCtx, deviceDir)
+
+					delState := (ghostState && isIbmDevice) || (pathOwned && (ghostState || !isIbmDevice || (serialNumber != "" && !r.IsSerialMatch(serialNumber, expectedSerial))))
+					return delState, nil
+				},
+			)
+
+			if errEval != nil || !shouldDelete {
 				continue
 			}
-			vendor := strings.ToUpper(strings.TrimSpace(vendorBytesRaw))
-			
+
+			isOurPath := r.isPathOwnedByMyArray(ctx, sgName, arrayIdentifiers)
 			isGhost, _ := r.IsSgDeviceGhost(ctx, sgName)
 			hwSerial, _ := r.getHardwareSerial(ctx, deviceDir)
-			isIBM := strings.Contains(vendor, "IBM")
-			
-			shouldDelete := (isGhost && isIBM) || (isOurPath && (isGhost || !isIBM || (hwSerial != "" && !r.IsSerialMatch(hwSerial, expectedSerial))))
+			vendorBytesRaw, _ := os.ReadFile(filepath.Join(deviceDir, "vendor"))
+			vendor := strings.ToUpper(strings.TrimSpace(string(vendorBytesRaw)))
 
-			if shouldDelete {
-				logger.Warningf("Pruning stale SCSI device %s [Vendor: %s, Serial Match: %v, Ghost: %v, Our path: %v]. Executing hot-unplug.", sgName, vendor, r.IsSerialMatch(hwSerial, expectedSerial), isGhost, isOurPath)
+			logger.Warningf("Pruning stale SCSI device %s [Vendor: %s, Serial Match: %v, Ghost: %v, Our path: %v]. Executing hot-unplug.", sgName, vendor, r.IsSerialMatch(hwSerial, expectedSerial), isGhost, isOurPath)
 
-				// Derive hctl completely safely by looking up the kernel symlink path from memory
-				var hctl string
-				if realPath, errLink := os.Readlink(deviceDir); errLink == nil {
-					hctl = filepath.Base(realPath) // Returns e.g. "host:channel:id:lun"
-				} else {
-					// Fallback to manual string generation if link lookup fails
-					hctl = fmt.Sprintf("0:0:0:%d", kernelLun)
-				}
+			_, err = executer.ExecuteUninterruptible[struct{}](
+				ctx,
+				r.KeyedGater,
+				"path-delete-"+sgName,
+				10, 100, 2*time.Second, 15*time.Second,
+				func(wCtx context.Context) (struct{}, error) {
+					deletePath := filepath.Join(deviceDir, "delete")
+					
+					if _, errStat := os.Stat(deletePath); os.IsNotExist(errStat) {
+						deletePath = fmt.Sprintf("/sys/bus/scsi/devices/%s/delete", hctl)
+					}
 
-				_, err := executer.ExecuteUninterruptible[struct{}](
-					ctx,
-					r.KeyedGater,
-					"path-delete-"+sgName,
-					10, 100, 2*time.Second, 15*time.Second,
-					func(wCtx context.Context) (struct{}, error) {
-						deletePath := filepath.Join(deviceDir, "delete")
-						
-						// FIX: Robust distribution check. If the direct generic descriptor file is missing (RHEL 7),
-						// fall back to targeting the unified canonical device bus layer endpoint to execute the unplug action.
-						if _, errStat := os.Stat(deletePath); os.IsNotExist(errStat) {
-							deletePath = fmt.Sprintf("/sys/bus/scsi/devices/%s/delete", hctl)
-						}
-
-						if errWrite := os.WriteFile(deletePath, []byte("1"), 0200); errWrite != nil {
-							return struct{}{}, errWrite
-						}
-						return struct{}{}, nil
-					},
-				)
-				if err != nil {
-					logger.Errorf("Ghost Scrubber: failed to issue un-plug write configuration for target node %s: %v", sgName, err)
-				}
+					if errWrite := os.WriteFile(deletePath, []byte("1"), 0200); errWrite != nil {
+						return struct{}{}, errWrite
+					}
+					return struct{}{}, nil
+				},
+			)
+			if err != nil {
+				logger.Errorf("Ghost Scrubber: failed to issue un-plug write configuration for target node %s: %v", sgName, err)
 			}
-			
-
-			// Target strictly verified! Run your safe cleanup logic below.
 		}
 
 		if len(devEntries) < 100 || err == io.EOF {
