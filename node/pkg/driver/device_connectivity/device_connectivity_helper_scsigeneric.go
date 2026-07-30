@@ -1242,8 +1242,6 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) purgeScsiGhosts(ctx context.Cont
 			// 2. Filter for only "sg*" strings safely inside memory
 			sgName := entry.Name()
 			
-			logger.Warningf("Ghost Scrubber: iterate %s", sgName)
-			
 			if !strings.HasPrefix(sgName, "sg") || len(sgName) < 3 {
 				continue
 			}
@@ -1267,16 +1265,12 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) purgeScsiGhosts(ctx context.Cont
 			// parse the kernel target text directly from the memory-backed symlink.
 			deviceDir := filepath.Join("/sys/class/scsi_generic", sgName, "device")
 			
-			logger.Warningf("Ghost Scrubber: iterate %s - readlink", sgName)
-			
 			realSubsysPath, errLink := os.Readlink(deviceDir)
 			if errLink != nil {
 				continue // Skip unresponsive or unbinding sysfs nodes safely
 			}
 
 			// The link target ends with the explicit HCTL sequence (e.g., "0:2:0:4")
-			
-			logger.Warningf("Ghost Scrubber: iterate %s - real path %s", sgName, realSubsysPath)
 			
 			hctl := filepath.Base(realSubsysPath)
 			hctlParts := strings.Split(hctl, ":")
