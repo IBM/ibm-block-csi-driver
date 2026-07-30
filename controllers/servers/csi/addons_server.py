@@ -93,11 +93,13 @@ class ReplicationControllerServicer(pb2_grpc.ControllerServicer):
     @staticmethod
     def _ensure_volume_role_for_replication(mediator, replication, is_to_promote, force=False):
         if is_to_promote:
+            if force:
+                logger.info("Ramen: force-promote requested for replication {}".format(replication.name))
             if replication.is_primary:
                 logger.info("idempotent case. volume is already primary")
             else:
                 logger.info("promoting volume for replication {}".format(replication.name))
-                mediator.promote_replication_volume(replication, force=force)
+                mediator.promote_replication_volume(replication)
         else:
             if replication.is_primary or replication.is_primary is None:
                 logger.info("demoting volume for replication {}".format(replication.name))

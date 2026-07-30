@@ -245,7 +245,7 @@ class TestPromoteVolume(BaseReplicationSetUp, CommonControllerTest):
         replication = utils.get_mock_mediator_response_replication(name=REPLICATION_NAME,
                                                                    replication_type=REPLICATION_TYPE_MIRROR)
         self._test_promote_replication_succeeds(REPLICATION_TYPE_MIRROR)
-        self.mediator.promote_replication_volume.assert_called_once_with(replication, force=self.request.force)
+        self.mediator.promote_replication_volume.assert_called_once_with(replication)
 
     def test_promote_replication_idempotency_succeeds(self):
         self._test_promote_replication_succeeds(REPLICATION_TYPE_MIRROR, True)
