@@ -1,14 +1,16 @@
 import grpc
 from decorator import decorator
 
+from controllers.array_action import errors as array_errors
 from controllers.common.csi_logger import get_stdout_logger
 from controllers.common.utils import set_current_thread_name
+from controllers.servers import utils
 from controllers.servers.errors import ObjectAlreadyProcessingError
 from controllers.servers.settings import (VOLUME_TYPE_NAME, VOLUME_GROUP_TYPE_NAME,
                                           LOCK_REPLICATION_REQUEST_ATTR, UNIQUE_KEY_KEY)
 from controllers.array_action.settings import METADATA_KEY
 from controllers.array_action.registration_maps import REGISTRATION_MAP
-from controllers.servers.csi.exception_handler import handle_exception, handle_common_exceptions
+from controllers.servers.csi.exception_handler import handle_exception, handle_common_exceptions, build_error_response
 from controllers.servers.csi.sync_lock import SyncLock
 
 logger = get_stdout_logger()
@@ -24,17 +26,27 @@ def csi_method(error_response_type, lock_request_attribute=''):
     return call_csi_method
 
 
-def csi_replication_method(error_response_type):
+def csi_replication_method(error_response_type, lock_volume_group_for_ramen=False):
     @decorator
     def call_csi_method(controller_method, servicer, request, context):
         replication_id = getattr(request, LOCK_REPLICATION_REQUEST_ATTR, None)
+        lock_id = None
         if replication_id:
             if replication_id.HasField(VOLUME_GROUP_TYPE_NAME):
                 lock_id = replication_id.volumegroup.volume_group_id
             elif replication_id.HasField(VOLUME_TYPE_NAME):
                 lock_id = replication_id.volume.volume_id
-            else:
-                lock_id = None
+
+                if lock_volume_group_for_ramen:
+                    try:
+                        vg_id = utils.resolve_vg_lock_id_for_ramen(request)
+                    except array_errors.ObjectNotFoundError as ex:
+                        return build_error_response(str(ex), context, grpc.StatusCode.NOT_FOUND, error_response_type)
+                    if vg_id is not None:
+                        logger.info("Ramen VG lock: volume '{}' resolved to volume group '{}', "
+                                    "acquiring lock on volume group".format(lock_id, vg_id))
+                        lock_id = vg_id
+
         return _set_sync_lock(lock_id, LOCK_REPLICATION_REQUEST_ATTR, error_response_type,
                               controller_method, servicer, request, context)
 
