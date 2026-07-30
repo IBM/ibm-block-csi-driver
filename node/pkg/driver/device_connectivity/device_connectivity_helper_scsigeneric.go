@@ -32,6 +32,7 @@ import (
 	"sync/atomic"
 	"syscall"
 	"time"
+	"io"
 	"unsafe"
 
 	"google.golang.org/grpc/codes"
@@ -1215,113 +1216,135 @@ type sgScsiId struct {
 	_       int32 // Kernel padding
 }
 
-// Failsafe Scrubber Loop
-func purgeScsiGhosts() error {
+func (r *OsDeviceConnectivityHelperScsiGeneric) purgeScsiGhosts(ctx context.Context, expectedSerial string, expectedLun int, arrayIdentifiers []string) error {
 	// 1. Read the /dev directory directly. This is a real filesystem mount (devtmpfs),
 	// which is significantly faster than the virtual /sys directory.
-	devEntries, err := os.ReadDir("/dev")
-	if err != nil {
-		return fmt.Errorf("failed to read /dev: %w", err)
+	dFile, errOpen := os.Open("/dev")
+	if errOpen != nil {
+		return fmt.Errorf("failed to open /dev: %w", errOpen)
 	}
+	defer dFile.Close()
 
-	for _, entry := range devEntries {
-		if ctx.Err() != nil {
-			return ctx.Err()
+	for {
+		devEntries, err := dFile.ReadDir(100)
+		if err != nil && err != io.EOF {
+			return fmt.Errorf("failed to read /dev: %w", err)
 		}
 
-		// 2. Filter for only "sg*" strings safely inside memory
-		sgName := entry.Name()
-		if !strings.HasPrefix(sgName, "sg") || len(sgName) < 3 {
-			continue
-		}
-		// Skip non-numeric suffixes if any exist
-		if sgName[2] < '0' || sgName[2] > '9' {
-			continue
-		}
-
-		deviceNode := filepath.Join("/dev", sgName)
-
-		// 3. Open the device file descriptor directly (read-only, non-blocking)
-		df, err := os.OpenFile(deviceNode, os.O_RDONLY|os.O_NONBLOCK, 0)
-		if err != nil {
-			// If it disappeared or is currently locked, skip it safely
-			continue
-		}
-
-		// 4. Perform the ultra-fast direct ioctl call
-		var scsiInfo sgScsiId
-		_, _, errno := syscall.Syscall(
-			syscall.SYS_IOCTL,
-			df.Fd(),
-			uintptr(SG_GET_SCSI_ID),
-			uintptr(unsafe.Pointer(&scsiInfo)),
-		)
-		df.Close() // Close immediately
-
-		if errno != 0 {
-			// Skip nodes where the driver backing is unresponsive/stale
-			continue
-		}
-
-		// 5. Binary match the target LUN
-		kernelLun := int(scsiInfo.Lun)
-		if kernelLun != expectedLun {
-			atomic.AddInt64(&notLunCount, 1)
-			continue
-		}
-
-		logger.Warningf("Ghost Scrubber: found target device %s matching LUN %d", sgName, kernelLun)
-		
-		isOurPath := r.isPathOwnedByMyArray(ctx, sgName, arrayIdentifiers)
-
-		vendorBytesRaw, err := secureReadSysfs(ctx, r.KeyedGater, sgName, filepath.Join(deviceDir, "vendor"))
-		if err != nil {
-			logger.Warningf("Ghost Scrubber: failed to safely read vendor attribute for device %s: %v", sgName, err)
-			continue
-		}
-		vendor := strings.ToUpper(strings.TrimSpace(vendorBytesRaw))
-		
-		isGhost, _ := r.IsSgDeviceGhost(ctx, sgName)
-		hwSerial, _ := r.getHardwareSerial(ctx, deviceDir)
-		isIBM := strings.Contains(vendor, "IBM")
-		
-		shouldDelete := (isGhost && isIBM) || (isOurPath && (isGhost || !isIBM || (hwSerial != "" && !r.IsSerialMatch(hwSerial, expectedSerial))))
-
-		if shouldDelete {
-			logger.Warningf("Pruning stale SCSI device %s [Vendor: %s, Serial Match: %v, Ghost: %v, Our path: %v]. Executing hot-unplug.", sgName, vendor, r.IsSerialMatch(hwSerial, expectedSerial), isGhost, isOurPath)
-
-			_, err := executer.ExecuteUninterruptible[struct{}](
-				ctx,
-				r.KeyedGater,
-				"path-delete-"+sgName,
-				10, 100, 2*time.Second, 15*time.Second,
-				func(wCtx context.Context) (struct{}, error) {
-					deletePath := filepath.Join(deviceDir, "delete")
-					
-					// FIX: Robust distribution check. If the direct generic descriptor file is missing (RHEL 7),
-					// fall back to targeting the unified canonical device bus layer endpoint to execute the unplug action.
-					if _, errStat := os.Stat(deletePath); os.IsNotExist(errStat) {
-						deletePath = fmt.Sprintf("/sys/bus/scsi/devices/%s/delete", hctl)
-					}
-
-					if errWrite := os.WriteFile(deletePath, []byte("1"), 0200); errWrite != nil {
-						return struct{}{}, errWrite
-					}
-					return struct{}{}, nil
-				},
-			)
-			if err == nil {
-				atomic.AddInt64(&deletedCount, 1)
-			} else {
-				logger.Errorf("Ghost Scrubber: failed to issue un-plug write configuration for target node %s: %v", sgName, err)
+		for _, entry := range devEntries {
+			if ctx.Err() != nil {
+				return ctx.Err()
 			}
-		}
-		
 
-		// Target strictly verified! Run your safe cleanup logic below.
+			// 2. Filter for only "sg*" strings safely inside memory
+			sgName := entry.Name()
+			if !strings.HasPrefix(sgName, "sg") || len(sgName) < 3 {
+				continue
+			}
+			// Skip non-numeric suffixes if any exist
+			if sgName[2] < '0' || sgName[2] > '9' {
+				continue
+			}
+
+			deviceNode := filepath.Join("/dev", sgName)
+
+			// 3. Open the device file descriptor directly (read-only, non-blocking)
+			df, err := os.OpenFile(deviceNode, os.O_RDONLY|syscall.O_NONBLOCK, 0)
+			if err != nil {
+				// If it disappeared or is currently locked, skip it safely
+				continue
+			}
+
+			// 4. Perform the ultra-fast direct ioctl call
+			var scsiInfo sgScsiId
+			_, _, errno := syscall.Syscall(
+				syscall.SYS_IOCTL,
+				df.Fd(),
+				uintptr(SG_GET_SCSI_ID),
+				uintptr(unsafe.Pointer(&scsiInfo)),
+			)
+			df.Close() // Close immediately
+
+			if errno != 0 {
+				// Skip nodes where the driver backing is unresponsive/stale
+				continue
+			}
+
+			// 5. Binary match the target LUN
+			kernelLun := int(scsiInfo.Lun)
+			if kernelLun != expectedLun {
+				// Target standard field if exposed globally
+				_ = kernelLun 
+				continue
+			}
+
+			logger.Warningf("Ghost Scrubber: found target device %s matching LUN %d", sgName, kernelLun)
+			
+			isOurPath := r.isPathOwnedByMyArray(ctx, sgName, arrayIdentifiers)
+			deviceDir := filepath.Join("/sys/class/scsi_generic", sgName, "device")
+
+			vendorBytesRaw, err := secureReadSysfs(ctx, r.KeyedGater, sgName, filepath.Join(deviceDir, "vendor"))
+			if err != nil {
+				logger.Warningf("Ghost Scrubber: failed to safely read vendor attribute for device %s: %v", sgName, err)
+				continue
+			}
+			vendor := strings.ToUpper(strings.TrimSpace(vendorBytesRaw))
+			
+			isGhost, _ := r.IsSgDeviceGhost(ctx, sgName)
+			hwSerial, _ := r.getHardwareSerial(ctx, deviceDir)
+			isIBM := strings.Contains(vendor, "IBM")
+			
+			shouldDelete := (isGhost && isIBM) || (isOurPath && (isGhost || !isIBM || (hwSerial != "" && !r.IsSerialMatch(hwSerial, expectedSerial))))
+
+			if shouldDelete {
+				logger.Warningf("Pruning stale SCSI device %s [Vendor: %s, Serial Match: %v, Ghost: %v, Our path: %v]. Executing hot-unplug.", sgName, vendor, r.IsSerialMatch(hwSerial, expectedSerial), isGhost, isOurPath)
+
+				// Derive hctl completely safely by looking up the kernel symlink path from memory
+				var hctl string
+				if realPath, errLink := os.Readlink(deviceDir); errLink == nil {
+					hctl = filepath.Base(realPath) // Returns e.g. "host:channel:id:lun"
+				} else {
+					// Fallback to manual string generation if link lookup fails
+					hctl = fmt.Sprintf("0:0:0:%d", kernelLun)
+				}
+
+				_, err := executer.ExecuteUninterruptible[struct{}](
+					ctx,
+					r.KeyedGater,
+					"path-delete-"+sgName,
+					10, 100, 2*time.Second, 15*time.Second,
+					func(wCtx context.Context) (struct{}, error) {
+						deletePath := filepath.Join(deviceDir, "delete")
+						
+						// FIX: Robust distribution check. If the direct generic descriptor file is missing (RHEL 7),
+						// fall back to targeting the unified canonical device bus layer endpoint to execute the unplug action.
+						if _, errStat := os.Stat(deletePath); os.IsNotExist(errStat) {
+							deletePath = fmt.Sprintf("/sys/bus/scsi/devices/%s/delete", hctl)
+						}
+
+						if errWrite := os.WriteFile(deletePath, []byte("1"), 0200); errWrite != nil {
+							return struct{}{}, errWrite
+						}
+						return struct{}{}, nil
+					},
+				)
+				if err != nil {
+					logger.Errorf("Ghost Scrubber: failed to issue un-plug write configuration for target node %s: %v", sgName, err)
+				}
+			}
+			
+
+			// Target strictly verified! Run your safe cleanup logic below.
+		}
+
+		if len(devEntries) < 100 || err == io.EOF {
+			break
+		}
 	}
 	return nil
 }
+
+
 // Structural pattern matching to ensure accurate device name handling across all Linux layers
 var nvmeScrubberControllerPattern = regexp.MustCompile(`^nvme\d+c\d+n\d+$`)
 
@@ -1360,7 +1383,7 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) purgeNvmeGhosts(ctx context.Cont
 		deviceNode := filepath.Join("/dev", name)
 
 		// 2. FAST: Try to open the device node directly
-		df, err := os.OpenFile(deviceNode, os.O_RDONLY|os.O_NONBLOCK, 0)
+		df, err := os.OpenFile(deviceNode, os.O_RDONLY|syscall.O_NONBLOCK, 0)
 		if err != nil {
 			// Exactly like your original code: If it's unopenable (dead/deleting), trigger cleanup
 			logger.Warningf("Ghost Scrubber: Found disconnected/dead NVMe path %s. Triggering cleanup.", name)
@@ -1576,7 +1599,7 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) PruneNvmeGhosts(ctx context.Cont
 		
 		// 2. FAST: Try opening the device node directly in non-blocking mode
 		deviceNode := filepath.Join("/dev", name)
-		df, err := os.OpenFile(deviceNode, os.O_RDONLY|os.O_NONBLOCK, 0)
+		df, err := os.OpenFile(deviceNode, os.O_RDONLY|syscall.O_NONBLOCK, 0)
 		
 		var wwid string
 		isGhost := false
@@ -2926,7 +2949,7 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) FindSlavesByWWID(ctx context.Con
 			// 2. FAST: Try an ultra-fast binary ioctl on the active /dev node first.
 			// This completely bypasses the 3 sequential sysfs text file reads and symlink traversals.
 			deviceNode := filepath.Join("/dev", name)
-			if df, errOpen := os.OpenFile(deviceNode, os.O_RDONLY|os.O_NONBLOCK, 0); errOpen == nil {
+			if df, errOpen := os.OpenFile(deviceNode, os.O_RDONLY|syscall.O_NONBLOCK, 0); errOpen == nil {
 				var nvmeInfo nvmeIdTarget
 				_, _, errno := syscall.Syscall(
 					syscall.SYS_IOCTL,
@@ -3714,7 +3737,7 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) disableNativeNvmeQueueing(ctx co
 		var discoveredID string
 		// 2. FAST: Perform an ultra-fast binary ioctl on the active /dev node first to get the unique ID
 		deviceNode := filepath.Join("/dev", devName)
-		if df, errOpen := os.OpenFile(deviceNode, os.O_RDONLY|os.O_NONBLOCK, 0); errOpen == nil {
+		if df, errOpen := os.OpenFile(deviceNode, os.O_RDONLY|syscall.O_NONBLOCK, 0); errOpen == nil {
 			var nvmeInfo nvmeIdTarget
 			_, _, errno := syscall.Syscall(
 				syscall.SYS_IOCTL,
@@ -3847,7 +3870,7 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) purgeStuckPhysicalPathsDualProto
 		if isNVMe {
 			// 2. FAST: Perform an ultra-fast binary ioctl on the active /dev node first to get the unique ID
 			deviceNode := filepath.Join("/dev", devName)
-			if df, errOpen := os.OpenFile(deviceNode, os.O_RDONLY|os.O_NONBLOCK, 0); errOpen == nil {
+			if df, errOpen := os.OpenFile(deviceNode, os.O_RDONLY|syscall.O_NONBLOCK, 0); errOpen == nil {
 				var nvmeInfo nvmeIdTarget
 				_, _, errno := syscall.Syscall(
 					syscall.SYS_IOCTL,
@@ -4871,7 +4894,7 @@ func (o *OsDeviceConnectivityHelperGeneric) willIoctl0x83Fail(ctx context.Contex
 	devName := filepath.Base(realPath)
 
 	if strings.HasPrefix(devName, "dm-") {
-		return o.checkDMDevice(devName)
+		return o.checkDMDevice(ctx, devName)
 	}
 
 	if strings.HasPrefix(devName, "nvme") {
@@ -5716,7 +5739,6 @@ func (o *OsDeviceConnectivityHelperGeneric) GetOpenCount(ctx context.Context, dm
 	)
 }
 
-
 // TODO there's also a version in mount_wrapper.go - GetMajorMinorFromSysfs
 // GetMajorMinorFromSysfs safe-extracts device identifiers, cleanly translating 'sg' proxies to their true 'sd' siblings.
 func (o *OsDeviceConnectivityHelperGeneric) GetMajorMinorFromSysfs(ctx context.Context, devicePath string) (major uint32, minor uint32, err error) {
@@ -5743,7 +5765,7 @@ func (o *OsDeviceConnectivityHelperGeneric) GetMajorMinorFromSysfs(ctx context.C
 		
 		// Use raw os.Readlink to read the pointer directly out of memory safely.
 		// For sgX, this returns a path like: ../../../../../devices/platform/host4/session1/target1:0:0/1:0:0:0
-		realPath, errLink := os.Readlink(sysPath)
+		_, errLink := os.Readlink(sysPath)
 		if errLink == nil {
 			// Find the block folder inside that same target path
 			// The kernel topology layout structure matches: .../1:0:0:0/block/sdX
@@ -5758,7 +5780,24 @@ func (o *OsDeviceConnectivityHelperGeneric) GetMajorMinorFromSysfs(ctx context.C
 				fmt.Sprintf("readdir-block-%s", name),
 				20, 100, 1*time.Second, 3*time.Second,
 				func(wCtx context.Context) ([]os.DirEntry, error) {
-					return os.ReadDir(blockPath)
+					dFile, errOpen := os.Open(blockPath)
+					if errOpen != nil {
+						return nil, errOpen
+					}
+					defer dFile.Close()
+
+					var allEntries []os.DirEntry
+					for {
+						entries, errEntries := dFile.ReadDir(100)
+						if errEntries != nil && errEntries != io.EOF {
+							return nil, errEntries
+						}
+						allEntries = append(allEntries, entries...)
+						if len(entries) < 100 || errEntries == io.EOF {
+							break
+						}
+					}
+					return allEntries, nil
 				},
 			)
 			
@@ -5955,7 +5994,7 @@ func convertScsiIdToNguid(scsiId string) string {
 }
 
 // WaitForDmToExist blocks securely via uninterruptpackage main
-func (o GetDmsfunc (o *PathHelperGeneric) WaitForDmToExist(ctx context.Context, gater *executer.KeyedGater, volumeWWID string, maxRetries int, intervalSeconds int) (string, error) {
+func (o GetDmsPathHelperGeneric) WaitForDmToExist(ctx context.Context, gater *executer.KeyedGater, volumeWWID string, maxRetries int, intervalSeconds int) (string, error) {
 	if err := ctx.Err(); err != nil {
 		return "", err
 	}
@@ -6133,7 +6172,7 @@ func (o GetDmsfunc (o *PathHelperGeneric) WaitForDmToExist(ctx context.Context, 
 					fmt.Sprintf("validate-integrity-%s", name),
 					10, 50, 2*time.Second, 10*time.Second,
 					func(wCtx context.Context) (string, error) {
-						return o.validateDMIntegrity(path)
+						return o.validateDMIntegrity(ctx, gater, path)
 					},
 				)
 				if valErr == nil {
@@ -6523,7 +6562,7 @@ func (of GetDmsPathHelperGeneric) EvaluateSysfsTopology(ctx context.Context, gat
 		// 2. FAST PATH: Try an ultra-fast binary ioctl on the active /dev node first to get the unique ID.
 		// This runs at native speed for modern, privileged environments.
 		deviceNode := filepath.Join("/dev", name)
-		if df, errOpen := os.OpenFile(deviceNode, os.O_RDONLY|os.O_NONBLOCK, 0); errOpen == nil {
+		if df, errOpen := os.OpenFile(deviceNode, os.O_RDONLY|syscall.O_NONBLOCK, 0); errOpen == nil {
 			var nvmeInfo nvmeIdTarget
 			_, _, errno := syscall.Syscall(
 				syscall.SYS_IOCTL,
@@ -6723,7 +6762,7 @@ func (of GetDmsPathHelperGeneric) EvaluateSpecificSysfsTopology(
 
 		// 2. FAST PATH: Try an ultra-fast binary ioctl on the active /dev node first to get the unique ID.
 		deviceNode := filepath.Join("/dev", dmName)
-		if df, errOpen := os.OpenFile(deviceNode, os.O_RDONLY|os.O_NONBLOCK, 0); errOpen == nil {
+		if df, errOpen := os.OpenFile(deviceNode, os.O_RDONLY|syscall.O_NONBLOCK, 0); errOpen == nil {
 			var nvmeInfo nvmeIdTarget
 			_, _, errno := syscall.Syscall(
 				syscall.SYS_IOCTL,
