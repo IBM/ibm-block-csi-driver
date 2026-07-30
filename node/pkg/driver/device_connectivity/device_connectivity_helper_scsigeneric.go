@@ -767,12 +767,8 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) flushDeviceBuffers(ctx context.C
 	const BLKFLSBUF = 0x1261
 	
 	sanitizedDevPath := devPath
-	if !strings.HasPrefix(sanitizedDevPath, "/host/dev/") {
-		if strings.HasPrefix(sanitizedDevPath, "/dev/") {
-			sanitizedDevPath = filepath.Join("/host", sanitizedDevPath)
-		} else {
-			sanitizedDevPath = filepath.Join("/host/dev", filepath.Base(sanitizedDevPath))
-		}
+	if !strings.HasPrefix(sanitizedDevPath, "/dev/") {
+		sanitizedDevPath = filepath.Join("/dev", sanitizedDevPath)
 	}
 
 	logger.Warningf("device %s flushDeviceBuffers initiation sweep via host path %s", devPath, sanitizedDevPath)
