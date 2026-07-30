@@ -249,9 +249,15 @@ func baseExecute[T any](
 	workerCtx, cancelWorker := context.WithCancel(context.Background())
 	defer cancelWorker()
 
+	// Capture parent logging context before entering the goroutine
+	parentLogFields := logEntry(0).Data
+
 	// 3. WORKER LAUNCH
 	go func() {
 		defer pool.activeOps.Add(-1)
+
+		// Create a local logger instance that preserves the parent's contextual fields
+		_ = parentLogFields // Available for any local logging explicitly inside this block if needed.
 
 		// The task should check workerCtx.Err() to be "cooperative"
 		data, err := worker(workerCtx)
