@@ -355,19 +355,6 @@ class AsyncDRReplicationPolicyNotFoundError(BaseArrayActionException):
             requested_policy_name, volume_group_id)
 
 
-class OperationTimeoutError(BaseArrayActionException):
-
-    def __init__(self, operation_details):  # pylint: disable=unused-argument
-        super().__init__()
-
-
-class OperationAbortedError(BaseArrayActionException):
-
-    def __init__(self, operation_details):
-        super().__init__()
-        self.message = messages.OPERATION_ABORTED_ERROR_MESSAGE.format(operation_details)
-
-
 class OperationNotReadyError(BaseArrayActionException):
     def __init__(self, operation_details):
         super().__init__()
