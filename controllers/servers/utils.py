@@ -12,7 +12,6 @@ import controllers.array_action.errors as array_errors
 import controllers.array_action.settings as array_settings
 import controllers.servers.messages as messages
 import controllers.servers.settings as servers_settings
-from controllers.array_action.array_action_types import VolumeGroup
 from controllers.array_action.array_action_types import ReplicationRequest
 from controllers.array_action.settings import NVME_OVER_FC_CONNECTIVITY_TYPE, FC_CONNECTIVITY_TYPE, \
     ISCSI_CONNECTIVITY_TYPE, REPLICATION_COPY_TYPE_SYNC, REPLICATION_COPY_TYPE_ASYNC, REPLICATION_TYPE_MIRROR, \
@@ -1149,25 +1148,16 @@ def get_replication_object_type_and_id_info(request, require_replication_source=
     return object_type, object_id_info
 
 
-def _get_cli_volume_for_ramen_ear(object_type, object_id_info, replication_type, mediator):
+def resolve_ramen_ear_volume_to_volume_group(object_type, object_id_info, replication_type, mediator):
     if object_type != servers_settings.VOLUME_TYPE_NAME or replication_type != array_settings.REPLICATION_TYPE_EAR:
-        return None
+        return object_type, object_id_info
 
     volume_uid = object_id_info.ids.uid
     cli_volume = mediator.get_object_by_id(volume_uid, servers_settings.VOLUME_TYPE_NAME)
     if not cli_volume:
         raise array_errors.ObjectNotFoundError(volume_uid)
 
-    return cli_volume
-
-
-def resolve_ramen_ear_volume_to_volume_group(object_type, object_id_info, replication_type, mediator):
-    cli_volume = _get_cli_volume_for_ramen_ear(object_type, object_id_info, replication_type, mediator)
-    if cli_volume is None:
-        return object_type, object_id_info
-
     vg_internal_id = cli_volume.volume_group_id
-    volume_uid = object_id_info.ids.uid
     if not vg_internal_id:
         raise array_errors.ObjectNotFoundError("volume '{}' is not part of any VolumeGroup".format(volume_uid))
 
@@ -1180,32 +1170,6 @@ def resolve_ramen_ear_volume_to_volume_group(object_type, object_id_info, replic
         uid=vg_internal_id
     )
     return servers_settings.VOLUME_GROUP_TYPE_NAME, vg_object_id_info
-
-
-def resolve_vg_lock_id_for_ramen(request):
-    from controllers.array_action.storage_agent import get_agent
-
-    replication_type = get_addons_replication_type(request)
-    object_type, object_id_info = get_replication_object_type_and_id_info(request)
-
-    connection_info = get_array_connection_info_from_secrets(request.secrets)
-    with get_agent(connection_info, object_id_info.array_type).get_mediator() as mediator:
-        cli_volume = _get_cli_volume_for_ramen_ear(object_type, object_id_info, replication_type, mediator)
-        if cli_volume is None:
-            return None
-
-        vg_internal_id = cli_volume.volume_group_id
-        volume_uid = object_id_info.ids.uid
-        if not vg_internal_id:
-            raise array_errors.ObjectNotFoundError("volume '{}' is not part of any VolumeGroup".format(volume_uid))
-
-        volume_group = VolumeGroup(
-            name=cli_volume.volume_group_name,
-            id='',
-            internal_id=vg_internal_id,
-            array_type=object_id_info.array_type,
-        )
-        return get_volume_group_id(volume_group, None)
 
 
 def is_call_home_enabled():
