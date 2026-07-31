@@ -282,7 +282,7 @@ class TestArrayMediatorSVC(unittest.TestCase):
 
         # Verify checkpoint was created and status was checked
         self.svc.client.svctask.chvolumegroupreplication.assert_called_once()
-        self.assertEqual(self.svc.client.svcinfo.lsvolumegroupreplication.call_count, 2)
+        self.assertEqual(self.svc.client.svcinfo.lsvolumegroupreplication.call_count, 3)
 
     def test_demote_ear_replication_not_supported(self):
         replication, _ = self._prepare_mocks_for_ear_replication(is_ear_supported=False)

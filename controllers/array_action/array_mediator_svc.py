@@ -73,6 +73,7 @@ LUN_ID_IS_NOT_VALID = 'CMMVC5844E'
 EAR_PROMOTE_REMOTE_NOT_READY = 'CMMVC1150E'
 EAR_PROMOTE_REMOTE_INTERNAL_ERROR = 'CMMVC9913E'
 EAR_PROMOTE_REMOTE_NOT_INDEPENDENT = "CMMVC9932E"
+EAR_PROMOTE_DIVERGED_COPY_NOT_SYNCED = "CMMVC1149E"
 
 HOST_NQN = 'nqn'
 HOST_WWPN = 'WWPN'
@@ -2182,14 +2183,13 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
         self._promote_replication_endpoint(endpoint_type, rcrelationship.name)
 
     @register_csi_plugin()
-    def promote_replication_volume(self, replication, force=False):
+    def promote_replication_volume(self, replication):
         if replication.replication_type == array_settings.REPLICATION_TYPE_MIRROR:
             self._promote_replication_volume(replication.name)
         elif replication.replication_type == array_settings.REPLICATION_TYPE_EAR:
             self._promote_ear_replication_volume(
                 replication.volume_group_id,
-                replication_policy=replication.name,
-                force=force
+                replication_policy=replication.name
             )
 
     def _promote_replication_volume(self, replication_name):
@@ -2200,7 +2200,7 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
         endpoint_type = self._get_replication_endpoint_type(rcrelationship)
         self._ensure_endpoint_is_primary(rcrelationship, endpoint_type)
 
-    def _promote_ear_replication_volume(self, volume_group_id, replication_policy=None, force=False):
+    def _promote_ear_replication_volume(self, volume_group_id, replication_policy=None):
         if not self._is_earreplication_supported():
             logger.info("EAR replication is not supported on the existing storage")
             return
@@ -2210,21 +2210,27 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
             logger.info("Clearing demote state for volume group %s during promote", volume_group_id)
             self._demote_state_map.pop(volume_group_id, None)
 
-        cli_kwargs = {}
         if self._get_replication_mode(volume_group_id) == array_settings.ENDPOINT_TYPE_RECOVERY:
-            cli_kwargs['mode'] = array_settings.ENDPOINT_TYPE_INDEPENDENT
-            if force:
-                cli_kwargs['accessdivergedcopy'] = array_settings.ACCESSDIVERGEDCOPY
-                logger.info("force flag set, adding accessdivergedcopy for recovery to independent transition "
-                            "for volume group '{}'".format(volume_group_id))
             logger.info("Changing the local volume group to be an independent copy")
-            self._chvolumegroupreplication(volume_group_id, **cli_kwargs)
+            self._promote_ear_replication_to_independent(volume_group_id)
 
         if self._get_replication_mode(volume_group_id) == array_settings.ENDPOINT_TYPE_INDEPENDENT:
             logger.info("Changing the local volume group to be a production copy")
             self._promote_ear_replication_to_production(volume_group_id, replication_policy=replication_policy)
         else:
             logger.info("Can't be promoted because the local volume group is not an independent copy")
+
+    def _promote_ear_replication_to_independent(self, volume_group_id):
+        try:
+            self._chvolumegroupreplication(volume_group_id, mode=array_settings.ENDPOINT_TYPE_INDEPENDENT)
+        except (svc_errors.CommandExecutionError, CLIFailureError) as ex:
+            if EAR_PROMOTE_DIVERGED_COPY_NOT_SYNCED in ex.my_message:
+                logger.warning("volume group '{}' recovery copy is diverged and not yet synced, "
+                               "retrying with accessdivergedcopy flag".format(volume_group_id))
+                self._chvolumegroupreplication(volume_group_id, mode=array_settings.ENDPOINT_TYPE_INDEPENDENT,
+                                               accessdivergedcopy=array_settings.ACCESSDIVERGEDCOPY)
+            else:
+                raise
 
     def _promote_ear_replication_to_production(self, volume_group_id, replication_policy=None):
         if replication_policy:
@@ -2294,6 +2300,11 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
         if not volume_group_replication:
             logger.error("Volume group replication not found for {}".format(volume_group_name))
             raise array_errors.ObjectNotFoundError(volume_group_name)
+
+        if self._get_replication_mode(volume_group_name) == array_settings.ENDPOINT_TYPE_RECOVERY:
+            logger.info("Idempotent case: volume group {} is already in recovery mode, "
+                        "skipping demote".format(volume_group_name))
+            return
 
         # Check if this is first demote attempt or retry
         if volume_group_name not in self._demote_state_map:
