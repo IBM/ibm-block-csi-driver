@@ -23,6 +23,7 @@ import (
 	"path/filepath"
 	"strings"
 	"strconv"
+	"time"
 
 	"github.com/ibm/ibm-block-csi-driver/node/logger"
 	"github.com/ibm/ibm-block-csi-driver/node/pkg/driver/executer"
@@ -172,9 +173,9 @@ func countLivePathsForSubsystem(livePaths map[string]bool, ipsByArrayInitiator m
         return count
 }
 
-func (r OsDeviceConnectivityNvmeOFc) updateHostIDs(hostIDs map[int]bool) {
+func (r OsDeviceConnectivityNvmeOFc) updateHostIDs(ctx context.Context, hostIDs map[int]bool) {
         // 1. Get a map of HostNumber -> PhysicalIdentifier (PCI or WWPN)
-        hostMap, err := r.mapHostsToPhysicalHardware()
+        hostMap, err := r.mapHostsToPhysicalHardware(ctx)
         if err != nil {
                 logger.Errorf("Failed to map FC hosts: %v", err)
                 return
@@ -197,14 +198,14 @@ func (r OsDeviceConnectivityNvmeOFc) updateHostIDs(hostIDs map[int]bool) {
         }
 }
 
-func (r *OsDeviceConnectivityNvmeOFc) mapHostsToPhysicalHardware(ctx context.Context) (map[map[int]string], error) {
+func (r OsDeviceConnectivityNvmeOFc) mapHostsToPhysicalHardware(ctx context.Context) (map[int]string, error) {
 	if err := ctx.Err(); err != nil {
 		return nil, err
 	}
 
 	// RULE 1: Enforce explicit infrastructure gating around the volatile sysfs parsing pass 
 	// to shield your worker threads from permanent hangs if a hardware controller collapses.
-	return ExecuteUninterruptible[map[int]string](
+	return executer.ExecuteUninterruptible[map[int]string](
 		ctx,
 		r.KeyedGater,
 		"global-fc-host-hardware-mapping", // Static key space limits overlapping checks safely
@@ -448,7 +449,7 @@ func (r OsDeviceConnectivityNvmeOFc) getHostFCPorts() ([]string, error) {
         return hostPorts, nil
 }
 
-func (r OsDeviceConnectivityNvmeOFc) RescanDevices(_ int, _ []string) error {
+func (r OsDeviceConnectivityNvmeOFc) RescanDevices(_ context.Context, _ int, _ []string) error {
 	return nil
 }
 
