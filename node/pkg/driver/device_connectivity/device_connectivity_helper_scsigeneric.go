@@ -52,7 +52,7 @@ type OsDeviceConnectivityHelperScsiGenericInterface interface {
 		Mainly for writing clean unit testing, so we can Mock this interface in order to unit test logic.
 	*/
 	RescanDevicesGetHostIds(lunId int, arrayIdentifiers []string) (map[int]bool, error)
-	RescanDevices(lunId int, arrayIdentifiers []string, hostIDs map[int]bool) error
+	RescanDevices(ctx context.Context, lunId int, arrayIdentifiers []string, hostIDs map[int]bool) error
 	GetMpathDevice(ctx context.Context, volumeId string) (string, error)
 	GetExistingMpathDevice(ctx context.Context, volumeUuid string, volumePath string) (string, error)
 	RemovePhysicalDevice(ctx context.Context, sysDevices []string) error
@@ -361,7 +361,6 @@ func NewOsDeviceConnectivityHelperScsiGeneric(executer executer.ExecuterInterfac
 }
 
 func (r *OsDeviceConnectivityHelperScsiGeneric) IsVolumePathMatchesVolumeId(ctx context.Context, volumeUuid string, volumePath string) (bool, error) {
-	r.KeyedGater.suicideIfLeaked()
 	if err := ctx.Err(); err != nil {
 		return false, err
 	}
@@ -374,7 +373,7 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) IsVolumePathMatchesVolumeId(ctx 
 	}
 
 	// 1. CONCURRENCY SHIELDED MULTIPATH MAP NAME RESOLUTION
-	mpathDeviceName, err := ExecuteUninterruptible[string](
+	mpathDeviceName, err := executer.ExecuteUninterruptible[string](
 		ctx,
 		r.KeyedGater,
 		"mpath-resolve-"+filepath.Base(volumePath),
@@ -394,7 +393,7 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) IsVolumePathMatchesVolumeId(ctx 
 	}
 
 	// 2. PRIMARY STRATEGY: SCSI Generic Inquiry IOCTL (Consistent from RHEL 7 to Ubuntu 26.04)
-	sgInqWwn, errInq := ExecuteUninterruptible[string](
+	sgInqWwn, errInq := executer.ExecuteUninterruptible[string](
 		ctx,
 		r.KeyedGater,
 		"scsi-ioctl-inquiry-"+dmName,
@@ -472,7 +471,7 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) IsVolumePathMatchesVolumeId(ctx 
 	// =========================================================================
 	// STAGE 2: THE REAL-TIME OPTIMAL BATCH EXECUTION ENGINE
 	// =========================================================================
-	results, errBatch := ExecuteUninterruptibleBatch[string, bool](
+	results, errBatch := executer.ExecuteUninterruptibleBatch[string, bool](
 		ctx,
 		r.KeyedGater,
 		"sysfs-slaves-nvme-scan-"+dmName,
@@ -555,7 +554,6 @@ func (r OsDeviceConnectivityHelperScsiGeneric) RescanDevicesGetHostIds(lunId int
 }
 
 func (r *OsDeviceConnectivityHelperScsiGeneric) RescanDevices(ctx context.Context, lunId int, arrayIdentifiers []string, hostIDs map[int]bool) error {
-	r.KeyedGater.suicideIfLeaked()
 	if err := ctx.Err(); err != nil {
 		return err
 	}
@@ -574,14 +572,14 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) RescanDevices(ctx context.Contex
 	// Enforce a unique concurrent execution gate key per LUN to avoid overlapping bus scans
 	gaterKey := fmt.Sprintf("scsi-rescan-lun-%d", lunId)
 
-	results, errBatch := ExecuteUninterruptibleBatch[int, struct{}](
+	results, errBatch := executer.ExecuteUninterruptibleBatch[int, struct{}](
 		ctx,
 		r.KeyedGater,
 		gaterKey,
 		32,  // maxRunning: allows broad parallel scsi bus interactions simultaneously
 		128, // maxSpare
-		r.HandoffTimeout, // Match the struct's configuration or reasonable defaults (e.g., 5*time.Second)
-		r.HardTimeout,    // Match defaults (e.g., 20*time.Second)
+		5*time.Second, // Match the struct's configuration or reasonable defaults (e.g., 5*time.Second)
+		20*time.Second,    // Match defaults (e.g., 20*time.Second)
 		hosts,
 		func(wCtx context.Context, index int, hostNumber int, cancelBatch func()) (struct{}, error) {
 			logger.Warningf("RescanDevices parallel iter for host%d", hostNumber)
@@ -705,7 +703,6 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) IsNativeNvmeDevice(ctx context.C
 }
 
 func (r *OsDeviceConnectivityHelperScsiGeneric) IsNonNativeNvmeDevice(ctx context.Context, dmPath string) (bool, error) {
-	r.KeyedGater.suicideIfLeaked()
 	if err := ctx.Err(); err != nil {
 		return false, err
 	}
@@ -726,7 +723,7 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) IsNonNativeNvmeDevice(ctx contex
 	// to prevent driver starvation if the local kernel block subsystem freezes.
 	gaterKey := "nvme-check-" + baseDevice
 	
-	return ExecuteUninterruptible[bool](
+	return executer.ExecuteUninterruptible[bool](
 		ctx,
 		r.KeyedGater,
 		gaterKey,
@@ -778,7 +775,6 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) IsNonNativeNvmeDevice(ctx contex
 // IsNvmeDevice determines if a given storage target path is an NVMe layout (native or multi-pathed).
 // Fully portable from RHEL 7 upwards, uses zero forks, and is protected against D-state freezes.
 func (r *OsDeviceConnectivityHelperScsiGeneric) IsNvmeDevice(ctx context.Context, dmPath string) (bool, error) {
-	r.KeyedGater.suicideIfLeaked()
 	if err := ctx.Err(); err != nil {
 		return false, err
 	}
@@ -806,7 +802,7 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) IsNvmeDevice(ctx context.Context
 	// RULE 1: Guard the blocking sysfs execution via infrastructure gate to handle kernel stalls safely
 	gaterKey := "nvme-layout-verify-" + baseDevice
 
-	return ExecuteUninterruptible[bool](
+	return executer.ExecuteUninterruptible[bool](
 		ctx,
 		r.KeyedGater,
 		gaterKey,
@@ -909,7 +905,7 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) flushDeviceBuffers(ctx context.C
 
 	// FLATTENED DEPLOYMENT: Enforce resource limits and timeout shielding on the disk 
 	// subsystem via a single un-nested gater wrapper to maximize parallelism.
-	_, err := ExecuteUninterruptible[struct{}](
+	_, err := executer.ExecuteUninterruptible[struct{}](
 		ctx,
 		r.KeyedGater,
 		"flush-buffers-"+baseName,
@@ -961,7 +957,6 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) flushDeviceBuffers(ctx context.C
 
 // flushDevicesBuffers implements parallel batch execution across multiple device configurations.
 func (r *OsDeviceConnectivityHelperScsiGeneric) flushDevicesBuffers(ctx context.Context, deviceNames []string) error {
-	r.KeyedGater.suicideIfLeaked()
 	if err := ctx.Err(); err != nil {
 		return err
 	}
@@ -982,7 +977,7 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) flushDevicesBuffers(ctx context.
 
 	// RULE 1: Replace raw ad-hoc goroutines with unified infrastructure batching.
 	// This bounds global token allocation while processing flushes concurrently.
-	results, errBatch := ExecuteUninterruptibleBatch[string, struct{}](
+	results, errBatch := executer.ExecuteUninterruptibleBatch[string, struct{}](
 		ctx,
 		r.KeyedGater,
 		"batch-flush-devices-pool",
@@ -1012,16 +1007,7 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) flushDevicesBuffers(ctx context.
 	return nil
 }
 
-// OperatingSystemFlavor tracks architectural variations between legacy and modern kernel sysfs layouts.
-type OperatingSystemFlavor int
-const (
-	FlavorUnknown OperatingSystemFlavor = iota
-	FlavorLegacy
-	FlavorModern
-)
-
 func (r *OsDeviceConnectivityHelperScsiGeneric) RemovePhysicalDevice(ctx context.Context, sysDevices []string) error {
-	r.KeyedGater.suicideIfLeaked()
 	if err := ctx.Err(); err != nil {
 		return err
 	}
@@ -1041,7 +1027,7 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) RemovePhysicalDevice(ctx context
 	}
 
 	// RULE 1: Replace raw ad-hoc loops with the parallel batch execution framework
-	results, errBatch := ExecuteUninterruptibleBatch[string, struct{}](
+	results, errBatch := executer.ExecuteUninterruptibleBatch[string, struct{}](
 		ctx,
 		r.KeyedGater,
 		"batch-physical-device-eviction",
@@ -1053,7 +1039,6 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) RemovePhysicalDevice(ctx context
 		func(wCtx context.Context, index int, name string, cancelBatch func()) (struct{}, error) {
 			baseBlockSysDir := filepath.Join("/sys/block", name)
 			var deletePath string
-			var determinedFlavor OperatingSystemFlavor = FlavorUnknown
 
 			// 1. Resolve exact target architectures using safe directory metadata probing
 			if strings.HasPrefix(name, "sd") {
@@ -1069,31 +1054,24 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) RemovePhysicalDevice(ctx context
 				}
 
 				// RULE 4: Retrieve cached OS strategy behavior using the existing thread-safe method
-				currentFlavor := r.getCachedFlavor()
-
 				// Strategy A: Modern Class Target Routing
-				if currentFlavor == FlavorModern || currentFlavor == FlavorUnknown {
-					if idx := strings.LastIndex(normalizedName, "n"); idx != -1 && idx > 0 {
-						ctrlPart := normalizedName[:idx]
-						modernClassDir := fmt.Sprintf("/sys/class/nvme/%s/%s", ctrlPart, normalizedName)
-						if _, err := os.Stat(modernClassDir); err == nil {
-							deletePath = fmt.Sprintf("%s/delete", modernClassDir)
-							determinedFlavor = FlavorModern
-						}
+				if idx := strings.LastIndex(normalizedName, "n"); idx != -1 && idx > 0 {
+					ctrlPart := normalizedName[:idx]
+					modernClassDir := fmt.Sprintf("/sys/class/nvme/%s/%s", ctrlPart, normalizedName)
+					if _, err := os.Stat(modernClassDir); err == nil {
+						deletePath = fmt.Sprintf("%s/delete", modernClassDir)
 					}
 				}
 
 				// Strategy B: Legacy /sys/block Target Routing (RHEL 7 Compatibility / Rule 3)
-				if deletePath == "" && (currentFlavor == FlavorLegacy || currentFlavor == FlavorUnknown) {
+				if deletePath == "" {
 					legacyDeviceDir := filepath.Join(baseBlockSysDir, "device")
 					if _, err := os.Stat(legacyDeviceDir); err == nil {
 						deletePath = filepath.Join(legacyDeviceDir, "delete")
-						determinedFlavor = FlavorLegacy
 					} else {
 						if idx := strings.LastIndex(normalizedName, "n"); idx != -1 && idx > 0 {
 							ctrlPart := normalizedName[:idx]
 							deletePath = fmt.Sprintf("/sys/class/nvme/%s/device/delete", ctrlPart)
-							determinedFlavor = FlavorLegacy
 						}
 					}
 				}
@@ -1120,11 +1098,6 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) RemovePhysicalDevice(ctx context
 					return struct{}{}, errWrite
 				}
 				logger.Infof("Idempotency: Eviction path %s already cleared from host node.", deletePath)
-			} else {
-				// RULE 4: Save discovered flavor back to cache safely on active match
-				if determinedFlavor != FlavorUnknown && r.getCachedFlavor() == FlavorUnknown {
-					r.setCachedFlavor(determinedFlavor)
-				}
 			}
 
 			// 4. RULE 1 ENFORCEMENT: The verification polling loop is kept entirely *inside* 
@@ -1210,7 +1183,6 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) readSysfs(path string) string {
 
 // ValidateLun performs validation metrics across active and alternative device mapper multi-path lines.
 func (r *OsDeviceConnectivityHelperScsiGeneric) ValidateLun(ctx context.Context, targetDm string, expectedLun int, sysDevices []string, expectedSerial string) error {
-	r.KeyedGater.suicideIfLeaked()
 	if err := ctx.Err(); err != nil {
 		return err
 	}
@@ -1238,7 +1210,7 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) ValidateLun(ctx context.Context,
 
 	// RULE 1: Transition the loop into the concurrent batch engine to process paths simultaneously.
 	// We do not cancel the batch on error because we want to inspect all available paths.
-	results, errBatch := ExecuteUninterruptibleBatch[string, bool](
+	results, errBatch := executer.ExecuteUninterruptibleBatch[string, bool](
 		ctx,
 		r.KeyedGater,
 		"batch-lun-path-validation-"+targetDm,
@@ -1413,7 +1385,6 @@ type sgScsiId struct {
 }
 
 func (r *OsDeviceConnectivityHelperScsiGeneric) purgeScsiGhosts(ctx context.Context, expectedSerial string, expectedLun int, arrayIdentifiers []string) error {
-	r.KeyedGater.suicideIfLeaked()
 	if err := ctx.Err(); err != nil {
 		return err
 	}
@@ -1496,7 +1467,7 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) purgeScsiGhosts(ctx context.Cont
 			// =========================================================================
 			if len(currentBatch) == chunkSize {
 				logger.Infof("Ghost Scrubber: reached %d matched targets. Executing batch.", chunkSize)
-				_, errBatch := ExecuteUninterruptibleBatch[ghostCandidate, struct{}](
+				_, errBatch := executer.ExecuteUninterruptibleBatch[ghostCandidate, struct{}](
 					ctx, r.KeyedGater, "batch-purge-scsi-ghosts-chunk", 10, 100, 5*time.Second, 30*time.Second, currentBatch,
 					func(wCtx context.Context, index int, candidate ghostCandidate, cancelBatch func()) (struct{}, error) {
 						vendorBytesRaw, err := os.ReadFile(filepath.Join(candidate.deviceDir, "vendor"))
@@ -1553,7 +1524,7 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) purgeScsiGhosts(ctx context.Cont
 	// =========================================================================
 	if len(currentBatch) > 0 {
 		logger.Infof("Ghost Scrubber: flushing final tail chunk of %d matched targets.", len(currentBatch))
-		_, errBatch := ExecuteUninterruptibleBatch[ghostCandidate, struct{}](
+		_, errBatch := executer.ExecuteUninterruptibleBatch[ghostCandidate, struct{}](
 			ctx, r.KeyedGater, "batch-purge-scsi-ghosts-tail", 10, 100, 5*time.Second, 30*time.Second, currentBatch,
 			func(wCtx context.Context, index int, candidate ghostCandidate, cancelBatch func()) (struct{}, error) {
 				vendorBytesRaw, err := os.ReadFile(filepath.Join(candidate.deviceDir, "vendor"))
@@ -1604,7 +1575,6 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) purgeScsiGhosts(ctx context.Cont
 var nvmeScrubberControllerPattern = regexp.MustCompile(`^nvme\d+c\d+n\d+$`)
 
 func (r *OsDeviceConnectivityHelperScsiGeneric) purgeNvmeGhosts(ctx context.Context, expectedSerial string, expectedLun int, arrayIdentifiers []string) error {
-	r.KeyedGater.suicideIfLeaked()
 	if err := ctx.Err(); err != nil {
 		return ctx.Err()
 	}
@@ -1630,7 +1600,7 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) purgeNvmeGhosts(ctx context.Cont
 		}
 
 		logger.Infof("NVMe Ghost Scrubber: processing chunk of %d targets", len(batch))
-		_, errBatch := ExecuteUninterruptibleBatch[string, struct{}](
+		_, errBatch := executer.ExecuteUninterruptibleBatch[string, struct{}](
 			ctx,
 			r.KeyedGater,
 			"batch-purge-nvme-ghosts-chunk",
@@ -1727,19 +1697,18 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) purgeNvmeGhosts(ctx context.Cont
 	return nil
 }
 
+// executeNvmeTeardown processes clean storage namespace removals with zero internal framework nesting.
 func (r *OsDeviceConnectivityHelperScsiGeneric) executeNvmeTeardown(ctx context.Context, nvmeBlockName string) {
 	ctrlName := ""
 	baseBlockName := nvmeBlockName 
 
 	if lastNIdx := strings.LastIndex(nvmeBlockName, "n"); lastNIdx != -1 && lastNIdx > 0 {
 		baseCtrl := nvmeBlockName[:lastNIdx]
-		if cIdx := strings.Index(baseCtrl, "c") {
-			if cIdx != -1 {
-				ctrlName = baseCtrl[:cIdx] 
-				baseBlockName = ctrlName + nvmeBlockName[lastNIdx:] 
-			} else {
-				ctrlName = baseCtrl 
-			}
+		if cIdx := strings.Index(baseCtrl, "c"); cIdx != -1 {
+			ctrlName = baseCtrl[:cIdx] 
+			baseBlockName = ctrlName + nvmeBlockName[lastNIdx:] 
+		} else {
+			ctrlName = baseCtrl 
 		}
 	}
 	
@@ -1749,11 +1718,14 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) executeNvmeTeardown(ctx context.
 
 	gaterKey := fmt.Sprintf("nvme-teardown-%s", ctrlName)
 
-	_, _ = ExecuteUninterruptible[struct{}](
+	_, _ = executer.ExecuteUninterruptible[struct{}](
 		ctx,
 		r.KeyedGater,
 		gaterKey, 
-		10, 50, 2*time.Second, 15*time.Second,
+		10, // maxRunning limits overlapping unbind sweeps per distinct controller
+		50, // maxSpare
+		2*time.Second, 
+		15*time.Second,
 		func(wCtx context.Context) (struct{}, error) {
 			
 			// 1. Try targeting the namespace specific deletion endpoint first
@@ -1775,7 +1747,7 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) executeNvmeTeardown(ctx context.
 				}
 			}
 
-			// 3. Legacy Fallback (Rule 3): Parse out the standalone parent controller name safely
+			// 3. Legacy Fallback (Rule 3 Layout Parity for RHEL 7 Environments)
 			if ctrlName != "generic" {
 				pciUeventPath := fmt.Sprintf("/sys/class/nvme/%s/device/uevent", ctrlName) 
 				if _, err := os.Stat(pciUeventPath); err == nil {
@@ -1795,14 +1767,18 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) executeNvmeTeardown(ctx context.
 					}
 				}
 
-				// RULE 1 REMEDY: Flattened nested call. Replaced the internal ExecuteUninterruptible wrapper with direct execution 
-				// since this code is already fully protected inside the outer nvme-teardown- gater.
-				pciAddrPath, errLink := filepath.EvalSymlinks(filepath.Join("/sys/class/nvme", ctrlName, "device"))
+				// FLATTENED FOR SIMPLICITY & DEADLOCK ELIMINATION (Rule 1):
+				// Replaced the internal nested ExecuteUninterruptible wrapper and heavy EvalSymlinks 
+				// engine with a fast, context-compliant os.Readlink call to resolve the pointer instantly.
+				pciAddrPath, errLink := os.Readlink(filepath.Join("/sys/class/nvme", ctrlName, "device"))
 				if errLink == nil {
+					if !filepath.IsAbs(pciAddrPath) {
+						pciAddrPath = filepath.Join(filepath.Join("/sys/class/nvme", ctrlName), pciAddrPath)
+					}
 					pciAddress := filepath.Base(pciAddrPath)
 					unbindPath := "/sys/bus/pci/drivers/nvme/unbind"
 					if _, err := os.Stat(unbindPath); err == nil {
-						logger.Warningf("[Purge-Scrubber-Legacy] Unbinding standalone controller %s at PCI address %s via eval fallback links", ctrlName, pciAddress)
+						logger.Warningf("[Purge-Scrubber-Legacy] Unbinding standalone controller %s at PCI address %s via readlink fallback", ctrlName, pciAddress)
 						_ = os.WriteFile(unbindPath, []byte(pciAddress), 0200)
 						return struct{}{}, nil
 					}
@@ -1830,7 +1806,6 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) isNvmeGhost(ctx context.Context,
 }
 
 func (r *OsDeviceConnectivityHelperScsiGeneric) PruneNvmeGhosts(ctx context.Context, expectedWWID string, arrayNqns []string) error {
-	r.KeyedGater.suicideIfLeaked()
 	if err := ctx.Err(); err != nil {
 		return ctx.Err()
 	}
@@ -1853,7 +1828,7 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) PruneNvmeGhosts(ctx context.Cont
 		}
 
 		logger.Infof("NVMe Prune Scrubber: processing chunk of %d targets", len(batch))
-		_, errBatch := ExecuteUninterruptibleBatch[string, struct{}](
+		_, errBatch := executer.ExecuteUninterruptibleBatch[string, struct{}](
 			ctx,
 			r.KeyedGater,
 			"batch-prune-nvme-ghosts-chunk",
@@ -2055,7 +2030,6 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) GetHCTLFromSg(ctx context.Contex
 
 // 1. GATEWAY: Direct and clear entry point regulating protocol limits
 func (r *OsDeviceConnectivityHelperScsiGeneric) isPathOwnedByMyArray(ctx context.Context, deviceName string, arrayIdentifiers []string) bool {
-	r.KeyedGater.suicideIfLeaked()
 	if err := ctx.Err(); err != nil {
 		return false
 	}
@@ -2103,7 +2077,7 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) isPathOwnedByMyArray(ctx context
 
 
 func (r *OsDeviceConnectivityHelperScsiGeneric) resolveTargetIDsWithContext(ctx context.Context, baseDeviceName string) ([]string, error) {
-	return ExecuteUninterruptible[[]string](
+	return executer.ExecuteUninterruptible[[]string](
 		ctx,
 		r.KeyedGater,
 		"resolve-target-ids-"+baseDeviceName,
@@ -2684,7 +2658,7 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) IsSgDeviceGhost(ctx context.Cont
 	// hardware checks simultaneously without cross-blocking or serializing execution threads.
 	ioctlGaterKey := fmt.Sprintf("ghost-inq-%s", cleanSgName)
 
-	isHwGhost, ioctlErr := ExecuteUninterruptible[bool](
+	isHwGhost, ioctlErr := executer.ExecuteUninterruptible[bool](
 		ctx,
 		r.KeyedGater,
 		ioctlGaterKey,
@@ -2918,7 +2892,6 @@ PROCESS_PAGE_0x83:
 
 
 func (r *OsDeviceConnectivityHelperScsiGeneric) TeardownVolume(ctx context.Context, target string, needFlush bool, needRemovePhysical bool, expectedWWID string) error {
-	r.KeyedGater.suicideIfLeaked()
 	if err := ctx.Err(); err != nil {
 		return err
 	}
@@ -2939,7 +2912,7 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) TeardownVolume(ctx context.Conte
 			logger.Warningf("[Teardown-Main] Isolated backing device path node from mount tree: %s", devPath)
 			
 			// Restored: Shielding the file system metadata access against unexpected kernel blockages
-			stat, errStat := ExecuteUninterruptible[os.FileInfo](
+			stat, errStat := executer.ExecuteUninterruptible[os.FileInfo](
 				ctx, r.KeyedGater, "stat-teardown-"+filepath.Base(devPath), 10, 50, 1*time.Second, 2*time.Second,
 				func(wCtx context.Context) (os.FileInfo, error) {
 					return os.Stat(devPath)
@@ -2983,9 +2956,9 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) TeardownVolume(ctx context.Conte
 			return fmt.Errorf("teardown: unmount step is still in progress: %w", errUnmount)
 		}
 		
-		if errPoll := r.Mounter.PollMountDeleted(ctx, target, 10*time.Second); errPoll != nil {
-			logger.Errorf("[Teardown-Main] Mount path %s remained pinned in kernel namespaces after timeout: %v", target, errPoll)
-			return fmt.Errorf("teardown: failed to confirm volume unmount clearance status: %w", errPoll)
+		if !r.Mounter.PollMountDeleted(ctx, target, 10*time.Second) {
+			logger.Errorf("[Teardown-Main] Mount path %s remained pinned in kernel namespaces after timeout", target)
+			return fmt.Errorf("teardown: failed to confirm volume unmount clearance status")
 		}
 		logger.Infof("[Teardown-Main] Target path %s cleanly unmounted and verified gone.", target)
 	}
@@ -3044,7 +3017,7 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) TeardownVolume(ctx context.Conte
 			_ = r.multipathdAction(ctx, "disablequeueing map "+mpathName)
 			
 			// Restored: Defensively wrap ioctl removal against stuck device queues
-			_, _ = ExecuteUninterruptible[struct{}](
+			_, _ = executer.ExecuteUninterruptible[struct{}](
 				ctx, r.KeyedGater, "rescue-"+mpathName, 10, 50, 5*time.Second, 15*time.Second,
 				func(wCtx context.Context) (struct{}, error) {
 					_ = r.dmIoctlCall(wCtx, mpathName, DM_DEV_REMOVE, DM_DEFERRED_REMOVE)
@@ -3054,7 +3027,7 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) TeardownVolume(ctx context.Conte
 		} else {
 			if needFlush {
 				// Restored: Explicitly wrap the buffer flush operation per-map
-				_, _ = ExecuteUninterruptible[struct{}](
+				_, _ = executer.ExecuteUninterruptible[struct{}](
 					ctx, r.KeyedGater, "flush-"+mpathName, 10, 50, 5*time.Second, 30*time.Second,
 					func(wCtx context.Context) (struct{}, error) {
 						err := r.flushDeviceBuffers(wCtx, mpathName)
@@ -3116,7 +3089,6 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) TeardownVolume(ctx context.Conte
 
 // cleanNVMeNamespacesFromSlaves executes systematic parallel sysfs deletion token injection on NVMe paths.
 func (r *OsDeviceConnectivityHelperScsiGeneric) cleanNVMeNamespacesFromSlaves(ctx context.Context, devices []string) {
-	r.KeyedGater.suicideIfLeaked()
 	if err := ctx.Err(); err != nil {
 		return
 	}
@@ -3140,7 +3112,7 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) cleanNVMeNamespacesFromSlaves(ct
 	// Enforce a unified batch container key to keep global allocations bounded 
 	gaterKey := "batch-nvme-slaves-namespace-cleanup"
 
-	_, _ = ExecuteUninterruptibleBatch[string, struct{}](
+	_, _ = executer.ExecuteUninterruptibleBatch[string, struct{}](
 		ctx,
 		r.KeyedGater,
 		gaterKey,
@@ -3174,7 +3146,6 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) cleanNVMeNamespacesFromSlaves(ct
 
 // evictNVMeNamespaces targets specific sysfs namespace delete attributes in parallel.
 func (r *OsDeviceConnectivityHelperScsiGeneric) evictNVMeNamespaces(ctx context.Context, devices []string) {
-	r.KeyedGater.suicideIfLeaked()
 	if err := ctx.Err(); err != nil {
 		return
 	}
@@ -3198,7 +3169,7 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) evictNVMeNamespaces(ctx context.
 	// Enforce a structured batch key layout to prevent overlapping orchestration interference
 	gaterKey := "batch-nvme-namespaces-eviction"
 
-	_, _ = ExecuteUninterruptibleBatch[string, struct{}](
+	_, _ = executer.ExecuteUninterruptibleBatch[string, struct{}](
 		ctx,
 		r.KeyedGater,
 		gaterKey,
@@ -3255,7 +3226,7 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) FindSlavesByWWID(ctx context.Con
 		}
 
 		var matchedSlaves []string
-		results, errBatch := ExecuteUninterruptibleBatch[string, string](
+		results, errBatch := executer.ExecuteUninterruptibleBatch[string, string](
 			ctx,
 			r.KeyedGater,
 			"batch-find-slaves-chunk",
@@ -3531,7 +3502,7 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) readDMNameSafe(ctx context.Conte
 	// We run the file reads through the protected KeyedGater executor frame. 
 	// This ensures that if a legacy or modern kernel locks up on a transitioning 
 	// DM block entry, the Go runtime thread will not hang permanently.
-	result, _ := ExecuteUninterruptible[string](
+	result, _ := executer.ExecuteUninterruptible[string](
 		ctx,
 		r.KeyedGater,
 		"read-dm-name-"+cleanDmName, // Safe device-isolated key avoids global choke points
@@ -3817,7 +3788,6 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) SwapToErrorTarget(ctx context.Co
 
 // IdentityAwarePreScan performs a strict safety scan prior to volume staging to confirm path availability and eliminate leaks.
 func (r *OsDeviceConnectivityHelperScsiGeneric) IdentityAwarePreScan(ctx context.Context, targetPath string, volumeId string) (string, bool, bool, bool, error) {
-	r.KeyedGater.suicideIfLeaked()
 	if err := ctx.Err(); err != nil {
 		return "", false, false, false, status.FromContextError(err).Err()
 	}
@@ -3941,11 +3911,8 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) IdentityAwarePreScan(ctx context
 	return "", false, false, false, nil
 }
 
-
-
 // cleanupOrphanedTopology clears residual hardware definitions from the node host.
 func (r *OsDeviceConnectivityHelperScsiGeneric) cleanupOrphanedTopology(ctx context.Context, mpathName string, expectedWWID string) error {
-	r.KeyedGater.suicideIfLeaked()
 	if err := ctx.Err(); err != nil {
 		return ctx.Err()
 	}
@@ -3981,16 +3948,17 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) cleanupOrphanedTopology(ctx cont
 					}
 				}
 
-				// FLATTENED FOR SIMPLICITY & MAXIMUM PERFORMANCE (Rule 1): Removed the redundant 
-				// nested gater block. GetMajorMinorFromSysfs executes direct sysfs lookups and 
-				// inherits full context lifecycle protection from the parent container.
-				major, minor, _ := r.Helper.GetMajorMinorFromSysfs(ctx, targetNode)
+				var major, minor uint32
+				
+				// FIXED: Pass 'baseBlockName' instead of the raw 'targetNode' to ensure 
+				// that virtual controller channels are correctly stripped before looking up sysfs major/minor properties.
+				major, minor, _ = r.Helper.GetMajorMinorFromSysfs(ctx, baseBlockName)
 				
 				if major != 0 {
 					mpathName = r.GetDMNameFromMinor(ctx, minor)
 					if mpathName != "" {
 						isDM = true
-						logger.Infof("[Cleanup-Topology] Resolved parent Device Mapper link dynamically via slave %s -> %s", targetNode, mpathName)
+						logger.Infof("[Cleanup-Topology] Resolved parent Device Mapper link dynamically via slave %s -> %s", baseBlockName, mpathName)
 					}
 				}
 			}
@@ -4031,6 +3999,7 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) cleanupOrphanedTopology(ctx cont
 	return nil
 }
 
+
 // Linux Device Mapper Kernel IOCTL Constants (Stable across all kernels since 2.6)
 const (
 	DM_IOCTL_CMD_MAGIC = 0xfd
@@ -4067,7 +4036,7 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) executeDmsetupDeferredRemove(ctx
 
 	// FIXED: Maintained the explicit struct{} infrastructure protection wrapper around 
 	// the pass-through kernel ioctl call to safely isolate against device-mapper queue deadlocks.
-	_, err := ExecuteUninterruptible[struct{}](
+	_, err := executer.ExecuteUninterruptible[struct{}](
 		ctx,
 		r.KeyedGater,
 		fmt.Sprintf("native-dm-remove-%s", mpathName),
@@ -4125,7 +4094,6 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) IsNativeNvmeNamespace(name strin
 
 // disableNativeNvmeQueueing identifies the target NVMe nodes and modifies timeout variables concurrently.
 func (r *OsDeviceConnectivityHelperScsiGeneric) disableNativeNvmeQueueing(ctx context.Context, expectedWWID string) error {
-	r.KeyedGater.suicideIfLeaked()
 	if err := ctx.Err(); err != nil {
 		return ctx.Err()
 	}
@@ -4148,7 +4116,7 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) disableNativeNvmeQueueing(ctx co
 		}
 
 		logger.Infof("[Disable-Queue] Processing concurrent chunk of %d targets", len(batch))
-		_, errBatch := ExecuteUninterruptibleBatch[string, struct{}](
+		_, errBatch := executer.ExecuteUninterruptibleBatch[string, struct{}](
 			ctx,
 			r.KeyedGater,
 			"batch-disable-nvme-queueing-chunk",
@@ -4293,7 +4261,6 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) disableNativeNvmeQueueing(ctx co
 
 // purgeStuckPhysicalPathsDualProtocol identifies and clears residual physical tracks in parallel.
 func (r *OsDeviceConnectivityHelperScsiGeneric) purgeStuckPhysicalPathsDualProtocol(ctx context.Context, rawScsiTarget, rawNvmeTarget string) error {
-	r.KeyedGater.suicideIfLeaked()
 	if err := ctx.Err(); err != nil {
 		return ctx.Err()
 	}
@@ -4318,7 +4285,7 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) purgeStuckPhysicalPathsDualProto
 		}
 
 		logger.Infof("[Purge-Paths] Processing concurrent chunk of %d targets", len(batch))
-		results, errBatch := ExecuteUninterruptibleBatch[string, struct{}](
+		results, errBatch := executer.ExecuteUninterruptibleBatch[string, struct{}](
 			ctx,
 			r.KeyedGater,
 			"batch-purge-dual-protocol-paths-chunk",
@@ -6040,7 +6007,7 @@ func (r *OsDeviceConnectivityHelperGeneric) getSlavesForDevice(ctx context.Conte
 
 	// FIXED: Maintained the explicit infrastructure framework container around the directory 
 	// scan to protect your driver threads from total sysfs lockups if storage buses freeze.
-	entries, err := ExecuteUninterruptible[[]os.DirEntry](
+	entries, err := executer.ExecuteUninterruptible[[]os.DirEntry](
 		ctx,
 		r.KeyedGater,
 		fmt.Sprintf("read-slaves-%d:%d", major, minor), // Device-isolated key avoids global choke points
@@ -6613,10 +6580,7 @@ func (o GetDmsPathHelperGeneric) WaitForDmToExist(ctx context.Context, gater *ex
 		}
 		
 		// FLATTENED (Rule 1): Directly evaluate read-only metrics safely within the loop timeline context
-		ro, err := o.getRoStatus(ctx, gater, path)
-		if err != nil {
-			ro = "unknown"
-		}
+		ro := o.getRoStatus(ctx, gater, path)
 		logger.Warningf("ro status %s", ro)
 
 		// UNIFIED PATH STABILITY VALIDATION MATRIX:
