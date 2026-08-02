@@ -260,8 +260,7 @@ func baseExecute[T any](
 		defer pool.activeOps.Add(-1)
 
 		if parentAdditionalID != "" && parentAdditionalID != "-" {
-			// goid_info.SetAdditionalIDInfo(parentAdditionalID)
-			_ = parentAdditionalID 
+			goid_info.SetAdditionalIDInfo(parentAdditionalID)
 		}
 
 		data, err := worker(workerCtx)
@@ -392,8 +391,7 @@ func ExecuteUninterruptibleBatch[Param any, T any](
 				defer pool.activeOps.Add(-1)
 
 				if parentAdditionalID != "" && parentAdditionalID != "-" {
-					// goid_info.SetAdditionalIDInfo(parentAdditionalID)
-					_ = parentAdditionalID 
+					goid_info.SetAdditionalIDInfo(parentAdditionalID)
 				}
 
 				data, err := worker(workerCtx, index, p, cancelBatch)
