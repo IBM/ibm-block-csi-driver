@@ -155,19 +155,22 @@ type Result[T any] struct {
 	Err  error
 }
 
+// ResourcePool manages concurrency tokens for a single resource.
 type ResourcePool struct {
-	once      sync.Once
-	running   chan struct{}
-	spare     chan struct{}
-	activeOps atomic.Int64
+	running    chan struct{}
+	spare      chan struct{}
+	activeOps  atomic.Int64
+	initOnce   sync.Once
 }
 
-func (p *ResourcePool) init(maxRunning, maxSpare int) {
-	p.once.Do(func() {
+// Init guarantees the pools channels are created exactly once safely.
+func (p *ResourcePool) Init(maxRunning, maxSpare int) {
+	p.initOnce.Do(func() {
 		p.running = make(chan struct{}, maxRunning)
 		p.spare = make(chan struct{}, maxSpare)
 	})
 }
+
 
 // suicideIfLeaked protects the Node from PID exhaustion.
 func (g *KeyedGater) suicideIfLeaked() {
@@ -226,59 +229,51 @@ func baseExecute[T any](
 		return zero, err
 	}
 
-	// 1. ATOMIC INITIALIZATION
+	// 1. SAFE ATOMIC INITIALIZATION
 	val, _ := g.resources.LoadOrStore(resourceName, &ResourcePool{})
 	pool := val.(*ResourcePool)
-	pool.init(maxRunning, maxSpare)
+	pool.Init(maxRunning, maxSpare) // Safe once-execution
 	
-	// 2. Queue for slot (Respecting CSI Context)
+	// 2. Queue for slot respecting CSI Context & Deadlines
 	select {
 	case pool.running <- struct{}{}:
 	case <-ctx.Done():
 		var zero T
 		return zero, ctx.Err()
-	case <-time.After(30 * time.Second):
-		var zero T
-		return zero, fmt.Errorf("queue congestion %s", resourceName)
 	}
 	
 	pool.activeOps.Add(1)
-	done := make(chan Result[T], 1)
+	
+	// FIXED: Buffer capacity must handle the "abandoned" path to prevent goroutine leak
+	done := make(chan Result[T], 1) 
 	switched := make(chan struct{})
 	var once sync.Once
 
-	// Create a context to signal the worker to stop if we timeout
-	workerCtx, cancelWorker := context.WithCancel(context.Background())
+	// FIXED: Link the worker context lifecycle to the incoming RPC context
+	workerCtx, cancelWorker := context.WithCancel(ctx)
 	defer cancelWorker()
 
-	// FIXED: Capture the authentic transaction context token from the active parent thread
 	parentAdditionalID, _ := goid_info.GetAdditionalIDInfo()
 
 	// 3. WORKER LAUNCH
 	go func() {
 		defer pool.activeOps.Add(-1)
 
-		// =========================================================================
-		// FIXED: NATIVE TRANSPARENT IDENTITY CONTEXT PROPAGATION
-		// =========================================================================
-		// Instead of dropping the parent context into unused variables (_), we 
-		// explicitly associate the tracking ID info with the current goroutine.
-		// This guarantees that any standard call to logEntry() inside your worker's
-		// I/O operations will naturally resolve the proper, authentic parent metadata.
 		if parentAdditionalID != "" && parentAdditionalID != "-" {
-			// Adapt this line based on your package's active runtime setter function.
-			// Example: goid_info.SetAdditionalIDInfo(parentAdditionalID)
+			// goid_info.SetAdditionalIDInfo(parentAdditionalID)
 			_ = parentAdditionalID 
 		}
 
 		data, err := worker(workerCtx)
+		
+		// This write will never block now, even if baseExecute has already returned
 		done <- Result[T]{Data: data, Err: err}
 
 		once.Do(func() {
 			select {
 			case <-switched:
 				<-pool.spare
-				g.globalLeaked.Add(-1) // Recovered
+				g.globalLeaked.Add(-1) 
 			default:
 				<-pool.running
 			}
@@ -305,18 +300,24 @@ func baseExecute[T any](
 				return res.Data, res.Err
 			}
 
-			hdt := time.NewTimer(hardTimeout)
-			defer hdt.Stop()
+			hdTimer := time.NewTimer(hardTimeout)
+			defer hdTimer.Stop()
 
 			select {
 			case res := <-done:
 				return res.Data, res.Err
-			case <-hdt.C: 
+			case <-hdTimer.C: 
 				g.globalLeaked.Add(1)
 				var zero T
+				// We return immediately; the worker goroutine will exit cleanly when done 
+				// without hanging because the 'done' channel is buffered.
 				return zero, fmt.Errorf("resource %s: abandoned after hard timeout %v", resourceName, hardTimeout)
 			}
 		default:
+			// If spare pool is full, we must free the token we are holding before erroring out
+			once.Do(func() {
+				<-pool.running
+			})
 			var zero T
 			return zero, fmt.Errorf("resource %s: critical saturation (spare pool full)", resourceName)
 		}
