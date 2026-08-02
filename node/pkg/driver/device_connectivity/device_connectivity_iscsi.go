@@ -25,6 +25,7 @@ import (
 	"strconv"
 	"strings"
 	"time"
+	"io"
 
 	"github.com/ibm/ibm-block-csi-driver/node/logger"
 	"github.com/ibm/ibm-block-csi-driver/node/pkg/driver/executer"
@@ -106,14 +107,13 @@ func (r *OsDeviceConnectivityIscsi) iscsiLogin(ctx context.Context, targetName, 
 
 // iscsiGetRawSessions reads from /sys/class/iscsi_session to extract target metrics with zero external forks.
 func (r *OsDeviceConnectivityIscsi) iscsiGetRawSessions(ctx context.Context) ([]string, error) {
-	r.KeyedGater.suicideIfLeaked()
 	if err := ctx.Err(); err != nil {
 		return nil, err
 	}
 
 	// RULE 1: Enforce infrastructure-protected gating around the connection sweep 
 	// to prevent networking link timeouts from permanently locking up the driver process.
-	return ExecuteUninterruptible[[]string](
+	return executer.ExecuteUninterruptible[[]string](
 		ctx,
 		r.KeyedGater,
 		"global-iscsi-raw-sessions-scan", // Static key space limits overlapping checks safely
@@ -299,7 +299,10 @@ func (r OsDeviceConnectivityIscsi) filterLoggedIn(ctx context.Context, portalsBy
 
 func (r OsDeviceConnectivityIscsi) discoverAndLogin(ctx context.Context, portalsByTarget map[string][]string) error {
 	// 1. Surgical Scan: Load existing target folders from the local database on disk.
-	dbCache := r.loadRelevantTargets(portalsByTarget)
+	dbCache, err := r.loadRelevantTargets(ctx, portalsByTarget)
+	if err != nil {
+		return err
+	}
 	discoveredPortals := make(map[string]bool)
 	
 	// Track targets/portals that are confirmed ready for login
@@ -376,14 +379,13 @@ func (r OsDeviceConnectivityIscsi) discoverAndLogin(ctx context.Context, portals
 
 // loadRelevantTargets indexes the local discovered target node database with full D-state protection.
 func (r *OsDeviceConnectivityIscsi) loadRelevantTargets(ctx context.Context, requestedTargets map[string][]string) (map[string]map[string]bool, error) {
-	r.KeyedGater.suicideIfLeaked()
 	if err := ctx.Err(); err != nil {
 		return nil, err
 	}
 
 	// RULE 1: Enforce infrastructure-protected gating around the database sweep 
 	// to prevent local disk system stalls from permanently locking up the driver process.
-	return ExecuteUninterruptible[map[string]map[string]bool](
+	return executer.ExecuteUninterruptible[map[string]map[string]bool](
 		ctx,
 		r.KeyedGater,
 		"global-iscsi-local-db-load", // Static key space limits overlapping checks safely
@@ -599,14 +601,13 @@ func (r OsDeviceConnectivityIscsi) extractHostFromDeviceLink(sessionPath string)
 
 // parseActiveSessions scans the active iSCSI session matrix natively out of sysfs with full D-state protection.
 func (r *OsDeviceConnectivityIscsi) parseActiveSessions(ctx context.Context) ([]activeSession, error) {
-	r.KeyedGater.suicideIfLeaked()
 	if err := ctx.Err(); err != nil {
 		return nil, err
 	}
 
 	// RULE 1: Enforce infrastructure-protected gating around the session sweep 
 	// to prevent networking link timeouts from permanently locking up the driver process.
-	return ExecuteUninterruptible[[]activeSession](
+	return executer.ExecuteUninterruptible[[]activeSession](
 		ctx,
 		r.KeyedGater,
 		"global-iscsi-active-sessions-scan", // Static key space limits overlapping checks safely
@@ -660,7 +661,7 @@ func (r *OsDeviceConnectivityIscsi) parseActiveSessions(ctx context.Context) ([]
 
 					// 2. ROBUST HOST RESOLUTION (Rule 5 Leaf Utilities)
 					// We pass wCtx down to internal helpers so they can honor the framework timeline ceilings natively.
-					hostNum, err := r.extractHostFromDeviceLink(wCtx, sessionPath)
+					hostNum, err := r.extractHostFromDeviceLink(sessionPath)
 					if err != nil {
 						logger.Debugf("Skipping %s: %v", entry.Name(), err)
 						continue
@@ -668,7 +669,7 @@ func (r *OsDeviceConnectivityIscsi) parseActiveSessions(ctx context.Context) ([]
 
 					// 3. IQN EXTRACTION
 					hostName := fmt.Sprintf("host%d", hostNum)
-					initiatorIQN, err := r.getInitiatorIQN(wCtx, sessionPath, hostName)
+					initiatorIQN, err := r.getInitiatorIQN(sessionPath, hostName)
 					if err != nil {
 						logger.Debugf("Skipping session %s: %v", entry.Name(), err)
 						continue
@@ -731,8 +732,8 @@ func (r OsDeviceConnectivityIscsi) getInitiatorIQN(sessionPath, hostName string)
 	return "", fmt.Errorf("initiator IQN not found")
 }
 
-func (r OsDeviceConnectivityIscsi) updateHostIDs(hostIDs map[int]bool) {
-	active, err := r.parseActiveSessions()
+func (r OsDeviceConnectivityIscsi) updateHostIDs(ctx context.Context, hostIDs map[int]bool) {
+	active, err := r.parseActiveSessions(ctx)
 	if err != nil {
 		logger.Errorf("Failed to parse iSCSI sessions: %v", err)
 		return
@@ -761,13 +762,13 @@ func (r OsDeviceConnectivityIscsi) updateHostIDs(hostIDs map[int]bool) {
 	}
 }
 
-func (r OsDeviceConnectivityIscsi) RescanDevices(lunId int, arrayIdentifiers []string) error {
+func (r OsDeviceConnectivityIscsi) RescanDevices(ctx context.Context, lunId int, arrayIdentifiers []string) error {
 	hostIDs, err := r.HelperScsiGeneric.RescanDevicesGetHostIds(lunId, arrayIdentifiers)
 	if err != nil {
 		return err
 	}
-	r.updateHostIDs(hostIDs)
-	return r.HelperScsiGeneric.RescanDevices(lunId, arrayIdentifiers, hostIDs)
+	r.updateHostIDs(ctx, hostIDs)
+	return r.HelperScsiGeneric.RescanDevices(ctx, lunId, arrayIdentifiers, hostIDs)
 }
 
 func (r OsDeviceConnectivityIscsi) GetMpathDevice(ctx context.Context, volumeId string) (string, error) {
@@ -791,14 +792,13 @@ func (r OsDeviceConnectivityIscsi) ValidateLun(ctx context.Context, targetDm str
 
 // GetBlockDeviceForSession safe-resolves the block device node from a target session ID.
 func (r OsDeviceConnectivityIscsi) GetBlockDeviceForSession(ctx context.Context, sessionID string) (string, error) {
-	r.KeyedGater.suicideIfLeaked()
 	if err := ctx.Err(); err != nil {
 		return "", err
 	}
 
 	// RULE 1: Enforce infrastructure-protected gating around the block lookup 
 	// to prevent local disk system stalls from permanently locking up the driver process.
-	return ExecuteUninterruptible[string](
+	return executer.ExecuteUninterruptible[string](
 		ctx,
 		r.KeyedGater,
 		"iscsi-session-block-resolve-"+sessionID, // Isolated key space limits overlapping checks safely

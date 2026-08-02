@@ -188,7 +188,7 @@ func (d *NodeService) NodeStageVolume(ctx context.Context, req *csi.NodeStageVol
 		_ = d.OsDeviceConnectivityHelper.RemoveGhostDevice(ctx, volumeUuid, lun, arrayInitiators)
 		
 		logger.Infof("Device missing or recently purged for WWID %v. Initiating fabric discovery - 2.", volumeUuid)
-		if err := osDeviceConnectivity.RescanDevices(lun, arrayInitiators); err != nil {
+		if err := osDeviceConnectivity.RescanDevices(ctx, lun, arrayInitiators); err != nil {
 			return nil, status.Error(codes.Internal, err.Error())
 		}
 		logger.Infof("Device missing or recently purged for WWID %v. Initiating fabric discovery - 3.", volumeUuid)
