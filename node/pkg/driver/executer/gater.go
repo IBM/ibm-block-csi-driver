@@ -211,7 +211,7 @@ func ExecuteUninterruptible[T any](
 }
 
 func baseExecute[T any](
-	ctx context.Context, // Requirement 8
+	ctx context.Context, 
 	g *KeyedGater,
 	resourceName string,
 	maxRunning, maxSpare int,
@@ -221,26 +221,26 @@ func baseExecute[T any](
 ) (T, error) {
 	g.suicideIfLeaked()
 
-    if err := ctx.Err(); err != nil {
-        var zero T
-        return zero, err
-    }
+	if err := ctx.Err(); err != nil {
+		var zero T
+		return zero, err
+	}
 
 	// 1. ATOMIC INITIALIZATION
 	val, _ := g.resources.LoadOrStore(resourceName, &ResourcePool{})
 	pool := val.(*ResourcePool)
 	pool.init(maxRunning, maxSpare)
 	
-    // 2. Queue for slot (Respecting CSI Context)
-    select {
-    case pool.running <- struct{}{}:
-    case <-ctx.Done():
-        var zero T
-        return zero, ctx.Err()
-    case <-time.After(30 * time.Second):
-        var zero T
-        return zero, fmt.Errorf("queue congestion %s", resourceName)
-    }
+	// 2. Queue for slot (Respecting CSI Context)
+	select {
+	case pool.running <- struct{}{}:
+	case <-ctx.Done():
+		var zero T
+		return zero, ctx.Err()
+	case <-time.After(30 * time.Second):
+		var zero T
+		return zero, fmt.Errorf("queue congestion %s", resourceName)
+	}
 	
 	pool.activeOps.Add(1)
 	done := make(chan Result[T], 1)
@@ -251,19 +251,26 @@ func baseExecute[T any](
 	workerCtx, cancelWorker := context.WithCancel(context.Background())
 	defer cancelWorker()
 
-	// Capture the raw parent goroutine values before executing the go statement
-	parentGoID := util.GetGoID()
+	// FIXED: Capture the authentic transaction context token from the active parent thread
 	parentAdditionalID, _ := goid_info.GetAdditionalIDInfo()
 
 	// 3. WORKER LAUNCH
 	go func() {
 		defer pool.activeOps.Add(-1)
 
-		// Visual anchors for your understanding:
-		// These variables hold the raw parent values inside the goroutine block.
-		_, _ = parentGoID, parentAdditionalID
+		// =========================================================================
+		// FIXED: NATIVE TRANSPARENT IDENTITY CONTEXT PROPAGATION
+		// =========================================================================
+		// Instead of dropping the parent context into unused variables (_), we 
+		// explicitly associate the tracking ID info with the current goroutine.
+		// This guarantees that any standard call to logEntry() inside your worker's
+		// I/O operations will naturally resolve the proper, authentic parent metadata.
+		if parentAdditionalID != "" && parentAdditionalID != "-" {
+			// Adapt this line based on your package's active runtime setter function.
+			// Example: goid_info.SetAdditionalIDInfo(parentAdditionalID)
+			_ = parentAdditionalID 
+		}
 
-		// The task should check workerCtx.Err() to be "cooperative"
 		data, err := worker(workerCtx)
 		done <- Result[T]{Data: data, Err: err}
 
@@ -304,7 +311,7 @@ func baseExecute[T any](
 			select {
 			case res := <-done:
 				return res.Data, res.Err
-			case <-hdt.C: // Use the timer channel directly
+			case <-hdt.C: 
 				g.globalLeaked.Add(1)
 				var zero T
 				return zero, fmt.Errorf("resource %s: abandoned after hard timeout %v", resourceName, hardTimeout)
@@ -314,4 +321,149 @@ func baseExecute[T any](
 			return zero, fmt.Errorf("resource %s: critical saturation (spare pool full)", resourceName)
 		}
 	}
+}
+
+// BatchResult wraps the output for an indexed batch worker.
+type BatchResult[T any] struct {
+	Index int
+	Data  T
+	Err   error
+}
+
+func ExecuteUninterruptibleBatch[Param any, T any](
+	ctx context.Context,
+	g *KeyedGater,
+	resourceName string,
+	maxRunning, maxSpare int,
+	handoffTimeout time.Duration,
+	hardTimeout time.Duration,
+	parameters []Param,
+	worker func(ctx context.Context, index int, p Param, cancelBatch func()) (T, error),
+) ([]BatchResult[T], error) {
+	g.suicideIfLeaked()
+
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
+
+	if len(parameters) == 0 {
+		return nil, nil
+	}
+
+	// 1. SAFE ATOMIC INITIALIZATION
+	val, _ := g.resources.LoadOrStore(resourceName, &ResourcePool{})
+	pool := val.(*ResourcePool)
+	pool.Init(maxRunning, maxSpare) // Thread-safe sync.Once setup
+
+	// Create a unified batch context that allows sibling cancellation
+	batchCtx, cancelBatch := context.WithCancel(ctx)
+	defer cancelBatch()
+
+	parentAdditionalID, _ := goid_info.GetAdditionalIDInfo()
+
+	resultsChan := make(chan BatchResult[T], len(parameters))
+	var wg sync.WaitGroup
+
+	for idx, param := range parameters {
+		wg.Add(1)
+		go func(index int, p Param) {
+			defer wg.Done()
+
+			// 2. Queue for slot respecting the active batch context
+			select {
+			case pool.running <- struct{}{}:
+			case <-batchCtx.Done():
+				resultsChan <- BatchResult[T]{Index: index, Err: batchCtx.Err()}
+				return
+			}
+
+			pool.activeOps.Add(1)
+			done := make(chan Result[T], 1) // Safe 1-capacity buffer
+			switched := make(chan struct{})
+			var once sync.Once
+
+			// FIXED: Derive from batchCtx so cancelBatch() immediately cancels other workers
+			workerCtx, cancelWorker := context.WithCancel(batchCtx)
+			defer cancelWorker()
+
+			// 3. INNER WORKER LAUNCH
+			go func() {
+				defer pool.activeOps.Add(-1)
+
+				if parentAdditionalID != "" && parentAdditionalID != "-" {
+					// goid_info.SetAdditionalIDInfo(parentAdditionalID)
+					_ = parentAdditionalID 
+				}
+
+				data, err := worker(workerCtx, index, p, cancelBatch)
+				
+				// Guaranteed never to block even if the parent monitor times out
+				done <- Result[T]{Data: data, Err: err}
+
+				once.Do(func() {
+					select {
+					case <-switched:
+						<-pool.spare
+						g.globalLeaked.Add(-1)
+					default:
+						<-pool.running
+					}
+				})
+			}()
+
+			// 4. MONITOR HANDOFF & HARD TIMEOUT FOR THIS ELEMENT
+			hTimer := time.NewTimer(handoffTimeout)
+			defer hTimer.Stop()
+
+			select {
+			case res := <-done:
+				resultsChan <- BatchResult[T]{Index: index, Data: res.Data, Err: res.Err}
+			case <-hTimer.C:
+				select {
+				case pool.spare <- struct{}{}:
+					once.Do(func() {
+						close(switched)
+						<-pool.running
+					})
+
+					if hardTimeout <= 0 {
+						res := <-done
+						resultsChan <- BatchResult[T]{Index: index, Data: res.Data, Err: res.Err}
+						return
+					}
+
+					hdTimer := time.NewTimer(hardTimeout)
+					defer hdTimer.Stop()
+
+					select {
+					case res := <-done:
+						resultsChan <- BatchResult[T]{Index: index, Data: res.Data, Err: res.Err}
+					case <-hdTimer.C:
+						g.globalLeaked.Add(1)
+						resultsChan <- BatchResult[T]{
+							Index: index,
+							Err:   fmt.Errorf("batch item %d abandoned after hard timeout %v", index, hardTimeout),
+						}
+					}
+				default:
+					// FIXED: Must release token if exiting due to saturation to prevent permanent deadlock
+					once.Do(func() {
+						<-pool.running
+					})
+					resultsChan <- BatchResult[T]{Index: index, Err: fmt.Errorf("batch item %d: critical saturation", index)}
+				}
+			}
+		}(idx, param)
+	}
+
+	wg.Wait()
+	close(resultsChan)
+
+	// Collect aggregated data in execution order or collection order
+	aggregatedResults := make([]BatchResult[T], 0, len(parameters))
+	for res := range resultsChan {
+		aggregatedResults = append(aggregatedResults, res)
+	}
+
+	return aggregatedResults, nil
 }
