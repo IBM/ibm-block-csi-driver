@@ -91,12 +91,12 @@ func (r OsDeviceConnectivityFc) updateFCHostIDs(hostIDs map[int]bool) {
 }
 
 
-func (r OsDeviceConnectivityFc) RescanDevices(lunId int, arrayIdentifiers []string) error {
+func (r OsDeviceConnectivityFc) RescanDevices(ctx context.Context, lunId int, arrayIdentifiers []string) error {
 	hostIDs, err := r.HelperScsiGeneric.RescanDevicesGetHostIds(lunId, arrayIdentifiers)
 	if err != nil {
 		return err
 	}
-	return r.HelperScsiGeneric.RescanDevices(lunId, arrayIdentifiers, hostIDs)
+	return r.HelperScsiGeneric.RescanDevices(ctx, lunId, arrayIdentifiers, hostIDs)
 }
 
 func (r OsDeviceConnectivityFc) GetMpathDevice(ctx context.Context, volumeId string) (string, error) {

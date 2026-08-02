@@ -2,7 +2,6 @@ package executer
 
 import (
 	"github.com/ibm/ibm-block-csi-driver/node/goid_info"
-	"github.com/ibm/ibm-block-csi-driver/node/util"
 	"context"
 	"errors"
 	"fmt"
