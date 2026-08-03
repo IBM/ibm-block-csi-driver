@@ -791,7 +791,6 @@ func (r OsDeviceConnectivityIscsi) ValidateLun(ctx context.Context, targetDm str
 }
 
 func (r OsDeviceConnectivityIscsi) GetBlockDeviceForSession(ctx context.Context, sessionID string) (string, error) {
-	r.KeyedGater.suicideIfLeaked()
 	if err := ctx.Err(); err != nil {
 		return "", err
 	}
@@ -868,7 +867,7 @@ func (r OsDeviceConnectivityIscsi) GetBlockDeviceForSession(ctx context.Context,
 			}
 
 			// =========================================================================
-			// LEGACY SEAMLESS FALLBACK TREE
+			// LEGACY SEAMLESS FALLBACK TREE (For specialized virtual container setups)
 			// =========================================================================
 			sessionDevicePath := fmt.Sprintf("/sys/class/iscsi_session/session%s/device", sessionID)
 			sFile, errOpenFallback := os.Open(sessionDevicePath)
@@ -899,6 +898,7 @@ func (r OsDeviceConnectivityIscsi) GetBlockDeviceForSession(ctx context.Context,
 							continue
 						}
 
+						// Chunk loop over target LUN paths safely
 						errLun := func() error {
 							defer tFile.Close()
 							for {
@@ -921,12 +921,14 @@ func (r OsDeviceConnectivityIscsi) GetBlockDeviceForSession(ctx context.Context,
 										continue
 									}
 
+									// Chunk loop over block disk layers safely
 									disks, errDisks := bFile.ReadDir(100)
 									bFile.Close()
 									
+									// FIXED: Correctly reference the zero-index element name of the DirEntry slice
 									if errDisks == nil && len(disks) > 0 {
-										matchedDevice = "/dev/" + disks.Name()
-										return nil 
+										matchedDevice = "/dev/" + disks[0].Name()
+										return nil // Break entirely out of deep validation stack
 									}
 								}
 
