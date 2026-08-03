@@ -2093,7 +2093,6 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) resolveTargetIDsWithContext(ctx 
 
 // getNvmeSubsysNQN retrieves the unique fabric NQN identification string for an NVMe block node.
 func (r *OsDeviceConnectivityHelperScsiGeneric) getNvmeSubsysNQN(ctx context.Context, deviceName string) (string, error) {
-	r.KeyedGater.suicideIfLeaked()
 	if err := ctx.Err(); err != nil {
 		return "", err
 	}
