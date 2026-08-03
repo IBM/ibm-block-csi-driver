@@ -2091,7 +2091,9 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) resolveTargetIDsWithContext(ctx 
 	)
 }
 
+// getNvmeSubsysNQN retrieves the unique fabric NQN identification string for an NVMe block node.
 func (r *OsDeviceConnectivityHelperScsiGeneric) getNvmeSubsysNQN(ctx context.Context, deviceName string) (string, error) {
+	r.KeyedGater.suicideIfLeaked()
 	if err := ctx.Err(); err != nil {
 		return "", err
 	}
@@ -2109,31 +2111,26 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) getNvmeSubsysNQN(ctx context.Con
 
 	deviceCtrl := ExtractNvmeControllerBase(rawName)
 
-	// Tier 1 Check
+	// Tier 1 Check: Target the standard parent controller node classification path
 	nqnPath := fmt.Sprintf("/sys/class/nvme/%s/subsysnqn", deviceCtrl)
 	dataStr, err := secureReadSysfs(ctx, r.KeyedGater, baseBlockName, nqnPath)
 	
 	if err != nil {
-		// Tier 2 Fallback
+		// Tier 2 Fallback: Target the true absolute base block folder layout
 		nqnPath = fmt.Sprintf("/sys/block/%s/device/subsysnqn", baseBlockName)
 		dataStr, err = secureReadSysfs(ctx, r.KeyedGater, baseBlockName, nqnPath)
 		
 		if err != nil {
-			// Tier 3 Fallback
+			// Tier 3 Fallback (Rule 3 Legacy Kernels): Target raw discovery name via true VFS resolution
 			subsysDirSymlink := fmt.Sprintf("/sys/block/%s/device/subsystem", rawName)
-			realSubsysPath, symErr := os.Readlink(subsysDirSymlink)
 			
-			if symErr == nil {
-				// EXPANSION FIX: Safely convert the relative symlink target string into a clean, 
-				// absolute path representation to ensure the intermediate path substring check matches correctly.
-				if !filepath.IsAbs(realSubsysPath) {
-					realSubsysPath = filepath.Clean(filepath.Join(filepath.Dir(subsysDirSymlink), realSubsysPath))
-				}
-
-				if strings.Contains(realSubsysPath, "virtual/nvme-subsys") {
-					nqnPath = filepath.Join(realSubsysPath, "subsysnqn")
-					dataStr, err = secureReadSysfs(ctx, r.KeyedGater, baseBlockName, nqnPath)
-				}
+			// RESTORED: Re-enabling true filepath.EvalSymlinks explicitly within the slow fallback route
+			// to guarantee that the multi-layered intermediate symlinks are accurately traversed by the kernel.
+			realSubsysPath, symErr := filepath.EvalSymlinks(subsysDirSymlink)
+			
+			if symErr == nil && strings.Contains(realSubsysPath, "virtual/nvme-subsys") {
+				nqnPath = filepath.Join(realSubsysPath, "subsysnqn")
+				dataStr, err = secureReadSysfs(ctx, r.KeyedGater, baseBlockName, nqnPath)
 			}
 			
 			if err != nil {
@@ -2295,6 +2292,7 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) getHCTLFromSd(ctx context.Contex
 	return hctl, nil
 }
 
+// getScsiTargetID safe-resolves hardware targets across FC, SAS, and iSCSI layers with deep trace logging.
 func (r *OsDeviceConnectivityHelperScsiGeneric) getScsiTargetID(ctx context.Context, hctl string) string {
 	logger.Infof("[SCSI-Target-Inspector] Entering identification pipeline for target address: [%s]", hctl)
 
@@ -2309,7 +2307,7 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) getScsiTargetID(ctx context.Cont
 		return ""
 	}
 
-	hostID := parts[0] // Isolate the host bus index primitive string (e.g., "10", "13", "14")
+	hostID := parts[0] // Isolate the host bus index primitive string (e.g., "13", "14")
 	hct := strings.Join(parts[:3], ":")
 	targetDirName := fmt.Sprintf("target%s", hct)
 
@@ -2414,19 +2412,6 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) getScsiTargetID(ctx context.Cont
 	}
 	defer sFile.Close()
 
-	// Real Linux kernels map /sys/class/iscsi_session to /sys/devices/platform/...
-	// Read this mapping layer once upfront to get the true canonical base directory.
-	var canonicalClassBase string
-	if realClassBase, err := os.Readlink(sessionClassPath); err == nil {
-		if filepath.IsAbs(realClassBase) {
-			canonicalClassBase = realClassBase
-		} else {
-			canonicalClassBase = filepath.Clean(filepath.Join(filepath.Dir(sessionClassPath), realClassBase))
-		}
-	} else {
-		canonicalClassBase = sessionClassPath // Fallback to raw path if not a link
-	}
-
 	for {
 		sessions, errDirs := sFile.ReadDir(100)
 		if errDirs != nil && errDirs != io.EOF {
@@ -2444,15 +2429,11 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) getScsiTargetID(ctx context.Cont
 			deviceMappingLink := filepath.Join(sessionClassPath, sessionName, "device")
 			logger.Debugf("[SCSI-Target-Inspector] [%s] [Track-C-Loop] Evaluating node: %s. Reading mapping token link: %s", hctl, sessionName, deviceMappingLink)
 
-			if hostPath, errLink := os.Readlink(deviceMappingLink); errLink == nil {
-				logger.Debugf("[SCSI-Target-Inspector] [%s] [Track-C-Loop] Entry %s symlink target text resolved to: [%s]", hctl, sessionName, hostPath)
-
-				// CORRECT PATH MATH: Combine the canonical base folder path with the 
-				// session sub-folder name and the relative symlink text hops.
-				// This perfectly resolves to /sys/devices/platform/host13/session13
-				trueHostPath := filepath.Clean(filepath.Join(canonicalClassBase, sessionName, hostPath))
-				
-				logger.Debugf("[SCSI-Target-Inspector] [%s] [Track-C-Loop] True absolute VFS path resolved successfully: [%s]", hctl, trueHostPath)
+			// RESTORED RESTRICTION (Rule 5): Re-enabled absolute kernel link resolution via EvalSymlinks.
+			// This perfectly computes directory locations across complex sysfs symlink hops.
+			trueHostPath, errLink := filepath.EvalSymlinks(deviceMappingLink)
+			if errLink == nil {
+				logger.Debugf("[SCSI-Target-Inspector] [%s] [Track-C-Loop] Entry %s symlink target text resolved to: [%s]", hctl, sessionName, trueHostPath)
 
 				if strings.Contains(trueHostPath, matchToken) {
 					targetNameFile := filepath.Join(sessionClassPath, sessionName, "targetname")
