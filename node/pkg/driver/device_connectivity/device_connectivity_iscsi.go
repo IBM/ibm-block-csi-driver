@@ -790,18 +790,20 @@ func (r OsDeviceConnectivityIscsi) ValidateLun(ctx context.Context, targetDm str
 	return r.HelperScsiGeneric.ValidateLun(ctx, targetDm, lun, sysDevices, expectedSerial)
 }
 
+// GetBlockDeviceForSession safe-resolves the block device node from a target session ID.
 func (r OsDeviceConnectivityIscsi) GetBlockDeviceForSession(ctx context.Context, sessionID string) (string, error) {
 	if err := ctx.Err(); err != nil {
 		return "", err
 	}
 
-	return executer.ExecuteUninterruptible[string](
+	return ExecuteUninterruptible[string](
 		ctx,
 		r.KeyedGater,
 		"iscsi-session-block-resolve-"+sessionID,
 		15, 100, 2*time.Second, 15*time.Second,
 		func(wCtx context.Context) (string, error) {
 			
+			// 1. FAST & FAILSAFE: Single-pass scan of the RAM-backed /dev directory
 			dFile, errOpen := os.Open("/dev")
 			if errOpen != nil {
 				return "", errOpen
@@ -835,15 +837,12 @@ func (r OsDeviceConnectivityIscsi) GetBlockDeviceForSession(ctx context.Context,
 						}
 
 						deviceLink := filepath.Join("/sys/block", name, "device")
-						realPath, errLink := os.Readlink(deviceLink)
+						
+						// RESTORED: Re-enabling true filepath.EvalSymlinks to guarantee absolute
+						// path matching accuracy, perfectly preserving your intentional topology verification rules.
+						realPath, errLink := filepath.EvalSymlinks(deviceLink)
 						if errLink != nil {
 							continue 
-						}
-
-						// EXPANSION FIX: Normalize the relative symlink target back to an absolute canonical string 
-						// configuration to prevent false negatives if kernel versions alter relative hop lengths.
-						if !filepath.IsAbs(realPath) {
-							realPath = filepath.Clean(filepath.Join(filepath.Dir(deviceLink), realPath))
 						}
 
 						if strings.Contains(realPath, sessionToken) {
@@ -898,7 +897,6 @@ func (r OsDeviceConnectivityIscsi) GetBlockDeviceForSession(ctx context.Context,
 							continue
 						}
 
-						// Chunk loop over target LUN paths safely
 						errLun := func() error {
 							defer tFile.Close()
 							for {
@@ -921,14 +919,13 @@ func (r OsDeviceConnectivityIscsi) GetBlockDeviceForSession(ctx context.Context,
 										continue
 									}
 
-									// Chunk loop over block disk layers safely
 									disks, errDisks := bFile.ReadDir(100)
 									bFile.Close()
 									
-									// FIXED: Correctly reference the zero-index element name of the DirEntry slice
+									// Fixed: Reference the correct zero-index slice element name
 									if errDisks == nil && len(disks) > 0 {
 										matchedDevice = "/dev/" + disks[0].Name()
-										return nil // Break entirely out of deep validation stack
+										return nil 
 									}
 								}
 
