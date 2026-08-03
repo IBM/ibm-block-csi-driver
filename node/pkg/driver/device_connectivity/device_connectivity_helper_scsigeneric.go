@@ -2414,6 +2414,19 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) getScsiTargetID(ctx context.Cont
 	}
 	defer sFile.Close()
 
+	// Real Linux kernels map /sys/class/iscsi_session to /sys/devices/platform/...
+	// Read this mapping layer once upfront to get the true canonical base directory.
+	var canonicalClassBase string
+	if realClassBase, err := os.Readlink(sessionClassPath); err == nil {
+		if filepath.IsAbs(realClassBase) {
+			canonicalClassBase = realClassBase
+		} else {
+			canonicalClassBase = filepath.Clean(filepath.Join(filepath.Dir(sessionClassPath), realClassBase))
+		}
+	} else {
+		canonicalClassBase = sessionClassPath // Fallback to raw path if not a link
+	}
+
 	for {
 		sessions, errDirs := sFile.ReadDir(100)
 		if errDirs != nil && errDirs != io.EOF {
@@ -2434,24 +2447,12 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) getScsiTargetID(ctx context.Cont
 			if hostPath, errLink := os.Readlink(deviceMappingLink); errLink == nil {
 				logger.Debugf("[SCSI-Target-Inspector] [%s] [Track-C-Loop] Entry %s symlink target text resolved to: [%s]", hctl, sessionName, hostPath)
 
-				// FIX: Resolve relative links back to an absolute directory path
-				// converts "../../../session13" into "/sys/class/iscsi_session/session13/../../../session13"
-				trueHostPath := hostPath
-				if !filepath.IsAbs(trueHostPath) {
-					trueHostPath = filepath.Clean(filepath.Join(filepath.Dir(deviceMappingLink), trueHostPath))
-				}
+				// CORRECT PATH MATH: Combine the canonical base folder path with the 
+				// session sub-folder name and the relative symlink text hops.
+				// This perfectly resolves to /sys/devices/platform/host13/session13
+				trueHostPath := filepath.Clean(filepath.Join(canonicalClassBase, sessionName, hostPath))
 				
-				logger.Debugf("[SCSI-Target-Inspector] [%s] [Track-C-Loop] Absolute cleaned VFS text path evaluated: [%s]", hctl, trueHostPath)
-
-				if !strings.Contains(trueHostPath, "host") {
-					absTarget, errAbs := os.Readlink(deviceMappingLink)
-					if errAbs == nil {
-						if !filepath.IsAbs(absTarget) {
-							absTarget = filepath.Clean(filepath.Join(filepath.Dir(deviceMappingLink), absTarget))
-						}
-						trueHostPath = absTarget
-					}
-				}
+				logger.Debugf("[SCSI-Target-Inspector] [%s] [Track-C-Loop] True absolute VFS path resolved successfully: [%s]", hctl, trueHostPath)
 
 				if strings.Contains(trueHostPath, matchToken) {
 					targetNameFile := filepath.Join(sessionClassPath, sessionName, "targetname")

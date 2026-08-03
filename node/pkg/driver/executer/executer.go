@@ -227,7 +227,7 @@ func (s *safeCmd) Wait() error {
         logger.Warning("wait")
         err := s.Cmd.Wait()
         device := s.extractDevice()
-        logger.Warning("Wait done")
+        //logger.Warning("Wait done")
 
 
     var pid int
@@ -342,7 +342,7 @@ func (e *Executer) LookPath(file string) (string, error) {
 
 func (s *safeCmd) extractDevice() string {
         for _, arg := range s.args {
-                logger.Warningf("Check arg %s", arg)
+                //logger.Warningf("Check arg %s", arg)
                 // Standard path (/dev/sdb)
                 if strings.HasPrefix(arg, "/dev/") {
                         return arg
