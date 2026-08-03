@@ -796,7 +796,7 @@ func (r OsDeviceConnectivityIscsi) GetBlockDeviceForSession(ctx context.Context,
 		return "", err
 	}
 
-	return ExecuteUninterruptible[string](
+	return executer.ExecuteUninterruptible[string](
 		ctx,
 		r.KeyedGater,
 		"iscsi-session-block-resolve-"+sessionID,
