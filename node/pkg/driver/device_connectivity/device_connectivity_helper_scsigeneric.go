@@ -1698,6 +1698,7 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) purgeNvmeGhosts(ctx context.Cont
 }
 
 // executeNvmeTeardown processes clean storage namespace removals with zero internal framework nesting.
+// Dynamically expands internal relative symlinks to guarantee absolute traversal evaluation accuracy.
 func (r *OsDeviceConnectivityHelperScsiGeneric) executeNvmeTeardown(ctx context.Context, nvmeBlockName string) {
 	ctrlName := ""
 	baseBlockName := nvmeBlockName 
@@ -1767,14 +1768,16 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) executeNvmeTeardown(ctx context.
 					}
 				}
 
-				// FLATTENED FOR SIMPLICITY & DEADLOCK ELIMINATION (Rule 1):
-				// Replaced the internal nested ExecuteUninterruptible wrapper and heavy EvalSymlinks 
-				// engine with a fast, context-compliant os.Readlink call to resolve the pointer instantly.
-				pciAddrPath, errLink := os.Readlink(filepath.Join("/sys/class/nvme", ctrlName, "device"))
+				// FLATTENED & HARDENED (Rule 1/5): Replaced nested frameworks with direct link extraction.
+				deviceDirLink := filepath.Join("/sys/class/nvme", ctrlName, "device")
+				pciAddrPath, errLink := os.Readlink(deviceDirLink)
 				if errLink == nil {
+					// EXPANSION FIX: Safely reconstruct the relative symlink target back to an absolute canonical string 
+					// to eliminate directory depth truncation variations across different Linux distributions.
 					if !filepath.IsAbs(pciAddrPath) {
-						pciAddrPath = filepath.Join(filepath.Join("/sys/class/nvme", ctrlName), pciAddrPath)
+						pciAddrPath = filepath.Clean(filepath.Join(filepath.Dir(deviceDirLink), pciAddrPath))
 					}
+					
 					pciAddress := filepath.Base(pciAddrPath)
 					unbindPath := "/sys/bus/pci/drivers/nvme/unbind"
 					if _, err := os.Stat(unbindPath); err == nil {
@@ -2088,11 +2091,11 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) resolveTargetIDsWithContext(ctx 
 	)
 }
 
-
 func (r *OsDeviceConnectivityHelperScsiGeneric) getNvmeSubsysNQN(ctx context.Context, deviceName string) (string, error) {
 	if err := ctx.Err(); err != nil {
 		return "", err
 	}
+
 	rawName := filepath.Base(deviceName)
 	baseBlockName := rawName
 	
@@ -2105,28 +2108,40 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) getNvmeSubsysNQN(ctx context.Con
 	}
 
 	deviceCtrl := ExtractNvmeControllerBase(rawName)
+
+	// Tier 1 Check
 	nqnPath := fmt.Sprintf("/sys/class/nvme/%s/subsysnqn", deviceCtrl)
 	dataStr, err := secureReadSysfs(ctx, r.KeyedGater, baseBlockName, nqnPath)
 	
 	if err != nil {
+		// Tier 2 Fallback
 		nqnPath = fmt.Sprintf("/sys/block/%s/device/subsysnqn", baseBlockName)
 		dataStr, err = secureReadSysfs(ctx, r.KeyedGater, baseBlockName, nqnPath)
 		
 		if err != nil {
+			// Tier 3 Fallback
 			subsysDirSymlink := fmt.Sprintf("/sys/block/%s/device/subsystem", rawName)
 			realSubsysPath, symErr := os.Readlink(subsysDirSymlink)
-			if symErr == nil && strings.Contains(realSubsysPath, "virtual/nvme-subsys") {
+			
+			if symErr == nil {
+				// EXPANSION FIX: Safely convert the relative symlink target string into a clean, 
+				// absolute path representation to ensure the intermediate path substring check matches correctly.
 				if !filepath.IsAbs(realSubsysPath) {
-					realSubsysPath = filepath.Join(filepath.Dir(subsysDirSymlink), realSubsysPath)
+					realSubsysPath = filepath.Clean(filepath.Join(filepath.Dir(subsysDirSymlink), realSubsysPath))
 				}
-				nqnPath = filepath.Join(realSubsysPath, "subsysnqn")
-				dataStr, err = secureReadSysfs(ctx, r.KeyedGater, baseBlockName, nqnPath)
+
+				if strings.Contains(realSubsysPath, "virtual/nvme-subsys") {
+					nqnPath = filepath.Join(realSubsysPath, "subsysnqn")
+					dataStr, err = secureReadSysfs(ctx, r.KeyedGater, baseBlockName, nqnPath)
+				}
 			}
+			
 			if err != nil {
-				return "", fmt.Errorf("failed to locate nvme subsysnqn for '%s': %w", rawName, err)
+				return "", fmt.Errorf("failed to locate nvme subsysnqn across all standard validation layers for block target '%s': %w", rawName, err)
 			}
 		}
 	}
+	
 	return strings.TrimSpace(dataStr), nil
 }
 
@@ -2412,19 +2427,27 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) getScsiTargetID(ctx context.Cont
 				return ""
 			}
 
-			sessionName := s.Name() // e.g., "session4"
+			sessionName := s.Name() // e.g., "session13"
 			deviceMappingLink := filepath.Join(sessionClassPath, sessionName, "device")
 			logger.Debugf("[SCSI-Target-Inspector] [%s] [Track-C-Loop] Evaluating node: %s. Reading mapping token link: %s", hctl, sessionName, deviceMappingLink)
 
 			if hostPath, errLink := os.Readlink(deviceMappingLink); errLink == nil {
 				logger.Debugf("[SCSI-Target-Inspector] [%s] [Track-C-Loop] Entry %s symlink target text resolved to: [%s]", hctl, sessionName, hostPath)
 
+				// FIX: Resolve relative links back to an absolute directory path
+				// converts "../../../session13" into "/sys/class/iscsi_session/session13/../../../session13"
 				trueHostPath := hostPath
+				if !filepath.IsAbs(trueHostPath) {
+					trueHostPath = filepath.Clean(filepath.Join(filepath.Dir(deviceMappingLink), trueHostPath))
+				}
+				
+				logger.Debugf("[SCSI-Target-Inspector] [%s] [Track-C-Loop] Absolute cleaned VFS text path evaluated: [%s]", hctl, trueHostPath)
+
 				if !strings.Contains(trueHostPath, "host") {
 					absTarget, errAbs := os.Readlink(deviceMappingLink)
 					if errAbs == nil {
 						if !filepath.IsAbs(absTarget) {
-							absTarget = filepath.Join(filepath.Dir(deviceMappingLink), absTarget)
+							absTarget = filepath.Clean(filepath.Join(filepath.Dir(deviceMappingLink), absTarget))
 						}
 						trueHostPath = absTarget
 					}

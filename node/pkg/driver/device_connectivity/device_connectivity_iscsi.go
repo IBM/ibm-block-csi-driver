@@ -790,34 +790,27 @@ func (r OsDeviceConnectivityIscsi) ValidateLun(ctx context.Context, targetDm str
 	return r.HelperScsiGeneric.ValidateLun(ctx, targetDm, lun, sysDevices, expectedSerial)
 }
 
-// GetBlockDeviceForSession safe-resolves the block device node from a target session ID.
 func (r OsDeviceConnectivityIscsi) GetBlockDeviceForSession(ctx context.Context, sessionID string) (string, error) {
+	r.KeyedGater.suicideIfLeaked()
 	if err := ctx.Err(); err != nil {
 		return "", err
 	}
 
-	// RULE 1: Enforce infrastructure-protected gating around the block lookup 
-	// to prevent local disk system stalls from permanently locking up the driver process.
 	return executer.ExecuteUninterruptible[string](
 		ctx,
 		r.KeyedGater,
-		"iscsi-session-block-resolve-"+sessionID, // Isolated key space limits overlapping checks safely
-		15,  // maxRunning: balances simultaneous workspace scans across the node
-		100, // maxSpare
-		2*time.Second,
-		15*time.Second, // Bounded hard timeout ceiling for full evaluation sweeps
+		"iscsi-session-block-resolve-"+sessionID,
+		15, 100, 2*time.Second, 15*time.Second,
 		func(wCtx context.Context) (string, error) {
 			
-			// 1. FAST & FAILSAFE: Single-pass scan of the RAM-backed /dev directory
 			dFile, errOpen := os.Open("/dev")
-			if errvar := errOpen; errvar != nil {
-				return "", errvar
+			if errOpen != nil {
+				return "", errOpen
 			}
 
 			sessionToken := fmt.Sprintf("session%s/", sessionID)
 			var matchedDevice string
 
-			// Bounded chunk pagination scanner pass (Rule 5 compliance)
 			errChunk := func() error {
 				defer dFile.Close()
 				for {
@@ -838,22 +831,25 @@ func (r OsDeviceConnectivityIscsi) GetBlockDeviceForSession(ctx context.Context,
 						if !strings.HasPrefix(name, "sd") || len(name) < 3 {
 							continue
 						}
-						// Skip partitions (e.g., sdb1, sdc2)
 						if name[len(name)-1] >= '0' && name[len(name)-1] <= '9' {
 							continue
 						}
 
-						// 2. FAST: Use raw os.Readlink to read the device pointer directly out of memory
 						deviceLink := filepath.Join("/sys/block", name, "device")
 						realPath, errLink := os.Readlink(deviceLink)
 						if errLink != nil {
 							continue 
 						}
 
-						// 3. IN-MEMORY MATCH: Check if the text pointer contains the targeted session token
+						// EXPANSION FIX: Normalize the relative symlink target back to an absolute canonical string 
+						// configuration to prevent false negatives if kernel versions alter relative hop lengths.
+						if !filepath.IsAbs(realPath) {
+							realPath = filepath.Clean(filepath.Join(filepath.Dir(deviceLink), realPath))
+						}
+
 						if strings.Contains(realPath, sessionToken) {
 							matchedDevice = "/dev/" + name
-							return nil // Immediate breakout out of chunk search loop
+							return nil 
 						}
 					}
 
@@ -867,13 +863,12 @@ func (r OsDeviceConnectivityIscsi) GetBlockDeviceForSession(ctx context.Context,
 			if errChunk != nil {
 				return "", errChunk
 			}
-
 			if matchedDevice != "" {
 				return matchedDevice, nil
 			}
 
 			// =========================================================================
-			// LEGACY SEAMLESS FALLBACK TREE (For specialized virtual container setups)
+			// LEGACY SEAMLESS FALLBACK TREE
 			// =========================================================================
 			sessionDevicePath := fmt.Sprintf("/sys/class/iscsi_session/session%s/device", sessionID)
 			sFile, errOpenFallback := os.Open(sessionDevicePath)
@@ -904,7 +899,6 @@ func (r OsDeviceConnectivityIscsi) GetBlockDeviceForSession(ctx context.Context,
 							continue
 						}
 
-						// Chunk loop over target LUN paths safely
 						errLun := func() error {
 							defer tFile.Close()
 							for {
@@ -927,13 +921,12 @@ func (r OsDeviceConnectivityIscsi) GetBlockDeviceForSession(ctx context.Context,
 										continue
 									}
 
-									// Chunk loop over block disk layers safely
 									disks, errDisks := bFile.ReadDir(100)
 									bFile.Close()
 									
 									if errDisks == nil && len(disks) > 0 {
-										matchedDevice = "/dev/" + disks[0].Name()
-										return nil // Break entirely out of deep validation stack
+										matchedDevice = "/dev/" + disks.Name()
+										return nil 
 									}
 								}
 
