@@ -10,7 +10,7 @@ packaging==25.0
 base58==2.1.1
 requests==2.33.0
 kubernetes==35.0.0
-setuptools==83.0.0
+setuptools==78.1.1
 
 # A9000 python client
 # pyxcli>=1.2.1
