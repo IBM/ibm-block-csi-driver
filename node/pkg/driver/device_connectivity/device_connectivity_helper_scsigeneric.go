@@ -110,9 +110,27 @@ func (r OsDeviceConnectivityHelperScsiGeneric) IsVolumePathMatchesVolumeId(volum
 		return false, err
 	}
 
+	isDmName := r.Helper.IsDmName(mpathDeviceName)
+
+	// Check if mpathDeviceName is already a WWID (user_friendly_names no)
+	// WWIDs typically start with '3' and are hexadecimal strings
+	if !isDmName && len(mpathDeviceName) > 16 && mpathDeviceName[0] == '3' {
+		// Device name is the WWID itself (user_friendly_names no)
+		logger.Infof("IsVolumePathMatchesVolumeId: Device name [%s] appears to be a WWID, comparing directly", mpathDeviceName)
+		// Compare the device name directly with volume ID variations
+		mpathDeviceNameLower := strings.ToLower(mpathDeviceName)
+		for _, volumeIdVariation := range volumeIdVariations {
+			if mpathDeviceNameLower == volumeIdVariation || strings.Contains(mpathDeviceNameLower, volumeIdVariation) {
+				logger.Infof("IsVolumePathMatchesVolumeId: found volume id [%s] for volume path [%s] ", mpathDeviceNameLower, volumePath)
+				return true, nil
+			}
+		}
+		return false, &VolumeIdNotFoundForMultipathDeviceNameError{mpathDeviceName}
+	}
+
 	dmDirectory := DevPath
 	multipathdCommandFormatArgs := multipathdWildcardsMpathAndVolumeId
-	if r.Helper.IsDmName(mpathDeviceName) {
+	if isDmName {
 		dmDirectory = DevMapperPath
 		multipathdCommandFormatArgs = MultipathdWildcardsMpathNameAndVolumeId
 	}
