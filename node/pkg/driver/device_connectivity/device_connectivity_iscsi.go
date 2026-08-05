@@ -791,165 +791,161 @@ func (r OsDeviceConnectivityIscsi) ValidateLun(ctx context.Context, targetDm str
 }
 
 // GetBlockDeviceForSession safe-resolves the block device node from a target session ID.
+// Production-hardened with a decoupled memory architecture to eliminate nested descriptor starvation.
 func (r OsDeviceConnectivityIscsi) GetBlockDeviceForSession(ctx context.Context, sessionID string) (string, error) {
 	if err := ctx.Err(); err != nil {
 		return "", err
 	}
 
-	return executer.ExecuteUninterruptible[string](
-		ctx,
-		r.KeyedGater,
-		"iscsi-session-block-resolve-"+sessionID,
-		15, 100, 2*time.Second, 15*time.Second,
-		func(wCtx context.Context) (string, error) {
+	const maxCapCeiling = 10000
+
+	// =========================================================================
+	// PRIMARY STRATEGY: SCAN RAM-BACKED /dev LAYOUT
+	// =========================================================================
+	dFile, errOpen := os.Open("/dev")
+	if errOpen != nil {
+		return "", errOpen
+	}
+
+	devCandidates := make([]string, 0, 128)
+
+	// STAGE 1: MICROSECOND SNAPSHOT SWEEP FOR /dev (Decouples VFS Handles Instantly)
+	for {
+		if err := ctx.Err(); err != nil {
+			dFile.Close()
+			return "", err
+		}
+
+		devEntries, errDirs := dFile.ReadDir(100)
+		if errDirs != nil && errDirs != io.EOF {
+			dFile.Close()
+			return "", fmt.Errorf("failed to parse dev stream: %w", errDirs)
+		}
+
+		for _, entry := range devEntries {
+			if len(devCandidates) >= maxCapCeiling {
+				logger.Warningf("[VFS-Guard] /dev candidates reached maximum safe allocation ceiling (%d). Truncating scan.", maxCapCeiling)
+				break
+			}
+			devCandidates = append(devCandidates, entry.Name())
+		}
+
+		if len(devCandidates) >= maxCapCeiling || len(devEntries) < 100 || errDirs == io.EOF {
+			break
+		}
+	}
+	dFile.Close() // CLOSED IMMEDIATELY: Protects process table limits before starting slow file queries.
+
+	sessionToken := fmt.Sprintf("session%s/", sessionID)
+
+	// STAGE 2: SAFE DECOUPLED EVALUATION PIPELINE
+	for _, name := range devCandidates {
+		if err := ctx.Err(); err != nil {
+			return "", err
+		}
+
+		if !strings.HasPrefix(name, "sd") || len(name) < 3 {
+			continue
+		}
+		if name[len(name)-1] >= '0' && name[len(name)-1] <= '9' {
+			continue
+		}
+
+		deviceLink := filepath.Join("/sys/block", name, "device")
+		
+		// Natively expands relative directory targets, ensuring absolute path matching accuracy
+		realPath, errLink := filepath.EvalSymlinks(deviceLink)
+		if errLink != nil {
+			continue 
+		}
+
+		if strings.Contains(realPath, sessionToken) {
+			return "/dev/" + name, nil 
+		}
+	}
+
+	// =========================================================================
+	// LEGACY SEAMLESS FALLBACK TREE (For specialized virtual container setups)
+	// =========================================================================
+	sessionDevicePath := fmt.Sprintf("/sys/class/iscsi_session/session%s/device", sessionID)
+	sFile, errOpenFallback := os.Open(sessionDevicePath)
+	if errOpenFallback != nil {
+		return "", errOpenFallback
+	}
+
+	sessionEntries := make([]string, 0, 16)
+
+	// TIER 1 SNAPSHOT SWEEP: Collect targets
+	for {
+		entries, errDirs := sFile.ReadDir(100)
+		if errDirs != nil && errDirs != io.EOF {
+			sFile.Close()
+			return "", fmt.Errorf("failed to parse fallback session tree: %w", errDirs)
+		}
+		for _, entry := range entries {
+			if len(sessionEntries) >= maxCapCeiling {
+				break
+			}
+			if strings.HasPrefix(entry.Name(), "target") {
+				sessionEntries = append(sessionEntries, entry.Name())
+			}
+		}
+		if len(sessionEntries) >= maxCapCeiling || len(entries) < 100 || errDirs == io.EOF {
+			break
+		}
+	}
+	sFile.Close() // CLOSED IMMEDIATELY
+
+	// DECOUPLED MULTI-TIER EVALUATION
+	for _, targetName := range sessionEntries {
+		if err := ctx.Err(); err != nil {
+			return "", err
+		}
+
+		targetPath := filepath.Join(sessionDevicePath, targetName)
+		tFile, errOpenTarget := os.Open(targetPath)
+		if errOpenTarget != nil {
+			continue
+		}
+
+		lunEntries := make([]string, 0, 16)
+
+		// TIER 2 SNAPSHOT SWEEP: Collect LUNs
+		for {
+			luns, errLunsDirs := tFile.ReadDir(100)
+			if errLunsDirs != nil && errLunsDirs != io.EOF {
+				break
+			}
+			for _, lun := range luns {
+				if len(lunEntries) >= maxCapCeiling {
+					break
+				}
+				lunEntries = append(lunEntries, lun.Name())
+			}
+			if len(lunEntries) >= maxCapCeiling || len(luns) < 100 || errLunsDirs == io.EOF {
+				break
+			}
+		}
+		tFile.Close() // CLOSED IMMEDIATELY
+
+		// DECOUPLED TIER 3 LUN PROCESSING
+		for _, lunName := range lunEntries {
+			blockPath := filepath.Join(targetPath, lunName, "block")
+			bFile, errOpenBlock := os.Open(blockPath)
+			if errOpenBlock != nil {
+				continue
+			}
+
+			disks, errDisks := bFile.ReadDir(100)
+			bFile.Close() // CLOSED IMMEDIATELY
 			
-			// 1. FAST & FAILSAFE: Single-pass scan of the RAM-backed /dev directory
-			dFile, errOpen := os.Open("/dev")
-			if errOpen != nil {
-				return "", errOpen
+			if errDisks == nil && len(disks) > 0 {
+				return "/dev/" + disks[0].Name(), nil 
 			}
+		}
+	}
 
-			sessionToken := fmt.Sprintf("session%s/", sessionID)
-			var matchedDevice string
-
-			errChunk := func() error {
-				defer dFile.Close()
-				for {
-					if err := wCtx.Err(); err != nil {
-						return err
-					}
-
-					devEntries, errDirs := dFile.ReadDir(100)
-					if errDirs != nil && errDirs != io.EOF {
-						return fmt.Errorf("failed to parse dev stream: %w", errDirs)
-					}
-					if len(devEntries) == 0 {
-						break
-					}
-
-					for _, entry := range devEntries {
-						name := entry.Name()
-						if !strings.HasPrefix(name, "sd") || len(name) < 3 {
-							continue
-						}
-						if name[len(name)-1] >= '0' && name[len(name)-1] <= '9' {
-							continue
-						}
-
-						deviceLink := filepath.Join("/sys/block", name, "device")
-						
-						// RESTORED: Re-enabling true filepath.EvalSymlinks to guarantee absolute
-						// path matching accuracy, perfectly preserving your intentional topology verification rules.
-						realPath, errLink := filepath.EvalSymlinks(deviceLink)
-						if errLink != nil {
-							continue 
-						}
-
-						if strings.Contains(realPath, sessionToken) {
-							matchedDevice = "/dev/" + name
-							return nil 
-						}
-					}
-
-					if len(devEntries) < 100 || errDirs == io.EOF {
-						break
-					}
-				}
-				return nil
-			}()
-
-			if errChunk != nil {
-				return "", errChunk
-			}
-			if matchedDevice != "" {
-				return matchedDevice, nil
-			}
-
-			// =========================================================================
-			// LEGACY SEAMLESS FALLBACK TREE (For specialized virtual container setups)
-			// =========================================================================
-			sessionDevicePath := fmt.Sprintf("/sys/class/iscsi_session/session%s/device", sessionID)
-			sFile, errOpenFallback := os.Open(sessionDevicePath)
-			if errOpenFallback != nil {
-				return "", errOpenFallback
-			}
-			defer sFile.Close()
-
-			for {
-				if err := wCtx.Err(); err != nil {
-					return "", err
-				}
-
-				entries, errDirs := sFile.ReadDir(100)
-				if errDirs != nil && errDirs != io.EOF {
-					return "", fmt.Errorf("failed to parse fallback session tree: %w", errDirs)
-				}
-				if len(entries) == 0 {
-					break
-				}
-
-				for _, entry := range entries {
-					if strings.HasPrefix(entry.Name(), "target") {
-						targetPath := filepath.Join(sessionDevicePath, entry.Name())
-
-						tFile, errOpenTarget := os.Open(targetPath)
-						if errOpenTarget != nil {
-							continue
-						}
-
-						errLun := func() error {
-							defer tFile.Close()
-							for {
-								if err := wCtx.Err(); err != nil {
-									return err
-								}
-
-								luns, errLunsDirs := tFile.ReadDir(100)
-								if errLunsDirs != nil && errLunsDirs != io.EOF {
-									return errLunsDirs
-								}
-								if len(luns) == 0 {
-									break
-								}
-
-								for _, lun := range luns {
-									blockPath := filepath.Join(targetPath, lun.Name(), "block")
-									bFile, errOpenBlock := os.Open(blockPath)
-									if errOpenBlock != nil {
-										continue
-									}
-
-									disks, errDisks := bFile.ReadDir(100)
-									bFile.Close()
-									
-									// Fixed: Reference the correct zero-index slice element name
-									if errDisks == nil && len(disks) > 0 {
-										matchedDevice = "/dev/" + disks[0].Name()
-										return nil 
-									}
-								}
-
-								if len(luns) < 100 || errLunsDirs == io.EOF {
-									break
-								}
-							}
-							return nil
-						}()
-
-						if errLun == nil && matchedDevice != "" {
-							return matchedDevice, nil
-						}
-					}
-				}
-
-				if len(entries) < 100 || errDirs == io.EOF {
-					break
-				}
-			}
-
-			return "", fmt.Errorf("no block device found for session %s", sessionID)
-		},
-	)
+	return "", fmt.Errorf("no block device found for session %s", sessionID)
 }
 
 func cleanSysfsData(data []byte) string {
