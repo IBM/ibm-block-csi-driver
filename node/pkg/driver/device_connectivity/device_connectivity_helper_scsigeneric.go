@@ -7205,8 +7205,11 @@ func (o *GetDmsPathHelperGeneric) GetSlaveCount(ctx context.Context, gater *exec
 				slaveNames = append(slaveNames, entry.Name())
 			}
 
-			if len(slaveNames) >= maxCapCeiling || len(entries)  Slave: %s | Kernel Address Mapping: %s | Hardware Identity: %s | State: %s | Operational: %v", 
-				slaveName, addrIdentifier, hardwareIdentity, state, isOperational)
+			if len(slaveNames) >= maxCapCeiling  {
+				logger.Warningf("[VFS-Guard] Slave nodes count reached maximum safe memory pre-allocation threshold (%d). Truncating processing tracking pass.", maxCapCeiling)
+				break
+			
+			}
 		}
 
 		return operationalCount
