@@ -362,7 +362,6 @@ func NewOsDeviceConnectivityHelperScsiGeneric(executer executer.ExecuterInterfac
 
 // IsVolumePathMatchesVolumeId safe-validates active and alternative storage paths against expected serial signatures.
 func (r *OsDeviceConnectivityHelperScsiGeneric) IsVolumePathMatchesVolumeId(ctx context.Context, volumeUuid string, volumePath string) (bool, error) {
-	r.KeyedGater.suicideIfLeaked()
 	if err := ctx.Err(); err != nil {
 		return false, err
 	}
@@ -467,8 +466,44 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) IsVolumePathMatchesVolumeId(ctx 
 					validNvmeTargets = append(validNvmeTargets, entryName)
 				}
 			}
-			
-			if len(validNvmeTargets) >= maxCapCeiling || len(entries)  hasDevice: %v, isPending: %v, matchedDev: %s", dmName, entryName, hasDevice, isPending, matchedDev)
+		}
+		return nil
+	}()
+
+	if errFilter != nil {
+		return false, fmt.Errorf("failed to read block slave endpoints: %w", errFilter)
+	}
+
+	if len(validNvmeTargets) == 0 {
+		return false, fmt.Errorf("hardware signature mapping failed: zero valid NVMe/DM entries discovered in slave paths")
+	}
+
+	// =========================================================================
+	// STAGE 2: THE REAL-TIME OPTIMAL BATCH EXECUTION ENGINE
+	// =========================================================================
+	results, errBatch := executer.ExecuteUninterruptibleBatch[string, bool](
+		ctx,
+		r.KeyedGater,
+		"sysfs-slaves-nvme-scan-"+dmName,
+		10, 50, 5*time.Second, 15*time.Second,
+		validNvmeTargets,
+		func(wCtx context.Context, index int, entryName string, cancelBatch func()) (bool, error) {
+			helper := GetDmsPathHelperGeneric{}
+			logger.Infof("[Identity-Check] [%s] Starting optimal execution on targeted entry: %s", dmName, entryName)
+
+			// Step A: Evaluate utilizing the original expectedSerial (Supports NVMe DM)
+			hasDevice, isPending, matchedDev := helper.EvaluateSysfsTopology(wCtx, r.KeyedGater, expectedSerial, false)
+
+			// Step B: Evaluate using the bit-shifted version if the original misses (Supports Native NVMe "Face")
+			if (!hasDevice || matchedDev == "") && !isPending {
+				nvmeTargetSerial := convertScsiIdToNguid(expectedSerial)
+				if nvmeTargetSerial != "" && nvmeTargetSerial != expectedSerial {
+					logger.Infof("[Identity-Check] [%s] Original lookup missed on path %s. Trying Native NVMe NGUID serialization...", dmName, entryName)
+					hasDevice, isPending, matchedDev = helper.EvaluateSysfsTopology(wCtx, r.KeyedGater, nvmeTargetSerial, false)
+				}
+			}
+
+			logger.Infof("[Identity-Check] [%s] Topology result for %s -> hasDevice: %v, isPending: %v, matchedDev: %s", dmName, entryName, hasDevice, isPending, matchedDev)
 
 			if hasDevice && !isPending && matchedDev != "" {
 				normalizedSlaveName := entryName
@@ -529,7 +564,6 @@ func (r OsDeviceConnectivityHelperScsiGeneric) RescanDevicesGetHostIds(lunId int
 
 // RescanDevices scans SCSI host buses concurrently to discover newly provisioned target channels securely.
 func (r *OsDeviceConnectivityHelperScsiGeneric) RescanDevices(ctx context.Context, lunId int, arrayIdentifiers []string, hostIDs map[int]bool) error {
-	r.KeyedGater.suicideIfLeaked()
 	if err := ctx.Err(); err != nil {
 		return err
 	}
@@ -1051,7 +1085,6 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) flushDevicesBuffers(ctx context.
 
 // RemovePhysicalDevice removes storage devices concurrently by injecting the "1" token into kernel deletion channels.
 func (r *OsDeviceConnectivityHelperScsiGeneric) RemovePhysicalDevice(ctx context.Context, sysDevices []string) error {
-	r.KeyedGater.suicideIfLeaked()
 	if err := ctx.Err(); err != nil {
 		return err
 	}
@@ -1242,7 +1275,6 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) readSysfs(path string) string {
 
 // ValidateLun performs validation metrics across active and alternative device mapper multi-path lines.
 func (r *OsDeviceConnectivityHelperScsiGeneric) ValidateLun(ctx context.Context, targetDm string, expectedLun int, sysDevices []string, expectedSerial string) error {
-	r.KeyedGater.suicideIfLeaked()
 	if err := ctx.Err(); err != nil {
 		return err
 	}
@@ -1465,7 +1497,6 @@ type sgScsiId struct {
 
 // purgeScsiGhosts scans host SCSI adapters in a memory-bounded, decoupled pipeline to clear unmapped logical units safely.
 func (r *OsDeviceConnectivityHelperScsiGeneric) purgeScsiGhosts(ctx context.Context, expectedSerial string, expectedLun int, arrayIdentifiers []string) error {
-	r.KeyedGater.suicideIfLeaked()
 	if err := ctx.Err(); err != nil {
 		return err
 	}
@@ -1638,7 +1669,6 @@ var nvmeScrubberControllerPattern = regexp.MustCompile(`^nvme\d+c\d+n\d+$`)
 
 // purgeNvmeGhosts scans the host NVMe adapters in parallel blocks to hot-unplug orphaned fabric paths cleanly.
 func (r *OsDeviceConnectivityHelperScsiGeneric) purgeNvmeGhosts(ctx context.Context, expectedSerial string, expectedLun int, arrayIdentifiers []string) error {
-	r.KeyedGater.suicideIfLeaked()
 	if err := ctx.Err(); err != nil {
 		return ctx.Err()
 	}
@@ -1874,7 +1904,6 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) isNvmeGhost(ctx context.Context,
 // PruneNvmeGhosts purges stale NVMe hardware maps and dead namespace paths concurrently across your array infrastructure.
 func (r *OsDeviceConnectivityHelperScsiGeneric) PruneNvmeGhosts(ctx context.Context, expectedWWID string, arrayNqns []string) error {
 	// CIRCUIT BREAKER: Guard the master entry frame against state drift or active leaks
-	r.KeyedGater.suicideIfLeaked()
 	if err := ctx.Err(); err != nil {
 		return ctx.Err()
 	}
@@ -3049,7 +3078,6 @@ PROCESS_PAGE_0x83:
 // TeardownVolume unmounts volumes, flushes buffers, and ejects backing physical lanes concurrently.
 // This is the fully unified, production-hardened implementation (All Phases Integrated).
 func (r *OsDeviceConnectivityHelperScsiGeneric) TeardownVolume(ctx context.Context, target string, needFlush bool, needRemovePhysical bool, expectedWWID string) error {
-	r.KeyedGater.suicideIfLeaked()
 	if err := ctx.Err(); err != nil {
 		return err
 	}
@@ -3640,7 +3668,6 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) FindSlavesByWWID(ctx context.Con
 
 // GetDMNameFromMinor safe-resolves a Device Mapper's functional name from its minor code.
 func (r *OsDeviceConnectivityHelperScsiGeneric) GetDMNameFromMinor(ctx context.Context, minor uint32) string {
-	r.KeyedGater.suicideIfLeaked()
 	logger.Warning("GetDMNameFromMinor Dynamic Matrix Parsing")
 
 	if err := ctx.Err(); err != nil {
@@ -4071,8 +4098,6 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) SwapToErrorTarget(ctx context.Co
 
 // IdentityAwarePreScan performs a strict safety scan prior to volume staging to confirm path availability and eliminate leaks.
 func (r *OsDeviceConnectivityHelperScsiGeneric) IdentityAwarePreScan(ctx context.Context, targetPath string, volumeId string) (string, bool, bool, bool, error) {
-	// CIRCUIT BREAKER: Guard the master entry frame against state drift or active leaks
-	r.KeyedGater.suicideIfLeaked()
 	if err := ctx.Err(); err != nil {
 		return "", false, false, false, status.FromContextError(err).Err()
 	}
@@ -4225,7 +4250,6 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) IdentityAwarePreScan(ctx context
 // cleanupOrphanedTopology clears residual hardware definitions from the node host.
 func (r *OsDeviceConnectivityHelperScsiGeneric) cleanupOrphanedTopology(ctx context.Context, mpathName string, expectedWWID string) error {
 	// CIRCUIT BREAKER: Halt execution instantly if any framework thread or token pool leak is active
-	r.KeyedGater.suicideIfLeaked()
 	if err := ctx.Err(); err != nil {
 		return ctx.Err()
 	}
@@ -4420,8 +4444,6 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) IsNativeNvmeNamespace(name strin
 
 // disableNativeNvmeQueueing identifies the target NVMe nodes and modifies timeout variables concurrently.
 func (r *OsDeviceConnectivityHelperScsiGeneric) disableNativeNvmeQueueing(ctx context.Context, expectedWWID string) error {
-	// CIRCUIT BREAKER: Guard the master entry frame against state drift or active leaks (Rule 4 Enforcement)
-	r.KeyedGater.suicideIfLeaked()
 	if err := ctx.Err(); err != nil {
 		return ctx.Err()
 	}
@@ -4612,8 +4634,6 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) disableNativeNvmeQueueing(ctx co
 
 // purgeStuckPhysicalPathsDualProtocol identifies and clears residual physical tracks in parallel.
 func (r *OsDeviceConnectivityHelperScsiGeneric) purgeStuckPhysicalPathsDualProtocol(ctx context.Context, rawScsiTarget, rawNvmeTarget string) error {
-	// CIRCUIT BREAKER: Guard the master entry frame against state drift or active leaks (Rule 4 Enforcement)
-	r.KeyedGater.suicideIfLeaked()
 	if err := ctx.Err(); err != nil {
 		return ctx.Err()
 	}
