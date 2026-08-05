@@ -58,7 +58,7 @@ func NewOsDeviceConnectivityNvmeOFc(executer executer.ExecuterInterface, KeyedGa
 // EnsureLogin performs NVMe-oFC discovery and connect for each (arrayTargetPort, hostPort) pair.
 // Connects paths until nvmeTargetPathCount is reached. Logs error if 0 paths result,
 // warning if below target. For non-native NVMe with find_multipaths=on, logs error if < 2 paths.
-func (r OsDeviceConnectivityNvmeOFc) EnsureLogin(ctx context.Context, ipsByArrayInitiator map[string][]string) {
+func (r *OsDeviceConnectivityNvmeOFc) EnsureLogin(ctx context.Context, ipsByArrayInitiator map[string][]string) {
         if len(ipsByArrayInitiator) == 0 {
                 logger.Warningf("NVMe-oFC EnsureLogin: no array target ports in publish context, skipping")
                 return
@@ -138,7 +138,7 @@ func (r OsDeviceConnectivityNvmeOFc) EnsureLogin(ctx context.Context, ipsByArray
 
         // Non-native NVMe + find_multipaths=on + < 2 paths: multipathd will not
         // create a dm device, causing GetMpathDevice to fail.
-        nativeMpath, err := isNvmeCoreMultipathEnabled(ctx)
+        nativeMpath, err := isNvmeCoreMultipathEnabled(ctx, r.KeyedGater)
         if err != nil {
                 logger.Warningf("NVMe-oFC EnsureLogin: could not determine nvme_core multipath mode: %v", err)
                 return
