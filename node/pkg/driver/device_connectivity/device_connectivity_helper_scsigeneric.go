@@ -7205,6 +7205,61 @@ func (o *GetDmsPathHelperGeneric) GetSlaveCount(ctx context.Context, gater *exec
 			
 			}
 		}
+		
+		count := 0
+		logger.Infof("[NVMe-Slave-Scan] [%s] Inspecting active controller pathways in tree directory: %s...", devName, targetScanDir)
+		
+		// STAGE 2: SAFE DECOUPLED EVALUATION PIPELINE
+		for _, slaveName := range slaveNames {
+			if err := ctx.Err(); err != nil {
+				return 0
+			}
+
+			slaveDeviceDir := filepath.Join(slavesDir, slaveName, "device")
+			
+			addrIdentifier := "UNKNOWN"
+			if realPath, errLink := filepath.EvalSymlinks(slaveDeviceDir); errLink == nil {
+				addrIdentifier = filepath.Base(realPath)
+			}
+
+			// RESTORED: Re-enabling the structural hardwareIdentity string evaluation
+			var hardwareIdentity string
+			isNvmeSlave := strings.HasPrefix(slaveName, "nvme")
+
+			if isNvmeSlave {
+				nqnPath := filepath.Join(slaveDeviceDir, "subsysnqn")
+				if nqnStr, err := secureReadSysfsFallback(ctx, gater, slaveName, nqnPath); err == nil && nqnStr != "" {
+					hardwareIdentity = fmt.Sprintf("NQN: %s", strings.TrimSpace(nqnStr))
+				} else {
+					hardwareIdentity = "NVMe (NQN Unreadable)"
+				}
+			} else {
+				vendorPath := filepath.Join(slaveDeviceDir, "vendor")
+				if vendorStr, err := secureReadSysfsFallback(ctx, gater, slaveName, vendorPath); err == nil && vendorStr != "" {
+					hardwareIdentity = fmt.Sprintf("Vendor: %s", strings.ToUpper(strings.TrimSpace(vendorStr)))
+				} else {
+					hardwareIdentity = "SCSI (Vendor Unreadable)"
+				}
+			}
+
+			stateBytesStr, err := secureReadSysfsFallback(ctx, gater, slaveName, filepath.Join(slaveDeviceDir, "state"))
+			state := "unknown"
+			isOperational := false
+			
+			if err == nil {
+				state = strings.ToLower(strings.TrimSpace(stateBytesStr))
+				if state == "running" || state == "live" {
+					isOperational = true
+					count++
+				}
+			}
+
+			logger.Warningf("[DM-Slave-Scan] -> Slave: %s | Kernel Address Mapping: %s | Hardware Identity: %s | State: %s | Operational: %v", 
+				slaveName, addrIdentifier, hardwareIdentity, state, isOperational)
+		}
+
+		return count
+		
 	}
 	
 	// =========================================================================
@@ -7276,59 +7331,46 @@ func (o *GetDmsPathHelperGeneric) GetSlaveCount(ctx context.Context, gater *exec
 		}
 		nvmeFile.Close() // CLOSED IMMEDIATELY: Prevents file descriptor table exhaustion prior to reading sysfs targets.
 		
-		count := 0
-		logger.Infof("[NVMe-Slave-Scan] [%s] Inspecting active controller pathways in tree directory: %s...", devName, targetScanDir)
-		
-		// STAGE 2: SAFE DECOUPLED EVALUATION PIPELINE
-		for _, slaveName := range slaveNames {
-			if err := ctx.Err(); err != nil {
-				return 0
-			}
-
-			slaveDeviceDir := filepath.Join(slavesDir, slaveName, "device")
-			
-			addrIdentifier := "UNKNOWN"
-			if realPath, errLink := filepath.EvalSymlinks(slaveDeviceDir); errLink == nil {
-				addrIdentifier = filepath.Base(realPath)
-			}
-
-			// RESTORED: Re-enabling the structural hardwareIdentity string evaluation
-			var hardwareIdentity string
-			isNvmeSlave := strings.HasPrefix(slaveName, "nvme")
-
-			if isNvmeSlave {
-				nqnPath := filepath.Join(slaveDeviceDir, "subsysnqn")
-				if nqnStr, err := secureReadSysfsFallback(ctx, gater, slaveName, nqnPath); err == nil && nqnStr != "" {
-					hardwareIdentity = fmt.Sprintf("NQN: %s", strings.TrimSpace(nqnStr))
-				} else {
-					hardwareIdentity = "NVMe (NQN Unreadable)"
+		for _, e := range nvmeCandidates {
+				if err := ctx.Err(); err != nil {
+						return 0
 				}
-			} else {
-				vendorPath := filepath.Join(slaveDeviceDir, "vendor")
-				if vendorStr, err := secureReadSysfsFallback(ctx, gater, slaveName, vendorPath); err == nil && vendorStr != "" {
-					hardwareIdentity = fmt.Sprintf("Vendor: %s", strings.ToUpper(strings.TrimSpace(vendorStr)))
-				} else {
-					hardwareIdentity = "SCSI (Vendor Unreadable)"
-				}
-			}
 
-			stateBytesStr, err := secureReadSysfsFallback(ctx, gater, slaveName, filepath.Join(slaveDeviceDir, "state"))
-			state := "unknown"
-			isOperational := false
-			
-			if err == nil {
-				state = strings.ToLower(strings.TrimSpace(stateBytesStr))
-				if state == "running" || state == "live" {
-					isOperational = true
-					count++
-				}
-			}
+				name := e.Name()
+				isNamespaceVolume := nvmeNamespaceRegex.MatchString(name)
 
-			logger.Warningf("[DM-Slave-Scan] -> Slave: %s | Kernel Address Mapping: %s | Hardware Identity: %s | State: %s | Operational: %v", 
-				slaveName, addrIdentifier, hardwareIdentity, state, isOperational)
+				isController := strings.HasPrefix(name, "nvme") && !isNamespaceVolume
+				isSubsys := strings.HasPrefix(name, "nvme-subsys")
+
+				if isController || isSubsys {
+						stateBytesStr, err := secureReadSysfsFallback(ctx, gater, name, filepath.Join(targetScanDir, name, "state"))
+						if err == nil {
+								state := strings.ToLower(strings.TrimSpace(stateBytesStr))
+								if state == "dead" || state == "deleting" || state == "failing" {
+										logger.Warningf("[NVMe-Slave-Scan] -> Skipping unhealthy controller path: %s (State: %s)", name, state)
+										continue
+								}
+						}
+
+						count++
+
+						nqnPath := filepath.Join(targetScanDir, name, "subsysnqn")
+						nqnBytesStr, err := secureReadSysfsFallback(ctx, gater, name, nqnPath)
+						if err != nil {
+								nqnPath = filepath.Join(targetScanDir, "subsysnqn")
+								nqnBytesStr, _ = secureReadSysfsFallback(ctx, gater, name, nqnPath)
+						}
+
+						nqn := strings.TrimSpace(nqnBytesStr)
+						if nqn == "" {
+								nqn = "UNKNOWN_NQN"
+						}
+
+						logger.Warningf("[NVMe-Slave-Scan] -> Controller Node: %s | Subsystem NQN: %s", name, nqn)
+				}
 		}
-
-		return count
+		
+		
 	}
 	
 	// =========================================================================
