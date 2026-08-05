@@ -7161,7 +7161,7 @@ func (o GetDmsPathHelperGeneric) waitInterval(ctx context.Context, intervalSecon
 }
 
 // GetSlaveCount safe-evaluates operational pathways across multi-protocol fabrics with full D-state protection.
-// Production-hardened with a Three-Stage Bounded Pipeline, immediate directory handle release, and a 10,000 item ceiling.
+// Production-hardened via a Three-Stage Bounded Pipeline, immediate file handle decoupling, and memory array limits.
 func (o *GetDmsPathHelperGeneric) GetSlaveCount(ctx context.Context, gater *executer.KeyedGater, devName string) int {
 	if err := ctx.Err(); err != nil {
 		return 0
@@ -7174,15 +7174,8 @@ func (o *GetDmsPathHelperGeneric) GetSlaveCount(ctx context.Context, gater *exec
 	// 1. DEVICE MAPPER SUBSYSTEM SCAN (SCSI or NVMe-over-DM slaves)
 	// =========================================================================
 	if o.IsDeviceMapper(devName) {
-		rawSlavesDir := filepath.Join("/sys/block", devName, "slaves")
+		slavesDir := filepath.Join("/sys/block", devName, "slaves")
 		
-		// RESTORED VFS LAYER: Resolve target paths natively via absolute canonical link check
-		// to protect against hidden symbolic redirections or relative path arithmetic variations.
-		slavesDir, errLink := filepath.EvalSymlinks(rawSlavesDir)
-		if errLink != nil {
-			slavesDir = rawSlavesDir // Fallback securely if the directory node is already unlinking
-		}
-
 		dFile, errOpen := os.Open(slavesDir)
 		if errOpen != nil {
 			logger.Warningf("[DM-Slave-Scan] [%s] Failed to read slaves directory layout: %v", devName, errOpen)
@@ -7191,7 +7184,7 @@ func (o *GetDmsPathHelperGeneric) GetSlaveCount(ctx context.Context, gater *exec
 
 		slaveNames := make([]string, 0, 32)
 
-		// STAGE 1: MICROSECOND SNAPSHOT SWEEP (Decouples VFS Handles Instantly)
+		// STAGE 1: MICROSECOND SNAPSHOT SWEEP FOR SLAVES (Decouples VFS Handles Instantly)
 		for {
 			if err := ctx.Err(); err != nil {
 				dFile.Close()
@@ -7223,16 +7216,11 @@ func (o *GetDmsPathHelperGeneric) GetSlaveCount(ctx context.Context, gater *exec
 	// 2. NATIVE NVME NAMESPACE SCAN (Native ANA Multipath Controllers)
 	// =========================================================================
 	if o.IsNativeNvmeNamespace(devName) {
-		rawBaseBlockDir := filepath.Join("/sys/block", devName)
-		
-		baseBlockDir, errLink := filepath.EvalSymlinks(rawBaseBlockDir)
-		if errLink != nil {
-			baseBlockDir = rawBaseBlockDir
-		}
-
+		baseBlockDir := filepath.Join("/sys/block", devName)
 		deviceDir := filepath.Join(baseBlockDir, "device")
-		subsysSymlink := filepath.Join(deviceDir, "subsystem")
 		
+		subsysSymlink := filepath.Join(deviceDir, "subsystem")
+		// RESTORED VFS LAYER: Natively evaluates absolute target paths to handle relative sysfs hops correctly
 		realSubsysPath, err := filepath.EvalSymlinks(subsysSymlink)
 		
 		targetScanDir := deviceDir
@@ -7266,7 +7254,7 @@ func (o *GetDmsPathHelperGeneric) GetSlaveCount(ctx context.Context, gater *exec
 		
 		nvmeCandidates := make([]string, 0, 32)
 
-		// STAGE 1: MICROSECOND SNAPSHOT SWEEP (Decouples VFS Handles Instantly)
+		// STAGE 1: MICROSECOND SNAPSHOT SWEEP FOR NVME (Decouples VFS Handles Instantly)
 		for {
 			if err := ctx.Err(); err != nil {
 				nvmeFile.Close()
@@ -7297,41 +7285,52 @@ func (o *GetDmsPathHelperGeneric) GetSlaveCount(ctx context.Context, gater *exec
 		logger.Infof("[NVMe-Slave-Scan] [%s] Inspecting active controller pathways in tree directory: %s...", devName, targetScanDir)
 		
 		// STAGE 2: SAFE DECOUPLED EVALUATION PIPELINE
-		for _, name := range nvmeCandidates {
+		for _, slaveName := range slaveNames {
 			if err := ctx.Err(); err != nil {
 				return 0
 			}
 
-			isNamespaceVolume := nvmeNamespaceRegex.MatchString(name)
-			isController := strings.HasPrefix(name, "nvme") && !isNamespaceVolume
-			isSubsys := strings.HasPrefix(name, "nvme-subsys")
-
-			if isController || isSubsys {
-				stateBytesStr, err := secureReadSysfsFallback(ctx, gater, name, filepath.Join(targetScanDir, name, "state"))
-				if err == nil {
-					state := strings.ToLower(strings.TrimSpace(stateBytesStr))
-					if state == "dead" || state == "deleting" || state == "failing" {
-						logger.Warningf("[NVMe-Slave-Scan] -> Skipping unhealthy controller path: %s (State: %s)", name, state)
-						continue
-					}
-				}
-
-				count++
-				
-				nqnPath := filepath.Join(targetScanDir, name, "subsysnqn")
-				nqnBytesStr, err := secureReadSysfsFallback(ctx, gater, name, nqnPath)
-				if err != nil {
-					nqnPath = filepath.Join(targetScanDir, "subsysnqn")
-					nqnBytesStr, _ = secureReadSysfsFallback(ctx, gater, name, nqnPath)
-				}
-				
-				nqn := strings.TrimSpace(nqnBytesStr)
-				if nqn == "" {
-					nqn = "UNKNOWN_NQN"
-				}
-				
-				logger.Warningf("[NVMe-Slave-Scan] -> Controller Node: %s | Subsystem NQN: %s", name, nqn)
+			slaveDeviceDir := filepath.Join(slavesDir, slaveName, "device")
+			
+			addrIdentifier := "UNKNOWN"
+			if realPath, errLink := filepath.EvalSymlinks(slaveDeviceDir); errLink == nil {
+				addrIdentifier = filepath.Base(realPath)
 			}
+
+			// RESTORED: Re-enabling the structural hardwareIdentity string evaluation
+			var hardwareIdentity string
+			isNvmeSlave := strings.HasPrefix(slaveName, "nvme")
+
+			if isNvmeSlave {
+				nqnPath := filepath.Join(slaveDeviceDir, "subsysnqn")
+				if nqnStr, err := secureReadSysfsFallback(ctx, gater, slaveName, nqnPath); err == nil && nqnStr != "" {
+					hardwareIdentity = fmt.Sprintf("NQN: %s", strings.TrimSpace(nqnStr))
+				} else {
+					hardwareIdentity = "NVMe (NQN Unreadable)"
+				}
+			} else {
+				vendorPath := filepath.Join(slaveDeviceDir, "vendor")
+				if vendorStr, err := secureReadSysfsFallback(ctx, gater, slaveName, vendorPath); err == nil && vendorStr != "" {
+					hardwareIdentity = fmt.Sprintf("Vendor: %s", strings.ToUpper(strings.TrimSpace(vendorStr)))
+				} else {
+					hardwareIdentity = "SCSI (Vendor Unreadable)"
+				}
+			}
+
+			stateBytesStr, err := secureReadSysfsFallback(ctx, gater, slaveName, filepath.Join(slaveDeviceDir, "state"))
+			state := "unknown"
+			isOperational := false
+			
+			if err == nil {
+				state = strings.ToLower(strings.TrimSpace(stateBytesStr))
+				if state == "running" || state == "live" {
+					isOperational = true
+					operationalCount++
+				}
+			}
+
+			logger.Warningf("[DM-Slave-Scan] -> Slave: %s | Kernel Address Mapping: %s | Hardware Identity: %s | State: %s | Operational: %v", 
+				slaveName, addrIdentifier, hardwareIdentity, state, isOperational)
 		}
 
 		return count
@@ -7343,6 +7342,7 @@ func (o *GetDmsPathHelperGeneric) GetSlaveCount(ctx context.Context, gater *exec
 	logger.Infof("[Slave-Scan] [%s] Non-multipath physical or virtual device. Defaulting count to 1.", devName)
 	return 1
 }
+
 
 // Inline secureReadSysfsFallback wrapper to handle multi-tiered properties extraction with strict gater tracking.
 func secureReadSysfsFallback(ctx context.Context, gater *executer.KeyedGater, devName, sysfsPath string) (string, error) {
