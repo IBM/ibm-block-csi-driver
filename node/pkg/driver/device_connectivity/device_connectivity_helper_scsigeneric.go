@@ -2439,200 +2439,248 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) getHCTLFromSd(ctx context.Contex
 	return hctl, nil
 }
 
-// getScsiTargetID safe-resolves hardware targets across FC, SAS, and iSCSI layers with deep trace logging.
+// getScsiTargetID safe-resolves hardware targets across FC, SAS, iSCSI, and NVMe-oF layers with punchy logging.
 func (r *OsDeviceConnectivityHelperScsiGeneric) getScsiTargetID(ctx context.Context, hctl string) string {
-	logger.Infof("[SCSI-Target-Inspector] Entering identification pipeline for target address: [%s]", hctl)
+	logger.Infof("[SCSI-Target-Inspector] Enter pipeline. HCTL: [%s]", hctl)
 
 	if err := ctx.Err(); err != nil {
-		logger.Warningf("[SCSI-Target-Inspector] [%s] Aborting execution: incoming context already cancelled: %v", hctl, err)
+		logger.Warningf("[SCSI-Target-Inspector] [%s] Abort: context cancelled: %v", hctl, err)
 		return ""
 	}
 
 	parts := strings.Split(hctl, ":")
 	if len(parts) < 4 {
-		logger.Warningf("[SCSI-Target-Inspector] [%s] Aborting execution: malformed HCTL layout segment footprint", hctl)
+		logger.Warningf("[SCSI-Target-Inspector] [%s] Abort: malformed HCTL segments", hctl)
 		return ""
 	}
 
-	hostID := parts[0] // Isolate the host bus index primitive string (e.g., "13", "14")
+	hostID := parts[0]
+	channelID := parts[1]
+	targetID := parts[2]
 	hct := strings.Join(parts[:3], ":")
 	targetDirName := fmt.Sprintf("target%s", hct)
+
+	// Upfront Storage Protocol Identification Sniffer
+	transportType := "unknown"
+	hostSubsysLink := fmt.Sprintf("/sys/class/scsi_host/host%s/device/subsystem", hostID)
+	
+	if realHostSubsys, errLink := filepath.EvalSymlinks(hostSubsysLink); errLink == nil {
+		subsysName := filepath.Base(realHostSubsys)
+		if strings.Contains(subsysName, "iscsi") {
+			transportType = "iscsi"
+		} else if strings.Contains(subsysName, "fc") || strings.Contains(subsysName, "pci") {
+			transportType = "fc"
+		} else if strings.Contains(subsysName, "sas") {
+			transportType = "sas"
+		}
+	} else {
+		nvmeCtrlPath := fmt.Sprintf("/sys/class/nvme/nvme%s", hostID)
+		if _, errStat := os.Stat(nvmeCtrlPath); errStat == nil {
+			transportType = "nvme"
+		}
+	}
+
+	logger.Debugf("[SCSI-Target-Inspector] [%s] Protocol sniffed: %s", hctl, transportType)
+
+	// =========================================================================
+	// 0. NATIVE NVME-OVER-FABRICS (NVMe-oF) RESOLUTION TRACK
+	// =========================================================================
+	if transportType == "nvme" {
+		logger.Infof("[SCSI-Target-Inspector] [%s] [Track-NVMe-oF] Start fabrics parsing.", hctl)
+		
+		subsysNqnFile := fmt.Sprintf("/sys/class/nvme/nvme%s/subsysnqn", hostID)
+		logger.Debugf("[SCSI-Target-Inspector] [%s] [Track-NVMe-oF] Probe path: %s", hctl, subsysNqnFile)
+		
+		if data, errRead := os.ReadFile(subsysNqnFile); errRead == nil && len(data) > 0 {
+			nqnString := strings.TrimSpace(string(data))
+			logger.Infof("[SCSI-Target-Inspector] [%s] [NVMe-oF SUCCESS] Target verified NQN: %s", hctl, nqnString)
+			return nqnString
+		} else {
+			logger.Debugf("[SCSI-Target-Inspector] [%s] [Track-NVMe-oF-Skip] Read failed: %v", hctl, errRead)
+		}
+		return "" 
+	}
 
 	// =========================================================================
 	// 1. FIBRE CHANNEL RESOLUTION LAYER (FLAT REMOTE PORT CLASS STRATEGY)
 	// =========================================================================
-	fcClassDir := "/sys/class/fc_remote_ports"
-	fcClassPattern := fmt.Sprintf("/sys/class/fc_remote_ports/rport-%s:*", hostID)
-	logger.Debugf("[SCSI-Target-Inspector] [%s] [Track-A1] Executing modern remote port wildcard scan: %s", hctl, fcClassPattern)
+	if transportType == "fc" || transportType == "unknown" {
+		fcClassDir := "/sys/class/fc_remote_ports"
+		fcClassPattern := fmt.Sprintf("/sys/class/fc_remote_ports/rport-%s:*", hostID)
+		logger.Debugf("[SCSI-Target-Inspector] [%s] [Track-A1] Wildcard scan: %s", hctl, fcClassPattern)
 
-	// Hybrid Attempt 1: Direct Path Calculation (Fast-path for modern kernels rport-H:C-T)
-	if len(parts) >= 3 {
-		channelID := parts[1]
-		targetID := parts[2]
 		directPortFile := filepath.Join(fcClassDir, fmt.Sprintf("rport-%s:%s-%s", hostID, channelID, targetID), "port_name")
-
-		logger.Debugf("[SCSI-Target-Inspector] [%s] [Track-A1-Direct] Trying direct path resolution: %s", hctl, directPortFile)
+		logger.Debugf("[SCSI-Target-Inspector] [%s] [Track-A1-Direct] Try direct path: %s", hctl, directPortFile)
+		
 		if data, errRead := os.ReadFile(directPortFile); errRead == nil && len(data) > 0 {
 			wwpn := strings.TrimSpace(string(data))
-			logger.Infof("[SCSI-Target-Inspector] [%s] [FC-rport-FastPath SUCCESS] Hardware target verified via DIRECT class rport node. Isolated WWPN: %s", hctl, wwpn)
-			return wwpn // IMMEDIATE SUCCESSFUL EXIT
+			logger.Infof("[SCSI-Target-Inspector] [%s] [FC-rport-FastPath SUCCESS] Direct rport verified WWPN: %s", hctl, wwpn)
+			return wwpn 
 		}
-	}
 
-	// Hybrid Attempt 2: ReadDir Fallback with Decoupled Memory Bounding
-	logger.Debugf("[SCSI-Target-Inspector] [%s] [Track-A1-Fallback] Direct path missed. Falling back to chunked directory iteration.", hctl)
-	
-	const maxCapCeiling = 10000
-	
-	fcCandidates := func() []string {
-		dFile, errOpen := os.Open(fcClassDir)
-		if errOpen != nil {
-			return nil
-		}
-		defer dFile.Close()
-
-		prefixSearch := fmt.Sprintf("rport-%s:", hostID)
-		candidates := make([]string, 0, 32)
-
-		for {
-			rportEntries, errDirs := dFile.ReadDir(100)
-			if errDirs != nil && errDirs != io.EOF {
-				break
+		logger.Debugf("[SCSI-Target-Inspector] [%s] [Track-A1-Fallback] Direct path missed. Run chunk sweep.", hctl)
+		
+		const maxCapCeiling = 10000
+		fcCandidates := func() []string {
+			dFile, err := os.Open(fcClassDir)
+			if err != nil {
+				return nil
 			}
-			for _, entry := range rportEntries {
-				if len(candidates) >= maxCapCeiling {
-					logger.Warningf("[VFS-Guard] FC remote ports list reached safe allocation ceiling (%d). Truncating scan.", maxCapCeiling)
+			defer dFile.Close()
+
+			prefixSearch := fmt.Sprintf("rport-%s:", hostID)
+			candidates := make([]string, 0, 32)
+
+			for {
+				rportEntries, errDirs := dFile.ReadDir(100)
+				if errDirs != nil && errDirs != io.EOF {
 					break
 				}
-				rportName := entry.Name()
-				if strings.HasPrefix(rportName, prefixSearch) {
-					candidates = append(candidates, rportName)
+				for _, entry := range rportEntries {
+					if len(candidates) >= maxCapCeiling {
+						logger.Warningf("[VFS-Guard] Safe ceiling hit (%d). Truncate scan.", maxCapCeiling)
+						break
+					}
+					rportName := entry.Name()
+					if strings.HasPrefix(rportName, prefixSearch) {
+						candidates = append(candidates, rportName)
+					}
+				}
+				if len(candidates) >= maxCapCeiling || len(rportEntries) < 100 || errDirs == io.EOF {
+					break
 				}
 			}
-			if len(candidates) >= maxCapCeiling || len(rportEntries) < 100 || errDirs == io.EOF {
-				break
+			return candidates
+		}()
+
+		for _, rportName := range fcCandidates {
+			if err := ctx.Err(); err != nil {
+				return ""
+			}
+			fcPortFile := filepath.Join(fcClassDir, rportName, "port_name")
+			logger.Debugf("[SCSI-Target-Inspector] [%s] [Track-A1-Loop] Probe file: %s", hctl, fcPortFile)
+
+			if data, errRead := os.ReadFile(fcPortFile); errRead == nil && len(data) > 0 {
+				wwpn := strings.TrimSpace(string(data))
+				logger.Infof("[SCSI-Target-Inspector] [%s] [FC-rport-FastPath SUCCESS] Class rport verified WWPN: %s", hctl, wwpn)
+				return wwpn 
+			} else if errRead != nil {
+				logger.Debugf("[SCSI-Target-Inspector] [%s] [Track-A1-Loop] Skip file %s. Error: %v", hctl, fcPortFile, errRead)
 			}
 		}
-		return candidates
-	}()
 
-	// Process FC candidates out of flat memory with zero open directory handles to avoid descriptor starvation
-	for _, rportName := range fcCandidates {
-		if err := ctx.Err(); err != nil {
+		fcClassicPath := fmt.Sprintf("/sys/class/scsi_target/%s/fc_transport/%s/port_name", targetDirName, targetDirName)
+		logger.Debugf("[SCSI-Target-Inspector] [%s] [Track-A2] Fallback classic target probe: %s", hctl, fcClassicPath)
+
+		if data, errRead := os.ReadFile(fcClassicPath); errRead == nil && len(data) > 0 {
+			wwpn := strings.TrimSpace(string(data))
+			logger.Infof("[SCSI-Target-Inspector] [%s] [FC-Classic-FastPath SUCCESS] Classic target verified WWPN: %s", hctl, wwpn)
+			return wwpn 
+		} else {
+			logger.Debugf("[SCSI-Target-Inspector] [%s] [Track-A2-Skip] Classic target missed footprint. Error: %v", hctl, errRead)
+		}
+
+		if transportType == "fc" {
 			return ""
 		}
-		fcPortFile := filepath.Join(fcClassDir, rportName, "port_name")
-		logger.Debugf("[SCSI-Target-Inspector] [%s] [Track-A1-Loop] Probing target file: %s", hctl, fcPortFile)
-
-		if data, errRead := os.ReadFile(fcPortFile); errRead == nil && len(data) > 0 {
-			wwpn := strings.TrimSpace(string(data))
-			logger.Infof("[SCSI-Target-Inspector] [%s] [FC-rport-FastPath SUCCESS] Hardware target verified via class rport node. Isolated WWPN: %s", hctl, wwpn)
-			return wwpn // IMMEDIATE SUCCESSFUL FC EXIT
-		} else if errRead != nil {
-			logger.Debugf("[SCSI-Target-Inspector] [%s] [Track-A1-Loop] Skipped file %s: read failed or inaccessible: %v", hctl, fcPortFile, errRead)
-		}
-	}
-
-	// Track A2: Classic Target Layout Fallback (RHEL 7)
-	fcClassicPath := fmt.Sprintf("/sys/class/scsi_target/%s/fc_transport/%s/port_name", targetDirName, targetDirName)
-	logger.Debugf("[SCSI-Target-Inspector] [%s] [Track-A2] Falling back to classic target layout file probe: %s", hctl, fcClassicPath)
-
-	if data, errRead := os.ReadFile(fcClassicPath); errRead == nil && len(data) > 0 {
-		wwpn := strings.TrimSpace(string(data))
-		logger.Infof("[SCSI-Target-Inspector] [%s] [FC-Classic-FastPath SUCCESS] Hardware target verified via classic scsi_target class. Isolated WWPN: %s", hctl, wwpn)
-		return wwpn // IMMEDIATE SUCCESSFUL FC EXIT
-	} else {
-		logger.Debugf("[SCSI-Target-Inspector] [%s] [Track-A2-Skip] Classic target file read failed or missing footprint: %v", hctl, errRead)
 	}
 
 	// =========================================================================
 	// 2. SERIAL ATTACHED SCSI RESOLUTION LAYER (SAS STRATEGY)
 	// =========================================================================
-	sasClassicPath := fmt.Sprintf("/sys/class/scsi_target/%s/sas_device/%s/sas_address", targetDirName, targetDirName)
-	logger.Debugf("[SCSI-Target-Inspector] [%s] [Track-B] Probing SAS transport class tree layout path: %s", hctl, sasClassicPath)
+	if transportType == "sas" || transportType == "unknown" {
+		sasClassicPath := fmt.Sprintf("/sys/class/scsi_target/%s/sas_device/%s/sas_address", targetDirName, targetDirName)
+		logger.Debugf("[SCSI-Target-Inspector] [%s] [Track-B] Probe SAS tree path: %s", hctl, sasClassicPath)
 
-	if data, errRead := os.ReadFile(sasClassicPath); errRead == nil && len(data) > 0 {
-		sasAddr := strings.TrimSpace(string(data))
-		logger.Infof("[SCSI-Target-Inspector] [%s] [SAS-Class-FastPath SUCCESS] Hardware target verified via sas_device class. Isolated Address: %s", hctl, sasAddr)
-		return sasAddr // IMMEDIATE SUCCESSFUL SAS EXIT
-	} else {
-		logger.Debugf("[SCSI-Target-Inspector] [%s] [Track-B-Skip] SAS class file read failed or missing footprint: %v", hctl, errRead)
-	}
-
-	// =========================================================================
-	// 3. iSCSI RESOLUTION LAYER (FLAT SUBSYSTEM SESSION LOOKUP WITH CHUNKING)
-	// =========================================================================
-	sessionClassPath := "/sys/class/iscsi_session"
-	matchToken := fmt.Sprintf("host%s", hostID)
-	logger.Infof("[SCSI-Target-Inspector] [%s] [Track-C] Initiating flat class iSCSI session lookup sweep at: %s", hctl, sessionClassPath)
-
-	iscsiCandidates := func() []string {
-		sFile, errOpen := os.Open(sessionClassPath)
-		if errOpen != nil {
-			return nil
+		if data, errRead := os.ReadFile(sasClassicPath); errRead == nil && len(data) > 0 {
+			sasAddr := strings.TrimSpace(string(data))
+			logger.Infof("[SCSI-Target-Inspector] [%s] [SAS-Class-FastPath SUCCESS] Verified SAS address: %s", hctl, sasAddr)
+			return sasAddr 
+		} else {
+			logger.Debugf("[SCSI-Target-Inspector] [%s] [Track-B-Skip] SAS missed footprint. Error: %v", hctl, errRead)
 		}
-		defer sFile.Close()
 
-		candidates := make([]string, 0, 32)
-		for {
-			sessions, errDirs := sFile.ReadDir(100)
-			if errDirs != nil && errDirs != io.EOF {
-				break
-			}
-			for _, s := range sessions {
-				if len(candidates) >= maxCapCeiling {
-					logger.Warningf("[VFS-Guard] iSCSI sessions list reached safe allocation ceiling (%d). Truncating scan.", maxCapCeiling)
-					break
-				}
-				candidates = append(candidates, s.Name())
-			}
-			if len(candidates) >= maxCapCeiling || len(sessions) < 100 || errDirs == io.EOF {
-				break
-			}
-		}
-		return candidates
-	}()
-
-	// Process iSCSI sessions out of flat memory with zero open directory handles to eliminate timeline distortion
-	for _, sessionName := range iscsiCandidates {
-		if ctx.Err() != nil {
-			logger.Warningf("[SCSI-Target-Inspector] [%s] [Track-C] Context expired during dynamic session loop traversal.", hctl)
+		if transportType == "sas" {
 			return ""
 		}
-
-		deviceMappingLink := filepath.Join(sessionClassPath, sessionName, "device")
-		logger.Debugf("[SCSI-Target-Inspector] [%s] [Track-C-Loop] Evaluating node: %s. Reading mapping token link: %s", hctl, sessionName, deviceMappingLink)
-
-		// RESTORED VFS LAYER: Natively evaluates absolute target paths to handle complex sysfs links correctly
-		trueHostPath, errLink := filepath.EvalSymlinks(deviceMappingLink)
-		if errLink == nil {
-			logger.Debugf("[SCSI-Target-Inspector] [%s] [Track-C-Loop] Entry %s symlink target text resolved to: [%s]", hctl, sessionName, trueHostPath)
-
-			if strings.Contains(trueHostPath, matchToken) {
-				targetNameFile := filepath.Join(sessionClassPath, sessionName, "targetname")
-				logger.Infof("[SCSI-Target-Inspector] [%s] [Track-C-Loop] Correlation successful! Target name file identified: %s", hctl, targetNameFile)
-
-				if data, errRead := os.ReadFile(targetNameFile); errRead == nil && len(data) > 0 {
-					iqnString := strings.TrimSpace(string(data))
-					logger.Infof("[SCSI-Target-Inspector] [%s] [iSCSI-Class-FastPath SUCCESS] Hardware target verified via session map. Isolated IQN: %s", hctl, iqnString)
-					return iqnString // IMMEDIATE SUCCESSFUL iSCSI EXIT
-				} else {
-					logger.Warningf("[SCSI-Target-Inspector] [%s] [Track-C-Loop-Error] Matched session %s but targetname file read failed: %v", hctl, sessionName, errRead)
-				}
-			} else {
-				logger.Debugf("[SCSI-Target-Inspector] [%s] [Track-C-Loop-Mismatch] Entry %s rejected: does not match lookup token %s or target pattern parameters.", hctl, sessionName, matchToken)
-			}
-		} else {
-			logger.Debugf("[SCSI-Target-Inspector] [%s] [Track-C-Loop-Skip] Entry %s device link mapping unreadable or incomplete: %v", hctl, sessionName, errLink)
-		}
 	}
 
 	// =========================================================================
-	// 4. TERMINAL FALLBACK BLOCK
+	// 3. iSCSI RESOLUTION LAYER (FLAT SUBSYSTEM SESSION LOOKUP)
 	// =========================================================================
-	logger.Warningf("[SCSI-Target-Inspector] [%s] [OUT OF STRATEGIES] Identification analysis complete. Zero protocol matches isolated across all system class mappings.", hctl)
+	if transportType == "iscsi" || transportType == "unknown" {
+		sessionClassPath := "/sys/class/iscsi_session"
+		matchToken := fmt.Sprintf("host%s", hostID)
+		logger.Infof("[SCSI-Target-Inspector] [%s] [Track-C] Start iSCSI session sweep path: %s", hctl, sessionClassPath)
+
+		const maxCapCeiling = 10000
+		iscsiCandidates := func() []string {
+			sFile, err := os.Open(sessionClassPath)
+			if err != nil {
+				logger.Warningf("[SCSI-Target-Inspector] [%s] [Track-C-Error] Global class tree lookups failed: %v", hctl, err)
+				return nil
+			}
+			defer sFile.Close()
+
+			candidates := make([]string, 0, 32)
+			for {
+				sessions, errDirs := sFile.ReadDir(100)
+				if errDirs != nil && errDirs != io.EOF {
+					logger.Warningf("[SCSI-Target-Inspector] [%s] [Track-C-Error] Chunk read error: %v", hctl, errDirs)
+					break
+				}
+				for _, s := range sessions {
+					if len(candidates) >= maxCapCeiling {
+						logger.Warningf("[VFS-Guard] Safe ceiling hit (%d). Truncate scan.", maxCapCeiling)
+						break
+					}
+					candidates = append(candidates, s.Name())
+				}
+				if len(candidates) >= maxCapCeiling || len(sessions) < 100 || errDirs == io.EOF {
+					break
+				}
+			}
+			return candidates
+		}()
+
+		for _, sessionName := range iscsiCandidates {
+			if ctx.Err() != nil {
+				logger.Warningf("[SCSI-Target-Inspector] [%s] [Track-C] Context expired in session loop traversal.", hctl)
+				return ""
+			}
+
+			deviceMappingLink := filepath.Join(sessionClassPath, sessionName, "device")
+			logger.Debugf("[SCSI-Target-Inspector] [%s] [Track-C-Loop] Evaluate: %s. Link: %s", hctl, sessionName, deviceMappingLink)
+
+			trueHostPath, errLink := filepath.EvalSymlinks(deviceMappingLink)
+			if errLink == nil {
+				logger.Debugf("[SCSI-Target-Inspector] [%s] [Track-C-Loop] Entry %s resolved: [%s]", hctl, sessionName, trueHostPath)
+
+				if strings.Contains(trueHostPath, matchToken) {
+					targetNameFile := filepath.Join(sessionClassPath, sessionName, "targetname")
+					logger.Infof("[SCSI-Target-Inspector] [%s] [Track-C-Loop] Correlated! Target file: %s", hctl, targetNameFile)
+
+					if data, errRead := os.ReadFile(targetNameFile); errRead == nil && len(data) > 0 {
+						iqnString := strings.TrimSpace(string(data))
+						logger.Infof("[SCSI-Target-Inspector] [%s] [iSCSI-Class-FastPath SUCCESS] Session verified IQN: %s", hctl, iqnString)
+						return iqnString 
+					} else {
+						logger.Warningf("[SCSI-Target-Inspector] [%s] [Track-C-Loop-Error] Session %s matched but targetname read failed: %v", hctl, sessionName, errRead)
+					}
+				} else {
+					logger.Debugf("[SCSI-Target-Inspector] [%s] [Track-C-Loop-Mismatch] Entry %s rejected: token %s mismatch.", hctl, sessionName, matchToken)
+				}
+			} else {
+				logger.Debugf("[SCSI-Target-Inspector] [%s] [Track-C-Loop-Skip] Entry %s link unreadable. Error: %v", hctl, sessionName, errLink)
+			}
+		}
+	}
+	// =========================================================================// 4. TERMINAL FALLBACK BLOCK// =========================================================================
+	logger.Warningf("[SCSI-Target-Inspector] [%s] [OUT OF STRATEGIES] Zero protocol matches across all system mappings.", hctl)
 	return ""
 }
+
+
 
 // getIscsiTargetName identifies the operational iSCSI target name with full D-state protection.
 func (r *OsDeviceConnectivityHelperScsiGeneric) getIscsiTargetName(ctx context.Context, realDevicePath string, parentTargetBase string, hostID string) string {
