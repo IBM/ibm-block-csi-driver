@@ -223,9 +223,12 @@ func (d *NodeService) NodeStageVolume(ctx context.Context, req *csi.NodeStageVol
 	if matches := nvmeStageControllerPattern.FindStringSubmatch(baseDevice); len(matches) == 3 {
 		sanitizedName := fmt.Sprintf("nvme%sn%s", matches[1], matches[2])
 		logger.Warningf("NodeStageVolume Sanitization: Redirecting raw controller channel %s to storage block interface %s", baseDevice, sanitizedName)
-		baseDevice = sanitizedName
-		mpathDevice = filepath.Join("/dev", baseDevice)
+		
+		// FIXED: Extract the authentic parent directory context (maintains /dev/mapper or /dev accurately)
+		parentDir := filepath.Dir(mpathDevice)
+		mpathDevice = filepath.Join(parentDir, sanitizedName)
 	}
+	
 
 	logger.Infof("Device discovery finalized and settled successfully at path: %s", mpathDevice)
 
@@ -819,11 +822,17 @@ func (d *NodeService) getVolumeStats(ctx context.Context, path string, volumeId 
 				// matches[1] captures the controller sequence (e.g., "13")
 				// matches[2] captures the namespace index (e.g., "2")
 				sanitizedName := fmt.Sprintf("nvme%sn%s", matches[1], matches[2])
-				sanitizedPath = filepath.Join("/dev", sanitizedName)
+				
+				// FIXED: Isolate and preserve the true canonical parent directory tree context 
+				// (e.g., maintaining /dev/mapper or /dev accurately based on VFS reality)
+				parentDir := filepath.Dir(realPath)
+				sanitizedPath = filepath.Join(parentDir, sanitizedName)
+				
 				logger.Warningf("NodeGetVolumeStats Sanitization: Redirected tracking path from %s to clean block device %s", realPath, sanitizedPath)
 			}
 		}
 	}
+	
 
 	isBlock, err := d.NodeUtils.IsBlock(ctx, sanitizedPath)
 	if err != nil {
