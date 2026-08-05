@@ -7204,7 +7204,6 @@ func (o *GetDmsPathHelperGeneric) GetSlaveCount(ctx context.Context, gater *exec
 		}
 
 			   count := 0
-			  logger.Infof("[NVMe-Slave-Scan] [%s] Inspecting active controller pathways in tree directory: %s...", devName, targetScanDir)
 
 			   // STAGE 2: SAFE DECOUPLED EVALUATION PIPELINE
 			   for _, slaveName := range slaveNames {
@@ -7256,7 +7255,6 @@ func (o *GetDmsPathHelperGeneric) GetSlaveCount(ctx context.Context, gater *exec
 				}
 
                 return count
-		}
 	}
 	
 	// =========================================================================
@@ -7297,6 +7295,8 @@ func (o *GetDmsPathHelperGeneric) GetSlaveCount(ctx context.Context, gater *exec
 			logger.Warningf("[NVMe-Slave-Scan] [%s] Target NVMe device runtime directory missing or inaccessible: %v", devName, errOpen)
 			return 0
 		}
+
+		logger.Infof("[NVMe-Slave-Scan] [%s] Inspecting active controller pathways in tree directory: %s...", devName, targetScanDir)
 		
 		nvmeCandidates := make([]string, 0, 32)
 
