@@ -636,7 +636,7 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) RescanDevices(ctx context.Contex
 }
 
 // isNvmeCoreMultipathEnabled safe-evaluates whether native NVMe kernel-level multipathing is active on the host.
-func (r *OsDeviceConnectivityHelperScsiGeneric) isNvmeCoreMultipathEnabled(ctx context.Context) (bool, error) {
+func isNvmeCoreMultipathEnabled(ctx context.Context, gater *executer.KeyedGater) (bool, error) {
 	if err := ctx.Err(); err != nil {
 		return false, err
 	}
@@ -645,7 +645,7 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) isNvmeCoreMultipathEnabled(ctx c
 	// Uses a shared, single-tenant key layout to serialize checks tightly without pool saturation.
 	return executer.ExecuteUninterruptible[bool](
 		ctx,
-		r.KeyedGater,
+		gater,
 		"check-nvme-multipath-core",
 		5,          // maxRunning capacity ceiling
 		20,         // maxSpare
