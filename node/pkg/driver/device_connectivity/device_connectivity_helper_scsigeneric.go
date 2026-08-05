@@ -7198,10 +7198,11 @@ func (o *GetDmsPathHelperGeneric) GetSlaveCount(ctx context.Context, gater *exec
 				}
 				slaveNames = append(slaveNames, entry.Name())
 			}
-			if len(slaveNames) >= maxCapCeiling {
+			if len(slaveNames) >= maxCapCeiling || len(entries) < 100 {
 				break
 			}
 		}
+		dFile.Close()
 
 			   count := 0
 
