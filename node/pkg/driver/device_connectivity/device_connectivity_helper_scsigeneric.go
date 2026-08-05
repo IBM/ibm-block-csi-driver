@@ -635,9 +635,6 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) RescanDevices(ctx context.Contex
 	return nil
 }
 
-// nvmeCoreMultipathParamPath maps precisely to the kernel module parameter endpoint.
-const nvmeCoreMultipathParamPath = "/sys/module/nvme_core/parameters/multipath"
-
 // isNvmeCoreMultipathEnabled safe-evaluates whether native NVMe kernel-level multipathing is active on the host.
 func (r *OsDeviceConnectivityHelperScsiGeneric) isNvmeCoreMultipathEnabled(ctx context.Context) (bool, error) {
 	if err := ctx.Err(); err != nil {
@@ -5941,7 +5938,7 @@ func (r *OsDeviceConnectivityHelperGeneric) checkDMDevice(ctx context.Context, d
 }
 
 // checkNVMeDevice evaluates standard and alternative native NVMe naming layouts to verify controller availability.
-func (o *OsDeviceConnectivityHelperGeneric) checkNVMeDevice(ctx context.Context, gater *executer.KeyGater, nvmeName string) bool {
+func (o *OsDeviceConnectivityHelperGeneric) checkNVMeDevice(ctx context.Context, gater *executer.KeyedGater, nvmeName string) bool {
 	if err := ctx.Err(); err != nil {
 		return true // Terminate instantly if context expired
 	}
@@ -7083,10 +7080,7 @@ func (o GetDmsPathHelperGeneric) WaitForDmToExist(ctx context.Context, gater *ex
 		}
 		
 		// FIXED: Corrected multi-variable assignment signature to resolve compiler error.
-		ro, errRo := o.getRoStatus(ctx, gater, path)
-		if errRo != nil {
-			ro = "unknown"
-		}
+		ro := o.getRoStatus(ctx, gater, path)
 		logger.Warningf("ro status %s", ro)
 
 		// UNIFIED PATH STABILITY VALIDATION MATRIX:
@@ -7211,8 +7205,6 @@ func (o *GetDmsPathHelperGeneric) GetSlaveCount(ctx context.Context, gater *exec
 			
 			}
 		}
-
-		return operationalCount
 	}
 	
 	// =========================================================================
@@ -7328,7 +7320,7 @@ func (o *GetDmsPathHelperGeneric) GetSlaveCount(ctx context.Context, gater *exec
 				state = strings.ToLower(strings.TrimSpace(stateBytesStr))
 				if state == "running" || state == "live" {
 					isOperational = true
-					operationalCount++
+					count++
 				}
 			}
 
@@ -7990,7 +7982,7 @@ func (of GetDmsPathHelperGeneric) safeSettle(ctx context.Context, gater *execute
 		select {
 		case <-ctx.Done():
 			return ctx.Err()
-		case <-time.After(time.Duration(200+rand.Intn(300)) * time.Millisecond):
+		case <-time.After(time.Duration(200+rand.IntN(300)) * time.Millisecond):
 		}
 	}
 	return fmt.Errorf("device %s (read path: %s) failed to settle read tests after maximum tracking limits", name, actualReadPath)
