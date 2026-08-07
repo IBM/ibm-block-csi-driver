@@ -359,20 +359,24 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) IsVolumePathMatchesVolumeId(ctx 
 		return false, fmt.Errorf("invalid IBM volume configuration signature: must be 32 chars starting with 6005076")
 	}
 
-	// 2. Locate the unified device-mapper node name (e.g., "dm-3" or "mpatha")
+	// 2. Locate the unified device-mapper node name (e.g., "dm-3" or "mpatha").
+	// GetMpathDeviceName returns the bare kernel name (e.g. "dm-10"), not a /dev/ path.
 	mpathDeviceName, err := r.Helper.GetMpathDeviceName(ctx, r.KeyedGater, volumePath)
 	if err != nil {
 		return false, fmt.Errorf("failed to trace multipath map for path %s: %w", volumePath, err)
 	}
 
 	// 3. Query the hardware Inquiry descriptor layer dynamically.
-	sgInqWwn, err := r.Helper.GetWwnByScsiInq(ctx, mpathDeviceName)
+	// GetWwnByScsiInq (and its internal EvalSymlinks + syscall.Open) require a full /dev/ path.
+	// GetMpathDeviceName returns only the kernel name ("dm-10"), so we must prepend /dev/ here.
+	mpathDevPath := filepath.Join("/dev", mpathDeviceName)
+	sgInqWwn, err := r.Helper.GetWwnByScsiInq(ctx, mpathDevPath)
 	
 	if err != nil {
 		// FIX: Handle environments where Device Mapper is only used to list devices.
 		// If the IOCTL fails with an unsafe state or invalid transport error, do not crash.
 		// Check if the underlying device maps to native NVMe multi-path components.
-		logger.Warningf("Hardware inquiry failed on %s (%v). Checking for native NVMe fallback...", mpathDeviceName, err)
+		logger.Warningf("Hardware inquiry failed on %s (%v). Checking for native NVMe fallback...", mpathDevPath, err)
 		
 		helper := GetDmsPathHelperGeneric{}
 		dmName := filepath.Base(mpathDeviceName) // Extract "dm-3"
@@ -399,7 +403,7 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) IsVolumePathMatchesVolumeId(ctx 
 		}
 		
 		// If it's a traditional SCSI volume and the ioctl fails, it is an actual physical failure. Bubble up the error.
-		return false, fmt.Errorf("hardware signature retrieval failed on target device %s: %w", mpathDeviceName, err)
+		return false, fmt.Errorf("hardware signature retrieval failed on target device %s: %w", mpathDevPath, err)
 	}
 
 	// 4. Standard Flow: If the IOCTL succeeds, run the regular prefix-verified comparison helper
