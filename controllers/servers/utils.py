@@ -369,6 +369,21 @@ def get_dr_array_connection_info_from_secrets(secrets):
         return None
     dr_secrets = dict(secrets)
     dr_secrets[servers_settings.SECRET_ARRAY_PARAMETER] = dr_address
+
+    dr_username = secrets.get(servers_settings.SECRET_DR_USERNAME_PARAMETER)
+    dr_password = secrets.get(servers_settings.SECRET_DR_PASSWORD_PARAMETER)
+
+    if dr_username and dr_password:
+        dr_secrets[servers_settings.SECRET_USERNAME_PARAMETER] = dr_username
+        dr_secrets[servers_settings.SECRET_PASSWORD_PARAMETER] = dr_password
+        logger.info("dr_username and dr_password found, using dedicated dr credentials")
+    elif dr_username and not dr_password:
+        logger.warning("dr_username provided but dr_password missing, falling back to primary password")
+    elif dr_password and not dr_username:
+        logger.warning("dr_password provided but dr_username missing, falling back to primary username")
+    else:
+        logger.info("dr_username and dr_password not provided, falling back to primary username and password")
+
     return _get_array_connection_info_from_system_info(dr_secrets, system_id=None)
 
 
