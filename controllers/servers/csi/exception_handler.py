@@ -19,6 +19,7 @@ status_codes_by_exception = {
     array_errors.CredentialsError: grpc.StatusCode.UNAUTHENTICATED,
     array_errors.SecondaryStorageTransitionToProductionNotReadyError: grpc.StatusCode.UNAVAILABLE,
     array_errors.OperationNotReadyError: grpc.StatusCode.UNAVAILABLE,
+    array_errors.ReplicationDestinationInfoNotSupportedError: grpc.StatusCode.FAILED_PRECONDITION,
 }
 
 
