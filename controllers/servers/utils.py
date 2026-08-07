@@ -387,6 +387,10 @@ def get_dr_array_connection_info_from_secrets(secrets):
     return _get_array_connection_info_from_system_info(dr_secrets, system_id=None)
 
 
+def should_force_dr_mediator(secrets):
+    return secrets.get(servers_settings.SECRET_DR_FORCE_REMOTE_STORAGE_LOOKUP_PARAMETER, '').lower() == 'true'
+
+
 def get_volume_parameters(parameters, system_id=None):
     return get_object_parameters(parameters, servers_settings.PARAMETERS_VOLUME_NAME_PREFIX, system_id)
 

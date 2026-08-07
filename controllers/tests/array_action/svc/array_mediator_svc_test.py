@@ -2797,8 +2797,7 @@ class TestArrayMediatorSVC(unittest.TestCase):
         self.svc.client.svcinfo.lsvdisk.return_value = self._mock_cli_object(cli_volume)
         self._mock_lsvolumegroupreplication(self._mock_vg_replication(partition_name=''))
 
-        result = self.svc.get_replication_destination_info(
-            "", common_settings.VOLUME_OBJECT_TYPE, common_settings.VOLUME_UID)
+        result = self.svc.get_replication_destination_info("", common_settings.VOLUME_UID)
 
         self.svc.client.svcinfo.lsvdisk.assert_any_call(
             filtervalue='vdisk_UID={}'.format(common_settings.VOLUME_UID), bytes=True)
@@ -2808,8 +2807,7 @@ class TestArrayMediatorSVC(unittest.TestCase):
         self.svc.client.svcinfo.lsvdisk.return_value = self._mock_cli_object(None)
 
         with self.assertRaises(array_errors.ObjectNotFoundError):
-            self.svc.get_replication_destination_info(
-                "", common_settings.VOLUME_OBJECT_TYPE, common_settings.VOLUME_UID)
+            self.svc.get_replication_destination_info("", common_settings.VOLUME_UID)
 
     def test_get_replication_destination_info_primary_path_non_partition(self):
         cli_volume = self._get_cli_volume(
@@ -2820,8 +2818,7 @@ class TestArrayMediatorSVC(unittest.TestCase):
         self.svc.client.svcinfo.lsvdisk.return_value = self._mock_cli_object(cli_volume)
         self._mock_lsvolumegroupreplication(self._mock_vg_replication(partition_name=''))
 
-        result = self.svc.get_replication_destination_info(
-            OBJECT_INTERNAL_ID, common_settings.VOLUME_OBJECT_TYPE, common_settings.VOLUME_UID)
+        result = self.svc.get_replication_destination_info(OBJECT_INTERNAL_ID, common_settings.VOLUME_UID)
 
         self.assertIsNotNone(result)
         self.assertIn(common_settings.DUMMY_REMOTE_VOLUME_UID, result)
@@ -2837,8 +2834,7 @@ class TestArrayMediatorSVC(unittest.TestCase):
         self.svc.client.svcinfo.lsvdisk.return_value = self._mock_cli_object(cli_volume)
         self._mock_lsvolumegroupreplication(self._mock_vg_replication(partition_name='SKGPTN0'))
 
-        result = self.svc.get_replication_destination_info(
-            OBJECT_INTERNAL_ID, common_settings.VOLUME_OBJECT_TYPE, common_settings.VOLUME_UID)
+        result = self.svc.get_replication_destination_info(OBJECT_INTERNAL_ID, common_settings.VOLUME_UID)
 
         self.assertIsNotNone(result)
         self.assertIn(common_settings.DUMMY_REMOTE_VOLUME_UID, result)
@@ -2850,8 +2846,7 @@ class TestArrayMediatorSVC(unittest.TestCase):
         self.svc.client.svcinfo.lsvdisk.return_value = self._mock_cli_object(cli_volume)
         self._mock_lsvolumegroupreplication(self._mock_vg_replication(partition_name=''))
 
-        result = self.svc.get_replication_destination_info(
-            OBJECT_INTERNAL_ID, common_settings.VOLUME_OBJECT_TYPE, common_settings.VOLUME_UID)
+        result = self.svc.get_replication_destination_info(OBJECT_INTERNAL_ID, common_settings.VOLUME_UID)
 
         self.assertIsNone(result)
         self.svc.client.svcinfo.lsvolumegroupreplication.assert_called_once()
@@ -2861,8 +2856,7 @@ class TestArrayMediatorSVC(unittest.TestCase):
         self.svc.client.svcinfo.lsvdisk.return_value = self._mock_cli_object(cli_volume)
 
         result = self.svc.get_replication_destination_info(
-            OBJECT_INTERNAL_ID, common_settings.VOLUME_OBJECT_TYPE, common_settings.VOLUME_UID,
-            dr_mediator=self._mock_dr_mediator())
+            OBJECT_INTERNAL_ID, common_settings.VOLUME_UID, dr_mediator=self._mock_dr_mediator())
 
         self.assertIsNotNone(result)
         self.assertIn(common_settings.DESTINATION_VOLUME_UID, result)
@@ -2875,8 +2869,7 @@ class TestArrayMediatorSVC(unittest.TestCase):
         dr_mediator._get_cli_volume.return_value = None
 
         result = self.svc.get_replication_destination_info(
-            OBJECT_INTERNAL_ID, common_settings.VOLUME_OBJECT_TYPE, common_settings.VOLUME_UID,
-            dr_mediator=dr_mediator)
+            OBJECT_INTERNAL_ID, common_settings.VOLUME_UID, dr_mediator=dr_mediator)
 
         self.assertIsNone(result)
 
@@ -2886,5 +2879,30 @@ class TestArrayMediatorSVC(unittest.TestCase):
 
         with self.assertRaises(array_errors.ReplicationDestinationInfoNotSupportedError):
             self.svc.get_replication_destination_info(
-                OBJECT_INTERNAL_ID, common_settings.VOLUME_OBJECT_TYPE, common_settings.VOLUME_UID,
-                dr_mediator=None)
+                OBJECT_INTERNAL_ID, common_settings.VOLUME_UID, dr_mediator=None)
+
+    def test_get_replication_destination_info_force_dr_mediator_uses_remote_even_if_supported(self):
+        cli_volume = self._get_cli_volume(
+            in_volume_group=True,
+            remote_volume_uid=common_settings.DUMMY_REMOTE_VOLUME_UID,
+            remote_internal_id=common_settings.DUMMY_REMOTE_INTERNAL_ID)
+        self.svc.client.svcinfo.lsvdisk.return_value = self._mock_cli_object(cli_volume)
+
+        result = self.svc.get_replication_destination_info(
+            OBJECT_INTERNAL_ID, common_settings.VOLUME_UID,
+            dr_mediator=self._mock_dr_mediator(), force_dr_mediator=True)
+
+        self.assertIsNotNone(result)
+        self.assertIn(common_settings.DESTINATION_VOLUME_UID, result)
+        self.svc.client.svcinfo.lsvolumegroupreplication.assert_not_called()
+
+    def test_get_replication_destination_info_force_dr_mediator_no_dr_mediator_raises(self):
+        cli_volume = self._get_cli_volume(
+            in_volume_group=True,
+            remote_volume_uid=common_settings.DUMMY_REMOTE_VOLUME_UID,
+            remote_internal_id=common_settings.DUMMY_REMOTE_INTERNAL_ID)
+        self.svc.client.svcinfo.lsvdisk.return_value = self._mock_cli_object(cli_volume)
+
+        with self.assertRaises(array_errors.ReplicationDestinationInfoNotSupportedError):
+            self.svc.get_replication_destination_info(
+                OBJECT_INTERNAL_ID, common_settings.VOLUME_UID, dr_mediator=None, force_dr_mediator=True)

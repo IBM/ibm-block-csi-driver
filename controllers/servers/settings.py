@@ -72,3 +72,4 @@ UNIQUE_KEY_KEY = 'uniquekey'
 SECRET_DR_ARRAY_PARAMETER = "dr_management_address"
 SECRET_DR_USERNAME_PARAMETER = "dr_username"
 SECRET_DR_PASSWORD_PARAMETER = "dr_password"
+SECRET_DR_FORCE_REMOTE_STORAGE_LOOKUP_PARAMETER = "dr_force_remote_storage_lookup"
