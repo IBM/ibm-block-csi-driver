@@ -730,7 +730,8 @@ class TestArrayMediatorSVC(unittest.TestCase):
                         in_volume_group=False,
                         remote_volume_uid="",
                         remote_internal_id="",
-                        partition_name=""):
+                        partition_name="",
+                        remote_volume_uid_supported=True):
         deduplicated_copy = svc_settings.NO_VALUE_ALIAS
         compressed_copy = svc_settings.NO_VALUE_ALIAS
         se_copy = svc_settings.NO_VALUE_ALIAS
@@ -744,24 +745,26 @@ class TestArrayMediatorSVC(unittest.TestCase):
             compressed_copy = YES
         elif not thick:
             se_copy = YES
-        return Munch({svc_settings.VOLUME_VDISK_UID_ATTR_KEY: vdisk_uid,
-                      array_settings.VOLUME_ID_ATTR_KEY: common_settings.INTERNAL_VOLUME_ID,
-                      array_settings.VOLUME_NAME_ATTR_KEY: name,
-                      svc_settings.VOLUME_CAPACITY_ATTR_KEY: capacity,
-                      svc_settings.VOLUME_MDISK_GRP_NAME_ATTR_KEY: pool_name,
-                      svc_settings.VOLUME_IO_GROUP_NAME_ATTR_KEY: common_settings.DUMMY_IO_GROUP,
-                      svc_settings.VOLUME_FC_ID_ATTR_KEY: fc_id,
-                      svc_settings.VOLUME_SE_COPY_ATTR_KEY: se_copy,
-                      svc_settings.VOLUME_DEDUPLICATED_COPY_ATTR_KEY: deduplicated_copy,
-                      svc_settings.VOLUME_COMPRESSED_COPY_ATTR_KEY: compressed_copy,
-                      svc_settings.VOLUME_GROUP_ID_ATTR_KEY: volume_group_id,
-                      svc_settings.VOLUME_REPLICATION_MODE_ATTR_KEY: replication_mode,
-                      svc_settings.VOLUME_FC_MAP_COUNT_ATTR_KEY: fc_map_count,
-                      svc_settings.VOLUME_VG_NAME_ATTR_KEY: volume_group_name,
-                      'remote_volume_uid': remote_volume_uid,
-                      'location2_volume_id': remote_internal_id if not partition_name else '',
-                      'location3_volume_id': remote_internal_id if partition_name else '',
-                      })
+        cli_volume = Munch({svc_settings.VOLUME_VDISK_UID_ATTR_KEY: vdisk_uid,
+                            array_settings.VOLUME_ID_ATTR_KEY: common_settings.INTERNAL_VOLUME_ID,
+                            array_settings.VOLUME_NAME_ATTR_KEY: name,
+                            svc_settings.VOLUME_CAPACITY_ATTR_KEY: capacity,
+                            svc_settings.VOLUME_MDISK_GRP_NAME_ATTR_KEY: pool_name,
+                            svc_settings.VOLUME_IO_GROUP_NAME_ATTR_KEY: common_settings.DUMMY_IO_GROUP,
+                            svc_settings.VOLUME_FC_ID_ATTR_KEY: fc_id,
+                            svc_settings.VOLUME_SE_COPY_ATTR_KEY: se_copy,
+                            svc_settings.VOLUME_DEDUPLICATED_COPY_ATTR_KEY: deduplicated_copy,
+                            svc_settings.VOLUME_COMPRESSED_COPY_ATTR_KEY: compressed_copy,
+                            svc_settings.VOLUME_GROUP_ID_ATTR_KEY: volume_group_id,
+                            svc_settings.VOLUME_REPLICATION_MODE_ATTR_KEY: replication_mode,
+                            svc_settings.VOLUME_FC_MAP_COUNT_ATTR_KEY: fc_map_count,
+                            svc_settings.VOLUME_VG_NAME_ATTR_KEY: volume_group_name,
+                            'location2_volume_id': remote_internal_id if not partition_name else '',
+                            'location3_volume_id': remote_internal_id if partition_name else '',
+                            })
+        if remote_volume_uid_supported:
+            cli_volume['remote_volume_uid'] = remote_volume_uid
+        return cli_volume
 
     @staticmethod
     def _get_cli_snapshot(snapshot_id=common_settings.INTERNAL_SNAPSHOT_ID):
@@ -2786,13 +2789,6 @@ class TestArrayMediatorSVC(unittest.TestCase):
         self.svc.client.svcinfo.lsvolumegroupreplication.return_value = Mock(
             as_single_element=vg_replication)
 
-    def _set_code_level(self, version):
-        self.svc.client.svcinfo.lssystem.return_value = [
-            Munch({svc_settings.LSSYSTEM_LOCATION_ATTR_KEY: svc_settings.LOCAL_LOCATION,
-                   svc_settings.LSSYSTEM_ID_ALIAS_ATTR_KEY: svc_settings.DUMMY_ID_ALIAS,
-                   svc_settings.LSSYSTEM_CODE_LEVEL_ATTR_KEY: version})]
-        self.svc._cluster = None
-
     def test_get_replication_destination_info_without_internal_id_resolves_from_uid(self):
         cli_volume = self._get_cli_volume(
             in_volume_group=True,
@@ -2861,8 +2857,7 @@ class TestArrayMediatorSVC(unittest.TestCase):
         self.svc.client.svcinfo.lsvolumegroupreplication.assert_called_once()
 
     def test_get_replication_destination_info_fallback_returns_destination_handle(self):
-        self._set_code_level('9.1.0.0')
-        cli_volume = self._get_cli_volume(in_volume_group=True)
+        cli_volume = self._get_cli_volume(in_volume_group=True, remote_volume_uid_supported=False)
         self.svc.client.svcinfo.lsvdisk.return_value = self._mock_cli_object(cli_volume)
 
         result = self.svc.get_replication_destination_info(
@@ -2874,8 +2869,7 @@ class TestArrayMediatorSVC(unittest.TestCase):
         self.assertNotIn(common_settings.VOLUME_UID, result)
 
     def test_get_replication_destination_info_fallback_destination_not_available_returns_none(self):
-        self._set_code_level('9.1.0.0')
-        cli_volume = self._get_cli_volume(in_volume_group=True)
+        cli_volume = self._get_cli_volume(in_volume_group=True, remote_volume_uid_supported=False)
         self.svc.client.svcinfo.lsvdisk.return_value = self._mock_cli_object(cli_volume)
         dr_mediator = Mock()
         dr_mediator._get_cli_volume.return_value = None
@@ -2886,14 +2880,11 @@ class TestArrayMediatorSVC(unittest.TestCase):
 
         self.assertIsNone(result)
 
-    def test_get_replication_destination_info_fallback_no_dr_mediator_returns_source_handle(self):
-        self._set_code_level('9.1.0.0')
-        cli_volume = self._get_cli_volume(in_volume_group=True)
+    def test_get_replication_destination_info_no_dr_mediator_and_field_unsupported_raises(self):
+        cli_volume = self._get_cli_volume(in_volume_group=True, remote_volume_uid_supported=False)
         self.svc.client.svcinfo.lsvdisk.return_value = self._mock_cli_object(cli_volume)
 
-        result = self.svc.get_replication_destination_info(
-            OBJECT_INTERNAL_ID, common_settings.VOLUME_OBJECT_TYPE, common_settings.VOLUME_UID,
-            dr_mediator=None)
-
-        self.assertIsNotNone(result)
-        self.assertIn(common_settings.VOLUME_UID, result)
+        with self.assertRaises(array_errors.ReplicationDestinationInfoNotSupportedError):
+            self.svc.get_replication_destination_info(
+                OBJECT_INTERNAL_ID, common_settings.VOLUME_OBJECT_TYPE, common_settings.VOLUME_UID,
+                dr_mediator=None)
