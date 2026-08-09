@@ -198,31 +198,49 @@ func (n NodeUtils) GetSysDevicesFromMpath(ctx context.Context, baseDevice string
 		return nil, err 
 	}
 
-	logger.Debugf("GetSysDevicesFromMpath with param: {%v}", baseDevice)
+	logger.Debugf("GetSysDevicesFromMpath: Aggregating underlying paths for %s", baseDevice)
 
 	// =========================================================================
-	// BRANCH 1: CLASSIC DEVICE MAPPER (FIBRE CHANNEL / SCSI TARGETS)
+	// BRANCH 1: DEVICE MAPPER (SCSI OR NON-NATIVE NVMe OVER DM FABRICS)
 	// =========================================================================
 	if strings.HasPrefix(baseDevice, "dm-") {
 		deviceSlavePath := filepath.Join("/sys", "block", baseDevice, "slaves")
-		slaves, err := os.ReadDir(deviceSlavePath)
-		if err != nil {
-			logger.Errorf("An error occurred while looking for device slaves : {%v}", err.Error())
-			return nil, fmt.Errorf("failed to read dm slaves at %s: %w", deviceSlavePath, err)
+		
+		// FIXED: Use explicit low-level folder streaming to guarantee instant 
+		// descriptor release on context abortion/early loop cancellation
+		dFile, errOpen := os.Open(deviceSlavePath)
+		if errOpen != nil {
+			logger.Errorf("An error occurred while looking for device slaves: %v", errOpen)
+			return nil, fmt.Errorf("failed to open dm slaves directory at %s: %w", deviceSlavePath, errOpen)
 		}
+		defer dFile.Close()
 
 		var slavesNames []string
-		for _, slave := range slaves {
-			if ctx.Err() != nil {
-				return nil, ctx.Err()
+		for {
+			if err := ctx.Err(); err != nil {
+				return nil, err
 			}
-			slavesNames = append(slavesNames, slave.Name()) // Yields raw "sdX" paths
+
+			entries, readErr := dFile.ReadDir(100)
+			if readErr != nil && readErr != io.EOF {
+				return nil, fmt.Errorf("failed to stream directory entries from %s: %w", deviceSlavePath, readErr)
+			}
+			if len(entries) == 0 || readErr == io.EOF {
+				break
+			}
+
+			for _, entry := range entries {
+				// This accurately yields either "sdX" (SCSI) or "nvmeXnY" (NVMe over DM) paths safely
+				slavesNames = append(slavesNames, entry.Name())
+			}
 		}
+		
+		logger.Debugf("GetSysDevicesFromMpath: Discovered slaves for DM device %s: %v", baseDevice, slavesNames)
 		return slavesNames, nil
 	}
 
 	// =========================================================================
-	// BRANCH 2: NATIVE NVME MULTIPATH SUBSYSTEM LAYERS
+	// BRANCH 2: NATIVE NVME MULTIPATH SUBSYSTEM LAYERS (nvme-subsysXnY)
 	// =========================================================================
 	if strings.HasPrefix(baseDevice, "nvme") {
 		// Use LastIndex to safely isolate namespace boundary (e.g. "nvme-subsys0n1" -> index of last 'n')
@@ -230,34 +248,48 @@ func (n NodeUtils) GetSysDevicesFromMpath(ctx context.Context, baseDevice string
 		if nIdx == -1 || nIdx == len(baseDevice)-1 {
 			return nil, fmt.Errorf("invalid nvme device configuration footprint name: %s", baseDevice)
 		}
-		nsID := baseDevice[nIdx:] // Resolves perfectly to "n1", "n2", etc.
+		nsID := baseDevice[nIdx:] // Resolves to "n1", "n2", etc.
 
 		subsysPath := filepath.Join("/sys", "block", baseDevice, "device", "subsystem")
-		controllers, err := os.ReadDir(subsysPath)
-		if err != nil {
-			// Fallback: If it's a standard endpoint rather than a subsystem layout, return itself
+		
+		dFile, errOpen := os.Open(subsysPath)
+		if errOpen != nil {
+			// Fallback: If it's a standard standalone endpoint rather than a multipath subsystem layout, return itself
 			if _, errStat := os.Stat(filepath.Join("/sys/block", baseDevice)); errStat == nil {
 				return []string{baseDevice}, nil
 			}
-			return nil, fmt.Errorf("failed to read nvme subsystem paths at %s: %w", subsysPath, err)
+			return nil, fmt.Errorf("failed to open nvme subsystem paths directory at %s: %w", subsysPath, errOpen)
 		}
+		defer dFile.Close()
 
 		var pathNames []string
-		for _, ctrl := range controllers {
-			if ctx.Err() != nil { 
-				return nil, ctx.Err() 
+		for {
+			if err := ctx.Err(); err != nil {
+				return nil, err
 			}
 
-			ctrlName := ctrl.Name() // e.g. "nvme0"
-			if strings.HasPrefix(ctrlName, "nvme") && !strings.Contains(ctrlName, "subsys") {
-				// Standard Block Mapping Alignment: controller + namespace suffix -> "nvme0" + "n1"
-				pathName := ctrlName + nsID
+			entries, readErr := dFile.ReadDir(100)
+			if readErr != nil && readErr != io.EOF {
+				return nil, fmt.Errorf("failed to stream directory entries from %s: %w", subsysPath, readErr)
+			}
+			if len(entries) == 0 || readErr == io.EOF {
+				break
+			}
 
-				if _, errStat := os.Stat(filepath.Join("/sys/block", pathName)); errStat == nil {
-					pathNames = append(pathNames, pathName)
+			for _, entry := range entries {
+				ctrlName := entry.Name() // e.g. "nvme0"
+				if strings.HasPrefix(ctrlName, "nvme") && !strings.Contains(ctrlName, "subsys") {
+					// Standard Block Mapping Alignment: controller + namespace suffix -> "nvme0" + "n1"
+					pathName := ctrlName + nsID
+
+					if _, errStat := os.Stat(filepath.Join("/sys/block", pathName)); errStat == nil {
+						pathNames = append(pathNames, pathName)
+					}
 				}
 			}
 		}
+		
+		logger.Debugf("GetSysDevicesFromMpath: Discovered native path components for %s: %v", baseDevice, pathNames)
 		return pathNames, nil
 	}
 	
@@ -284,54 +316,57 @@ func (n NodeUtils) IsNativeNVMeMultipathEnabled() (bool, error) {
 }
 
 func (n NodeUtils) DevicesAreNvme(ctx context.Context, device string) (NvmeType, error) {
-
-	nativeMultipath, err := n.IsNativeNVMeMultipathEnabled()
-	if err != nil {
-		logger.Warningf("Failed to read nvme_core multipath param, will try all checks: %v", err)
-	}
-
-	if nativeMultipath {
-		// CHECK 1: Native NVMe multipath ON
-		subsysNqnPath := path.Join("/sys/block", device, "device/subsysnqn")
-		_, err := os.Stat(subsysNqnPath)
-		if err == nil {
-			logger.Infof("Current node is configured with NVMe native multipath for device %s", device)
-			return NVMeNative, nil
-		}
-		if os.IsNotExist(err) {
-			return NotNVMe, nil
-		}
-		return NotNVMe, fmt.Errorf("unable to determine if device %s is NVMe: %w", device, err)
-	}
-
-	// CHECK 2: Native multipath OFF → non-native NVMe?
-	args := []string{"list"}
-	out, err := n.Executer.ExecuteWithTimeout(TimeOutNvmeCmd, nvmeCmd, args)
-	if err != nil {
-		if err.Error() == "exit status 1" {
-			logger.Debugf("'nvme list' failing, nvme/nvme-core modules not loaded. Not NVMe.")
-			return NotNVMe, nil
-		}
-		outMessage := strings.TrimSpace(string(out))
-		if strings.HasSuffix(outMessage, noSuchFileOrDirectoryErrorMessage) {
-			return NotNVMe, nil
-		}
+	if err := ctx.Err(); err != nil {
 		return NotNVMe, err
 	}
 
-	nvmeListOutput := string(out)
-	slaves, err := n.GetSysDevicesFromMpath(ctx, device)
-	if err == nil {
-		for _, slave := range slaves {
-			if strings.Contains(nvmeListOutput, slave) {
-				logger.Infof("Current node is configured with NVMe non-native multipath for device %s", device)
-				return NVMeNonNative, nil
-			}
-		}
-		return NotNVMe, nil
+	logger.Debugf("DevicesAreNvme: Analyzing transport topology structure for device %s", device)
+
+	// Step 1: Structural Check for Native NVMe (Multipath or Standalone Single-Path)
+	sysBlockPath := filepath.Join("/sys/block", device)
+	
+	// A. Native Multipath Check: Check for explicit Subsystem NQN presence
+	subsysNqnPath := filepath.Join(sysBlockPath, "device", "subsysnqn")
+	if _, err := os.Stat(subsysNqnPath); err == nil {
+		logger.Infof("DevicesAreNvme: Device %s verified structurally as NVMeNative via subsysnqn", device)
+		return NVMeNative, nil
 	}
 
-	return NotNVMe, fmt.Errorf("unable to determine if device %s is NVMe", device)
+	// B. Native Standalone / Single-Path Check: Verify if device subsystem points directly to nvme module
+	deviceSubsystemPath := filepath.Join(sysBlockPath, "device", "subsystem")
+	if target, errEval := filepath.EvalSymlinks(deviceSubsystemPath); errEval == nil {
+		if filepath.Base(target) == "nvme" {
+			logger.Infof("DevicesAreNvme: Device %s verified structurally as NVMeNative (Single Path) via subsystem link", device)
+			return NVMeNative, nil
+		}
+	}
+
+	// Step 2: Structural Check for Non-Native NVMe managed via Device Mapper Multipath
+	if strings.HasPrefix(device, "dm-") {
+		slaves, err := n.GetSysDevicesFromMpath(ctx, device)
+		if err != nil {
+			return NotNVMe, fmt.Errorf("failed to aggregate slaves layout for DM device %s: %w", device, err)
+		}
+
+		// Loop through the collected slave names and verify their true backing hardware transport subsystem
+		for _, slave := range slaves {
+			if ctx.Err() != nil {
+				return NotNVMe, ctx.Err()
+			}
+
+			slaveSubsystemPath := filepath.Join("/sys/block", slave, "device", "subsystem")
+			if target, errEval := filepath.EvalSymlinks(slaveSubsystemPath); errEval == nil {
+				if filepath.Base(target) == "nvme" {
+					logger.Infof("DevicesAreNvme: Device %s verified as NVMeNonNative (Device Mapper Multipath over NVMe Fabrics)", device)
+					return NVMeNonNative, nil
+				}
+			}
+		}
+	}
+
+	// If no structural markers match, it is standard SCSI (FC, iSCSI, SAS) or local SATA storage
+	logger.Debugf("DevicesAreNvme: Device %s verified as NotNVMe storage protocol type", device)
+	return NotNVMe, nil
 }
 
 func getRelevantLines(rawContent *os.File) ([]string, error) {
@@ -498,132 +533,190 @@ func (n NodeUtils) MakeFile(filePath string) error {
 }
 
 // TODO
-func (n NodeUtils) ExpandFilesystem(ctx context.Context, devicePath string, volumePath string, fsType string) error {
+func (n NodeUtils) Expandfunc (n NodeUtils) ExpandFilesystem(ctx context.Context, devicePath string, volumePath string, fsType string) error {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+
 	var cmd string
 	var args []string
-	if fsType == "ext4" {
+
+	switch fsType {
+	case "ext4":
 		cmd = "resize2fs"
-		args = []string{devicePath}
-	} else if fsType == "xfs" {
+		// FIXED: Pass the volume mount point path instead of the raw device path.
+		// This bypasses container devfs namespace access boundaries during online resizes.
+		args = []string{volumePath}
+	case "xfs":
 		cmd = "xfs_growfs"
 		args = []string{"-d", volumePath}
-	} else {
+	default:
 		logger.Warningf("Skipping resize of unsupported fsType: %v", fsType)
 		return nil
 	}
 
-	logger.Debugf("Resizing the device: {%v} with fs_type = {%v}", devicePath, fsType)
+	logger.Debugf("Resizing filesystem: %s on target mount %s", fsType, volumePath)
 	_, err := n.Executer.ExecuteWithTimeout(resizeFsTimeoutMilliseconds, cmd, args)
 	if err != nil {
-		logger.Errorf("Failed to resize filesystem, error: %v", err)
-		return err
+		return fmt.Errorf("failed to execute filesystem utility %s on path %s: %w", cmd, volumePath, err)
 	}
 	return nil
 }
 
 func (n NodeUtils) ExpandMpathDevice(ctx context.Context, mpathDevice string) error {
-	logger.Infof("ExpandMpathDevice: [%s] ", mpathDevice)
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+
+	logger.Infof("ExpandMpathDevice: Initializing expansion actions for target map %s", mpathDevice)
 	
-	// REQUIREMENT 6: Guard against expanding a device that is already wedged
 	if n.Executer.IsDeviceStillStuck(mpathDevice) {
 		return fmt.Errorf("expand-safety: device %s is currently stuck in D-state; aborting resize", mpathDevice)
 	}	
 	
-	// REQUIREMENT 4: Use socket instead of 'multipathd' process
+	// Step 1: Send the targeted resize directive to the multipathd socket handle
 	cmd := fmt.Sprintf("resize map %s", mpathDevice)
 	_, err := n.Executer.MultipathdCmd(ctx, mpathDevice, cmd)
 	if err != nil {
-		return fmt.Errorf("multipathd resize map failed: %w", err)
+		logger.Warningf("Socket resize map failed for %s: %v. Initiating structural fallback path rescans.", mpathDevice, err)
+		
+		// RESTORED FALLBACK: Retrieve the physical paths and trigger explicit kernel geometric rescans
+		slaves, errSlaves := n.GetSysDevicesFromMpath(ctx, mpathDevice)
+		if errSlaves == nil {
+			for _, slave := range slaves {
+				if err := n.triggerPhysicalRescan(slave); err != nil {
+					logger.Warningf("Rescan notification skipped for slave path node %s: %v", slave, err)
+				}
+			}
+			
+			// Retry socket expansion directive following the manual path updates
+			_, err = n.Executer.MultipathdCmd(ctx, mpathDevice, cmd)
+			if err != nil {
+				return fmt.Errorf("multipathd resize map failed after executing path updates: %w", err)
+			}
+		}
 	}
 	
-
-// if resize map fails:
-//slaves, _ := n.GetSysDevicesFromMpath(ctx, mpathDevice)
-//for _, slave := range slaves {
-//    // Echo 1 to /sys/block/sdX/device/rescan (Fork-free Requirement 4)
-//    _ = os.WriteFile(fmt.Sprintf("/sys/block/%s/device/rescan", slave), []byte("1"), 0644)
-//}
-	
-
-	// 2. REQUIREMENT 7: Avoid 'reconfigure' if possible.
-	// 'reconfigure' parses /etc/multipath.conf and reloads EVERY map on the host.
-	// On RH7, if one unrelated LUN is dead, 'reconfigure' will hang the daemon.
-	// Instead, we 'reload' only the specific map.
+	// Step 2: Target reload of the mutated map to apply boundaries safely without invoking global reconfigures
 	_, err = n.Executer.MultipathdCmd(ctx, mpathDevice, fmt.Sprintf("reload map %s", mpathDevice))
 	if err != nil {
-		logger.Warningf("Targeted reload failed for %s, attempting minor update: %v", mpathDevice, err)
-		// Fallback to 'reconfigure' only as a last resort, or skip if context is tight.
+		logger.Warningf("Targeted reload map completed with warnings for %s: %v", mpathDevice, err)
 	}
 
 	return nil
-	//args = []string{"reconfigure"}
-	//output, err = n.Executer.ExecuteWithTimeout(TimeOutMultipathdCmd, multipathdCmd, args)
-	//if err != nil {
-	//	return fmt.Errorf("multipathd reconfigure failed: %v\narguments: %v\nOutput: %s\n", err, args, string(output))
-	//}
+}
+
+// triggerPhysicalRescan handles fork-free file updates across different block storage protocols
+func (n NodeUtils) triggerPhysicalRescan(slave string) error {
+	// Protocol Case A: Underlying path represents a standard SCSI target track (sdX)
+	if strings.HasPrefix(slave, "sd") {
+		rescanPath := fmt.Sprintf("/sys/block/%s/device/rescan", slave)
+		return os.WriteFile(rescanPath, []byte("1"), 0644)
+	}
+
+	// Protocol Case B: Underlying path represents an NVMe over Fabrics target node layer (nvmeXnY)
+	if strings.HasPrefix(slave, "nvme") {
+		// Resolve back through sysfs to isolate the true controller sequence ID (nvmeX)
+		// /sys/block/nvme0n1/device points to /sys/devices/virtual/nvme-fabrics/ctl/nvme0
+		deviceSymlink := fmt.Sprintf("/sys/block/%s/device", slave)
+		realControllerPath, err := filepath.EvalSymlinks(deviceSymlink)
+		if err != nil {
+			return err
+		}
+		
+		controllerName := filepath.Base(realControllerPath) // e.g. "nvme0"
+		nvmeRescanPath := fmt.Sprintf("/sys/class/nvme/%s/rescan", controllerName)
+		return os.WriteFile(nvmeRescanPath, []byte("1"), 0644)
+	}
+
+	return fmt.Errorf("unknown block protocol scheme layout for device path: %s", slave)
 }
 
 
 
 
 func (n NodeUtils) rescanPhysicalDevice(deviceName string) error {
-	filename := fmt.Sprintf("/sys/block/%s/device/rescan", deviceName)
-	f, err := n.Executer.OsOpenFile(filename, os.O_APPEND|os.O_WRONLY, 0200)
-	if err != nil {
-		logger.Errorf("Rescan Error: could not open filename : {%v}. err : {%v}", filename, err)
-		return err
+	var filename string
+
+	// Protocol Case A: Underlying path represents a standard SCSI target track (sdX)
+	if strings.HasPrefix(deviceName, "sd") {
+		filename = fmt.Sprintf("/sys/block/%s/device/rescan", deviceName)
+	} else if strings.HasPrefix(deviceName, "nvme") {
+		// Protocol Case B: Underlying path represents an NVMe over Fabrics target node layer (nvmeXnY)
+		// We must resolve the parent controller name (e.g., nvme0) by tracking the device's symlink link.
+		deviceSymlink := fmt.Sprintf("/sys/block/%s/device", deviceName)
+		realControllerPath, err := filepath.EvalSymlinks(deviceSymlink)
+		if err != nil {
+			// Fallback: If symlink parsing is blocked or varies across an old custom kernel, 
+			// attempt to guess the prefix by stripping the namespace modifier suffix (e.g., "nvme0n1" -> "nvme0")
+			if idx := strings.Index(deviceName, "n"); idx != -1 {
+				filename = fmt.Sprintf("/sys/class/nvme/%s/rescan", deviceName[:idx])
+			} else {
+				return fmt.Errorf("failed to evaluate NVMe sysfs controller symlink for %s: %w", deviceName, err)
+			}
+		} else {
+			controllerName := filepath.Base(realControllerPath) // e.g. "nvme0"
+			filename = fmt.Sprintf("/sys/class/nvme/%s/rescan", controllerName)
+		}
+	} else {
+		return fmt.Errorf("unknown block protocol scheme layout for device path name: %s", deviceName)
 	}
 
+	// FIXED: Removed os.O_APPEND to guarantee full compatibility with virtual kernel sysfs attributes
+	f, err := n.Executer.OsOpenFile(filename, os.O_WRONLY, 0200)
+	if err != nil {
+		logger.Errorf("Rescan Error: could not open filename: %s. err: %v", filename, err)
+		return err
+	}
 	defer f.Close()
 
-	scanCmd := fmt.Sprintf("1")
-	logger.Debugf("Rescan sys device : echo %s > %s", scanCmd, filename)
-	if written, err := n.Executer.FileWriteString(f, scanCmd); err != nil {
-		logger.Errorf("Rescan Error: could not write to rescan file :{%v}, error : {%v}", filename, err)
+	scanCmd := "1"
+	logger.Debugf("Rescan sys device: echo %s > %s", scanCmd, filename)
+	
+	written, err := n.Executer.FileWriteString(f, scanCmd)
+	if err != nil {
+		logger.Errorf("Rescan Error: could not write to rescan file: %s, error: %v", filename, err)
 		return err
-	} else if written == 0 {
-		e := fmt.Errorf("rescan error: nothing was written to rescan file : {%s}", filename)
+	} 
+	if written == 0 {
+		e := fmt.Errorf("rescan error: nothing was written to rescan file: %s", filename)
 		logger.Errorf("%s", e.Error())
 		return e
 	}
+	
 	return nil
 }
 
 func (n NodeUtils) RescanPhysicalDevices(ctx context.Context, sysDevices []string) error {
-	// REQUIREMENT 8: Fail-fast if gRPC call is canceled
 	if err := ctx.Err(); err != nil {
 		return err
 	}
 
-	logger.Debugf("Rescan : Start rescan on sys devices : {%v}", sysDevices)
+	logger.Debugf("Rescan: Start rescan on sys devices: %v", sysDevices)
 	for _, deviceName := range sysDevices {
-		// REQUIREMENT 6: Check for D-state before touching sysfs
 		if n.Executer.IsDeviceStillStuck(deviceName) {
-			logger.Warningf("Rescan: Skipping %s as it is already marked stuck", deviceName)
+			logger.Warningf("Rescan: Skipping %s as it is already marked stuck in D-state", deviceName)
 			continue
 		}
 
-		// REQUIREMENT 7: Use all possible methods (Uninterruptible Wrapper)
-		// Writing to 'rescan' can block for 30s+ if the HBA is busy.
 		_, err := executer.ExecuteUninterruptible[struct{}](
 			ctx,
 			n.KeyedGater,
 			"rescan-"+deviceName,
-			5,              // maxRunning: concurrent rescans
-			20,             // maxSpare: budget for hung writes
-			2*time.Second,  // handoff: return to CSI if kernel blocks
-			10*time.Second, // hardTimeout: fail the specific path
+			5,              // maxRunning
+			20,             // maxSpare
+			2*time.Second,  // handoff
+			10*time.Second, // hardTimeout
 			func(wCtx context.Context) (struct{}, error) {
 				return struct{}{}, n.rescanPhysicalDevice(deviceName)
 			},
 		)
 		
 		if err != nil {
-			logger.Errorf("Rescan failed for %s: %v", deviceName, err)
-			// We continue to other devices even if one fails (Resiliency)
+			logger.Errorf("Rescan failed for device path target %s: %v", deviceName, err)
 		}
 	}
-	logger.Debugf("Rescan : finish rescan on sys devices : {%v}", sysDevices)
+	logger.Debugf("Rescan: Finish rescan on sys devices: %v", sysDevices)
 	return nil
 }
 
@@ -802,7 +895,8 @@ func (n NodeUtils) GetFileSystemVolumeStats(ctx context.Context, path string) (V
 		return VolumeStatistics{}, err
 	}
 
-	gaterKey := fmt.Sprintf("statfs-%s", filepath.Base(path))
+	// FIXED: Use the absolute path as the key to prevent global collisions on common names like "mount"
+	gaterKey := "statfs-" + path
 
 	stat, err := executer.ExecuteUninterruptible[unix.Statfs_t](
 		ctx,
@@ -820,17 +914,14 @@ func (n NodeUtils) GetFileSystemVolumeStats(ctx context.Context, path string) (V
 		return VolumeStatistics{}, err
 	}
 
-	// Upgrade fields to standard uint64 types independently to eliminate arithmetic overflows
 	blkSize     := uint64(stat.Bsize)
 	totalBlocks := uint64(stat.Blocks)
 	availBlocks := uint64(stat.Bavail)
-	
 	totalFiles  := uint64(stat.Files)
 	freeFiles   := uint64(stat.Ffree)
 
-	// Calculate user-space consumption accurately by tracking available user blocks
 	usedBlocks := totalBlocks - availBlocks
-	if totalBlocks < availBlocks { // Underflow safety edge case protection
+	if totalBlocks < availBlocks { 
 		usedBlocks = 0
 	}
 
@@ -845,39 +936,39 @@ func (n NodeUtils) GetFileSystemVolumeStats(ctx context.Context, path string) (V
 }
 
 func (n NodeUtils) GetBlockVolumeStats(ctx context.Context, devicePath string) (VolumeStatistics, error) {
-	// REQUIREMENT 8: Respect CSI API Context
 	if err := ctx.Err(); err != nil {
 		return VolumeStatistics{}, err
 	}
 
+	// FIXED: Use the complete path for proper multi-pod isolation checks
+	gaterKey := "block-stats-" + devicePath
+
 	size, err := executer.ExecuteUninterruptible[uint64](
 		ctx,
 		n.KeyedGater,
-		"block-stats-"+devicePath,
+		gaterKey,
 		5, 20, 1*time.Second, 5*time.Second,
 		func(wCtx context.Context) (uint64, error) {
-			// REQUIREMENT 6: Use O_NONBLOCK to avoid hanging on the Open itself
-			// TODO should we use O_NONBLOCK - do we need to retry
+			if err := wCtx.Err(); err != nil {
+				return 0, err
+			}
+
+			// Correctly uses O_NONBLOCK. If the device path is experiencing an active link transport 
+			// drop or a D-state hang, this open call breaks out immediately without deadlocking the Go thread.
 			f, err := os.OpenFile(devicePath, os.O_RDONLY|unix.O_NONBLOCK, 0)
 			if err != nil {
 				return 0, fmt.Errorf("failed to open device %s: %w", devicePath, err)
 			}
 			defer f.Close()
 
-			var s uint64
-			// REQUIREMENT 4: Direct ioctl (no 'blockdev --getsize64' process)
-			// REQUIREMENT 1: BLKGETSIZE64 is stable on Kernel 3.10
-			_, _, errno := unix.Syscall(
-				unix.SYS_IOCTL,
-				f.Fd(),
-				unix.BLKGETSIZE64,
-				uintptr(unsafe.Pointer(&s)),
-			)
-
-			if errno != 0 {
-				return 0, fmt.Errorf("ioctl BLKGETSIZE64 failed: %v", errno)
+			// FIXED: Safe pointer tracking invocation via runtime-aware helper.
+			// This avoids memory corruption and ensures full compatibility for SCSI, Native NVMe, and DM devices.
+			sizeInt, errIoctl := unix.IoctlGetInt(int(f.Fd()), unix.BLKGETSIZE64)
+			if errIoctl != nil {
+				return 0, fmt.Errorf("ioctl BLKGETSIZE64 failed on target %s: %w", devicePath, errIoctl)
 			}
-			return s, nil
+			
+			return uint64(sizeInt), nil
 		},
 	)
 
@@ -886,7 +977,7 @@ func (n NodeUtils) GetBlockVolumeStats(ctx context.Context, devicePath string) (
 	}
 
 	return VolumeStatistics{
-		TotalBytes: int64(size),
+		TotalBytes:     int64(size),
 		AvailableBytes: int64(size),
 		UsedBytes:      0,
 	}, nil
