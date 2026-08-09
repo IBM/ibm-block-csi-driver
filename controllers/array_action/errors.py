@@ -359,3 +359,10 @@ class OperationNotReadyError(BaseArrayActionException):
     def __init__(self, operation_details):
         super().__init__()
         self.message = messages.OPERATION_NOT_READY_ERROR_MESSAGE.format(operation_details)
+
+
+class ReplicationDestinationInfoNotSupportedError(BaseArrayActionException):
+
+    def __init__(self, volume_name):
+        super().__init__()
+        self.message = messages.REPLICATION_DESTINATION_INFO_NOT_SUPPORTED_ERROR_MESSAGE.format(volume_name)

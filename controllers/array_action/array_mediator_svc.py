@@ -1911,34 +1911,33 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
 
         return self._build_replication_info(vg_replication)
 
-    def get_replication_destination_info(self, object_id, object_type, object_uid, dr_mediator=None):
+    def _is_remote_volume_uid_supported(self, raw_cli_volume):
+        return hasattr(raw_cli_volume, 'remote_volume_uid')
+
+    def get_replication_destination_info(self, object_id, object_uid, dr_mediator=None, force_dr_mediator=False):
         volume_internal_id = object_id if object_id else self._get_volume_internal_id_from_uid(object_uid)
         raw_cli_volume = self._get_cli_volume(volume_internal_id)
-        source_thin_volume = self._generate_thin_volume_response(raw_cli_volume)
-        source_volume_handle = get_volume_id(source_thin_volume, None)
 
-        if Version(self._code_level) >= Version(array_settings.SVC_DR_SANDBOX_BUILD):
+        is_remote_uid_supported = self._is_remote_volume_uid_supported(raw_cli_volume)
+        use_replication_fields = is_remote_uid_supported and not force_dr_mediator
+
+        if not use_replication_fields and dr_mediator is None:
+            raise array_errors.ReplicationDestinationInfoNotSupportedError(raw_cli_volume.name)
+
+        if use_replication_fields:
+            logger.info("volume '{}': retrieving destination info from remote_volume_uid field in lsvdisk".format(
+                raw_cli_volume.name))
             return self._get_destination_volume_handle_from_replication_fields(raw_cli_volume)
 
-        if dr_mediator is None:
-            logger.info("DR mediator not provided, returning source handle '{}' as destination".format(
-                source_volume_handle))
-            return source_volume_handle
-
-        destination_vol_handle = self._get_destination_volume_handle_from_remote(source_thin_volume.name, dr_mediator)
-        if destination_vol_handle is None:
-            logger.warning("destination volume not yet available on secondary storage "
-                           "for volume '{}'".format(source_thin_volume.name))
-            return None
-
-        return destination_vol_handle
+        if is_remote_uid_supported and force_dr_mediator:
+            logger.info("volume '{}': remote_volume_uid field is supported but force_dr_mediator is set, "
+                        "retrieving destination info using dr mediator instead".format(raw_cli_volume.name))
+        else:
+            logger.info("volume '{}': remote_volume_uid field not supported, "
+                        "retrieving destination info using dr mediator".format(raw_cli_volume.name))
+        return self._get_destination_volume_handle_from_remote(raw_cli_volume, dr_mediator)
 
     def _get_destination_volume_handle_from_replication_fields(self, raw_cli_volume):
-        if not hasattr(raw_cli_volume, 'remote_volume_uid'):
-            logger.info("storage does not support replication destination fields for volume '{}', "
-                        "skipping replication fields lookup".format(raw_cli_volume.name))
-            return None
-
         volume_group_id = self._getattr_as_str(raw_cli_volume, 'volume_group_id', '')
         if not volume_group_id:
             logger.info("volume '{}' is not part of a volume group, skipping replication fields lookup".format(
@@ -1968,13 +1967,12 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
             name=raw_cli_volume.name,
             array_type=self.array_type
         )
-        handle = get_volume_id(dest_thin_volume, None)
-        logger.info("destination volume handle '{}' resolved from replication fields for volume '{}'".format(
-            handle, raw_cli_volume.name))
-        return handle
+        return get_volume_id(dest_thin_volume, None)
 
-    @staticmethod
-    def _get_destination_volume_handle_from_remote(volume_name, dr_mediator):
+    def _get_destination_volume_handle_from_remote(self, raw_cli_volume, dr_mediator):
+        source_thin_volume = self._generate_thin_volume_response(raw_cli_volume)
+        volume_name = source_thin_volume.name
+
         try:
             dest_cli_volume = dr_mediator._get_cli_volume(volume_name, not_exist_err=False)
         except Exception as ex:
@@ -1995,7 +1993,7 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
             return None
         return volume_group_replication.replication_policy_name
 
-    def _assign_partition_replication_policy(self, volume_group_id, requested_policy_name):
+    def _assign_replication_policy_to_partition_vg(self, volume_group_id, requested_policy_name):
         try:
             policies = self.client.svcinfo.lsreplicationpolicy().as_list
         except (svc_errors.CommandExecutionError, CLIFailureError) as ex:
@@ -2240,7 +2238,7 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
                 if not existing_policy:
                     logger.info("assigning replication policy '{}' to partition VG '{}'".format(
                         replication_policy, volume_group_id))
-                    self._assign_partition_replication_policy(volume_group_id, replication_policy)
+                    self._assign_replication_policy_to_partition_vg(volume_group_id, replication_policy)
 
         try:
             self._chvolumegroupreplication(volume_group_id, mode=array_settings.ENDPOINT_TYPE_PRODUCTION)

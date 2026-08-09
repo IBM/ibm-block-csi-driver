@@ -5,6 +5,7 @@ import grpc
 from csi_general import replication_pb2 as pb2
 from mock import Mock, MagicMock
 
+from controllers.array_action.errors import ReplicationDestinationInfoNotSupportedError
 from controllers.servers.settings import PARAMETERS_SYSTEM_ID, PARAMETERS_COPY_TYPE, PARAMETERS_REPLICATION_POLICY
 from controllers.array_action import svc_messages
 from controllers.array_action.settings import (REPLICATION_TYPE_MIRROR, REPLICATION_TYPE_EAR,
@@ -507,15 +508,15 @@ class TestGetReplicationDestinationInfo(BaseReplicationSetUp, CommonControllerTe
         self.mediator.get_replication_destination_info.assert_not_called()
         self.assertEqual("", response.replication_destination.volume.volume_id)
 
-    def test_get_destination_info_without_dr_mediator_returns_source_handle(self):
-        source_id = "{0}:{1};{1}".format("A9000", OBJECT_INTERNAL_ID)
-        self.mediator.get_replication_destination_info.return_value = source_id
+    def test_get_destination_info_not_supported_returns_failed_precondition(self):
+        self.mediator.get_replication_destination_info.side_effect = \
+            ReplicationDestinationInfoNotSupportedError(OBJECT_INTERNAL_ID)
 
         response = self.servicer.GetReplicationDestinationInfo(self.request, self.context)
 
-        self.assertEqual(grpc.StatusCode.OK, self.context.code)
+        self.assertEqual(grpc.StatusCode.FAILED_PRECONDITION, self.context.code)
         self.mediator.get_replication_destination_info.assert_called_once()
-        self.assertEqual(source_id, response.replication_destination.volume.volume_id)
+        self.assertEqual("", response.replication_destination.volume.volume_id)
 
     def test_get_destination_info_with_wrong_secrets(self):
         self._test_request_with_wrong_secrets()
