@@ -454,15 +454,15 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) IsVolumePathMatchesVolumeId(ctx 
 				return readErr
 			}
 			
-			for _, entry := range entries {
-				// MEMORY BOUNDED CEILING BREAK: Prevent unbounded heap allocation under unstable node states
-				if len(validNvmeTargets) >= maxCapCeiling {
-					logger.Warningf("[VFS-Guard] Slave nodes count reached maximum safe memory pre-allocation threshold (%d). Truncating processing tracking pass.", maxCapCeiling)
-					break
-				}
-				
+			for _, entry := range entries {				
 				entryName := entry.Name()
 				if strings.HasPrefix(entryName, "nvme") || strings.HasPrefix(entryName, "dm-") {
+					// MEMORY BOUNDED CEILING BREAK: Prevent unbounded heap allocation under unstable node states
+					if len(validNvmeTargets) >= maxCapCeiling {
+						logger.Warningf("[VFS-Guard] Slave nodes count reached maximum safe memory pre-allocation threshold (%d). Truncating processing tracking pass.", maxCapCeiling)
+						break
+					}
+				
 					validNvmeTargets = append(validNvmeTargets, entryName)
 				}
 			}
@@ -787,16 +787,17 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) IsNonNativeNvmeDevice(ctx contex
 				}
 
 				for _, entry := range entries {
-					// MEMORY BOUNDED CEILING BREAK: Prevent unbounded heap allocation under unstable node leaks
-					if processedCount >= maxCapCeiling {
-						logger.Warningf("[VFS-Guard] Slaves folder tracking pass reached maximum safe memory pre-allocation threshold (%d). Truncating scan.", maxCapCeiling)
-						break
-					}
-					processedCount++
 
 					name := entry.Name()
 					// NVMe over Device Mapper identification support
 					if strings.HasPrefix(name, "nvme") {
+						// MEMORY BOUNDED CEILING BREAK: Prevent unbounded heap allocation under unstable node leaks
+						if processedCount >= maxCapCeiling {
+							logger.Warningf("[VFS-Guard] Slaves folder tracking pass reached maximum safe memory pre-allocation threshold (%d). Truncating scan.", maxCapCeiling)
+							break
+						}
+						processedCount++
+					
 						logger.Debugf("IsNonNativeNvmeDevice: Slave [%s] discovered in sysfs mapping -> Non-Native NVMe verified", name)
 						return true, nil
 					}
@@ -889,14 +890,15 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) IsNvmeDevice(ctx context.Context
 
 				// If any underlying channel node maps back to an nvme drive handle, this is an NVMe volume
 				for _, entry := range entries {
-					// MEMORY BOUNDED CEILING BREAK: Prevent unbounded heap allocation under unstable node leaks
-					if processedCount >= maxCapCeiling {
-						logger.Warningf("[VFS-Guard] Slaves directory tracking pass reached maximum safe memory threshold (%d). Truncating scan.", maxCapCeiling)
-						break
-					}
-					processedCount++
 
 					if strings.HasPrefix(entry.Name(), "nvme") {
+						// MEMORY BOUNDED CEILING BREAK: Prevent unbounded heap allocation under unstable node leaks
+						if processedCount >= maxCapCeiling {
+							logger.Warningf("[VFS-Guard] Slaves directory tracking pass reached maximum safe memory threshold (%d). Truncating scan.", maxCapCeiling)
+							break
+						}
+						processedCount++
+					
 						logger.Debugf("IsNvmeDevice: Target %s confirmed as non-native NVMe via sysfs slaves", baseDevice)
 						return true, nil
 					}
@@ -1529,11 +1531,6 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) purgeScsiGhosts(ctx context.Cont
 		}
 
 		for _, entry := range devEntries {
-			// CIRCUIT BREAKER BOUNDARY: Prevent unbounded array bloat from unstable path leaks
-			if len(rawCandidates) >= maxCapCeiling {
-				logger.Warningf("[VFS-Guard] Ghost tracking candidate list reached safe allocation ceiling (%d). Truncating scan pass.", maxCapCeiling)
-				break
-			}
 
 			sgName := entry.Name()
 			if !strings.HasPrefix(sgName, "sg") || len(sgName) < 3 {
@@ -1568,6 +1565,12 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) purgeScsiGhosts(ctx context.Cont
 			parsedLun, errParse := strconv.Atoi(lunStr)
 			if errParse != nil || parsedLun != expectedLun {
 				continue 
+			}
+			
+			// CIRCUIT BREAKER BOUNDARY: Prevent unbounded array bloat from unstable path leaks
+			if len(rawCandidates) >= maxCapCeiling {
+				logger.Warningf("[VFS-Guard] Ghost tracking candidate list reached safe allocation ceiling (%d). Truncating scan pass.", maxCapCeiling)
+				break
 			}
 
 			rawCandidates = append(rawCandidates, ghostCandidate{
@@ -1688,15 +1691,16 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) purgeNvmeGhosts(ctx context.Cont
 	// STAGE 1: MICROSECOND SNAPSHOT SWEEP (Decouples VFS State Instantly)
 	// =========================================================================
 	for _, entry := range devEntries {
-		// CIRCUIT BREAKER BOUNDARY: Prevent unbounded array bloat from unstable path leaks
-		if len(rawNames) >= maxCapCeiling {
-			logger.Warningf("[VFS-Guard] NVMe ghost tracking candidate list reached safe allocation ceiling (%d). Truncating scan pass.", maxCapCeiling)
-			break
-		}
 
 		name := entry.Name()
 		if !nvmeNamespaceRegex.MatchString(name) {
 			continue
+		}
+		
+		// CIRCUIT BREAKER BOUNDARY: Prevent unbounded array bloat from unstable path leaks
+		if len(rawNames) >= maxCapCeiling {
+			logger.Warningf("[VFS-Guard] NVMe ghost tracking candidate list reached safe allocation ceiling (%d). Truncating scan pass.", maxCapCeiling)
+			break
 		}
 
 		rawNames = append(rawNames, name)
@@ -1921,16 +1925,17 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) PruneNvmeGhosts(ctx context.Cont
 	// STAGE 1: MICROSECOND SNAPSHOT SWEEP (Decouples VFS State Instantly)
 	// =========================================================================
 	for _, entry := range devEntries {
-		// CIRCUIT BREAKER BOUNDARY: Prevent unbounded array bloat from unstable path leaks
-		if len(rawNames) >= maxCapCeiling {
-			logger.Warningf("[VFS-Guard] NVMe prune candidate list reached safe allocation ceiling (%d). Truncating scan pass.", maxCapCeiling)
-			break
-		}
 
 		name := entry.Name()
 		if !nvmeNamespaceRegex.MatchString(name) {
 			continue
 		}
+		
+		// CIRCUIT BREAKER BOUNDARY: Prevent unbounded array bloat from unstable path leaks
+		if len(rawNames) >= maxCapCeiling {
+			logger.Warningf("[VFS-Guard] NVMe prune candidate list reached safe allocation ceiling (%d). Truncating scan pass.", maxCapCeiling)
+			break
+		}		
 
 		rawNames = append(rawNames, name)
 	}
@@ -2537,12 +2542,13 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) getScsiTargetID(ctx context.Cont
 					break
 				}
 				for _, entry := range rportEntries {
-					if len(candidates) >= maxCapCeiling {
-						logger.Warningf("[VFS-Guard] Safe ceiling hit (%d). Truncate scan.", maxCapCeiling)
-						break
-					}
 					rportName := entry.Name()
 					if strings.HasPrefix(rportName, prefixSearch) {
+						if len(candidates) >= maxCapCeiling {
+							logger.Warningf("[VFS-Guard] Safe ceiling hit (%d). Truncate scan.", maxCapCeiling)
+							break
+						}
+					
 						candidates = append(candidates, rportName)
 					}
 				}
@@ -3548,11 +3554,6 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) FindSlavesByWWID(ctx context.Con
 	// STAGE 1: MICROSECOND SNAPSHOT SWEEP (Decouples VFS State Instantly)
 	// =========================================================================
 	for _, entry := range devEntries {
-		// CIRCUIT BREAKER BOUNDARY: Prevent unbounded array bloat from unstable path leaks
-		if len(rawNames) >= maxCapCeiling {
-			logger.Warningf("[VFS-Guard] Slaves lookups candidate list reached safe allocation ceiling (%d). Truncating scan pass.", maxCapCeiling)
-			break
-		}
 
 		name := entry.Name()
 		if strings.HasPrefix(name, "loop") || strings.HasPrefix(name, "ram") || strings.HasPrefix(name, "dm-") {
@@ -3564,6 +3565,12 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) FindSlavesByWWID(ctx context.Con
 
 		if !isNVMe && !isSCSI {
 			continue
+		}
+		
+		// CIRCUIT BREAKER BOUNDARY: Prevent unbounded array bloat from unstable path leaks
+		if len(rawNames) >= maxCapCeiling {
+			logger.Warningf("[VFS-Guard] Slaves lookups candidate list reached safe allocation ceiling (%d). Truncating scan pass.", maxCapCeiling)
+			break
 		}
 
 		rawNames = append(rawNames, name)
@@ -3730,11 +3737,11 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) GetDMNameFromMinor(ctx context.C
 				break
 			}
 			if strings.HasPrefix(ext.Name(), "dm-") {
-				if stat, errStat := os.Stat(filepath.Join("/sys/block", ext.Name())); errStat == nil {
-					if sysObj, ok := stat.Sys().(*syscall.Stat_t); ok {
-						dmMajor = unix.Major(uint64(sysObj.Rdev))
-						break
-					}
+				// FIXED: Native unix.Stat used directly to ensure clean bit-shifting precision alignment across platform architectures
+				var rawStat unix.Stat_t
+				if errStat := unix.Stat(filepath.Join("/sys/block", ext.Name()), &rawStat); errStat == nil {
+					dmMajor = unix.Major(uint64(rawStat.Rdev))
+					break
 				}
 			}
 		}
@@ -3743,7 +3750,7 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) GetDMNameFromMinor(ctx context.C
 	directBlockPath := fmt.Sprintf("/sys/dev/block/%d:%d", dmMajor, minor)
 
 	var resolvedDmName string
-	// Automatically and flawlessly handles nested relative sysfs folders back to /sys/devices/virtual/block/dm-X
+	// Automatically handles nested relative sysfs folders back to /sys/devices/virtual/block/dm-X
 	if realPath, errLink := filepath.EvalSymlinks(directBlockPath); errLink == nil {
 		dmDirName := filepath.Base(realPath)
 		if strings.HasPrefix(dmDirName, "dm-") {
@@ -3777,19 +3784,21 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) GetDMNameFromMinor(ctx context.C
 
 		mapperEntries, errDirs := sFile.ReadDir(100)
 		if errDirs != nil && errDirs != io.EOF {
+			sFile.Close() // FIXED: Explicitly close handle prior to early loop breakout to neutralize resource table leakage
 			break
 		}
 
 		for _, entry := range mapperEntries {
-			if len(mapperNames) >= maxCapCeiling {
-				logger.Warningf("[VFS-Guard] /dev/mapper entries reached safe processing ceiling (%d). Truncating scan.", maxCapCeiling)
-				break
-			}
-
 			name := entry.Name()
 			if name == "control" {
 				continue
 			}
+			
+			if len(mapperNames) >= maxCapCeiling {
+				logger.Warningf("[VFS-Guard] /dev/mapper entries reached safe processing ceiling (%d). Truncating scan.", maxCapCeiling)
+				break
+			}
+			
 			mapperNames = append(mapperNames, name)
 		}
 
@@ -3806,31 +3815,31 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) GetDMNameFromMinor(ctx context.C
 		}
 
 		fullPath := filepath.Join("/dev/mapper", name)
-		fi, errStat := os.Lstat(fullPath)
-		if errStat != nil {
+		
+		// FIXED: Shifted to unix.Lstat to ensure unified field types across all platform paths
+		var statT unix.Stat_t
+		if errStat := unix.Lstat(fullPath, &statT); errStat != nil {
 			continue
 		}
 
 		var dmKernelName string
 		// Secure check for both symlink and raw block device nodes (RHEL 7 vs Modern Parity)
-		if fi.Mode()&os.ModeSymlink != 0 {
+		if (statT.Mode & unix.S_IFMT) == unix.S_IFLNK {
 			realPath, errLink := filepath.EvalSymlinks(fullPath)
 			if errLink != nil {
 				continue
 			}
 			dmKernelName = filepath.Base(realPath)
-		} else {
-			statT, ok := fi.Sys().(*syscall.Stat_t)
-			if !ok {
-				continue
-			}
+		} else if (statT.Mode & unix.S_IFMT) == unix.S_IFBLK {
 			minorIndex := unix.Minor(uint64(statT.Rdev))
 			dmKernelName = fmt.Sprintf("dm-%d", minorIndex)
+		} else {
+			continue
 		}
 
 		if dmKernelName == fmt.Sprintf("dm-%d", minor) {
 			if functionalName := r.readDMNameSafe(ctx, dmKernelName); functionalName != "" {
-				return functionalName
+				return functionalName // INSTANT EARLY EXIT
 			}
 		}
 	}
@@ -4509,15 +4518,16 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) disableNativeNvmeQueueing(ctx co
 	// STAGE 1: MICROSECOND SNAPSHOT SWEEP (Decouples VFS State Instantly)
 	// =========================================================================
 	for _, entry := range devEntries {
-		// CIRCUIT BREAKER BOUNDARY: Prevent unbounded array bloat from unstable path leaks
-		if len(rawNames) >= maxCapCeiling {
-			logger.Warningf("[VFS-Guard] NVMe queue tracking list reached safe allocation ceiling (%d). Truncating scan pass.", maxCapCeiling)
-			break
-		}
 
 		devName := entry.Name()
 		if !nvmeNamespaceRegex.MatchString(devName) {
 			continue
+		}
+		
+		// CIRCUIT BREAKER BOUNDARY: Prevent unbounded array bloat from unstable path leaks
+		if len(rawNames) >= maxCapCeiling {
+			logger.Warningf("[VFS-Guard] NVMe queue tracking list reached safe allocation ceiling (%d). Truncating scan pass.", maxCapCeiling)
+			break
 		}
 
 		rawNames = append(rawNames, devName)
@@ -4610,12 +4620,13 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) disableNativeNvmeQueueing(ctx co
 								break
 							}
 							for _, e := range entries {
-								if processedSubCount >= maxCapCeiling {
-									break
-								}
-								processedSubCount++
 								name := e.Name()
 								if strings.HasPrefix(name, "nvme") && !nvmeNamespaceRegex.MatchString(name) {
+									if processedSubCount >= maxCapCeiling {
+										break
+									}
+									processedSubCount++
+								
 									controllersToUpdate = append(controllersToUpdate, name)
 								}
 							}
@@ -4700,11 +4711,6 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) purgeStuckPhysicalPathsDualProto
 	// STAGE 1: MICROSECOND SNAPSHOT SWEEP (Decouples VFS State Instantly)
 	// =========================================================================
 	for _, f := range devEntries {
-		// CIRCUIT BREAKER BOUNDARY: Prevent unbounded array bloat from unstable path leaks
-		if len(rawNames) >= maxCapCeiling {
-			logger.Warningf("[VFS-Guard] Dual protocol purge list reached safe allocation ceiling (%d). Truncating scan pass.", maxCapCeiling)
-			break
-		}
 
 		devName := f.Name()
 		isSCSI := strings.HasPrefix(devName, "sd")
@@ -4713,6 +4719,13 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) purgeStuckPhysicalPathsDualProto
 		if !isSCSI && !isNVMe {
 			continue
 		}
+		
+		// CIRCUIT BREAKER BOUNDARY: Prevent unbounded array bloat from unstable path leaks
+		if len(rawNames) >= maxCapCeiling {
+			logger.Warningf("[VFS-Guard] Dual protocol purge list reached safe allocation ceiling (%d). Truncating scan pass.", maxCapCeiling)
+			break
+		}
+		
 
 		rawNames = append(rawNames, devName)
 	}
@@ -6426,15 +6439,16 @@ func (o *OsDeviceConnectivityHelperGeneric) findDMByWWID(ctx context.Context, ww
 		}
 
 		for _, entry := range mapperEntries {
-			if len(mapperNames) >= maxCapCeiling {
-				logger.Warningf("[VFS-Guard] /dev/mapper candidate entries reached safe processing ceiling (%d). Truncating scan.", maxCapCeiling)
-				break
-			}
 
 			name := entry.Name()
 			if name == "control" {
 				continue
 			}
+			if len(mapperNames) >= maxCapCeiling {
+				logger.Warningf("[VFS-Guard] /dev/mapper candidate entries reached safe processing ceiling (%d). Truncating scan.", maxCapCeiling)
+				break
+			}
+			
 			mapperNames = append(mapperNames, name)
 		}
 
@@ -7084,8 +7098,8 @@ func (o GetDmsPathHelperGeneric) WaitForDmToExist(ctx context.Context, gater *ex
 				}
 				defer dFile.Close()
 				
-				const maxCapCeiling = 10000
-				processedEntriesCount := 0
+				//const maxCapCeiling = 10000
+				//processedEntriesCount := 0
 				nvmeLanes := 0
 				
 				for {
@@ -7100,11 +7114,11 @@ func (o GetDmsPathHelperGeneric) WaitForDmToExist(ctx context.Context, gater *ex
 					
 					for _, entry := range entries {
 						// CIRCUIT BREAKER BOUNDARY: Prevent unbounded array bloat under unstable node leaks
-						if processedEntriesCount >= maxCapCeiling {
-							logger.Warningf("[VFS-Guard] NVMe transport sub-directories reached maximum processing ceiling (%d). Truncating scan.", maxCapCeiling)
-							break
-						}
-						processedEntriesCount++
+						//if processedEntriesCount >= maxCapCeiling {
+						//	logger.Warningf("[VFS-Guard] NVMe transport sub-directories reached maximum processing ceiling (%d). Truncating scan.", maxCapCeiling)
+						//	break
+						//}
+						//processedEntriesCount++
 
 						entryName := entry.Name()
 						if strings.HasPrefix(entryName, "nvme") && !strings.Contains(entryName, "-") {
@@ -7363,11 +7377,18 @@ func (o *GetDmsPathHelperGeneric) GetSlaveCount(ctx context.Context, gater *exec
 			}
 			
 			for _, e := range entries {
-				if len(nvmeCandidates) >= maxCapCeiling {
-					logger.Warningf("[VFS-Guard] NVMe slave candidates reached safe processing ceiling (%d). Truncating scan.", maxCapCeiling)
-					break
+				isNamespaceVolume := nvmeNamespaceRegex.MatchString(name)
+				isController := strings.HasPrefix(name, "nvme") && !isNamespaceVolume
+				isSubsys := strings.HasPrefix(name, "nvme-subsys")
+
+				if isController || isSubsys {
+					if len(nvmeCandidates) >= maxCapCeiling {
+						logger.Warningf("[VFS-Guard] NVMe slave candidates reached safe processing ceiling (%d). Truncating scan.", maxCapCeiling)
+						break
+					}
+					nvmeCandidates = append(nvmeCandidates, e.Name())				
 				}
-				nvmeCandidates = append(nvmeCandidates, e.Name())
+			
 			}
 
 			if len(nvmeCandidates) >= maxCapCeiling || len(entries) < 100 || errDirs == io.EOF {
@@ -7385,36 +7406,30 @@ func (o *GetDmsPathHelperGeneric) GetSlaveCount(ctx context.Context, gater *exec
 				return 0
 			}
 
-			isNamespaceVolume := nvmeNamespaceRegex.MatchString(name)
-			isController := strings.HasPrefix(name, "nvme") && !isNamespaceVolume
-			isSubsys := strings.HasPrefix(name, "nvme-subsys")
-
-			if isController || isSubsys {
-				stateBytesStr, err := secureReadSysfsFallback(ctx, gater, name, filepath.Join(targetScanDir, name, "state"))
-				if err == nil {
-					state := strings.ToLower(strings.TrimSpace(stateBytesStr))
-					if state == "dead" || state == "deleting" || state == "failing" {
-						logger.Warningf("[NVMe-Slave-Scan] -> Skipping unhealthy controller path: %s (State: %s)", name, state)
-						continue
-					}
+			stateBytesStr, err := secureReadSysfsFallback(ctx, gater, name, filepath.Join(targetScanDir, name, "state"))
+			if err == nil {
+				state := strings.ToLower(strings.TrimSpace(stateBytesStr))
+				if state == "dead" || state == "deleting" || state == "failing" {
+					logger.Warningf("[NVMe-Slave-Scan] -> Skipping unhealthy controller path: %s (State: %s)", name, state)
+					continue
 				}
-
-				count++
-
-				nqnPath := filepath.Join(targetScanDir, name, "subsysnqn")
-				nqnBytesStr, err := secureReadSysfsFallback(ctx, gater, name, nqnPath)
-				if err != nil {
-					nqnPath = filepath.Join(targetScanDir, "subsysnqn")
-					nqnBytesStr, _ = secureReadSysfsFallback(ctx, gater, name, nqnPath)
-				}
-
-				nqn := strings.TrimSpace(nqnBytesStr)
-				if nqn == "" {
-					nqn = "UNKNOWN_NQN"
-				}
-
-				logger.Warningf("[NVMe-Slave-Scan] -> Controller Node: %s | Subsystem NQN: %s", name, nqn)
 			}
+
+			count++
+
+			nqnPath := filepath.Join(targetScanDir, name, "subsysnqn")
+			nqnBytesStr, err := secureReadSysfsFallback(ctx, gater, name, nqnPath)
+			if err != nil {
+				nqnPath = filepath.Join(targetScanDir, "subsysnqn")
+				nqnBytesStr, _ = secureReadSysfsFallback(ctx, gater, name, nqnPath)
+			}
+
+			nqn := strings.TrimSpace(nqnBytesStr)
+			if nqn == "" {
+				nqn = "UNKNOWN_NQN"
+			}
+
+			logger.Warningf("[NVMe-Slave-Scan] -> Controller Node: %s | Subsystem NQN: %s", name, nqn)
 		}
 		
 		return count
@@ -7517,6 +7532,11 @@ func (of GetDmsPathHelperGeneric) EvaluateSysfsTopology(ctx context.Context, gat
 
 	// STAGE 1: MICROSECOND SNAPSHOT SWEEP (Decouples VFS State Instantly)
 	for _, entry := range devEntries {
+		// Target only device-mapper paths by name signature matching
+		if !strings.HasPrefix(name, "dm-") {
+			continue
+		}
+	
 		if len(devNames) >= maxCapCeiling {
 			logger.Warningf("[VFS-Guard] /dev snapshot lookup exceeded safe processing ceiling (%d). Truncating scan pass.", maxCapCeiling)
 			break
@@ -7532,10 +7552,6 @@ func (of GetDmsPathHelperGeneric) EvaluateSysfsTopology(ctx context.Context, gat
 			return false, false, ""
 		}
 		
-		// Target only device-mapper paths by name signature matching
-		if !strings.HasPrefix(name, "dm-") {
-			continue
-		}
 
 		dmPath := filepath.Join("/sys/block", name)
 
@@ -7682,10 +7698,22 @@ func (of GetDmsPathHelperGeneric) EvaluateSysfsTopology(ctx context.Context, gat
 						break
 					}
 					for _, entry := range entries {
-						if len(candidates) >= maxCapCeiling {
-							break
+						logger.Warningf("check entry %s", entryName)
+					
+						if strings.HasPrefix(entryName, "nvme") && !strings.Contains(entryName, "-") {
+							isNamespace := false
+							if nIdx := strings.LastIndex(entryName, "n"); nIdx != -1 && nIdx > 0 {
+								isNamespace = true
+							}
+							if !isNamespace {
+								logger.Warning("Not namespace")
+						
+								if len(candidates) >= maxCapCeiling {
+									break
+								}
+								candidates = append(candidates, entry.Name())						
+							}
 						}
-						candidates = append(candidates, entry.Name())
 					}
 					if len(candidates) >= maxCapCeiling || len(entries) < 100 || errEntries == io.EOF {
 						break
@@ -7700,24 +7728,14 @@ func (of GetDmsPathHelperGeneric) EvaluateSysfsTopology(ctx context.Context, gat
 					break
 				}
 
-				logger.Warningf("check entry %s", entryName)
-				if strings.HasPrefix(entryName, "nvme") && !strings.Contains(entryName, "-") {
-					isNamespace := false
-					if nIdx := strings.LastIndex(entryName, "n"); nIdx != -1 && nIdx > 0 {
-						isNamespace = true
-					}
-					if !isNamespace {
-						logger.Warning("Not namespace")
-						statePath := filepath.Join(deviceDir, entryName, "state")
-						
-						if stateBytesStr, err := secureReadSysfs(ctx, gater, entryName, statePath); err == nil {
-							state := strings.ToLower(strings.TrimSpace(stateBytesStr))
-							logger.Warningf("state is %s", state)
-							if state == "resetting" || state == "connecting" || state == "deleting" {
-								isControllerTransitioning = true
-								break
-							}
-						}
+				statePath := filepath.Join(deviceDir, entryName, "state")
+				
+				if stateBytesStr, err := secureReadSysfs(ctx, gater, entryName, statePath); err == nil {
+					state := strings.ToLower(strings.TrimSpace(stateBytesStr))
+					logger.Warningf("state is %s", state)
+					if state == "resetting" || state == "connecting" || state == "deleting" {
+						isControllerTransitioning = true
+						break
 					}
 				}
 			}
