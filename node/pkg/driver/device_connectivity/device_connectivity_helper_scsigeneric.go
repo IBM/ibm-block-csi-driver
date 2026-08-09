@@ -367,6 +367,9 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) IsVolumePathMatchesVolumeId(ctx 
 
 	logger.Infof("[Identity-Check] Validating path [%s] for VolumeUUID: [%s]", volumePath, volumeUuid)
 	expectedSerial := strings.ToLower(strings.TrimSpace(volumeUuid))
+	if len(expectedSerial) != 32 {
+		return false, fmt.Errorf("invalid IBM volume signature length: must reduce to 32 hex characters")
+	}
 
 	// 1. RESOLVE TARGET DEVICE LAYER
 	mpathDeviceName, err := r.Helper.GetMpathDeviceName(ctx, r.KeyedGater, volumePath)
@@ -382,6 +385,8 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) IsVolumePathMatchesVolumeId(ctx 
 		directDevPath := filepath.Join("/dev", dmName)
 		if _, errStat := os.Stat(mapperPath); errStat == nil {
 			absoluteDevPath = mapperPath
+		} else if _, errStat := os.Stat(directDevPath); errStat == nil {
+			absoluteDevPath = directDevPath
 		} else {
 			absoluteDevPath = directDevPath
 		}
@@ -679,11 +684,9 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) IsNativeNvmeDevice(ctx context.C
 	}
 	baseDevice := filepath.Base(resolvedPath)
 
-	// FIXED: Eradicated the fragile strings.HasPrefix shortcut block. 
-	// We force structural verification to perfectly distinguish between native nvme block devices 
-	// and device mapper nodes that happen to use an 'nvme-' string prefix template.
+	// INVARIANT: Device Mapper nodes are never Native NVMe standalone devices
 	if strings.HasPrefix(baseDevice, "dm-") {
-		return false, nil // Device Mapper nodes are never Native NVMe standalone devices
+		return false, nil 
 	}
 
 	// 2. PARTITION HOOK: Handle partition block nodes cleanly (e.g. nvme0n1p1 -> nvme0n1)
@@ -695,6 +698,7 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) IsNativeNvmeDevice(ctx context.C
 			if strings.Contains(realClassPath, "/block/") {
 				parts := strings.Split(realClassPath, "/block/")
 				if len(parts) == 2 {
+					// FIXED: Corrected multi-variable index bounds to ensure safe whole-disk extraction
 					subParts := strings.Split(parts[1], "/")
 					if len(subParts) > 0 {
 						baseDevice = subParts[0] // Correctly abstracts "nvme0n1p1" to parent "nvme0n1"
@@ -7182,9 +7186,62 @@ func (o *GetDmsPathHelperGeneric) GetSlaveCount(ctx context.Context, gater *exec
 				}
 				slaveNames = append(slaveNames, entry.Name())
 			}
-			if len(slaveNames) >= maxCapCeiling || len(entries)  Slave: %s | Kernel Address Mapping: %s | Hardware Identity: %s | State: %s | Operational: %v",
-				slaveName, addrIdentifier, hardwareIdentity, state, isOperational)
+			if len(slaveNames) >= maxCapCeiling || len(entries) < 100 {
+				break
+			}
 		}
+		dFile.Close()
+
+			   count := 0
+
+			   // STAGE 2: SAFE DECOUPLED EVALUATION PIPELINE
+			   for _, slaveName := range slaveNames {
+					  if err := ctx.Err(); err != nil {
+							   return 0
+					   }
+
+					   slaveDeviceDir := filepath.Join(slavesDir, slaveName, "device")
+
+					  addrIdentifier := "UNKNOWN"
+					   if realPath, errLink := filepath.EvalSymlinks(slaveDeviceDir); errLink == nil {
+							   addrIdentifier = filepath.Base(realPath)
+					   }
+
+					   // RESTORED: Re-enabling the structural hardwareIdentity string evaluation
+					   var hardwareIdentity string
+					  isNvmeSlave := strings.HasPrefix(slaveName, "nvme")
+
+					   if isNvmeSlave {
+							   nqnPath := filepath.Join(slaveDeviceDir, "subsysnqn")
+							   if nqnStr, err := secureReadSysfsFallback(ctx, gater, slaveName, nqnPath); err == nil && nqnStr != "" {
+									  hardwareIdentity = fmt.Sprintf("NQN: %s", strings.TrimSpace(nqnStr))
+							   } else {
+									   hardwareIdentity = "NVMe (NQN Unreadable)"
+							   }
+					   } else {
+							  vendorPath := filepath.Join(slaveDeviceDir, "vendor")
+							   if vendorStr, err := secureReadSysfsFallback(ctx, gater, slaveName, vendorPath); err == nil && vendorStr != "" {
+									   hardwareIdentity = fmt.Sprintf("Vendor: %s", strings.ToUpper(strings.TrimSpace(vendorStr)))
+							   } else {
+									  hardwareIdentity = "SCSI (Vendor Unreadable)"
+							   }
+					   }
+
+					   stateBytesStr, err := secureReadSysfsFallback(ctx, gater, slaveName, filepath.Join(slaveDeviceDir, "state"))
+					   state := "unknown"
+					  isOperational := false
+
+					   if err == nil {
+							   state = strings.ToLower(strings.TrimSpace(stateBytesStr))
+							   if state == "running" || state == "live" {
+									   isOperational = true
+									   count++
+							  }
+					   }
+
+					   logger.Warningf("[DM-Slave-Scan] -> Slave: %s | Kernel Address Mapping: %s | Hardware Identity: %s | State: %s | Operational: %v",
+							slaveName, addrIdentifier, hardwareIdentity, state, isOperational)
+				}
 
 		return count
 	}
