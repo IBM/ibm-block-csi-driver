@@ -74,6 +74,8 @@ EAR_PROMOTE_REMOTE_NOT_READY = 'CMMVC1150E'
 EAR_PROMOTE_REMOTE_INTERNAL_ERROR = 'CMMVC9913E'
 EAR_PROMOTE_REMOTE_NOT_INDEPENDENT = "CMMVC9932E"
 EAR_PROMOTE_DIVERGED_COPY_NOT_SYNCED = "CMMVC1149E"
+EAR_PROMOTE_REMOTE_PARTNERSHIP_UNAVAILABLE = "CMMVC9901E"
+EAR_PROMOTE_REMOTE_UNREACHABLE = "CMMVC9949E"
 
 HOST_NQN = 'nqn'
 HOST_WWPN = 'WWPN'
@@ -2243,7 +2245,19 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
         try:
             self._chvolumegroupreplication(volume_group_id, mode=array_settings.ENDPOINT_TYPE_PRODUCTION)
         except (svc_errors.CommandExecutionError, CLIFailureError) as ex:
-            is_remote_not_ready = any(
+            is_remote_storage_unreachable = any(
+                code in ex.my_message
+                for code in (
+                    EAR_PROMOTE_REMOTE_PARTNERSHIP_UNAVAILABLE,
+                    EAR_PROMOTE_REMOTE_UNREACHABLE,
+                )
+            )
+            if is_remote_storage_unreachable:
+                logger.warning("promote failed because remote storage is unreachable/disconnected, accepting promote "
+                               "with volume group '{}' state as independent: {}".format(volume_group_id, ex.my_message))
+                return
+
+            is_remote_storage_vg_mode_not_ready = any(
                 code in ex.my_message
                 for code in (
                     EAR_PROMOTE_REMOTE_NOT_READY,
@@ -2251,9 +2265,9 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
                     EAR_PROMOTE_REMOTE_NOT_INDEPENDENT,
                 )
             )
-            if is_remote_not_ready:
-                logger.warning("remote not ready for volume group '{}', "
-                               "operator will retry: {}".format(volume_group_id, ex.my_message))
+            if is_remote_storage_vg_mode_not_ready:
+                logger.warning("remote storage's volume group mode not independent yet for volume group '{}', "
+                               "replication operator will retry: {}".format(volume_group_id, ex.my_message))
                 raise array_errors.SecondaryStorageTransitionToProductionNotReadyError(ex.my_message)
             logger.error("failed to promote volume group '{}' to production: {}".format(
                 volume_group_id, ex.my_message))
@@ -2272,23 +2286,6 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
         self._ensure_endpoint_is_primary(rcrelationship, endpoint_type_to_promote)
 
     def _demote_ear_replication_volume(self, volume_group_name):
-        """
-        Demote an EAR replication volume by creating and verifying checkpoint synchronization.
-
-        Uses state tracking to handle long-running checkpoint creation. On first attempt,
-        creates a checkpoint and tracks the operation. On retries, checks if checkpoint
-        is achieved without creating a new one.
-
-        Args:
-            volume_group_name: The name of the volume group to demote
-
-        Returns:
-           None on success, or raises OperationNotReadyError if checkpoint not achieved
-
-        Raises:
-            ObjectNotFoundError: If volume group replication not found
-            OperationNotReadyError: If checkpoint not yet achieved (should trigger retry)
-        """
         if not self._is_earreplication_supported():
             logger.info("EAR replication is not supported on the existing storage")
             return
@@ -2302,6 +2299,12 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
         if self._get_replication_mode(volume_group_name) == array_settings.ENDPOINT_TYPE_RECOVERY:
             logger.info("Idempotent case: volume group {} is already in recovery mode, "
                         "skipping demote".format(volume_group_name))
+            return
+
+        dr_link_status = getattr(volume_group_replication, 'dr_link_status', '')
+        if dr_link_status in array_settings.FAILED_DR_LINK_STATES:
+            logger.warning("skipping demote for volume group '{}' as remote storage link status is '{}', "
+                           "checkpoint sync cannot complete".format(volume_group_name, dr_link_status))
             return
 
         # Check if this is first demote attempt or retry
