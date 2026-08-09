@@ -17,7 +17,9 @@ from controllers.array_action.array_mediator_svc import SVCArrayMediator, build_
     FCMAP_STATUS_DONE, YES
 from controllers.array_action.settings import (REPLICATION_TYPE_MIRROR, REPLICATION_TYPE_EAR,
                                                RCRELATIONSHIP_STATE_READY, ENDPOINT_TYPE_PRODUCTION,
-                                               HEALTHY_DR_LINK_STATES, DEGRADED_DR_LINK_STATES, FAILED_DR_LINK_STATES)
+                                               HEALTHY_DR_LINK_STATES, DEGRADED_DR_LINK_STATES, FAILED_DR_LINK_STATES,
+                                               DR_LINK_STATUS_DISCONNECTED,
+                                               DR_LINK_STATUS_SUSPENDED_MISSING_CONNECTIVITY)
 from controllers.common.node_info import Initiators
 from controllers.common.settings import ARRAY_TYPE_SVC, SPACE_EFFICIENCY_THIN, SPACE_EFFICIENCY_COMPRESSED, \
     SPACE_EFFICIENCY_DEDUPLICATED_COMPRESSED, SPACE_EFFICIENCY_DEDUPLICATED_THIN, SPACE_EFFICIENCY_DEDUPLICATED, \
@@ -2774,6 +2776,28 @@ class TestArrayMediatorSVC(unittest.TestCase):
             as_single_element=None)
         with self.assertRaises(array_errors.ObjectNotFoundError):
             self.svc.get_last_async_snapshot_info(OBJECT_INTERNAL_ID)
+
+    # --- _demote_ear_replication_volume skip-on-disconnect tests ---
+    def test_demote_ear_replication_volume_skips_when_non_partition_remote_disconnected(self):
+        self.svc.client.svctask.chvolumereplicationinternals = Mock()
+        vg_replication = self._mock_vg_replication(partition_name='', dr_link_status=DR_LINK_STATUS_DISCONNECTED)
+        self.svc.client.svcinfo.lsvolumegroupreplication.return_value = Mock(
+            as_single_element=vg_replication)
+
+        self.svc._demote_ear_replication_volume(REPLICATION_NAME)
+
+        self.svc.client.svctask.chvolumegroupreplication.assert_not_called()
+
+    def test_demote_ear_replication_volume_skips_when_partition_remote_suspended_missing_connectivity(self):
+        self.svc.client.svctask.chvolumereplicationinternals = Mock()
+        vg_replication = self._mock_vg_replication(partition_name='SKGPTN0',
+                                                   dr_link_status=DR_LINK_STATUS_SUSPENDED_MISSING_CONNECTIVITY)
+        self.svc.client.svcinfo.lsvolumegroupreplication.return_value = Mock(
+            as_single_element=vg_replication)
+
+        self.svc._demote_ear_replication_volume(REPLICATION_NAME)
+
+        self.svc.client.svctask.chvolumegroupreplication.assert_not_called()
 
     # --- get_replication_destination_info tests ---
 
