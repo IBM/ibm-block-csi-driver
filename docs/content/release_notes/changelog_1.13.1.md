@@ -15,7 +15,7 @@ IBM® Block Storage CSI driver 1.13.1 added new support and enhancements.
 
 For more information regarding the IBM FlashSystem® Call Home feature, search IBM.com/docs for your product's documentation.{: tip}
 
-IBM® block storage CSI driver version 1.14.0 resolved the following issues:
+IBM® block storage CSI driver version 1.13.1 resolved the following issues:
 
 |Ticket ID|Severity|Description|
 |---------|--------|-----------|

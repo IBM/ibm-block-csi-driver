@@ -23,7 +23,7 @@ Some storage system types do not support High availability (HA).{: attention}
 
 - HA Snapshots are support starting IBM Storage Virtualize® version 9.1.1.
 - If a volume is moved out of its assigned partition via direct storage operations (not supported through the CSI driver), the PV object must be recreated to restore functionality.
-- Some features aren't supported for partitions, please refer to the docuemntation for details. For example - as of time of this release (1.14.0) IO groups are not supported and shouldn't be used.
+- Some features aren't supported for partitions, please refer to the docuemntation for details. For example - as of time of this release (1.15.0) IO groups are not supported and shouldn't be used.
 
 ## HyperSwap volume limitations
 The following IBM block storage CSI driver features are not supported on volumes where HyperSwap is used:

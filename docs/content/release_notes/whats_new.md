@@ -1,15 +1,15 @@
 {{site.data.keyword.attribute-definition-list}}
 
-# What's new in 1.14.0
+# What's new in 1.15.0
 
-IBM® block storage CSI driver 1.14.0 adds support for:
+IBM® block storage CSI driver 1.15.0 adds support for:
 
 
 **General availability date:** TBD 2026
 
 ## Miscellaneous resolved issues
 
-For information about the resolved issues in version 1.14.0, see [1.14.0](changelog_1.14.0.md).
+For information about the resolved issues in version 1.15.0, see [1.15.0](changelog_1.15.0.md).
 
 If you have any configuration changes that you want saved over upgrade, notice the following.{: attention}
 
