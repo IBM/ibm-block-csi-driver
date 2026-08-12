@@ -26,6 +26,7 @@ from controllers.servers.csi.controller_types import (ArrayConnectionInfo,
 from controllers.servers.errors import ObjectIdError, ValidationException, InvalidNodeId
 from controllers.common.node_info import Initiators
 from controllers.servers.host_definer.kubernetes_manager.manager import KubernetesManager
+from controllers.array_action.registration_maps import ramen_plugin_type
 
 logger = get_stdout_logger()
 
@@ -1170,6 +1171,9 @@ def get_replication_object_type_and_id_info(request, require_replication_source=
 def resolve_ramen_ear_volume_to_volume_group(object_type, object_id_info, replication_type, mediator):
     if object_type != servers_settings.VOLUME_TYPE_NAME or replication_type != array_settings.REPLICATION_TYPE_EAR:
         return object_type, object_id_info
+
+    mediator.register_plugin(ramen_plugin_type[servers_settings.UNIQUE_KEY_KEY],
+                             ramen_plugin_type[array_settings.METADATA_KEY])
 
     volume_uid = object_id_info.ids.uid
     cli_volume = mediator.get_object_by_id(volume_uid, servers_settings.VOLUME_TYPE_NAME)

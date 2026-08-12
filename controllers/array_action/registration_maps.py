@@ -17,6 +17,7 @@ replication_plugin_type = _generate_plugin_type('replication')
 volume_group_plugin_type = _generate_plugin_type('volume_group')
 snapshot_plugin_type = _generate_plugin_type('snapshot')
 host_definition_plugin_type = _generate_plugin_type('host_definition')
+ramen_plugin_type = _generate_plugin_type('ramen')
 
 
 REGISTRATION_MAP = {
