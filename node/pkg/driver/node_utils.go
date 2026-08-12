@@ -74,7 +74,6 @@ type NodeUtilsInterface interface {
 	GetVolumeUuid(volumeId string) string
 	ReadNvmeNqn() (string, error)
 	IsNativeNVMeMultipathEnabled() (bool, error)
-	DevicesAreNvme(ctx context.Context, device string) (NvmeType, error)
 	ParseFCPorts() ([]string, error)
 	ParseIscsiInitiators() (string, error)
 	GetInfoFromPublishContext(publishContext map[string]string) (string, int, map[string][]string, error)
@@ -92,7 +91,7 @@ type NodeUtilsInterface interface {
 	MakeFile(filePath string) error
 	ExpandFilesystem(ctx context.Context, devicePath string, volumePath string, fsType string) error
 	ExpandMpathDevice(ctx context.Context, mpathDevice string) error
-	RescanPhysicalDevices(ctx context.Context, sysDevices []string) error
+	RescanPhysicalDevices(ctx context.Context, mpathDevice string, sysDevices []string) error
 	FormatDevice(ctx context.Context, devicePath string, fsType string) error
 	IsNotMountPoint(file string) (bool, error)
 	GetPodPath(filepath string) string
@@ -370,7 +369,7 @@ func (n NodeUtils) MakeFile(filePath string) error {
 }
 
 // TODO
-func (n NodeUtils) Expandfunc (n NodeUtils) ExpandFilesystem(ctx context.Context, devicePath string, volumePath string, fsType string) error {
+func (n NodeUtils) ExpandFilesystem(ctx context.Context, devicePath string, volumePath string, fsType string) error {
 	if err := ctx.Err(); err != nil {
 		return err
 	}
@@ -419,7 +418,7 @@ func (n NodeUtils) ExpandMpathDevice(ctx context.Context, mpathDevice string) er
 		logger.Warningf("Socket resize map failed for %s: %v. Initiating structural fallback path rescans.", mpathDevice, err)
 		
 		// RESTORED FALLBACK: Retrieve the physical paths and trigger explicit kernel geometric rescans
-		slaves, errSlaves := n.GetSysDevicesFromMpath(ctx, mpathDevice)
+		slaves, errSlaves := GetSysDevicesFromMpath(ctx, mpathDevice)
 		if errSlaves == nil {
 			for _, slave := range slaves {
 				if err := n.triggerPhysicalRescan(slave); err != nil {

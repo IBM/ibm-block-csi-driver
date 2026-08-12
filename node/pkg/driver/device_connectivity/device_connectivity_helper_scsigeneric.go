@@ -3146,8 +3146,6 @@ PROCESS_PAGE_0x83:
 // sHardwareBlocked, also check for the quiesce state. It often indicates a storage controller failover where I/O is paused but not failed.
 
 
-
-
 // TeardownVolume unmounts volumes, flushes buffers, and ejects backing physical lanes concurrently.
 // This is the fully unified, production-hardened implementation (All Phases Integrated).
 func (r *OsDeviceConnectivityHelperScsiGeneric) TeardownVolume(ctx context.Context, target string, needFlush bool, needRemovePhysical bool, expectedWWID string) error {
@@ -3218,7 +3216,11 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) TeardownVolume(ctx context.Conte
 		mpathName = r.Helper.findDMByWWID(ctx, expectedWWID)
 		if mpathName != "" {
 			if !hardwareResolved {
-				major, minor, errSysfs := r.Helper.GetMajorMinorFromSysfs(ctx, mpathName)
+				// FIXED: Declare the error variable explicitly beforehand.
+				// This allows using standard assignment '=' to update the master major/minor 
+				// variables directly, removing the block-scope masking compiler error.
+				var errSysfs error
+				major, minor, errSysfs = r.Helper.GetMajorMinorFromSysfs(ctx, mpathName)
 				if errSysfs == nil {
 					hardwareResolved = true
 				}
@@ -3303,7 +3305,6 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) TeardownVolume(ctx context.Conte
 				logger.Infof("[Teardown-Main] [%s] Step 2/2: Evicting physical backing slave devices: %v", mpathName, slaves)
 				_ = r.RemovePhysicalDevice(ctx, slaves)
 				
-				// CORRECTED TO EXTRACT SLAVES FOR DEVICE MAPPER TOPOLOGIES:
 				r.cleanNVMeNamespacesFromSlaves(ctx, slaves)
 				needRemovePhysical = false 
 			} else {
@@ -3329,7 +3330,6 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) TeardownVolume(ctx context.Conte
 			logger.Infof("[Teardown-Main] Evicting native NVMe path lanes: %v", slaves)
 			_ = r.RemovePhysicalDevice(ctx, slaves)
 			
-			// CORRECTED TO TARGET NATIVE NVME TOPOLOGIES:
 			r.evictNVMeNamespaces(ctx, slaves)
 			needRemovePhysical = false
 		}
