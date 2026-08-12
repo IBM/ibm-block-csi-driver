@@ -224,7 +224,7 @@ func (d *NodeService) NodeStageVolume(ctx context.Context, req *csi.NodeStageVol
 	baseDevice := filepath.Base(mpathDevice)
 	
 	// FIXED: Replace string prefix heuristics with your zero-fork, VFS-aware checker
-	nvmeType, err := DevicesAreNvme(ctx, baseDevice)
+	nvmeType, err := device_connectivity.DevicesAreNvme(ctx, baseDevice)
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "Topology evaluation failed during block scheme lookup for %s: %v", baseDevice, err)
 	}
@@ -232,12 +232,12 @@ func (d *NodeService) NodeStageVolume(ctx context.Context, req *csi.NodeStageVol
 	var sysDevices []string
 	logger.Infof("Device missing or recently purged for WWID %v. Initiating fabric discovery - 7.", volumeUuid)
 
-	if nvmeType == NVMeNative {
+	if nvmeType == device_connectivity.NVMeNative {
 		// Native NVMe Multipathing structures track the global virtual subsystem node directly
 		sysDevices = []string{baseDevice}
 	} else {
 		// Securely handles both traditional SCSI maps and NVMe over DM (NVMeNonNative) layouts via sysfs
-		sysDevices, err = GetSysDevicesFromMpath(ctx, baseDevice)
+		sysDevices, err = device_connectivity.GetSysDevicesFromMpath(ctx, baseDevice)
 		if err != nil {
 			logger.Errorf("Error while trying to get sys devices : {%v}", err.Error())
 			return nil, status.Error(codes.Internal, err.Error())
@@ -452,25 +452,25 @@ func (d *NodeService) NodeUnstageVolume(ctx context.Context, req *csi.NodeUnstag
 		baseDevice := filepath.Base(device)
 
 		// Robust structural zero-fork lookups replace fragile regex text matching
-		nvmeType, err := DevicesAreNvme(ctx, baseDevice)
+		nvmeType, err := device_connectivity.DevicesAreNvme(ctx, baseDevice)
 		if err != nil {
 			logger.Errorf("Failed to determine device type for %s: %v. Defaulting to full cleanup strategy.", baseDevice, err)
 			needFlush = true
 			needRemovePhysical = true
 		} else {
 			switch nvmeType {
-			case NVMeNative:
+			case device_connectivity.NVMeNative:
 				logger.Infof("Device %s is native NVMe: skipping flush and SCSI device cleanup", baseDevice)
 				needFlush = false
 				needRemovePhysical = false
 
-			case NVMeNonNative:
+			case device_connectivity.NVMeNonNative:
 				needFlush = true
 				logger.Infof("Device %s is non-native NVMe: flush multipath, skip physical device removal", baseDevice)
 				needFlush = true
 				needRemovePhysical = false
 
-			case NotNVMe:
+			case device_connectivity.NotNVMe:
 				logger.Infof("Device %s is not NVMe (SCSI/FC): flush multipath and trigger physical device path removal", baseDevice)
 				needFlush = true
 				needRemovePhysical = true
@@ -844,28 +844,28 @@ func (d *NodeService) NodeExpandVolume(ctx context.Context, req *csi.NodeExpandV
 	logger.Debugf("Discovered device: {%v}", device)
 
 	baseDevice := path.Base(device)
-	nvmeType, err := DevicesAreNvme(ctx, baseDevice)
+	nvmeType, err := device_connectivity.DevicesAreNvme(ctx, baseDevice)
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "Failed to determine device type for %s: %v", baseDevice, err)
 	}
 
 	switch nvmeType {
-	case NVMeNative:
+	case device_connectivity.NVMeNative:
 		// Native NVMe → The kernel updates the block sizing directly on namespace updates.
 		// No multipath layer or manual controller rescan is required.
 		logger.Infof("Device %s is native NVMe: skipping multipath expand/rescan", baseDevice)
 
-	case NVMeNonNative:
+	case device_connectivity.NVMeNonNative:
 		// FIXED: Non-native NVMe over DM MUST rescan its NVMe fabric controllers before resizing DM!
 		logger.Infof("Device %s is non-native NVMe: initiating NVMe controller rescan prior to DM resize", baseDevice)
-		sysDevices, err := GetSysDevicesFromMpath(ctx, baseDevice)
+		sysDevices, err := device_connectivity.GetSysDevicesFromMpath(ctx, baseDevice)
 		if err != nil {
 			logger.Errorf("Error getting underlying paths for NVMe-DM device %s: %v", baseDevice, err)
 			return nil, status.Error(codes.Internal, err.Error())
 		}
 		
 		// This must iterate through the nvme session layers and trigger /sys/class/nvme/nvmeX/rescan
-		err = d.NodeUtils.RescanNvmeControllers(ctx, sysDevices)
+		err = d.NodeUtils.RescanPhysicalDevices(ctx, baseDevice, sysDevices)
 		if err != nil {
 			return nil, status.Errorf(codes.Internal, "Failed to rescan underlying NVMe paths: %v", err)
 		}
@@ -875,9 +875,9 @@ func (d *NodeService) NodeExpandVolume(ctx context.Context, req *csi.NodeExpandV
 			return nil, status.Error(codes.Internal, err.Error())
 		}
 
-	case NotNVMe:
+	case device_connectivity.NotNVMe:
 		// Standard SCSI (FC/iSCSI) -> Rescan physical paths via sysfs, then expand the multipath map
-		sysDevices, err := GetSysDevicesFromMpath(ctx, baseDevice)
+		sysDevices, err := device_connectivity.GetSysDevicesFromMpath(ctx, baseDevice)
 		if err != nil {
 			logger.Errorf("Error getting sys devices for %s: %v", baseDevice, err)
 			return nil, status.Error(codes.Internal, err.Error())
