@@ -870,7 +870,7 @@ func (d *NodeService) NodeExpandVolume(ctx context.Context, req *csi.NodeExpandV
 			return nil, status.Errorf(codes.Internal, "Failed to rescan underlying NVMe paths: %v", err)
 		}
 
-		err = d.NodeUtils.ExpandMpathDevice(ctx, baseDevice)
+		err = d.NodeUtils.ExpandMpathDevice(ctx, baseDevice, sysDevices)
 		if err != nil {
 			return nil, status.Error(codes.Internal, err.Error())
 		}
@@ -890,7 +890,7 @@ func (d *NodeService) NodeExpandVolume(ctx context.Context, req *csi.NodeExpandV
 			logger.Errorf("Physical hardware rescan pass completed with failures for map %s: %v", baseDevice, err)
 		}
 	
-		err = d.NodeUtils.ExpandMpathDevice(ctx, baseDevice)
+		err = d.NodeUtils.ExpandMpathDevice(ctx, baseDevice, sysDevices)
 		if err != nil {
 			return nil, status.Error(codes.Internal, err.Error())
 		}
