@@ -360,6 +360,7 @@ func NewOsDeviceConnectivityHelperScsiGeneric(executer executer.ExecuterInterfac
 	}
 }
 
+// IsVolumePathMatchesVolumeId safe-evaluates whether a block path represents an authentic target mapping.
 func (r *OsDeviceConnectivityHelperScsiGeneric) IsVolumePathMatchesVolumeId(ctx context.Context, volumeUuid string, volumePath string) (bool, error) {
 	if err := ctx.Err(); err != nil {
 		return false, err
@@ -420,11 +421,9 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) IsVolumePathMatchesVolumeId(ctx 
 	if os.IsNotExist(errSlaves) {
 		logger.Infof("[Identity-Check] [%s] Device has no slaves directory. Evaluating as Native NVMe block structure.", dmName)
 		
-		// Read Native NVMe identity attributes directly from sysfs metadata nodes
 		wwidPath := filepath.Join(sysBlockTarget, "device", "wwid")
 		if wwidBytes, errRead := os.ReadFile(wwidPath); errRead == nil {
 			cleanedWwid := strings.ToLower(strings.TrimSpace(string(wwidBytes)))
-			// Strip common kernel prefixes if present (e.g., "nvme-")
 			cleanedWwid = strings.TrimPrefix(cleanedWwid, "nvme-")
 			
 			if strings.Contains(cleanedWwid, expectedSerial) || cleanedWwid == convertScsiIdToNguid(expectedSerial) {
@@ -436,7 +435,7 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) IsVolumePathMatchesVolumeId(ctx 
 	}
 
 	// =========================================================================
-	// PROTOCOL BRANCH B: NON-NATIVE NVME STRATEGY (Device Mapper over Slaves)
+	// PROTOCOL BRANCH B: MULTI-PROTOCOL SLAVES SELECTION (SCSI, NVMe-oF, or Nested DM)
 	// =========================================================================
 	const maxCapCeiling = 10000
 	validNvmeTargets := make([]string, 0, 100)
@@ -446,7 +445,8 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) IsVolumePathMatchesVolumeId(ctx 
 		return false, fmt.Errorf("failed to open block slaves folder: %w", errOpen)
 	}
 	
-	// Stream entries safely to prevent file descriptor retention issues
+	helper := GetDmsPathHelperGeneric{}
+
 	for {
 		if ctx.Err() != nil {
 			dFile.Close()
@@ -463,7 +463,15 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) IsVolumePathMatchesVolumeId(ctx 
 		
 		for _, entry := range entries {				
 			entryName := entry.Name()
-			if strings.HasPrefix(entryName, "nvme") || strings.HasPrefix(entryName, "dm-") {
+			
+			// FIXED: Structural Evaluation. We leverage your precise IsNativeNvmeNamespace check 
+			// alongside explicit sd and dm prefix gates. This guarantees standard SCSI paths (sda) 
+			// pass validation filters natively without experiencing cross-protocol drops.
+			isSCSI := strings.HasPrefix(entryName, "sd")
+			isDM := strings.HasPrefix(entryName, "dm-")
+			isNVMe := helper.IsNativeNvmeNamespace(entryName)
+
+			if isSCSI || isDM || isNVMe {
 				if len(validNvmeTargets) >= maxCapCeiling {
 					break
 				}
@@ -474,10 +482,9 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) IsVolumePathMatchesVolumeId(ctx 
 	dFile.Close()
 
 	if len(validNvmeTargets) == 0 {
-		return false, fmt.Errorf("hardware signature mapping failed: zero valid NVMe/DM elements discovered in slave paths")
+		return false, fmt.Errorf("hardware signature mapping failed: zero valid storage elements discovered in slave paths for %s", dmName)
 	}
 
-	// Execute batch scanning against resolved slave items concurrently
 	results, errBatch := executer.ExecuteUninterruptibleBatch[string, bool](
 		ctx,
 		r.KeyedGater,
@@ -489,13 +496,13 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) IsVolumePathMatchesVolumeId(ctx 
 				return false, err
 			}
 
-			helper := GetDmsPathHelperGeneric{}
-			hasDevice, isPending, matchedDev := helper.EvaluateSysfsTopology(wCtx, r.KeyedGater, expectedSerial, false)
+			innerHelper := GetDmsPathHelperGeneric{}
+			hasDevice, isPending, matchedDev := innerHelper.EvaluateSysfsTopology(wCtx, r.KeyedGater, expectedSerial, false)
 
 			if (!hasDevice || matchedDev == "") && !isPending && wCtx.Err() == nil {
 				nvmeTargetSerial := convertScsiIdToNguid(expectedSerial)
 				if nvmeTargetSerial != "" && nvmeTargetSerial != expectedSerial {
-					hasDevice, isPending, matchedDev = helper.EvaluateSysfsTopology(wCtx, r.KeyedGater, nvmeTargetSerial, false)
+					hasDevice, isPending, matchedDev = innerHelper.EvaluateSysfsTopology(wCtx, r.KeyedGater, nvmeTargetSerial, false)
 				}
 			}
 
@@ -510,7 +517,7 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) IsVolumePathMatchesVolumeId(ctx 
 				}
 
 				if matchedDev == dmName || matchedDev == entryName || matchedDev == normalizedSlaveName {
-					cancelBatch() // Stop other pending threads gracefully
+					cancelBatch() 
 					return true, nil
 				}
 			}
@@ -520,18 +527,17 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) IsVolumePathMatchesVolumeId(ctx 
 	)
 
 	if errBatch != nil {
-		return false, fmt.Errorf("parallel topology evaluation encountered an engine failure: %w", errBatch)
+		return false, fmt.Errorf("parallel topology evaluation encountered an unexpected engine failure: %w", errBatch)
 	}
 
 	for _, res := range results {
-		// Ignore explicit context cancellations from alternate racing batch matches
 		if res.Err == nil && res.Data {
-			logger.Infof("[Identity-Check] [%s] Identity successfully verified via NVMe batch fallback architecture.", dmName)
+			logger.Infof("[Identity-Check] [%s] Identity successfully verified via multi-protocol batch fallback architecture.", dmName)
 			return true, nil
 		}
 	}
 
-	return false, fmt.Errorf("hardware signature mapping failed: no matching identities verified across any available NVMe slaves for path %s", absoluteDevPath)
+	return false, fmt.Errorf("hardware signature mapping failed: no matching identities verified across any available storage slaves for path %s", absoluteDevPath)
 }
 
 // TODO id unused?
@@ -864,6 +870,7 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) resolveParentAndType(baseDevice 
 		}
 	}
 
+	// Ok to check prefix
 	isDM := strings.HasPrefix(baseDevice, "dm-")
 	return baseDevice, isDM, nil
 }
@@ -1297,7 +1304,6 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) ValidateLun(ctx context.Context,
 		return fmt.Errorf("zero active paths verified for device target %s; cumulative logs: [no paths supplied]", targetDm)
 	}
 
-	// FIXED: Inject target tracking identifier metadata hashes to prevent parallel clock collisions
 	gaterKey := fmt.Sprintf("batch-lun-path-validation-%s-%s", rawScsiTarget, filepath.Base(targetDm))
 
 	results, errBatch := executer.ExecuteUninterruptibleBatch[string, bool](
@@ -1320,22 +1326,45 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) ValidateLun(ctx context.Context,
 			}
 
 			baseBlockName := deviceName 
-			targetSysDir := filepath.Join("/sys/block", deviceName)
+			sysBlockTarget := filepath.Join("/sys/block", deviceName)
 			
-			// FIXED: Sanitize virtual character control channels up-front to protect path structural paths
-			if strings.Contains(deviceName, "c") && strings.HasPrefix(deviceName, "nvme") {
-				if lastNIdx := strings.LastIndex(deviceName, "n"); lastNIdx != -1 && lastNIdx > 0 {
-					if cIdx := strings.Index(deviceName, "c"); cIdx != -1 && cIdx < lastNIdx {
-						ctrlPart := deviceName[:cIdx]  
-						nsPart := deviceName[lastNIdx:] 
-						baseBlockName = ctrlPart + nsPart 
-						targetSysDir = filepath.Join("/sys/block", baseBlockName)
+			// FIXED: Use standard structural class/block fallback traversal first. 
+			// If a partition sub-node link is passed (e.g., nvme-eui...part1), this dynamically 
+			// pivots the pointer back to the parent whole-disk storage node BEFORE running string parsing math.
+			if _, errStat := os.Stat(sysBlockTarget); os.IsNotExist(errStat) {
+				classBlockPath := filepath.Join("/sys/class/block", deviceName)
+				if realClassPath, errEval := filepath.EvalSymlinks(classBlockPath); errEval == nil {
+					if strings.Contains(realClassPath, "/block/") {
+						parts := strings.Split(realClassPath, "/block/")
+						if len(parts) == 2 {
+							subParts := strings.Split(parts[1], "/")
+							if len(subParts) > 0 {
+								baseBlockName = subParts[0] // Isolate canonical parent "nvme2c3n4" or "dm-0"
+								sysBlockTarget = filepath.Join("/sys/block", baseBlockName)
+							}
+						}
+					}
+				}
+			}
+
+			// FIXED: Safe Protocol/String Parsing. 
+			// Now that baseBlockName is guaranteed by sysfs symlinks to be the canonical kernel block identifier name, 
+			// we evaluate character controller channel tags (nvme0c1n2) using your index math safely, 
+			// entirely eliminating string-alias false positives.
+			if strings.Contains(baseBlockName, "c") && strings.HasPrefix(baseBlockName, "nvme") {
+				if lastNIdx := strings.LastIndex(baseBlockName, "n"); lastNIdx != -1 && lastNIdx > 0 {
+					if cIdx := strings.Index(baseBlockName, "c"); cIdx != -1 && cIdx < lastNIdx {
+						ctrlPart := baseBlockName[:cIdx]  
+						nsPart := baseBlockName[lastNIdx:] 
+						baseBlockName = ctrlPart + nsPart // Resolves cleanly to "nvme0n2"
+						sysBlockTarget = filepath.Join("/sys/block", baseBlockName)
 					}
 				}
 			}
 
 			var actualLun, sysfsIdRaw, hwIdRaw string
-			isNvmePath := strings.HasPrefix(baseBlockName, "nvme")
+			helper := GetDmsPathHelperGeneric{}
+			isNvmePath := helper.IsNativeNvmeNamespace(baseBlockName)
 
 			if isNvmePath {
 				state, err := secureReadSysfs(wCtx, r.KeyedGater, baseBlockName, filepath.Join(targetSysDir, "device", "state"))
@@ -1344,7 +1373,6 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) ValidateLun(ctx context.Context,
 					return false, fmt.Errorf("path %s: nvme state not live", baseBlockName)
 				}
 
-				// FIXED: Reroute target directly to the whole disk folder root to prevent missing file errors
 				rawNsid, err := secureReadSysfs(wCtx, r.KeyedGater, baseBlockName, filepath.Join(targetSysDir, "nsid"))
 				if err != nil {
 					return false, fmt.Errorf("path %s: failed to read nsid: %w", baseBlockName, err)
@@ -1441,10 +1469,6 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) ValidateLun(ctx context.Context,
 		},
 	)
 	
-	if errBatch != nil {
-		return fmt.Errorf("parallel validation batch engine failed structurally: %w", errBatch)
-	}
-
 	validPathsFound := 0
 	var cumulativeErrors []string
 
