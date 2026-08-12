@@ -87,7 +87,7 @@ type NodeUtilsInterface interface {
 	ParseIscsiInitiators() (string, error)
 	GetInfoFromPublishContext(publishContext map[string]string) (string, int, map[string][]string, error)
 	GetArrayInitiators(ipsByArrayInitiator map[string][]string) []string
-	GetSysDevicesFromMpath(ctx context.Context, baseDevice string) ([]string, error)
+//	GetSysDevicesFromMpath(ctx context.Context, baseDevice string) ([]string, error)
 
 	// TODO refactor and move all staging methods to dedicate interface.
 	ClearStageInfoFile(filePath string) error
@@ -193,108 +193,6 @@ func (n NodeUtils) ClearStageInfoFile(filePath string) error {
 	return os.Remove(filePath)
 }
 
-func (n NodeUtils) GetSysDevicesFromMpath(ctx context.Context, baseDevice string) ([]string, error) {
-	if err := ctx.Err(); err != nil { 
-		return nil, err 
-	}
-
-	logger.Debugf("GetSysDevicesFromMpath: Aggregating underlying paths for %s", baseDevice)
-
-	// =========================================================================
-	// BRANCH 1: DEVICE MAPPER (SCSI OR NON-NATIVE NVMe OVER DM FABRICS)
-	// =========================================================================
-	if strings.HasPrefix(baseDevice, "dm-") {
-		deviceSlavePath := filepath.Join("/sys", "block", baseDevice, "slaves")
-		
-		// FIXED: Use explicit low-level folder streaming to guarantee instant 
-		// descriptor release on context abortion/early loop cancellation
-		dFile, errOpen := os.Open(deviceSlavePath)
-		if errOpen != nil {
-			logger.Errorf("An error occurred while looking for device slaves: %v", errOpen)
-			return nil, fmt.Errorf("failed to open dm slaves directory at %s: %w", deviceSlavePath, errOpen)
-		}
-		defer dFile.Close()
-
-		var slavesNames []string
-		for {
-			if err := ctx.Err(); err != nil {
-				return nil, err
-			}
-
-			entries, readErr := dFile.ReadDir(100)
-			if readErr != nil && readErr != io.EOF {
-				return nil, fmt.Errorf("failed to stream directory entries from %s: %w", deviceSlavePath, readErr)
-			}
-			if len(entries) == 0 || readErr == io.EOF {
-				break
-			}
-
-			for _, entry := range entries {
-				// This accurately yields either "sdX" (SCSI) or "nvmeXnY" (NVMe over DM) paths safely
-				slavesNames = append(slavesNames, entry.Name())
-			}
-		}
-		
-		logger.Debugf("GetSysDevicesFromMpath: Discovered slaves for DM device %s: %v", baseDevice, slavesNames)
-		return slavesNames, nil
-	}
-
-	// =========================================================================
-	// BRANCH 2: NATIVE NVME MULTIPATH SUBSYSTEM LAYERS (nvme-subsysXnY)
-	// =========================================================================
-	if strings.HasPrefix(baseDevice, "nvme") {
-		// Use LastIndex to safely isolate namespace boundary (e.g. "nvme-subsys0n1" -> index of last 'n')
-		nIdx := strings.LastIndex(baseDevice, "n")
-		if nIdx == -1 || nIdx == len(baseDevice)-1 {
-			return nil, fmt.Errorf("invalid nvme device configuration footprint name: %s", baseDevice)
-		}
-		nsID := baseDevice[nIdx:] // Resolves to "n1", "n2", etc.
-
-		subsysPath := filepath.Join("/sys", "block", baseDevice, "device", "subsystem")
-		
-		dFile, errOpen := os.Open(subsysPath)
-		if errOpen != nil {
-			// Fallback: If it's a standard standalone endpoint rather than a multipath subsystem layout, return itself
-			if _, errStat := os.Stat(filepath.Join("/sys/block", baseDevice)); errStat == nil {
-				return []string{baseDevice}, nil
-			}
-			return nil, fmt.Errorf("failed to open nvme subsystem paths directory at %s: %w", subsysPath, errOpen)
-		}
-		defer dFile.Close()
-
-		var pathNames []string
-		for {
-			if err := ctx.Err(); err != nil {
-				return nil, err
-			}
-
-			entries, readErr := dFile.ReadDir(100)
-			if readErr != nil && readErr != io.EOF {
-				return nil, fmt.Errorf("failed to stream directory entries from %s: %w", subsysPath, readErr)
-			}
-			if len(entries) == 0 || readErr == io.EOF {
-				break
-			}
-
-			for _, entry := range entries {
-				ctrlName := entry.Name() // e.g. "nvme0"
-				if strings.HasPrefix(ctrlName, "nvme") && !strings.Contains(ctrlName, "subsys") {
-					// Standard Block Mapping Alignment: controller + namespace suffix -> "nvme0" + "n1"
-					pathName := ctrlName + nsID
-
-					if _, errStat := os.Stat(filepath.Join("/sys/block", pathName)); errStat == nil {
-						pathNames = append(pathNames, pathName)
-					}
-				}
-			}
-		}
-		
-		logger.Debugf("GetSysDevicesFromMpath: Discovered native path components for %s: %v", baseDevice, pathNames)
-		return pathNames, nil
-	}
-	
-	return nil, fmt.Errorf("unsupported block layer device type layout specification: %s", baseDevice)
-}
 
 func (n NodeUtils) StageInfoFileIsExist(filePath string) bool {
 	if _, err := os.Stat(filePath); err != nil {
@@ -315,59 +213,6 @@ func (n NodeUtils) IsNativeNVMeMultipathEnabled() (bool, error) {
 	return val == "Y", nil
 }
 
-func (n NodeUtils) DevicesAreNvme(ctx context.Context, device string) (NvmeType, error) {
-	if err := ctx.Err(); err != nil {
-		return NotNVMe, err
-	}
-
-	logger.Debugf("DevicesAreNvme: Analyzing transport topology structure for device %s", device)
-
-	// Step 1: Structural Check for Native NVMe (Multipath or Standalone Single-Path)
-	sysBlockPath := filepath.Join("/sys/block", device)
-	
-	// A. Native Multipath Check: Check for explicit Subsystem NQN presence
-	subsysNqnPath := filepath.Join(sysBlockPath, "device", "subsysnqn")
-	if _, err := os.Stat(subsysNqnPath); err == nil {
-		logger.Infof("DevicesAreNvme: Device %s verified structurally as NVMeNative via subsysnqn", device)
-		return NVMeNative, nil
-	}
-
-	// B. Native Standalone / Single-Path Check: Verify if device subsystem points directly to nvme module
-	deviceSubsystemPath := filepath.Join(sysBlockPath, "device", "subsystem")
-	if target, errEval := filepath.EvalSymlinks(deviceSubsystemPath); errEval == nil {
-		if filepath.Base(target) == "nvme" {
-			logger.Infof("DevicesAreNvme: Device %s verified structurally as NVMeNative (Single Path) via subsystem link", device)
-			return NVMeNative, nil
-		}
-	}
-
-	// Step 2: Structural Check for Non-Native NVMe managed via Device Mapper Multipath
-	if strings.HasPrefix(device, "dm-") {
-		slaves, err := n.GetSysDevicesFromMpath(ctx, device)
-		if err != nil {
-			return NotNVMe, fmt.Errorf("failed to aggregate slaves layout for DM device %s: %w", device, err)
-		}
-
-		// Loop through the collected slave names and verify their true backing hardware transport subsystem
-		for _, slave := range slaves {
-			if ctx.Err() != nil {
-				return NotNVMe, ctx.Err()
-			}
-
-			slaveSubsystemPath := filepath.Join("/sys/block", slave, "device", "subsystem")
-			if target, errEval := filepath.EvalSymlinks(slaveSubsystemPath); errEval == nil {
-				if filepath.Base(target) == "nvme" {
-					logger.Infof("DevicesAreNvme: Device %s verified as NVMeNonNative (Device Mapper Multipath over NVMe Fabrics)", device)
-					return NVMeNonNative, nil
-				}
-			}
-		}
-	}
-
-	// If no structural markers match, it is standard SCSI (FC, iSCSI, SAS) or local SATA storage
-	logger.Debugf("DevicesAreNvme: Device %s verified as NotNVMe storage protocol type", device)
-	return NotNVMe, nil
-}
 
 func getRelevantLines(rawContent *os.File) ([]string, error) {
 	scanner := bufio.NewScanner(rawContent)
@@ -563,6 +408,7 @@ func (n NodeUtils) Expandfunc (n NodeUtils) ExpandFilesystem(ctx context.Context
 	return nil
 }
 
+// ExpandMpathDevice handles fork-free file updates across different block storage protocols
 func (n NodeUtils) ExpandMpathDevice(ctx context.Context, mpathDevice string) error {
 	if err := ctx.Err(); err != nil {
 		return err
@@ -634,35 +480,69 @@ func (n NodeUtils) triggerPhysicalRescan(slave string) error {
 
 
 
-
 func (n NodeUtils) rescanPhysicalDevice(deviceName string) error {
+	if deviceName == "" {
+		return fmt.Errorf("rescanPhysicalDevice: target device name cannot be empty")
+	}
+
+	// FIXED: Structural VFS Hardening Layer. Resolve symlinks upfront to cleanly 
+	// translate user-space alias targets like /dev/mapper/nvme-eui... down to 
+	// their true underlying block names (dm-X or nvmeXnY) or follow partition steps.
+	resolvedPath, errLink := filepath.EvalSymlinks(deviceName)
+	if errLink != nil {
+		resolvedPath = deviceName 
+	}
+	
+	cleanName := filepath.Base(resolvedPath)
+	sysBlockTarget := filepath.Join("/sys/block", cleanName)
+
+	// Pivot partition sub-nodes back to the parent whole-disk root container folder
+	if _, err := os.Stat(sysBlockTarget); os.IsNotExist(err) {
+		classBlockPath := filepath.Join("/sys/class/block", cleanName)
+		if realClassPath, errEval := filepath.EvalSymlinks(classBlockPath); errEval == nil {
+			if strings.Contains(realClassPath, "/block/") {
+				parts := strings.Split(realClassPath, "/block/")
+				if len(parts) == 2 {
+					subParts := strings.Split(parts[1], "/")
+					if len(subParts) > 0 {
+						cleanName = subParts[0]
+						sysBlockTarget = filepath.Join("/sys/block", cleanName)
+					}
+				}
+			}
+		}
+	}
+
+	// FIXED: Block Device Mapper nodes from hitting the NVMe prefix trap.
+	// Rescans must be issued directly to individual physical slave tracks, never to the DM coordinator layer.
+	if strings.HasPrefix(cleanName, "dm-") {
+		logger.Infof("rescanPhysicalDevice: %s is a Device Mapper node. Skipping direct rescan write.", cleanName)
+		return nil
+	}
+
 	var filename string
 
 	// Protocol Case A: Underlying path represents a standard SCSI target track (sdX)
-	if strings.HasPrefix(deviceName, "sd") {
-		filename = fmt.Sprintf("/sys/block/%s/device/rescan", deviceName)
-	} else if strings.HasPrefix(deviceName, "nvme") {
+	if strings.HasPrefix(cleanName, "sd") {
+		filename = fmt.Sprintf("/sys/block/%s/device/rescan", cleanName)
+	} else if strings.HasPrefix(cleanName, "nvme") {
 		// Protocol Case B: Underlying path represents an NVMe over Fabrics target node layer (nvmeXnY)
-		// We must resolve the parent controller name (e.g., nvme0) by tracking the device's symlink link.
-		deviceSymlink := fmt.Sprintf("/sys/block/%s/device", deviceName)
+		deviceSymlink := fmt.Sprintf("/sys/block/%s/device", cleanName)
 		realControllerPath, err := filepath.EvalSymlinks(deviceSymlink)
 		if err != nil {
-			// Fallback: If symlink parsing is blocked or varies across an old custom kernel, 
-			// attempt to guess the prefix by stripping the namespace modifier suffix (e.g., "nvme0n1" -> "nvme0")
-			if idx := strings.Index(deviceName, "n"); idx != -1 {
-				filename = fmt.Sprintf("/sys/class/nvme/%s/rescan", deviceName[:idx])
+			if idx := strings.Index(cleanName, "n"); idx != -1 {
+				filename = fmt.Sprintf("/sys/class/nvme/%s/rescan", cleanName[:idx])
 			} else {
-				return fmt.Errorf("failed to evaluate NVMe sysfs controller symlink for %s: %w", deviceName, err)
+				return fmt.Errorf("failed to evaluate NVMe sysfs controller symlink for %s: %w", cleanName, err)
 			}
 		} else {
 			controllerName := filepath.Base(realControllerPath) // e.g. "nvme0"
 			filename = fmt.Sprintf("/sys/class/nvme/%s/rescan", controllerName)
 		}
 	} else {
-		return fmt.Errorf("unknown block protocol scheme layout for device path name: %s", deviceName)
+		return fmt.Errorf("unknown block protocol scheme layout for device path name: %s", cleanName)
 	}
 
-	// FIXED: Removed os.O_APPEND to guarantee full compatibility with virtual kernel sysfs attributes
 	f, err := n.Executer.OsOpenFile(filename, os.O_WRONLY, 0200)
 	if err != nil {
 		logger.Errorf("Rescan Error: could not open filename: %s. err: %v", filename, err)
@@ -687,22 +567,30 @@ func (n NodeUtils) rescanPhysicalDevice(deviceName string) error {
 	return nil
 }
 
-func (n NodeUtils) RescanPhysicalDevices(ctx context.Context, sysDevices []string) error {
+// RescanPhysicalDevices blocks securely via uninterruptible context pooling to refresh newly expanded physical drives.
+// FIXED: Added the mpathName parameter to allow absolute concurrency lock segregation node-wide
+func (n NodeUtils) RescanPhysicalDevices(ctx context.Context, mpathName string, sysDevices []string) error {
 	if err := ctx.Err(); err != nil {
 		return err
 	}
 
-	logger.Debugf("Rescan: Start rescan on sys devices: %v", sysDevices)
+	cleanMpathName := filepath.Base(mpathName)
+	logger.Debugf("Rescan: Start rescan on sys devices: %v for parent map: %s", sysDevices, cleanMpathName)
+	
 	for _, deviceName := range sysDevices {
 		if n.Executer.IsDeviceStillStuck(deviceName) {
 			logger.Warningf("Rescan: Skipping %s as it is already marked stuck in D-state", deviceName)
 			continue
 		}
 
+		// FIXED: Blending the unique parent map name into the gater key template completely 
+		// de-duplicates competing parallel requests across independent volumes sharing the same hardware tracks.
+		uniqueGaterKey := fmt.Sprintf("rescan-%s-%s", cleanMpathName, filepath.Base(deviceName))
+
 		_, err := executer.ExecuteUninterruptible[struct{}](
 			ctx,
 			n.KeyedGater,
-			"rescan-"+deviceName,
+			uniqueGaterKey,
 			5,              // maxRunning
 			20,             // maxSpare
 			2*time.Second,  // handoff
@@ -713,7 +601,7 @@ func (n NodeUtils) RescanPhysicalDevices(ctx context.Context, sysDevices []strin
 		)
 		
 		if err != nil {
-			logger.Errorf("Rescan failed for device path target %s: %v", deviceName, err)
+			logger.Errorf("Rescan failed for device path target %s under map %s: %v", deviceName, cleanMpathName, err)
 		}
 	}
 	logger.Debugf("Rescan: Finish rescan on sys devices: %v", sysDevices)

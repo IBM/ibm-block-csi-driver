@@ -977,7 +977,7 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) flushDeviceBuffers(ctx context.C
 	logger.Warningf("device %s flushDeviceBuffers: initiation sweep via host path %s", devPath, sanitizedDevPath)
 
 	// FIXED: Use structural zero-fork topology inspection to avoid skipping flushes on NVMe-DM maps
-	nvmeType, errType := r.NodeUtils.DevicesAreNvme(ctx, baseName)
+	nvmeType, errType := DevicesAreNvme(ctx, baseName)
 	if errType != nil {
 		logger.Warningf("flushDeviceBuffers: Unable to structurally verify storage protocol for %s: %v. Proceeding with safety flush.", baseName, errType)
 	}
@@ -3180,7 +3180,7 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) TeardownVolume(ctx context.Conte
 					
 					baseName := filepath.Base(sanitizedDevPath)
 					
-					nvmeType, errType := r.NodeUtils.DevicesAreNvme(ctx, baseName)
+					nvmeType, errType := DevicesAreNvme(ctx, baseName)
 					if errType != nil {
 						logger.Warningf("[Teardown-Main] Topology inspection failed for base device %s: %v. Assuming legacy behavior.", baseName, errType)
 					}
@@ -3217,16 +3217,18 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) TeardownVolume(ctx context.Conte
 		mpathName = r.Helper.findDMByWWID(ctx, expectedWWID)
 		if mpathName != "" {
 			if !hardwareResolved {
-				major, minor, _ = r.Helper.GetMajorMinorFromSysfs(ctx, mpathName)
-				hardwareResolved = true
+				major, minor, errSysfs := r.Helper.GetMajorMinorFromSysfs(ctx, mpathName)
+				if errSysfs == nil {
+					hardwareResolved = true
+				}
 			}
 		} else {
 			slaves := r.FindSlavesByWWID(ctx, expectedWWID)
 			if len(slaves) > 0 {
-				slaveBase := filepath.Base(slaves)
-				nvmeType, _ := r.NodeUtils.DevicesAreNvme(ctx, slaveBase)
+				slaveBase := filepath.Base(slaves[0])
+				nvmeType, _ := DevicesAreNvme(ctx, slaveBase)
 				if nvmeType == NVMeNative {
-					mpathName = slaves 
+					mpathName = slaves[0]
 					isNativeNVMe = true
 				}
 			}
@@ -8583,4 +8585,196 @@ func ExtractNvmeControllerBase(name string) string {
 	
 	// It's already a base controller node (e.g., "nvme2")
 	return cleanName
+}
+
+func (n NodeUtils) DevicesAreNvme(ctx context.Context, device string) (NvmeType, error) {
+	if err := ctx.Err(); err != nil {
+		return NotNVMe, err
+	}
+
+	logger.Debugf("DevicesAreNvme: Analyzing transport topology structure for device %s", device)
+
+	// Step 1: Structural Check for Native NVMe (Multipath or Standalone Single-Path)
+	sysBlockPath := filepath.Join("/sys/block", device)
+	
+	// A. Native Multipath Check: Check for explicit Subsystem NQN presence
+	subsysNqnPath := filepath.Join(sysBlockPath, "device", "subsysnqn")
+	if _, err := os.Stat(subsysNqnPath); err == nil {
+		logger.Infof("DevicesAreNvme: Device %s verified structurally as NVMeNative via subsysnqn", device)
+		return NVMeNative, nil
+	}
+
+	// B. Native Standalone / Single-Path Check: Verify if device subsystem points directly to nvme module
+	deviceSubsystemPath := filepath.Join(sysBlockPath, "device", "subsystem")
+	if target, errEval := filepath.EvalSymlinks(deviceSubsystemPath); errEval == nil {
+		if filepath.Base(target) == "nvme" {
+			logger.Infof("DevicesAreNvme: Device %s verified structurally as NVMeNative (Single Path) via subsystem link", device)
+			return NVMeNative, nil
+		}
+	}
+
+	// Step 2: Structural Check for Non-Native NVMe managed via Device Mapper Multipath
+	if strings.HasPrefix(device, "dm-") {
+		slaves, err := GetSysDevicesFromMpath(ctx, device)
+		if err != nil {
+			return NotNVMe, fmt.Errorf("failed to aggregate slaves layout for DM device %s: %w", device, err)
+		}
+
+		// Loop through the collected slave names and verify their true backing hardware transport subsystem
+		for _, slave := range slaves {
+			if ctx.Err() != nil {
+				return NotNVMe, ctx.Err()
+			}
+
+			slaveSubsystemPath := filepath.Join("/sys/block", slave, "device", "subsystem")
+			if target, errEval := filepath.EvalSymlinks(slaveSubsystemPath); errEval == nil {
+				if filepath.Base(target) == "nvme" {
+					logger.Infof("DevicesAreNvme: Device %s verified as NVMeNonNative (Device Mapper Multipath over NVMe Fabrics)", device)
+					return NVMeNonNative, nil
+				}
+			}
+		}
+	}
+
+	// If no structural markers match, it is standard SCSI (FC, iSCSI, SAS) or local SATA storage
+	logger.Debugf("DevicesAreNvme: Device %s verified as NotNVMe storage protocol type", device)
+	return NotNVMe, nil
+}
+
+
+// GetSysDevicesFromMpath cleanly resolves raw storage block devices protected against D-state freezes.
+func (n NodeUtils) GetSysDevicesFromMpath(ctx context.Context, baseDevice string) ([]string, error) {
+	if err := ctx.Err(); err != nil { 
+		return nil, err 
+	}
+
+	logger.Debugf("GetSysDevicesFromMpath: Aggregating underlying paths for %s", baseDevice)
+
+	baseDevice = filepath.Base(baseDevice)
+	sysBlockTarget := filepath.Join("/sys/block", baseDevice)
+
+	if _, err := os.Stat(sysBlockTarget); os.IsNotExist(err) {
+		classBlockPath := filepath.Join("/sys/class/block", baseDevice)
+		if realClassPath, errEval := filepath.EvalSymlinks(classBlockPath); errEval == nil {
+			if strings.Contains(realClassPath, "/block/") {
+				parts := strings.Split(realClassPath, "/block/")
+				if len(parts) == 2 {
+					subParts := strings.Split(parts[1], "/")
+					if len(subParts) > 0 {
+						baseDevice = subParts[0] 
+						sysBlockTarget = filepath.Join("/sys/block", baseDevice)
+					}
+				}
+			}
+		}
+	}
+
+	isDM := false
+	if _, errDmDir := os.Stat(filepath.Join(sysBlockTarget, "dm")); errDmDir == nil {
+		isDM = true
+	}
+
+	// FIXED: Declared memory boundary ceiling locally to ensure seamless compilation passes
+	const maxCapCeiling = 10000
+
+	// =========================================================================
+	// BRANCH 1: DEVICE MAPPER (SCSI OR NON-NATIVE NVMe OVER DM FABRICS)
+	// =========================================================================
+	if isDM {
+		deviceSlavePath := filepath.Join(sysBlockTarget, "slaves")
+		
+		dFile, errOpen := os.Open(deviceSlavePath)
+		if errOpen != nil {
+			logger.Errorf("An error occurred while looking for device slaves: %v", errOpen)
+			return nil, fmt.Errorf("failed to open dm slaves directory at %s: %w", deviceSlavePath, errOpen)
+		}
+		defer dFile.Close()
+
+		var slavesNames []string
+		for {
+			if err := ctx.Err(); err != nil {
+				return nil, err
+			}
+
+			entries, readErr := dFile.ReadDir(100)
+			if readErr != nil && readErr != io.EOF {
+				return nil, fmt.Errorf("failed to stream directory entries from %s: %w", deviceSlavePath, readErr)
+			}
+			if len(entries) == 0 || readErr == io.EOF {
+				break
+			}
+
+			for _, entry := range entries {
+				if len(slavesNames) >= maxCapCeiling {
+					break
+				}
+				slavesNames = append(slavesNames, entry.Name())
+			}
+			if len(slavesNames) >= maxCapCeiling || len(entries) < 100 || readErr == io.EOF {
+				break
+			}
+		}
+		
+		logger.Debugf("GetSysDevicesFromMpath: Discovered slaves for DM device %s: %v", baseDevice, slavesNames)
+		return slavesNames, nil
+	}
+
+	// =========================================================================
+	// BRANCH 2: NATIVE NVME MULTIPATH SUBSYSTEM LAYERS (nvme-subsysXnY)
+	// =========================================================================
+	if strings.HasPrefix(baseDevice, "nvme") {
+		nIdx := strings.LastIndex(baseDevice, "n")
+		if nIdx == -1 || nIdx == len(baseDevice)-1 {
+			return nil, fmt.Errorf("invalid nvme device configuration footprint name: %s", baseDevice)
+		}
+		nsID := baseDevice[nIdx:] 
+
+		subsysPath := filepath.Join(sysBlockTarget, "device", "subsystem")
+		
+		dFile, errOpen := os.Open(subsysPath)
+		if errOpen != nil {
+			if _, errStat := os.Stat(sysBlockTarget); errStat == nil {
+				return []string{baseDevice}, nil
+			}
+			return nil, fmt.Errorf("failed to open nvme subsystem paths directory at %s: %w", subsysPath, errOpen)
+		}
+		defer dFile.Close()
+
+		var pathNames []string
+		for {
+			if err := ctx.Err(); err != nil {
+				return nil, err
+			}
+
+			entries, readErr := dFile.ReadDir(100)
+			if readErr != nil && readErr != io.EOF {
+				return nil, fmt.Errorf("failed to stream directory entries from %s: %w", subsysPath, readErr)
+			}
+			if len(entries) == 0 || readErr == io.EOF {
+				break
+			}
+
+			for _, entry := range entries {
+				ctrlName := entry.Name() 
+				if strings.HasPrefix(ctrlName, "nvme") && !strings.Contains(ctrlName, "subsys") {
+					pathName := ctrlName + nsID
+
+					if _, errStat := os.Stat(filepath.Join("/sys/block", pathName)); errStat == nil {
+						if len(pathNames) >= maxCapCeiling {
+							break
+						}
+						pathNames = append(pathNames, pathName)
+					}
+				}
+			}
+			if len(pathNames) >= maxCapCeiling || len(entries) < 100 || readErr == io.EOF {
+				break
+			}
+		}
+		
+		logger.Debugf("GetSysDevicesFromMpath: Discovered native path components for %s: %v", baseDevice, pathNames)
+		return pathNames, nil
+	}
+	
+	return nil, fmt.Errorf("unsupported block layer device type layout specification: %s", baseDevice)
 }
