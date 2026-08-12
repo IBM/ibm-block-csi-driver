@@ -52,14 +52,6 @@ var (
 	topologyPrefixes = [...]string{"topology.block.csi.ibm.com"}
 )
 
-type NvmeType string
-
-const (
-	NVMeNative    NvmeType = "native"
-	NVMeNonNative NvmeType = "non-native"
-	NotNVMe       NvmeType = "non-nvme"
-)
-
 const (
 	// In the Dockerfile of the node, specific commands (e.g: multipath, mount...) from the host mounted inside the container in /host directory.
 	// Command lines inside the container will show /host prefix.
