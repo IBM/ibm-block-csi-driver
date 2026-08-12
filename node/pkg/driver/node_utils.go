@@ -30,7 +30,6 @@ import (
 	"strconv"
 	"strings"
 	"time"
-	"unsafe"
 
 	"github.com/ibm/ibm-block-csi-driver/node/pkg/driver/device_connectivity"
 	"golang.org/x/sys/unix"
@@ -90,7 +89,7 @@ type NodeUtilsInterface interface {
 	MakeDir(dirPath string) error
 	MakeFile(filePath string) error
 	ExpandFilesystem(ctx context.Context, devicePath string, volumePath string, fsType string) error
-	ExpandMpathDevice(ctx context.Context, mpathDevice string) error
+	ExpandMpathDevice(ctx context.Context, mpathDevice string, slaves []string) error
 	RescanPhysicalDevices(ctx context.Context, mpathDevice string, sysDevices []string) error
 	FormatDevice(ctx context.Context, devicePath string, fsType string) error
 	IsNotMountPoint(file string) (bool, error)
@@ -400,7 +399,7 @@ func (n NodeUtils) ExpandFilesystem(ctx context.Context, devicePath string, volu
 }
 
 // ExpandMpathDevice handles fork-free file updates across different block storage protocols
-func (n NodeUtils) ExpandMpathDevice(ctx context.Context, mpathDevice string) error {
+func (n NodeUtils) ExpandMpathDevice(ctx context.Context, mpathDevice string, slaves []string) error {
 	if err := ctx.Err(); err != nil {
 		return err
 	}
@@ -418,19 +417,16 @@ func (n NodeUtils) ExpandMpathDevice(ctx context.Context, mpathDevice string) er
 		logger.Warningf("Socket resize map failed for %s: %v. Initiating structural fallback path rescans.", mpathDevice, err)
 		
 		// RESTORED FALLBACK: Retrieve the physical paths and trigger explicit kernel geometric rescans
-		slaves, errSlaves := GetSysDevicesFromMpath(ctx, mpathDevice)
-		if errSlaves == nil {
-			for _, slave := range slaves {
-				if err := n.triggerPhysicalRescan(slave); err != nil {
-					logger.Warningf("Rescan notification skipped for slave path node %s: %v", slave, err)
-				}
+		for _, slave := range slaves {
+			if err := n.triggerPhysicalRescan(slave); err != nil {
+				logger.Warningf("Rescan notification skipped for slave path node %s: %v", slave, err)
 			}
+		}
 			
-			// Retry socket expansion directive following the manual path updates
-			_, err = n.Executer.MultipathdCmd(ctx, mpathDevice, cmd)
-			if err != nil {
-				return fmt.Errorf("multipathd resize map failed after executing path updates: %w", err)
-			}
+		// Retry socket expansion directive following the manual path updates
+		_, err = n.Executer.MultipathdCmd(ctx, mpathDevice, cmd)
+		if err != nil {
+			return fmt.Errorf("multipathd resize map failed after executing path updates: %w", err)
 		}
 	}
 	
