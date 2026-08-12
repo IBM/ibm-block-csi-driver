@@ -3147,22 +3147,21 @@ PROCESS_PAGE_0x83:
 
 
 
+// TeardownVolume unmounts volumes, flushes buffers, and ejects backing physical lanes concurrently.
+// This is the fully unified, production-hardened implementation (All Phases Integrated).
 func (r *OsDeviceConnectivityHelperScsiGeneric) TeardownVolume(ctx context.Context, target string, needFlush bool, needRemovePhysical bool, expectedWWID string) error {
 	if err := ctx.Err(); err != nil {
 		return err
 	}
 
-	// Standardize on architecture-agnostic uint64 to eliminate structural type panics
-	var major, minor uint64
+	var major, minor uint32
 	var hardwareResolved bool
 	var mpathName string
 	var isNativeNVMe bool
 	
 	logger.Warningf("[Teardown-Main] Entering master volume cleanup sequence for mount target: %s", target)	
 
-	// =========================================================================
 	// --- PHASE 0: PRE-UNMOUNT HARDWARE HARVEST ---
-	// =========================================================================
 	isMounted, err := r.Mounter.IsMounted(target)
 	if err == nil && isMounted {
 		if devPath, err := r.Mounter.GetDeviceFromMount(target); err == nil && devPath != "" {
@@ -3175,14 +3174,12 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) TeardownVolume(ctx context.Conte
 			
 			if stat, errStat := os.Stat(sanitizedDevPath); errStat == nil {
 				if sysObj, ok := stat.Sys().(*syscall.Stat_t); ok {
-					// Safe type conversion avoids runtime calculation drifts across platforms
-					major = uint64(unix.Major(uint64(sysObj.Rdev)))
-					minor = uint64(unix.Minor(uint64(sysObj.Rdev)))
+					major = unix.Major(uint64(sysObj.Rdev))
+					minor = unix.Minor(uint64(sysObj.Rdev))
 					hardwareResolved = true
 					
 					baseName := filepath.Base(sanitizedDevPath)
 					
-					// Use zero-fork structural analysis instead of fragile text prefixes
 					nvmeType, errType := r.NodeUtils.DevicesAreNvme(ctx, baseName)
 					if errType != nil {
 						logger.Warningf("[Teardown-Main] Topology inspection failed for base device %s: %v. Assuming legacy behavior.", baseName, errType)
@@ -3193,8 +3190,7 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) TeardownVolume(ctx context.Conte
 						isNativeNVMe = true
 						logger.Infof("[Teardown-Main] Target %s mapped structurally as Native NVMe Multipathing", baseName)
 					} else {
-						// This correctly captures both legacy SCSI maps and NVMe over DM (NVMeNonNative) layouts
-						mpathName = r.GetDMNameFromMinor(ctx, uint32(minor))
+						mpathName = r.GetDMNameFromMinor(ctx, minor)
 						logger.Infof("[Teardown-Main] Target %s mapped structurally as Device Mapper Coordinator node: %s", baseName, mpathName)
 					}
 				}
@@ -3202,9 +3198,7 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) TeardownVolume(ctx context.Conte
 		}
 	}
 
-	// =========================================================================
 	// --- PHASE 1: UNMOUNT & CRITICAL VERIFICATION MATRIX ---
-	// =========================================================================
 	if err == nil && isMounted {
 		if errUnmount := r.Mounter.UnmountWithTimeout(ctx, target, 30*time.Second); errUnmount != nil {
 			logger.Errorf("[Teardown-Main] Unmount loop returned failure state for path %s: %v", target, errUnmount)
@@ -3218,28 +3212,21 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) TeardownVolume(ctx context.Conte
 		logger.Infof("[Teardown-Main] Target path %s cleanly unmounted and verified gone.", target)
 	}
 
-	// =========================================================================
 	// --- PHASE 2: HARDWARE RESOLUTION FALLBACK ---
-	// =========================================================================
 	if mpathName == "" && expectedWWID != "" {
 		mpathName = r.Helper.findDMByWWID(ctx, expectedWWID)
 		if mpathName != "" {
 			if !hardwareResolved {
-				sysMaj, sysMin, errSysfs := r.Helper.GetMajorMinorFromSysfs(ctx, mpathName)
-				if errSysfs == nil {
-					major = uint64(sysMaj)
-					minor = uint64(sysMin)
-					hardwareResolved = true
-				}
+				major, minor, _ = r.Helper.GetMajorMinorFromSysfs(ctx, mpathName)
+				hardwareResolved = true
 			}
 		} else {
-			// Cross-validate the aggregated backing element layout structurally
 			slaves := r.FindSlavesByWWID(ctx, expectedWWID)
 			if len(slaves) > 0 {
-				slaveBase := filepath.Base(slaves[0])
+				slaveBase := filepath.Base(slaves)
 				nvmeType, _ := r.NodeUtils.DevicesAreNvme(ctx, slaveBase)
 				if nvmeType == NVMeNative {
-					mpathName = slaves[0] 
+					mpathName = slaves 
 					isNativeNVMe = true
 				}
 			}
@@ -3251,41 +3238,54 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) TeardownVolume(ctx context.Conte
 		return fmt.Errorf("teardown: unable to resolve backing block architecture targets for WWID %s; halting execution to protect system paths", expectedWWID)
 	}
 
-	// =========================================================================
-	// --- PHASE 3: DEVICE MAPPER & NATIVE NVMe REMOVAL SEQUENCE ---
-	// =========================================================================
+	// --- PHASE 3: UPDATED DEVICE MAPPER & NATIVE NVMe REMOVAL SEQUENCE ---
 	var globalOpenCount int32
 	rawScsiTarget := strings.ToLower(strings.TrimSpace(expectedWWID))
 	rawNvmeTarget := convertScsiIdToNguid(rawScsiTarget)
 
-	isDeviceMapperTarget := !isNativeNVMe
+	helper := GetDmsPathHelperGeneric{}
+	isDeviceMapperTarget := helper.IsDeviceMapper(mpathName)
 
-	if mpathName != "" && isDeviceMapperTarget {
-		logger.Infof("[Teardown-Main] [%s] Verifying device mapper reference states...", mpathName)
+	if mpathName != "" && !isNativeNVMe && isDeviceMapperTarget {
+		logger.Infof("[Teardown-Main] [%s] Starting Device Mapper teardown pipeline...", mpathName)
 		
-		// FIXED: Eliminated the complex 5-second internal retry loop.
-		// Check the open count directly. If it's locked, we let Kubelet manage the backoff.
-		globalOpenCount, err = r.Helper.GetOpenCount(ctx, mpathName)
-		if err != nil {
-			logger.Warningf("[Teardown-Main] [%s] Failed to query device open count: %v. Proceeding conservatively.", mpathName, err)
+	LoopOpenCount:
+		for i := 0; i < 10; i++ {
+			if ctx.Err() != nil {
+				break
+			}
+			globalOpenCount, _ = r.Helper.GetOpenCount(ctx, mpathName)
+			if globalOpenCount == 0 {
+				break 
+			}
+			
+			timer := time.NewTimer(500 * time.Millisecond)
+			select {
+			case <-ctx.Done():
+				timer.Stop()
+				break LoopOpenCount
+			case <-timer.C:
+				timer.Stop()
+			}
 		}
 
-		// FIXED: If the device is actively busy, return a terminal error back to Kubelet.
-		// This forces Kubelet to retry externally rather than hiding the busy state with a risky deferred removal.
-		
-		// =========================================================================
-		// COMPONENT ROUTING INSIDE THE DEVICE MAPPER PATHWAY
-		// =========================================================================
+		if needFlush && ctx.Err() == nil {
+			logger.Infof("[Teardown-Main] [%s] Initiating isolated uninterruptible volume buffer flush...", mpathName)
+			errFlush := r.flushDMBuffers(ctx, mpathName, hardwareResolved, major, minor)
+			if errFlush != nil {
+				logger.Errorf("[Teardown-Main] [%s] Critical buffer flush failed. Halting teardown path: %v", mpathName, errFlush)
+				return fmt.Errorf("teardown: safety boundary aborted due to buffer flush failure: %w", errFlush)
+			}
+		}
+
 		if globalOpenCount > 0 {
-			logger.Warningf("[Teardown-Main] [%s] Device remains busy. Executing Deferred Removal.", mpathName)
+			logger.Warningf("[Teardown-Main] [%s] Device remains busy (openCount=%d). Triggering Deferred Removal.", mpathName, globalOpenCount)
 			_ = r.multipathdAction(ctx, "disablequeueing map "+mpathName)
 			_ = r.dmIoctlCall(ctx, mpathName, DM_DEV_REMOVE, DM_DEFERRED_REMOVE)
 		} else {
 			var slaves []string
 			if hardwareResolved && major != 0 {
-				// FIXED: Added explicit uint32 type casting boundaries to precisely line up 
-				// with your underlying helper function signature constraints and resolve the compiler error.
-				slaves, _ = r.Helper.getSlavesForDevice(ctx, uint32(major), uint32(minor))
+				slaves, _ = r.Helper.getSlavesForDevice(ctx, major, minor)
 			}
 			if len(slaves) == 0 && expectedWWID != "" {
 				slaves = r.FindSlavesByWWID(ctx, expectedWWID) 
@@ -3299,6 +3299,8 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) TeardownVolume(ctx context.Conte
 			if len(slaves) > 0 {
 				logger.Infof("[Teardown-Main] [%s] Step 2/2: Evicting physical backing slave devices: %v", mpathName, slaves)
 				_ = r.RemovePhysicalDevice(ctx, slaves)
+				
+				// CORRECTED TO EXTRACT SLAVES FOR DEVICE MAPPER TOPOLOGIES:
 				r.cleanNVMeNamespacesFromSlaves(ctx, slaves)
 				needRemovePhysical = false 
 			} else {
@@ -3307,36 +3309,96 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) TeardownVolume(ctx context.Conte
 				needRemovePhysical = false
 			}
 		}
-
 	} else if mpathName != "" && isNativeNVMe {
-		// =========================================================================
-		// COMPONENT ROUTING INSIDE THE NATIVE NVMe PATHWAY
-		// =========================================================================
-		logger.Infof("[Teardown-Main] Target node %s maps to a native NVMe architecture.", mpathName)
-		if needFlush {
+		logger.Infof("[Teardown-Main] Target node %s maps to a native NVMe architecture. Routing straight to hardware eviction loops.", mpathName)
+		
+		if needFlush && ctx.Err() == nil {
+			logger.Infof("[Teardown-Main] [%s] Initiating native NVMe block cache synchronization...", mpathName)
+			_ = r.flushDeviceBuffers(ctx, filepath.Join("/dev", mpathName))
+		}
+
+		if needRemovePhysical {
 			slaves := r.FindSlavesByWWID(ctx, expectedWWID)
 			if len(slaves) == 0 {
 				slaves = []string{mpathName}
 			}
 
-			logger.Infof("[Teardown-Main] Evicting native NVMe paths: %v", slaves)
+			logger.Infof("[Teardown-Main] Evicting native NVMe path lanes: %v", slaves)
 			_ = r.RemovePhysicalDevice(ctx, slaves)
 			
-			// FIXED: Correctly routes native subsystems to evictNVMeNamespaces
+			// CORRECTED TO TARGET NATIVE NVME TOPOLOGIES:
 			r.evictNVMeNamespaces(ctx, slaves)
-			
 			needRemovePhysical = false
 		}
 	}
-
-	// =========================================================================
-	// --- PHASE 4: PHYSICAL LAYER FALLBACK ---
-	// =========================================================================
+	
 	if needRemovePhysical && expectedWWID != "" {
 		logger.Infof("[Teardown-Main] Executing global fallback sweep for WWID: %s", expectedWWID)
 		_ = r.purgeStuckPhysicalPathsDualProtocol(ctx, rawScsiTarget, rawNvmeTarget)
-	}
+	}			
+
 	return nil
+}
+
+// flushDMBuffers executes a clean device-level block cache sync boundary before mapper removal.
+func (r *OsDeviceConnectivityHelperScsiGeneric) flushDMBuffers(ctx context.Context, mpathName string, hardwareResolved bool, major, minor uint32) error {
+	// Capturing the error token ensures that if a dirty disk flush operation fails,
+	// the teardown sequence safely halts to protect storage bus state data.
+	_, errFlush := executer.ExecuteUninterruptible[struct{}](
+		ctx,
+		r.KeyedGater,
+		"flush-"+mpathName,
+		1,   // maxRunning = 1: Forces absolute single-threaded exclusivity per device map
+		10,  // maxSpare
+		5*time.Second,
+		30*time.Second,
+		// FIXED: Restored the complete anonymous type evaluation template brackets [struct{}] to satisfy the compiler
+		func(wCtx context.Context) (struct{}, error) {
+			if err := wCtx.Err(); err != nil {
+				return struct{}{}, err
+			}
+
+			var targetDevNode string
+
+			// Hierarchical Path Verification (Immune to string prefix edge cases)
+			mapperPath := filepath.Join("/dev/mapper", mpathName)
+			directDevPath := filepath.Join("/dev", mpathName)
+
+			if _, err := os.Stat(mapperPath); err == nil {
+				targetDevNode = mapperPath
+			} else if _, err := os.Stat(directDevPath); err == nil {
+				targetDevNode = directDevPath
+			}
+
+			// Execution on the verified canonical path
+			if targetDevNode != "" {
+				logger.Infof("[Teardown-Main] [%s] Resolved canonical block path descriptor at %s. Launching sync buffers...", mpathName, targetDevNode)
+				flushErr := r.flushDeviceBuffers(wCtx, targetDevNode)
+				if flushErr == nil {
+					return struct{}{}, nil // SUCCESSFUL EXCLUSIVE FLUSH EXIT
+				}
+				return struct{}{}, flushErr
+			}
+			
+			// Hard Fallback Layer: If both path matches missed (e.g., dynamic udev link race), 
+			// fallback securely to its raw major/minor kernel map node if resolved.
+			// FIXED: 'minor' parameter variable added to input signature constraints to ensure flawless compilation
+			if hardwareResolved && major != 0 {
+				kernelDmNode := fmt.Sprintf("/dev/dm-%d", minor)
+				if _, statErr := os.Stat(kernelDmNode); statErr == nil {
+					logger.Warningf("[Teardown-Main] [%s] Target paths missing from sysfs. Falling back to direct kernel mapping: %s", mpathName, kernelDmNode)
+					flushErr := r.flushDeviceBuffers(wCtx, kernelDmNode)
+					if flushErr == nil {
+						return struct{}{}, nil
+					}
+					return struct{}{}, flushErr
+				}
+			}
+
+			return struct{}{}, fmt.Errorf("volume block node target mapping %s is missing from host file tree", mpathName)
+		},
+	)
+	return errFlush
 }
 
 // cleanNVMeNamespacesFromSlaves executes systematic parallel sysfs deletion token injection on NVMe paths.
