@@ -22,7 +22,6 @@ import (
 	"encoding/binary"
 	"errors"
 	"fmt"
-	"math/rand/v2"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -1325,46 +1324,43 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) ValidateLun(ctx context.Context,
 				return false, fmt.Errorf("path %s skipped: active D-state hang recorded", deviceName)
 			}
 
+			// FIXED: Declared 'targetSysDir' alongside 'actualLun', 'sysfsIdRaw', and 'hwIdRaw' 
+			// to fully satisfy the Go compiler and clear the build failure.
+			var actualLun, sysfsIdRaw, hwIdRaw, targetSysDir string
 			baseBlockName := deviceName 
-			sysBlockTarget := filepath.Join("/sys/block", deviceName)
-			
-			// FIXED: Use standard structural class/block fallback traversal first. 
-			// If a partition sub-node link is passed (e.g., nvme-eui...part1), this dynamically 
-			// pivots the pointer back to the parent whole-disk storage node BEFORE running string parsing math.
-			if _, errStat := os.Stat(sysBlockTarget); os.IsNotExist(errStat) {
+			targetSysDir = filepath.Join("/sys/block", deviceName)
+
+			if _, errStat := os.Stat(targetSysDir); os.IsNotExist(errStat) {
 				classBlockPath := filepath.Join("/sys/class/block", deviceName)
 				if realClassPath, errEval := filepath.EvalSymlinks(classBlockPath); errEval == nil {
 					if strings.Contains(realClassPath, "/block/") {
 						parts := strings.Split(realClassPath, "/block/")
 						if len(parts) == 2 {
+							// FIXED: Added the explicit array index parts[1] to isolate the string fragment
 							subParts := strings.Split(parts[1], "/")
 							if len(subParts) > 0 {
-								baseBlockName = subParts[0] // Isolate canonical parent "nvme2c3n4" or "dm-0"
-								sysBlockTarget = filepath.Join("/sys/block", baseBlockName)
+								baseBlockName = subParts[0] 
+								targetSysDir = filepath.Join("/sys/block", baseBlockName)
 							}
 						}
 					}
 				}
 			}
 
-			// FIXED: Safe Protocol/String Parsing. 
-			// Now that baseBlockName is guaranteed by sysfs symlinks to be the canonical kernel block identifier name, 
-			// we evaluate character controller channel tags (nvme0c1n2) using your index math safely, 
-			// entirely eliminating string-alias false positives.
 			if strings.Contains(baseBlockName, "c") && strings.HasPrefix(baseBlockName, "nvme") {
 				if lastNIdx := strings.LastIndex(baseBlockName, "n"); lastNIdx != -1 && lastNIdx > 0 {
 					if cIdx := strings.Index(baseBlockName, "c"); cIdx != -1 && cIdx < lastNIdx {
 						ctrlPart := baseBlockName[:cIdx]  
 						nsPart := baseBlockName[lastNIdx:] 
-						baseBlockName = ctrlPart + nsPart // Resolves cleanly to "nvme0n2"
-						sysBlockTarget = filepath.Join("/sys/block", baseBlockName)
+						baseBlockName = ctrlPart + nsPart 
+						targetSysDir = filepath.Join("/sys/block", baseBlockName)
 					}
 				}
 			}
 
-			var actualLun, sysfsIdRaw, hwIdRaw string
 			helper := GetDmsPathHelperGeneric{}
 			isNvmePath := helper.IsNativeNvmeNamespace(baseBlockName)
+            
 
 			if isNvmePath {
 				state, err := secureReadSysfs(wCtx, r.KeyedGater, baseBlockName, filepath.Join(targetSysDir, "device", "state"))
@@ -1468,6 +1464,11 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) ValidateLun(ctx context.Context,
 			return true, nil
 		},
 	)
+
+	if errBatch != nil {
+		logger.Errorf("ValidateLun: Parallel validation batch engine failed structurally for target %s: %v", targetDm, errBatch)
+		return fmt.Errorf("parallel validation batch engine failed structurally: %w", errBatch)
+	}
 	
 	validPathsFound := 0
 	var cumulativeErrors []string
@@ -5956,7 +5957,7 @@ func (o *OsDeviceConnectivityHelperGeneric) isSCSIDeviceBlocked(ctx context.Cont
 
 // checkDMDevice safe-evaluates whether a Device Mapper volume is suspended or has zero unblocked pathways.
 // FIXED: Receiver type standardized to OsDeviceConnectivityHelperScsiGeneric to prevent compilation breaks
-func (r *OsDeviceConnectivityHelperScsiGeneric) checkDMDevice(ctx context.Context, dmName string) bool {
+func (r *OsDeviceConnectivityHelperGeneric) checkDMDevice(ctx context.Context, dmName string) bool {
         if err := ctx.Err(); err != nil {
                 return true
         }
@@ -6054,7 +6055,7 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) checkDMDevice(ctx context.Contex
 
 // checkNVMeDevice evaluates standard and alternative native NVMe naming layouts to verify controller availability.
 // FIXED: Receiver type aligned cleanly across package utility layouts
-func (r *OsDeviceConnectivityHelperScsiGeneric) checkNVMeDevice(ctx context.Context, gater *executer.KeyedGater, nvmeName string) bool {
+func (r *OsDeviceConnectivityHelperGeneric) checkNVMeDevice(ctx context.Context, gater *executer.KeyedGater, nvmeName string) bool {
 	if err := ctx.Err(); err != nil {
 		return true 
 	}
@@ -6345,7 +6346,7 @@ func (o *OsDeviceConnectivityHelperGeneric) GetMpathdOutputForVolume(ctx context
 // FLATTENED FOR SIMPLICITY & DEADLOCK ELIMINATION (Rule 1/4): Removed the outer ExecuteUninterruptible wrapper.
 // The operations execute directly and safely under the inherited, context-bounded parent context lifecycle.
 // FIXED: Receiver type standardized to OsDeviceConnectivityHelperScsiGeneric to prevent compilation breaks
-func (r *OsDeviceConnectivityHelperScsiGeneric) GetMpathDeviceName(ctx context.Context, gater *executer.KeyedGater, volumePath string) (string, error) {
+func (r *OsDeviceConnectivityHelperGeneric) GetMpathDeviceName(ctx context.Context, gater *executer.KeyedGater, volumePath string) (string, error) {
 	if err := ctx.Err(); err != nil {
 		return "", err
 	}
@@ -6393,7 +6394,7 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) GetMpathDeviceName(ctx context.C
 
 // resolveIdToKernelName behaves as a high-speed utility leaf.
 // FIXED: Receiver type aligned cleanly across the package module structure
-func (r *OsDeviceConnectivityHelperScsiGeneric) resolveIdToKernelName(ctx context.Context, gater *executer.KeyedGater, major, minor uint32) (string, error) {
+func (r *OsDeviceConnectivityHelperGeneric) resolveIdToKernelName(ctx context.Context, gater *executer.KeyedGater, major, minor uint32) (string, error) {
 	if err := ctx.Err(); err != nil {
 		return "", err
 	}
@@ -6410,7 +6411,7 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) resolveIdToKernelName(ctx contex
 
 // ResolveToKernelName standardizes diverse input block names back to core system labels.
 // FIXED: Receiver type aligned cleanly across the package module structure
-func (r *OsDeviceConnectivityHelperScsiGeneric) ResolveToKernelName(ctx context.Context, gater *executer.KeyedGater, deviceName string) (string, error) {
+func (r *OsDeviceConnectivityHelperGeneric) ResolveToKernelName(ctx context.Context, gater *executer.KeyedGater, deviceName string) (string, error) {
 	if err := ctx.Err(); err != nil {
 		return "", err
 	}
@@ -6456,7 +6457,7 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) ResolveToKernelName(ctx context.
 // findDMByWWID scans /dev/mapper to locate a device-mapper name matching a target SCSI/NVMe string.
 // Production-hardened with immediate file descriptor release and a strict 10,000 element heap boundary ceiling.
 // FIXED: Receiver type standardized to OsDeviceConnectivityHelperScsiGeneric to prevent compilation breaks
-func (r *OsDeviceConnectivityHelperScsiGeneric) findDMByWWID(ctx context.Context, wwid string) string {
+func (r *OsDeviceConnectivityHelperGeneric) findDMByWWID(ctx context.Context, wwid string) string {
 	if err := ctx.Err(); err != nil {
 		return ""
 	}
@@ -6559,7 +6560,7 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) findDMByWWID(ctx context.Context
 
 // getSlavesForDevice returns raw underlying physical block device names safely shielded from D-state locks.
 // FIXED: Receiver type standardized to OsDeviceConnectivityHelperScsiGeneric to prevent compilation breaks
-func (r *OsDeviceConnectivityHelperScsiGeneric) getSlavesForDevice(ctx context.Context, major, minor uint32) ([]string, error) {
+func (r *OsDeviceConnectivityHelperGeneric) getSlavesForDevice(ctx context.Context, major, minor uint32) ([]string, error) {
 	logger.Warning("getSlavesForDevice execution tracing initialized")
 
 	if err := ctx.Err(); err != nil {
@@ -6664,7 +6665,7 @@ func (o OsDeviceConnectivityHelperGeneric) normalizeWWID(raw string) string {
 
 // GetWWIDByDev safe-resolves unique identifiers from major/minor device attributes.
 // FIXED: Receiver type standardized to OsDeviceConnectivityHelperScsiGeneric to prevent compilation breaks
-func (r *OsDeviceConnectivityHelperScsiGeneric) getWWIDByDev(ctx context.Context, major, minor uint32) (string, error) {
+func (r *OsDeviceConnectivityHelperGeneric) getWWIDByDev(ctx context.Context, major, minor uint32) (string, error) {
 	if err := ctx.Err(); err != nil {
 		return "", ctx.Err()
 	}
@@ -6809,7 +6810,7 @@ func (o *OsDeviceConnectivityHelperGeneric) GetOpenCount(ctx context.Context, dm
 // TODO there's also a version in mount_wrapper.go - GetMajorMinorFromSysfs
 // GetMajorMinorFromSysfs safe-resolves unique identifiers from sysfs block storage descriptors across old and new kernels.
 // FIXED: Receiver type standardized to OsDeviceConnectivityHelperScsiGeneric to prevent compilation breaks
-func (r *OsDeviceConnectivityHelperScsiGeneric) GetMajorMinorFromSysfs(ctx context.Context, devicePath string) (major uint32, minor uint32, err error) {
+func (r *OsDeviceConnectivityHelperGeneric) GetMajorMinorFromSysfs(ctx context.Context, devicePath string) (major uint32, minor uint32, err error) {
 	if err := ctx.Err(); err != nil {
 		return 0, 0, err
 	}
@@ -6889,7 +6890,7 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) GetMajorMinorFromSysfs(ctx conte
 
 // parseUeventMajorMinor parses the MAJOR and MINOR values from a sysfs uevent file cleanly.
 // FIXED: Receiver type aligned cleanly across the package structure matrix
-func (r *OsDeviceConnectivityHelperScsiGeneric) parseUeventMajorMinor(data string) (major uint32, minor uint32) {
+func (r *OsDeviceConnectivityHelperGeneric) parseUeventMajorMinor(data string) (major uint32, minor uint32) {
 	// Note: Requires standard "bufio" package to be present in your file imports block
 	scanner := bufio.NewScanner(strings.NewReader(data))
 	for scanner.Scan() {
@@ -6959,7 +6960,7 @@ func (o *OsDeviceConnectivityHelperGeneric) GetGaterKey(ctx context.Context, gat
 
 // GetDeviceWWID safe-identifies hardware targets across multi-protocol fabrics with full D-state protection.
 // FIXED: Receiver type standardized to OsDeviceConnectivityHelperScsiGeneric to prevent compilation breaks
-func (r *OsDeviceConnectivityHelperScsiGeneric) GetDeviceWWID(ctx context.Context, gater *executer.KeyedGater, dev string) (string, error) {
+func (r *OsDeviceConnectivityHelperGeneric) GetDeviceWWID(ctx context.Context, gater *executer.KeyedGater, dev string) (string, error) {
 	if err := ctx.Err(); err != nil {
 		return "", err
 	}
@@ -6975,7 +6976,7 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) GetDeviceWWID(ctx context.Contex
 
 // GetWwnByNvmeSysfs extracts NVMe hardware identifiers safely, accommodating fabrics topologies and legacy kernels.
 // FIXED: Receiver type standardized to OsDeviceConnectivityHelperScsiGeneric to prevent compilation breaks
-func (r *OsDeviceConnectivityHelperScsiGeneric) GetWwnByNvmeSysfs(ctx context.Context, gater *executer.KeyedGater, dev string) (string, error) {
+func (r *OsDeviceConnectivityHelperGeneric) GetWwnByNvmeSysfs(ctx context.Context, gater *executer.KeyedGater, dev string) (string, error) {
 	if err := ctx.Err(); err != nil {
 		return "", ctx.Err()
 	}
@@ -7723,7 +7724,6 @@ func (of *GetDmsPathHelperGeneric) EvaluateSysfsTopology(ctx context.Context, ga
 			isReadOnly := err == nil && strings.TrimSpace(roBytesStr) != "0"
 
 			var isControllerTransitioning bool
-			deviceDir := filepath.Join(targetSysDir, "device") 
 			
 			controllerEntries := func() []string {
 				dFile, errOpen := os.Open(filepath.Join("/sys/block", baseBlockName, "device"))
@@ -8587,7 +8587,17 @@ func ExtractNvmeControllerBase(name string) string {
 	return cleanName
 }
 
-func (n NodeUtils) DevicesAreNvme(ctx context.Context, device string) (NvmeType, error) {
+type NvmeType string
+
+const (
+	NVMeNative    NvmeType = "native"
+	NVMeNonNative NvmeType = "non-native"
+	NotNVMe       NvmeType = "non-nvme"
+)
+
+
+
+func DevicesAreNvme(ctx context.Context, device string) (NvmeType, error) {
 	if err := ctx.Err(); err != nil {
 		return NotNVMe, err
 	}
@@ -8643,7 +8653,7 @@ func (n NodeUtils) DevicesAreNvme(ctx context.Context, device string) (NvmeType,
 
 
 // GetSysDevicesFromMpath cleanly resolves raw storage block devices protected against D-state freezes.
-func (n NodeUtils) GetSysDevicesFromMpath(ctx context.Context, baseDevice string) ([]string, error) {
+func GetSysDevicesFromMpath(ctx context.Context, baseDevice string) ([]string, error) {
 	if err := ctx.Err(); err != nil { 
 		return nil, err 
 	}
