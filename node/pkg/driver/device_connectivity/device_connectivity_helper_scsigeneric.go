@@ -673,90 +673,6 @@ func isNvmeCoreMultipathEnabled(ctx context.Context, gater *executer.KeyedGater)
 
 
 
-// resolveParentAndType inspects the VFS layers to return the whole-disk device parent node and true if it is a Device Mapper.
-func (r *OsDeviceConnectivityHelperScsiGeneric) resolveParentAndType(baseDevice string) (string, bool, error) {
-	sysPath := filepath.Join("/sys/block", baseDevice)
-	
-	// If the path does not exist under /sys/block, check if it's a partition block offset (e.g. /sys/class/block/dm-4)
-	if _, err := os.Stat(sysPath); os.IsNotExist(err) {
-		classPath := filepath.Join("/sys/class/block", baseDevice)
-		realPath, errEval := filepath.EvalSymlinks(classPath)
-		if errEval != nil {
-			return "", false, fmt.Errorf("failed to evaluate block class path for %s: %w", baseDevice, errEval)
-		}
-		
-		// If it's a partition node, parsing the path back components reveals the parent holder device node name cleanly
-		// /sys/devices/virtual/block/dm-0/dm-4 -> parent is dm-0
-		// /sys/devices/pci0000:00/.../block/nvme0n1/nvme0n1p1 -> parent is nvme0n1
-		if strings.Contains(realPath, "/block/") {
-			parts := strings.Split(realPath, "/block/")
-			if len(parts) == 2 {
-				subParts := strings.Split(parts[1], "/")
-				if len(subParts) > 0 {
-					baseDevice = subParts[0]
-				}
-			}
-		}
-	}
-
-	// Ok to check prefix
-	isDM := strings.HasPrefix(baseDevice, "dm-")
-	return baseDevice, isDM, nil
-}
-
-// scanSlavesForSubsystem safely walks the /sys/block/<dev>/slaves folder to inspect backing hardware transport subsystems.
-func (r *OsDeviceConnectivityHelperScsiGeneric) scanSlavesForSubsystem(wCtx context.Context, parentDevice, expectedSubsystem string) (bool, error) {
-	if err := wCtx.Err(); err != nil {
-		return false, err
-	}
-
-	slavesPath := filepath.Join("/sys/block", parentDevice, "slaves")
-	dFile, errOpen := os.Open(slavesPath)
-	if errOpen != nil {
-		if os.IsNotExist(errOpen) {
-			return false, nil
-		}
-		return false, fmt.Errorf("failed to open device slaves directory %s: %w", slavesPath, errOpen)
-	}
-	defer dFile.Close()
-
-	const maxCapCeiling = 10000
-	processedCount := 0
-
-	for {
-		if err := wCtx.Err(); err != nil {
-			return false, err
-		}
-
-		entries, readErr := dFile.ReadDir(100)
-		if readErr != nil && readErr != io.EOF {
-			return false, fmt.Errorf("failed to streaming-read entries from directory %s: %w", slavesPath, readErr)
-		}
-		if len(entries) == 0 || readErr == io.EOF {
-			break
-		}
-
-		for _, entry := range entries {
-			if processedCount >= maxCapCeiling {
-				logger.Warningf("[VFS-Guard] Slaves directory processing bounds hit limits (%d). Truncating scan.", maxCapCeiling)
-				return false, nil
-			}
-			processedCount++
-
-			// Structural Subsystem Check: Query structural /sys definition to completely bypass fake admin text tags.
-			slaveSubsystemPath := filepath.Join("/sys/block", entry.Name(), "device", "subsystem")
-			if target, errEval := filepath.EvalSymlinks(slaveSubsystemPath); errEval == nil {
-				if filepath.Base(target) == expectedSubsystem {
-					logger.Debugf("Storage Scan Match: Device %s confirmed as %s via structural slave element (%s)", parentDevice, expectedSubsystem, entry.Name())
-					return true, nil
-				}
-			}
-		}
-	}
-
-	return false, nil
-}
-
 func (r *OsDeviceConnectivityHelperScsiGeneric) GetMpathDevice(ctx context.Context, volumeId string) (string, error) {
 	if err := ctx.Err(); err != nil {
 		return "", err
@@ -806,7 +722,7 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) flushDeviceBuffers(ctx context.C
 	logger.Warningf("device %s flushDeviceBuffers: initiation sweep via host path %s", devPath, sanitizedDevPath)
 
 	// FIXED: Use structural zero-fork topology inspection to avoid skipping flushes on NVMe-DM maps
-	nvmeType, errType := DevicesAreNvme(ctx, baseName)
+	nvmeType, errType := DevicesAreNvme(ctx, r.KeyedGater, baseName)
 	if errType != nil {
 		logger.Warningf("flushDeviceBuffers: Unable to structurally verify storage protocol for %s: %v. Proceeding with safety flush.", baseName, errType)
 	}
@@ -1114,8 +1030,6 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) ValidateLun(ctx context.Context,
 	rawNvmeTarget := convertScsiIdToNguid(rawScsiTarget)
 	normExpectedLun := r.normalizeLun(strconv.Itoa(expectedLun))
 	
-	hctlRegex := regexp.MustCompile(`(\d+):(\d+):(\d+):(\d+)$`)
-
 	const maxCapCeiling = 10000
 	validDevices := make([]string, 0, len(sysDevices))
 	
@@ -1522,7 +1436,7 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) purgeScsiGhosts(ctx context.Cont
 					return struct{}{}, nil
 				}
 
-				logger.Warningf("Pruning stale SCSI device %s [Vendor: %s, Serial Match: %v, Ghost: %v, Our path: %v]. Executing hot-unplug.", candidate.sgName, vdr, r.IsSerialMatch(hwSerial, expectedSerial), isGhost, isOurPath)
+				logger.Warningf("Pruning stale SCSI device %s [Vendor: %s, Serial Match: %v, Ghost: %v, Our path: %v]. Executing hot-unplug.", candidate.sgName, vdr, r.IsSerialMatch(serialNumber, expectedSerial), ghostState, pathOwned)
 
 				deletePath := filepath.Join(candidate.deviceDir, "delete")
 				if _, errStat := os.Stat(deletePath); os.IsNotExist(errStat) {
@@ -3046,7 +2960,7 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) TeardownVolume(ctx context.Conte
 					
 					baseName := filepath.Base(sanitizedDevPath)
 					
-					nvmeType, errType := DevicesAreNvme(ctx, baseName)
+					nvmeType, errType := DevicesAreNvme(ctx, r.KeyedGater, baseName)
 					if errType != nil {
 						logger.Warningf("[Teardown-Main] Topology inspection failed for base device %s: %v. Assuming legacy behavior.", baseName, errType)
 					}
@@ -3094,7 +3008,7 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) TeardownVolume(ctx context.Conte
 			if len(slaves) > 0 {
 				for _, slavePath := range slaves {
 					slaveBase := filepath.Base(slavePath)
-					nvmeType, _ := DevicesAreNvme(ctx, slaveBase)
+					nvmeType, _ := DevicesAreNvme(ctx, r.KeyedGater, slaveBase)
 					if nvmeType == NVMeNative {
 						mpathName = slavePath
 						isNativeNVMe = true
@@ -4699,7 +4613,7 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) purgeStuckPhysicalPathsDualProto
 
 				// FIXED: Attached the struct receiver pointer 'r.' prefix and corrected 
 				// the return spelling variable from 'picAddress' to 'pciAddress' to clear compilation errors
-				deletePath, pciAddress, useUnbindStrategy := r.getDeletePath(devName, baseBlockName)
+				deletePath, pciAddress, useUnbindStrategy := r.getDeletePath(wCtx, r.KeyedGater, devName, baseBlockName, targetSysDir, isSCSI, isNVMe)
 
 				if deletePath == "" {
 					return struct{}{}, nil
@@ -7641,7 +7555,7 @@ func (of *GetDmsPathHelperGeneric) EvaluateSysfsTopology(ctx context.Context, ga
 			// =========================================================================
 			// SAFE DECOUPLED EVALUATION LOOP
 			// =========================================================================
-			isControllerTransitioning := of.isNvmeControllerTransitioning(ctx, controllerEntries)
+			isControllerTransitioning := of.isNvmeControllerTransitioning(ctx, gater, baseBlockName, controllerEntries)
 
 			if isControllerTransitioning || isReadOnly {
 				return true, true, baseBlockName
@@ -8530,7 +8444,15 @@ func ExtractNvmeControllerBase(name string) string {
 	return cleanName
 }
 
-func (r *OsDeviceConnectivityHelperScsiGeneric) DevicesAreNvme(ctx context.Context, device string) (NvmeType, error) {
+type NvmeType string
+
+const (
+       NVMeNative    NvmeType = "native"
+       NVMeNonNative NvmeType = "non-native"
+       NotNVMe       NvmeType = "non-nvme"
+)
+
+func DevicesAreNvme(ctx context.Context, gater *executer.KeyedGater, device string) (NvmeType, error) {
 	if err := ctx.Err(); err != nil {
 		return NotNVMe, err
 	}
@@ -8538,7 +8460,7 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) DevicesAreNvme(ctx context.Conte
 	logger.Debugf("DevicesAreNvme: Analyzing transport topology structure for device %s", device)
 
 	// Step 1: Check for Native NVMe using the hardened, gater-protected helper
-	isNative, err := r.IsNativeNvmeDevice(ctx, device)
+	isNative, err := IsNativeNvmeDevice(ctx, gater, device)
 	if err != nil {
 		logger.Warningf("DevicesAreNvme: Failed native NVMe evaluation for %s: %v", device, err)
 	} else if isNative {
@@ -8547,7 +8469,7 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) DevicesAreNvme(ctx context.Conte
 	}
 
 	// Step 2: Check for Non-Native NVMe managed via Device Mapper Multipath
-	isNonNative, err := r.IsNonNativeNvmeDevice(ctx, device)
+	isNonNative, err := IsNonNativeNvmeDevice(ctx, gater, device)
 	if err != nil {
 		logger.Warningf("DevicesAreNvme: Failed non-native NVMe evaluation for %s: %v", device, err)
 	} else if isNonNative {
@@ -8562,7 +8484,7 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) DevicesAreNvme(ctx context.Conte
 
 // IsNativeNvmeDevice safe-evaluates whether a block path represents a native NVMe device mapping.
 // Portable from RHEL 7 upwards, completely immune to fake string aliases, and partition-slice aware.
-func (r *OsDeviceConnectivityHelperScsiGeneric) IsNativeNvmeDevice(ctx context.Context, dmPath string) (bool, error) {
+func IsNativeNvmeDevice(ctx context.Context, gater *executer.KeyedGater, dmPath string) (bool, error) {
 	if err := ctx.Err(); err != nil {
 		return false, err
 	}
@@ -8606,7 +8528,7 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) IsNativeNvmeDevice(ctx context.C
 	// Shield the system interaction loop against low-level storage freezes safely
 	return executer.ExecuteUninterruptible[bool](
 		ctx,
-		r.KeyedGater,
+		gater,
 		fmt.Sprintf("check-native-nvme-%s", baseDevice),
 		10, 50, 1*time.Second, 3*time.Second,
 		func(wCtx context.Context) (bool, error) {
@@ -8643,7 +8565,7 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) IsNativeNvmeDevice(ctx context.C
 
 // IsNonNativeNvmeDevice checks if a device-mapper path maps to underlying non-native NVMe fabrics.
 // Protected against fake naming schemes, resource leaks, partition offsets, and D-state freezes.
-func (r *OsDeviceConnectivityHelperScsiGeneric) IsNonNativeNvmeDevice(ctx context.Context, dmPath string) (bool, error) {
+func IsNonNativeNvmeDevice(ctx context.Context, gater *executer.KeyedGater, dmPath string) (bool, error) {
 	if err := ctx.Err(); err != nil {
 		return false, err
 	}
@@ -8656,7 +8578,7 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) IsNonNativeNvmeDevice(ctx contex
 	baseDevice := filepath.Base(resolvedPath)
 
 	// Partition and Device Mapper verification layer
-	parentDevice, isDM, errVerify := r.resolveParentAndType(baseDevice)
+	parentDevice, isDM, errVerify := resolveParentAndType(baseDevice)
 	if errVerify != nil {
 		return false, errVerify
 	}
@@ -8668,14 +8590,99 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) IsNonNativeNvmeDevice(ctx contex
 	gaterKey := "nvme-check-" + parentDevice
 	return executer.ExecuteUninterruptible[bool](
 		ctx,
-		r.KeyedGater,
+		gater,
 		gaterKey,
 		30, 150, 2*time.Second, 8*time.Second,
 		func(wCtx context.Context) (bool, error) {
-			return r.scanSlavesForSubsystem(wCtx, parentDevice, "nvme")
+			return scanSlavesForSubsystem(wCtx, parentDevice, "nvme")
 		},
 	)
 }
+
+// resolveParentAndType inspects the VFS layers to return the whole-disk device parent node and true if it is a Device Mapper.
+func resolveParentAndType(baseDevice string) (string, bool, error) {
+	sysPath := filepath.Join("/sys/block", baseDevice)
+	
+	// If the path does not exist under /sys/block, check if it's a partition block offset (e.g. /sys/class/block/dm-4)
+	if _, err := os.Stat(sysPath); os.IsNotExist(err) {
+		classPath := filepath.Join("/sys/class/block", baseDevice)
+		realPath, errEval := filepath.EvalSymlinks(classPath)
+		if errEval != nil {
+			return "", false, fmt.Errorf("failed to evaluate block class path for %s: %w", baseDevice, errEval)
+		}
+		
+		// If it's a partition node, parsing the path back components reveals the parent holder device node name cleanly
+		// /sys/devices/virtual/block/dm-0/dm-4 -> parent is dm-0
+		// /sys/devices/pci0000:00/.../block/nvme0n1/nvme0n1p1 -> parent is nvme0n1
+		if strings.Contains(realPath, "/block/") {
+			parts := strings.Split(realPath, "/block/")
+			if len(parts) == 2 {
+				subParts := strings.Split(parts[1], "/")
+				if len(subParts) > 0 {
+					baseDevice = subParts[0]
+				}
+			}
+		}
+	}
+
+	// Ok to check prefix
+	isDM := strings.HasPrefix(baseDevice, "dm-")
+	return baseDevice, isDM, nil
+}
+
+// scanSlavesForSubsystem safely walks the /sys/block/<dev>/slaves folder to inspect backing hardware transport subsystems.
+func scanSlavesForSubsystem(wCtx context.Context, parentDevice, expectedSubsystem string) (bool, error) {
+	if err := wCtx.Err(); err != nil {
+		return false, err
+	}
+
+	slavesPath := filepath.Join("/sys/block", parentDevice, "slaves")
+	dFile, errOpen := os.Open(slavesPath)
+	if errOpen != nil {
+		if os.IsNotExist(errOpen) {
+			return false, nil
+		}
+		return false, fmt.Errorf("failed to open device slaves directory %s: %w", slavesPath, errOpen)
+	}
+	defer dFile.Close()
+
+	const maxCapCeiling = 10000
+	processedCount := 0
+
+	for {
+		if err := wCtx.Err(); err != nil {
+			return false, err
+		}
+
+		entries, readErr := dFile.ReadDir(100)
+		if readErr != nil && readErr != io.EOF {
+			return false, fmt.Errorf("failed to streaming-read entries from directory %s: %w", slavesPath, readErr)
+		}
+		if len(entries) == 0 || readErr == io.EOF {
+			break
+		}
+
+		for _, entry := range entries {
+			if processedCount >= maxCapCeiling {
+				logger.Warningf("[VFS-Guard] Slaves directory processing bounds hit limits (%d). Truncating scan.", maxCapCeiling)
+				return false, nil
+			}
+			processedCount++
+
+			// Structural Subsystem Check: Query structural /sys definition to completely bypass fake admin text tags.
+			slaveSubsystemPath := filepath.Join("/sys/block", entry.Name(), "device", "subsystem")
+			if target, errEval := filepath.EvalSymlinks(slaveSubsystemPath); errEval == nil {
+				if filepath.Base(target) == expectedSubsystem {
+					logger.Debugf("Storage Scan Match: Device %s confirmed as %s via structural slave element (%s)", parentDevice, expectedSubsystem, entry.Name())
+					return true, nil
+				}
+			}
+		}
+	}
+
+	return false, nil
+}
+
 
 // GetSysDevicesFromMpath cleanly resolves raw storage block devices protected against D-state freezes.
 func GetSysDevicesFromMpath(ctx context.Context, baseDevice string) ([]string, error) {
