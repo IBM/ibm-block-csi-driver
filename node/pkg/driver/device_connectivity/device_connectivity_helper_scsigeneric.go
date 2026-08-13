@@ -1153,6 +1153,8 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) ValidateLun(ctx context.Context,
 				logger.Warningf("Path %s is currently marked as trapped in a kernel D-state. Skipping route evaluation.", deviceName)
 				return false, fmt.Errorf("path %s skipped: active D-state hang recorded", deviceName)
 			}
+			
+			
 
 			// FIXED: Declared required local path variables and resolved block naming
 			var targetSysDir string
@@ -1166,8 +1168,9 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) ValidateLun(ctx context.Context,
 					if strings.Contains(realClassPath, "/block/") {
 						parts := strings.Split(realClassPath, "/block/")
 						if len(parts) == 2 {
-							subParts := strings.Split(parts, "/")
-							if len(subParts) > 0 {
+							// FIXED: Split the string value parts[1] instead of the slice parts
+							subParts := strings.Split(parts[1], "/")
+							if len(subParts) > 0 && subParts[0] != "" {
 								baseBlockName = subParts[0] 
 								targetSysDir = filepath.Join("/sys/block", baseBlockName)
 							}
@@ -1176,13 +1179,18 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) ValidateLun(ctx context.Context,
 				}
 			}
 
-			if strings.Contains(baseBlockName, "c") && strings.HasPrefix(baseBlockName, "nvme") {
+			// Hardened NVMe virtual character channel cleaner (e.g., nvme1c0n1 -> nvme1n1)
+			if strings.HasPrefix(baseBlockName, "nvme") && strings.Contains(baseBlockName, "c") {
 				if lastNIdx := strings.LastIndex(baseBlockName, "n"); lastNIdx != -1 && lastNIdx > 0 {
 					if cIdx := strings.Index(baseBlockName, "c"); cIdx != -1 && cIdx < lastNIdx {
 						ctrlPart := baseBlockName[:cIdx]  
 						nsPart := baseBlockName[lastNIdx:] 
-						baseBlockName = ctrlPart + nsPart 
-						targetSysDir = filepath.Join("/sys/block", baseBlockName)
+						candidateName := ctrlPart + nsPart 
+						// Verify candidate path exists in sysfs before committing the strip
+						if _, errCand := os.Stat(filepath.Join("/sys/block", candidateName)); errCand == nil {
+							baseBlockName = candidateName
+							targetSysDir = filepath.Join("/sys/block", baseBlockName)
+						}
 					}
 				}
 			}
@@ -1202,11 +1210,12 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) ValidateLun(ctx context.Context,
 			return true, nil
 		},
 	)
-
+	
 	if errBatch != nil {
+		logger.Errorf("ValidateLun: Parallel validation batch engine failed structurally for target %s: %v", targetDm, errBatch)
 		return fmt.Errorf("parallel validation batch engine failed structurally: %w", errBatch)
 	}
-
+	
 	validPathsFound := 0
 	var cumulativeErrors []string
 
@@ -1216,8 +1225,100 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) ValidateLun(ctx context.Context,
 		} else if res.Data {
 			validPathsFound++
 		} else {
+			// FIXED: Defensive boundary check eliminates out-of-bounds slice panics on tracking retries
 			deviceName := "unknown-node"
-			if res.Index >= 0 && res.Index  4 {
+			if res.Index >= 0 && res.Index < len(validDevices) {
+				deviceName = validDevices[res.Index]
+			}
+			cumulativeErrors = append(cumulativeErrors, fmt.Sprintf("path %s skipped during inspection", deviceName))
+		}
+	}
+
+	// At least one path must be completely validated and healthy to proceed.
+	if validPathsFound == 0 {
+		return fmt.Errorf("zero active paths verified for device target %s; cumulative logs: [%s]", targetDm, strings.Join(cumulativeErrors, "; "))
+	}
+
+	logger.Infof("Successfully verified and attached %d multi-path tracks out of %d for lun %d", validPathsFound, len(validDevices), expectedLun)
+	return nil
+}
+
+// validateNvmePathId checks NVMe states, reads NSID/WWID/serial fields, and validates path identities.
+func (r *OsDeviceConnectivityHelperScsiGeneric) validateNvmePathId(wCtx context.Context, deviceName, baseBlockName, targetSysDir, rawScsiTarget, rawNvmeTarget, normExpectedLun string) error {
+	state, errState := secureReadSysfs(wCtx, r.KeyedGater, baseBlockName, filepath.Join(targetSysDir, "device", "state"))
+	if errState != nil || state != "live" {
+		logger.Warningf("NVMe path %s unavailable (state: %s, err: %v); skipping track", baseBlockName, state, errState)
+		return fmt.Errorf("path %s: nvme state not live", baseBlockName)
+	}
+
+	rawNsid, errNsid := secureReadSysfs(wCtx, r.KeyedGater, baseBlockName, filepath.Join(targetSysDir, "nsid"))
+	if errNsid != nil {
+		return fmt.Errorf("path %s: failed to read nsid: %w", baseBlockName, errNsid)
+	}
+	actualLun := r.normalizeLun(rawNsid)
+	
+	sysfsIdRaw, _ := secureReadSysfs(wCtx, r.KeyedGater, baseBlockName, filepath.Join(targetSysDir, "wwid"))
+	if sysfsIdRaw == "" {
+		sysfsIdRaw, _ = secureReadSysfs(wCtx, r.KeyedGater, baseBlockName, filepath.Join(targetSysDir, "device", "wwid"))
+	}
+
+	var isSerialFallback bool
+	if sysfsIdRaw == "" {
+		sysfsIdRaw, _ = secureReadSysfs(wCtx, r.KeyedGater, baseBlockName, filepath.Join(targetSysDir, "device", "serial"))
+		isSerialFallback = (sysfsIdRaw != "")
+	}
+	hwIdRaw := sysfsIdRaw
+
+	if isSerialFallback {
+		normHwIdSerial := strings.ToLower(strings.TrimSpace(hwIdRaw))
+		if !strings.Contains(rawScsiTarget, normHwIdSerial) && !strings.Contains(rawNvmeTarget, normHwIdSerial) {
+			logger.Errorf("NVMe serial configuration profile mismatch on path %s (got ASCII: %s)", baseBlockName, normHwIdSerial)
+			return fmt.Errorf("path %s: serial mismatch (got ASCII %s)", baseBlockName, normHwIdSerial)
+		}
+	}
+	
+	normSysfsId := normalizeWWID(sysfsIdRaw)
+	normHwId := normalizeWWID(hwIdRaw)
+
+	if actualLun != normExpectedLun {
+		logger.Errorf("LUN/NSID layout mismatch on path %s (got %s, exp %s)", deviceName, actualLun, normExpectedLun)
+		return fmt.Errorf("path %s: lun deviation detected", deviceName)
+	}
+
+	if normHwId != rawNvmeTarget {
+		logger.Errorf("Hardware identifier signature mismatch on NVMe path %s (got %s, exp %s)", deviceName, normHwId, rawNvmeTarget)
+		return fmt.Errorf("path %s: nvme identity mismatch", deviceName)
+	}
+
+	if normSysfsId != "" && normSysfsId != normHwId {
+		logger.Errorf("Kernel sysfs and core hardware identification split detected on path %s (Sysfs: %s, HW: %s)", deviceName, normSysfsId, normHwId)
+		return fmt.Errorf("path %s: hardware identity split profile tracking hazard", deviceName)
+	}
+	
+	return nil
+}
+
+// validateScsiPathId checks SCSI path states, resolves LUN/WWID/Inquiry data, and validates identities.
+func (r *OsDeviceConnectivityHelperScsiGeneric) validateScsiPathId(wCtx context.Context, deviceName, baseBlockName, targetSysDir, rawScsiTarget, normExpectedLun string) error {
+	hctlRegex := regexp.MustCompile(`(\d+):(\d+):(\d+):(\d+)$`)
+	
+	state, errState := secureReadSysfs(wCtx, r.KeyedGater, baseBlockName, filepath.Join(targetSysDir, "device", "state"))
+	if errState != nil || state != "running" {
+		logger.Warningf("SCSI path %s checking phase dropped (state: %s, err: %v); skipping track", baseBlockName, state, errState)
+		return fmt.Errorf("path %s: scsi state not running", baseBlockName)
+	}
+
+	var actualLun string
+	var scsiLunEval string
+	rawScsiLun, errLun := secureReadSysfs(wCtx, r.KeyedGater, baseBlockName, filepath.Join(targetSysDir, "device", "lun"))
+	if errLun == nil {
+		scsiLunEval = r.normalizeLun(rawScsiLun)
+	}
+	actualLun = scsiLunEval
+	
+	if actualLun == "" {
+		if devLink, errLink := filepath.EvalSymlinks(filepath.Join(targetSysDir, "device")); errLink == nil {
+			if match := hctlRegex.FindStringSubmatch(devLink); len(match) > 4 {
 				actualLun = r.normalizeLun(match[4])
 			}
 		}
@@ -1237,95 +1338,33 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) ValidateLun(ctx context.Context,
 		}
 	}
 
-	hwIdRaw, errInq := r.Helper.GetWwnByScsiInq(wCtx, r.KeyedGater, sanitizedDevPath)
-	if errInq != nil {
-		logger.Errorf("Hardware query block failure on %s: %v", baseBlockName, errInq)
-		return fmt.Errorf("path %s: inquiry execution crash: %v", baseBlockName, errInq)
-	}
-
-	return r.checkDeviceSerials(deviceName, sysfsIdRaw, hwIdRaw, actualLun, normExpectedLun, rawScsiTarget, "", false)
-}
-
-func (r *OsDeviceConnectivityHelperScsiGeneric) getNvmePathId(wCtx context.Context, baseBlockName, targetSysDir, rawScsiTarget, rawNvmeTarget string) (actualLun, sysfsIdRaw, hwIdRaw string, err error) {
-	state, errState := secureReadSysfs(wCtx, r.KeyedGater, baseBlockName, filepath.Join(targetSysDir, "device", "state"))
-	if errState != nil || state != "live" {
-		logger.Warningf("NVMe path %s unavailable (state: %s, err: %v); skipping track", baseBlockName, state, errState)
-		return "", "", "", fmt.Errorf("path %s: nvme state not live", baseBlockName)
-	}
-
-	rawNsid, errNsid := secureReadSysfs(wCtx, r.KeyedGater, baseBlockName, filepath.Join(targetSysDir, "nsid"))
-	if errNsid != nil {
-		return "", "", "", fmt.Errorf("path %s: failed to read nsid: %w", baseBlockName, errNsid)
-	}
-	actualLun = r.normalizeLun(rawNsid)
-	
-	sysfsIdRaw, _ = secureReadSysfs(wCtx, r.KeyedGater, baseBlockName, filepath.Join(targetSysDir, "wwid"))
-	if sysfsIdRaw == "" {
-		sysfsIdRaw, _ = secureReadSysfs(wCtx, r.KeyedGater, baseBlockName, filepath.Join(targetSysDir, "device", "wwid"))
-	}
-
-	var isSerialFallback bool
-	if sysfsIdRaw == "" {
-		sysfsIdRaw, _ = secureReadSysfs(wCtx, r.KeyedGater, baseBlockName, filepath.Join(targetSysDir, "device", "serial"))
-		isSerialFallback = (sysfsIdRaw != "")
-	}
-	hwIdRaw = sysfsIdRaw
-
-	if isSerialFallback {
-		normHwId := strings.ToLower(strings.TrimSpace(hwIdRaw))
-		if !strings.Contains(rawScsiTarget, normHwId) && !strings.Contains(rawNvmeTarget, normHwId) {
-			logger.Errorf("NVMe serial configuration profile mismatch on path %s (got ASCII: %s)", baseBlockName, normHwId)
-			return "", "", "", fmt.Errorf("path %s: serial mismatch (got ASCII %s)", baseBlockName, normHwId)
-		}
-	}
-	return actualLun, sysfsIdRaw, hwIdRaw, nil
-}
-
-func (r *OsDeviceConnectivityHelperScsiGeneric) getScsiPathId(wCtx context.Context, baseBlockName, targetSysDir string, rawScsiTarget string) (actualLun, sysfsIdRaw, hwIdRaw string, err error) {
-	hctlRegex := regexp.MustCompile(`(\d+):(\d+):(\d+):(\d+)$`)
-	
-	state, errState := secureReadSysfs(wCtx, r.KeyedGater, baseBlockName, filepath.Join(targetSysDir, "device", "state"))
-	if errState != nil || state != "running" {
-		logger.Warningf("SCSI path %s checking phase dropped (state: %s, err: %v); skipping track", baseBlockName, state, errState)
-		return "", "", "", fmt.Errorf("path %s: scsi state not running", baseBlockName)
-	}
-
-	var scsiLunEval string
-	rawScsiLun, errLun := secureReadSysfs(wCtx, r.KeyedGater, baseBlockName, filepath.Join(targetSysDir, "device", "lun"))
-	if errLun == nil {
-		scsiLunEval = r.normalizeLun(rawScsiLun)
-	}
-	actualLun = scsiLunEval
-	
-	if actualLun == "" {
-		if devLink, errLink := filepath.EvalSymlinks(filepath.Join(targetSysDir, "device")); errLink == nil {
-			if match := hctlRegex.FindStringSubmatch(devLink); len(match) > 4 {
-				actualLun = r.normalizeLun(match[4])
-			}
-		}
-	}
-
-	sysfsIdRaw, _ = secureReadSysfs(wCtx, r.KeyedGater, baseBlockName, filepath.Join(targetSysDir, "device", "wwid"))
-
-	sanitizedDevPath := baseBlockName
-	if !filepath.IsAbs(sanitizedDevPath) {
-		mapperPath := filepath.Join("/dev/mapper", baseBlockName)
-		directDevPath := filepath.Join("/dev", baseBlockName)
-
-		if _, errStat := os.Stat(mapperPath); errStat == nil {
-			sanitizedDevPath = mapperPath
-		} else {
-			sanitizedDevPath = directDevPath
-		}
-	}
-
+	var hwIdRaw string
 	var errInq error
 	hwIdRaw, errInq = r.Helper.GetWwnByScsiInq(wCtx, r.KeyedGater, sanitizedDevPath)
 	if errInq != nil {
 		logger.Errorf("Hardware query block failure on %s: %v", baseBlockName, errInq)
-		return "", "", "", fmt.Errorf("path %s: inquiry execution crash: %v", baseBlockName, errInq)
+		return fmt.Errorf("path %s: inquiry execution crash: %v", baseBlockName, errInq)
 	}
-	return actualLun, sysfsIdRaw, hwIdRaw, nil
+	
+	normSysfsId := normalizeWWID(sysfsIdRaw)
+	normHwId := normalizeWWID(hwIdRaw)
+
+	if actualLun != normExpectedLun {
+		logger.Errorf("LUN/NSID layout mismatch on path %s (got %s, exp %s)", deviceName, actualLun, normExpectedLun)
+		return fmt.Errorf("path %s: lun deviation detected", deviceName)
+	}
+
+	if normHwId != rawScsiTarget {
+		logger.Errorf("Hardware identifier signature mismatch on SCSI path %s (got %s, exp %s)", deviceName, normHwId, rawScsiTarget)
+		return fmt.Errorf("path %s: scsi identity mismatch", deviceName)
+	}
+
+	if normSysfsId != "" && normSysfsId != normHwId {
+		logger.Errorf("Kernel sysfs and core hardware identification split detected on path %s (Sysfs: %s, HW: %s)", deviceName, normSysfsId, normHwId)
+		return fmt.Errorf("path %s: hardware identity split profile tracking hazard", deviceName)
+	}
+	
+	return nil
 }
 
 
