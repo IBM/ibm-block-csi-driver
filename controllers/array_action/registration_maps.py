@@ -17,6 +17,7 @@ replication_plugin_type = _generate_plugin_type('replication')
 volume_group_plugin_type = _generate_plugin_type('volume_group')
 snapshot_plugin_type = _generate_plugin_type('snapshot')
 host_definition_plugin_type = _generate_plugin_type('host_definition')
+ramen_plugin_type = _generate_plugin_type('ramen')
 
 
 REGISTRATION_MAP = {
@@ -38,4 +39,5 @@ REGISTRATION_MAP = {
     'delete_host': host_definition_plugin_type,
     'add_ports_to_host': host_definition_plugin_type,
     'remove_ports_from_host': host_definition_plugin_type,
+    'get_replication_destination_info': ramen_plugin_type,
 }
