@@ -280,9 +280,7 @@ func (d *NodeService) NodeStageVolume(ctx context.Context, req *csi.NodeStageVol
 		return nil, status.Errorf(codes.Internal, "failed to create staging target directory: %v", err)
 	}	
 
-	// FIXED: Pass stagingPathWithHostPrefix instead of stagingPath to ensure format/mount operations targeting
-	// the proper namespace work seamlessly across all protocols
-	if err = d.formatAndMount(ctx, mpathDevice, stagingPathWithHostPrefix, fsTypeForMount, existingFormat); err != nil {
+	if err = d.formatAndMount(ctx, mpathDevice, stagingPath, fsTypeForMount, existingFormat); err != nil {
 		return nil, status.Error(codes.Internal, err.Error())
 	}
 
@@ -915,14 +913,12 @@ func (d *NodeService) NodeExpandVolume(ctx context.Context, req *csi.NodeExpandV
 		return nil, status.Error(codes.Internal, err.Error())
 	}
 	logger.Warningf("Detected storage format: %s", existingFormat)
-
-	// FIXED: Ensure staging paths are sanitized using the host path prefix utility wrapper
-	rawMountPoint := req.GetStagingTargetPath()
-	if rawMountPoint == "" {
-		rawMountPoint = req.GetVolumePath()
+	
+	mountPointToExpand := req.GetStagingTargetPath()
+	if mountPointToExpand == "" {
+		mountPointToExpand = req.GetVolumePath()
 	}
-	mountPointToExpand := d.NodeUtils.GetPodPath(rawMountPoint)
-
+	
 	err = d.NodeUtils.ExpandFilesystem(ctx, device, mountPointToExpand, existingFormat)
 	if err != nil {
 		logger.Errorf("Could not resize {%v} file system of {%v}, error: %v", existingFormat, device, err)
