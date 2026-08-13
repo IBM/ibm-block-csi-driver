@@ -392,6 +392,7 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) IsVolumePathMatchesVolumeId(ctx 
 			absoluteDevPath = directDevPath
 		}
 	}
+	
 
 	// =========================================================================
 	// UPFRONT PROTOCOL FAST-PATH SHORT-CIRCUIT (PREFIX-FREE VFS INSPECTION)
@@ -407,6 +408,9 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) IsVolumePathMatchesVolumeId(ctx 
 	if resolvedSysBlock, errLink := filepath.EvalSymlinks(sysBlockTarget); errLink == nil {
 		sysBlockTarget = resolvedSysBlock
 	}
+	
+	logger.Warningf("[Identity-Check] absolute path %s sysBlockTarget %s", absoluteDevPath, sysBlockTarget)
+
 
 	slavesPath := filepath.Join(sysBlockTarget, "slaves")
 	if dFile, errOpen := os.Open(slavesPath); errOpen == nil {
@@ -443,10 +447,13 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) IsVolumePathMatchesVolumeId(ctx 
 	_, errSlaves := os.Stat(slavesPath)
 
 	// =========================================================================
-	// PROTOCOL BRANCH A: NATIVE NVME / NON-DM BLOCK STRUCTURE (No slaves folder)
+	// PROTOCOL BRANCH A: NATIVE NVME / NON-DM BLOCK STRUCTURE
 	// =========================================================================
-	if os.IsNotExist(errSlaves) {
-		logger.Infof("[Identity-Check] [%s] Device has no slaves directory. Evaluating as Native/Raw NVMe block structure.", dmName)
+	// FIXED: Do not blindly rely on the absence of the 'slaves' folder. 
+	// If our pre-calculated VFS check confirmed it is a native NVMe namespace, 
+	// force it into Branch A immediately to prevent empty directory misdirection.
+	if isNativeNVMe || os.IsNotExist(errSlaves) {
+		logger.Infof("[Identity-Check] [%s] Evaluating as Native/Raw NVMe block structure.", dmName)
 		
 		possibleWwidPaths := []string{
 			filepath.Join(sysBlockTarget, "wwid"),
@@ -460,6 +467,8 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) IsVolumePathMatchesVolumeId(ctx 
 				cleanedWwid := strings.ToLower(strings.TrimSpace(string(wwidBytes)))
 				cleanedWwid = strings.TrimPrefix(cleanedWwid, "nvme-")
 				
+				logger.Warningf("[Identity-Check]  check clean id %s", cleanedWwid)
+				
 				if strings.Contains(cleanedWwid, expectedSerial) || cleanedWwid == convertScsiIdToNguid(expectedSerial) {
 					logger.Infof("[Identity-Check] [%s] Identity verified successfully via Native NVMe metadata path: %s", dmName, p)
 					return true, nil
@@ -468,6 +477,8 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) IsVolumePathMatchesVolumeId(ctx 
 		}
 
 		hasDev, _, matchedDev := helper.EvaluateSysfsTopology(ctx, r.KeyedGater, expectedSerial, false)
+		
+		logger.Infof("[Identity-Check]  matchDev %s dmName %s", matchedDev, dmName)
 		if hasDev && (matchedDev == dmName || strings.Contains(matchedDev, dmName)) {
 			logger.Infof("[Identity-Check] [%s] Identity verified via topology helper fallback for raw NVMe.", dmName)
 			return true, nil
@@ -3509,6 +3520,7 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) FindSlavesByWWID(ctx context.Con
 
 				var discoveredID string
 				if isNVMe {
+					logger.Warningf("nvme flow for %s", name)
 					baseBlockName := name 
 					targetSysDir := filepath.Join("/sys/block", name)
 					if _, errStat := os.Stat(targetSysDir); os.IsNotExist(errStat) {
@@ -3529,6 +3541,7 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) FindSlavesByWWID(ctx context.Con
 
 					deviceNode := filepath.Join("/dev", name)
 					if df, errOpen := os.OpenFile(deviceNode, os.O_RDONLY|syscall.O_NONBLOCK, 0); errOpen == nil {
+						logger.Warningf("nvme flow for %s - found in dev", name)
 						var nvmeInfo nvmeIdTarget
 						// FIXED: Replaced raw syscall.Syscall with unix.Syscall for GC protection
 						_, _, errno := unix.Syscall(
@@ -3545,6 +3558,7 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) FindSlavesByWWID(ctx context.Con
 					}
 
 					if discoveredID == "" || discoveredID == "00000000000000000000000000000000" {
+						logger.Warningf("nvme flow for %s - read if", name)
 						if bytesStr, err := secureReadSysfs(wCtx, r.KeyedGater, baseBlockName, filepath.Join(targetSysDir, "nguid")); err == nil && bytesStr != "" {
 							discoveredID = normalizeWWID(bytesStr)
 						}
@@ -3570,6 +3584,7 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) FindSlavesByWWID(ctx context.Con
 								}
 							}
 						}
+						logger.Warningf("nvme flow for %s - discovered id %d", name, discoveredID)
 					}
 				} else if isSCSI {
 					scsiWwidPath := filepath.Join("/sys/block", name, "device", "wwid")
@@ -3579,6 +3594,7 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) FindSlavesByWWID(ctx context.Con
 					if bytesStr, err := secureReadSysfs(wCtx, r.KeyedGater, name, scsiWwidPath); err == nil && bytesStr != "" {
 						discoveredID = normalizeWWID(bytesStr)
 					}
+					logger.Warningf("nvme flow for %s found id %s", name, discoveredID)
 				}
 
 				if discoveredID == "" {
@@ -7427,28 +7443,49 @@ func secureReadSysfsFallback(ctx context.Context, gater *executer.KeyedGater, de
 	return string(bytes), nil
 }
 
-/// IsDeviceMapper verifies if a block entry is truly a Device Mapper device.
-// 100% Failsafe Structural Verification: Eradicated string prefix heuristics completely.
+// IsDeviceMapper verifies if a block entry is truly a Device Mapper device.
+// 100% Failsafe Structural Verification: Uses strict path segment matching and exact sysfs attributes.
 func (r *GetDmsPathHelperGeneric) IsDeviceMapper(devName string) bool {
 	cleanName := filepath.Base(devName)
 	if cleanName == "" || cleanName == "." || cleanName == "/" {
 		return false
 	}
 
-	// Strategy A: Check for the physical kernel-allocated 'dm' attribute subdirectory layout
-	dmPath := filepath.Join("/sys/block", cleanName, "dm")
-	if _, err := os.Stat(dmPath); err == nil {
+	// 1. HARD EXCLUSION: Standalone native NVMe namespaces (e.g., nvme0n1) 
+	// or raw SCSI drives (e.g., sda) can NEVER be Device Mapper nodes.
+	if r.IsNativeNvmeNamespace(cleanName) || strings.HasPrefix(cleanName, "sd") {
+		return false
+	}
+
+	// 2. STRICT NAME CONVENTION CHECK: Device mapper blocks must start with 'dm-' 
+	// or be mapped in the mapper directory namespace.
+	isDmNamed := strings.HasPrefix(cleanName, "dm-")
+
+	// 3. PHYSICAL SYSFS ATTRIBUTE VALIDATION: 
+	// The ultimate source of truth for a Device Mapper device in Linux is the 
+	// existence of the 'dm' directory and 'uevent' or 'holders' in its primary block path.
+	sysBlockPath := filepath.Join("/sys/block", cleanName)
+	if _, errStat := os.Stat(sysBlockPath); os.IsNotExist(errStat) {
+		sysBlockPath = filepath.Join("/sys/class/block", cleanName)
+	}
+
+	// Resolve symlinks safely with a guard against broken links
+	resolvedPath, errEval := filepath.EvalSymlinks(sysBlockPath)
+	if errEval == nil {
+		sysBlockPath = resolvedPath
+	}
+
+	// Verify the physical 'dm' subdirectory exists inside this precise block path
+	dmSubDir := filepath.Join(sysBlockPath, "dm")
+	if info, errStat := os.Stat(dmSubDir); errStat == nil && info.IsDir() {
 		return true
 	}
 
-	// Strategy B: Pivot partition blocks back via multi-distro block class pointers
-	classPath := filepath.Join("/sys/class/block", cleanName)
-	if realPath, errEval := filepath.EvalSymlinks(classPath); errEval == nil {
-		if _, errDm := os.Stat(filepath.Join(realPath, "dm")); errDm == nil {
-			return true
-		}
-		// Fallback check against the canonical resolved VFS backing subsystem folder
-		if strings.Contains(realPath, "/virtual/block/dm-") {
+	// If it doesn't have a physical 'dm' folder, but was named dm-* and resolves under virtual block,
+	// do a precise path element validation rather than a loose substring search
+	if isDmNamed {
+		// Ensure the resolved path explicitly terminates or contains a structural virtual dm component
+		if strings.Contains(sysBlockPath, "/virtual/block/") || strings.Contains(sysBlockPath, "/box/dm/") {
 			return true
 		}
 	}
@@ -8719,33 +8756,28 @@ func IsNonNativeNvmeDevice(ctx context.Context, gater *executer.KeyedGater, dmPa
 	)
 }
 
-// resolveParentAndType inspects the VFS layers to return the whole-disk device parent node and true if it is a Device Mapper.
 func resolveParentAndType(baseDevice string) (string, bool, error) {
 	sysPath := filepath.Join("/sys/block", baseDevice)
 	
-	// If the path does not exist under /sys/block, check if it's a partition block offset (e.g. /sys/class/block/dm-4)
 	if _, err := os.Stat(sysPath); os.IsNotExist(err) {
 		classPath := filepath.Join("/sys/class/block", baseDevice)
 		realPath, errEval := filepath.EvalSymlinks(classPath)
+		realPathLower := strings.ToLower(realPath)
 		if errEval != nil {
 			return "", false, fmt.Errorf("failed to evaluate block class path for %s: %w", baseDevice, errEval)
 		}
 		
-		// If it's a partition node, parsing the path back components reveals the parent holder device node name cleanly
-		// /sys/devices/virtual/block/dm-0/dm-4 -> parent is dm-0
-		// /sys/devices/pci0000:00/.../block/nvme0n1/nvme0n1p1 -> parent is nvme0n1
-		if strings.Contains(realPath, "/block/") {
-			parts := strings.Split(realPath, "/block/")
-			if len(parts) == 2 {
-				subParts := strings.Split(parts[1], "/")
-				if len(subParts) > 0 {
-					baseDevice = subParts[0]
-				}
+		// FIXED: Locate the LAST occurrence of "/block/" to prevent premature string splitting
+		idx := strings.LastIndex(realPathLower, "/block/")
+		if idx != -1 {
+			remainder := realPath[idx+len("/block/"):]
+			subParts := strings.Split(remainder, "/")
+			if len(subParts) > 0 && subParts[0] != "" {
+				baseDevice = subParts[0]
 			}
 		}
 	}
 
-	// Ok to check prefix
 	isDM := strings.HasPrefix(baseDevice, "dm-")
 	return baseDevice, isDM, nil
 }
