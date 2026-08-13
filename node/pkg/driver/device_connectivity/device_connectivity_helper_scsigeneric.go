@@ -6890,9 +6890,12 @@ func (o *GetDmsPathHelperGeneric) WaitForDmToExist(ctx context.Context, gater *e
 			lastCount = 0
 			lastRo = "unknown"
 			
+			logger.Warning("waitInterval - before")
 			if err := o.waitInterval(ctx, intervalSeconds); err != nil {
+				logger.Warning("waitInterval - expired")
 				return "", err
 			}
+			logger.Warning("waitInterval - continue")
 			continue
 		}
 
@@ -6917,6 +6920,7 @@ func (o *GetDmsPathHelperGeneric) WaitForDmToExist(ctx context.Context, gater *e
 			path = directDevPath
 		}
 
+		logger.Warning("before IsDeviceMapper")
 		isDM := o.IsDeviceMapper(baseBlockName)
 		count := 0
 		
@@ -6928,6 +6932,7 @@ func (o *GetDmsPathHelperGeneric) WaitForDmToExist(ctx context.Context, gater *e
 			// FIXED: Replaced strings.HasPrefix("nvme") with structural subsystem checking.
 			// Probing for the presence of an NVMe configuration file or an active ANA node 
 			// isolates fabrics targets cleanly without depending on prefix text heuristics.
+			logger.Warningf("[Topology-PathCheck] Querying Native NVMe transport lane metrics for: %s", baseBlockName)
 			rawSubsysDevicesDir := filepath.Join("/sys/block", baseBlockName, "device", "subsystem")
 			subsysDevicesDir, errLink := filepath.EvalSymlinks(rawSubsysDevicesDir)
 			if errLink != nil {
@@ -7023,6 +7028,9 @@ func (o *GetDmsPathHelperGeneric) WaitForDmToExist(ctx context.Context, gater *e
 				}
 			}
 
+			logger.Warningf("[Settle-Main] Finalizing path tracks. Target device location: %s", path)
+
+			// FLATTENED FOR STABILITY: Direct execution of hardware settling parameters.
 			settleErr := o.safeSettle(ctx, gater, path)
 			if settleErr == nil {
 				validatedPath, valErr := o.validateDMIntegrity(ctx, gater, path)
@@ -7032,14 +7040,17 @@ func (o *GetDmsPathHelperGeneric) WaitForDmToExist(ctx context.Context, gater *e
 			}
 			
 			stableCycles = 0
+			logger.Warning("reset stableCycles due to integration or validation step failure")
 		}
 
 		lastCount = count
 		lastRo = ro
 
+		logger.Warning("waitInterval2 - before")
 		if err := o.waitInterval(ctx, intervalSeconds); err != nil {
 			return "", err
 		}
+		logger.Warning("waitInterval2 - after")
 	}
 
 	return "", &MultipathDeviceNotFoundForVolumeError{volumeWWID}
