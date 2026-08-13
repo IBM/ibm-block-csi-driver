@@ -1916,6 +1916,7 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
     def _is_remote_volume_uid_supported(self, raw_cli_volume):
         return hasattr(raw_cli_volume, 'remote_volume_uid')
 
+    @register_csi_plugin()
     def get_replication_destination_info(self, object_id, object_uid, dr_mediator=None, force_dr_mediator=False):
         volume_internal_id = object_id if object_id else self._get_volume_internal_id_from_uid(object_uid)
         raw_cli_volume = self._get_cli_volume(volume_internal_id)
