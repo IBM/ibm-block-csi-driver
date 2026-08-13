@@ -7126,12 +7126,9 @@ func (o *GetDmsPathHelperGeneric) WaitForDmToExist(ctx context.Context, gater *e
 		} else if strings.HasPrefix(baseBlockName, "nvme") {
 			logger.Warningf("[Topology-PathCheck] Querying Native NVMe transport lane metrics for: %s", baseBlockName)
 			
-			// FIXED: Target the subsystem link layer folder to properly capture active multi-path sibling nodes
 			rawSubsysDevicesDir := filepath.Join("/sys/block", baseBlockName, "device", "subsystem")
-			
 			subsysDevicesDir, errLink := filepath.EvalSymlinks(rawSubsysDevicesDir)
 			if errLink != nil {
-				// Fallback: If subsystem links vary across older kernels, revert to the whole disk block parent root
 				subsysDevicesDir = filepath.Join("/sys/block", baseBlockName, "device")
 			}
 
@@ -7142,7 +7139,6 @@ func (o *GetDmsPathHelperGeneric) WaitForDmToExist(ctx context.Context, gater *e
 				}
 				defer dFile.Close()
 				
-				// FIXED: Restored compiler variables to resolve immediate type build failures
 				const maxCapCeiling = 10000
 				processedEntriesCount := 0
 				nvmeLanes := 0
@@ -7159,13 +7155,11 @@ func (o *GetDmsPathHelperGeneric) WaitForDmToExist(ctx context.Context, gater *e
 					
 					for _, entry := range entries {
 						if processedEntriesCount >= maxCapCeiling {
-							logger.Warningf("[VFS-Guard] NVMe transport sub-directories reached maximum processing ceiling (%d). Truncating scan.", maxCapCeiling)
 							break
 						}
 						processedEntriesCount++
 
 						entryName := entry.Name()
-						// Natively track sibling namespaces connected to the active subsystem fabric
 						if strings.HasPrefix(entryName, "nvme") && !strings.Contains(entryName, "-") {
 							nvmeLanes++
 						}
@@ -7181,6 +7175,16 @@ func (o *GetDmsPathHelperGeneric) WaitForDmToExist(ctx context.Context, gater *e
 			if errOpen == nil {
 				count = countResult
 			}
+
+			// FIXED: Native NVMe fallback. If directory parsing yields 0 lanes for a live 
+			// raw namespace node, assign a baseline path count of 1 to satisfy stability gates.
+			if count == 0 {
+				if _, errStat := os.Stat(path); errStat == nil {
+					logger.Warningf("[Topology-PathCheck] Zero NVMe subsystem lanes enumerated, but raw endpoint is active. Promoting native fallback count to 1 for: %s", baseBlockName)
+					count = 1
+				}
+			}
+
 			logger.Warningf("resolved path/slave count is %d", count)
 		}
 		
@@ -8249,8 +8253,8 @@ func (o GetDmsPathHelperGeneric) GetSlaveCount(path string) int {
 }
 */
 
+
 /// validateDMIntegrity now accepts a context and a KeyedGater to enforce D-state hang protection boundaries.
-// FIXED: Receiver type converted to a pointer specifier to ensure synchronized package-wide alignment
 func (o *GetDmsPathHelperGeneric) validateDMIntegrity(ctx context.Context, gater *executer.KeyedGater, dmPath string) (string, error) {
 	if err := ctx.Err(); err != nil {
 		return "", ctx.Err()
@@ -8259,7 +8263,10 @@ func (o *GetDmsPathHelperGeneric) validateDMIntegrity(ctx context.Context, gater
 	dmName := filepath.Base(dmPath)
 	const maxCapCeiling = 10000
 	
-	if o.IsNativeNvmeNamespace(dmName) {
+	// FIXED: Explicitly check if it's actually a Device Mapper node first. 
+	// If it's a raw namespace or native path, bypass the DM-slaves assumption entirely.
+	isDM := o.IsDeviceMapper(dmName)
+	if o.IsNativeNvmeNamespace(dmName) || !isDM {
 		anaStatePath := filepath.Join("/sys/block", dmName, "ana_state")
 		
 		if anaBytesStr, err := secureReadSysfsFallback(ctx, gater, dmName, anaStatePath); err == nil && anaBytesStr != "" {
