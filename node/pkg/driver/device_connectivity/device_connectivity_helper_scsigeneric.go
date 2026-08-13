@@ -8464,7 +8464,7 @@ const (
        NotNVMe       NvmeType = "non-nvme"
 )
 
-func (r *OsDeviceConnectivityHelperScsiGeneric) DevicesAreNvme(ctx context.Context, device string) (NvmeType, error) {
+func DevicesAreNvme(ctx context.Context, gater *executer.KeyedGater, device string) (NvmeType, error) {
 	if err := ctx.Err(); err != nil {
 		return NotNVMe, err
 	}
