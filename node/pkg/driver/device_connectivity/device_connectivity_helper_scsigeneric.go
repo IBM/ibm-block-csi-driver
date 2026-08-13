@@ -1102,7 +1102,7 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) readSysfs(path string) string {
 	return strings.Trim(string(data), " \n\r\t\x00")
 }
 
-// ValidateLun performs validation metrics across active and alternative device mapper multi-p
+// ValidateLun performs validation metrics across active and alternative device mapper multi-path lines.
 func (r *OsDeviceConnectivityHelperScsiGeneric) ValidateLun(ctx context.Context, targetDm string, expectedLun int, sysDevices []string, expectedSerial string) error {
 	if err := ctx.Err(); err != nil {
 		return err
@@ -1154,7 +1154,9 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) ValidateLun(ctx context.Context,
 				return false, fmt.Errorf("path %s skipped: active D-state hang recorded", deviceName)
 			}
 
-			var actualLun, sysfsIdRaw, hwIdRaw, targetSysDir string
+			// FIXED: Declared required local path variables and resolved block naming
+			var targetSysDir string
+			var err error
 			baseBlockName := deviceName 
 			targetSysDir = filepath.Join("/sys/block", deviceName)
 
@@ -1164,7 +1166,7 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) ValidateLun(ctx context.Context,
 					if strings.Contains(realClassPath, "/block/") {
 						parts := strings.Split(realClassPath, "/block/")
 						if len(parts) == 2 {
-							subParts := strings.Split(parts[1], "/")
+							subParts := strings.Split(parts, "/")
 							if len(subParts) > 0 {
 								baseBlockName = subParts[0] 
 								targetSysDir = filepath.Join("/sys/block", baseBlockName)
@@ -1176,19 +1178,72 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) ValidateLun(ctx context.Context,
 
 			if strings.Contains(baseBlockName, "c") && strings.HasPrefix(baseBlockName, "nvme") {
 				if lastNIdx := strings.LastIndex(baseBlockName, "n"); lastNIdx != -1 && lastNIdx > 0 {
-					if cIdx := strings.Index(baseBlockName, "c"); cIdx != -1 && cIdx = 0 && res.Index < len(validDevices) {
-				deviceName = validDevices[res.Index]
+					if cIdx := strings.Index(baseBlockName, "c"); cIdx != -1 && cIdx < lastNIdx {
+						ctrlPart := baseBlockName[:cIdx]  
+						nsPart := baseBlockName[lastNIdx:] 
+						baseBlockName = ctrlPart + nsPart 
+						targetSysDir = filepath.Join("/sys/block", baseBlockName)
+					}
+				}
 			}
-			cumulativeErrors = append(cumulativeErrors, fmt.Sprintf("path %s skipped during inspection", deviceName))
+
+			isNvmePath := r.IsNativeNvmeNamespace(baseBlockName)
+
+			if isNvmePath {
+				err = r.validateNvmePathId(wCtx, deviceName, baseBlockName, targetSysDir, rawScsiTarget, rawNvmeTarget, normExpectedLun)
+			} else {
+				err = r.validateScsiPathId(wCtx, deviceName, baseBlockName, targetSysDir, rawScsiTarget, normExpectedLun)
+			}
+			
+			if err != nil {
+				return false, err
+			}
+
+			return true, nil
+		},
+	)
+
+	if errBatch != nil {
+		return fmt.Errorf("parallel validation batch engine failed structurally: %w", errBatch)
+	}
+
+	validPathsFound := 0
+	var cumulativeErrors []string
+
+	for _, res := range results {
+		if res.Err != nil {
+			cumulativeErrors = append(cumulativeErrors, res.Err.Error())
+		} else if res.Data {
+			validPathsFound++
+		} else {
+			deviceName := "unknown-node"
+			if res.Index >= 0 && res.Index  4 {
+				actualLun = r.normalizeLun(match[4])
+			}
 		}
 	}
 
-	if validPathsFound == 0 {
-		return fmt.Errorf("zero active paths verified for device target %s; cumulative logs: [%s]", targetDm, strings.Join(cumulativeErrors, "; "))
+	sysfsIdRaw, _ := secureReadSysfs(wCtx, r.KeyedGater, baseBlockName, filepath.Join(targetSysDir, "device", "wwid"))
+
+	sanitizedDevPath := baseBlockName
+	if !filepath.IsAbs(sanitizedDevPath) {
+		mapperPath := filepath.Join("/dev/mapper", baseBlockName)
+		directDevPath := filepath.Join("/dev", baseBlockName)
+
+		if _, errStat := os.Stat(mapperPath); errStat == nil {
+			sanitizedDevPath = mapperPath
+		} else {
+			sanitizedDevPath = directDevPath
+		}
 	}
 
-	logger.Infof("Successfully verified and attached %d multi-path tracks out of %d for lun %d", validPathsFound, len(validDevices), expectedLun)
-	return nil
+	hwIdRaw, errInq := r.Helper.GetWwnByScsiInq(wCtx, r.KeyedGater, sanitizedDevPath)
+	if errInq != nil {
+		logger.Errorf("Hardware query block failure on %s: %v", baseBlockName, errInq)
+		return fmt.Errorf("path %s: inquiry execution crash: %v", baseBlockName, errInq)
+	}
+
+	return r.checkDeviceSerials(deviceName, sysfsIdRaw, hwIdRaw, actualLun, normExpectedLun, rawScsiTarget, "", false)
 }
 
 func (r *OsDeviceConnectivityHelperScsiGeneric) getNvmePathId(wCtx context.Context, baseBlockName, targetSysDir, rawScsiTarget, rawNvmeTarget string) (actualLun, sysfsIdRaw, hwIdRaw string, err error) {
@@ -1226,7 +1281,6 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) getNvmePathId(wCtx context.Conte
 	return actualLun, sysfsIdRaw, hwIdRaw, nil
 }
 
-// FIXED: Converted to a method receiver matching OsDeviceConnectivityHelperScsiGeneric and added missing parameters
 func (r *OsDeviceConnectivityHelperScsiGeneric) getScsiPathId(wCtx context.Context, baseBlockName, targetSysDir string, rawScsiTarget string) (actualLun, sysfsIdRaw, hwIdRaw string, err error) {
 	hctlRegex := regexp.MustCompile(`(\d+):(\d+):(\d+):(\d+)$`)
 	
