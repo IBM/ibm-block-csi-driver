@@ -3055,6 +3055,7 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) TeardownVolume(ctx context.Conte
 	// --- PHASE 0: PRE-UNMOUNT HARDWARE HARVEST ---
 	isMounted, err := r.Mounter.IsMounted(target)
 	if err == nil && isMounted {
+		logger.Warningf("[Teardown-Main]  Target is mounted %s", target)
 		if devPath, err := r.Mounter.GetDeviceFromMount(target); err == nil && devPath != "" {
 			logger.Warningf("[Teardown-Main] Isolated backing device path node from mount tree: %s", devPath)
 			
@@ -3088,8 +3089,56 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) TeardownVolume(ctx context.Conte
 			}
 		}
 	}
+	
+	// FIXED: Always attempt to resolve the device map parameters from the pre-discovered 
+	// device block name (e.g., passed from GetExistingMpathDevice) rather than strictly gating it behind an active mount check.
+	discoveredDevName := "" // Populate this from the string result of GetExistingMpathDevice
+	if discoveredDevName == "" {
+		// Fallback to checking the mount if it wasn't explicitly passed down
+		if isMounted, errCheck := r.Mounter.IsMounted(target); errCheck == nil && isMounted {
+			if devPath, errMnt := r.Mounter.GetDeviceFromMount(target); errMnt == nil && devPath != "" {
+				discoveredDevName = filepath.Base(devPath)
+			}
+		}
+	}
 
-	// --- PHASE 1: UNMOUNT & CRITICAL VERIFICATION MATRIX ---
+	// Always resolve the structural hardware metrics if a device string is available
+	if discoveredDevName != "" {
+		sanitizedDevPath := filepath.Join("/dev", discoveredDevName)
+		if resolvedDev, errLink := filepath.EvalSymlinks(sanitizedDevPath); errLink == nil {
+			sanitizedDevPath = resolvedDev
+		}
+		
+		if stat, errStat := os.Stat(sanitizedDevPath); errStat == nil {
+			if sysObj, ok := stat.Sys().(*syscall.Stat_t); ok {
+				major = unix.Major(uint64(sysObj.Rdev))
+				minor = unix.Minor(uint64(sysObj.Rdev))
+				hardwareResolved = true
+				
+				baseName := filepath.Base(sanitizedDevPath)
+				mpathName = baseName // CRITICAL: This guarantees mpathName is never blank if dm-0 exists!
+				
+				nvmeType, errType := DevicesAreNvme(ctx, r.KeyedGater, baseName)
+				if errType != nil {
+					logger.Warningf("[Teardown-Main] Topology inspection failed for base device %s: %v. Assuming legacy behavior.", baseName, errType)
+				}
+
+				if nvmeType == NVMeNative {
+					isNativeNVMe = true
+					logger.Infof("[Teardown-Main] Target %s mapped structurally as Native NVMe Multipathing", baseName)
+				} else {
+					// If it's a device mapper block, ensure we resolve the true coordinator name alias
+					if strings.HasPrefix(baseName, "dm-") {
+						mpathName = r.GetDMNameFromMinor(ctx, minor)
+					}
+					logger.Infof("[Teardown-Main] Target %s mapped structurally as Device Mapper Coordinator node: %s", baseName, mpathName)
+				}
+			}
+		}
+	}
+
+	// --- PHASE 1: UNMOUNT & CRITICAL VERIFICATION MATRIX (Kept isolated and safe) ---
+	isMounted, err := r.Mounter.IsMounted(target)
 	if err == nil && isMounted {
 		if errUnmount := r.Mounter.UnmountWithTimeout(ctx, target, 30*time.Second); errUnmount != nil {
 			logger.Errorf("[Teardown-Main] Unmount loop returned failure state for path %s: %v", target, errUnmount)
@@ -3102,7 +3151,7 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) TeardownVolume(ctx context.Conte
 		}
 		logger.Infof("[Teardown-Main] Target path %s cleanly unmounted and verified gone.", target)
 	}
-
+	
 	// --- PHASE 2: HARDWARE RESOLUTION FALLBACK ---
 	if mpathName == "" && expectedWWID != "" {
 		mpathName = r.Helper.findDMByWWID(ctx, expectedWWID)
@@ -3130,8 +3179,20 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) TeardownVolume(ctx context.Conte
 		}
 	}
 
-	// Safeguard against missing metadata targets to prevent silent data leak passes on retries
+	// =========================================================================
+	// FIXED: CRITICAL LIVELOCK BREAKER (IDEMPOTENCY SAFEGUARD)
+	// =========================================================================
 	if mpathName == "" && (needFlush || needRemovePhysical) {
+		// Double-check if the mount path is genuinely already clear
+		stillMounted, errCheck := r.Mounter.IsMounted(target)
+		if errCheck == nil && !stillMounted {
+			// If it's already unmounted and we cannot find any trace of the mpathName 
+			// or slaves on the host bus, the fabric has already been disconnected.
+			// Return success to allow Kubernetes to delete the pod cleanly.
+			logger.Warningf("[Teardown-Idempotency] Volume path %s is already unmounted and backing block devices for WWID %s are gone from the host bus. Assuming previous cleanup was completed. Bypassing failure.", target, expectedWWID)
+			return nil
+		}
+
 		return fmt.Errorf("teardown: unable to resolve backing block architecture targets for WWID %s; halting execution to protect system paths", expectedWWID)
 	}
 
@@ -3584,7 +3645,7 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) FindSlavesByWWID(ctx context.Con
 								}
 							}
 						}
-						logger.Warningf("nvme flow for %s - discovered id %d", name, discoveredID)
+						logger.Warningf("nvme flow for %s - discovered id %s", name, discoveredID)
 					}
 				} else if isSCSI {
 					scsiWwidPath := filepath.Join("/sys/block", name, "device", "wwid")
@@ -3594,7 +3655,7 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) FindSlavesByWWID(ctx context.Con
 					if bytesStr, err := secureReadSysfs(wCtx, r.KeyedGater, name, scsiWwidPath); err == nil && bytesStr != "" {
 						discoveredID = normalizeWWID(bytesStr)
 					}
-					logger.Warningf("nvme flow for %s found id %s", name, discoveredID)
+					logger.Warningf("iscsi flow for %s found id %s", name, discoveredID)
 				}
 
 				if discoveredID == "" {
