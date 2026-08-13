@@ -73,7 +73,7 @@ func NewDriver(endpoint string, configFilePath string, hostname string, max_invo
 	return &Driver{
 		endpoint:    endpoint,
 		config:      configFile,
-		NodeService: NewNodeService(configFile, hostname, nodeUtils, osDeviceConnectivityMapping, osDeviceConnectivityHelper, commandExecuter, mounter, syncLock),
+		NodeService: NewNodeService(configFile, hostname, nodeUtils, osDeviceConnectivityMapping, osDeviceConnectivityHelper, commandExecuter, gater, mounter, syncLock),
 	}, nil
 }
 

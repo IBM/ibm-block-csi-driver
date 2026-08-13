@@ -84,6 +84,7 @@ type NodeService struct {
 	Hostname                    string
 	NodeUtils                   NodeUtilsInterface
 	executer                    executer.ExecuterInterface
+	KeyedGater      *executer.KeyedGater
 	VolumeIdLocksMap            SyncLockInterface
 	OsDeviceConnectivityMapping map[string]device_connectivity.OsDeviceConnectivityInterface
 	OsDeviceConnectivityHelper  device_connectivity.OsDeviceConnectivityHelperScsiGenericInterface
@@ -99,12 +100,13 @@ type VolumeStatistics struct {
 func NewNodeService(configYaml ConfigFile, hostname string, nodeUtils NodeUtilsInterface,
 	OsDeviceConnectivityMapping map[string]device_connectivity.OsDeviceConnectivityInterface,
 	osDeviceConnectivityHelper device_connectivity.OsDeviceConnectivityHelperScsiGenericInterface,
-	executer executer.ExecuterInterface, mounter NodeMounter, syncLock SyncLockInterface) NodeService {
+	executer executer.ExecuterInterface, KeyedGater *executer.KeyedGater, mounter NodeMounter, syncLock SyncLockInterface) NodeService {
 	return NodeService{
 		ConfigYaml:                  configYaml,
 		Hostname:                    hostname,
 		NodeUtils:                   nodeUtils,
 		executer:                    executer,
+		KeyedGater:			KeyedGater,
 		OsDeviceConnectivityMapping: OsDeviceConnectivityMapping,
 		OsDeviceConnectivityHelper:  osDeviceConnectivityHelper,
 		Mounter:                     mounter,
@@ -224,7 +226,7 @@ func (d *NodeService) NodeStageVolume(ctx context.Context, req *csi.NodeStageVol
 	baseDevice := filepath.Base(mpathDevice)
 	
 	// FIXED: Replace string prefix heuristics with your zero-fork, VFS-aware checker
-	nvmeType, err := device_connectivity.DevicesAreNvme(ctx, baseDevice)
+	nvmeType, err := device_connectivity.DevicesAreNvme(ctx, d.KeyedGater, baseDevice)
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "Topology evaluation failed during block scheme lookup for %s: %v", baseDevice, err)
 	}
@@ -450,7 +452,7 @@ func (d *NodeService) NodeUnstageVolume(ctx context.Context, req *csi.NodeUnstag
 		baseDevice := filepath.Base(device)
 
 		// Robust structural zero-fork lookups replace fragile regex text matching
-		nvmeType, err := device_connectivity.DevicesAreNvme(ctx, baseDevice)
+		nvmeType, err := device_connectivity.DevicesAreNvme(ctx, d.KeyedGater, baseDevice)
 		if err != nil {
 			logger.Errorf("Failed to determine device type for %s: %v. Defaulting to full cleanup strategy.", baseDevice, err)
 			needFlush = true
@@ -842,7 +844,7 @@ func (d *NodeService) NodeExpandVolume(ctx context.Context, req *csi.NodeExpandV
 	logger.Debugf("Discovered device: {%v}", device)
 
 	baseDevice := path.Base(device)
-	nvmeType, err := device_connectivity.DevicesAreNvme(ctx, baseDevice)
+	nvmeType, err := device_connectivity.DevicesAreNvme(ctx, d.KeyedGater, baseDevice)
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "Failed to determine device type for %s: %v", baseDevice, err)
 	}
