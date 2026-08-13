@@ -2250,7 +2250,7 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) resolveTargetIDsRecursive(ctx co
 		return nil, err
 	}
 
-	targetID := r.getScsiTargetID(ctx, hctl)
+	targetID := r.getScsiTargetID(ctx, hctl, baseName)
 	if targetID == "" {
 		return nil, fmt.Errorf("scsi target registration state attributes not ready for address %s", hctl)
 	}
