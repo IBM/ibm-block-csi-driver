@@ -8463,15 +8463,24 @@ const (
        NotNVMe       NvmeType = "non-nvme"
 )
 
-func DevicesAreNvme(ctx context.Context, gater *executer.KeyedGater, device string) (NvmeType, error) {
+func (r *OsDeviceConnectivityHelperScsiGeneric) DevicesAreNvme(ctx context.Context, device string) (NvmeType, error) {
 	if err := ctx.Err(); err != nil {
 		return NotNVMe, err
 	}
 
 	logger.Debugf("DevicesAreNvme: Analyzing transport topology structure for device %s", device)
 
-	// Step 1: Check for Native NVMe using the hardened, gater-protected helper
-	isNative, err := IsNativeNvmeDevice(ctx, gater, device)
+	// FIXED: Absolute path alignment safeguard. 
+	// If the device argument arrives as a raw block name (e.g., "dm-0" or "nvme8n1"),
+	// prepend "/dev/" to ensure that underlying filepath.EvalSymlinks statements 
+	// resolve the actual host device nodes correctly instead of erroring with ENOENT.
+	sanitizedDevicePath := device
+	if !filepath.IsAbs(sanitizedDevicePath) {
+		sanitizedDevicePath = filepath.Join("/dev", device)
+	}
+
+	// Step 1: Check for Native NVMe using the gater-protected helper with the absolute path
+	isNative, err := IsNativeNvmeDevice(ctx, gater, sanitizedDevicePath)
 	if err != nil {
 		logger.Warningf("DevicesAreNvme: Failed native NVMe evaluation for %s: %v", device, err)
 	} else if isNative {
@@ -8480,7 +8489,7 @@ func DevicesAreNvme(ctx context.Context, gater *executer.KeyedGater, device stri
 	}
 
 	// Step 2: Check for Non-Native NVMe managed via Device Mapper Multipath
-	isNonNative, err := IsNonNativeNvmeDevice(ctx, gater, device)
+	isNonNative, err := IsNonNativeNvmeDevice(ctx, gater, sanitizedDevicePath)
 	if err != nil {
 		logger.Warningf("DevicesAreNvme: Failed non-native NVMe evaluation for %s: %v", device, err)
 	} else if isNonNative {
