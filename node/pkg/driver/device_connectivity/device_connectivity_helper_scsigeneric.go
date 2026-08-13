@@ -360,6 +360,7 @@ func NewOsDeviceConnectivityHelperScsiGeneric(executer executer.ExecuterInterfac
 }
 
 // IsVolumePathMatchesVolumeId safe-evaluates whether a block path represents an authentic target mapping.
+// Fully prefix-free VFS resolution handles DM aliases, raw dm-X, native NVMe namespaces, and SCSI targets safely.
 func (r *OsDeviceConnectivityHelperScsiGeneric) IsVolumePathMatchesVolumeId(ctx context.Context, volumeUuid string, volumePath string) (bool, error) {
 	if err := ctx.Err(); err != nil {
 		return false, err
@@ -392,20 +393,13 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) IsVolumePathMatchesVolumeId(ctx 
 		}
 	}
 
-	// 2. PRIMARY STRATEGY: SCSI Generic Inquiry IOCTL
-	sgInqWwn, errInq := r.Helper.GetWwnByScsiInq(ctx, r.KeyedGater, absoluteDevPath)
-	if errInq == nil {
-		if r.MatchVolumeToScsiSpec(sgInqWwn, expectedSerial) {
-			logger.Infof("[Identity-Check] [%s] Identity successfully verified via raw SCSI generic IOCTL.", dmName)
-			return true, nil
-		}
-		logger.Warningf("[Identity-Check] [%s] SCSI Inquiry string mismatch (Got: %s, Exp: %s).", dmName, sgInqWwn, expectedSerial)
-		return false, &ErrorWrongDeviceFound{absoluteDevPath, volumeUuid, sgInqWwn}
-	}
-
-	// 3. FALLBACK STRATEGY: Handle NVMe (Native and Device Mapper Variants)
-	logger.Warningf("[Identity-Check] [%s] Hardware IOCTL inquiry missed (%v). Inspecting structural sysfs properties...", dmName, errInq)
-
+	// =========================================================================
+	// UPFRONT PROTOCOL FAST-PATH SHORT-CIRCUIT (PREFIX-FREE VFS INSPECTION)
+	// =========================================================================
+	helper := GetDmsPathHelperGeneric{}
+	isNativeNVMe := helper.IsNativeNvmeNamespace(dmName)
+	
+	isMpathNVMe := false
 	sysBlockTarget := filepath.Join("/sys/block", dmName)
 	if _, errStat := os.Stat(sysBlockTarget); os.IsNotExist(errStat) {
 		sysBlockTarget = filepath.Join("/sys/class/block", dmName)
@@ -413,50 +407,93 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) IsVolumePathMatchesVolumeId(ctx 
 	if resolvedSysBlock, errLink := filepath.EvalSymlinks(sysBlockTarget); errLink == nil {
 		sysBlockTarget = resolvedSysBlock
 	}
-	
-	slavesDir := filepath.Join(sysBlockTarget, "slaves")
-	_, errSlaves := os.Stat(slavesDir)
 
-	// =========================================================================
-	// PROTOCOL BRANCH A: NATIVE NVME STRATEGY (No slaves directory exists)
-	// =========================================================================
-	if os.IsNotExist(errSlaves) {
-		logger.Infof("[Identity-Check] [%s] Device has no slaves directory. Evaluating as Native NVMe block structure.", dmName)
-		
-		wwidPath := filepath.Join(sysBlockTarget, "device", "wwid")
-		if wwidBytes, errRead := os.ReadFile(wwidPath); errRead == nil {
-			cleanedWwid := strings.ToLower(strings.TrimSpace(string(wwidBytes)))
-			cleanedWwid = strings.TrimPrefix(cleanedWwid, "nvme-")
-			
-			if strings.Contains(cleanedWwid, expectedSerial) || cleanedWwid == convertScsiIdToNguid(expectedSerial) {
-				logger.Infof("[Identity-Check] [%s] Identity verified successfully via Native NVMe WWID sysfs metadata.", dmName)
-				return true, nil
+	slavesPath := filepath.Join(sysBlockTarget, "slaves")
+	if dFile, errOpen := os.Open(slavesPath); errOpen == nil {
+		if entries, errRead := dFile.ReadDir(16); errRead == nil {
+			for _, entry := range entries {
+				if strings.HasPrefix(entry.Name(), "nvme") {
+					isMpathNVMe = true
+					break
+				}
 			}
 		}
+		dFile.Close()
+	}
+
+	// 2. PRIMARY STRATEGY: SCSI Generic Inquiry IOCTL (Bypassed entirely for NVMe structures)
+	var errInq error
+	if !isNativeNVMe && !isMpathNVMe {
+		var sgInqWwn string
+		sgInqWwn, errInq = r.Helper.GetWwnByScsiInq(ctx, r.KeyedGater, absoluteDevPath)
+		if errInq == nil {
+			if r.MatchVolumeToScsiSpec(sgInqWwn, expectedSerial) {
+				logger.Infof("[Identity-Check] [%s] Identity successfully verified via raw SCSI generic IOCTL.", dmName)
+				return true, nil
+			}
+			logger.Warningf("[Identity-Check] [%s] SCSI Inquiry string mismatch (Got: %s, Exp: %s).", dmName, sgInqWwn, expectedSerial)
+			return false, &ErrorWrongDeviceFound{absoluteDevPath, volumeUuid, sgInqWwn}
+		}
+		logger.Warningf("[Identity-Check] [%s] Hardware SCSI Inquiry failed (%v). Inspecting structural sysfs properties...", dmName, errInq)
+	} else {
+		logger.Infof("[Identity-Check] [%s] NVMe signature identified. Safely bypassing legacy SCSI IOCTL layer.", dmName)
+	}
+
+	// 3. FALLBACK STRATEGY: Structural Sysfs Inspection for NVMe and Multipath/DM
+	_, errSlaves := os.Stat(slavesPath)
+
+	// =========================================================================
+	// PROTOCOL BRANCH A: NATIVE NVME / NON-DM BLOCK STRUCTURE (No slaves folder)
+	// =========================================================================
+	if os.IsNotExist(errSlaves) {
+		logger.Infof("[Identity-Check] [%s] Device has no slaves directory. Evaluating as Native/Raw NVMe block structure.", dmName)
+		
+		possibleWwidPaths := []string{
+			filepath.Join(sysBlockTarget, "wwid"),
+			filepath.Join(sysBlockTarget, "device", "wwid"),
+			filepath.Join(sysBlockTarget, "nguid"),
+			filepath.Join(sysBlockTarget, "device", "nguid"),
+		}
+
+		for _, p := range possibleWwidPaths {
+			if wwidBytes, errRead := os.ReadFile(p); errRead == nil {
+				cleanedWwid := strings.ToLower(strings.TrimSpace(string(wwidBytes)))
+				cleanedWwid = strings.TrimPrefix(cleanedWwid, "nvme-")
+				
+				if strings.Contains(cleanedWwid, expectedSerial) || cleanedWwid == convertScsiIdToNguid(expectedSerial) {
+					logger.Infof("[Identity-Check] [%s] Identity verified successfully via Native NVMe metadata path: %s", dmName, p)
+					return true, nil
+				}
+			}
+		}
+
+		hasDev, _, matchedDev := helper.EvaluateSysfsTopology(ctx, r.KeyedGater, expectedSerial, false)
+		if hasDev && (matchedDev == dmName || strings.Contains(matchedDev, dmName)) {
+			logger.Infof("[Identity-Check] [%s] Identity verified via topology helper fallback for raw NVMe.", dmName)
+			return true, nil
+		}
+
 		return false, fmt.Errorf("hardware signature mapping failed: native NVMe identification mismatch for device %s", dmName)
 	}
 
 	// =========================================================================
-	// PROTOCOL BRANCH B: MULTI-PROTOCOL SLAVES SELECTION (SCSI, NVMe-oF, or Nested DM)
+	// PROTOCOL BRANCH B: DEVICE MAPPER / MULTIPATH SLAVES SELECTION
 	// =========================================================================
 	const maxCapCeiling = 10000
 	validNvmeTargets := make([]string, 0, 100)
 	
-	dFile, errOpen := os.Open(slavesDir)
+	dFile, errOpen := os.Open(slavesPath)
 	if errOpen != nil {
 		return false, fmt.Errorf("failed to open block slaves folder: %w", errOpen)
 	}
-	
-	helper := GetDmsPathHelperGeneric{}
+	defer dFile.Close()
 
 	for {
 		if ctx.Err() != nil {
-			dFile.Close()
 			return false, ctx.Err()
 		}
 		entries, readErr := dFile.ReadDir(100)
 		if readErr != nil && readErr != io.EOF {
-			dFile.Close()
 			return false, readErr
 		}
 		if len(entries) == 0 || readErr == io.EOF {
@@ -465,7 +502,6 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) IsVolumePathMatchesVolumeId(ctx 
 		
 		for _, entry := range entries {				
 			entryName := entry.Name()
-			
 			isSCSI := strings.HasPrefix(entryName, "sd")
 			isDM := strings.HasPrefix(entryName, "dm-")
 			isNVMe := helper.IsNativeNvmeNamespace(entryName)
@@ -478,7 +514,6 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) IsVolumePathMatchesVolumeId(ctx 
 			}
 		}
 	}
-	dFile.Close()
 
 	if len(validNvmeTargets) == 0 {
 		return false, fmt.Errorf("hardware signature mapping failed: zero valid storage elements discovered in slave paths for %s", dmName)
@@ -2248,8 +2283,9 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) getHCTLFromSd(ctx context.Contex
 }
 
 // getScsiTargetID safe-resolves hardware targets across FC, SAS, iSCSI, and NVMe-oF layers with punchy logging.
-func (r *OsDeviceConnectivityHelperScsiGeneric) getScsiTargetID(ctx context.Context, hctl string) string {
-	logger.Infof("[SCSI-Target-Inspector] Enter pipeline. HCTL: [%s]", hctl)
+// Fail-safe VFS resolution handles DM aliases, raw dm-X, and native NVMe without prefix assumptions.
+func (r *OsDeviceConnectivityHelperScsiGeneric) getScsiTargetID(ctx context.Context, hctl string, baseBlockName string) string {
+	logger.Infof("[SCSI-Target-Inspector] Enter pipeline. HCTL: [%s] | Block Target: [%s]", hctl, baseBlockName)
 
 	if err := ctx.Err(); err != nil {
 		logger.Warningf("[SCSI-Target-Inspector] [%s] Abort: context cancelled: %v", hctl, err)
@@ -2268,42 +2304,82 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) getScsiTargetID(ctx context.Cont
 	hct := strings.Join(parts[:3], ":")
 	targetDirName := fmt.Sprintf("target%s", hct)
 
-	// Upfront Storage Protocol Identification Sniffer
+	// =========================================================================
+	// FAIL-SAFE STRUCTURAL NVME & SLAVE SCANNER (BYPASSES HCTL INT TRAPS)
+	// =========================================================================
 	transportType := "unknown"
-	hostSubsysLink := fmt.Sprintf("/sys/class/scsi_host/host%s/device/subsystem", hostID)
-	
-	if realHostSubsys, errLink := filepath.EvalSymlinks(hostSubsysLink); errLink == nil {
-		subsysName := filepath.Base(realHostSubsys)
-		if strings.Contains(subsysName, "iscsi") {
-			transportType = "iscsi"
-		} else if strings.Contains(subsysName, "fc") || strings.Contains(subsysName, "pci") {
-			transportType = "fc"
-		} else if strings.Contains(subsysName, "sas") {
-			transportType = "sas"
+	cleanBlockName := filepath.Base(baseBlockName)
+
+	// Resolve actual block device directory under /sys/block, handling symlinks and aliases
+	sysBlockPath := filepath.Join("/sys/block", cleanBlockName)
+	if resolvedPath, errEval := filepath.EvalSymlinks(sysBlockPath); errEval == nil {
+		sysBlockPath = resolvedPath
+	}
+
+	// 1. Check if the block device is directly native NVMe
+	if r.IsNativeNvmeNamespace(cleanBlockName) || strings.Contains(sysBlockPath, "/nvme/") {
+		transportType = "nvme"
+		if nvmeCtrl := ExtractNvmeControllerBase(cleanBlockName); nvmeCtrl != "" {
+			hostID = strings.TrimPrefix(nvmeCtrl, "nvme")
 		}
 	} else {
-		nvmeCtrlPath := fmt.Sprintf("/sys/class/nvme/nvme%s", hostID)
-		if _, errStat := os.Stat(nvmeCtrlPath); errStat == nil {
-			transportType = "nvme"
+		// 2. Fail-safe scan for Device Mapper / Multipath slaves (handles names like mpatha, VolGroup01, dm-0)
+		slavesPath := filepath.Join("/sys/block", cleanBlockName, "slaves")
+		if dFile, errOpen := os.Open(slavesPath); errOpen == nil {
+			if entries, errRead := dFile.ReadDir(32); errRead == nil {
+				for _, entry := range entries {
+					slaveName := entry.Name()
+					if strings.HasPrefix(slaveName, "nvme") {
+						transportType = "nvme"
+						if nvmeCtrl := ExtractNvmeControllerBase(slaveName); nvmeCtrl != "" {
+							hostID = strings.TrimPrefix(nvmeCtrl, "nvme")
+						}
+						break
+					}
+				}
+			}
+			dFile.Close()
 		}
 	}
 
-	logger.Debugf("[SCSI-Target-Inspector] [%s] Protocol sniffed: %s", hctl, transportType)
+	// =========================================================================
+	// FALLBACK LEGACY SCSI/FC/iSCSI SUBSYSTEM SCAN (IF NOT NVME)
+	// =========================================================================
+	if transportType == "unknown" {
+		hostSubsysLink := fmt.Sprintf("/sys/class/scsi_host/host%s/device/subsystem", hostID)
+		if realHostSubsys, errLink := filepath.EvalSymlinks(hostSubsysLink); errLink == nil {
+			subsysName := filepath.Base(realHostSubsys)
+			if strings.Contains(subsysName, "iscsi") {
+				transportType = "iscsi"
+			} else if strings.Contains(subsysName, "fc") || strings.Contains(subsysName, "pci") {
+				transportType = "fc"
+			} else if strings.Contains(subsysName, "sas") {
+				transportType = "sas"
+			}
+		}
+	}
+
+	logger.Debugf("[SCSI-Target-Inspector] [%s] Protocol sniffed: %s | Resolved Host Target Token: host%s", hctl, transportType, hostID)
 
 	// =========================================================================
-	// 0. NATIVE NVME-OVER-FABRICS (NVMe-oF) RESOLUTION TRACK
+	// EXECUTION BRANCH 0: NATIVE NVME-OVER-FABRICS (NVMe-oF) RESOLUTION TRACK
 	// =========================================================================
 	if transportType == "nvme" {
-		return getScsiTargetIDTransportNvme(hctl)
+		res := r.getScsiTargetIDTransportNvme(hctl, hostID)
+		if res != "" {
+			return res
+		}
+		logger.Warningf("[SCSI-Target-Inspector] [%s] NVMe transport resolution yielded empty ID; halting fallback bleed.", hctl)
+		return ""
 	}
 
 	// =========================================================================
-	// 1. FIBRE CHANNEL RESOLUTION LAYER (FLAT REMOTE PORT CLASS STRATEGY)
+	// EXECUTION BRANCH 1: FIBRE CHANNEL RESOLUTION LAYER (FC STRATEGY)
 	// =========================================================================
 	if transportType == "fc" || transportType == "unknown" {
-		targetID := getScsiTargetIDTransportFc(hctl, hostID)
-		if targetID != "" {
-			return targetID
+		resolvedFcID := r.getScsiTargetIDTransportFc(ctx, hctl, hostID, channelID, targetID, targetDirName)
+		if resolvedFcID != "" {
+			return resolvedFcID
 		}
 		if transportType == "fc" {
 			return ""
@@ -2311,12 +2387,12 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) getScsiTargetID(ctx context.Cont
 	}
 
 	// =========================================================================
-	// 2. SERIAL ATTACHED SCSI RESOLUTION LAYER (SAS STRATEGY)
+	// EXECUTION BRANCH 2: SERIAL ATTACHED SCSI RESOLUTION LAYER (SAS STRATEGY)
 	// =========================================================================
 	if transportType == "sas" || transportType == "unknown" {
-		targetID := getScsiTargetIDTransportSas(targetDirName, targetDirName)
-		if targetID != "" {
-			return targetID
+		resolvedSasID := r.getScsiTargetIDTransportSas(hctl, targetDirName)
+		if resolvedSasID != "" {
+			return resolvedSasID
 		}
 		if transportType == "sas" {
 			return ""
@@ -2324,19 +2400,20 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) getScsiTargetID(ctx context.Cont
 	}
 
 	// =========================================================================
-	// 3. iSCSI RESOLUTION LAYER (FLAT SUBSYSTEM SESSION LOOKUP)
+	// EXECUTION BRANCH 3: iSCSI RESOLUTION LAYER (iSCSI SESSION LOOKUP)
 	// =========================================================================
 	if transportType == "iscsi" || transportType == "unknown" {
-		return getScsiTargetIDTransportIscsi(hctl, hostID)
+		return r.getScsiTargetIDTransportIscsi(ctx, hctl, hostID)
 	}
-	// =========================================================================// 4. TERMINAL FALLBACK BLOCK// =========================================================================
+	
 	logger.Warningf("[SCSI-Target-Inspector] [%s] [OUT OF STRATEGIES] Zero protocol matches across all system mappings.", hctl)
 	return ""
 }
 
-func (r *OsDeviceConnectivityHelperScsiGeneric) getScsiTargetIDTransportNvme(hctl string) string {
+func (r *OsDeviceConnectivityHelperScsiGeneric) getScsiTargetIDTransportNvme(hctl string, hostID string) string {
 	logger.Infof("[SCSI-Target-Inspector] [%s] [Track-NVMe-oF] Start fabrics parsing.", hctl)
 	
+	// FIXED: hostID is now properly received as a function parameter
 	subsysNqnFile := fmt.Sprintf("/sys/class/nvme/nvme%s/subsysnqn", hostID)
 	logger.Debugf("[SCSI-Target-Inspector] [%s] [Track-NVMe-oF] Probe path: %s", hctl, subsysNqnFile)
 	
@@ -2350,7 +2427,7 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) getScsiTargetIDTransportNvme(hct
 	return "" 
 }
 
-func (r *OsDeviceConnectivityHelperScsiGeneric) getScsiTargetIDTransportFc(hctl string, hostID string) string {
+func (r *OsDeviceConnectivityHelperScsiGeneric) getScsiTargetIDTransportFc(ctx context.Context, hctl string, hostID string, channelID string, targetID string, targetDirName string) string {
 	fcClassDir := "/sys/class/fc_remote_ports"
 	fcClassPattern := fmt.Sprintf("/sys/class/fc_remote_ports/rport-%s:*", hostID)
 	logger.Debugf("[SCSI-Target-Inspector] [%s] [Track-A1] Wildcard scan: %s", hctl, fcClassPattern)
@@ -2428,13 +2505,9 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) getScsiTargetIDTransportFc(hctl 
 	}
 	
 	return ""
-
-	if transportType == "fc" {
-		return ""
-	}
 }
 
-func (r *OsDeviceConnectivityHelperScsiGeneric) getScsiTargetIDTransportSas(targetDirName string, targetDirName string) string {
+func (r *OsDeviceConnectivityHelperScsiGeneric) getScsiTargetIDTransportSas(hctl string, targetDirName string) string {
 	sasClassicPath := fmt.Sprintf("/sys/class/scsi_target/%s/sas_device/%s/sas_address", targetDirName, targetDirName)
 	logger.Debugf("[SCSI-Target-Inspector] [%s] [Track-B] Probe SAS tree path: %s", hctl, sasClassicPath)
 
@@ -2447,13 +2520,9 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) getScsiTargetIDTransportSas(targ
 	}
 	
 	return ""
-
-	if transportType == "sas" {
-		return ""
-	}
 }
 
-func (r *OsDeviceConnectivityHelperScsiGeneric) getScsiTargetIDTransportIscsi(hctl string, hostID string) string {
+func (r *OsDeviceConnectivityHelperScsiGeneric) getScsiTargetIDTransportIscsi(ctx context.Context, hctl string, hostID string) string {
 	sessionClassPath := "/sys/class/iscsi_session"
 	matchToken := fmt.Sprintf("host%s", hostID)
 	logger.Infof("[SCSI-Target-Inspector] [%s] [Track-C] Start iSCSI session sweep path: %s", hctl, sessionClassPath)
