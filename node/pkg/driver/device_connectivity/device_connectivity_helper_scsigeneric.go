@@ -3138,7 +3138,7 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) TeardownVolume(ctx context.Conte
 	}
 
 	// --- PHASE 1: UNMOUNT & CRITICAL VERIFICATION MATRIX (Kept isolated and safe) ---
-	isMounted, err := r.Mounter.IsMounted(target)
+	isMounted, err = r.Mounter.IsMounted(target)
 	if err == nil && isMounted {
 		if errUnmount := r.Mounter.UnmountWithTimeout(ctx, target, 30*time.Second); errUnmount != nil {
 			logger.Errorf("[Teardown-Main] Unmount loop returned failure state for path %s: %v", target, errUnmount)
