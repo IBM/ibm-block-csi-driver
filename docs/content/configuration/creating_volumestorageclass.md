@@ -50,7 +50,7 @@ Volume groups can only be managed by **either** the associated VolumeGroup **or*
 
 - The `virt_snap_func` parameter is optional but necessary in IBM Storage Virtualize® storage systems if using the Snapshot function. To enable the Snapshot function, set the value to _"true"_. The default value is _"false"_. If the value is _"false"_ the snapshot will use the FlashCopy function.
 
-When electing to set the optional "virt_snap_func" parameter, it **must** also be set with an identical value in the relevant VolumeSnapshotClass yamls.{: requirement}
+The `virt_snap_func` parameter should be configured in the **StorageClass** as the primary location. When creating a snapshot, if the parameter is not specified in the VolumeSnapshotClass, the driver will automatically use the value from the source volume's StorageClass. If specified in the VolumeSnapshotClass, that value takes precedence (explicit configuration wins).{: tip}
 
 When setting the optional "virt_snap_func" parameter to "true", the optional "SpaceEfficiency" parameter **must not** be set.{: restriction}
 
@@ -69,7 +69,7 @@ For IBM Storage Virtualize® family storage systems, the `CSI` prefix is added a
       volume_group: demo-volumegroup   # Optional.
       SpaceEfficiency: thin            # Optional. Do not set this optional parameter if virt_snap_func is set to "true"
       volume_name_prefix: demo-prefix  # Optional.
-      virt_snap_func: "true"           # Optional. Values "true"/"false". The default is "false". If set, this value MUST be identical to the value set in the VolumeSnapshotClass yamls
+      virt_snap_func: "true"           # Optional. Values "true"/"false". The default is "false". This is the primary location for this parameter. VolumeSnapshotClass can optionally override this value.
 
       csi.storage.k8s.io/fstype: xfs   # Optional. Values ext4/xfs. The default is ext4.
       csi.storage.k8s.io/secret-name: demo-secret

@@ -355,12 +355,14 @@ class CSIControllerServicer(csi_pb2_grpc.ControllerServicer):
             array_connection_info = utils.get_array_connection_info_from_secrets(secrets, system_id=system_id)
             snapshot_parameters = utils.get_snapshot_parameters(parameters=request.parameters,
                                                                 system_id=array_connection_info.system_id)
-            use_snap_object = bool(snapshot_parameters.virt_snap_func and not array_connection_info.partition_name)
+            resolved_virt_snap_func = utils.resolve_snapshot_virt_snap_func(
+                request.parameters, snapshot_parameters, source_id)
+            use_snap_object = bool(resolved_virt_snap_func and not array_connection_info.partition_name)
             pool = snapshot_parameters.pool
             space_efficiency = snapshot_parameters.space_efficiency
             # Apparently this was never supposed to be a restriction - meanwhile enabling for partitions only for
             # backward compatibility, need to revisit
-            if snapshot_parameters.virt_snap_func and not array_connection_info.partition_name \
+            if resolved_virt_snap_func and not array_connection_info.partition_name \
                     and space_efficiency:
                 raise array_errors.SpaceEfficiencyNotSupported(space_efficiency)
             with get_agent(array_connection_info, array_type).get_mediator() as array_mediator:

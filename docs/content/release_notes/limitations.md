@@ -62,6 +62,8 @@ For other policy-based replication limitations with your storage system, see the
 
 FlashCopy mapping (`fcmap`) and Snapshot function cannot be used together on the same volume. However, they can be used on different volumes within the same storage system. {: restriction}
 
+The `virt_snap_func` parameter should be configured in the StorageClass as the primary location. When creating a snapshot, if not specified in the VolumeSnapshotClass, the driver automatically retrieves the value from the source volume's StorageClass. If specified in both locations, the VolumeSnapshotClass value takes precedence.{: tip}
+
 Check your IBM Storage Virtualize® product documentation on [IBM Documentation](https://www.ibm.com/docs) if your product supports the Snapshot function prior to enabling with the `virt_snap_func` parameter.{: important}
 
 ## Volume clone limitations
