@@ -25,6 +25,7 @@ import (
 	"os"
 	"path/filepath"
 	"regexp"
+	"runtime"
 	"strconv"
 	"strings"
 	"sync"
@@ -3042,7 +3043,7 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) TeardownVolume(ctx context.Conte
 	logger.Infof("[Teardown-Main] Entering master volume cleanup sequence for mount target: %s", target)	
 	
 	// CONSUMES PRE-CALCULATED VALUES FROM THE HARVEST PASS
-	mpathName, hardwareResolved, isNativeNVMe, major, minor, isMounted, needFlush, needRemovePhysical, isDeviceMapperTarget := r.collectInformationForTeardown(ctx, target, expectedWWID)
+	mpathName, hardwareResolved, isNativeNVMe, major, minor, isMounted, needFlush, needRemovePhysical, _ := r.collectInformationForTeardown(ctx, target, expectedWWID)
 
 	// --- PHASE 1: UNMOUNT & CRITICAL VERIFICATION MATRIX ---
 	if isMounted {
@@ -3127,7 +3128,7 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) TeardownVolume(ctx context.Conte
 				slaves, _ = r.Helper.getSlavesForDevice(ctx, major, minor)
 			}
 			if len(slaves) == 0 && expectedWWID != "" {
-				slaves = FindSlavesByWWID(ctx, expectedWWID) 
+				slaves = r.FindSlavesByWWID(ctx, expectedWWID) 
 			}
 
 			logger.Infof("[Teardown-Main] [%s] Step 1/2: Dropping multipath layout via daemon entry...", mpathName)
@@ -3899,7 +3900,6 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) dmIoctlLoadTable(ctx context.Con
     return err // Return just the error to match function signature
 }
 
-
 // dmIoctlCall executes a safe, stack-pinned kernel ioctl call on /dev/mapper/control.
 // Hardened against string truncation, missing null-terminators, and Go GC pointer shifting.
 func (r *OsDeviceConnectivityHelperScsiGeneric) dmIoctlCall(ctx context.Context, name string, op uintptr, flags uint32) error {
@@ -3909,23 +3909,21 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) dmIoctlCall(ctx context.Context,
 	}
 
 	// Capture the tuple, discard the struct{}
+	// FIXED: Corrected anonymised return type parameters list syntax to clear compilation breaks.
 	_, err := executer.ExecuteUninterruptible[struct{}](
 		ctx, r.KeyedGater, "dm-ioctl-"+cleanName, 1, 10, 1*time.Second, 5*time.Second,
-		func(wCtx context.Context) (struct{}{}, error) {
+		func(wCtx context.Context) (struct{}, error) {
 			f, err := os.OpenFile(DM_IOCTL_CONTROL, os.O_RDWR, 0)
 			if err != nil { 
 				return struct{}{}, fmt.Errorf("dm-ioctl: failed to open control path: %w", err) 
 			}
-			// Safe handle release via deferred descriptor close
 			defer f.Close()
 
-			// 1. BOUNDARY SAFEGUARD: Enforce strict Linux DM_NAME_LEN (128 bytes) constraints
 			const dmNameLen = 128
 			if len(cleanName) >= dmNameLen {
 				return struct{}{}, fmt.Errorf("dm-ioctl: target name length (%d) exceeds kernel limit of %d", len(cleanName), dmNameLen-1)
 			}
 
-			// Define the explicit underlying C-aligned struct locally for size assessment
 			type dmIoctlPacked struct {
 				version     [3]uint32
 				dataSize    uint32
@@ -3936,7 +3934,7 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) dmIoctlCall(ctx context.Context,
 				lastEventNr uint32
 				dev         uint64
 				name        [dmNameLen]byte
-				uuid        [129]byte // Standard kernel spacing alignment
+				uuid        [dmNameLen]byte
 				dataStart   uint32
 			}
 
@@ -3945,13 +3943,9 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) dmIoctlCall(ctx context.Context,
 			payload.dataSize = uint32(unsafe.Sizeof(payload))
 			payload.flags = flags
 
-			// Safe copy string bytes into fixed array, ensuring explicit terminal null padding
 			copy(payload.name[:dmNameLen-1], cleanName)
 			payload.name[len(cleanName)] = 0 // Enforce physical null terminator explicitly
 
-			// 2. RUNTIME MEMORY LOCK: Capture direct pointer instance into a local variable 
-			// and use runtime.KeepAlive right after to guarantee Go GC never shifts or collects 
-			// the object out of the CPU registers until the unix.Syscall instruction completely finishes.
 			payloadPtr := unsafe.Pointer(&payload)
 
 			logger.Infof("[DM-Ioctl] Dispatched tracking operator code %v on device map: %s", op, cleanName)
@@ -3962,10 +3956,8 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) dmIoctlCall(ctx context.Context,
 				uintptr(payloadPtr),
 			)
 
-			// Force the compiler to pin the structural object in memory until this line is crossed
 			runtime.KeepAlive(payload)
 
-			// ENXIO means device didn't exist (idempotency target success for deletion ops)
 			if errno != 0 && errno != unix.ENXIO && errno != unix.ENOENT { 
 				return struct{}{}, fmt.Errorf("dm-ioctl execution returned kernel errno: %v", errno) 
 			}
@@ -3975,9 +3967,6 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) dmIoctlCall(ctx context.Context,
 	)
 	return err
 }
-
-
-
 
 
 type dmTargetSpec struct {
