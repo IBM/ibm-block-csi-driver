@@ -58,7 +58,7 @@ type OsDeviceConnectivityHelperScsiGenericInterface interface {
 	RemoveGhostDevice(ctx context.Context, expectedSerial string, expectedLun int, arrayIdentifiers []string) error
 	ValidateLun(ctx context.Context, targetDm string, lun int, sysDevices []string, expectedSerial string) error
 	IsVolumePathMatchesVolumeId(ctx context.Context, volumeId string, volumePath string) (bool, error)
-	TeardownVolume(ctx context.Context, target string, needFlush bool, needRemovePhysical bool, expectedWWID string) error
+	TeardownVolume(ctx context.Context, target string, expectedWWID string) error
 	IdentityAwarePreScan(ctx context.Context, targetPath string, expectedWWID string) (discoveredDev string, isStaged bool, skipRescan bool, isLeftover bool, err error)
 }
 
@@ -3148,14 +3148,9 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) TeardownVolume(ctx context.Conte
 			logger.Infof("[Teardown-Main] Evicting native NVMe path lanes: %v", slaves)
 			_ = r.RemovePhysicalDevice(ctx, slaves)
 			
-			r.evictNVMeNamespaces(ctx, slaves)
 			needRemovePhysical = false
 		}
 
-		logger.Infof("[Teardown-Main] Triggering physical host channel eviction for NVMe device: %s", mpathName)
-		if errDisconnect := r.DisconnectNativeNvme(ctx, r.KeyedGater, mpathName); errDisconnect != nil {
-			logger.Warningf("[Teardown-Main] Fabric controller disconnection routine returned warning: %v", errDisconnect)
-		}
 	}
 	
 	// Hard Livelock breaker safety gate for tracking unmounts on empty links
@@ -3258,7 +3253,7 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) collectInformationForTeardown(ct
 
 	// --- CALCULATE CLEANUP POLICIES INTERNALLY ---
 	helper := GetDmsPathHelperGeneric{}
-	isDeviceMapperTarget := helper.IsDeviceMapper(mpathName)
+	isDeviceMapperTarget = helper.IsDeviceMapper(mpathName)
 
 	if mpathName == "" {
 		needFlush = true
@@ -4102,7 +4097,7 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) IdentityAwarePreScan(ctx context
 			helper := GetDmsPathHelperGeneric{}
 			if mpathName != "" && helper.IsDeviceMapper(mpathName) {
 				if helper.GetSlaveCount(ctx, r.KeyedGater, mpathName) == 0 {
-					_ = r.TeardownVolume(ctx, targetPath, false, false, rawScsiTarget)
+					_ = r.TeardownVolume(ctx, targetPath, rawScsiTarget)
 					r.busyTimestamps.Delete(rawScsiTarget)
 					return "", false, false, true, nil
 				}
