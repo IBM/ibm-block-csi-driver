@@ -882,13 +882,11 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) RemovePhysicalDevice(ctx context
 
 	logger.Debugf(`Removing storage device : {%v} by writing "1" to the deletion channel of each target`, sysDevices)
 	
-	// STEP 1: Fast filter pass with strict memory bounds pre-allocation limits
 	const maxCapCeiling = 10000
 	validDevices := make([]string, 0, len(sysDevices))
 	
 	for _, name := range sysDevices {
 		if name != "" {
-			// MEMORY BOUNDED CEILING BREAK: Prevent unbounded heap allocation under unstable node states
 			if len(validDevices) >= maxCapCeiling {
 				logger.Warningf("[VFS-Guard] Eviction device tracking slice reached maximum safe memory threshold (%d). Truncating scan.", maxCapCeiling)
 				break
@@ -901,33 +899,28 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) RemovePhysicalDevice(ctx context
 		return nil
 	}
 
-	// FIXED: Distinct multi-tenant key template structure isolates concurrency pools across independent
-	// parallel attachment channels, preventing global slot contention under cluster workload strain.
 	uniqueBatchKey := fmt.Sprintf("batch-device-eviction-%d", time.Now().UnixNano())
 
-	// Maintained parallel thread execution pools securely bounded via infrastructure container
 	results, errBatch := executer.ExecuteUninterruptibleBatch[string, struct{}](
 		ctx,
 		r.KeyedGater,
 		uniqueBatchKey,
-		15,  // maxRunning
-		100, // maxSpare
+		15,  
+		100, 
 		5*time.Second,
-		45*time.Second, // Bounded hard timeout for complete write + verification process
+		45*time.Second, 
 		validDevices,
 		func(wCtx context.Context, index int, name string, cancelBatch func()) (struct{}, error) {
 			rawBlockDir := filepath.Join("/sys/block", name)
 			
-			// RESTORED VFS LAYER: Resolve target paths natively via absolute canonical link check
-			// to protect against hidden symbolic redirections or folder depth variations across modern distros.
 			baseBlockSysDir, errLink := filepath.EvalSymlinks(rawBlockDir)
 			if errLink != nil {
-				baseBlockSysDir = rawBlockDir // Fallback securely if the directory node is already unlinking
+				baseBlockSysDir = rawBlockDir 
 			}
 			
 			var deletePath string
 
-			// 1. Resolve exact target architectures using safe directory metadata probing (Rule 3/5 Parity)
+			// 1. Resolve exact target architectures using strict Linux VFS paths
 			if strings.HasPrefix(name, "sd") {
 				deletePath = filepath.Join(baseBlockSysDir, "device", "delete")
 			} else if strings.HasPrefix(name, "nvme") {
@@ -940,24 +933,27 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) RemovePhysicalDevice(ctx context
 					}
 				}
 
-				// Strategy A: Modern Class Target Routing
-				if idx := strings.LastIndex(normalizedName, "n"); idx != -1 && idx > 0 {
-					ctrlPart := normalizedName[:idx]
-					modernClassDir := fmt.Sprintf("/sys/class/nvme/%s/%s", ctrlPart, normalizedName)
-					if _, err := os.Stat(modernClassDir); err == nil {
-						deletePath = fmt.Sprintf("%s/delete", modernClassDir)
+				// FIXED: Valid NVMe/NVMe-oF Subsystem Path Extraction.
+				// Standalone NVMe namespaces are evicted by targeting their controller-level deletion channels.
+				idx := strings.LastIndex(normalizedName, "n")
+				if idx != -1 && idx > 0 {
+					ctrlPart := normalizedName[:idx] // e.g. "nvme0"
+					
+					// Check the direct controller namespace delete_controller handle (authoritative for fabrics/PCIe)
+					modernCtrlDelete := filepath.Join("/sys/class/nvme", ctrlPart, "delete_controller")
+					if _, err := os.Stat(modernCtrlDelete); err == nil {
+						deletePath = modernCtrlDelete
 					}
 				}
 
-				// Strategy B: Legacy /sys/block Target Routing (RHEL 7 Compatibility / Rule 3)
+				// Fallback to structural namespace-specific attributes if available on older kernels
 				if deletePath == "" {
-					legacyDeviceDir := filepath.Join(baseBlockSysDir, "device")
-					if _, err := os.Stat(legacyDeviceDir); err == nil {
-						deletePath = filepath.Join(legacyDeviceDir, "delete")
-					} else {
-						if idx := strings.LastIndex(normalizedName, "n"); idx != -1 && idx > 0 {
-							ctrlPart := normalizedName[:idx]
-							deletePath = fmt.Sprintf("/sys/class/nvme/%s/device/delete", ctrlPart)
+					nsDeletePath := filepath.Join(baseBlockSysDir, "wwid") // Verify the namespace structure exists
+					if _, err := os.Stat(nsDeletePath); err == nil {
+						// Certain custom multipath drivers expose a localized deletion endpoint
+						fallbackPath := filepath.Join(baseBlockSysDir, "device", "delete")
+						if _, errStat := os.Stat(fallbackPath); errStat == nil {
+							deletePath = fallbackPath
 						}
 					}
 				}
@@ -971,10 +967,8 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) RemovePhysicalDevice(ctx context
 				return struct{}{}, nil
 			}
 
-			// 2. Polymorphic leaf function natively evaluates file channels under the inherited context safely
 			_ = r.flushDeviceBuffers(wCtx, name)
 
-			// 3. Dispatch the atomic eviction instruction packet
 			logger.Infof("[Device-Evict] Directly writing eviction token '1' to: %s", deletePath)
 			errWrite := os.WriteFile(deletePath, []byte("1\n"), 0200)
 			
@@ -985,7 +979,6 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) RemovePhysicalDevice(ctx context
 				logger.Infof("Idempotency: Eviction path %s already cleared from host node.", deletePath)
 			}
 
-			// 4. Verification polling loop remains entirely inside the infrastructure context lane (Rule 1)
 			ticker := time.NewTicker(500 * time.Millisecond)
 			defer ticker.Stop()
 			
@@ -1014,11 +1007,12 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) RemovePhysicalDevice(ctx context
 		return fmt.Errorf("parallel physical device eviction batch engine failed: %w", errBatch)
 	}
 
-	// Aggregate and format encountered problems exactly according to Rule 5
 	var aggregatedErrors []string
 	for _, res := range results {
 		if res.Err != nil {
-			aggregatedErrors = append(aggregatedErrors, fmt.Sprintf("%s: delete write failed (%v)", sysDevices[res.Index], res.Err))
+			if res.Index >= 0 && res.Index < len(sysDevices) {
+				aggregatedErrors = append(aggregatedErrors, fmt.Sprintf("%s: delete write failed (%v)", sysDevices[res.Index], res.Err))
+			}
 		}
 	}
 
@@ -3045,101 +3039,12 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) TeardownVolume(ctx context.Conte
 		return err
 	}
 
-	var major, minor uint32
-	var hardwareResolved bool
-	var mpathName string
-	var isNativeNVMe bool
-	
 	logger.Warningf("[Teardown-Main] Entering master volume cleanup sequence for mount target: %s", target)	
-
-	// --- PHASE 0: PRE-UNMOUNT HARDWARE HARVEST ---
-	isMounted, err := r.Mounter.IsMounted(target)
-	if err == nil && isMounted {
-		logger.Warningf("[Teardown-Main]  Target is mounted %s", target)
-		if devPath, err := r.Mounter.GetDeviceFromMount(target); err == nil && devPath != "" {
-			logger.Warningf("[Teardown-Main] Isolated backing device path node from mount tree: %s", devPath)
-			
-			sanitizedDevPath := devPath
-			if resolvedDev, errLink := filepath.EvalSymlinks(sanitizedDevPath); errLink == nil {
-				sanitizedDevPath = resolvedDev
-			}
-			
-			if stat, errStat := os.Stat(sanitizedDevPath); errStat == nil {
-				if sysObj, ok := stat.Sys().(*syscall.Stat_t); ok {
-					major = unix.Major(uint64(sysObj.Rdev))
-					minor = unix.Minor(uint64(sysObj.Rdev))
-					hardwareResolved = true
-					
-					baseName := filepath.Base(sanitizedDevPath)
-					
-					nvmeType, errType := DevicesAreNvme(ctx, r.KeyedGater, baseName)
-					if errType != nil {
-						logger.Warningf("[Teardown-Main] Topology inspection failed for base device %s: %v. Assuming legacy behavior.", baseName, errType)
-					}
-
-					if nvmeType == NVMeNative {
-						mpathName = baseName
-						isNativeNVMe = true
-						logger.Infof("[Teardown-Main] Target %s mapped structurally as Native NVMe Multipathing", baseName)
-					} else {
-						mpathName = r.GetDMNameFromMinor(ctx, minor)
-						logger.Infof("[Teardown-Main] Target %s mapped structurally as Device Mapper Coordinator node: %s", baseName, mpathName)
-					}
-				}
-			}
-		}
-	}
 	
-	// FIXED: Always attempt to resolve the device map parameters from the pre-discovered 
-	// device block name (e.g., passed from GetExistingMpathDevice) rather than strictly gating it behind an active mount check.
-	discoveredDevName := "" // Populate this from the string result of GetExistingMpathDevice
-	if discoveredDevName == "" {
-		// Fallback to checking the mount if it wasn't explicitly passed down
-		if isMounted, errCheck := r.Mounter.IsMounted(target); errCheck == nil && isMounted {
-			if devPath, errMnt := r.Mounter.GetDeviceFromMount(target); errMnt == nil && devPath != "" {
-				discoveredDevName = filepath.Base(devPath)
-			}
-		}
-	}
-
-	// Always resolve the structural hardware metrics if a device string is available
-	if discoveredDevName != "" {
-		sanitizedDevPath := filepath.Join("/dev", discoveredDevName)
-		if resolvedDev, errLink := filepath.EvalSymlinks(sanitizedDevPath); errLink == nil {
-			sanitizedDevPath = resolvedDev
-		}
-		
-		if stat, errStat := os.Stat(sanitizedDevPath); errStat == nil {
-			if sysObj, ok := stat.Sys().(*syscall.Stat_t); ok {
-				major = unix.Major(uint64(sysObj.Rdev))
-				minor = unix.Minor(uint64(sysObj.Rdev))
-				hardwareResolved = true
-				
-				baseName := filepath.Base(sanitizedDevPath)
-				mpathName = baseName // CRITICAL: This guarantees mpathName is never blank if dm-0 exists!
-				
-				nvmeType, errType := DevicesAreNvme(ctx, r.KeyedGater, baseName)
-				if errType != nil {
-					logger.Warningf("[Teardown-Main] Topology inspection failed for base device %s: %v. Assuming legacy behavior.", baseName, errType)
-				}
-
-				if nvmeType == NVMeNative {
-					isNativeNVMe = true
-					logger.Infof("[Teardown-Main] Target %s mapped structurally as Native NVMe Multipathing", baseName)
-				} else {
-					// If it's a device mapper block, ensure we resolve the true coordinator name alias
-					if strings.HasPrefix(baseName, "dm-") {
-						mpathName = r.GetDMNameFromMinor(ctx, minor)
-					}
-					logger.Infof("[Teardown-Main] Target %s mapped structurally as Device Mapper Coordinator node: %s", baseName, mpathName)
-				}
-			}
-		}
-	}
+	mpathName, hardwareResolved, isNativeNVMe, major, minor, isMounted := r.collectInformationForTeardown(ctx, target, expectedWWID)
 
 	// --- PHASE 1: UNMOUNT & CRITICAL VERIFICATION MATRIX (Kept isolated and safe) ---
-	isMounted, err = r.Mounter.IsMounted(target)
-	if err == nil && isMounted {
+	if isMounted {
 		if errUnmount := r.Mounter.UnmountWithTimeout(ctx, target, 30*time.Second); errUnmount != nil {
 			logger.Errorf("[Teardown-Main] Unmount loop returned failure state for path %s: %v", target, errUnmount)
 			return fmt.Errorf("teardown: unmount step is still in progress: %w", errUnmount)
@@ -3152,50 +3057,6 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) TeardownVolume(ctx context.Conte
 		logger.Infof("[Teardown-Main] Target path %s cleanly unmounted and verified gone.", target)
 	}
 	
-	// --- PHASE 2: HARDWARE RESOLUTION FALLBACK ---
-	if mpathName == "" && expectedWWID != "" {
-		mpathName = r.Helper.findDMByWWID(ctx, expectedWWID)
-		if mpathName != "" {
-			if !hardwareResolved {
-				var errSysfs error
-				major, minor, errSysfs = r.Helper.GetMajorMinorFromSysfs(ctx, mpathName)
-				if errSysfs == nil {
-					hardwareResolved = true
-				}
-			}
-		} else {
-			slaves := r.FindSlavesByWWID(ctx, expectedWWID)
-			if len(slaves) > 0 {
-				for _, slavePath := range slaves {
-					slaveBase := filepath.Base(slavePath)
-					nvmeType, _ := DevicesAreNvme(ctx, r.KeyedGater, slaveBase)
-					if nvmeType == NVMeNative {
-						mpathName = slavePath
-						isNativeNVMe = true
-						break
-					}
-				}
-			}
-		}
-	}
-
-	// =========================================================================
-	// FIXED: CRITICAL LIVELOCK BREAKER (IDEMPOTENCY SAFEGUARD)
-	// =========================================================================
-	if mpathName == "" && (needFlush || needRemovePhysical) {
-		// Double-check if the mount path is genuinely already clear
-		stillMounted, errCheck := r.Mounter.IsMounted(target)
-		if errCheck == nil && !stillMounted {
-			// If it's already unmounted and we cannot find any trace of the mpathName 
-			// or slaves on the host bus, the fabric has already been disconnected.
-			// Return success to allow Kubernetes to delete the pod cleanly.
-			logger.Warningf("[Teardown-Idempotency] Volume path %s is already unmounted and backing block devices for WWID %s are gone from the host bus. Assuming previous cleanup was completed. Bypassing failure.", target, expectedWWID)
-			return nil
-		}
-
-		return fmt.Errorf("teardown: unable to resolve backing block architecture targets for WWID %s; halting execution to protect system paths", expectedWWID)
-	}
-
 	// --- PHASE 3: UPDATED DEVICE MAPPER & NATIVE NVMe REMOVAL SEQUENCE ---
 	var globalOpenCount int32
 	rawScsiTarget := strings.ToLower(strings.TrimSpace(expectedWWID))
@@ -3203,7 +3064,7 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) TeardownVolume(ctx context.Conte
 
 	helper := GetDmsPathHelperGeneric{}
 	isDeviceMapperTarget := helper.IsDeviceMapper(mpathName)
-
+	
 	if mpathName != "" && !isNativeNVMe && isDeviceMapperTarget {
 		logger.Infof("[Teardown-Main] [%s] Starting Device Mapper teardown pipeline...", mpathName)
 		
@@ -3297,6 +3158,103 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) TeardownVolume(ctx context.Conte
 	return nil
 }
 
+func (r *OsDeviceConnectivityHelperScsiGeneric) collectInformationForTeardown(ctx context.Context, target string, expectedWWID string) 
+					(mpathName string, hardwareResolved bool, isNativeNVMe bool, major uint32, minor uint32, isMounted bool) {
+	var major, minor uint32
+	var hardwareResolved bool
+	var mpathName string
+	var isNativeNVMe bool
+	
+	logger.Warningf("[Teardown-Main] Entering master volume cleanup sequence for mount target: %s", target)	
+
+	// FIXED: Centralized VFS inspection routine avoids copy-paste bugs 
+	// and accurately preserves friendly device-mapper names.
+	harvestDeviceMetadata := func(devNodePath string, hintMpathName string) {
+		sanitizedDevPath := devNodePath
+		if resolvedDev, errLink := filepath.EvalSymlinks(sanitizedDevPath); errLink == nil {
+			sanitizedDevPath = resolvedDev
+		}
+		
+		if stat, errStat := os.Stat(sanitizedDevPath); errStat == nil {
+			if sysObj, ok := stat.Sys().(*syscall.Stat_t); ok {
+				major = unix.Major(uint64(sysObj.Rdev))
+				minor = unix.Minor(uint64(sysObj.Rdev))
+				hardwareResolved = true
+				
+				baseName := filepath.Base(sanitizedDevPath)
+				nvmeType, errType := DevicesAreNvme(ctx, r.KeyedGater, baseName)
+				if errType != nil {
+					logger.Warningf("[Teardown-Main] Topology inspection failed for base device %s: %v. Assuming legacy behavior.", baseName, errType)
+				}
+
+				if nvmeType == NVMeNative {
+					mpathName = baseName
+					isNativeNVMe = true
+					logger.Infof("[Teardown-Main] Target %s mapped structurally as Native NVMe Multipathing", baseName)
+				} else {
+					// FIXED: Preserve the pre-existing mapper alias name (hintMpathName) if valid,
+					// otherwise fall back securely to r.GetDMNameFromMinor for raw dm-* names.
+					if hintMpathName != "" && !strings.HasPrefix(hintMpathName, "dm-") {
+						mpathName = hintMpathName
+					} else if strings.HasPrefix(baseName, "dm-") {
+						mpathName = r.GetDMNameFromMinor(ctx, minor)
+					} else {
+						mpathName = baseName
+					}
+					logger.Infof("[Teardown-Main] Target %s mapped structurally as Device Mapper Coordinator node: %s", baseName, mpathName)
+				}
+			}
+		}
+	}
+
+	// --- PHASE 0: PRE-UNMOUNT HARDWARE HARVEST ---
+	isMounted, err := r.Mounter.IsMounted(target)
+	if err == nil && isMounted {
+		logger.Warningf("[Teardown-Main] Target is mounted %s", target)
+		if devPath, err := r.Mounter.GetDeviceFromMount(target); err == nil && devPath != "" {
+			logger.Warningf("[Teardown-Main] Isolated backing device path node from mount tree: %s", devPath)
+			harvestDeviceMetadata(devPath, "")
+		}
+	}
+	
+	// --- PHASE 2: HARDWARE RESOLUTION FALLBACK (RUNS IDEMPOTENTLY ON RETRIES) ---
+	if mpathName == "" && expectedWWID != "" {
+		discoveredMapperName := r.Helper.findDMByWWID(ctx, expectedWWID)
+		if discoveredMapperName != "" {
+			logger.Infof("[Teardown-Main] Found device from volume id via /dev/mapper: %s", discoveredMapperName)
+			if !hardwareResolved {
+				var errSysfs error
+				major, minor, errSysfs = r.Helper.GetMajorMinorFromSysfs(ctx, discoveredMapperName)
+				if errSysfs == nil {
+					hardwareResolved = true
+				}
+			}
+			
+			// Always inspect properties using the absolute system path coordinates
+			harvestDeviceMetadata(filepath.Join("/dev/mapper", discoveredMapperName), discoveredMapperName)
+			
+		} else {
+			// Step 3 Fallback: Scan direct host slave endpoints for unmounted tracks
+			slaves := r.FindSlavesByWWID(ctx, expectedWWID)
+			if len(slaves) > 0 {
+				for _, slavePath := range slaves {
+					slaveBase := filepath.Base(slavePath)
+					nvmeType, _ := DevicesAreNvme(ctx, r.KeyedGater, slaveBase)
+					if nvmeType == NVMeNative {
+						// FIXED: Ensure mpathName stores a clean base block identifier 
+						// to keep ExtractNvmeControllerBase from failing on downstream disconnect loops.
+						mpathName = slaveBase
+						isNativeNVMe = true
+						logger.Infof("[Teardown-Main] Fallback slave tracking matched native NVMe handle: %s", mpathName)
+						break
+					}
+				}
+			}
+		}		
+	}
+	return mpathName, hardwareResolved, isNativeNVMe, major, minor, isMounted
+}
+
 // flushDMBuffers executes a clean device-level block cache sync boundary before mapper removal.
 func (r *OsDeviceConnectivityHelperScsiGeneric) flushDMBuffers(ctx context.Context, mpathName string, hardwareResolved bool, major, minor uint32) error {
 	// Capturing the error token ensures that if a dirty disk flush operation fails,
@@ -3358,8 +3316,9 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) flushDMBuffers(ctx context.Conte
 	return errFlush
 }
 
-// cleanNVMeNamespacesFromSlaves executes systematic parallel sysfs deletion token injection on NVMe paths.
-func (r *OsDeviceConnectivityHelperScsiGeneric) cleanNVMeNamespacesFromSlaves(ctx context.Context, devices []string) {
+// cleanNV// evictOrCleanNvmeNamespaces executes systematic parallel sysfs eviction on NVMe namespace paths.
+// Unified: Eliminates code duplication and targets valid controller-level deletion interfaces.
+func (r *OsDeviceConnectivityHelperScsiGeneric) evictOrCleanNvmeNamespaces(ctx context.Context, devices []string, actionLabel string) {
 	if err := ctx.Err(); err != nil {
 		return
 	}
@@ -3374,7 +3333,7 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) cleanNVMeNamespacesFromSlaves(ct
 		}
 		if strings.Contains(base, "n") && !strings.Contains(base, "c") {
 			if len(validDevices) >= maxCapCeiling {
-				logger.Warningf("[VFS-Guard] NVMe slave tracking slice reached maximum safe memory threshold (%d). Truncating scan.", maxCapCeiling)
+				logger.Warningf("[VFS-Guard] NVMe %s tracking slice reached safe threshold ceiling (%d). Truncating scan.", actionLabel, maxCapCeiling)
 				break
 			}
 			validDevices = append(validDevices, dev)
@@ -3385,9 +3344,7 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) cleanNVMeNamespacesFromSlaves(ct
 		return
 	}
 
-	// FIXED: Include a random token or distinct hash element alongside UnixNano 
-	// to completely rule out concurrent key collisions during multi-threaded provisioning storms.
-	uniqueBatchKey := fmt.Sprintf("batch-nvme-slaves-cleanup-%d-%s", time.Now().UnixNano(), filepath.Base(validDevices[0]))
+	uniqueBatchKey := fmt.Sprintf("batch-nvme-%s-%d-%s", actionLabel, time.Now().UnixNano(), filepath.Base(validDevices[0]))
 
 	_, _ = executer.ExecuteUninterruptibleBatch[string, struct{}](
 		ctx,
@@ -3400,75 +3357,6 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) cleanNVMeNamespacesFromSlaves(ct
 			
 			ctrlName := ExtractNvmeControllerBase(base)
 			if ctrlName == "" {
-				// FIXED: Safe extraction fallback that handles "nvme12c0n2" and long formats safely.
-				// Find the last index of 'n' to correctly separate controller boundaries from namespace indices.
-				if lastNIdx := strings.LastIndex(base, "n"); lastNIdx != -1 && lastNIdx > 0 {
-					if cIdx := strings.Index(base, "c"); cIdx != -1 && cIdx < lastNIdx {
-						ctrlName = base[:cIdx] // Extracts "nvme12" from "nvme12c0n2"
-					} else {
-						ctrlName = base[:lastNIdx] // Extracts "nvme0" from "nvme0n1"
-					}
-				}
-			}
-
-			if ctrlName != "" {
-				// Direct composition targets the absolute path instantly without relying on heavy EvalSymlinks loops
-				sysfsDeletePath := fmt.Sprintf("/sys/class/nvme/%s/%s/delete", ctrlName, base)
-				logger.Infof("[Teardown-NVMe] Injecting sysfs eviction write token to: %s", sysfsDeletePath)
-				
-				if err := os.WriteFile(sysfsDeletePath, []byte("1\n"), 0200); err != nil {
-					if !os.IsNotExist(err) {
-						logger.Warningf("[Teardown-NVMe] Failed to force write to sysfs path %s: %v", sysfsDeletePath, err)
-					}
-				}
-			}
-			return struct{}{}, nil
-		},
-	)
-}
-
-// evictNVMeNamespaces targets specific sysfs namespace delete attributes in parallel.
-func (r *OsDeviceConnectivityHelperScsiGeneric) evictNVMeNamespaces(ctx context.Context, devices []string) {
-	if err := ctx.Err(); err != nil {
-		return
-	}
-
-	const maxCapCeiling = 10000
-	validDevices := make([]string, 0, len(devices))
-	
-	for _, dev := range devices {
-		base := filepath.Base(dev)
-		if !strings.HasPrefix(base, "nvme") {
-			continue
-		}
-		if strings.Contains(base, "n") && !strings.Contains(base, "c") {
-			if len(validDevices) >= maxCapCeiling {
-				logger.Warningf("[VFS-Guard] NVMe namespace eviction tracking slice reached safe threshold ceiling (%d). Truncating scan.", maxCapCeiling)
-				break
-			}
-			validDevices = append(validDevices, dev)
-		}
-	}
-
-	if len(validDevices) == 0 {
-		return
-	}
-
-	// FIXED: Reinforced with contextual tracking metrics to ensure absolute key uniqueness
-	uniqueBatchKey := fmt.Sprintf("batch-nvme-ns-evict-%d-%s", time.Now().UnixNano(), filepath.Base(validDevices[0]))
-
-	_, _ = executer.ExecuteUninterruptibleBatch[string, struct{}](
-		ctx,
-		r.KeyedGater,
-		uniqueBatchKey,
-		15, 100, 3*time.Second, 15*time.Second,
-		validDevices,
-		func(wCtx context.Context, index int, dev string, cancelBatch func()) (struct{}, error) {
-			base := filepath.Base(dev)
-			
-			ctrlName := ExtractNvmeControllerBase(base)
-			if ctrlName == "" {
-				// FIXED: Safe extraction fallback that handles "nvme12c0n2" and long formats safely.
 				if lastNIdx := strings.LastIndex(base, "n"); lastNIdx != -1 && lastNIdx > 0 {
 					if cIdx := strings.Index(base, "c"); cIdx != -1 && cIdx < lastNIdx {
 						ctrlName = base[:cIdx]
@@ -3479,18 +3367,29 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) evictNVMeNamespaces(ctx context.
 			}
 
 			if ctrlName != "" {
-				sysfsDeletePath := fmt.Sprintf("/sys/class/nvme/%s/%s/delete", ctrlName, base)
-				logger.Infof("[Teardown-NVMe] Injecting sysfs eviction write token to: %s", sysfsDeletePath)
+				// FIXED: Correct path targeting controller-level delete_controller or subsystem disconnection
+				sysfsDeletePath := fmt.Sprintf("/sys/class/nvme/%s/delete_controller", ctrlName)
+				logger.Infof("[Teardown-NVMe] [%s] Injecting controller eviction write token to: %s", actionLabel, sysfsDeletePath)
 				
 				if err := os.WriteFile(sysfsDeletePath, []byte("1\n"), 0200); err != nil {
 					if !os.IsNotExist(err) {
-						logger.Warningf("[Teardown-NVMe] Failed to force write to sysfs path %s: %v", sysfsDeletePath, err)
+						logger.Warningf("[Teardown-NVMe] [%s] Failed to write to controller path %s: %v", actionLabel, sysfsDeletePath, err)
 					}
 				}
 			}
 			return struct{}{}, nil
 		},
 	)
+}
+
+// cleanNVMeNamespacesFromSlaves routes to unified NVMe management.
+func (r *OsDeviceConnectivityHelperScsiGeneric) cleanNVMeNamespacesFromSlaves(ctx context.Context, devices []string) {
+	r.evictOrCleanNvmeNamespaces(ctx, devices, "clean-slaves")
+}
+
+// evictNVMeNamespaces routes to unified NVMe management.
+func (r *OsDeviceConnectivityHelperScsiGeneric) evictNVMeNamespaces(ctx context.Context, devices []string) {
+	r.evictOrCleanNvmeNamespaces(ctx, devices, "evict-ns")
 }
 
 // FindSlavesByWWID safely scans the host block layer in parallel to aggregate all physical path lanes matching the volume identifier.
@@ -3800,12 +3699,10 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) GetDMNameFromMinor(ctx context.C
 
 		minorIndex := unix.Minor(uint64(statT.Rdev))
 		if uint32(minorIndex) == minor {
-			if realPath, errLink := filepath.EvalSymlinks(fullPath); errLink == nil {
-				dmKernelName := filepath.Base(realPath) 
-				if functionalName := r.readDMNameSafe(ctx, dmKernelName); functionalName != "" {
-					return functionalName // INSTANT EARLY EXIT
-				}
-			}
+			// FIXED: Instantly return 'name' (e.g. "mpatha") on match, bypassing the secondary 
+			// sysfs readDMNameSafe check which can fail if sysfs is partially unpopulated or masked.
+			logger.Infof("[GetDMNameFromMinor] Minor %d successfully mapped to alias name via /dev/mapper loop: %s", minor, name)
+			return name
 		}
 	}
 
@@ -7505,7 +7402,7 @@ func secureReadSysfsFallback(ctx context.Context, gater *executer.KeyedGater, de
 }
 
 // IsDeviceMapper verifies if a block entry is truly a Device Mapper device.
-// 100% Failsafe Structural Verification: Uses strict path segment matching and exact sysfs attributes.
+// Hardened: Treats canonical 'dm-' prefix and /dev/mapper layout as primary truth.
 func (r *GetDmsPathHelperGeneric) IsDeviceMapper(devName string) bool {
 	cleanName := filepath.Base(devName)
 	if cleanName == "" || cleanName == "." || cleanName == "/" {
@@ -7518,37 +7415,29 @@ func (r *GetDmsPathHelperGeneric) IsDeviceMapper(devName string) bool {
 		return false
 	}
 
-	// 2. STRICT NAME CONVENTION CHECK: Device mapper blocks must start with 'dm-' 
-	// or be mapped in the mapper directory namespace.
-	isDmNamed := strings.HasPrefix(cleanName, "dm-")
+	// 2. STANDARD CONVENTION SHORTCUT: Any block starting with 'dm-' is a device mapper node
+	if strings.HasPrefix(cleanName, "dm-") {
+		return true
+	}
 
-	// 3. PHYSICAL SYSFS ATTRIBUTE VALIDATION: 
-	// The ultimate source of truth for a Device Mapper device in Linux is the 
-	// existence of the 'dm' directory and 'uevent' or 'holders' in its primary block path.
+	// 3. PHYSICAL SYSFS ATTRIBUTE VALIDATION (Fallback for friendly names/symlinks)
 	sysBlockPath := filepath.Join("/sys/block", cleanName)
 	if _, errStat := os.Stat(sysBlockPath); os.IsNotExist(errStat) {
 		sysBlockPath = filepath.Join("/sys/class/block", cleanName)
 	}
 
-	// Resolve symlinks safely with a guard against broken links
 	resolvedPath, errEval := filepath.EvalSymlinks(sysBlockPath)
 	if errEval == nil {
 		sysBlockPath = resolvedPath
 	}
 
-	// Verify the physical 'dm' subdirectory exists inside this precise block path
 	dmSubDir := filepath.Join(sysBlockPath, "dm")
 	if info, errStat := os.Stat(dmSubDir); errStat == nil && info.IsDir() {
 		return true
 	}
 
-	// If it doesn't have a physical 'dm' folder, but was named dm-* and resolves under virtual block,
-	// do a precise path element validation rather than a loose substring search
-	if isDmNamed {
-		// Ensure the resolved path explicitly terminates or contains a structural virtual dm component
-		if strings.Contains(sysBlockPath, "/virtual/block/") || strings.Contains(sysBlockPath, "/box/dm/") {
-			return true
-		}
+	if strings.Contains(sysBlockPath, "/virtual/block/") || strings.Contains(sysBlockPath, "/dm/") {
+		return true
 	}
 
 	return false
