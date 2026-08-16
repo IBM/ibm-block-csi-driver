@@ -3039,7 +3039,7 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) TeardownVolume(ctx context.Conte
 		return err
 	}
 
-	logger.Warningf("[Teardown-Main] Entering master volume cleanup sequence for mount target: %s", target)	
+	logger.Infof("[Teardown-Main] Entering master volume cleanup sequence for mount target: %s", target)	
 	
 	// CONSUMES PRE-CALCULATED VALUES: Zero duplicate work or extra sysfs traverses needed here.
 	mpathName, hardwareResolved, isNativeNVMe, major, minor, isMounted, needFlush, needRemovePhysical, isDeviceMapperTarget := r.collectInformationForTeardown(ctx, target, expectedWWID)
@@ -3100,6 +3100,7 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) TeardownVolume(ctx context.Conte
 			_ = r.multipathdAction(ctx, "disablequeueing map "+mpathName)
 			_ = r.dmIoctlCall(ctx, mpathName, DM_DEV_REMOVE, DM_DEFERRED_REMOVE)
 		} else {
+			logger.Infof("[Teardown-Main]  Device %s is free.", mpathName)
 			var slaves []string
 			if hardwareResolved && major != 0 {
 				slaves, _ = r.Helper.getSlavesForDevice(ctx, major, minor)
@@ -3172,9 +3173,9 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) TeardownVolume(ctx context.Conte
 }
 
 func (r *OsDeviceConnectivityHelperScsiGeneric) collectInformationForTeardown(ctx context.Context, target string, expectedWWID string) (mpathName string, hardwareResolved bool, isNativeNVMe bool, major uint32, minor uint32, isMounted bool, needFlush bool, needRemovePhysical bool, isDeviceMapperTarget bool) {
-	logger.Warningf("[Teardown-Main] Entering master volume cleanup sequence for mount target: %s", target)	
 
 	harvestDeviceMetadata := func(devNodePath string, hintMpathName string) {
+		logger.Infof("[Teardown-Main] Target %s - harvest device %s hint %s", target, devNodePath, hintMpathName)
 		sanitizedDevPath := devNodePath
 		if resolvedDev, errLink := filepath.EvalSymlinks(sanitizedDevPath); errLink == nil {
 			sanitizedDevPath = resolvedDev
@@ -3235,6 +3236,7 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) collectInformationForTeardown(ct
 			}
 			harvestDeviceMetadata(filepath.Join("/dev/mapper", discoveredMapperName), discoveredMapperName)
 		} else {
+			logger.Infof("[Teardown-Main] Couldn't find device with id for target: %s", target)
 			slaves := r.FindSlavesByWWID(ctx, expectedWWID)
 			if len(slaves) > 0 {
 				for _, slavePath := range slaves {
@@ -3258,9 +3260,11 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) collectInformationForTeardown(ct
 	if mpathName == "" {
 		needFlush = true
 		needRemovePhysical = true
+		logger.Infof("[Teardown-Main] No mpath found for mount target: %s", target)	
 	} else if isNativeNVMe {
 		needFlush = false
 		needRemovePhysical = false
+		logger.Infof("[Teardown-Main] Native NVMe found for mount target: %s", target)	
 	} else if isDeviceMapperTarget {
 		isMpathNVMe := false
 		slavesPath := filepath.Join("/sys/block", mpathName, "slaves")
@@ -3279,13 +3283,16 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) collectInformationForTeardown(ct
 		if isMpathNVMe {
 			needFlush = true
 			needRemovePhysical = false
+			logger.Infof("[Teardown-Main] NVMe DM found for mount target: %s", target)	
 		} else {
 			needFlush = true
 			needRemovePhysical = true
+			logger.Infof("[Teardown-Main] DM found for mount target: %s", target)	
 		}
 	} else {
 		needFlush = true
 		needRemovePhysical = true
+		logger.Infof("[Teardown-Main] DM found, not DM target,  for mount target: %s", target)	
 	}
 	
 	return mpathName, hardwareResolved, isNativeNVMe, major, minor, isMounted, needFlush, needRemovePhysical, isDeviceMapperTarget
