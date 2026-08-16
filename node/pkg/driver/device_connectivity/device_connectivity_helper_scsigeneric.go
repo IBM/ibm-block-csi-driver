@@ -3041,7 +3041,7 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) TeardownVolume(ctx context.Conte
 
 	logger.Infof("[Teardown-Main] Entering master volume cleanup sequence for mount target: %s", target)	
 	
-	// CONSUMES PRE-CALCULATED VALUES: Zero duplicate work or extra sysfs traverses needed here.
+	// CONSUMES PRE-CALCULATED VALUES FROM THE HARVEST PASS
 	mpathName, hardwareResolved, isNativeNVMe, major, minor, isMounted, needFlush, needRemovePhysical, isDeviceMapperTarget := r.collectInformationForTeardown(ctx, target, expectedWWID)
 
 	// --- PHASE 1: UNMOUNT & CRITICAL VERIFICATION MATRIX ---
@@ -3058,20 +3058,41 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) TeardownVolume(ctx context.Conte
 		logger.Infof("[Teardown-Main] Target path %s cleanly unmounted and verified gone.", target)
 	}
 	
-	// --- PHASE 3: UPDATED DEVICE MAPPER & NATIVE NVMe REMOVAL SEQUENCE ---
+	// --- PHASE 3: UNIFIED DEVICE MAPPER & ALIAS REMOVAL SEQUENCE ---
 	var globalOpenCount int32
 	rawScsiTarget := strings.ToLower(strings.TrimSpace(expectedWWID))
 	rawNvmeTarget := convertScsiIdToNguid(rawScsiTarget)
 	
-	if mpathName != "" && !isNativeNVMe && isDeviceMapperTarget {
-		logger.Infof("[Teardown-Main] [%s] Starting Device Mapper teardown pipeline...", mpathName)
+	// RELAXED GUARD: If mpathName is known and it's not a native NVMe path, treat it as a DM/alias target 
+	// regardless of whether minor/sysfs classification checks returned true or false for IsDeviceMapper.
+	if mpathName != "" && !isNativeNVMe {
+		// ENTERPRISE HARDENING: Determine the definitive kernel-level name (dm-X) 
+		// alongside the user-space alias name to ensure 100% protocol coverage.
+		canonicalKernelName := mpathName
+		userSpaceAliasName := mpathName
+
+		if strings.HasPrefix(mpathName, "dm-") {
+			// If we found the raw kernel name, try to recover the descriptive alias name
+			if recoveredAlias := r.GetDMNameFromMinor(ctx, minor); recoveredAlias != "" {
+				userSpaceAliasName = recoveredAlias
+			}
+		} else {
+			// If we found a friendly alias (like mpathbud), find its canonical dm-X counterpart
+			resolvedDev, errLink := filepath.EvalSymlinks(filepath.Join("/dev/mapper", mpathName))
+			if errLink == nil {
+				canonicalKernelName = filepath.Base(resolvedDev) // Transforms "mpathbud" -> "dm-3"
+			}
+		}
+
+		logger.Infof("[Teardown-Main] [%s] Starting Device Mapper teardown pipeline. Alias: %s | Kernel Node: %s", mpathName, userSpaceAliasName, canonicalKernelName)
 		
 	LoopOpenCount:
 		for i := 0; i < 10; i++ {
 			if ctx.Err() != nil {
 				break
 			}
-			globalOpenCount, _ = r.Helper.GetOpenCount(ctx, mpathName)
+			// Use the canonical device name to check system lock boundaries safely
+			globalOpenCount, _ = r.Helper.GetOpenCount(ctx, canonicalKernelName)
 			if globalOpenCount == 0 {
 				break 
 			}
@@ -3087,43 +3108,44 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) TeardownVolume(ctx context.Conte
 		}
 
 		if needFlush && ctx.Err() == nil {
-			logger.Infof("[Teardown-Main] [%s] Initiating isolated uninterruptible volume buffer flush...", mpathName)
-			errFlush := r.flushDMBuffers(ctx, mpathName, hardwareResolved, major, minor)
+			logger.Infof("[Teardown-Main] [%s] Initiating isolated volume buffer flush on %s...", mpathName, canonicalKernelName)
+			errFlush := r.flushDMBuffers(ctx, canonicalKernelName, hardwareResolved, major, minor)
 			if errFlush != nil {
-				logger.Errorf("[Teardown-Main] [%s] Critical buffer flush failed. Halting teardown path: %v", mpathName, errFlush)
+				logger.Errorf("[Teardown-Main] [%s] Critical buffer flush failed: %v", mpathName, errFlush)
 				return fmt.Errorf("teardown: safety boundary aborted due to buffer flush failure: %w", errFlush)
 			}
 		}
 
 		if globalOpenCount > 0 {
 			logger.Warningf("[Teardown-Main] [%s] Device remains busy (openCount=%d). Triggering Deferred Removal.", mpathName, globalOpenCount)
-			_ = r.multipathdAction(ctx, "disablequeueing map "+mpathName)
-			_ = r.dmIoctlCall(ctx, mpathName, DM_DEV_REMOVE, DM_DEFERRED_REMOVE)
+			// Multipath tools expect the user-space map alias string name
+			_ = r.multipathdAction(ctx, "disablequeueing map "+userSpaceAliasName)
+			_ = r.dmIoctlCall(ctx, userSpaceAliasName, DM_DEV_REMOVE, DM_DEFERRED_REMOVE)
 		} else {
-			logger.Infof("[Teardown-Main]  Device %s is free.", mpathName)
 			var slaves []string
 			if hardwareResolved && major != 0 {
 				slaves, _ = r.Helper.getSlavesForDevice(ctx, major, minor)
 			}
 			if len(slaves) == 0 && expectedWWID != "" {
-				slaves = r.FindSlavesByWWID(ctx, expectedWWID) 
+				slaves = FindSlavesByWWID(ctx, expectedWWID) 
 			}
 
 			logger.Infof("[Teardown-Main] [%s] Step 1/2: Dropping multipath layout via daemon entry...", mpathName)
-			_ = r.multipathdAction(ctx, "disablequeueing map "+mpathName)
-			if errDelMap := r.multipathdAction(ctx, "del map "+mpathName); errDelMap != nil {
+			_ = r.multipathdAction(ctx, "disablequeueing map "+userSpaceAliasName)
+			if errDelMap := r.multipathdAction(ctx, "del map "+userSpaceAliasName); errDelMap != nil {
 				logger.Warningf("[Teardown-Main] [%s] Daemon map deletion failed: %v.", mpathName, errDelMap)
 			}
 
-			logger.Infof("[Teardown-Main] [%s] Issuing synchronous DM_DEV_REMOVE ioctl instruction...", mpathName)
-			if errIoctlRm := r.dmIoctlCall(ctx, mpathName, DM_DEV_REMOVE, 0); errIoctlRm != nil {
-				logger.Warningf("[Teardown-Main] [%s] Immediate device mapper removal ioctl returned error: %v", mpathName, errIoctlRm)
+			// Direct kernel ioctls can target the alias or canonical block safely depending on driver support
+			logger.Infof("[Teardown-Main] [%s] Issuing synchronous DM_DEV_REMOVE ioctl instruction...", userSpaceAliasName)
+			if errIoctlRm := r.dmIoctlCall(ctx, userSpaceAliasName, DM_DEV_REMOVE, 0); errIoctlRm != nil {
+				// Fallback to canonical node target if the user-space alias name is unrecognized by custom kernels
+				_ = r.dmIoctlCall(ctx, canonicalKernelName, DM_DEV_REMOVE, 0)
 			}
 
 			if len(slaves) > 0 {
 				logger.Infof("[Teardown-Main] [%s] Step 2/2: Evicting physical backing slave devices: %v", mpathName, slaves)
 				_ = r.RemovePhysicalDevice(ctx, slaves)
-				
 				r.cleanNVMeNamespacesFromSlaves(ctx, slaves)
 				needRemovePhysical = false 
 			} else {
@@ -3198,14 +3220,24 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) collectInformationForTeardown(ct
 					isNativeNVMe = true
 					logger.Infof("[Teardown-Main] Target %s mapped structurally as Native NVMe Multipathing", baseName)
 				} else {
-					if hintMpathName != "" && !strings.HasPrefix(hintMpathName, "dm-") {
-						mpathName = hintMpathName
-					} else if strings.HasPrefix(baseName, "dm-") {
-						mpathName = r.GetDMNameFromMinor(ctx, minor)
-					} else {
+					// NORMALIZE TO CANONICAL dm-X NAME IF RESOLVED VIA MINOR OR SYMLINK
+					if strings.HasPrefix(baseName, "dm-") {
 						mpathName = baseName
+					} else if hintMpathName != "" && strings.HasPrefix(hintMpathName, "dm-") {
+						mpathName = hintMpathName
+					} else {
+						// If it's a friendly name, check if we can get the canonical dm name from major/minor
+						canonicalDm := r.GetDMNameFromMinor(ctx, minor)
+						if canonicalDm != "" {
+							mpathName = canonicalDm
+							logger.Infof("[Teardown-Main] Normalized friendly alias '%s' to canonical kernel name: %s", hintMpathName, canonicalDm)
+						} else if hintMpathName != "" {
+							mpathName = hintMpathName
+						} else {
+							mpathName = baseName
+						}
 					}
-					logger.Infof("[Teardown-Main] Target %s mapped structurally as Device Mapper Coordinator node: %s", baseName, mpathName)
+					logger.Infof("[Teardown-Main] Target mapped structurally as Device Mapper Coordinator node: %s", mpathName)
 				}
 			}
 		}
@@ -3219,8 +3251,11 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) collectInformationForTeardown(ct
 		if devPath, err := r.Mounter.GetDeviceFromMount(target); err == nil && devPath != "" {
 			logger.Warningf("[Teardown-Main] Isolated backing device path node from mount tree: %s", devPath)
 			harvestDeviceMetadata(devPath, "")
+		} else {
+			logger.Warningf("[Teardown-Main] GetDeviceFromMount returned empty or error for %s: %v. Relying on WWID fallback.", target, err)
 		}
 	}
+	
 	
 	// --- PHASE 2: HARDWARE RESOLUTION FALLBACK ---
 	if mpathName == "" && expectedWWID != "" {
@@ -3865,28 +3900,80 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) dmIoctlLoadTable(ctx context.Con
 }
 
 
+// dmIoctlCall executes a safe, stack-pinned kernel ioctl call on /dev/mapper/control.
+// Hardened against string truncation, missing null-terminators, and Go GC pointer shifting.
 func (r *OsDeviceConnectivityHelperScsiGeneric) dmIoctlCall(ctx context.Context, name string, op uintptr, flags uint32) error {
-    // Capture the tuple, discard the struct{}
-    _, err := executer.ExecuteUninterruptible[struct{}](
-        ctx, r.KeyedGater, "dm-ioctl-"+name, 1, 10, 1*time.Second, 5*time.Second,
-        func(wCtx context.Context) (struct{}, error) {
-            f, err := os.OpenFile(DM_IOCTL_CONTROL, os.O_RDWR, 0)
-            if err != nil { return struct{}{}, err }
-            defer f.Close()
+	cleanName := filepath.Base(name)
+	if cleanName == "" || cleanName == "control" {
+		return fmt.Errorf("dm-ioctl: invalid device target name provided: %s", name)
+	}
 
-            payload := dmIoctl{
-                version:  [3]uint32{4, 0, 0},
-                dataSize: uint32(unsafe.Sizeof(dmIoctl{})),
-                flags:    flags,
-            }
-            copy(payload.name[:], name)
+	// Capture the tuple, discard the struct{}
+	_, err := executer.ExecuteUninterruptible[struct{}](
+		ctx, r.KeyedGater, "dm-ioctl-"+cleanName, 1, 10, 1*time.Second, 5*time.Second,
+		func(wCtx context.Context) (struct{}{}, error) {
+			f, err := os.OpenFile(DM_IOCTL_CONTROL, os.O_RDWR, 0)
+			if err != nil { 
+				return struct{}{}, fmt.Errorf("dm-ioctl: failed to open control path: %w", err) 
+			}
+			// Safe handle release via deferred descriptor close
+			defer f.Close()
 
-            _, _, errno := unix.Syscall(unix.SYS_IOCTL, f.Fd(), op, uintptr(unsafe.Pointer(&payload)))
-            if errno != 0 && errno != unix.ENXIO { return struct{}{}, errno }
-            return struct{}{}, nil
-        },
-    )
-    return err // Return the error alone
+			// 1. BOUNDARY SAFEGUARD: Enforce strict Linux DM_NAME_LEN (128 bytes) constraints
+			const dmNameLen = 128
+			if len(cleanName) >= dmNameLen {
+				return struct{}{}, fmt.Errorf("dm-ioctl: target name length (%d) exceeds kernel limit of %d", len(cleanName), dmNameLen-1)
+			}
+
+			// Define the explicit underlying C-aligned struct locally for size assessment
+			type dmIoctlPacked struct {
+				version     [3]uint32
+				dataSize    uint32
+				flags       uint32
+				eventNr     uint32
+				targetCount uint32
+				openCount   int32
+				lastEventNr uint32
+				dev         uint64
+				name        [dmNameLen]byte
+				uuid        [129]byte // Standard kernel spacing alignment
+				dataStart   uint32
+			}
+
+			var payload dmIoctlPacked
+			payload.version = [3]uint32{4, 0, 0}
+			payload.dataSize = uint32(unsafe.Sizeof(payload))
+			payload.flags = flags
+
+			// Safe copy string bytes into fixed array, ensuring explicit terminal null padding
+			copy(payload.name[:dmNameLen-1], cleanName)
+			payload.name[len(cleanName)] = 0 // Enforce physical null terminator explicitly
+
+			// 2. RUNTIME MEMORY LOCK: Capture direct pointer instance into a local variable 
+			// and use runtime.KeepAlive right after to guarantee Go GC never shifts or collects 
+			// the object out of the CPU registers until the unix.Syscall instruction completely finishes.
+			payloadPtr := unsafe.Pointer(&payload)
+
+			logger.Infof("[DM-Ioctl] Dispatched tracking operator code %v on device map: %s", op, cleanName)
+			_, _, errno := unix.Syscall(
+				unix.SYS_IOCTL, 
+				f.Fd(), 
+				op, 
+				uintptr(payloadPtr),
+			)
+
+			// Force the compiler to pin the structural object in memory until this line is crossed
+			runtime.KeepAlive(payload)
+
+			// ENXIO means device didn't exist (idempotency target success for deletion ops)
+			if errno != 0 && errno != unix.ENXIO && errno != unix.ENOENT { 
+				return struct{}{}, fmt.Errorf("dm-ioctl execution returned kernel errno: %v", errno) 
+			}
+
+			return struct{}{}, nil
+		},
+	)
+	return err
 }
 
 
@@ -7444,45 +7531,76 @@ func secureReadSysfsFallback(ctx context.Context, gater *executer.KeyedGater, de
 	return string(bytes), nil
 }
 
-// IsDeviceMapper verifies if a block entry is truly a Device Mapper device.
-// Hardened: Treats canonical 'dm-' prefix and /dev/mapper layout as primary truth.
+// IsDeviceMapper verifies if a block entry is a true Device Mapper device 
+// by inspecting sysfs topology and structural backing attributes with verbose debugging traces.
 func (r *GetDmsPathHelperGeneric) IsDeviceMapper(devName string) bool {
 	cleanName := filepath.Base(devName)
-	if cleanName == "" || cleanName == "." || cleanName == "/" {
+	logger.Debugf("[Is-DM-Check] Evaluating device name: original='%s', sanitized='%s'", devName, cleanName)
+
+	if cleanName == "" || cleanName == "." || cleanName == "/" || cleanName == "control" {
+		logger.Debugf("[Is-DM-Check] Rejected early: '%s' is an empty string, root path, or control node.", cleanName)
 		return false
 	}
 
-	// 1. HARD EXCLUSION: Standalone native NVMe namespaces (e.g., nvme0n1) 
-	// or raw SCSI drives (e.g., sda) can NEVER be Device Mapper nodes.
-	if r.IsNativeNvmeNamespace(cleanName) || strings.HasPrefix(cleanName, "sd") {
+	// 1. HARD EXCLUSION: Standalone native NVMe namespaces or raw SCSI drives can never be DM nodes.
+	if r.IsNativeNvmeNamespace(cleanName) {
+		logger.Debugf("[Is-DM-Check] Rejected: '%s' identified as a native NVMe namespace.", cleanName)
+		return false
+	}
+	if strings.HasPrefix(cleanName, "sd") {
+		logger.Debugf("[Is-DM-Check] Rejected: '%s' starts with 'sd' (raw SCSI block).", cleanName)
 		return false
 	}
 
-	// 2. STANDARD CONVENTION SHORTCUT: Any block starting with 'dm-' is a device mapper node
-	if strings.HasPrefix(cleanName, "dm-") {
-		return true
-	}
-
-	// 3. PHYSICAL SYSFS ATTRIBUTE VALIDATION (Fallback for friendly names/symlinks)
+	// 2. RESOLVE TO SYSFS BLOCK PATH (Handles both short aliases and canonical dm-X names)
 	sysBlockPath := filepath.Join("/sys/block", cleanName)
 	if _, errStat := os.Stat(sysBlockPath); os.IsNotExist(errStat) {
 		sysBlockPath = filepath.Join("/sys/class/block", cleanName)
 	}
 
-	resolvedPath, errEval := filepath.EvalSymlinks(sysBlockPath)
-	if errEval == nil {
+	if resolvedPath, errEval := filepath.EvalSymlinks(sysBlockPath); errEval == nil {
+		logger.Debugf("[Is-DM-Check] Resolved symlink for block node: inputPath='%s', finalPath='%s'", sysBlockPath, resolvedPath)
 		sysBlockPath = resolvedPath
+	} else {
+		logger.Debugf("[Is-DM-Check] No symlink resolution or stat failure for base sysfs path %s: %v", sysBlockPath, errEval)
 	}
 
-	dmSubDir := filepath.Join(sysBlockPath, "dm")
-	if info, errStat := os.Stat(dmSubDir); errStat == nil && info.IsDir() {
+	// 3. STRUCTURAL KERNEL VALIDATION: Check for explicit 'dm' metadata directory in sysfs
+	dmMetaPath := filepath.Join(sysBlockPath, "dm")
+	if info, errStat := os.Stat(dmMetaPath); errStat == nil && info.IsDir() {
+		logger.Infof("[Is-DM-Check] Confirmed TRUE: Found active sysfs DM metadata directory at %s for device '%s'", dmMetaPath, cleanName)
+		return true
+	} else {
+		logger.Debugf("[Is-DM-Check] No 'dm' metadata directory found at %s: %v", dmMetaPath, errStat)
+	}
+
+	if strings.Contains(sysBlockPath, "/virtual/block/dm-") || strings.Contains(sysBlockPath, "/dm/") {
+		logger.Infof("[Is-DM-Check] Confirmed TRUE: Sysfs path structure contains virtual DM signature: path='%s'", sysBlockPath)
 		return true
 	}
 
-	if strings.Contains(sysBlockPath, "/virtual/block/") || strings.Contains(sysBlockPath, "/dm/") {
-		return true
+	// 4. RESOLVE VIA /dev/mapper MAPPING BACKING CHECK
+	devMapperPath := filepath.Join("/dev/mapper", cleanName)
+	logger.Debugf("[Is-DM-Check] Checking enterprise mapper path link: %s", devMapperPath)
+	if resolvedDev, errLink := filepath.EvalSymlinks(devMapperPath); errLink == nil {
+		resolvedBase := filepath.Base(resolvedDev)
+		logger.Debugf("[Is-DM-Check] /dev/mapper/%s points to underlying node: '%s'", cleanName, resolvedBase)
+		
+		if strings.HasPrefix(resolvedBase, "dm-") {
+			logger.Infof("[Is-DM-Check] Confirmed TRUE: Mapper alias '%s' resolves directly to kernel node '%s'", cleanName, resolvedBase)
+			return true
+		}
+		
+		resolvedSysPath := filepath.Join("/sys/block", resolvedBase)
+		if infoDm, errDm := os.Stat(filepath.Join(resolvedSysPath, "dm")); errDm == nil && infoDm.IsDir() {
+			logger.Infof("[Is-DM-Check] Confirmed TRUE: Resolved target '%s' contains active sysfs DM subsystem backing", resolvedBase)
+			return true
+		}
+	} else {
+		logger.Debugf("[Is-DM-Check] Failed to evaluate symlinks for %s: %v", devMapperPath, errLink)
 	}
 
+	logger.Debugf("[Is-DM-Check] Evaluated FALSE: Device '%s' does not match any known Device Mapper backing patterns.", cleanName)
 	return false
 }
 
