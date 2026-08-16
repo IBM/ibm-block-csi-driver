@@ -161,6 +161,7 @@ func (d *NodeService) NodeStageVolume(ctx context.Context, req *csi.NodeStageVol
 		return nil, err
 	}
 	if isMounted { 
+		logger.Infof("NodeStageVolume Idempotency: Target %s is already mounted. Staging complete.", stagingPathWithHostPrefix)
 		return &csi.NodeStageVolumeResponse{}, nil
 	}
 
@@ -209,7 +210,6 @@ func (d *NodeService) NodeStageVolume(ctx context.Context, req *csi.NodeStageVol
 		return nil, status.Errorf(codes.Internal, "device fingerprint stabilization failed: %v", err)
 	}
 
-	// FIXED: Removed unreachable character-device regex tracking code completely.
 	logger.Infof("Device discovery finalized and settled successfully at path: %s", mpathDevice)
 	
 	// 3. BLOCK VOLUME EXIT
@@ -225,14 +225,14 @@ func (d *NodeService) NodeStageVolume(ctx context.Context, req *csi.NodeStageVol
 	// =========================================================================
 	baseDevice := filepath.Base(mpathDevice)
 	
-	// FIXED: Replace string prefix heuristics with your zero-fork, VFS-aware checker
+	// FIXED: Standardized, prefix-free protocol checker handles multi-distro naming variants safely
 	nvmeType, err := device_connectivity.DevicesAreNvme(ctx, d.KeyedGater, baseDevice)
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "Topology evaluation failed during block scheme lookup for %s: %v", baseDevice, err)
 	}
 
 	var sysDevices []string
-	logger.Infof("Device missing or recently purged for WWID %v. Initiating fabric discovery - 7.", volumeUuid)
+	logger.Debugf("[NodeStage-Topology] Extracting physical slave lanes for settled device node: %s", baseDevice)
 
 	if nvmeType == device_connectivity.NVMeNative {
 		// Native NVMe Multipathing structures track the global virtual subsystem node directly
@@ -246,15 +246,14 @@ func (d *NodeService) NodeStageVolume(ctx context.Context, req *csi.NodeStageVol
 		}
 	}
 	
-	logger.Infof("Device missing or recently purged for WWID %v. Initiating fabric discovery - 8.", volumeUuid)
-	
-	// Invoke LUN tracking verification with the protocol-isolated tracking fields
+	// FIXED: Replaced misleading "device missing" tracking logs with proper phase progress logging
+	logger.Debugf("[NodeStage-Topology] Resolved slave devices list: %v. Initiating LUN verification matrix.", sysDevices)
 	if err := osDeviceConnectivity.ValidateLun(ctx, mpathDevice, lun, sysDevices, volumeUuid); err != nil {
 		logger.Errorf("Volume LUN validation failed for %s: %v", mpathDevice, err)
 		return nil, status.Error(codes.Internal, err.Error())
 	}
 	
-	logger.Infof("Device missing or recently purged for WWID %v. Initiating fabric discovery - 9.", volumeUuid)
+	logger.Debugf("[NodeStage-Mount] LUN validation successful. Inspecting filesystem format type.")
 
 	existingFormat, err := d.Mounter.GetDiskFormat(mpathDevice)
 	if err != nil {
@@ -271,8 +270,10 @@ func (d *NodeService) NodeStageVolume(ctx context.Context, req *csi.NodeStageVol
 	// HARDENED SANITIZATION LAYER: Pre-clean stale block files or dangling relics from prior crashes
 	if d.NodeUtils.IsPathExists(stagingPathWithHostPrefix) {
 		isBlockFile, errBlock := d.NodeUtils.IsBlock(ctx, stagingPathWithHostPrefix)
-		if errBlock == nil && isBlockFile {
-			logger.Warningf("Sanitization Safeguard: Removing left-behind block file artifact at staging path: %s", stagingPathWithHostPrefix)
+		// FIXED: Aggressive fallback path eviction. If IsBlock returns true OR if the check fails, 
+		// we treat the file node as a potential directory-creation blocker and purge it safely.
+		if (errBlock == nil && isBlockFile) || errBlock != nil {
+			logger.Warningf("Sanitization Safeguard: Removing left-behind block file or ambiguous path obstacle at staging path: %s", stagingPathWithHostPrefix)
 			_ = os.Remove(stagingPathWithHostPrefix)
 		}
 	}
