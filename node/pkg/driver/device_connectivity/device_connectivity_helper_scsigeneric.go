@@ -3033,17 +3033,18 @@ PROCESS_PAGE_0x83:
 
 
 // TeardownVolume unmounts volumes, flushes buffers, and ejects backing physical lanes concurrently.
-// This is the fully unified, production-hardened implementation (All Phases Integrated).
-func (r *OsDeviceConnectivityHelperScsiGeneric) TeardownVolume(ctx context.Context, target string, needFlush bool, needRemovePhysical bool, expectedWWID string) error {
+// Fully streamlined to consume pre-calculated attributes directly from harvest logic.
+func (r *OsDeviceConnectivityHelperScsiGeneric) TeardownVolume(ctx context.Context, target string, expectedWWID string) error {
 	if err := ctx.Err(); err != nil {
 		return err
 	}
 
 	logger.Warningf("[Teardown-Main] Entering master volume cleanup sequence for mount target: %s", target)	
 	
-	// FIXED: Gather parameters cleanly from decoupled helper
-	mpathName, hardwareResolved, isNativeNVMe, major, minor, isMounted := r.collectInformationForTeardown(ctx, target, expectedWWID)
+	// CONSUMES PRE-CALCULATED VALUES: Zero duplicate work or extra sysfs traverses needed here.
+	mpathName, hardwareResolved, isNativeNVMe, major, minor, isMounted, needFlush, needRemovePhysical, isDeviceMapperTarget := r.collectInformationForTeardown(ctx, target, expectedWWID)
 
+	// --- PHASE 1: UNMOUNT & CRITICAL VERIFICATION MATRIX ---
 	if isMounted {
 		if errUnmount := r.Mounter.UnmountWithTimeout(ctx, target, 30*time.Second); errUnmount != nil {
 			logger.Errorf("[Teardown-Main] Unmount loop returned failure state for path %s: %v", target, errUnmount)
@@ -3061,9 +3062,6 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) TeardownVolume(ctx context.Conte
 	var globalOpenCount int32
 	rawScsiTarget := strings.ToLower(strings.TrimSpace(expectedWWID))
 	rawNvmeTarget := convertScsiIdToNguid(rawScsiTarget)
-
-	helper := GetDmsPathHelperGeneric{}
-	isDeviceMapperTarget := helper.IsDeviceMapper(mpathName)
 	
 	if mpathName != "" && !isNativeNVMe && isDeviceMapperTarget {
 		logger.Infof("[Teardown-Main] [%s] Starting Device Mapper teardown pipeline...", mpathName)
@@ -3116,7 +3114,6 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) TeardownVolume(ctx context.Conte
 				logger.Warningf("[Teardown-Main] [%s] Daemon map deletion failed: %v.", mpathName, errDelMap)
 			}
 
-			// FIXED: Immediate Kernel-Level Device Removal ioctl to completely eradicate ghost maps
 			logger.Infof("[Teardown-Main] [%s] Issuing synchronous DM_DEV_REMOVE ioctl instruction...", mpathName)
 			if errIoctlRm := r.dmIoctlCall(ctx, mpathName, DM_DEV_REMOVE, 0); errIoctlRm != nil {
 				logger.Warningf("[Teardown-Main] [%s] Immediate device mapper removal ioctl returned error: %v", mpathName, errIoctlRm)
@@ -3155,14 +3152,13 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) TeardownVolume(ctx context.Conte
 			needRemovePhysical = false
 		}
 
-		// FIXED: Execute structural Fabrics controller deletion to wipe leftover nvme list nodes completely
 		logger.Infof("[Teardown-Main] Triggering physical host channel eviction for NVMe device: %s", mpathName)
 		if errDisconnect := r.DisconnectNativeNvme(ctx, r.KeyedGater, mpathName); errDisconnect != nil {
 			logger.Warningf("[Teardown-Main] Fabric controller disconnection routine returned warning: %v", errDisconnect)
 		}
 	}
 	
-	// FIXED: Hard Livelock breaker safety gate for tracking unmounts on empty links
+	// Hard Livelock breaker safety gate for tracking unmounts on empty links
 	if mpathName == "" && (needFlush || needRemovePhysical) && expectedWWID != "" {
 		stillMounted, errCheck := r.Mounter.IsMounted(target)
 		if errCheck == nil && !stillMounted {
@@ -3180,11 +3176,9 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) TeardownVolume(ctx context.Conte
 	return nil
 }
 
-func (r *OsDeviceConnectivityHelperScsiGeneric) collectInformationForTeardown(ctx context.Context, target string, expectedWWID string) (mpathName string, hardwareResolved bool, isNativeNVMe bool, major uint32, minor uint32, isMounted bool) {
+func (r *OsDeviceConnectivityHelperScsiGeneric) collectInformationForTeardown(ctx context.Context, target string, expectedWWID string) (mpathName string, hardwareResolved bool, isNativeNVMe bool, major uint32, minor uint32, isMounted bool, needFlush bool, needRemovePhysical bool, isDeviceMapperTarget bool) {
 	logger.Warningf("[Teardown-Main] Entering master volume cleanup sequence for mount target: %s", target)	
 
-	// Centralized VFS inspection routine avoids copy-paste bugs 
-	// and accurately preserves friendly device-mapper names.
 	harvestDeviceMetadata := func(devNodePath string, hintMpathName string) {
 		sanitizedDevPath := devNodePath
 		if resolvedDev, errLink := filepath.EvalSymlinks(sanitizedDevPath); errLink == nil {
@@ -3232,7 +3226,7 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) collectInformationForTeardown(ct
 		}
 	}
 	
-	// --- PHASE 2: HARDWARE RESOLUTION FALLBACK (RUNS IDEMPOTENTLY ON RETRIES) ---
+	// --- PHASE 2: HARDWARE RESOLUTION FALLBACK ---
 	if mpathName == "" && expectedWWID != "" {
 		discoveredMapperName := r.Helper.findDMByWWID(ctx, expectedWWID)
 		if discoveredMapperName != "" {
@@ -3244,9 +3238,7 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) collectInformationForTeardown(ct
 					hardwareResolved = true
 				}
 			}
-			
 			harvestDeviceMetadata(filepath.Join("/dev/mapper", discoveredMapperName), discoveredMapperName)
-			
 		} else {
 			slaves := r.FindSlavesByWWID(ctx, expectedWWID)
 			if len(slaves) > 0 {
@@ -3263,8 +3255,45 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) collectInformationForTeardown(ct
 			}
 		}		
 	}
+
+	// --- CALCULATE CLEANUP POLICIES INTERNALLY ---
+	helper := GetDmsPathHelperGeneric{}
+	isDeviceMapperTarget := helper.IsDeviceMapper(mpathName)
+
+	if mpathName == "" {
+		needFlush = true
+		needRemovePhysical = true
+	} else if isNativeNVMe {
+		needFlush = false
+		needRemovePhysical = false
+	} else if isDeviceMapperTarget {
+		isMpathNVMe := false
+		slavesPath := filepath.Join("/sys/block", mpathName, "slaves")
+		if dFile, errOpen := os.Open(slavesPath); errOpen == nil {
+			if entries, errRead := dFile.ReadDir(10); errRead == nil {
+				for _, entry := range entries {
+					if strings.HasPrefix(entry.Name(), "nvme") {
+						isMpathNVMe = true
+						break
+					}
+				}
+			}
+			dFile.Close()
+		}
+
+		if isMpathNVMe {
+			needFlush = true
+			needRemovePhysical = false
+		} else {
+			needFlush = true
+			needRemovePhysical = true
+		}
+	} else {
+		needFlush = true
+		needRemovePhysical = true
+	}
 	
-	return mpathName, hardwareResolved, isNativeNVMe, major, minor, isMounted
+	return mpathName, hardwareResolved, isNativeNVMe, major, minor, isMounted, needFlush, needRemovePhysical, isDeviceMapperTarget
 }
 
 // flushDMBuffers executes a clean device-level block cache sync boundary before mapper removal.

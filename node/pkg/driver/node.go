@@ -430,10 +430,7 @@ func (d *NodeService) NodeUnstageVolume(ctx context.Context, req *csi.NodeUnstag
 
 	volumeUuid := d.NodeUtils.GetVolumeUuid(volumeID)
 	
-	var needFlush bool
-	var needRemovePhysical bool
-	
-	// FIXED: Clear Metadata info FIRST before the teardown unmounts the directory 
+	// Clear Metadata info FIRST before the teardown unmounts the directory 
 	// out from underneath the container namespace.
 	stageInfoPath := filepath.Join(stagingPathWithHostPrefix, StageInfoFilename)
 	if d.NodeUtils.StageInfoFileIsExist(stageInfoPath) {
@@ -442,54 +439,16 @@ func (d *NodeService) NodeUnstageVolume(ctx context.Context, req *csi.NodeUnstag
 		}
 	}
 
-	device, err := d.OsDeviceConnectivityHelper.GetExistingMpathDevice(ctx, volumeUuid, stagingPathWithHostPrefix)
-	if err != nil {
-		logger.Errorf("Error while discovering the device : {%v}. Activating multi-protocol fallback configuration safety variables.", err.Error())
-		needFlush = true
-		needRemovePhysical = true
-	} else {
-		logger.Debugf("Discovered device : {%v}", device)
-		baseDevice := filepath.Base(device)
-
-		// Robust structural zero-fork lookups replace fragile regex text matching
-		nvmeType, err := device_connectivity.DevicesAreNvme(ctx, d.KeyedGater, baseDevice)
-		if err != nil {
-			logger.Errorf("Failed to determine device type for %s: %v. Defaulting to full cleanup strategy.", baseDevice, err)
-			needFlush = true
-			needRemovePhysical = true
-		} else {
-			switch nvmeType {
-			case device_connectivity.NVMeNative:
-				logger.Infof("Device %s is native NVMe: skipping flush and SCSI device cleanup", baseDevice)
-				needFlush = false
-				needRemovePhysical = false
-
-			case device_connectivity.NVMeNonNative:
-				needFlush = true
-				logger.Infof("Device %s is non-native NVMe: flush multipath, skip physical device removal", baseDevice)
-				needFlush = true
-				needRemovePhysical = false
-
-			case device_connectivity.NotNVMe:
-				logger.Infof("Device %s is not NVMe (SCSI/FC): flush multipath and trigger physical device path removal", baseDevice)
-				needFlush = true
-				needRemovePhysical = true
-
-			default:
-				return nil, status.Errorf(codes.Internal, "Unknown NVMe type for device %s", baseDevice)
-			}
-		}
-	}
-
-	// UNCHANGED INTERFACE: Invoking TeardownVolume exactly as it was originally defined by you, 
-	// using stagingTargetPath as the second parameter and volumeUuid as the fifth parameter.
-	err = d.OsDeviceConnectivityHelper.TeardownVolume(ctx, stagingTargetPath, needFlush, needRemovePhysical, volumeUuid)
+	// OMITTED REDUNDANT PARSING: All device discovery, protocol switching, 
+	// and flag settings (needFlush, needRemovePhysical) are now computed 
+	// internally inside the underlying TeardownVolume function.
+	err = d.OsDeviceConnectivityHelper.TeardownVolume(ctx, stagingTargetPath, volumeUuid)
 	if err != nil {
 		logger.Errorf("Failed to teardown volume %s at staging path %s: %v", volumeUuid, stagingTargetPath, err)
 		return nil, status.Errorf(codes.Internal, "failed to teardown staging target %s: %v", stagingTargetPath, err)
 	}
 
-	// 3. Wipe target path registration now that the underlying unmount is safely complete
+	// Wipe target path registration now that the underlying unmount is safely complete
 	if err := os.Remove(stagingPathWithHostPrefix); err != nil && !os.IsNotExist(err) {
 		return nil, status.Errorf(codes.Internal, "failed to remove staging host path: %v", err)
 	}
