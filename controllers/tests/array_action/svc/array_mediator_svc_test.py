@@ -933,6 +933,17 @@ class TestArrayMediatorSVC(unittest.TestCase):
             call(bytes=True, object_id=common_settings.SOURCE_VOLUME_NAME)]
         self.svc.client.svcinfo.lsvdisk.assert_has_calls(calls)
 
+    def test_get_object_by_id_snapshot_without_volume_group_name_success(self):
+        # Regression test: on SVC < 8.6.0, the concise lsvdisk output does not include
+        # volume_group_name. Ensure _get_partition_name_of_cli_volume does not crash.
+        self._prepare_mocks_for_get_snapshot()
+        target_cli_volume = self._get_mapped_target_cli_volume()
+        del target_cli_volume[svc_settings.VOLUME_VG_NAME_ATTR_KEY]
+        self.svc.client.svcinfo.lsvdisk.return_value = self._mock_cli_object(target_cli_volume)
+
+        snapshot = self.svc.get_object_by_id(common_settings.SNAPSHOT_VOLUME_UID, common_settings.SNAPSHOT_OBJECT_TYPE)
+        self.assertEqual(common_settings.SNAPSHOT_NAME, snapshot.name)
+
     def test_get_object_by_id_snapshot_virt_snap_func_enabled_success(self):
         self._prepare_mocks_for_get_snapshot()
         self._prepare_mocks_for_lsvolumesnapshot()

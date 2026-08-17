@@ -366,7 +366,7 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
         return self.client.transport.transport.get_transport().is_active()
 
     def _get_partition_name_of_cli_volume(self, cli_volume):
-        if not cli_volume.volume_group_name:
+        if not getattr(cli_volume, 'volume_group_name', None):
             return None
         cli_volume_group = self._lsvolumegroup(cli_volume.volume_group_name)
         if cli_volume_group is not None and hasattr(cli_volume_group, "partition_name") \
