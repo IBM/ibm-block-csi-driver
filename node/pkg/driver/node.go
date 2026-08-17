@@ -154,48 +154,41 @@ func (d *NodeService) NodeStageVolume(ctx context.Context, req *csi.NodeStageVol
 	stagingPathWithHostPrefix := d.NodeUtils.GetPodPath(stagingPath)
 	volumeUuid := d.NodeUtils.GetVolumeUuid(volumeID)
 
-	// 2. IDEMPOTENCY MOUNT CHECK
-	isMounted, err := d.isTargetMounted(stagingPathWithHostPrefix, true)
-	if err != nil {
-		logger.Debugf("Existing mount check failed {%v}", err.Error())
-		return nil, err
-	}
-	if isMounted { 
-		logger.Infof("NodeStageVolume Idempotency: Target %s is already mounted. Staging complete.", stagingPathWithHostPrefix)
-		return &csi.NodeStageVolumeResponse{}, nil
-	}
-
 	// =========================================================================
 	// STAGE 1: EVALUATE IDENTITY AND KERNEL TOPOLOGY PRE-SCAN
 	// =========================================================================
-	mpathDevice, isStaged, skipRescan, _, preScanErr := d.OsDeviceConnectivityHelper.IdentityAwarePreScan(ctx, stagingPathWithHostPrefix, volumeUuid)
-	if preScanErr != nil && status.Code(preScanErr) != codes.Aborted {
+	mpathDevice, isStaged, skipRescan, scanInProgress, preScanErr := d.OsDeviceConnectivityHelper.IdentityAwarePreScan(ctx, stagingPathWithHostPrefix, volumeUuid)
+	
+	// Handle the in-flight stabilization check (Interrupted Previous Stage)
+	if preScanErr != nil {
+		if status.Code(preScanErr) == codes.Aborted {
+			logger.Infof("Optimization: Active kernel path transition detected for %v. Bypassing rescan and entering poll loop.", volumeUuid)
+			return nil, preScanErr
+		}
 		return nil, preScanErr
 	}
 
 	if isStaged {
-		logger.Infof("NodeStageVolume Complete: Already fully staged and verified via hardware inquiry.")
+		logger.Infof("NodeStageVolume Idempotency: Volume already fully staged and verified via hardware inquiry.")
 		return &csi.NodeStageVolumeResponse{}, nil
 	}
 
 	// =========================================================================
 	// STAGE 2: DISCOVERY OR STABILIZATION ROUTING
 	// =========================================================================
-	if !skipRescan {
+	if !skipRescan && !scanInProgress {
 		logger.Infof("Device missing or recently purged for WWID %v. Initiating fabric discovery.", volumeUuid)
 		osDeviceConnectivity.EnsureLogin(ctx, ipsByArrayInitiator)
 		
+		// Consolidated into a single precise pre/post execution cleanup bracket
 		_ = d.OsDeviceConnectivityHelper.RemoveGhostDevice(ctx, volumeUuid, lun, arrayInitiators)
 		if err := osDeviceConnectivity.RescanDevices(ctx, lun, arrayInitiators); err != nil {
 			return nil, status.Error(codes.Internal, err.Error())
 		}
-		_ = d.OsDeviceConnectivityHelper.RemoveGhostDevice(ctx, volumeUuid, lun, arrayInitiators)
+	} else if scanInProgress {
+		logger.Infof("Optimization: Active bus transition or scan in progress detected for %v. Bypassing rescan phase.", volumeUuid)
 	} else {
-		if preScanErr != nil && status.Code(preScanErr) == codes.Aborted {
-			logger.Infof("Optimization: Active kernel transition detected for %v. Bypassing rescan and entering poll loop.", volumeUuid)
-		} else {
-			 logger.Infof("Optimization: Healthy idle block device %s found in sysfs. Bypassing rescan phase.", mpathDevice)
-		}
+		logger.Infof("Optimization: Healthy idle block device %s found in sysfs. Bypassing rescan phase.", mpathDevice)
 	}
 
 	// =========================================================================
@@ -265,6 +258,17 @@ func (d *NodeService) NodeStageVolume(ctx context.Context, req *csi.NodeStageVol
 	if err != nil {
 		logger.Errorf("Error while resolving type of filesystem to mount : {%v}", err.Error())
 		return nil, err
+	}
+
+	// 2. IDEMPOTENCY MOUNT CHECK
+	isMounted, err := d.isTargetMounted(stagingPathWithHostPrefix, true)
+	if err != nil {
+		logger.Debugf("Existing mount check failed {%v}", err.Error())
+		return nil, err
+	}
+	if isMounted { 
+		logger.Infof("NodeStageVolume Idempotency: Target %s is already mounted. Staging complete.", stagingPathWithHostPrefix)
+		return &csi.NodeStageVolumeResponse{}, nil
 	}
 	
 	// HARDENED SANITIZATION LAYER: Pre-clean stale block files or dangling relics from prior crashes
