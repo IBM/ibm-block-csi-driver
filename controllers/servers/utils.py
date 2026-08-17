@@ -431,34 +431,15 @@ def get_object_parameters(parameters, prefix_param_name, system_id):
         volume_group=system_parameters.get(servers_settings.PARAMETERS_VOLUME_GROUP, default_volume_group),
         virt_snap_func=is_virt_snap_func)
 
-def resolve_snapshot_virt_snap_func(request_parameters, snapshot_parameters, source_volume_id):
-    """
-    Resolve virt_snap_func for CreateSnapshot.
-
-    If the VolumeSnapshotClass explicitly sets virt_snap_func, that value wins (no lookup).
-    Otherwise, resolve it from the source volume's StorageClass by:
-      source_volume_id -> PersistentVolume (matched by spec.csi.volumeHandle)
-                        -> PersistentVolume.spec.storageClassName
-                        -> StorageClass.parameters[virt_snap_func]
-    """
-    if servers_settings.PARAMETERS_VIRT_SNAP_FUNC in request_parameters:
-        logger.debug("virt_snap_func explicitly set on VolumeSnapshotClass: {}".format(
-            snapshot_parameters.virt_snap_func))
-        return snapshot_parameters.virt_snap_func
-
-    logger.debug(
-        "virt_snap_func not set on VolumeSnapshotClass, resolving from source volume's StorageClass")
-    return _resolve_virt_snap_func_from_source_storage_class(source_volume_id)
-
-
-def _resolve_virt_snap_func_from_source_storage_class(source_volume_id):
+def get_virt_snap_func_from_storage_class(source_volume_id):
+    logger.debug("Getting virt_snap_func from source volume's StorageClass")
     kubernetes_manager = KubernetesManager()
-
     persistent_volume = kubernetes_manager.get_persistent_volume_by_volume_handle(source_volume_id)
+
     if not persistent_volume:
         raise ValidationException(
             messages.SOURCE_VOLUME_PV_NOT_FOUND_MESSAGE.format(source_volume_id))
-
+    
     storage_class_name = persistent_volume.spec.storage_class_name
     if not storage_class_name:
         raise ValidationException(
@@ -468,12 +449,13 @@ def _resolve_virt_snap_func_from_source_storage_class(source_volume_id):
     if not storage_class:
         raise ValidationException(
             messages.SOURCE_VOLUME_STORAGE_CLASS_MISSING_MESSAGE.format(storage_class_name))
-
+    
     sc_parameters = storage_class.parameters or {}
     virt_snap_func_str = sc_parameters.get(servers_settings.PARAMETERS_VIRT_SNAP_FUNC)
-    resolved = _str_to_bool(virt_snap_func_str)
-    logger.debug("resolved virt_snap_func={} from StorageClass '{}'".format(resolved, storage_class_name))
-    return resolved
+    virt_snap_func = _str_to_bool(virt_snap_func_str)
+    logger.debug("virt_snap_func={} from StorageClass '{}'".format(virt_snap_func, storage_class_name))
+    
+    return virt_snap_func
 
 
 def get_volume_id(new_volume, system_id):

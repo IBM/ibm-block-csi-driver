@@ -17,11 +17,11 @@ For IBM DS8000® family storage systems, the maximum prefix length is five chara
 
 For IBM Storage Virtualize® family storage systems, the `CSI` prefix is added as default if not specified by the user.{: tip}
 
-- The `virt_snap_func` parameter is optional in the VolumeSnapshotClass. It is necessary in IBM Storage Virtualize® storage systems if using the Snapshot function. To enable the Snapshot function, set the value to _"true"_. The default value is _"false"_. If the value is `"false"` the snapshot will use the FlashCopy function.
+- The `virt_snap_func` parameter should **NOT** be configured in the VolumeSnapshotClass. This parameter is **only** read from the source volume's StorageClass. Any value specified in the VolumeSnapshotClass will be ignored by the driver.
+
+For IBM Storage Virtualize® storage systems, configure `virt_snap_func` in the StorageClass to control whether snapshots use the Snapshot function (`"true"`) or FlashCopy function (`"false"`, default). See [Creating a StorageClass](creating_storageclass.md) for details.{: tip}
 
 NOTE: In IBM Storage Virtualize® partition environments the flag is ignored - new method is used for taking snapshots
-
-The `virt_snap_func` parameter is **optional** in the VolumeSnapshotClass. If not specified here, the driver will automatically retrieve the value from the source volume's StorageClass. If you specify it in the VolumeSnapshotClass, that value takes precedence over the StorageClass value (explicit configuration wins). This allows for flexibility while reducing configuration duplication.{: tip}
 
 - To create a stretched snapshot on SAN Volume Controller storage systems, put a colon (:) between the two pools within the `pool` value. For example:
   
@@ -43,7 +43,7 @@ parameters:
   pool: demo-pool                    # Optional. Use to create the snapshot on a different pool than the source.
   SpaceEfficiency: thin              # Optional. Use to create the snapshot with a different space efficiency than the source.
   snapshot_name_prefix: demo-prefix  # Optional.
-  virt_snap_func: "true"             # Optional. Values "true"/"false". If not specified, the value will be automatically retrieved from the source volume's StorageClass. If specified, this value overrides the StorageClass value.
+  # NOTE: virt_snap_func should NOT be configured here. It is only read from the StorageClass.
 
   csi.storage.k8s.io/snapshotter-secret-name: demo-secret
   csi.storage.k8s.io/snapshotter-secret-namespace: default
