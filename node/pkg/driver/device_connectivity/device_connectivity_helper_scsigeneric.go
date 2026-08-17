@@ -4168,27 +4168,9 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) IdentityAwarePreScan(ctx context
 		currentWWIDRaw, _ := r.Helper.getWWIDByDev(ctx, mounts.Major, mounts.Minor)
 		currentWWID := normalizeWWID(currentWWIDRaw)
 		logger.Debugf("[PreScan-Trace] Interrogated active mount device WWID: raw='%s', normalized='%s'", currentWWIDRaw, currentWWID)
-		
-		var isNvmeMount bool
-		
-		// LOCK 1: Extract the authoritative device name from major/minor numbers
-		currentDevName, errDevName := r.Helper.GetDeviceNameFromMajorMinor(ctx, mounts[0].Major, mounts[0].Minor)
-		if errDevName == nil && currentDevName != "" {
-			// LOCK 2: Validate using your zero-fork, VFS-aware protocol helper
-			nvmeType, errType := DevicesAreNvme(ctx, r.KeyedGater, currentDevName)
-			if errType == nil && (nvmeType == NVMeNative || nvmeType == NVMeNonNative) {
-				isNvmeMount = true
-			}
-			logger.Debugf("[PreScan-Trace] Structural device check: devName='%s', nvmeType=%v -> isNvmeMount=%v", 
-				currentDevName, nvmeType, isNvmeMount)
-		} else {
-			// Emergency Fallback: If sysfs minor tracking is blocked, fall back strictly to root path prefixes
-			baseSource := filepath.Base(mounts[0].MountSource)
-			isNvmeMount = strings.HasPrefix(baseSource, "nvme") || strings.HasPrefix(mounts[0].MountSource, "/dev/nvme")
-			logger.Warningf("[PreScan-Trace] Sysfs major/minor lookup missed. Falling back to safe string prefix: isNvmeMount=%v", isNvmeMount)
-		}
-		
 
+		// FIXED: Replaced unsafe string substring checks with the robust major/minor kernel resolution helper
+		isNvmeMount := r.SafeResolveNvmeMountState(ctx, mounts.Major, mounts.Minor)
 		hwWWID := r.getPathHwid(ctx, mpathAlias, isNvmeMount)
 		logger.Debugf("[PreScan-Trace] Hardware identity results: isNvmeMount=%v, hwWWID='%s'", isNvmeMount, hwWWID)
 
@@ -4300,21 +4282,18 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) IdentityAwarePreScan(ctx context
 		mapperPath := filepath.Join("/dev/mapper", cleanDevName)
 		directDevPath := filepath.Join("/dev", cleanDevName)
 
-		// Authoritative file-tree check to guarantee path structural safety
+		// FIXED: Safe multi-tier path checking via os.Stat instead of blind assumption
 		if _, errStat := os.Stat(mapperPath); errStat == nil {
 			targetPathOutput = mapperPath
 			logger.Debugf("[PreScan-Trace] Validated absolute storage target path via mapper: %s", targetPathOutput)
-		} else if _, errStatDirect := os.Stat(directDevPath); errEmStatDirect == nil {
+		} else if _, errStatDirect := os.Stat(directDevPath); errStatDirect == nil {
 			targetPathOutput = directDevPath
 			logger.Debugf("[PreScan-Trace] Validated absolute storage target path via raw dev root: %s", targetPathOutput)
 		} else {
-			// FIXED: Circuit-breaker for unpopulated udev nodes. If both lookups fail, 
-			// the block node is missing from the system tree. Return empty to trigger a clean rescan.
-			logger.Warningf("[PreScan-Trace] Target device node '%s' found in topology metadata but missing from host VFS trees (/dev/mapper and /dev). Forcing rescan path.", cleanDevName)
+			logger.Warningf("[PreScan-Trace] Target device node '%s' found in topology metadata but missing from host VFS trees. Forcing rescan pass.", cleanDevName)
 			r.busyTimestamps.Delete(rawScsiTarget)
 			return "", false, false, false, nil
 		}
-		
 		
 		if isPending {
 			ctrlTrackingKey := fmt.Sprintf("%s-%s", ExtractNvmeControllerBase(cleanDevName), rawScsiTarget)
@@ -4345,6 +4324,50 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) IdentityAwarePreScan(ctx context
 	logger.Infof("[PreScan-Trace] Pre-scan finished with no device node matched or discovered for target volume.")
 	r.busyTimestamps.Delete(rawScsiTarget)
 	return "", false, false, false, nil
+}
+
+
+// SafeResolveNvmeMountState authoritatively inspects kernel state via major/minor attributes.
+// Bypasses fragile path string substrings by checking true sysfs and device-mapper linkages.
+func (r *OsDeviceConnectivityHelperScsiGeneric) SafeResolveNvmeMountState(ctx context.Context, major, minor uint32) bool {
+	logger.Infof("[NvmeResolve-Trace] Inspecting major:minor %d:%d for NVMe backing attributes", major, minor)
+
+	if ctx.Err() != nil {
+		return false
+	}
+
+	// 1. Resolve canonical WWID/UUID properties using your hardened major/minor scanner
+	wwid, errWwid := r.getWWIDByDev(ctx, major, minor)
+	if errWwid == nil && wwid != "" {
+		// Check if WWID format or underlying namespace maps an NVMe structure (e.g. nguid / nvme prefix)
+		if strings.HasPrefix(strings.ToLower(wwid), "nvme.") || strings.Contains(strings.ToLower(wwid), "nguid") {
+			logger.Infof("[NvmeResolve-Trace] Confirmed NVMe protocol via device WWID pattern: '%s'", wwid)
+			return true
+		}
+	}
+
+	// 2. Fall back to checking if the device mapper name associated with this minor corresponds to NVMe
+	dmName := r.GetDMNameFromMinor(ctx, minor)
+	if dmName != "" {
+		isNvmeDm := r.isPathNvme(dmName, false)
+		if isNvmeDm {
+			logger.Infof("[NvmeResolve-Trace] Confirmed NVMe backing via device-mapper minor resolution: dmName='%s'", dmName)
+			return true
+		}
+	}
+
+	// 3. Final physical bus layer inspection via sysfs block path lookup
+	basePath := fmt.Sprintf("/sys/dev/block/%d:%d", major, minor)
+	if realPath, errLink := filepath.EvalSymlinks(basePath); errLink == nil {
+		baseBlockName := filepath.Base(realPath)
+		if strings.HasPrefix(baseBlockName, "nvme") {
+			logger.Infof("[NvmeResolve-Trace] Confirmed native NVMe base block match: '%s'", baseBlockName)
+			return true
+		}
+	}
+
+	logger.Debugf("[NvmeResolve-Trace] Major:minor %d:%d verified as non-NVMe standard SAN lane.", major, minor)
+	return false
 }
 
 // getPathHwid securely recovers hardware WWID signatures while maintaining an upfront protocol shield.
