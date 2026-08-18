@@ -1285,9 +1285,11 @@ func GetMounts(targetPath string) ([]MountInfo, error) {
 		absTarget, _ = filepath.Abs(targetPath)
 		absTarget = filepath.Clean(absTarget)
 	}
+	logger.Infof("[Mountinfo-Trace] Initiating mount scanner matrix. Target lookup constraints: targetPath='%s', absTarget='%s'", targetPath, absTarget)
 
 	f, err := os.Open("/proc/self/mountinfo")
 	if err != nil {
+		logger.Errorf("[Mountinfo-Trace] Fatal: Failed to open kernel mount table /proc/self/mountinfo: %v", err)
 		return nil, err
 	}
 	defer f.Close()
@@ -1298,28 +1300,37 @@ func GetMounts(targetPath string) ([]MountInfo, error) {
 	buf := make([]byte, maxCapacity)
 	scanner.Buffer(buf, maxCapacity)
 
+	lineCounter := 0
 	for scanner.Scan() {
-		// FIXED: Replaced loose space matching with structural split rules
-		// to protect against truncated rows in environments running high volume densities.
-		fields := strings.Fields(scanner.Text())
+		lineCounter++
+		rawLine := scanner.Text()
+		
+		fields := strings.Fields(rawLine)
 		if len(fields) < 10 {
+			logger.Warningf("[Mountinfo-Trace] [REJECTED] Line %d: Row truncated or invalid format (fields=%d). Raw: '%s'", lineCounter, len(fields), rawLine)
 			continue
 		}
 
 		mountPoint := unescapeMountString(fields[4])
+		cleanMountPoint := filepath.Clean(mountPoint)
 
-		if absTarget != "" && filepath.Clean(mountPoint) != absTarget {
+		// Verification Gateway: Track path evaluation drift precisely
+		if absTarget != "" && cleanMountPoint != absTarget {
+			logger.Debugf("[Mountinfo-Trace] [REJECTED] Line %d: Target folder mismatch. MountPoint: '%s' (Cleaned: '%s') does not match Target: '%s'. Raw: '%s'", 
+				lineCounter, mountPoint, cleanMountPoint, absTarget, rawLine)
 			continue
 		}
 
 		devParts := strings.Split(fields[2], ":")
 		if len(devParts) != 2 {
+			logger.Warningf("[Mountinfo-Trace] [REJECTED] Line %d: Incompatible major:minor character block layout ('%s'). Raw: '%s'", lineCounter, fields[2], rawLine)
 			continue 
 		}
 
 		major, errMajor := strconv.Atoi(devParts[0])
 		minor, errMinor := strconv.Atoi(devParts[1])
 		if errMajor != nil || errMinor != nil {
+			logger.Warningf("[Mountinfo-Trace] [REJECTED] Line %d: Integer translation failed for dev tokens (major_err=%v, minor_err=%v). Raw: '%s'", lineCounter, errMajor, errMinor, rawLine)
 			continue
 		}
 
@@ -1331,10 +1342,11 @@ func GetMounts(targetPath string) ([]MountInfo, error) {
 			}
 		}
 		if sepIdx == -1 || sepIdx+3 >= len(fields) {
+			logger.Warningf("[Mountinfo-Trace] [REJECTED] Line %d: Missing structural optional fields hyphen separator token. Raw: '%s'", lineCounter, rawLine)
 			continue
 		}
 
-		mounts = append(mounts, MountInfo{
+		infoItem := MountInfo{
 			MountID:        parseInt(fields[0]),
 			ParentID:       parseInt(fields[1]),
 			Major:          uint32(major),
@@ -1345,9 +1357,21 @@ func GetMounts(targetPath string) ([]MountInfo, error) {
 			FilesystemType: fields[sepIdx+1],
 			MountSource:    unescapeMountString(fields[sepIdx+2]),
 			SuperOptions:   fields[sepIdx+3],
-		})
+		}
+
+		logger.Infof("[Mountinfo-Trace] [ACCEPTED MATCH] Line %d: Successfully validated row map. MountID=%d | Major:Minor=%d:%d | FS=%s | MountPoint='%s' | MountSource='%s'", 
+			lineCounter, infoItem.MountID, infoItem.Major, infoItem.Minor, infoItem.FilesystemType, infoItem.MountPoint, infoItem.MountSource)
+		
+		mounts = append(mounts, infoItem)
 	}
-	return mounts, scanner.Err()
+
+	if scanErr := scanner.Err(); scanErr != nil {
+		logger.Errorf("[Mountinfo-Trace] Scanner encountered stream processing errors: %v", scanErr)
+		return nil, scanErr
+	}
+
+	logger.Infof("[Mountinfo-Trace] Scan loop concluded. Total lines processed: %d, Matching mounts captured: %d", lineCounter, len(mounts))
+	return mounts, nil
 }
 
 
