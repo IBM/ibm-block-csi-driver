@@ -22,17 +22,18 @@ class StorageClassWatcher(Watcher):
     def watch_storage_class_resources(self):
         while self._loop_forever():
             resource_version = self._get_k8s_object_resource_version(self.storage_api.list_storage_class())
-            stream = watch.Watch().stream(self.storage_api.list_storage_class,
-                                          resource_version=resource_version, timeout_seconds=5)
-            for watch_event in stream:
-                watch_event = self._munch(watch_event)
-                storage_class_info = self._generate_storage_class_info(watch_event.object)
-                secrets_info = self._get_secrets_info_from_storage_class_with_driver_provisioner(storage_class_info)
-                if watch_event.type == settings.ADDED_EVENT:
-                    self._handle_added_watch_event(secrets_info, storage_class_info.name)
+            with watch.Watch() as w:
+                stream = w.stream(self.storage_api.list_storage_class,
+                                  resource_version=resource_version, timeout_seconds=5)
+                for watch_event in stream:
+                    watch_event = self._munch(watch_event)
+                    storage_class_info = self._generate_storage_class_info(watch_event.object)
+                    secrets_info = self._get_secrets_info_from_storage_class_with_driver_provisioner(storage_class_info)
+                    if watch_event.type == settings.ADDED_EVENT:
+                        self._handle_added_watch_event(secrets_info, storage_class_info.name)
 
-                if watch_event.type == settings.DELETED_EVENT:
-                    self._handle_deleted_watch_event(secrets_info)
+                    if watch_event.type == settings.DELETED_EVENT:
+                        self._handle_deleted_watch_event(secrets_info)
 
     def _get_secrets_info_from_storage_class_with_driver_provisioner(self, storage_class_info):
         if self._is_storage_class_has_csi_as_a_provisioner(storage_class_info):
@@ -109,3 +110,5 @@ class StorageClassWatcher(Watcher):
         for secret_info in secrets_info:
             _, index = self._get_matching_managed_secret_info(secret_info)
             MANAGED_SECRETS[index].managed_storage_classes -= 1
+            if MANAGED_SECRETS[index].managed_storage_classes == 0:
+                MANAGED_SECRETS.pop(index)

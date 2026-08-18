@@ -88,16 +88,21 @@ class CsiNodeWatcher(Watcher):
         return csi_daemon_set.metadata.name
 
     def _create_definitions_when_csi_node_changed(self, csi_node_info):
+        node_name = csi_node_info.name
+        initiators_changed = False
         for secret_info in MANAGED_SECRETS:
             secret_name, secret_namespace = secret_info.name, secret_info.namespace
             host_definition_info = self._get_matching_host_definition_info(
-                csi_node_info.name, secret_name, secret_namespace)
+                node_name, secret_name, secret_namespace)
             if host_definition_info:
                 if self._is_node_initiators_changed(host_definition_info, csi_node_info):
-                    logger.info(messages.NODE_INITIATORS_WERE_CHANGED.format(csi_node_info.name,
+                    logger.info(messages.NODE_INITIATORS_WERE_CHANGED.format(node_name,
                                 host_definition_info.node_initiators, csi_node_info.node_initiators))
-                    NODES[csi_node_info.name] = self._generate_managed_node(csi_node_info)
+                    NODES[node_name] = self._generate_managed_node(csi_node_info)
                     self._create_definition(host_definition_info)
+                    initiators_changed = True
+        if not initiators_changed:
+            NODES.pop(node_name, None)
 
     def _is_node_initiators_changed(self, host_definition_info, csi_node_info):
         if not host_definition_info.node_id or not csi_node_info.node_id:

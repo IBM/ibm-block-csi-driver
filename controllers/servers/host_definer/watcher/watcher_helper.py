@@ -435,8 +435,10 @@ class Watcher(KubernetesManager):
     def _loop_forever(self):
         return True
 
-    def _generate_secret_info(self, secret_name, secret_namespace, nodes_with_system_id={}, system_ids_topologies={}):
-        return SecretInfo(secret_name, secret_namespace, nodes_with_system_id, system_ids_topologies)
+    def _generate_secret_info(self, secret_name, secret_namespace, nodes_with_system_id=None, system_ids_topologies=None):
+        return SecretInfo(secret_name, secret_namespace,
+                          nodes_with_system_id if nodes_with_system_id is not None else {},
+                          system_ids_topologies if system_ids_topologies is not None else {})
 
     def _is_secret_managed(self, secret_info):
         _, index = self._get_matching_managed_secret_info(secret_info)

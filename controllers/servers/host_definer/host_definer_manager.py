@@ -34,5 +34,5 @@ class HostDefinerManager:
             self.node_watcher.watch_nodes_resources,
             self.storage_class_watcher.watch_storage_class_resources)
         for watch_function in watchers:
-            thread = Thread(target=watch_function,)
+            thread = Thread(target=watch_function, daemon=True)
             thread.start()

@@ -33,16 +33,20 @@ class NodeWatcher(Watcher):
     def watch_nodes_resources(self):
         while self._loop_forever():
             resource_version = self._get_k8s_object_resource_version(self.core_api.list_node())
-            stream = watch.Watch().stream(self.core_api.list_node, resource_version=resource_version, timeout_seconds=5)
-            for watch_event in stream:
-                watch_event = self._munch(watch_event)
-                node_name = watch_event.object.metadata.name
-                csi_node_info = self._get_csi_node_info(node_name)
-                node_info = self._generate_node_info(watch_event.object)
-                self._add_new_unmanaged_nodes_with_ibm_csi_driver(watch_event, csi_node_info)
-                self._define_new_managed_node(watch_event, node_name, csi_node_info)
-                self._handle_node_topologies(node_info, watch_event)
-                self._update_io_group(node_info)
+            with watch.Watch() as w:
+                stream = w.stream(self.core_api.list_node, resource_version=resource_version, timeout_seconds=5)
+                for watch_event in stream:
+                    watch_event = self._munch(watch_event)
+                    node_name = watch_event.object.metadata.name
+                    csi_node_info = self._get_csi_node_info(node_name)
+                    node_info = self._generate_node_info(watch_event.object)
+                    if watch_event.type == settings.DELETED_EVENT:
+                        unmanaged_csi_nodes_with_driver.discard(node_name)
+                        continue
+                    self._add_new_unmanaged_nodes_with_ibm_csi_driver(watch_event, csi_node_info)
+                    self._define_new_managed_node(watch_event, node_name, csi_node_info)
+                    self._handle_node_topologies(node_info, watch_event)
+                    self._update_io_group(node_info)
 
     def _add_new_unmanaged_nodes_with_ibm_csi_driver(self, watch_event, csi_node_info):
         if watch_event.type in settings.MODIFIED_EVENT and \
