@@ -920,8 +920,10 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) RemovePhysicalDevice(ctx context
 			}
 			
 			var deletePath string
+			var pathIsNvmeController bool
 
 			// 1. Resolve exact target architectures using strict Linux VFS paths
+			
 			if strings.HasPrefix(name, "sd") {
 				deletePath = filepath.Join(baseBlockSysDir, "device", "delete")
 			} else if strings.HasPrefix(name, "nvme") {
@@ -939,11 +941,11 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) RemovePhysicalDevice(ctx context
 				idx := strings.LastIndex(normalizedName, "n")
 				if idx != -1 && idx > 0 {
 					ctrlPart := normalizedName[:idx] // e.g. "nvme0"
-					
 					// Check the direct controller namespace delete_controller handle (authoritative for fabrics/PCIe)
 					modernCtrlDelete := filepath.Join("/sys/class/nvme", ctrlPart, "delete_controller")
 					if _, err := os.Stat(modernCtrlDelete); err == nil {
-						deletePath = modernCtrlDelete
+						pathIsNvmeController = true
+						deletePath = ctrlPart
 					}
 				}
 
@@ -971,13 +973,19 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) RemovePhysicalDevice(ctx context
 			_ = r.flushDeviceBuffers(wCtx, name)
 
 			logger.Infof("[Device-Evict] Directly writing eviction token '1' to: %s", deletePath)
-			errWrite := os.WriteFile(deletePath, []byte("1\n"), 0200)
 			
-			if errWrite != nil {
-				if !os.IsNotExist(errWrite) {
-					return struct{}{}, errWrite
-				}
-				logger.Infof("Idempotency: Eviction path %s already cleared from host node.", deletePath)
+			if pathIsNvmeController {
+				r.SafeEvictNvmeController(ctx, deletePath)
+			}
+			else {
+				errWrite := os.WriteFile(deletePath, []byte("1\n"), 0200)
+				
+				if errWrite != nil {
+					if !os.IsNotExist(errWrite) {
+						return struct{}{}, errWrite
+					}
+					logger.Infof("Idempotency: Eviction path %s already cleared from host node.", deletePath)
+				}			
 			}
 
 			ticker := time.NewTicker(500 * time.Millisecond)
@@ -3440,14 +3448,8 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) evictOrCleanNvmeNamespaces(ctx c
 
 			if ctrlName != "" {
 				// FIXED: Correct path targeting controller-level delete_controller or subsystem disconnection
-				sysfsDeletePath := fmt.Sprintf("/sys/class/nvme/%s/delete_controller", ctrlName)
-				logger.Infof("[Teardown-NVMe] [%s] Injecting controller eviction write token to: %s", actionLabel, sysfsDeletePath)
 				
-				if err := os.WriteFile(sysfsDeletePath, []byte("1\n"), 0200); err != nil {
-					if !os.IsNotExist(err) {
-						logger.Warningf("[Teardown-NVMe] [%s] Failed to write to controller path %s: %v", actionLabel, sysfsDeletePath, err)
-					}
-				}
+				r.SafeEvictNvmeController(ctx, ctrlName)
 			}
 			return struct{}{}, nil
 		},
@@ -3462,6 +3464,68 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) cleanNVMeNamespacesFromSlaves(ct
 // evictNVMeNamespaces routes to unified NVMe management.
 func (r *OsDeviceConnectivityHelperScsiGeneric) evictNVMeNamespaces(ctx context.Context, devices []string) {
 	r.evictOrCleanNvmeNamespaces(ctx, devices, "evict-ns")
+}
+
+// SafeEvictNvmeController verifies if a parent controller is completely idle 
+// across all system workloads before executing a destructive hardware disconnect.
+func (r *OsDeviceConnectivityHelperScsiGeneric) SafeEvictNvmeController(ctx context.Context, ctrlName string error {
+	logger.Infof("[Controller-Guard] Evaluating safety boundaries for controller eviction: %s (Volume: %s)", ctrlName)
+
+	if ctrlName == "" {
+		return nil
+	}
+
+	// 1. SCAN THE ENTIRE SYSFS MATRIX FOR COMPANION NAMESPACES
+	// Check if this specific controller folder contains ANY other active namespaces (e.g. nvme4n2, nvme4n3)
+	ctrlSysPath := filepath.Join("/sys/class/nvme", ctrlName)
+	entries, err := os.ReadDir(ctrlSysPath)
+	if err != nil {
+		if os.IsNotExist(err) {
+			logger.Infof("[Controller-Guard] Controller %s already detached from system. No eviction needed.", ctrlName)
+			return nil
+		}
+		return err
+	}
+
+	activeNamespaceCount := 0
+	for _, entry := range entries {
+		name := entry.Name()
+		// Match namespaces managed by this controller (e.g., nvme4n1, nvme4n2)
+		if strings.HasPrefix(name, ctrlName+"n") {
+			activeNamespaceCount++
+			logger.Debugf("[Controller-Guard] Found active sister namespace dependency: %s", name)
+		}
+	}
+
+	// 2. CHECK MULTI-PATH SUBSYSTEM REFERENCE COUNT
+	// If it's a shared subsystem fabric, verify if other controller lanes are linked
+	subsysPath := filepath.Join(ctrlSysPath, "subsys")
+	if realSubsys, errLink := filepath.EvalSymlinks(subsysPath); errLink == nil {
+		if subsysEntries, errSub := os.ReadDir(realSubsys); errSub == nil {
+			for _, subEntry := range subsysEntries {
+				// Count other namespaces mapped under the same universal subsystem tree
+				if nvmeNamespaceRegex.MatchString(subEntry.Name()) {
+					logger.Debugf("[Controller-Guard] Found active subsystem namespace layout link: %s", subEntry.Name())
+				}
+			}
+		}
+	}
+
+	// =========================================================================
+	// PROTECTION GATEWAY CIRCUIT-BREAKER
+	// =========================================================================
+	// If other active storage namespaces are found on this controller channel,
+	// WE MUST SKIP THE DELETION PASS to protect independent running workloads.
+	if activeNamespaceCount > 1 {
+		logger.Warningf("[Controller-Guard] PROTECTION SHIELD TRIGGERED: Controller %s manages %d active volumes. Skipping hardware eviction to prevent data corruption on active sister volumes.", 
+			ctrlName, activeNamespaceCount)
+		return nil // Safe exit; preserves the transport lane for remaining volumes
+	}
+
+	// 3. ABSOLUTE EXCLUSIVITY CONFIRMED: Safe to issue the kernel deletion signal
+	logger.Infof("[Controller-Guard] Exclusivity verified for %s. Issuing structural controller removal command.", ctrlName)
+	deletePath := filepath.Join(ctrlSysPath, "delete_controller")
+	return os.WriteFile(deletePath, []byte("1\n"), 0200)
 }
 
 // FindSlavesByWWID safely scans the host block layer in parallel to aggregate all physical path lanes matching the volume identifier.
@@ -5226,17 +5290,20 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) FinalWwidPurge(ctx context.Conte
 				// 4. Determine Delete Path
 				var deletePath string
 				if strings.HasPrefix(name, "nvme") {
-					deletePath = fmt.Sprintf("/sys/block/%s/device/delete_controller", name)
-				} else {
-					deletePath = fmt.Sprintf("/sys/block/%s/device/delete", name)
-				}
-
-				// 5. Final Trigger
-				if _, err := os.Stat(deletePath); err == nil {
-					if errWrite := os.WriteFile(deletePath, []byte("1"), 0200); errWrite != nil {
+					if errWrite := r.SafeEvictNvmeController(ctx, name); errWrite != nil {
 						return struct{}{}, errWrite
 					}
+
+				} else {
+					deletePath = fmt.Sprintf("/sys/block/%s/device/delete", name)
+					if _, err := os.Stat(deletePath); err == nil {
+						if errWrite := os.WriteFile(deletePath, []byte("1"), 0200); errWrite != nil {
+							return struct{}{}, errWrite
+						}
+					}
+					
 				}
+
 
 				return struct{}{}, nil
 			},
