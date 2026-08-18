@@ -3113,7 +3113,7 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) TeardownVolume(ctx context.Conte
 				for _, slaveNode := range slaves {
 					ctrlName := ExtractNvmeControllerBase(filepath.Base(slaveNode))
 					if ctrlName != "" {
-						_ = r.SafeEvictNvmeController(ctx, ctrlName, expectedWWID)
+						_ = r.SafeEvictNvmeController(ctx, ctrlName)
 					}
 				}
 
@@ -3150,7 +3150,7 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) TeardownVolume(ctx context.Conte
 			ctrlName := ExtractNvmeControllerBase(slaveNode)
 			if ctrlName != "" {
 				// Ensures independent running volumes on the same bus adapter are shielded from corruption
-				_ = r.SafeEvictNvmeController(ctx, ctrlName, expectedWWID)
+				_ = r.SafeEvictNvmeController(ctx, ctrlName)
 			}
 		}
 		
@@ -3423,7 +3423,7 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) evictOrCleanNvmeNamespaces(ctx c
 			if ctrlName != "" {
 				// FIXED: Supplied the required 3rd argument 'uniqueBatchKey' (or pass expectedWWID if available) 
 				// and substituted bounded 'wCtx' to respect execution timeouts cleanly.
-				_ = r.SafeEvictNvmeController(wCtx, ctrlName, uniqueBatchKey)
+				_ = r.SafeEvictNvmeController(wCtx, ctrlName)
 			}
 			return struct{}{}, nil
 		},
@@ -5076,8 +5076,8 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) purgeStuckPhysicalPathsDualProto
 
 		// FIXED: Restructured type-safe extraction from the custom batch response fields
 		for _, res := range results {
-			if res.Error != nil {
-				aggregatedErrors = append(aggregatedErrors, res.Error.Error())
+			if res.Err != nil {
+				aggregatedErrors = append(aggregatedErrors, res.Err.Error())
 			}
 		}
 		return nil
