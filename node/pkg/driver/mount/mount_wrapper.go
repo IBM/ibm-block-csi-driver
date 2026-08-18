@@ -1123,37 +1123,19 @@ func (m *Mounter) isMountedInProc(target string) (bool, error) {
 
 
 // GetMountsForPath returns all MountInfo entries matching the target path.
-func (m *Mounter) GetDeviceFromMount(target string) (string, error) {
-	if target == "" {
-		return "", fmt.Errorf("get-device: empty lookup path provided")
-	}
-
-	// Parse /proc/self/mountinfo to find the device source for the target
-	mounts, err := m.List()
+func (m *Mounter) GetMountsForPath(target string) ([]MountInfo, error) {
+	// Clean the path to handle trailing slashes or relative segments.
+	targetPath, err := filepath.Abs(filepath.Clean(target))
 	if err != nil {
-		return "", err
+		return nil, err
 	}
 
-	// FIXED: Normalize the lookup target path upfront to eliminate trailing slashes or relative directory dots
-	cleanTarget := filepath.Clean(target)
-	if absTarget, errAbs := filepath.Abs(cleanTarget); errAbs == nil {
-		cleanTarget = absTarget
+	allMounts, err := GetMounts(targetPath) // Our common low-level function
+	if err != nil {
+		return nil, err
 	}
 
-	for _, mnt := range mounts {
-		// FIXED: Normalize the mount path entry explicitly to guarantee a symmetrical comparison matrix
-		cleanMntPath := filepath.Clean(mnt.Path)
-		if absMntPath, errMntAbs := filepath.Abs(cleanMntPath); errMntAbs == nil {
-			cleanMntPath = absMntPath
-		}
-
-		if cleanMntPath == cleanTarget {
-			logger.Infof("[Mounter] Successful normalized match: Target '%s' maps to backing device: %s", target, mnt.Device)
-			return mnt.Device, nil
-		}
-	}
-	
-	return "", fmt.Errorf("not found")
+	return allMounts, nil
 }
 
 // Block Devices: You want the clean kernel name (e.g., sda1 instead of /dev/sda1).
