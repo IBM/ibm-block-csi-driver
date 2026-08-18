@@ -692,17 +692,35 @@ func (m *Mounter) ImmediateDetach(ctx context.Context, target string) error {
 }
 
 func (m *Mounter) GetDeviceFromMount(target string) (string, error) {
+	if target == "" {
+		return "", fmt.Errorf("get-device: empty lookup path provided")
+	}
+
 	// Parse /proc/self/mountinfo to find the device source for the target
-	// This is standard for CSI mounter implementations
-	mounts, err := m.Mounter.List()
+	mounts, err := m.List()
 	if err != nil {
 		return "", err
 	}
+
+	// FIXED: Normalize the lookup target path upfront to eliminate trailing slashes or relative directory dots
+	cleanTarget := filepath.Clean(target)
+	if absTarget, errAbs := filepath.Abs(cleanTarget); errAbs == nil {
+		cleanTarget = absTarget
+	}
+
 	for _, mnt := range mounts {
-		if mnt.Path == target {
+		// FIXED: Normalize the mount path entry explicitly to guarantee a symmetrical comparison matrix
+		cleanMntPath := filepath.Clean(mnt.Path)
+		if absMntPath, errMntAbs := filepath.Abs(cleanMntPath); errMntAbs == nil {
+			cleanMntPath = absMntPath
+		}
+
+		if cleanMntPath == cleanTarget {
+			logger.Infof("[Mounter] Successful normalized match: Target '%s' maps to backing device: %s", target, mnt.Device)
 			return mnt.Device, nil
 		}
 	}
+	
 	return "", fmt.Errorf("not found")
 }
 

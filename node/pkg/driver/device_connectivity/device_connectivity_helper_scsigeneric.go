@@ -976,8 +976,7 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) RemovePhysicalDevice(ctx context
 			
 			if pathIsNvmeController {
 				r.SafeEvictNvmeController(ctx, deletePath)
-			}
-			else {
+			} else {
 				errWrite := os.WriteFile(deletePath, []byte("1\n"), 0200)
 				
 				if errWrite != nil {
@@ -3468,7 +3467,7 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) evictNVMeNamespaces(ctx context.
 
 // SafeEvictNvmeController verifies if a parent controller is completely idle 
 // across all system workloads before executing a destructive hardware disconnect.
-func (r *OsDeviceConnectivityHelperScsiGeneric) SafeEvictNvmeController(ctx context.Context, ctrlName string error {
+func (r *OsDeviceConnectivityHelperScsiGeneric) SafeEvictNvmeController(ctx context.Context, ctrlName string) error {
 	logger.Infof("[Controller-Guard] Evaluating safety boundaries for controller eviction: %s (Volume: %s)", ctrlName)
 
 	if ctrlName == "" {
