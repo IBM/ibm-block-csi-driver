@@ -1,4 +1,4 @@
-from threading import Thread
+from threading import Thread, Lock
 from time import sleep
 
 import controllers.servers.host_definer.messages as messages
@@ -12,6 +12,11 @@ logger = get_stdout_logger()
 
 
 class HostDefinitionWatcher(Watcher):
+
+    def __init__(self):
+        super().__init__()
+        self._pending_threads_lock = Lock()
+        self._pending_threads = set()
 
     def watch_host_definitions_resources(self):
         self._watch_host_definition_with_timeout('')
@@ -33,27 +38,36 @@ class HostDefinitionWatcher(Watcher):
 
     def _define_host_definition_after_pending_state(self, host_definition_info):
         logger.info(messages.FOUND_HOST_DEFINITION_IN_PENDING_STATE.format(host_definition_info.name))
-        remove_host_thread = Thread(target=self._define_host_using_exponential_backoff,
-                                    args=(host_definition_info, ))
-        remove_host_thread.start()
+        with self._pending_threads_lock:
+            if host_definition_info.name in self._pending_threads:
+                logger.info(messages.HOST_DEFINITION_ALREADY_BEING_PROCESSED.format(host_definition_info.name))
+                return
+            self._pending_threads.add(host_definition_info.name)
+        thread = Thread(target=self._define_host_using_exponential_backoff, args=(host_definition_info,),
+                        daemon=True)
+        thread.start()
 
     def _define_host_using_exponential_backoff(self, host_definition_info):
-        retries = settings.HOST_DEFINITION_PENDING_RETRIES
-        backoff_in_seconds = settings.HOST_DEFINITION_PENDING_EXPONENTIAL_BACKOFF_IN_SECONDS
-        delay_in_seconds = settings.HOST_DEFINITION_PENDING_DELAY_IN_SECONDS
-        while retries > 0:
-            logger.info(messages.VERIFY_HOST_DEFINITION_USING_EXPONENTIAL_BACKOFF.format(
-                host_definition_info.name, retries))
-            if self._is_host_definition_not_pending(host_definition_info) and \
-                    retries != settings.HOST_DEFINITION_PENDING_RETRIES:
-                logger.info(messages.HOST_DEFINITION_IS_NOT_PENDING.format(host_definition_info.name))
-                return
-            self._handle_pending_host_definition(host_definition_info)
-            retries -= 1
-            delay_in_seconds *= backoff_in_seconds
-            sleep(delay_in_seconds)
+        try:
+            retries = settings.HOST_DEFINITION_PENDING_RETRIES
+            backoff_in_seconds = settings.HOST_DEFINITION_PENDING_EXPONENTIAL_BACKOFF_IN_SECONDS
+            delay_in_seconds = settings.HOST_DEFINITION_PENDING_DELAY_IN_SECONDS
+            while retries > 0:
+                logger.info(messages.VERIFY_HOST_DEFINITION_USING_EXPONENTIAL_BACKOFF.format(
+                    host_definition_info.name, retries))
+                if self._is_host_definition_not_pending(host_definition_info) and \
+                        retries != settings.HOST_DEFINITION_PENDING_RETRIES:
+                    logger.info(messages.HOST_DEFINITION_IS_NOT_PENDING.format(host_definition_info.name))
+                    return
+                self._handle_pending_host_definition(host_definition_info)
+                retries -= 1
+                delay_in_seconds *= backoff_in_seconds
+                sleep(delay_in_seconds)
 
-        self._set_host_definition_phase_to_error(host_definition_info)
+            self._set_host_definition_phase_to_error(host_definition_info)
+        finally:
+            with self._pending_threads_lock:
+                self._pending_threads.discard(host_definition_info.name)
 
     def _is_host_definition_not_pending(self, host_definition_info):
         current_host_definition_info_on_cluster = self._get_matching_host_definition_info(

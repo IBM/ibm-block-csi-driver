@@ -1,5 +1,5 @@
 import time
-from threading import Thread
+from threading import Thread, Lock
 
 from controllers.common.csi_logger import get_stdout_logger
 from controllers.servers.host_definer.watcher.watcher_helper import Watcher, NODES, MANAGED_SECRETS
@@ -10,6 +10,11 @@ logger = get_stdout_logger()
 
 
 class CsiNodeWatcher(Watcher):
+
+    def __init__(self):
+        super().__init__()
+        self._undefine_threads_lock = Lock()
+        self._undefine_threads = set()
 
     def add_initial_csi_nodes(self):
         csi_nodes_info = self._get_csi_nodes_info_with_driver()
@@ -42,18 +47,27 @@ class CsiNodeWatcher(Watcher):
 
     def _handle_deleted_csi_node_pod(self, csi_node_info):
         if self._is_node_has_manage_node_label(csi_node_info.name):
-            remove_host_thread = Thread(target=self._undefine_host_when_node_pod_is_deleted, args=(csi_node_info,))
-            remove_host_thread.start()
+            with self._undefine_threads_lock:
+                if csi_node_info.name in self._undefine_threads:
+                    logger.info(messages.CSI_NODE_ALREADY_BEING_PROCESSED.format(csi_node_info.name))
+                    return
+                self._undefine_threads.add(csi_node_info.name)
+            thread = Thread(target=self._undefine_host_when_node_pod_is_deleted, args=(csi_node_info,), daemon=True)
+            thread.start()
 
     def _undefine_host_when_node_pod_is_deleted(self, csi_node_info):
-        node_name = csi_node_info.name
-        if self._is_host_part_of_update(node_name):
-            self._create_definitions_when_csi_node_changed(csi_node_info)
-        elif self._is_host_definer_can_delete_hosts() and \
-                not self._is_node_has_forbid_deletion_label(node_name):
-            self._undefine_hosts(csi_node_info.name)
-        else:
-            NODES.pop(node_name, None)
+        try:
+            node_name = csi_node_info.name
+            if self._is_host_part_of_update(node_name):
+                self._create_definitions_when_csi_node_changed(csi_node_info)
+            elif self._is_host_definer_can_delete_hosts() and \
+                    not self._is_node_has_forbid_deletion_label(node_name):
+                self._undefine_hosts(csi_node_info.name)
+            else:
+                NODES.pop(node_name, None)
+        finally:
+            with self._undefine_threads_lock:
+                self._undefine_threads.discard(csi_node_info.name)
 
     def _is_host_part_of_update(self, worker):
         logger.info(messages.CHECK_IF_NODE_IS_PART_OF_UPDATE.format(worker))

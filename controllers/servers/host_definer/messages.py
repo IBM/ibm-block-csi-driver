@@ -63,6 +63,8 @@ CHECK_IF_NODE_IS_PART_OF_UPDATE = 'Checking if node {} is part of update'
 UPDATED_CSI_NODE_VS_DESIRED = 'CSINode that was updated [{}] and the desired CSINode pods that should be updated [{}]'
 CHECK_IF_CSI_NODE_POD_IS_RUNNING = 'Checking if CSINode pod {} is running'
 FOUND_HOST_DEFINITION_IN_PENDING_STATE = 'Found hostDefinition {} is in pending state'
+HOST_DEFINITION_ALREADY_BEING_PROCESSED = 'HostDefinition {} is already being processed in a pending thread, skipping'
+CSI_NODE_ALREADY_BEING_PROCESSED = 'CSI node {} already has an in-flight undefine thread, skipping duplicate event'
 CSI_NODE_POD_DELETED_WHILE_HOST_DEFINER_WAS_DOWN = "CSINode pod {} was deleted when the hostDefiner was down,"\
     "deleting all of his hostDefinitions if it allowed"
 DETECTED_UNMANAGED_CSI_NODE_WITH_IBM_BLOCK_CSI_DRIVER = 'Detected unmanaged CSINodes with ibm block csi driver: {}'
