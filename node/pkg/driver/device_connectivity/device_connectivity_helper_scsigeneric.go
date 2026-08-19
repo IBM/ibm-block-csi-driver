@@ -3148,7 +3148,7 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) TeardownVolume(ctx context.Conte
 					}
 				}
 
-				needRemovePhysical = false 			}
+				needRemovePhysical = false 
 			} else {
 				logger.Infof("[Teardown-Main] [%s] Step 2/2: Slaves empty. Sweeping dual-protocol parameters...", mpathName)
 				_ = r.purgeStuckPhysicalPathsDualProtocol(ctx, rawScsiTarget, rawNvmeTarget)
