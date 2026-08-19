@@ -3505,7 +3505,8 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) SafeEvictNvmeController(ctx cont
 		// 2. HARDWARE IDENTITY EXTRACTION: Read the immutable unique array ID for this path entry
 		var entryWWID string
 		wwidPath := filepath.Join(ctrlSysPath, name, "wwid")
-		if bytes, errRead := os.ReadFile(wwidPath); errError == nil {
+		// FIXED: Changed errError to errRead to perfectly match the initialization variable assignment
+		if bytes, errRead := os.ReadFile(wwidPath); errRead == nil {
 			entryWWID = normalizeWWID(string(bytes))
 			logger.Infof("[Controller-Guard-Trace] ['%s'] Read sysfs unique hardware identity string: '%s'", name, entryWWID)
 		} else {
@@ -5357,7 +5358,7 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) FinalWwidPurge(ctx context.Conte
 				var deletePath string
 				if strings.HasPrefix(name, "nvme") {
 					// Broken
-					if errWrite := r.SafeEvictNvmeController(ctx, name, ""); errWrite != nil {
+					if errWrite := r.SafeEvictNvmeController(ctx, name, "", ""); errWrite != nil {
 						return struct{}{}, errWrite
 					}
 
