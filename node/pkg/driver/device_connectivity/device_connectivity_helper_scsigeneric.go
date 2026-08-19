@@ -3439,15 +3439,9 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) evictOrCleanNvmeNamespaces(ctx c
 			}
 
 			if ctrlName != "" {
-<<<<<<< HEAD
-				// FIXED: Supplied the required 3rd argument 'uniqueBatchKey' (or pass expectedWWID if available) 
-				// and substituted bounded 'wCtx' to respect execution timeouts cleanly.
-				_ = r.SafeEvictNvmeController(wCtx, ctrlName)
-=======
 				// FIXED: Extracted 'base' (the standalone namespace filename token) and forwarded it 
 				// straight as the required 'currentNamespace' argument to fulfill your signature layout.
 				_ = r.SafeEvictNvmeController(wCtx, ctrlName, base)
->>>>>>> e0326328 (rc)
 			}
 			return struct{}{}, nil
 		},
@@ -3458,6 +3452,7 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) evictOrCleanNvmeNamespaces(ctx c
 func (r *OsDeviceConnectivityHelperScsiGeneric) cleanNVMeNamespacesFromSlaves(ctx context.Context, devices []string) {
 	r.evictOrCleanNvmeNamespaces(ctx, devices, "clean-slaves")
 }
+
 
 // evictNVMeNamespaces routes to unified NVMe management.
 func (r *OsDeviceConnectivityHelperScsiGeneric) evictNVMeNamespaces(ctx context.Context, devices []string) {
@@ -5209,7 +5204,6 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) getDeletePath(wCtx context.Conte
 	return deletePath, pciAddress, useUnbindStrategy
 }
 
-/*
 func (r *OsDeviceConnectivityHelperScsiGeneric) FinalWwidPurge(ctx context.Context, expectedWWID string) error {
 	targetWWID := r.Helper.normalizeWWID(expectedWWID)
 
@@ -5319,7 +5313,8 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) FinalWwidPurge(ctx context.Conte
 				// 4. Determine Delete Path
 				var deletePath string
 				if strings.HasPrefix(name, "nvme") {
-					if errWrite := r.SafeEvictNvmeController(ctx, name); errWrite != nil {
+					// Broken
+					if errWrite := r.SafeEvictNvmeController(ctx, name, ""); errWrite != nil {
 						return struct{}{}, errWrite
 					}
 
@@ -5344,7 +5339,6 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) FinalWwidPurge(ctx context.Conte
 	}
 	return nil
 }
-*/
 
 
 // In Case 1, when a collision is detected, you call UnmountWithContext. Ensure your UnmountWithContext is set to use MNT_DETACH (Lazy) immediately for collisions, as you don't want to wait for a graceful timeout on a rogue volume.
