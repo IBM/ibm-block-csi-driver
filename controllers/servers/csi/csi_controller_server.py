@@ -361,8 +361,7 @@ class CSIControllerServicer(csi_pb2_grpc.ControllerServicer):
             space_efficiency = snapshot_parameters.space_efficiency
             # Apparently this was never supposed to be a restriction - meanwhile enabling for partitions only for
             # backward compatibility, need to revisit
-            if virt_snap_func and not array_connection_info.partition_name \
-                    and space_efficiency:
+            if use_snap_object and space_efficiency:
                 raise array_errors.SpaceEfficiencyNotSupported(space_efficiency)
             with get_agent(array_connection_info, array_type).get_mediator() as array_mediator:
                 logger.debug(array_mediator)

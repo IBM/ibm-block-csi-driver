@@ -27,18 +27,17 @@ SNAPSHOT_ID_SHOULD_NOT_BE_EMPTY_MESSAGE = 'snapshot id should not be empty'
 SIZE_SHOULD_NOT_BE_NEGATIVE_MESSAGE = 'size should not be negative'
 NO_CAPACITY_RANGE_MESSAGE = 'no capacity range set'
 POOL_IS_MISSING_MESSAGE = 'pool parameter is missing.'
-SOURCE_VOLUME_PV_NOT_FOUND_MESSAGE = (
+SOURCE_PV_NOT_FOUND_MESSAGE = (
     "Could not find a PersistentVolume with volumeHandle '{}' to resolve virt_snap_func "
-    "from its StorageClass. Set virt_snap_func explicitly on the VolumeSnapshotClass instead."
+    "from its StorageClass."
 )
-SOURCE_VOLUME_STORAGE_CLASS_NOT_FOUND_MESSAGE = (
+SOURCE_PV_HAS_NO_STORAGECLASS_MESSAGE = (
     "PersistentVolume '{}' has no StorageClass reference (statically provisioned volume); "
-    "virt_snap_func cannot be resolved automatically. Set virt_snap_func explicitly on the "
-    "VolumeSnapshotClass instead."
+    "virt_snap_func cannot be resolved automatically."
 )
-SOURCE_VOLUME_STORAGE_CLASS_MISSING_MESSAGE = (
+SOURCE_PV_STORAGECLASS_NOT_FOUND_MESSAGE = (
     "StorageClass '{}' referenced by the source volume no longer exists; cannot resolve "
-    "virt_snap_func. Set virt_snap_func explicitly on the VolumeSnapshotClass instead."
+    "virt_snap_func."
 )
 POOL_SHOULD_NOT_BE_EMPTY_MESSAGE = 'pool should not be empty'
 WRONG_FORMAT_MESSAGE = '{} has wrong format'

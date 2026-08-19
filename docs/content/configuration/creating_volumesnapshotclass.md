@@ -17,9 +17,7 @@ For IBM DS8000® family storage systems, the maximum prefix length is five chara
 
 For IBM Storage Virtualize® family storage systems, the `CSI` prefix is added as default if not specified by the user.{: tip}
 
-- The `virt_snap_func` parameter should **NOT** be configured in the VolumeSnapshotClass. This parameter is **only** read from the source volume's StorageClass. Any value specified in the VolumeSnapshotClass will be ignored by the driver.
-
-For IBM Storage Virtualize® storage systems, configure `virt_snap_func` in the StorageClass to control whether snapshots use the Snapshot function (`"true"`) or FlashCopy function (`"false"`, default). See [Creating a StorageClass](creating_storageclass.md) for details.{: tip}
+- For IBM Storage Virtualize® storage systems, the `virt_snap_func` parameter is configured in the StorageClass to control whether snapshots use the Snapshot function (`"true"`) or FlashCopy function (`"false"`, default). The driver automatically retrieves this value from the source volume's StorageClass. See [Creating a StorageClass](creating_storageclass.md) for details.{: tip}
 
 NOTE: In IBM Storage Virtualize® partition environments the flag is ignored - new method is used for taking snapshots
 
@@ -43,7 +41,6 @@ parameters:
   pool: demo-pool                    # Optional. Use to create the snapshot on a different pool than the source.
   SpaceEfficiency: thin              # Optional. Use to create the snapshot with a different space efficiency than the source.
   snapshot_name_prefix: demo-prefix  # Optional.
-  # NOTE: virt_snap_func should NOT be configured here. It is only read from the StorageClass.
 
   csi.storage.k8s.io/snapshotter-secret-name: demo-secret
   csi.storage.k8s.io/snapshotter-secret-namespace: default

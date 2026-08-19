@@ -438,17 +438,17 @@ def get_virt_snap_func_from_storage_class(source_volume_id):
 
     if not persistent_volume:
         raise ValidationException(
-            messages.SOURCE_VOLUME_PV_NOT_FOUND_MESSAGE.format(source_volume_id))
+            messages.SOURCE_PV_NOT_FOUND_MESSAGE.format(source_volume_id))
     
     storage_class_name = persistent_volume.spec.storage_class_name
     if not storage_class_name:
         raise ValidationException(
-            messages.SOURCE_VOLUME_STORAGE_CLASS_NOT_FOUND_MESSAGE.format(persistent_volume.metadata.name))
+            messages.SOURCE_PV_HAS_NO_STORAGECLASS_MESSAGE.format(persistent_volume.metadata.name))
 
     storage_class = kubernetes_manager.get_storage_class(storage_class_name)
     if not storage_class:
         raise ValidationException(
-            messages.SOURCE_VOLUME_STORAGE_CLASS_MISSING_MESSAGE.format(storage_class_name))
+            messages.SOURCE_PV_STORAGECLASS_NOT_FOUND_MESSAGE.format(storage_class_name))
     
     sc_parameters = storage_class.parameters or {}
     virt_snap_func_str = sc_parameters.get(servers_settings.PARAMETERS_VIRT_SNAP_FUNC)
