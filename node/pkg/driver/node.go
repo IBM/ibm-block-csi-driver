@@ -570,8 +570,8 @@ func (d *NodeService) publishRawBlockVolume(mpathDevice string, targetPath strin
 // targetPathWithHostPrefix: path of target
 // isFSVolume: if we check volume with file system - true, otherwise for raw block false
 // Returns: is <target mounted, error if occured>
-func (d *NodeService) isTargetMounted(targetPath, isFSVolume bool) (bool, error) {
-	targetPathWithHostPrefix := d.NodeUtils.GetPodPath(target)
+func (d *NodeService) isTargetMounted(targetPath string, isFSVolume bool) (bool, error) {
+	targetPathWithHostPrefix := d.NodeUtils.GetPodPath(targetPath)
 	logger.Debugf("Check if target {%s} is mounted", targetPathWithHostPrefix)
 	isNotMounted, err := d.NodeUtils.IsNotMountPoint(targetPath)
 	if err != nil {
@@ -659,7 +659,7 @@ func (d *NodeService) NodeUnpublishVolume(ctx context.Context, req *csi.NodeUnpu
 
 	// Unmount and delete mount point file/folder
 	logger.Debugf("Check if target %s is mounted", targetPathWithHostPrefix)
-	isNotMounted, err := d.NodeUtils.IsNotMountPoint(targetPath)
+	isNotMounted, err := d.NodeUtils.IsNotMountPoint(target)
 	if err != nil {
 		logger.Errorf("Check is target mounted failed. Target : %q, err : %v", targetPathWithHostPrefix, err.Error())
 		return nil, status.Error(codes.Internal, err.Error())
