@@ -9,8 +9,6 @@ Create a storage class YAML file, similar to the following demo-storageclass.yam
 
 Volume groups can only be managed by **either** the associated VolumeGroup **or** the associated StorageClass (with the `volume_group` parameter). If a volume group is already associated with a VolumeGroup, then each volume of this StorageClass can be automatically deleted.{: restriction}
 
-The `virt_snap_func` parameter is configured in the StorageClass. When creating a snapshot, the driver automatically retrieves the value from the source volume's StorageClass.{: tip}
-
 When setting the optional "virt_snap_func" parameter to "true", the optional "SpaceEfficiency" parameter **must not** be set.{: restriction}
   
     kind: StorageClass

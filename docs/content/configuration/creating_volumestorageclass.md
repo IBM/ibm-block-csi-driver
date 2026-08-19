@@ -50,8 +50,6 @@ Volume groups can only be managed by **either** the associated VolumeGroup **or*
 
 - The `virt_snap_func` parameter is optional but necessary in IBM Storage Virtualize® storage systems if using the Snapshot function. To enable the Snapshot function, set the value to _"true"_. The default value is _"false"_. If the value is _"false"_ the snapshot will use the FlashCopy function.
 
-The `virt_snap_func` parameter is configured in the StorageClass. When creating a snapshot, the driver automatically retrieves the value from the source volume's StorageClass.{: tip}
-
 When setting the optional "virt_snap_func" parameter to "true", the optional "SpaceEfficiency" parameter **must not** be set.{: restriction}
 
 For IBM DS8000® family storage systems, the maximum prefix length is five characters. The maximum prefix length for other systems is 20 characters.{: requirement}

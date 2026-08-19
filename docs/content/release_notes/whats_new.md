@@ -7,15 +7,11 @@ IBM® block storage CSI driver 1.14.0 adds support for:
 
 **General availability date:** TBD 2026
 
-## Breaking changes
-
 ### virt_snap_func parameter configuration change
 
-The `virt_snap_func` parameter is now **only** read from the StorageClass and is **no longer** supported in VolumeSnapshotClass configurations. When creating a snapshot, the driver automatically retrieves the `virt_snap_func` value from the source volume's StorageClass.
+The `virt_snap_func` parameter is now **only** read from the StorageClass and is **no longer** supported in VolumeSnapshotClass configurations. When creating a snapshot, the driver automatically retrieves the `virt_snap_func` value from the source volume's StorageClass. Any value specified in VolumeSnapshotClass will be ignored.
 
-**Action required:** Remove any `virt_snap_func` parameter from your VolumeSnapshotClass YAML files. The parameter should only be configured in StorageClass YAML files. Any value specified in VolumeSnapshotClass will be ignored.
-
-For more information, see [Creating a StorageClass](../configuration/creating_volumestorageclass.md) and [Creating a VolumeSnapshotClass](../configuration/creating_volumesnapshotclass.md).
+For more information, see [Creating a StorageClass](../configuration/creating_volumestorageclass.md).
 
 ## Miscellaneous resolved issues
 

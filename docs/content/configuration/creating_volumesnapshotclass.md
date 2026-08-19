@@ -17,7 +17,7 @@ For IBM DS8000® family storage systems, the maximum prefix length is five chara
 
 For IBM Storage Virtualize® family storage systems, the `CSI` prefix is added as default if not specified by the user.{: tip}
 
-- For IBM Storage Virtualize® storage systems, the `virt_snap_func` parameter is configured in the StorageClass to control whether snapshots use the Snapshot function (`"true"`) or FlashCopy function (`"false"`, default). The driver automatically retrieves this value from the source volume's StorageClass. See [Creating a StorageClass](creating_storageclass.md) for details.{: tip}
+- The `virt_snap_func` parameter is optional but necessary in IBM Storage Virtualize® storage systems if using the Snapshot function. To enable the Snapshot function, set the value to _"true"_. The default value is _"false"_. If the value is `"false"` the snapshot will use the FlashCopy function.
 
 NOTE: In IBM Storage Virtualize® partition environments the flag is ignored - new method is used for taking snapshots
 
