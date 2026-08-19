@@ -1282,10 +1282,11 @@ type MountInfo struct {
 func GetMounts(targetPath string) ([]MountInfo, error) {
 	absTarget := ""
 	if targetPath != "" {
+		absTarget = GetPodPath(absTarget)
 		absTarget, _ = filepath.Abs(targetPath)
 		absTarget = filepath.Clean(absTarget)
 	}
-	logger.Infof("[Mountinfo-Trace] Initiating mount scanner matrix. Target lookup constraints: targetPath='%s', absTarget='%s'", targetPath, absTarget)
+	//logger.Infof("[Mountinfo-Trace] Initiating mount scanner matrix. Target lookup constraints: targetPath='%s', absTarget='%s'", targetPath, absTarget)
 
 	f, err := os.Open("/proc/self/mountinfo")
 	if err != nil {
@@ -1307,7 +1308,7 @@ func GetMounts(targetPath string) ([]MountInfo, error) {
 		
 		fields := strings.Fields(rawLine)
 		if len(fields) < 10 {
-			logger.Warningf("[Mountinfo-Trace] [REJECTED] Line %d: Row truncated or invalid format (fields=%d). Raw: '%s'", lineCounter, len(fields), rawLine)
+			//logger.Warningf("[Mountinfo-Trace] [REJECTED] Line %d: Row truncated or invalid format (fields=%d). Raw: '%s'", lineCounter, len(fields), rawLine)
 			continue
 		}
 
@@ -1316,21 +1317,21 @@ func GetMounts(targetPath string) ([]MountInfo, error) {
 
 		// Verification Gateway: Track path evaluation drift precisely
 		if absTarget != "" && cleanMountPoint != absTarget {
-			logger.Debugf("[Mountinfo-Trace] [REJECTED] Line %d: Target folder mismatch. MountPoint: '%s' (Cleaned: '%s') does not match Target: '%s'. Raw: '%s'", 
-				lineCounter, mountPoint, cleanMountPoint, absTarget, rawLine)
+			//logger.Debugf("[Mountinfo-Trace] [REJECTED] Line %d: Target folder mismatch. MountPoint: '%s' (Cleaned: '%s') does not match Target: '%s'. Raw: '%s'", 
+			//	lineCounter, mountPoint, cleanMountPoint, absTarget, rawLine)
 			continue
 		}
 
 		devParts := strings.Split(fields[2], ":")
 		if len(devParts) != 2 {
-			logger.Warningf("[Mountinfo-Trace] [REJECTED] Line %d: Incompatible major:minor character block layout ('%s'). Raw: '%s'", lineCounter, fields[2], rawLine)
+			//logger.Warningf("[Mountinfo-Trace] [REJECTED] Line %d: Incompatible major:minor character block layout ('%s'). Raw: '%s'", lineCounter, fields[2], rawLine)
 			continue 
 		}
 
 		major, errMajor := strconv.Atoi(devParts[0])
 		minor, errMinor := strconv.Atoi(devParts[1])
 		if errMajor != nil || errMinor != nil {
-			logger.Warningf("[Mountinfo-Trace] [REJECTED] Line %d: Integer translation failed for dev tokens (major_err=%v, minor_err=%v). Raw: '%s'", lineCounter, errMajor, errMinor, rawLine)
+			//logger.Warningf("[Mountinfo-Trace] [REJECTED] Line %d: Integer translation failed for dev tokens (major_err=%v, minor_err=%v). Raw: '%s'", lineCounter, errMajor, errMinor, rawLine)
 			continue
 		}
 
@@ -1342,7 +1343,7 @@ func GetMounts(targetPath string) ([]MountInfo, error) {
 			}
 		}
 		if sepIdx == -1 || sepIdx+3 >= len(fields) {
-			logger.Warningf("[Mountinfo-Trace] [REJECTED] Line %d: Missing structural optional fields hyphen separator token. Raw: '%s'", lineCounter, rawLine)
+			//logger.Warningf("[Mountinfo-Trace] [REJECTED] Line %d: Missing structural optional fields hyphen separator token. Raw: '%s'", lineCounter, rawLine)
 			continue
 		}
 
@@ -1359,8 +1360,8 @@ func GetMounts(targetPath string) ([]MountInfo, error) {
 			SuperOptions:   fields[sepIdx+3],
 		}
 
-		logger.Infof("[Mountinfo-Trace] [ACCEPTED MATCH] Line %d: Successfully validated row map. MountID=%d | Major:Minor=%d:%d | FS=%s | MountPoint='%s' | MountSource='%s'", 
-			lineCounter, infoItem.MountID, infoItem.Major, infoItem.Minor, infoItem.FilesystemType, infoItem.MountPoint, infoItem.MountSource)
+		//logger.Infof("[Mountinfo-Trace] [ACCEPTED MATCH] Line %d: Successfully validated row map. MountID=%d | Major:Minor=%d:%d | FS=%s | MountPoint='%s' | MountSource='%s'", 
+		//	lineCounter, infoItem.MountID, infoItem.Major, infoItem.Minor, infoItem.FilesystemType, infoItem.MountPoint, infoItem.MountSource)
 		
 		mounts = append(mounts, infoItem)
 	}
