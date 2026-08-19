@@ -6,7 +6,6 @@ from mock import patch, Mock, MagicMock
 from munch import Munch
 
 import controllers.servers.utils as utils
-import controllers.servers.messages as messages
 from controllers.array_action.settings import (NVME_OVER_FC_CONNECTIVITY_TYPE,
                                                FC_CONNECTIVITY_TYPE,
                                                ISCSI_CONNECTIVITY_TYPE)
@@ -835,18 +834,18 @@ class TestUtils(unittest.TestCase):
 
         mock_k8s_manager = MagicMock()
         mock_k8s_manager_class.return_value = mock_k8s_manager
-        
+
         mock_pv = MagicMock()
         mock_pv.spec.storage_class_name = "test-storage-class"
         mock_pv.metadata.name = "test-pv"
         mock_k8s_manager.get_persistent_volume_by_volume_handle.return_value = mock_pv
-        
+
         mock_sc = MagicMock()
         mock_sc.parameters = {"virt_snap_func": "true"}
         mock_k8s_manager.get_storage_class.return_value = mock_sc
-        
+
         result = utils.get_virt_snap_func_from_storage_class("test-volume-id")
-        
+
         self.assertTrue(result)
         mock_k8s_manager.get_persistent_volume_by_volume_handle.assert_called_once_with("test-volume-id")
         mock_k8s_manager.get_storage_class.assert_called_once_with("test-storage-class")
@@ -857,18 +856,18 @@ class TestUtils(unittest.TestCase):
 
         mock_k8s_manager = MagicMock()
         mock_k8s_manager_class.return_value = mock_k8s_manager
-        
+
         mock_pv = MagicMock()
         mock_pv.spec.storage_class_name = "test-storage-class"
         mock_pv.metadata.name = "test-pv"
         mock_k8s_manager.get_persistent_volume_by_volume_handle.return_value = mock_pv
-        
+
         mock_sc = MagicMock()
         mock_sc.parameters = {"virt_snap_func": "false"}
         mock_k8s_manager.get_storage_class.return_value = mock_sc
-        
+
         result = utils.get_virt_snap_func_from_storage_class("test-volume-id")
-        
+
         self.assertFalse(result)
 
     @patch('controllers.servers.utils.KubernetesManager')
@@ -877,18 +876,18 @@ class TestUtils(unittest.TestCase):
 
         mock_k8s_manager = MagicMock()
         mock_k8s_manager_class.return_value = mock_k8s_manager
-        
+
         mock_pv = MagicMock()
         mock_pv.spec.storage_class_name = "test-storage-class"
         mock_pv.metadata.name = "test-pv"
         mock_k8s_manager.get_persistent_volume_by_volume_handle.return_value = mock_pv
-        
+
         mock_sc = MagicMock()
         mock_sc.parameters = {"pool": "test-pool"}
         mock_k8s_manager.get_storage_class.return_value = mock_sc
-        
+
         result = utils.get_virt_snap_func_from_storage_class("test-volume-id")
-        
+
         self.assertFalse(result)
 
     @patch('controllers.servers.utils.KubernetesManager')
@@ -897,18 +896,18 @@ class TestUtils(unittest.TestCase):
 
         mock_k8s_manager = MagicMock()
         mock_k8s_manager_class.return_value = mock_k8s_manager
-        
+
         mock_pv = MagicMock()
         mock_pv.spec.storage_class_name = "test-storage-class"
         mock_pv.metadata.name = "test-pv"
         mock_k8s_manager.get_persistent_volume_by_volume_handle.return_value = mock_pv
-        
+
         mock_sc = MagicMock()
         mock_sc.parameters = {}
         mock_k8s_manager.get_storage_class.return_value = mock_sc
-        
+
         result = utils.get_virt_snap_func_from_storage_class("test-volume-id")
-        
+
         self.assertFalse(result)
 
     @patch('controllers.servers.utils.KubernetesManager')
@@ -917,18 +916,18 @@ class TestUtils(unittest.TestCase):
 
         mock_k8s_manager = MagicMock()
         mock_k8s_manager_class.return_value = mock_k8s_manager
-        
+
         mock_pv = MagicMock()
         mock_pv.spec.storage_class_name = "test-storage-class"
         mock_pv.metadata.name = "test-pv"
         mock_k8s_manager.get_persistent_volume_by_volume_handle.return_value = mock_pv
-        
+
         mock_sc = MagicMock()
         mock_sc.parameters = None
         mock_k8s_manager.get_storage_class.return_value = mock_sc
-        
+
         result = utils.get_virt_snap_func_from_storage_class("test-volume-id")
-        
+
         self.assertFalse(result)
 
     @patch('controllers.servers.utils.KubernetesManager')
@@ -937,12 +936,12 @@ class TestUtils(unittest.TestCase):
 
         mock_k8s_manager = MagicMock()
         mock_k8s_manager_class.return_value = mock_k8s_manager
-        
+
         mock_k8s_manager.get_persistent_volume_by_volume_handle.return_value = None
-        
+
         with self.assertRaises(ValidationException) as context:
             utils.get_virt_snap_func_from_storage_class("non-existent-volume-id")
-        
+
         self.assertIn("non-existent-volume-id", str(context.exception))
         self.assertIn("Could not find a PersistentVolume", str(context.exception))
 
@@ -952,15 +951,15 @@ class TestUtils(unittest.TestCase):
 
         mock_k8s_manager = MagicMock()
         mock_k8s_manager_class.return_value = mock_k8s_manager
-        
+
         mock_pv = MagicMock()
         mock_pv.spec.storage_class_name = None
         mock_pv.metadata.name = "static-pv"
         mock_k8s_manager.get_persistent_volume_by_volume_handle.return_value = mock_pv
-        
+
         with self.assertRaises(ValidationException) as context:
             utils.get_virt_snap_func_from_storage_class("test-volume-id")
-        
+
         self.assertIn("static-pv", str(context.exception))
         self.assertIn("no StorageClass reference", str(context.exception))
 
@@ -970,15 +969,15 @@ class TestUtils(unittest.TestCase):
 
         mock_k8s_manager = MagicMock()
         mock_k8s_manager_class.return_value = mock_k8s_manager
-        
+
         mock_pv = MagicMock()
         mock_pv.spec.storage_class_name = ""
         mock_pv.metadata.name = "test-pv"
         mock_k8s_manager.get_persistent_volume_by_volume_handle.return_value = mock_pv
-        
+
         with self.assertRaises(ValidationException) as context:
             utils.get_virt_snap_func_from_storage_class("test-volume-id")
-        
+
         self.assertIn("test-pv", str(context.exception))
         self.assertIn("no StorageClass reference", str(context.exception))
 
@@ -988,17 +987,17 @@ class TestUtils(unittest.TestCase):
 
         mock_k8s_manager = MagicMock()
         mock_k8s_manager_class.return_value = mock_k8s_manager
-        
+
         mock_pv = MagicMock()
         mock_pv.spec.storage_class_name = "deleted-storage-class"
         mock_pv.metadata.name = "test-pv"
         mock_k8s_manager.get_persistent_volume_by_volume_handle.return_value = mock_pv
-        
+
         mock_k8s_manager.get_storage_class.return_value = None
-        
+
         with self.assertRaises(ValidationException) as context:
             utils.get_virt_snap_func_from_storage_class("test-volume-id")
-        
+
         self.assertIn("deleted-storage-class", str(context.exception))
         self.assertIn("no longer exists", str(context.exception))
 
@@ -1008,19 +1007,19 @@ class TestUtils(unittest.TestCase):
 
         mock_k8s_manager = MagicMock()
         mock_k8s_manager_class.return_value = mock_k8s_manager
-        
+
         mock_pv = MagicMock()
         mock_pv.spec.storage_class_name = "test-storage-class"
         mock_pv.metadata.name = "test-pv"
         mock_k8s_manager.get_persistent_volume_by_volume_handle.return_value = mock_pv
-        
+
         test_cases = ["TRUE", "True", "TrUe", "tRuE"]
-        
+
         for true_value in test_cases:
             mock_sc = MagicMock()
             mock_sc.parameters = {"virt_snap_func": true_value}
             mock_k8s_manager.get_storage_class.return_value = mock_sc
-            
+
             result = utils.get_virt_snap_func_from_storage_class("test-volume-id")
             self.assertTrue(result, f"Failed for value: {true_value}")
 
@@ -1030,18 +1029,18 @@ class TestUtils(unittest.TestCase):
 
         mock_k8s_manager = MagicMock()
         mock_k8s_manager_class.return_value = mock_k8s_manager
-        
+
         mock_pv = MagicMock()
         mock_pv.spec.storage_class_name = "test-storage-class"
         mock_pv.metadata.name = "test-pv"
         mock_k8s_manager.get_persistent_volume_by_volume_handle.return_value = mock_pv
-        
+
         test_cases = ["FALSE", "False", "0", "1", "yes", "no", "enabled", "disabled", ""]
-        
+
         for false_value in test_cases:
             mock_sc = MagicMock()
             mock_sc.parameters = {"virt_snap_func": false_value}
             mock_k8s_manager.get_storage_class.return_value = mock_sc
-            
+
             result = utils.get_virt_snap_func_from_storage_class("test-volume-id")
             self.assertFalse(result, f"Failed for value: {false_value}")

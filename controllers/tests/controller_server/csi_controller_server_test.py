@@ -20,7 +20,7 @@ from controllers.tests.common.test_settings import (CLONE_VOLUME_NAME,
                                                     DUMMY_IO_GROUP, DUMMY_VOLUME_GROUP,
                                                     VOLUME_NAME, SNAPSHOT_NAME,
                                                     SNAPSHOT_VOLUME_NAME,
-                                                    SNAPSHOT_VOLUME_UID, VIRT_SNAP_FUNC_TRUE, SECRET_PASSWORD_VALUE,
+                                                    SNAPSHOT_VOLUME_UID, SECRET_PASSWORD_VALUE,
                                                     SECRET_USERNAME_VALUE,
                                                     VOLUME_UID, INTERNAL_VOLUME_ID, DUMMY_POOL2,
                                                     SECRET_MANAGEMENT_ADDRESS_VALUE,
@@ -161,7 +161,7 @@ class TestCreateSnapshot(BaseControllerSetUp, CommonControllerTest):
         self.mediator.get_object_by_id.return_value = utils.get_mock_mediator_response_volume(10, SNAPSHOT_VOLUME_NAME,
                                                                                               VOLUME_UID, "xiv")
         self.context = utils.FakeContext()
-        
+
         self.mock_get_virt_snap_func = patch(
             f"{CONTROLLER_SERVER_UTILS_PATH}.get_virt_snap_func_from_storage_class"
         ).start()
