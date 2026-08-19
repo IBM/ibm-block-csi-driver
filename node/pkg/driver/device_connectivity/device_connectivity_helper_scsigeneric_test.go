@@ -528,6 +528,11 @@ func TestHelperGetWwnByScsiInq(t *testing.T) {
 		cmdReturnErr    error
 		sgInqExecutable error
 		expErrType      reflect.Type
+		// When cmdReturn contains no parseable text (triggers fallback to sg_inq -i),
+		// set fallbackReturn/fallbackErr to configure the second mock call.
+		triggersFallback bool
+		fallbackReturn   []byte
+		fallbackErr      error
 	}{
 		{
 			name:            "Should fail when sg_Inq is not executable",
@@ -554,12 +559,15 @@ func TestHelperGetWwnByScsiInq(t *testing.T) {
 			sgInqExecutable: nil,
 		},
 		{
-			name:            "Should fail when no device found",
-			cmdReturn:       []byte(""),
-			wwn:             "",
-			cmdReturnErr:    nil,
-			expErrType:      reflect.TypeOf(&device_connectivity.MultipathDeviceNotFoundForVolumeError{}),
-			sgInqExecutable: nil,
+			name:             "Should fail when no device found (fallback also fails)",
+			cmdReturn:        []byte(""),
+			wwn:              "",
+			cmdReturnErr:     nil,
+			expErrType:       reflect.TypeOf(&device_connectivity.MultipathDeviceNotFoundForVolumeError{}),
+			sgInqExecutable:  nil,
+			triggersFallback: true,
+			fallbackReturn:   []byte(""),
+			fallbackErr:      nil,
 		},
 		{
 			name:            "Should succeed",
@@ -579,11 +587,15 @@ func TestHelperGetWwnByScsiInq(t *testing.T) {
 			defer mockCtrl.Finish()
 
 			fakeExecuter := mocks.NewMockExecuterInterface(mockCtrl)
-			args := []string{"-p", "0x83", device}
+			argsVpd := []string{"-p", "0x83", device}
 			fakeExecuter.EXPECT().IsExecutable(sgInqCmd).Return(tc.sgInqExecutable)
 
 			if tc.sgInqExecutable == nil {
-				fakeExecuter.EXPECT().ExecuteWithTimeout(device_connectivity.TimeOutSgInqCmd, sgInqCmd, args).Return(tc.cmdReturn, tc.cmdReturnErr)
+				fakeExecuter.EXPECT().ExecuteWithTimeout(device_connectivity.TimeOutSgInqCmd, sgInqCmd, argsVpd).Return(tc.cmdReturn, tc.cmdReturnErr)
+				if tc.triggersFallback {
+					argsFallback := []string{"-i", device}
+					fakeExecuter.EXPECT().ExecuteWithTimeout(device_connectivity.TimeOutSgInqCmd, sgInqCmd, argsFallback).Return(tc.fallbackReturn, tc.fallbackErr)
+				}
 			}
 
 			helperGeneric := device_connectivity.NewOsDeviceConnectivityHelperGeneric(fakeExecuter)
@@ -606,6 +618,83 @@ func TestHelperGetWwnByScsiInq(t *testing.T) {
 				t.Fatalf("Expected wwn  %v, got %v", wwn, tc.wwn)
 			}
 
+		})
+	}
+}
+
+func TestHelperGetWwnByScsiInqFallback(t *testing.T) {
+	// Tests for the sg_inq -i fallback path triggered when sg_inq -p 0x83
+	// returns raw hex output (e.g. on SUSE) instead of the expected text format.
+	sgInqCmd := "sg_inq"
+	device := "/dev/dm-1"
+	argsVpd := []string{"-p", "0x83", device}
+	argsFallback := []string{"-i", device}
+	// Raw hex output as produced by SUSE's sg_inq -p 0x83 (no parsed text lines).
+	suseRawOutput := []byte("VPD INQUIRY, page code=0x83:\n" +
+		"00 83 00 24 01 03 00 10  60 05 07 68 10 84 02 39    ...$....`..h...9\n" +
+		"d0 00 00 00 00 00 7f 8d  51 94 00 04 00 00 09 00    ........Q.......\n")
+
+	testCases := []struct {
+		name           string
+		fallbackReturn []byte
+		fallbackErr    error
+		expWwn         string
+		expErrType     reflect.Type
+	}{
+		{
+			name:           "Should succeed via sg_inq -i fallback (SUSE)",
+			fallbackReturn: []byte(fmt.Sprintf("VPD INQUIRY: Device Identification page\n  [0x%s]\n", volumeUuid)),
+			fallbackErr:    nil,
+			expWwn:         volumeUuid,
+		},
+		{
+			name:           "Should fail when sg_inq -i also returns no match",
+			fallbackReturn: []byte("VPD INQUIRY: Device Identification page\n  no wwn here\n"),
+			fallbackErr:    nil,
+			expWwn:         "",
+			expErrType:     reflect.TypeOf(&device_connectivity.MultipathDeviceNotFoundForVolumeError{}),
+		},
+		{
+			name:           "Should fail when sg_inq -i returns error",
+			fallbackReturn: []byte(""),
+			fallbackErr:    fmt.Errorf("error"),
+			expWwn:         "",
+			expErrType:     reflect.TypeOf(fmt.Errorf("error")),
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			mockCtrl := gomock.NewController(t)
+			defer mockCtrl.Finish()
+
+			fakeExecuter := mocks.NewMockExecuterInterface(mockCtrl)
+			fakeExecuter.EXPECT().IsExecutable(sgInqCmd).Return(nil)
+			// First call returns raw hex output — no parsed text lines found.
+			fakeExecuter.EXPECT().ExecuteWithTimeout(device_connectivity.TimeOutSgInqCmd, sgInqCmd, argsVpd).Return(suseRawOutput, nil)
+			// Second call is the -i fallback.
+			fakeExecuter.EXPECT().ExecuteWithTimeout(device_connectivity.TimeOutSgInqCmd, sgInqCmd, argsFallback).Return(tc.fallbackReturn, tc.fallbackErr)
+
+			helperGeneric := device_connectivity.NewOsDeviceConnectivityHelperGeneric(fakeExecuter)
+			wwn, err := helperGeneric.GetWwnByScsiInq(device)
+
+			if tc.expErrType != nil {
+				if err == nil {
+					t.Fatalf("Expected error, got success")
+				}
+				if tc.expErrType != reflect.TypeOf(fmt.Errorf("error")) {
+					if reflect.TypeOf(err) != tc.expErrType {
+						t.Fatalf("Expected error type %v, got %v", tc.expErrType, reflect.TypeOf(err))
+					}
+				}
+			} else {
+				if err != nil {
+					t.Fatalf("Expected success, got error: %v", err)
+				}
+			}
+			if strings.ToLower(tc.expWwn) != strings.ToLower(wwn) {
+				t.Fatalf("Expected wwn %v, got %v", tc.expWwn, wwn)
+			}
 		})
 	}
 }
@@ -984,6 +1073,18 @@ func TestIsVolumePathMatchesVolumeId(t *testing.T) {
 			matchingVolumeIdErr:         errors.New("failed in matching volume id to mpath name"),
 			isVolumePathMatchesVolumeId: false,
 		},
+		{
+			// SUSE sets the multipath alias to the raw WWN; IsDmName must treat it
+			// as a named device (%n) so the correct multipathd format is used.
+			name:                        "success with WWN-named device (SUSE)",
+			volumeUuid:                  "volumeUuid",
+			volumePath:                  "/path",
+			mpathDeviceName:             "36005076810840239d00000000000d6bd",
+			isDmName:                    true,
+			mpathdOutput:                "36005076810840239d00000000000d6bd," + volumeUuid,
+			volumeIdByVolumePath:        volumeUuid,
+			isVolumePathMatchesVolumeId: true,
+		},
 	}
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -1032,5 +1133,44 @@ func TestIsVolumePathMatchesVolumeId(t *testing.T) {
 func assertExpectedError(t *testing.T, expectedError error, responseErr error) {
 	if expectedError != responseErr {
 		t.Fatalf("wrong error: expected %v, got %v", expectedError, responseErr)
+	}
+}
+
+func TestIsDmName(t *testing.T) {
+	testCases := []struct {
+		name            string
+		mpathDeviceName string
+		expected        bool
+	}{
+		{
+			name:            "mpathXX is a named device",
+			mpathDeviceName: "mpathhe",
+			expected:        true,
+		},
+		{
+			name:            "WWN alias (SUSE) is a named device",
+			mpathDeviceName: "36005076810840239d00000000000d6bd",
+			expected:        true,
+		},
+		{
+			name:            "dm-N is NOT a named device",
+			mpathDeviceName: "dm-3",
+			expected:        false,
+		},
+		{
+			name:            "dm-0 is NOT a named device",
+			mpathDeviceName: "dm-0",
+			expected:        false,
+		},
+	}
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			fakeExecuter := mocks.NewMockExecuterInterface(gomock.NewController(t))
+			helper := device_connectivity.NewOsDeviceConnectivityHelperGeneric(fakeExecuter)
+			got := helper.IsDmName(tc.mpathDeviceName)
+			if got != tc.expected {
+				t.Fatalf("IsDmName(%q) = %v, want %v", tc.mpathDeviceName, got, tc.expected)
+			}
+		})
 	}
 }
