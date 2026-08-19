@@ -325,7 +325,7 @@ func baseExecute[T any](
 	}
 }
 
-// Batc// BatchResult wraps the output for an indexed batch worker.
+// BatchResult wraps the output for an indexed batch worker.
 type BatchResult[T any] struct {
 	Index int
 	Data  T

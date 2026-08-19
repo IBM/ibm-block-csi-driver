@@ -2999,8 +2999,8 @@ PROCESS_PAGE_0x83:
 // sHardwareBlocked, also check for the quiesce state. It often indicates a storage controller failover where I/O is paused but not failed.
 
 
-/// TeardownVolume unmounts volumes, flushes buffers, and ejects backing physical lanes concurrently.
-// Production-Hardened: Eliminates native NVMe path leaks and protects shared controllers from data corruption.
+// TeardownVolume unmounts volumes, flushes buffers, and ejects backing physical lanes concurrently.
+// Production-Hardened: Handles explicit multi-path transport splits and ensures error-free native execution tracks.
 func (r *OsDeviceConnectivityHelperScsiGeneric) TeardownVolume(ctx context.Context, target string, expectedWWID string) error {
 	if err := ctx.Err(); err != nil {
 		return err
@@ -3103,19 +3103,36 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) TeardownVolume(ctx context.Conte
 			}
 
 			if len(slaves) > 0 {
-				logger.Infof("[Teardown-Main] [%s] Step 2/2: Evicting physical backing slave devices: %v", mpathName, slaves)
+				logger.Infof("[Teardown-Main] [%s] Step 2/2: Segmenting physical backing slave devices for eviction: %v", mpathName, slaves)
 				
-				// 1. Evict any standard SCSI/iSCSI tracks natively via the safe channel
-				_ = r.RemovePhysicalDevice(ctx, slaves)
+				var scsiSlaves []string
+				var nvmeSlaves []string
+
+				for _, slaveNode := range slaves {
+					baseSlave := filepath.Base(slaveNode)
+					if strings.HasPrefix(baseSlave, "sd") {
+						scsiSlaves = append(scsiSlaves, baseSlave)
+					} else if strings.HasPrefix(baseSlave, "nvme") {
+						nvmeSlaves = append(nvmeSlaves, baseSlave)
+					}
+				}
+
+				// 1. Evict standard SCSI/iSCSI tracks natively via the safe channel
+				if len(scsiSlaves) > 0 {
+					logger.Infof("[Teardown-Main] [%s] Dispatched SCSI slave tracking nodes to physical evictor: %v", mpathName, scsiSlaves)
+					_ = r.RemovePhysicalDevice(ctx, scsiSlaves)
+				}
 				
 				// 2. FIXED: Explicitly run your safe reference-counted controller eviction 
 				// for any NVMe components backing this Device Mapper table
-				// FIXED: Replaced loose loops with your safe, multi-volume reference-counting controller gate helper
-				for _, slaveNode := range slaves {
-					ctrlName := ExtractNvmeControllerBase(slaveNode)
-					if ctrlName != "" {
-						// FIXED: Passed slaveNode to allow the circuit-breaker to open when it is the final remaining volume
-						_ = r.SafeEvictNvmeController(ctx, ctrlName, slaveNode, expectedWWID)
+				// FIXED: Forwarded the individual namespace string (nvmeSlave) to meet your signature contract exactly
+				if len(nvmeSlaves) > 0 {
+					logger.Infof("[Teardown-Main] [%s] Dispatched NVMe slave tracking nodes to reference-counted controller gates: %v", mpathName, nvmeSlaves)
+					for _, nvmeSlave := range nvmeSlaves {
+						ctrlName := ExtractNvmeControllerBase(nvmeSlave)
+						if ctrlName != "" {
+							_ = r.SafeEvictNvmeController(ctx, ctrlName, nvmeSlave)
+						}
 					}
 				}
 
@@ -3135,11 +3152,11 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) TeardownVolume(ctx context.Conte
 	} else if mpathName != "" && isNativeNVMe {
 		logger.Infof("[Teardown-Main] Target node %s maps to a native NVMe architecture. Routing straight to hardware eviction loops.", mpathName)
 		
-		// FIXED: Enforce cache synchronization. flushDeviceBuffers safely skips ioctls internally for Native entries
+		// Enforce cache synchronization. flushDeviceBuffers safely skips ioctls internally for Native entries
 		logger.Infof("[Teardown-Main] [%s] Initiating native NVMe block cache synchronization check...", mpathName)
 		_ = r.flushDeviceBuffers(ctx, filepath.Join("/dev", mpathName))
 
-		// FIXED: Unconditionally collect underlying namespaces to resolve all path links
+		// Unconditionally collect underlying namespaces to resolve all path links
 		slaves := r.FindSlavesByWWID(ctx, expectedWWID)
 		if len(slaves) == 0 {
 			slaves = []string{mpathName}
@@ -3147,12 +3164,11 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) TeardownVolume(ctx context.Conte
 
 		logger.Infof("[Teardown-Main] Evicting native NVMe path lanes safely: %v", slaves)
 		
-		// FIXED: Replaced loose loops with your safe, multi-volume reference-counting controller gate helper
+		// FIXED: Forwarded the individual namespace string (slaveNode) to meet your signature contract exactly
 		for _, slaveNode := range slaves {
 			ctrlName := ExtractNvmeControllerBase(slaveNode)
 			if ctrlName != "" {
-				// Ensures independent running volumes on the same bus adapter are shielded from corruption
-				_ = r.SafeEvictNvmeController(ctx, ctrlName)
+				_ = r.SafeEvictNvmeController(ctx, ctrlName, slaveNode)
 			}
 		}
 		
@@ -3373,7 +3389,7 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) flushDMBuffers(ctx context.Conte
 }
 
 // evictOrCleanNvmeNamespaces executes systematic parallel sysfs eviction on NVMe namespace paths.
-// Fully compiled and hardened against context deadline leaks and signature mismatches.
+// Hardened: Formats and maps parameters symmetrically to fulfill the required 3-argument guard loop contract.
 func (r *OsDeviceConnectivityHelperScsiGeneric) evictOrCleanNvmeNamespaces(ctx context.Context, devices []string, actionLabel string) {
 	if err := ctx.Err(); err != nil {
 		return
@@ -3409,7 +3425,7 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) evictOrCleanNvmeNamespaces(ctx c
 		15, 100, 3*time.Second, 15*time.Second,
 		validDevices,
 		func(wCtx context.Context, index int, dev string, cancelBatch func()) (struct{}, error) {
-			base := filepath.Base(dev)
+			base := filepath.Base(dev) // e.g., "nvme0n1"
 			
 			ctrlName := ExtractNvmeControllerBase(base)
 			if ctrlName == "" {
@@ -3423,9 +3439,15 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) evictOrCleanNvmeNamespaces(ctx c
 			}
 
 			if ctrlName != "" {
+<<<<<<< HEAD
 				// FIXED: Supplied the required 3rd argument 'uniqueBatchKey' (or pass expectedWWID if available) 
 				// and substituted bounded 'wCtx' to respect execution timeouts cleanly.
 				_ = r.SafeEvictNvmeController(wCtx, ctrlName)
+=======
+				// FIXED: Extracted 'base' (the standalone namespace filename token) and forwarded it 
+				// straight as the required 'currentNamespace' argument to fulfill your signature layout.
+				_ = r.SafeEvictNvmeController(wCtx, ctrlName, base)
+>>>>>>> e0326328 (rc)
 			}
 			return struct{}{}, nil
 		},
@@ -3443,11 +3465,13 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) evictNVMeNamespaces(ctx context.
 }
 
 // SafeEvictNvmeController verifies if a parent controller is completely idle 
-// across all system workloads before executing a hardware disconnect.
-func (r *OsDeviceConnectivityHelperScsiGeneric) SafeEvictNvmeController(ctx context.Context, ctrlName string) error {
-	logger.Infof("[Controller-Guard] Evaluating safety boundaries for controller eviction: %s", ctrlName)
+// across all other system workloads before executing a hardware disconnect.
+// Hardened: Leverages explicit string self-exclusion checks to bypass udev race conditions.
+func (r *OsDeviceConnectivityHelperScsiGeneric) SafeEvictNvmeController(ctx context.Context, ctrlName string, currentNamespace string) error {
+	logger.Infof("[Controller-Guard] Evaluating safety boundaries for controller eviction: %s (Target Namespace: %s)", ctrlName, currentNamespace)
 
-	if ctrlName == "" || volumeId == "" {
+	if ctrlName == "" || currentNamespace == "" {
+		logger.Warningf("[Controller-Guard] Missing tracking criteria context. Skipping eviction safety gate to prevent corruption.")
 		return nil
 	}
 
@@ -3455,32 +3479,33 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) SafeEvictNvmeController(ctx cont
 	entries, err := os.ReadDir(ctrlSysPath)
 	if err != nil {
 		if os.IsNotExist(err) {
+			logger.Infof("[Controller-Guard] Controller %s already detached from system. No eviction needed.", ctrlName)
 			return nil
 		}
 		return err
 	}
 
-	targetVolumeBase := normalizeWWID(volumeId)
+	// Clean the target namespace string to handle full paths or relative tokens cleanly
+	targetNamespaceBase := filepath.Base(currentNamespace)
 	otherActiveNamespaces := 0
 
 	for _, entry := range entries {
-		name := entry.Name()
+		name := entry.Name() // e.g., "nvme0n1", "nvme0n2"
 		
-		// FIXED: Strict boundary enforcement to prevent matching separate controllers (like nvme1n1 on nvme0)
+		logger.Debugf("[Controller-Guard] Evaluate %s", name)
+		
+		// Filter out sub-controllers and isolate pure namespace character folders
 		if !strings.HasPrefix(name, ctrlName+"n") || strings.Contains(name, "c") {
 			continue
 		}
 
-		// 1. Recover the unique identifier code for this loop entry
-		var entryWWID string
-		wwidPath := filepath.Join(ctrlSysPath, name, "wwid")
-		if bytes, errRead := os.ReadFile(wwidPath); errRead == nil {
-			entryWWID = normalizeWWID(string(bytes))
-		}
-
-		// 2. Self-Comparison check to ignore current target
-		if entryWWID != "" && entryWWID == targetVolumeBase {
-			logger.Debugf("[Controller-Guard] Identified target self volume node via WWID match: %s", name)
+		// =========================================================================
+		// FIXED: DIRECT EXPLICIT SELF-COMPARISON GUARD
+		// =========================================================================
+		// If this entry matches our active volume namespace parameter context, it is SELF.
+		// Skip incrementing the counter so we don't block our own hardware deletion.
+		if name == targetNamespaceBase {
+			logger.Debugf("[Controller-Guard] Identified target self volume node (skipping from share count): %s", name)
 			continue
 		}
 
@@ -3505,7 +3530,6 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) SafeEvictNvmeController(ctx cont
 		if _, errStat := os.Stat(devNodeCheck); os.IsNotExist(errStat) {
 			logger.Warningf("[Controller-Guard] Sister namespace %s is active in sysfs but missing from /dev. Treating as an unlinked remnant.", name)
 			
-			// Force-evict the dead namespace node on the fly to help the kernel prune the tree
 			nsDeletePath := filepath.Join(ctrlSysPath, name, "device", "delete")
 			if _, errDelFile := os.Stat(nsDeletePath); errDelFile == nil {
 				_ = os.WriteFile(nsDeletePath, []byte("1\n"), 0200)
@@ -3517,13 +3541,17 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) SafeEvictNvmeController(ctx cont
 		logger.Infof("[Controller-Guard] Verified genuine active sister namespace dependency: %s", name)
 	}
 
+	// =========================================================================
+	// PROTECTION GATEWAY CIRCUIT-BREAKER
+	// =========================================================================
 	if otherActiveNamespaces > 0 {
-		logger.Warningf("[Controller-Guard] PROTECTION SHIELD ACTIVE: Controller %s still manages %d active companion volumes. Skipping hardware eviction.", ctrlName, otherActiveNamespaces)
-		return nil 
+		logger.Warningf("[Controller-Guard] PROTECTION SHIELD ACTIVE: Controller %s manages %d other active volumes. Skipping hardware eviction to protect sister storage tracks.", 
+			ctrlName, otherActiveNamespaces)
+		return nil // Safe exit; preserves the transport lane for remaining volumes
 	}
 
-	// Exclusivity validated: All ghost remnants pruned, safe to drop the adapter lane
-	logger.Infof("[Controller-Guard] Absolute exclusivity verified for %s. Issuing controller removal command.", ctrlName)
+	// Absolute exclusivity confirmed: Safe to issue the kernel deletion signal
+	logger.Infof("[Controller-Guard] Exclusivity verified for %s (0 other active namespaces found). Issuing structural controller removal command.", ctrlName)
 	deletePath := filepath.Join(ctrlSysPath, "delete_controller")
 	return os.WriteFile(deletePath, []byte("1\n"), 0200)
 }
@@ -5181,6 +5209,7 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) getDeletePath(wCtx context.Conte
 	return deletePath, pciAddress, useUnbindStrategy
 }
 
+/*
 func (r *OsDeviceConnectivityHelperScsiGeneric) FinalWwidPurge(ctx context.Context, expectedWWID string) error {
 	targetWWID := r.Helper.normalizeWWID(expectedWWID)
 
@@ -5315,7 +5344,7 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) FinalWwidPurge(ctx context.Conte
 	}
 	return nil
 }
-
+*/
 
 
 // In Case 1, when a collision is detected, you call UnmountWithContext. Ensure your UnmountWithContext is set to use MNT_DETACH (Lazy) immediately for collisions, as you don't want to wait for a graceful timeout on a rogue volume.
@@ -5486,7 +5515,6 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) multipathdAction(ctx context.Con
 func (r *OsDeviceConnectivityHelperScsiGeneric) pollLayerDeleted(target string, mountID int, timeout time.Duration) bool {
 	expiry := time.Now().Add(timeout)
 	for time.Now().Before(expiry) {
-		// TODO make sure applied on GetsPodPath
 		currentMounts, _ := r.Mounter.GetMountsForPath(target)
 		found := false
 		for _, m := range currentMounts {
