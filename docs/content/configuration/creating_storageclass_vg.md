@@ -9,8 +9,6 @@ Create a storage class YAML file, similar to the following demo-storageclass.yam
 
 Volume groups can only be managed by **either** the associated VolumeGroup **or** the associated StorageClass (with the `volume_group` parameter). If a volume group is already associated with a VolumeGroup, then each volume of this StorageClass can be automatically deleted.{: restriction}
 
-When electing to set the optional "virt_snap_func" parameter, it **must** also be set with an identical value in the relevant VolumeSnapshotClass yamls.{: requirement}
-
 When setting the optional "virt_snap_func" parameter to "true", the optional "SpaceEfficiency" parameter **must not** be set.{: restriction}
   
     kind: StorageClass
@@ -24,7 +22,7 @@ When setting the optional "virt_snap_func" parameter to "true", the optional "Sp
       volume_group: demo-volumegroup   # Optional.
       SpaceEfficiency: thin            # Optional. Do not set this optional parameter if virt_snap_func is set to "true"
       volume_name_prefix: demo-prefix  # Optional.
-      virt_snap_func: "true"           # Optional. Values "true"/"false". The default is "false". If set, this value MUST be identical to the value set in the VolumeSnapshotClass yamls
+      virt_snap_func: "true"           # Optional. Values "true"/"false". The default is "false".
 
       csi.storage.k8s.io/fstype: xfs   # Optional. Values ext4/xfs. The default is ext4.
       csi.storage.k8s.io/secret-name: demo-secret

@@ -431,6 +431,32 @@ def get_object_parameters(parameters, prefix_param_name, system_id):
         volume_group=system_parameters.get(servers_settings.PARAMETERS_VOLUME_GROUP, default_volume_group),
         virt_snap_func=is_virt_snap_func)
 
+def get_virt_snap_func_from_storage_class(source_volume_id):
+    logger.debug("Getting virt_snap_func from source volume's StorageClass")
+    kubernetes_manager = KubernetesManager()
+    persistent_volume = kubernetes_manager.get_persistent_volume_by_volume_handle(source_volume_id)
+
+    if not persistent_volume:
+        raise ValidationException(
+            messages.SOURCE_PV_NOT_FOUND_MESSAGE.format(source_volume_id))
+    
+    storage_class_name = persistent_volume.spec.storage_class_name
+    if not storage_class_name:
+        raise ValidationException(
+            messages.SOURCE_PV_HAS_NO_STORAGECLASS_MESSAGE.format(persistent_volume.metadata.name))
+
+    storage_class = kubernetes_manager.get_storage_class(storage_class_name)
+    if not storage_class:
+        raise ValidationException(
+            messages.SOURCE_PV_STORAGECLASS_NOT_FOUND_MESSAGE.format(storage_class_name))
+    
+    sc_parameters = storage_class.parameters or {}
+    virt_snap_func_str = sc_parameters.get(servers_settings.PARAMETERS_VIRT_SNAP_FUNC)
+    virt_snap_func = _str_to_bool(virt_snap_func_str)
+    logger.debug("virt_snap_func={} from StorageClass '{}'".format(virt_snap_func, storage_class_name))
+    
+    return virt_snap_func
+
 
 def get_volume_id(new_volume, system_id):
     return _get_object_id(new_volume, new_volume.id, system_id)
