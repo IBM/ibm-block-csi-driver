@@ -261,7 +261,7 @@ func (d *NodeService) NodeStageVolume(ctx context.Context, req *csi.NodeStageVol
 	}
 
 	// 2. IDEMPOTENCY MOUNT CHECK
-	isMounted, err := d.isTargetMounted(stagingPathWithHostPrefix, true)
+	isMounted, err := d.isTargetMounted(stagingPath, true)
 	if err != nil {
 		logger.Debugf("Existing mount check failed {%v}", err.Error())
 		return nil, err
@@ -499,8 +499,7 @@ func (d *NodeService) NodePublishVolume(ctx context.Context, req *csi.NodePublis
 	}
 
 	if isFSVolume {
-		stagingPathWithHostPrefix := d.NodeUtils.GetPodPath(stagingPath)
-		isStagingNotMounted, err := d.NodeUtils.IsNotMountPoint(stagingPathWithHostPrefix)
+		isStagingNotMounted, err := d.NodeUtils.IsNotMountPoint(stagingPath)
 		if err != nil {
 			logger.Errorf("Existing mount check failed {%v}", err.Error())
 			return nil, err
@@ -513,7 +512,7 @@ func (d *NodeService) NodePublishVolume(ctx context.Context, req *csi.NodePublis
 	isTargetPathExists := d.NodeUtils.IsPathExists(targetPathWithHostPrefix)
 	if isTargetPathExists {
 		// check if already mounted
-		isTargetMounted, err := d.isTargetMounted(targetPathWithHostPrefix, isFSVolume)
+		isTargetMounted, err := d.isTargetMounted(targetPath, isFSVolume)
 		if err != nil {
 			logger.Debugf("Existing mount check failed {%v}", err.Error())
 			return nil, err
@@ -571,9 +570,10 @@ func (d *NodeService) publishRawBlockVolume(mpathDevice string, targetPath strin
 // targetPathWithHostPrefix: path of target
 // isFSVolume: if we check volume with file system - true, otherwise for raw block false
 // Returns: is <target mounted, error if occured>
-func (d *NodeService) isTargetMounted(targetPathWithHostPrefix string, isFSVolume bool) (bool, error) {
+func (d *NodeService) isTargetMounted(targetPath, isFSVolume bool) (bool, error) {
+	targetPathWithHostPrefix := d.NodeUtils.GetPodPath(target)
 	logger.Debugf("Check if target {%s} is mounted", targetPathWithHostPrefix)
-	isNotMounted, err := d.NodeUtils.IsNotMountPoint(targetPathWithHostPrefix)
+	isNotMounted, err := d.NodeUtils.IsNotMountPoint(targetPath)
 	if err != nil {
 		logger.Warningf("Failed to check if (%s), is mounted", targetPathWithHostPrefix)
 		return false, status.Error(codes.Internal, err.Error())
@@ -659,7 +659,7 @@ func (d *NodeService) NodeUnpublishVolume(ctx context.Context, req *csi.NodeUnpu
 
 	// Unmount and delete mount point file/folder
 	logger.Debugf("Check if target %s is mounted", targetPathWithHostPrefix)
-	isNotMounted, err := d.NodeUtils.IsNotMountPoint(targetPathWithHostPrefix)
+	isNotMounted, err := d.NodeUtils.IsNotMountPoint(targetPath)
 	if err != nil {
 		logger.Errorf("Check is target mounted failed. Target : %q, err : %v", targetPathWithHostPrefix, err.Error())
 		return nil, status.Error(codes.Internal, err.Error())
