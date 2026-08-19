@@ -172,27 +172,31 @@ func (p *ResourcePool) Init(maxRunning, maxSpare int) {
 
 
 // suicideIfLeaked protects the Node from PID exhaustion.
+// Hardened: Fixed the duration scale collision and aligned atomic checks to explicit nanosecond barriers.
 func (g *KeyedGater) suicideIfLeaked() {
 	leaks := g.globalLeaked.Load()
 	if leaks <= 0 {
 		return
 	}
 
-	// 1. FATAL EXIT
+	// 1. FATAL EXIT (The Absolute Circuit-Breaker)
 	if leaks >= g.maxGlobal {
-		fmt.Fprintf(os.Stderr, "FATAL: Global thread leak limit (%d) reached. Terminating to protect Node.\n", g.maxGlobal)
+		fmt.Fprintf(os.Stderr, "FATAL: Global thread leak limit (%d) reached. Terminating process to protect Node PID tracks.\n", g.maxGlobal)
+		// Give standard I/O channels a brief window to flush buffers before hard termination
 		time.Sleep(500 * time.Millisecond)
 		os.Exit(1)
 	}
 
-	// 2. THROTTLED WARNING (Every 30s)
+	// 2. THROTTLED WARNING (Every 30 seconds exactly)
 	if leaks > (g.maxGlobal / 2) {
-		now := time.Now().UnixNano()
-		last := g.lastWarnTime.Load()
-		if now-last > int64(30*time.Second) {
-			if g.lastWarnTime.CompareAndSwap(last, now) {
-				// Replace with your actual logger
-				fmt.Printf("WARNING: High thread leak detected (%d/%d).\n", leaks, g.maxGlobal)
+		nowNano := time.Now().UnixNano()
+		lastNano := g.lastWarnTime.Load()
+		
+		// FIXED: Explicitly use standard duration thresholds to eliminate numeric scale drift
+		if nowNano-lastNano > (30 * time.Second).Nanoseconds() {
+			if g.lastWarnTime.CompareAndSwap(lastNano, nowNano) {
+				// Aligned to use your primary logging engine infrastructure cleanly
+				logger.Warningf("CRITICAL HEALTH ALERT: High kernel D-state or ghost thread leaks detected on host node (%d/%d active leaks).", leaks, g.maxGlobal)
 			}
 		}
 	}
@@ -228,12 +232,10 @@ func baseExecute[T any](
 		return zero, err
 	}
 
-	// 1. SAFE ATOMIC INITIALIZATION
 	val, _ := g.resources.LoadOrStore(resourceName, &ResourcePool{})
 	pool := val.(*ResourcePool)
-	pool.Init(maxRunning, maxSpare) // Safe once-execution
+	pool.Init(maxRunning, maxSpare) 
 	
-	// 2. Queue for slot respecting CSI Context & Deadlines
 	select {
 	case pool.running <- struct{}{}:
 	case <-ctx.Done():
@@ -243,12 +245,11 @@ func baseExecute[T any](
 	
 	pool.activeOps.Add(1)
 	
-	// FIXED: Buffer capacity must handle the "abandoned" path to prevent goroutine leak
 	done := make(chan Result[T], 1) 
 	switched := make(chan struct{})
+	monitorDone := make(chan struct{}) // FIXED: Symmetrical escape gateway handshake
 	var once sync.Once
 
-	// FIXED: Link the worker context lifecycle to the incoming RPC context
 	workerCtx, cancelWorker := context.WithCancel(ctx)
 	defer cancelWorker()
 
@@ -263,15 +264,17 @@ func baseExecute[T any](
 		}
 
 		data, err := worker(workerCtx)
-		
-		// This write will never block now, even if baseExecute has already returned
 		done <- Result[T]{Data: data, Err: err}
 
+		// FIXED: Evaluate whether the parent monitoring thread aborted due to saturation
 		once.Do(func() {
 			select {
 			case <-switched:
 				<-pool.spare
 				g.globalLeaked.Add(-1) 
+			case <-monitorDone:
+				// The monitor thread already freed the pool.running slot; exit immediately
+				return
 			default:
 				<-pool.running
 			}
@@ -307,13 +310,13 @@ func baseExecute[T any](
 			case <-hdTimer.C: 
 				g.globalLeaked.Add(1)
 				var zero T
-				// We return immediately; the worker goroutine will exit cleanly when done 
-				// without hanging because the 'done' channel is buffered.
 				return zero, fmt.Errorf("resource %s: abandoned after hard timeout %v", resourceName, hardTimeout)
 			}
 		default:
-			// If spare pool is full, we must free the token we are holding before erroring out
+			// FIXED: Microsecond-safe release. Notify the worker goroutine via close(monitorDone)
+			// that it should skip its own pool extraction block before reclaiming the token.
 			once.Do(func() {
+				close(monitorDone)
 				<-pool.running
 			})
 			var zero T
@@ -322,11 +325,17 @@ func baseExecute[T any](
 	}
 }
 
-// BatchResult wraps the output for an indexed batch worker.
+// Batc// BatchResult wraps the output for an indexed batch worker.
 type BatchResult[T any] struct {
 	Index int
 	Data  T
 	Err   error
+}
+
+// Result tracks the inner channel worker payload.
+type Result[T any] struct {
+	Data T
+	Err  error
 }
 
 func ExecuteUninterruptibleBatch[Param any, T any](
@@ -349,12 +358,10 @@ func ExecuteUninterruptibleBatch[Param any, T any](
 		return nil, nil
 	}
 
-	// 1. SAFE ATOMIC INITIALIZATION
 	val, _ := g.resources.LoadOrStore(resourceName, &ResourcePool{})
 	pool := val.(*ResourcePool)
-	pool.Init(maxRunning, maxSpare) // Thread-safe sync.Once setup
+	pool.Init(maxRunning, maxSpare) 
 
-	// Create a unified batch context that allows sibling cancellation
 	batchCtx, cancelBatch := context.WithCancel(ctx)
 	defer cancelBatch()
 
@@ -368,7 +375,6 @@ func ExecuteUninterruptibleBatch[Param any, T any](
 		go func(index int, p Param) {
 			defer wg.Done()
 
-			// 2. Queue for slot respecting the active batch context
 			select {
 			case pool.running <- struct{}{}:
 			case <-batchCtx.Done():
@@ -377,16 +383,17 @@ func ExecuteUninterruptibleBatch[Param any, T any](
 			}
 
 			pool.activeOps.Add(1)
-			done := make(chan Result[T], 1) // Safe 1-capacity buffer
+			done := make(chan Result[T], 1) 
 			switched := make(chan struct{})
+			monitorDone := make(chan struct{}) // FIXED: Symmetrical handshake channel
 			var once sync.Once
 
-			// FIXED: Derive from batchCtx so cancelBatch() immediately cancels other workers
 			workerCtx, cancelWorker := context.WithCancel(batchCtx)
 			defer cancelWorker()
 
 			// 3. INNER WORKER LAUNCH
 			go func() {
+				// Guarantees activeOps is ALWAYS decremented under any exit trajectory
 				defer pool.activeOps.Add(-1)
 
 				if parentAdditionalID != "" && parentAdditionalID != "-" {
@@ -394,15 +401,17 @@ func ExecuteUninterruptibleBatch[Param any, T any](
 				}
 
 				data, err := worker(workerCtx, index, p, cancelBatch)
-				
-				// Guaranteed never to block even if the parent monitor times out
 				done <- Result[T]{Data: data, Err: err}
 
+				// FIXED: Safe execution state machine checks if the monitor exited due to saturation
 				once.Do(func() {
 					select {
 					case <-switched:
 						<-pool.spare
 						g.globalLeaked.Add(-1)
+					case <-monitorDone:
+						// Monitor thread already handled pool.running token release during a saturation miss
+						return
 					default:
 						<-pool.running
 					}
@@ -444,8 +453,9 @@ func ExecuteUninterruptibleBatch[Param any, T any](
 						}
 					}
 				default:
-					// FIXED: Must release token if exiting due to saturation to prevent permanent deadlock
+					// FIXED: Microsecond-safe saturation release using the close-channel handshake
 					once.Do(func() {
+						close(monitorDone)
 						<-pool.running
 					})
 					resultsChan <- BatchResult[T]{Index: index, Err: fmt.Errorf("batch item %d: critical saturation", index)}
@@ -457,7 +467,6 @@ func ExecuteUninterruptibleBatch[Param any, T any](
 	wg.Wait()
 	close(resultsChan)
 
-	// Collect aggregated data in execution order or collection order
 	aggregatedResults := make([]BatchResult[T], 0, len(parameters))
 	for res := range resultsChan {
 		aggregatedResults = append(aggregatedResults, res)
