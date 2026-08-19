@@ -3117,16 +3117,29 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) TeardownVolume(ctx context.Conte
 					}
 				}
 
-				// 1. Evict standard SCSI/iSCSI tracks natively via the safe channel
+				// =========================================================================
+				// INVERSION STEP 1: FORCEFULLY PRUNE THE LOCAL NAMESPACE HANDLES FIRST
+				// =========================================================================
+				// This unlinks the volume's specific endpoint footprints (e.g. nvme1n1 or nvme1n2)
+				// straight out of the host controller directories BEFORE we run the check loop.
+				if len(nvmeSlaves) > 0 {
+					logger.Infof("[Teardown-Main] [%s] Executing early parallel namespace eviction...", mpathName)
+					r.cleanNVMeNamespacesFromSlaves(ctx, slaves, expectedWWID)
+				}
+
+				// Evict standard SCSI/iSCSI tracks natively via the safe channel
 				if len(scsiSlaves) > 0 {
 					logger.Infof("[Teardown-Main] [%s] Dispatched SCSI slave tracking nodes to physical evictor: %v", mpathName, scsiSlaves)
 					_ = r.RemovePhysicalDevice(ctx, scsiSlaves)
 				}
 				
-				// 2. FIXED: Aligned caller to pass exactly 4 arguments to meet the new signature:
-				// (ctx, ctrlName, currentNamespace, volumeId)
+				// =========================================================================
+				// INVERSION STEP 2: EVALUATE CONTROLLER EVICTION (AFTER PRUNING)
+				// =========================================================================
+				// Now that our unique namespace footprints have been successfully dropped,
+				// the controller check will accurately count only genuine concurrent sister volumes.
 				if len(nvmeSlaves) > 0 {
-					logger.Infof("[Teardown-Main] [%s] Dispatched NVMe slave tracking nodes to reference-counted controller gates: %v", mpathName, nvmeSlaves)
+					logger.Infof("[Teardown-Main] [%s] Evaluating reference-counted controller gates: %v", mpathName, nvmeSlaves)
 					for _, nvmeSlave := range nvmeSlaves {
 						ctrlName := ExtractNvmeControllerBase(nvmeSlave)
 						if ctrlName != "" {
@@ -3135,9 +3148,7 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) TeardownVolume(ctx context.Conte
 					}
 				}
 
-				// 3. Clear remaining descriptor files and reset tracking variables
-				r.cleanNVMeNamespacesFromSlaves(ctx, slaves, expectedWWID)
-				needRemovePhysical = false 
+				needRemovePhysical = false 			}
 			} else {
 				logger.Infof("[Teardown-Main] [%s] Step 2/2: Slaves empty. Sweeping dual-protocol parameters...", mpathName)
 				_ = r.purgeStuckPhysicalPathsDualProtocol(ctx, rawScsiTarget, rawNvmeTarget)
@@ -3161,10 +3172,13 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) TeardownVolume(ctx context.Conte
 			slaves = []string{mpathName}
 		}
 
-		logger.Infof("[Teardown-Main] Evicting native NVMe path lanes safely: %v", slaves)
-		
-		// FIXED: Aligned caller to pass exactly 4 arguments to meet the new signature:
-		// (ctx, ctrlName, currentNamespace, volumeId)
+		// INVERSION STEP 1: Early namespace pruning drops the local tracking endpoints out of sysfs
+		logger.Infof("[Teardown-Main] [%s] Executing early native namespace eviction: %v", mpathName, slaves)
+		r.cleanNVMeNamespacesFromSlaves(ctx, slaves, expectedWWID)
+
+		// INVERSION STEP 2: Now that namespaces are cleared, run the controller reference gater checks
+		// Symmetrically aligned to pass exactly 4 arguments: (ctx, ctrlName, currentNamespace, volumeId)
+		logger.Infof("[Teardown-Main] Evicting native NVMe controller adapters safely: %v", slaves)
 		for _, slaveNode := range slaves {
 			ctrlName := ExtractNvmeControllerBase(slaveNode)
 			if ctrlName != "" {
@@ -3172,27 +3186,28 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) TeardownVolume(ctx context.Conte
 			}
 		}
 		
-		// Flush remaining descriptors and clear state variables natively
-		r.cleanNVMeNamespacesFromSlaves(ctx, slaves, expectedWWID)
 		needRemovePhysical = false
 	}
 	
-   // --- PHASE 4: IDEMPOTENCY SAFETY ANCHORS ---
-   if mpathName == "" && (needFlush || needRemovePhysical) && expectedWWID != "" {
-		   stillMounted, errCheck := r.Mounter.IsMounted(target)
-		   if errCheck == nil && !stillMounted {
-				   logger.Warningf("[Teardown-Main] Volume target %s is already unmounted and mpath device for WWID %s cannot be resolved. Assuming previous unstage completed successfully.", target, expectedWWID)
-				   return nil
-		   }
-		   return fmt.Errorf("teardown: unable to resolve backing block architecture targets for WWID %s; halting execution to protect system paths", expectedWWID)
-   }
+	// =========================================================================
+	// PHASE 4: IDEMPOTENCY SAFETY ANCHORS
+	// =========================================================================
+	if mpathName == "" && (needFlush || needRemovePhysical) && expectedWWID != "" {
+		stillMounted, errCheck := r.Mounter.IsMounted(target)
+		if errCheck == nil && !stillMounted {
+			logger.Warningf("[Teardown-Main] Volume target %s is already unmounted and mpath device for WWID %s cannot be resolved. Assuming previous unstage completed successfully.", target, expectedWWID)
+			return nil
+		}
+		return fmt.Errorf("teardown: unable to resolve backing block architecture targets for WWID %s; halting execution to protect system paths", expectedWWID)
+	}
 
-   if needRemovePhysical && expectedWWID != "" {
-		   logger.Infof("[Teardown-Main] Executing global fallback sweep for WWID: %s", expectedWWID)
-		   _ = r.purgeStuckPhysicalPathsDualProtocol(ctx, rawScsiTarget, rawNvmeTarget)
-   }
+	if needRemovePhysical && expectedWWID != "" {
+		logger.Infof("[Teardown-Main] Executing global fallback sweep for WWID: %s", expectedWWID)
+		_ = r.purgeStuckPhysicalPathsDualProtocol(ctx, rawScsiTarget, rawNvmeTarget)
+	}
 
-   return nil
+	logger.Infof("[Teardown-Main] Master cleanup sequence successfully finalized for target: %s", target)
+	return nil
 }
 
 func (r *OsDeviceConnectivityHelperScsiGeneric) collectInformationForTeardown(ctx context.Context, target string, expectedWWID string) (mpathName string, hardwareResolved bool, isNativeNVMe bool, major uint32, minor uint32, isMounted bool, needFlush bool, needRemovePhysical bool, isDeviceMapperTarget bool) {
