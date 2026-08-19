@@ -161,6 +161,12 @@ class TestCreateSnapshot(BaseControllerSetUp, CommonControllerTest):
         self.mediator.get_object_by_id.return_value = utils.get_mock_mediator_response_volume(10, SNAPSHOT_VOLUME_NAME,
                                                                                               VOLUME_UID, "xiv")
         self.context = utils.FakeContext()
+        
+        self.mock_get_virt_snap_func = patch(
+            f"{CONTROLLER_SERVER_UTILS_PATH}.get_virt_snap_func_from_storage_class"
+        ).start()
+        self.mock_get_virt_snap_func.return_value = False
+        self.addCleanup(patch.stopall)
 
     def test_create_snapshot_with_empty_name(self):
         self._test_create_object_with_empty_name()
@@ -201,8 +207,8 @@ class TestCreateSnapshot(BaseControllerSetUp, CommonControllerTest):
         self._test_create_snapshot_succeeds(expected_space_efficiency=SPACE_EFFICIENCY)
 
     def test_create_snapshot_with_space_efficiency_and_virt_snap_func_enabled_fail(self):
-        self.request.parameters = {servers_settings.PARAMETERS_SPACE_EFFICIENCY: SPACE_EFFICIENCY,
-                                   servers_settings.PARAMETERS_VIRT_SNAP_FUNC: VIRT_SNAP_FUNC_TRUE}
+        self.request.parameters = {servers_settings.PARAMETERS_SPACE_EFFICIENCY: SPACE_EFFICIENCY}
+        self.mock_get_virt_snap_func.return_value = True
 
         self.servicer.CreateSnapshot(self.request, self.context)
 
