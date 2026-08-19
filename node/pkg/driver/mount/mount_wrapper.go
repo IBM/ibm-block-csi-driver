@@ -695,6 +695,7 @@ func (m *Mounter) GetDeviceFromMount(target string) (string, error) {
 	if target == "" {
 		return "", fmt.Errorf("get-device: empty lookup path provided")
 	}
+	target = GetPodPath(target)
 
 	// Parse /proc/self/mountinfo to find the device source for the target
 	mounts, err := m.List()

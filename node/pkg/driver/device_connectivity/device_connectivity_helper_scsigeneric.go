@@ -3459,7 +3459,6 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) evictNVMeNamespaces(ctx context.
 
 // SafeEvictNvmeController verifies if a parent controller is completely idle 
 // across all other system workloads before executing a hardware disconnect.
-// Hardened: Features granular line-by-line tracing for every verification gate to pinpoint rejections.
 func (r *OsDeviceConnectivityHelperScsiGeneric) SafeEvictNvmeController(ctx context.Context, ctrlName string, currentNamespace string, volumeId string) error {
 	logger.Infof("[Controller-Guard-Trace] >>> Entering Guard Pipeline for Controller: '%s' | Target Namespace Parameter: '%s' | Volume ID Context: '%s'", 
 		ctrlName, currentNamespace, volumeId)
@@ -3480,7 +3479,6 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) SafeEvictNvmeController(ctx cont
 		return err
 	}
 
-	// 1. GENERATE DUAL-PROTOCOL TARGET CONFIGURATIONS FOR MATCHING BOUNDARIES
 	cleanScsiTarget := normalizeWWID(volumeId)
 	cleanNvmeTarget := convertScsiIdToNguid(cleanScsiTarget)
 	targetNamespaceBase := filepath.Base(currentNamespace)
@@ -3492,25 +3490,33 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) SafeEvictNvmeController(ctx cont
 	var rejectionDetails []string
 
 	for _, entry := range entries {
-		name := entry.Name() // e.g., "nvme1n1", "nvme1n2", "state", "delete_controller"
+		name := entry.Name() 
 		
-		// Boundary enforcement: Filter out non-namespace control files or cross-controller mappings
-		if !strings.HasPrefix(name, ctrlName+"n") || strings.Contains(name, "c") {
+		// FIXED: Strict prefix rule filters out generic mappings (ng0n1) and control controllers (nvme0c0)
+		// block namespaces MUST start exactly with the controller prefix followed by "n" (e.g. "nvme0n")
+		expectedNamespacePrefix := ctrlName + "n"
+		if !strings.HasPrefix(name, expectedNamespacePrefix) || strings.Contains(name, "c") {
 			logger.Debugf("[Controller-Guard-Trace] [SKIP-ENTRY] Skipping non-namespace configuration file node: '%s'", name)
+			continue
+		}
+
+		// Double-check: ensure it represents a directory layout before trying to read parameters
+		wwidPath := filepath.Join(ctrlSysPath, name, "wwid")
+		if _, errStat := os.Stat(wwidPath); os.IsNotExist(errStat) {
+			logger.Debugf("[Controller-Guard-Trace] [SKIP-ENTRY] Namespace directory entry '%s' lacks identity wwid file. Skipping.", name)
 			continue
 		}
 
 		logger.Infof("[Controller-Guard-Trace] [EVALUATING NODE] Inspecting block path candidate: '%s'", name)
 
-		// 2. HARDWARE IDENTITY EXTRACTION: Read the immutable unique array ID for this path entry
+		// 2. HARDWARE IDENTITY EXTRACTION
 		var entryWWID string
-		wwidPath := filepath.Join(ctrlSysPath, name, "wwid")
-		// FIXED: Changed errError to errRead to perfectly match the initialization variable assignment
 		if bytes, errRead := os.ReadFile(wwidPath); errRead == nil {
 			entryWWID = normalizeWWID(string(bytes))
 			logger.Infof("[Controller-Guard-Trace] ['%s'] Read sysfs unique hardware identity string: '%s'", name, entryWWID)
 		} else {
 			logger.Warningf("[Controller-Guard-Trace] ['%s'] Unable to access wwid file at %s: %v", name, wwidPath, errRead)
+			continue // Skip processing if file read errors out to prevent breaking subsequent loops
 		}
 
 		// =========================================================================
@@ -3554,7 +3560,6 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) SafeEvictNvmeController(ctx cont
 			continue
 		}
 
-		// Secondary state probe
 		statePath := filepath.Join(ctrlSysPath, name, "device", "state")
 		if stateBytes, errState := os.ReadFile(statePath); errState == nil {
 			stateStr := strings.ToLower(strings.TrimSpace(string(stateBytes)))
@@ -3565,7 +3570,7 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) SafeEvictNvmeController(ctx cont
 		}
 
 		// =========================================================================
-		// GENUINE SISTER DEPENDENCY CONFIRMED (The Deletion Blocker)
+		// GENUINE SISTER DEPENDENCY CONFIRMED
 		// =========================================================================
 		otherActiveNamespaces++
 		blockerMsg := fmt.Sprintf("Namespace: '%s' (sysfs_id: '%s', cleanScsiTarget: '%s', nvmeNguidTarget: '%s')", name, entryWWID, cleanScsiTarget, cleanNvmeTarget)
@@ -3579,10 +3584,10 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) SafeEvictNvmeController(ctx cont
 	if otherActiveNamespaces > 0 {
 		logger.Warningf("[Controller-Guard-Trace] [EVICTION REJECTED] Controller '%s' hardware disconnection blocked! Active sibling dependency count: %d. Blocker details: [%s]", 
 			ctrlName, otherActiveNamespaces, strings.Join(rejectionDetails, " | "))
-		return nil // Safe exit; protects the remaining active paths from friendly-fire dropouts
+		return nil 
 	}
 
-	// 3. ABSOLUTE EXCLUSIVITY VERIFIED: Safe to trigger deletion
+	// 3. ABSOLUTE EXCLUSIVITY VERIFIED
 	logger.Infof("[Controller-Guard-Trace] [EVICTION APPROVED] Absolute exclusivity confirmed for controller '%s' (0 other active namespaces found). Issuing delete_controller payload command.", ctrlName)
 	deletePath := filepath.Join(ctrlSysPath, "delete_controller")
 	
