@@ -1,6 +1,7 @@
 package executer
 
 import (
+	"github.com/ibm/ibm-block-csi-driver/node/logger"
 	"github.com/ibm/ibm-block-csi-driver/node/goid_info"
 	"context"
 	"errors"
@@ -330,12 +331,6 @@ type BatchResult[T any] struct {
 	Index int
 	Data  T
 	Err   error
-}
-
-// Result tracks the inner channel worker payload.
-type Result[T any] struct {
-	Data T
-	Err  error
 }
 
 func ExecuteUninterruptibleBatch[Param any, T any](
