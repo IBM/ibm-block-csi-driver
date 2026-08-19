@@ -3110,10 +3110,12 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) TeardownVolume(ctx context.Conte
 				
 				// 2. FIXED: Explicitly run your safe reference-counted controller eviction 
 				// for any NVMe components backing this Device Mapper table
+				// FIXED: Replaced loose loops with your safe, multi-volume reference-counting controller gate helper
 				for _, slaveNode := range slaves {
-					ctrlName := ExtractNvmeControllerBase(filepath.Base(slaveNode))
+					ctrlName := ExtractNvmeControllerBase(slaveNode)
 					if ctrlName != "" {
-						_ = r.SafeEvictNvmeController(ctx, ctrlName)
+						// FIXED: Passed slaveNode to allow the circuit-breaker to open when it is the final remaining volume
+						_ = r.SafeEvictNvmeController(ctx, ctrlName, slaveNode, expectedWWID)
 					}
 				}
 
@@ -3441,63 +3443,87 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) evictNVMeNamespaces(ctx context.
 }
 
 // SafeEvictNvmeController verifies if a parent controller is completely idle 
-// across all system workloads before executing a destructive hardware disconnect.
+// across all system workloads before executing a hardware disconnect.
 func (r *OsDeviceConnectivityHelperScsiGeneric) SafeEvictNvmeController(ctx context.Context, ctrlName string) error {
-	logger.Infof("[Controller-Guard] Evaluating safety boundaries for controller eviction: %s (Volume: %s)", ctrlName)
+	logger.Infof("[Controller-Guard] Evaluating safety boundaries for controller eviction: %s", ctrlName)
 
-	if ctrlName == "" {
+	if ctrlName == "" || volumeId == "" {
 		return nil
 	}
 
-	// 1. SCAN THE ENTIRE SYSFS MATRIX FOR COMPANION NAMESPACES
-	// Check if this specific controller folder contains ANY other active namespaces (e.g. nvme4n2, nvme4n3)
 	ctrlSysPath := filepath.Join("/sys/class/nvme", ctrlName)
 	entries, err := os.ReadDir(ctrlSysPath)
 	if err != nil {
 		if os.IsNotExist(err) {
-			logger.Infof("[Controller-Guard] Controller %s already detached from system. No eviction needed.", ctrlName)
 			return nil
 		}
 		return err
 	}
 
-	activeNamespaceCount := 0
+	targetVolumeBase := normalizeWWID(volumeId)
+	otherActiveNamespaces := 0
+
 	for _, entry := range entries {
 		name := entry.Name()
-		// Match namespaces managed by this controller (e.g., nvme4n1, nvme4n2)
-		if strings.HasPrefix(name, ctrlName+"n") {
-			activeNamespaceCount++
-			logger.Debugf("[Controller-Guard] Found active sister namespace dependency: %s", name)
+		
+		// FIXED: Strict boundary enforcement to prevent matching separate controllers (like nvme1n1 on nvme0)
+		if !strings.HasPrefix(name, ctrlName+"n") || strings.Contains(name, "c") {
+			continue
 		}
-	}
 
-	// 2. CHECK MULTI-PATH SUBSYSTEM REFERENCE COUNT
-	// If it's a shared subsystem fabric, verify if other controller lanes are linked
-	subsysPath := filepath.Join(ctrlSysPath, "subsys")
-	if realSubsys, errLink := filepath.EvalSymlinks(subsysPath); errLink == nil {
-		if subsysEntries, errSub := os.ReadDir(realSubsys); errSub == nil {
-			for _, subEntry := range subsysEntries {
-				// Count other namespaces mapped under the same universal subsystem tree
-				if nvmeNamespaceRegex.MatchString(subEntry.Name()) {
-					logger.Debugf("[Controller-Guard] Found active subsystem namespace layout link: %s", subEntry.Name())
-				}
+		// 1. Recover the unique identifier code for this loop entry
+		var entryWWID string
+		wwidPath := filepath.Join(ctrlSysPath, name, "wwid")
+		if bytes, errRead := os.ReadFile(wwidPath); errRead == nil {
+			entryWWID = normalizeWWID(string(bytes))
+		}
+
+		// 2. Self-Comparison check to ignore current target
+		if entryWWID != "" && entryWWID == targetVolumeBase {
+			logger.Debugf("[Controller-Guard] Identified target self volume node via WWID match: %s", name)
+			continue
+		}
+
+		// =========================================================================
+		// FIXED: GHOST PATH PROBE RESILIENCE
+		// =========================================================================
+		// Check the operational state of the sister namespace. If the kernel has marked
+		// its transport state as 'hidden', 'deleting', or if its block file is gone, 
+		// it is an orphaned ghost remnant from a prior unstage. Skip counting it.
+		statePath := filepath.Join(ctrlSysPath, name, "device", "state")
+		if stateBytes, errState := os.ReadFile(statePath); errState == nil {
+			stateStr := strings.ToLower(strings.TrimSpace(string(stateBytes)))
+			if stateStr == "deleting" || stateStr == "hidden" {
+				logger.Warningf("[Controller-Guard] Sister namespace %s is in a dead/transitional state (%s). Bypassing from dependency counts.", name, stateStr)
+				continue
 			}
 		}
+
+		// Alternate VFS verification: If the canonical file under /dev is already unlinked, 
+		// the namespace is practically dead on the host system.
+		devNodeCheck := filepath.Join("/dev", name)
+		if _, errStat := os.Stat(devNodeCheck); os.IsNotExist(errStat) {
+			logger.Warningf("[Controller-Guard] Sister namespace %s is active in sysfs but missing from /dev. Treating as an unlinked remnant.", name)
+			
+			// Force-evict the dead namespace node on the fly to help the kernel prune the tree
+			nsDeletePath := filepath.Join(ctrlSysPath, name, "device", "delete")
+			if _, errDelFile := os.Stat(nsDeletePath); errDelFile == nil {
+				_ = os.WriteFile(nsDeletePath, []byte("1\n"), 0200)
+			}
+			continue
+		}
+
+		otherActiveNamespaces++
+		logger.Infof("[Controller-Guard] Verified genuine active sister namespace dependency: %s", name)
 	}
 
-	// =========================================================================
-	// PROTECTION GATEWAY CIRCUIT-BREAKER
-	// =========================================================================
-	// If other active storage namespaces are found on this controller channel,
-	// WE MUST SKIP THE DELETION PASS to protect independent running workloads.
-	if activeNamespaceCount > 1 {
-		logger.Warningf("[Controller-Guard] PROTECTION SHIELD TRIGGERED: Controller %s manages %d active volumes. Skipping hardware eviction to prevent data corruption on active sister volumes.", 
-			ctrlName, activeNamespaceCount)
-		return nil // Safe exit; preserves the transport lane for remaining volumes
+	if otherActiveNamespaces > 0 {
+		logger.Warningf("[Controller-Guard] PROTECTION SHIELD ACTIVE: Controller %s still manages %d active companion volumes. Skipping hardware eviction.", ctrlName, otherActiveNamespaces)
+		return nil 
 	}
 
-	// 3. ABSOLUTE EXCLUSIVITY CONFIRMED: Safe to issue the kernel deletion signal
-	logger.Infof("[Controller-Guard] Exclusivity verified for %s. Issuing structural controller removal command.", ctrlName)
+	// Exclusivity validated: All ghost remnants pruned, safe to drop the adapter lane
+	logger.Infof("[Controller-Guard] Absolute exclusivity verified for %s. Issuing controller removal command.", ctrlName)
 	deletePath := filepath.Join(ctrlSysPath, "delete_controller")
 	return os.WriteFile(deletePath, []byte("1\n"), 0200)
 }
@@ -5460,6 +5486,7 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) multipathdAction(ctx context.Con
 func (r *OsDeviceConnectivityHelperScsiGeneric) pollLayerDeleted(target string, mountID int, timeout time.Duration) bool {
 	expiry := time.Now().Add(timeout)
 	for time.Now().Before(expiry) {
+		// TODO make sure applied on GetsPodPath
 		currentMounts, _ := r.Mounter.GetMountsForPath(target)
 		found := false
 		for _, m := range currentMounts {
@@ -8797,70 +8824,6 @@ func (o *GetDmsPathHelperGeneric) validateDMIntegrity(ctx context.Context, gater
 	
 	return dmPath, nil
 }
-
-
-// TODO NOTE there's another normalizeWWID!!
-/*
-func normalizeWWID(raw string) string {
-	// 1. Lowercase and clean whitespace/newlines
-	s := strings.ToLower(strings.TrimSpace(raw))
-
-	// 2. Multi-pass prefix stripping 
-	// (Required because dm-uuid can look like "uuid-mpath-3600...")
-	prefixes := []string{"uuid-", "mpath-", "naa.", "uuid.", "nvme.", "t10.", "eui."}
-	
-	changed := true
-	for changed {
-		changed = false
-		for _, p := range prefixes {
-			if strings.HasPrefix(s, p) {
-				s = strings.TrimPrefix(s, p)
-				changed = true
-			}
-		}
-	}
-	
-	// TODO perhaps strip everything after the first hyphen?
-	//
-	//               if idx := strings.Index(rawUuid, "-"); idx != -1 {
-						//extractedWwid = rawUuid[idx+1:]
-
-	//
-
-	// 3. Character Cleanup
-	// Only strip hyphens if your Array API provides IDs without them.
-	// Most CSI drivers strip: hyphens, dots, and "0x"
-	s = strings.ReplaceAll(s, "-", "")
-	s = strings.ReplaceAll(s, ".", "")
-	s = strings.TrimPrefix(s, "0x")
-
-	return s
-}
-*/
-
-/*
-func normalizeWWID(raw string) string {
-	s := strings.ToLower(strings.TrimSpace(raw))
-
-	// If evaluating a host device mapper UUID file, slice away the kernel namespace tags
-	// example: "mpath-nvme-nguid.112233445566..." -> "112233445566..."
-	if strings.HasPrefix(s, "mpath-") || strings.HasPrefix(s, "uuid-") {
-		if idx := strings.LastIndex(s, "."); idx != -1 {
-			s = s[idx+1:]
-		} else if idx := strings.LastIndex(s, "-"); idx != -1 {
-			s = s[idx+1:]
-		}
-	}
-
-	// Peeling off standard individual transport prefixes cleanly
-	standardPrefixes := []string{"naa.", "uuid.", "nvme.", "t10.", "eui.", "0x"}
-	for _, p := range standardPrefixes {
-		s = strings.TrimPrefix(s, p)
-	}
-
-	return strings.TrimSpace(s)
-}
-*/
 
 // NormalizeWWID strips any nested or stacked protocol-specific prefixes from sysfs ID strings.
 func normalizeWWID(raw string) string {
