@@ -2999,8 +2999,8 @@ PROCESS_PAGE_0x83:
 // sHardwareBlocked, also check for the quiesce state. It often indicates a storage controller failover where I/O is paused but not failed.
 
 
-// TeardownVolume unmounts volumes, flushes buffers, and ejects backing physical lanes concurrently.
-// Production-Hardened: Handles explicit multi-path transport splits and ensures error-free native execution tracks.
+/// TeardownVolume unmounts volumes, flushes buffers, and ejects backing physical lanes concurrently.
+// Production-Hardened: Symmetrically aligns 4-argument tracking criteria to eliminate ghost controller leaks.
 func (r *OsDeviceConnectivityHelperScsiGeneric) TeardownVolume(ctx context.Context, target string, expectedWWID string) error {
 	if err := ctx.Err(); err != nil {
 		return err
@@ -3123,21 +3123,20 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) TeardownVolume(ctx context.Conte
 					_ = r.RemovePhysicalDevice(ctx, scsiSlaves)
 				}
 				
-				// 2. FIXED: Explicitly run your safe reference-counted controller eviction 
-				// for any NVMe components backing this Device Mapper table
-				// FIXED: Forwarded the individual namespace string (nvmeSlave) to meet your signature contract exactly
+				// 2. FIXED: Aligned caller to pass exactly 4 arguments to meet the new signature:
+				// (ctx, ctrlName, currentNamespace, volumeId)
 				if len(nvmeSlaves) > 0 {
 					logger.Infof("[Teardown-Main] [%s] Dispatched NVMe slave tracking nodes to reference-counted controller gates: %v", mpathName, nvmeSlaves)
 					for _, nvmeSlave := range nvmeSlaves {
 						ctrlName := ExtractNvmeControllerBase(nvmeSlave)
 						if ctrlName != "" {
-							_ = r.SafeEvictNvmeController(ctx, ctrlName, nvmeSlave)
+							_ = r.SafeEvictNvmeController(ctx, ctrlName, nvmeSlave, expectedWWID)
 						}
 					}
 				}
 
 				// 3. Clear remaining descriptor files and reset tracking variables
-				r.cleanNVMeNamespacesFromSlaves(ctx, slaves)
+				r.cleanNVMeNamespacesFromSlaves(ctx, slaves, expectedWWID)
 				needRemovePhysical = false 
 			} else {
 				logger.Infof("[Teardown-Main] [%s] Step 2/2: Slaves empty. Sweeping dual-protocol parameters...", mpathName)
@@ -3164,35 +3163,36 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) TeardownVolume(ctx context.Conte
 
 		logger.Infof("[Teardown-Main] Evicting native NVMe path lanes safely: %v", slaves)
 		
-		// FIXED: Forwarded the individual namespace string (slaveNode) to meet your signature contract exactly
+		// FIXED: Aligned caller to pass exactly 4 arguments to meet the new signature:
+		// (ctx, ctrlName, currentNamespace, volumeId)
 		for _, slaveNode := range slaves {
 			ctrlName := ExtractNvmeControllerBase(slaveNode)
 			if ctrlName != "" {
-				_ = r.SafeEvictNvmeController(ctx, ctrlName, slaveNode)
+				_ = r.SafeEvictNvmeController(ctx, ctrlName, slaveNode, expectedWWID)
 			}
 		}
 		
 		// Flush remaining descriptors and clear state variables natively
-		r.cleanNVMeNamespacesFromSlaves(ctx, slaves)
+		r.cleanNVMeNamespacesFromSlaves(ctx, slaves, expectedWWID)
 		needRemovePhysical = false
 	}
 	
-	// --- PHASE 4: IDEMPOTENCY SAFETY ANCHORS ---
-	if mpathName == "" && (needFlush || needRemovePhysical) && expectedWWID != "" {
-		stillMounted, errCheck := r.Mounter.IsMounted(target)
-		if errCheck == nil && !stillMounted {
-			logger.Warningf("[Teardown-Main] Volume target %s is already unmounted and mpath device for WWID %s cannot be resolved. Assuming previous unstage completed successfully.", target, expectedWWID)
-			return nil 
-		}
-		return fmt.Errorf("teardown: unable to resolve backing block architecture targets for WWID %s; halting execution to protect system paths", expectedWWID)
-	}
+   // --- PHASE 4: IDEMPOTENCY SAFETY ANCHORS ---
+   if mpathName == "" && (needFlush || needRemovePhysical) && expectedWWID != "" {
+		   stillMounted, errCheck := r.Mounter.IsMounted(target)
+		   if errCheck == nil && !stillMounted {
+				   logger.Warningf("[Teardown-Main] Volume target %s is already unmounted and mpath device for WWID %s cannot be resolved. Assuming previous unstage completed successfully.", target, expectedWWID)
+				   return nil
+		   }
+		   return fmt.Errorf("teardown: unable to resolve backing block architecture targets for WWID %s; halting execution to protect system paths", expectedWWID)
+   }
 
-	if needRemovePhysical && expectedWWID != "" {
-		logger.Infof("[Teardown-Main] Executing global fallback sweep for WWID: %s", expectedWWID)
-		_ = r.purgeStuckPhysicalPathsDualProtocol(ctx, rawScsiTarget, rawNvmeTarget)
-	}			
+   if needRemovePhysical && expectedWWID != "" {
+		   logger.Infof("[Teardown-Main] Executing global fallback sweep for WWID: %s", expectedWWID)
+		   _ = r.purgeStuckPhysicalPathsDualProtocol(ctx, rawScsiTarget, rawNvmeTarget)
+   }
 
-	return nil
+   return nil
 }
 
 func (r *OsDeviceConnectivityHelperScsiGeneric) collectInformationForTeardown(ctx context.Context, target string, expectedWWID string) (mpathName string, hardwareResolved bool, isNativeNVMe bool, major uint32, minor uint32, isMounted bool, needFlush bool, needRemovePhysical bool, isDeviceMapperTarget bool) {
@@ -3390,7 +3390,7 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) flushDMBuffers(ctx context.Conte
 
 // evictOrCleanNvmeNamespaces executes systematic parallel sysfs eviction on NVMe namespace paths.
 // Hardened: Formats and maps parameters symmetrically to fulfill the required 3-argument guard loop contract.
-func (r *OsDeviceConnectivityHelperScsiGeneric) evictOrCleanNvmeNamespaces(ctx context.Context, devices []string, actionLabel string) {
+func (r *OsDeviceConnectivityHelperScsiGeneric) evictOrCleanNvmeNamespaces(ctx context.Context, devices []string, actionLabel string, volId string) {
 	if err := ctx.Err(); err != nil {
 		return
 	}
@@ -3439,9 +3439,7 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) evictOrCleanNvmeNamespaces(ctx c
 			}
 
 			if ctrlName != "" {
-				// FIXED: Extracted 'base' (the standalone namespace filename token) and forwarded it 
-				// straight as the required 'currentNamespace' argument to fulfill your signature layout.
-				_ = r.SafeEvictNvmeController(wCtx, ctrlName, base)
+				_ = r.SafeEvictNvmeController(wCtx, ctrlName, base, volId)
 			}
 			return struct{}{}, nil
 		},
@@ -3449,24 +3447,25 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) evictOrCleanNvmeNamespaces(ctx c
 }
 
 // cleanNVMeNamespacesFromSlaves routes to unified NVMe management.
-func (r *OsDeviceConnectivityHelperScsiGeneric) cleanNVMeNamespacesFromSlaves(ctx context.Context, devices []string) {
-	r.evictOrCleanNvmeNamespaces(ctx, devices, "clean-slaves")
+func (r *OsDeviceConnectivityHelperScsiGeneric) cleanNVMeNamespacesFromSlaves(ctx context.Context, devices []string, volId string) {
+	r.evictOrCleanNvmeNamespaces(ctx, devices, "clean-slaves", volId)
 }
 
 
 // evictNVMeNamespaces routes to unified NVMe management.
-func (r *OsDeviceConnectivityHelperScsiGeneric) evictNVMeNamespaces(ctx context.Context, devices []string) {
-	r.evictOrCleanNvmeNamespaces(ctx, devices, "evict-ns")
+func (r *OsDeviceConnectivityHelperScsiGeneric) evictNVMeNamespaces(ctx context.Context, devices []string, volId string) {
+	r.evictOrCleanNvmeNamespaces(ctx, devices, "evict-ns", volId)
 }
 
 // SafeEvictNvmeController verifies if a parent controller is completely idle 
 // across all other system workloads before executing a hardware disconnect.
-// Hardened: Leverages explicit string self-exclusion checks to bypass udev race conditions.
-func (r *OsDeviceConnectivityHelperScsiGeneric) SafeEvictNvmeController(ctx context.Context, ctrlName string, currentNamespace string) error {
-	logger.Infof("[Controller-Guard] Evaluating safety boundaries for controller eviction: %s (Target Namespace: %s)", ctrlName, currentNamespace)
+// Hardened: Features granular line-by-line tracing for every verification gate to pinpoint rejections.
+func (r *OsDeviceConnectivityHelperScsiGeneric) SafeEvictNvmeController(ctx context.Context, ctrlName string, currentNamespace string, volumeId string) error {
+	logger.Infof("[Controller-Guard-Trace] >>> Entering Guard Pipeline for Controller: '%s' | Target Namespace Parameter: '%s' | Volume ID Context: '%s'", 
+		ctrlName, currentNamespace, volumeId)
 
-	if ctrlName == "" || currentNamespace == "" {
-		logger.Warningf("[Controller-Guard] Missing tracking criteria context. Skipping eviction safety gate to prevent corruption.")
+	if ctrlName == "" || volumeId == "" {
+		logger.Warningf("[Controller-Guard-Trace] [REJECTED] Aborting scan due to missing critical context fields (ctrlName='%s', volumeId='%s')", ctrlName, volumeId)
 		return nil
 	}
 
@@ -3474,81 +3473,125 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) SafeEvictNvmeController(ctx cont
 	entries, err := os.ReadDir(ctrlSysPath)
 	if err != nil {
 		if os.IsNotExist(err) {
-			logger.Infof("[Controller-Guard] Controller %s already detached from system. No eviction needed.", ctrlName)
+			logger.Infof("[Controller-Guard-Trace] [PASSTHRU] Target controller directory %s already missing from VFS layer. Eviction complete.", ctrlSysPath)
 			return nil
 		}
+		logger.Errorf("[Controller-Guard-Trace] [REJECTED] Critical error traversing controller directory %s: %v", ctrlSysPath, err)
 		return err
 	}
 
-	// Clean the target namespace string to handle full paths or relative tokens cleanly
+	// 1. GENERATE DUAL-PROTOCOL TARGET CONFIGURATIONS FOR MATCHING BOUNDARIES
+	cleanScsiTarget := normalizeWWID(volumeId)
+	cleanNvmeTarget := convertScsiIdToNguid(cleanScsiTarget)
 	targetNamespaceBase := filepath.Base(currentNamespace)
+	
+	logger.Infof("[Controller-Guard-Trace] Normalized Target Matching Footprints: scsiMatchTarget='%s' | nvmeNguidTarget='%s' | targetNamespaceBase='%s'", 
+		cleanScsiTarget, cleanNvmeTarget, targetNamespaceBase)
+
 	otherActiveNamespaces := 0
+	var rejectionDetails []string
 
 	for _, entry := range entries {
-		name := entry.Name() // e.g., "nvme0n1", "nvme0n2"
+		name := entry.Name() // e.g., "nvme1n1", "nvme1n2", "state", "delete_controller"
 		
-		logger.Debugf("[Controller-Guard] Evaluate %s", name)
-		
-		// Filter out sub-controllers and isolate pure namespace character folders
+		// Boundary enforcement: Filter out non-namespace control files or cross-controller mappings
 		if !strings.HasPrefix(name, ctrlName+"n") || strings.Contains(name, "c") {
+			logger.Debugf("[Controller-Guard-Trace] [SKIP-ENTRY] Skipping non-namespace configuration file node: '%s'", name)
 			continue
 		}
 
-		// =========================================================================
-		// FIXED: DIRECT EXPLICIT SELF-COMPARISON GUARD
-		// =========================================================================
-		// If this entry matches our active volume namespace parameter context, it is SELF.
-		// Skip incrementing the counter so we don't block our own hardware deletion.
-		if name == targetNamespaceBase {
-			logger.Debugf("[Controller-Guard] Identified target self volume node (skipping from share count): %s", name)
-			continue
+		logger.Infof("[Controller-Guard-Trace] [EVALUATING NODE] Inspecting block path candidate: '%s'", name)
+
+		// 2. HARDWARE IDENTITY EXTRACTION: Read the immutable unique array ID for this path entry
+		var entryWWID string
+		wwidPath := filepath.Join(ctrlSysPath, name, "wwid")
+		if bytes, errRead := os.ReadFile(wwidPath); errError == nil {
+			entryWWID = normalizeWWID(string(bytes))
+			logger.Infof("[Controller-Guard-Trace] ['%s'] Read sysfs unique hardware identity string: '%s'", name, entryWWID)
+		} else {
+			logger.Warningf("[Controller-Guard-Trace] ['%s'] Unable to access wwid file at %s: %v", name, wwidPath, errRead)
 		}
 
 		// =========================================================================
-		// FIXED: GHOST PATH PROBE RESILIENCE
+		// DUAL-PROTOCOL SELF-COMPARISON VERIFICATION MATRIX
 		// =========================================================================
-		// Check the operational state of the sister namespace. If the kernel has marked
-		// its transport state as 'hidden', 'deleting', or if its block file is gone, 
-		// it is an orphaned ghost remnant from a prior unstage. Skip counting it.
-		statePath := filepath.Join(ctrlSysPath, name, "device", "state")
-		if stateBytes, errState := os.ReadFile(statePath); errState == nil {
-			stateStr := strings.ToLower(strings.TrimSpace(string(stateBytes)))
-			if stateStr == "deleting" || stateStr == "hidden" {
-				logger.Warningf("[Controller-Guard] Sister namespace %s is in a dead/transitional state (%s). Bypassing from dependency counts.", name, stateStr)
-				continue
+		isSelf := false
+		var matchReason string
+
+		if entryWWID != "" {
+			if entryWWID == cleanScsiTarget {
+				isSelf = true
+				matchReason = fmt.Sprintf("sysfs identity matched cleanScsiTarget ('%s')", cleanScsiTarget)
+			} else if entryWWID == cleanNvmeTarget {
+				isSelf = true
+				matchReason = fmt.Sprintf("sysfs identity matched nvmeNguidTarget ('%s')", cleanNvmeTarget)
 			}
 		}
 
-		// Alternate VFS verification: If the canonical file under /dev is already unlinked, 
-		// the namespace is practically dead on the host system.
+		if !isSelf && name == targetNamespaceBase {
+			isSelf = true
+			matchReason = fmt.Sprintf("base node filename matched targetNamespaceBase string template ('%s')", targetNamespaceBase)
+		}
+
+		if isSelf {
+			logger.Infof("[Controller-Guard-Trace] [SELF IDENTIFIED] Namespace '%s' is verified as SELF. Reason: %s. Removing from sister dependency count.", name, matchReason)
+			continue
+		}
+
+		// =========================================================================
+		// GHOST PATH PROBE RESILIENCE
+		// =========================================================================
 		devNodeCheck := filepath.Join("/dev", name)
 		if _, errStat := os.Stat(devNodeCheck); os.IsNotExist(errStat) {
-			logger.Warningf("[Controller-Guard] Sister namespace %s is active in sysfs but missing from /dev. Treating as an unlinked remnant.", name)
+			logger.Warningf("[Controller-Guard-Trace] [GHOST PATH HIT] Namespace '%s' exists in sysfs but its character file '%s' is missing from /dev. Treating as an unlinked remnant.", name, devNodeCheck)
 			
 			nsDeletePath := filepath.Join(ctrlSysPath, name, "device", "delete")
 			if _, errDelFile := os.Stat(nsDeletePath); errDelFile == nil {
+				logger.Infof("[Controller-Guard-Trace] ['%s'] Injecting eviction token '1' on ghost track path: %s", name, nsDeletePath)
 				_ = os.WriteFile(nsDeletePath, []byte("1\n"), 0200)
 			}
 			continue
 		}
 
+		// Secondary state probe
+		statePath := filepath.Join(ctrlSysPath, name, "device", "state")
+		if stateBytes, errState := os.ReadFile(statePath); errState == nil {
+			stateStr := strings.ToLower(strings.TrimSpace(string(stateBytes)))
+			if stateStr == "deleting" || stateStr == "hidden" {
+				logger.Warningf("[Controller-Guard-Trace] [GHOST PATH HIT] Namespace '%s' belongs to a dying/hidden kernel transport state ('%s'). Bypassing count.", name, stateStr)
+				continue
+			}
+		}
+
+		// =========================================================================
+		// GENUINE SISTER DEPENDENCY CONFIRMED (The Deletion Blocker)
+		// =========================================================================
 		otherActiveNamespaces++
-		logger.Infof("[Controller-Guard] Verified genuine active sister namespace dependency: %s", name)
+		blockerMsg := fmt.Sprintf("Namespace: '%s' (sysfs_id: '%s', cleanScsiTarget: '%s', nvmeNguidTarget: '%s')", name, entryWWID, cleanScsiTarget, cleanNvmeTarget)
+		rejectionDetails = append(rejectionDetails, blockerMsg)
+		logger.Warningf("[Controller-Guard-Trace] [BLOCKER DETECTED] Namespace '%s' evaluated as a genuine active sibling volume. Incrementing layout constraint counter. Current Count = %d", name, otherActiveNamespaces)
 	}
 
 	// =========================================================================
-	// PROTECTION GATEWAY CIRCUIT-BREAKER
+	// PROTECTION GATEWAY CIRCUIT-BREAKER EVALUATION
 	// =========================================================================
 	if otherActiveNamespaces > 0 {
-		logger.Warningf("[Controller-Guard] PROTECTION SHIELD ACTIVE: Controller %s manages %d other active volumes. Skipping hardware eviction to protect sister storage tracks.", 
-			ctrlName, otherActiveNamespaces)
-		return nil // Safe exit; preserves the transport lane for remaining volumes
+		logger.Warningf("[Controller-Guard-Trace] [EVICTION REJECTED] Controller '%s' hardware disconnection blocked! Active sibling dependency count: %d. Blocker details: [%s]", 
+			ctrlName, otherActiveNamespaces, strings.Join(rejectionDetails, " | "))
+		return nil // Safe exit; protects the remaining active paths from friendly-fire dropouts
 	}
 
-	// Absolute exclusivity confirmed: Safe to issue the kernel deletion signal
-	logger.Infof("[Controller-Guard] Exclusivity verified for %s (0 other active namespaces found). Issuing structural controller removal command.", ctrlName)
+	// 3. ABSOLUTE EXCLUSIVITY VERIFIED: Safe to trigger deletion
+	logger.Infof("[Controller-Guard-Trace] [EVICTION APPROVED] Absolute exclusivity confirmed for controller '%s' (0 other active namespaces found). Issuing delete_controller payload command.", ctrlName)
 	deletePath := filepath.Join(ctrlSysPath, "delete_controller")
-	return os.WriteFile(deletePath, []byte("1\n"), 0200)
+	
+	if errWrite := os.WriteFile(deletePath, []byte("1\n"), 0200); errWrite != nil {
+		logger.Errorf("[Controller-Guard-Trace] Fatal: Failed to write eviction payload token to %s: %v", deletePath, errWrite)
+		return fmt.Errorf("eviction: system write failure on %s: %w", deletePath, errWrite)
+	}
+
+	logger.Infof("[Controller-Guard-Trace] >>> Success! Controller '%s' has been forcefully evicted from the host adapter bus.", ctrlName)
+	return nil
 }
 
 // FindSlavesByWWID safely scans the host block layer in parallel to aggregate all physical path lanes matching the volume identifier.
