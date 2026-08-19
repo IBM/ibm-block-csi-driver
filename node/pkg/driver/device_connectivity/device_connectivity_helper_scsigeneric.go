@@ -654,7 +654,7 @@ func (o OsDeviceConnectivityHelperGeneric) GetMpathVolumeId(mpathdOutput string,
 }
 
 func (o OsDeviceConnectivityHelperGeneric) GetWwnByScsiInq(dev string) (string, error) {
-	/* scsi inq example
+	/* scsi inq example (standard output, e.g. RHEL/Ubuntu)
 	$> sg_inq -p 0x83 /dev/mapper/mpathhe
 		VPD INQUIRY: Device Identification page
 		  Designation descriptor number 1, descriptor length: 20
@@ -685,6 +685,13 @@ func (o OsDeviceConnectivityHelperGeneric) GetWwnByScsiInq(dev string) (string, 
 			designator_type: Relative target port,  code_set: Binary
 			associated with the target port
 			  Relative target port: 0xd22
+
+	On some OS variants (e.g. SUSE), sg_inq -p 0x83 outputs raw hex bytes instead
+	of the parsed text format above. In that case we fall back to sg_inq -i which
+	always prints a human-readable identification page, e.g.:
+	$> sg_inq -i /dev/dm-0
+		VPD INQUIRY: Device Identification page
+		  [0x6005076810840239d000000000007f8d]
 	*/
 	sgInqCmd := "sg_inq"
 
@@ -734,7 +741,24 @@ func (o OsDeviceConnectivityHelperGeneric) GetWwnByScsiInq(dev string) (string, 
 			// its one line after "Vendor Specific Identifier Extension:" line which should contain the WWN
 			continue
 		}
+	}
 
+	// Fallback for OS variants (e.g. SUSE) where sg_inq -p 0x83 emits raw hex
+	// bytes instead of parsed text. sg_inq -i always outputs a human-readable
+	// identification page that contains the NAA WWN as [0x<wwn>].
+	logger.Debugf("sg_inq -p 0x83 did not return expected text output for %s, retrying with sg_inq -i", dev)
+	args = []string{"-i", dev}
+	outputBytes, err = o.Executer.ExecuteWithTimeout(TimeOutSgInqCmd, sgInqCmd, args)
+	if err != nil {
+		return "", err
+	}
+	for _, line := range strings.Split(string(outputBytes), "\n") {
+		matches := wwnRegexCompiled.FindStringSubmatch(line)
+		if len(matches) == 2 {
+			wwn = matches[1]
+			logger.Debugf("Found wwn [%s] in sg_inq -i output", wwn)
+			return wwn, nil
+		}
 	}
 	return "", &MultipathDeviceNotFoundForVolumeError{wwn}
 }
@@ -806,7 +830,11 @@ func (o OsDeviceConnectivityHelperGeneric) IsAnyVariationInMpathVolumeId(mpathVo
 }
 
 func (o OsDeviceConnectivityHelperGeneric) IsDmName(mpathDeviceName string) bool {
-	return strings.Contains(mpathDeviceName, "mpath")
+	// A device is a "named" multipath entry (uses %n in multipathd) when it has
+	// an alias set — either the classic "mpathXX" form or any other name including
+	// raw WWNs (e.g. "36005076810840239d00000000000d6bd") as set by SUSE.
+	// The only case that is NOT a named entry is a bare kernel dm device "dm-N".
+	return !strings.HasPrefix(mpathDeviceName, "dm-")
 }
 
 //go:generate mockgen -destination=../../../mocks/mock_GetDmsPathHelperInterface.go -package=mocks github.com/ibm/ibm-block-csi-driver/node/pkg/driver/device_connectivity GetDmsPathHelperInterface
