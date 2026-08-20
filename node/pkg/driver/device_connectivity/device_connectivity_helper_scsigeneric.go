@@ -3098,8 +3098,7 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) TeardownVolume(ctx context.Conte
 				anyControllerPreserved := r.removeControllersOfSlaves(ctx, nvmeSlaves, mpathName, expectedWWID)
 
 				if anyControllerPreserved {
-					logger.Warningf("[Teardown-Main] [%s] Controllers preserved due to active sister volumes. Executing multi-volume dual-protocol fallback path purge.", mpathName)
-					_ = r.purgeStuckPhysicalPathsDualProtocol(ctx, rawScsiTarget, rawNvmeTarget)
+					logger.Infof("[Teardown-Main] [%s] Shared parent adapters safely preserved to maintain active sister volume transport lines.", mpathName)
 				} else {
 					logger.Infof("[Teardown-Main] [%s] All parent controllers successfully evicted from system bus.", mpathName)
 				}
@@ -3129,8 +3128,7 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) TeardownVolume(ctx context.Conte
 		anyControllerPreserved := r.removeControllersOfSlaves(ctx, slaves, mpathName, expectedWWID)
 
 		if anyControllerPreserved {
-			logger.Warningf("[Teardown-Main] [%s] Native controllers preserved due to active sister volumes. Executing multi-volume dual-protocol fallback path purge.", mpathName)
-			_ = r.purgeStuckPhysicalPathsDualProtocol(ctx, rawScsiTarget, rawNvmeTarget)
+			logger.Infof("[Teardown-Main] [%s] Shared parent adapters safely preserved to maintain active sister volume transport lines.", mpathName)
 		} else {
 			if len(slaves) > 0 {
 				logger.Infof("[Teardown-Main] [%s] Executing secondary namespace pruning verification...", mpathName)
@@ -5311,7 +5309,7 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) getDeletePath(wCtx context.Conte
 	if isSCSI {
 		deletePath = filepath.Join("/sys/block", devName, "device", "delete")
 	} else if isNVMe {
-		// FIXED: Check direct raw block endpoint for standard bare-metal structures
+		// Target standard direct namespace block delete targets if they exist
 		deletePath = filepath.Join("/sys/block", baseBlockName, "delete")
 		if _, errStat := os.Stat(deletePath); os.IsNotExist(errStat) {
 			deletePath = filepath.Join("/sys/block", baseBlockName, "device", "delete")
@@ -5320,19 +5318,12 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) getDeletePath(wCtx context.Conte
 			deletePath = filepath.Join(targetSysDir, "delete")
 		}
 
-		// FIXED: If individual namespace deletion switches are entirely absent (universal Linux behavior 
-		// for NVMe-oF shared paths), fall back safely to the parent controller's delete_controller switch.
-		// This replaces the unsafe PCI unbind nuclear option that drops sibling volumes.
+		// FIXED: If individual namespace deletes are missing (universal Linux behavior for shared NVMe-oF paths),
+		// we MUST return an empty deletePath here if sibling volumes are active. 
+		// We do NOT fall back to delete_controller here because doing so breaks concurrent companion volume teardowns.
 		if _, errStat := os.Stat(deletePath); os.IsNotExist(errStat) {
-			ctrlName := ExtractNvmeControllerBase(baseBlockName) // E.g., extracts "nvme0"
-			if ctrlName != "" {
-				ctrlDeleteRegister := filepath.Join("/sys/class/nvme", ctrlName, "delete_controller")
-				if _, errCtrl := os.Stat(ctrlDeleteRegister); errCtrl == nil {
-					logger.Infof("[Purge-Paths] [%s] Individual namespace delete unavailable. Mapping to parent fabric controller disconnect switch: %s", devName, ctrlDeleteRegister)
-					deletePath = ctrlDeleteRegister
-					useUnbindStrategy = false // Force standard "1\n" write token path execution trajectory
-				}
-			}
+			logger.Debugf("[Purge-Paths] [%s] Individual namespace delete unavailable on this kernel. Leaving controllers active to protect sibling stability.", devName)
+			return "", "", false // Bypasses physical write, allows DM layer to handle unlinking cleanly
 		}
 	}
 	return deletePath, pciAddress, useUnbindStrategy
