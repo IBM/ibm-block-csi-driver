@@ -24,12 +24,34 @@ class HostDefinitionWatcher(Watcher):
         for watch_event in stream:
             watch_event = self._munch(watch_event)
             host_definition_info = self._generate_host_definition_info(watch_event.object)
-            if self._is_host_definition_in_pending_phase(host_definition_info.phase) and \
+            if watch_event.type == settings.MODIFIED_EVENT and \
+                    self._is_host_definition_being_deleted(watch_event.object):
+                self._handle_user_deletion(host_definition_info)
+            elif self._is_host_definition_in_pending_phase(host_definition_info.phase) and \
                     watch_event.type != settings.DELETED_EVENT:
                 self._define_host_definition_after_pending_state(host_definition_info)
 
     def _is_host_definition_in_pending_phase(self, phase):
         return phase.startswith(settings.PENDING_PREFIX)
+
+    def _is_host_definition_being_deleted(self, k8s_object):
+        deletion_timestamp = getattr(k8s_object.metadata, 'deletionTimestamp', None) or \
+            getattr(k8s_object.metadata, 'deletion_timestamp', None)
+        return bool(deletion_timestamp)
+
+    def _handle_user_deletion(self, host_definition_info):
+        logger.info(messages.USER_REQUESTED_HOST_DEFINITION_DELETION.format(host_definition_info.name))
+        deletion_thread = Thread(target=self._process_user_deletion, args=(host_definition_info,))
+        deletion_thread.start()
+
+    def _process_user_deletion(self, host_definition_info):
+        if self._is_host_definer_can_delete_hosts():
+            logger.info(messages.ALLOW_DELETE_TRUE_DELETING_FROM_STORAGE.format(host_definition_info.name))
+            response = self._undefine_host(host_definition_info)
+            self._handle_k8s_host_definition_after_undefine_action(response.error_message, host_definition_info)
+        else:
+            logger.info(messages.ALLOW_DELETE_FALSE_REMOVING_K8S_OBJECT_ONLY.format(host_definition_info.name))
+            self._delete_host_definition(host_definition_info.name)
 
     def _define_host_definition_after_pending_state(self, host_definition_info):
         logger.info(messages.FOUND_HOST_DEFINITION_IN_PENDING_STATE.format(host_definition_info.name))

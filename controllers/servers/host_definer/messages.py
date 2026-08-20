@@ -77,3 +77,6 @@ COULD_NOT_CHANGE_HOST_PROTOCOL_USING_CHHOST = "Could not change host [{}] protoc
     "changing the host protocol by deleting it and creating it again"
 NODE_IS_NOT_MANAGED_NODE_TYPE = "Node {} is not a ManagedNode instance. This might lead to attribute errors."
 NODE_ID_IS_NONE = "node_id is None !!!"
+USER_REQUESTED_HOST_DEFINITION_DELETION = 'User requested deletion of hostDefinition {}, handling deletion'
+ALLOW_DELETE_TRUE_DELETING_FROM_STORAGE = 'allowDelete=true: deleting hostDefinition {} from storage and cluster'
+ALLOW_DELETE_FALSE_REMOVING_K8S_OBJECT_ONLY = 'allowDelete=false: removing hostDefinition {} from cluster only, host on storage is preserved'
