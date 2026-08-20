@@ -3118,43 +3118,66 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) TeardownVolume(ctx context.Conte
 				}
 
 				// =========================================================================
-				// INVERSION STEP 1: FORCEFULLY PRUNE THE LOCAL NAMESPACE HANDLES FIRST
+				// STEP 1: UNCONDITIONAL NAMESPACE PRUNING (RUNS FIRST)
 				// =========================================================================
-				// This unlinks the volume's specific endpoint footprints (e.g. nvme1n1 or nvme1n2)
-				// straight out of the host controller directories BEFORE we run the check loop.
+				// This completely strips out your target volume's physical endpoints (nvme0n1, etc.)
+				// out of the kernel trees before any controller loops are evaluated.
 				if len(nvmeSlaves) > 0 {
-					logger.Infof("[Teardown-Main] [%s] Executing early parallel namespace eviction...", mpathName)
-					r.cleanNVMeNamespacesFromSlaves(ctx, slaves, expectedWWID)
+					logger.Infof("[Teardown-Main] [%s] Executing unconditional namespace pruning sweep...", mpathName)
+					r.cleanNVMeNamespacesFromSlaves(ctx, slaves)
 				}
 
-				// Evict standard SCSI/iSCSI tracks natively via the safe channel
+				// Evict traditional SCSI/iSCSI lanes concurrently
 				if len(scsiSlaves) > 0 {
 					logger.Infof("[Teardown-Main] [%s] Dispatched SCSI slave tracking nodes to physical evictor: %v", mpathName, scsiSlaves)
 					_ = r.RemovePhysicalDevice(ctx, scsiSlaves)
 				}
 				
 				// =========================================================================
-				// INVERSION STEP 2: EVALUATE CONTROLLER EVICTION (AFTER PRUNING)
+				// STEP 2: CONCURRENT CONTROLLER EVICTION (RUNS SECOND)
 				// =========================================================================
-				// Now that our unique namespace footprints have been successfully dropped,
-				// the controller check will accurately count only genuine concurrent sister volumes.
+				// Now that the namespaces are gone, we can safely sweep the parent controllers
+				// in parallel using an asynchronous batch loop to maximize throughput velocity.
 				if len(nvmeSlaves) > 0 {
-					logger.Infof("[Teardown-Main] [%s] Evaluating reference-counted controller gates: %v", mpathName, nvmeSlaves)
+					logger.Infof("[Teardown-Main] [%s] Executing concurrent controller eviction sweep...", mpathName)
+					
+					// Build a clean, isolated controller array to prevent duplicate checks
+					uniqueControllers := make(map[string]string)
+					var controllerBatch []string
 					for _, nvmeSlave := range nvmeSlaves {
 						ctrlName := ExtractNvmeControllerBase(nvmeSlave)
-						if ctrlName != "" {
-							_ = r.SafeEvictNvmeController(ctx, ctrlName, nvmeSlave, expectedWWID)
+						if ctrlName != "" && uniqueControllers[ctrlName] == "" {
+							uniqueControllers[ctrlName] = nvmeSlave // Maintain namespace reference pairing
+							controllerBatch = append(controllerBatch, nvmeSlave)
 						}
 					}
+
+					// Fire the controller evictions in parallel using your batch engine
+					uniqueBatchKey := fmt.Sprintf("batch-ctrl-eviction-%s-%d", mpathName, time.Now().UnixNano())
+					_, _ = executer.ExecuteUninterruptibleBatch[string, struct{}](
+						ctx,
+						r.KeyedGater,
+						uniqueBatchKey,
+						15, 100, 3*time.Second, 15*time.Second,
+						controllerBatch,
+						func(wCtx context.Context, index int, nvmeSlave string, cancelBatch func()) (struct{}, error) {
+							ctrlName := ExtractNvmeControllerBase(nvmeSlave)
+							if ctrlName != "" {
+								// Symmetrically aligned to pass exactly 4 arguments to the ultra-verbose guard
+								_ = r.SafeEvictNvmeController(wCtx, ctrlName, nvmeSlave, expectedWWID)
+							}
+							return struct{}{}, nil
+						},
+					)
 				}
 
-				needRemovePhysical = false 
-			} else {
-				logger.Infof("[Teardown-Main] [%s] Step 2/2: Slaves empty. Sweeping dual-protocol parameters...", mpathName)
-				_ = r.purgeStuckPhysicalPathsDualProtocol(ctx, rawScsiTarget, rawNvmeTarget)
 				needRemovePhysical = false
+				} else {
+					logger.Infof("[Teardown-Main] [%s] Step 2/2: Slaves empty. Sweeping dual-protocol parameters...", mpathName)
+					_ = r.purgeStuckPhysicalPathsDualProtocol(ctx, rawScsiTarget, rawNvmeTarget)
+					needRemovePhysical = false 
+				}
 			}
-		}
 	
 	// =========================================================================
 	// CHANNEL B: PURE NATIVE NVMe FABRIC WORKFLOW (UNCONDITIONAL HARDENING)
@@ -3172,18 +3195,48 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) TeardownVolume(ctx context.Conte
 			slaves = []string{mpathName}
 		}
 
-		// INVERSION STEP 1: Early namespace pruning drops the local tracking endpoints out of sysfs
-		logger.Infof("[Teardown-Main] [%s] Executing early native namespace eviction: %v", mpathName, slaves)
-		r.cleanNVMeNamespacesFromSlaves(ctx, slaves, expectedWWID)
+		// =========================================================================
+		// STEP 1: UNCONDITIONAL NAMESPACE PRUNING (RUNS FIRST)
+		// =========================================================================
+		// Forcefully deletes and unlinks this volume's specific path endpoints (e.g., nvme0n1)
+		// out of the kernel directories. The batch loop blocks the main thread synchronously until done.
+		logger.Infof("[Teardown-Main] [%s] Executing unconditional native namespace pruning sweep: %v", mpathName, slaves)
+		r.cleanNVMeNamespacesFromSlaves(ctx, slaves)
 
-		// INVERSION STEP 2: Now that namespaces are cleared, run the controller reference gater checks
-		// Symmetrically aligned to pass exactly 4 arguments: (ctx, ctrlName, currentNamespace, volumeId)
+		// =========================================================================
+		// STEP 2: CONCURRENT CONTROLLER EVICTION (RUNS SECOND)
+		// =========================================================================
+		// Now that the namespaces are cleared, we safely sweep the parent hardware controllers 
+		// concurrently. Deduping the controllers into a batch prevents duplicate thread executions.
 		logger.Infof("[Teardown-Main] Evicting native NVMe controller adapters safely: %v", slaves)
+		
+		uniqueControllers := make(map[string]string)
+		var controllerBatch []string
 		for _, slaveNode := range slaves {
 			ctrlName := ExtractNvmeControllerBase(slaveNode)
-			if ctrlName != "" {
-				_ = r.SafeEvictNvmeController(ctx, ctrlName, slaveNode, expectedWWID)
+			if ctrlName != "" && uniqueControllers[ctrlName] == "" {
+				uniqueControllers[ctrlName] = slaveNode // Maintain controller-to-slave tracking pairing
+				controllerBatch = append(controllerBatch, slaveNode)
 			}
+		}
+
+		if len(controllerBatch) > 0 {
+			uniqueBatchKey := fmt.Sprintf("batch-native-ctrl-eviction-%s-%d", mpathName, time.Now().UnixNano())
+			_, _ = executer.ExecuteUninterruptibleBatch[string, struct{}](
+				ctx,
+				r.KeyedGater,
+				uniqueBatchKey,
+				15, 100, 3*time.Second, 15*time.Second,
+				controllerBatch,
+				func(wCtx context.Context, index int, slaveNode string, cancelBatch func()) (struct{}, error) {
+					ctrlName := ExtractNvmeControllerBase(slaveNode)
+					if ctrlName != "" {
+						// Symmetrically aligned to pass exactly 4 arguments to your ultra-verbose guard layout
+						_ = r.SafeEvictNvmeController(wCtx, ctrlName, slaveNode, expectedWWID)
+					}
+					return struct{}{}, nil
+				},
+			)
 		}
 		
 		needRemovePhysical = false
@@ -3404,8 +3457,8 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) flushDMBuffers(ctx context.Conte
 }
 
 // evictOrCleanNvmeNamespaces executes systematic parallel sysfs eviction on NVMe namespace paths.
-// Hardened: Formats and maps parameters symmetrically to fulfill the required 3-argument guard loop contract.
-func (r *OsDeviceConnectivityHelperScsiGeneric) evictOrCleanNvmeNamespaces(ctx context.Context, devices []string, actionLabel string, volId string) {
+// Production-Hardened: Universal VFS path mapping targets /sys/block to clean both Native and DM slaves flawlessly.
+func (r *OsDeviceConnectivityHelperScsiGeneric) evictOrCleanNvmeNamespaces(ctx context.Context, devices []string, actionLabel string) {
 	if err := ctx.Err(); err != nil {
 		return
 	}
@@ -3414,7 +3467,7 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) evictOrCleanNvmeNamespaces(ctx c
 	validDevices := make([]string, 0, len(devices))
 	
 	for _, dev := range devices {
-		base := filepath.Base(dev)
+		base := filepath.Base(dev) // Safely handles either absolute paths (/dev/nvme0n1) or raw strings (nvme0n1)
 		if !strings.HasPrefix(base, "nvme") {
 			continue
 		}
@@ -3423,7 +3476,7 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) evictOrCleanNvmeNamespaces(ctx c
 				logger.Warningf("[VFS-Guard] NVMe %s tracking slice reached safe threshold ceiling (%d). Truncating scan.", actionLabel, maxCapCeiling)
 				break
 			}
-			validDevices = append(validDevices, dev)
+			validDevices = append(validDevices, base)
 		}
 	}
 
@@ -3431,7 +3484,7 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) evictOrCleanNvmeNamespaces(ctx c
 		return
 	}
 
-	uniqueBatchKey := fmt.Sprintf("batch-nvme-%s-%d-%s", actionLabel, time.Now().UnixNano(), filepath.Base(validDevices[0]))
+	uniqueBatchKey := fmt.Sprintf("batch-nvme-%s-%d-%s", actionLabel, time.Now().UnixNano(), validDevices[0])
 
 	_, _ = executer.ExecuteUninterruptibleBatch[string, struct{}](
 		ctx,
@@ -3439,22 +3492,43 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) evictOrCleanNvmeNamespaces(ctx c
 		uniqueBatchKey,
 		15, 100, 3*time.Second, 15*time.Second,
 		validDevices,
-		func(wCtx context.Context, index int, dev string, cancelBatch func()) (struct{}, error) {
-			base := filepath.Base(dev) // e.g., "nvme0n1"
+		func(wCtx context.Context, index int, baseName string, cancelBatch func()) (struct{}, error) {
+			// FIXED: Use the universal Linux block architecture path mapping endpoint (/sys/block/nvmeXnY/)
+			// This path is identical across both pure native transport lines and nested Device Mapper slaves.
+			universalBlockDir := filepath.Join("/sys/block", baseName)
 			
-			ctrlName := ExtractNvmeControllerBase(base)
-			if ctrlName == "" {
-				if lastNIdx := strings.LastIndex(base, "n"); lastNIdx != -1 && lastNIdx > 0 {
-					if cIdx := strings.Index(base, "c"); cIdx != -1 && cIdx < lastNIdx {
-						ctrlName = base[:cIdx]
-					} else {
-						ctrlName = base[:lastNIdx]
-					}
-				}
+			// Resolve any symlinks in case the VFS uses system virtual path pointers
+			baseBlockSysDir, errLink := filepath.EvalSymlinks(universalBlockDir)
+			if errLink != nil {
+				baseBlockSysDir = universalBlockDir 
 			}
 
-			if ctrlName != "" {
-				_ = r.SafeEvictNvmeController(wCtx, ctrlName, base, volId)
+			nsDeletePath := filepath.Join(baseBlockSysDir, "device", "delete")
+			
+			// Verification Bypass: Check if the write endpoint is present under this layout branch
+			if _, errStat := os.Stat(nsDeletePath); errStat == nil {
+				_ = r.flushDeviceBuffers(wCtx, baseName)
+
+				logger.Infof("[Namespace-Evict] [%s] Unconditionally writing eviction token '1' to: %s", baseName, nsDeletePath)
+				if errWrite := os.WriteFile(nsDeletePath, []byte("1\n"), 0200); errWrite != nil {
+					if !os.IsNotExist(errWrite) {
+						logger.Errorf("[Namespace-Evict] [%s] Failed to write namespace deletion token: %v", baseName, errWrite)
+					}
+				} else {
+					logger.Infof("[Namespace-Evict] [%s] Successfully unlinked namespace path node from system bus.", baseName)
+				}
+			} else {
+				logger.Warningf("[Namespace-Evict] [%s] No deletion channel found at %s. Checking alternate controller paths.", baseName, nsDeletePath)
+				
+				// Fallback track: If /sys/block lacks the delete endpoint, target the controller class path
+				ctrlName := ExtractNvmeControllerBase(baseName)
+				if ctrlName != "" {
+					classCtrlDelete := filepath.Join("/sys/class/nvme", ctrlName, baseName, "device", "delete")
+					if _, errCtrl := os.Stat(classCtrlDelete); errCtrl == nil {
+						logger.Infof("[Namespace-Evict] [%s] Writing deletion token to fallback controller path: %s", baseName, classCtrlDelete)
+						_ = os.WriteFile(classCtrlDelete, []byte("1\n"), 0200)
+					}
+				}
 			}
 			return struct{}{}, nil
 		},
@@ -3462,14 +3536,14 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) evictOrCleanNvmeNamespaces(ctx c
 }
 
 // cleanNVMeNamespacesFromSlaves routes to unified NVMe management.
-func (r *OsDeviceConnectivityHelperScsiGeneric) cleanNVMeNamespacesFromSlaves(ctx context.Context, devices []string, volId string) {
-	r.evictOrCleanNvmeNamespaces(ctx, devices, "clean-slaves", volId)
+func (r *OsDeviceConnectivityHelperScsiGeneric) cleanNVMeNamespacesFromSlaves(ctx context.Context, devices []string) {
+	r.evictOrCleanNvmeNamespaces(ctx, devices, "clean-slaves")
 }
 
 
 // evictNVMeNamespaces routes to unified NVMe management.
-func (r *OsDeviceConnectivityHelperScsiGeneric) evictNVMeNamespaces(ctx context.Context, devices []string, volId string) {
-	r.evictOrCleanNvmeNamespaces(ctx, devices, "evict-ns", volId)
+func (r *OsDeviceConnectivityHelperScsiGeneric) evictNVMeNamespaces(ctx context.Context, devices []string) {
+	r.evictOrCleanNvmeNamespaces(ctx, devices, "evict-ns")
 }
 
 // SafeEvictNvmeController verifies if a parent controller is completely idle 
