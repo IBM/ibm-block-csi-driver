@@ -219,6 +219,7 @@ class Watcher(KubernetesManager):
                 settings.UNDEFINE_ACTION, settings.FAILED_MESSAGE_TYPE)
         elif host_definition_info:
             self._delete_host_definition(host_definition_info.name)
+            NODES.pop(host_definition_info.node_name, None)
 
     def _set_host_definition_status_to_ready(self, host_definition):
         self._set_host_definition_status(host_definition.name, settings.READY_PHASE)
