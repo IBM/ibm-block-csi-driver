@@ -3183,7 +3183,7 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) tearDownBusyRescue(ctx context.C
 			
 			dmDevNode := filepath.Join("/dev", canonicalKernelName)
 			if _, errStat := os.Stat(dmDevNode); os.IsNotExist(errStat) {
-				logger.Infof("[Teardown-Async] Deferred map removal completed by kernel. Launching physical path purge for WWID: %s", expectedWWID)
+				logger.Infof("[Teardown-Async] Deferred map removal completed by kernel. Launching physical path purge for WWID: %s", rawScsiTarget)
 				
 				// Safely invoke the fallback path un-linker to wipe the dirty zombie footprints
 				_ = r.purgeStuckPhysicalPathsDualProtocol(bgCtx, rawScsiTarget, rawNvmeTarget)
@@ -3648,17 +3648,27 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) SafeEvictNvmeController(ctx cont
 		// Check if the sibling device node is active in /dev
 		devNodeCheck := filepath.Join("/dev", name)
 		if _, errStat := os.Stat(devNodeCheck); os.IsNotExist(errStat) {
-			if _, errStat := os.Stat(devNodeCheck); os.IsNotExist(errStat) {
 			logger.Warningf("[Controller-Guard-Trace] [GHOST PATH HIT] Namespace '%s' exists in sysfs but its character file '%s' is missing from /dev. Treating as an unlinked remnant.", name, devNodeCheck)
 			continue
 		}
 
-		// Check the kernel transport lifecycle state of the sibling path node
-		statePath := filepath.Join(ctrlSysPath, name, "device", "state")
-		if stateBytes, errState := os.ReadFile(statePath); errState == nil {
+		// FIXED: Target 'ana_state' directly within the block folder namespace structure 
+		// to catch dying, optimization-blocked, or hidden multi-namespace fabrics paths cleanly.
+		anaStatePath := filepath.Join(ctrlSysPath, name, "ana_state")
+		if stateBytes, errState := os.ReadFile(anaStatePath); errState == nil {
 			stateStr := strings.ToLower(strings.TrimSpace(string(stateBytes)))
-			if stateStr == "deleting" || stateStr == "hidden" {
-				logger.Warningf("[Controller-Guard-Trace] [GHOST PATH HIT] Namespace '%s' belongs to a dying/hidden kernel transport state ('%s'). Bypassing count.", name, stateStr)
+			if stateStr == "inaccessible" || stateStr == "change" {
+				logger.Warningf("[Controller-Guard-Trace] [GHOST PATH HIT] Namespace '%s' belongs to a dead or changing ANA transport state ('%s'). Bypassing count.", name, stateStr)
+				continue
+			}
+		}
+
+		// Alternate general controller hardware validation track check
+		ctrlStatePath := filepath.Join(ctrlSysPath, "state")
+		if stateBytes, errState := os.ReadFile(ctrlStatePath); errState == nil {
+			stateStr := strings.ToLower(strings.TrimSpace(string(stateBytes)))
+			if stateStr == "deleting" || stateStr == "degraded" {
+				logger.Warningf("[Controller-Guard-Trace] Parent controller %s is already in state '%s'. Bypassing count.", ctrlName, stateStr)
 				continue
 			}
 		}
@@ -3673,7 +3683,7 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) SafeEvictNvmeController(ctx cont
 	if otherActiveNamespaces > 0 {
 		logger.Warningf("[Controller-Guard-Trace] [EVICTION REJECTED] Controller '%s' preservation triggered! Active sibling workloads remain: %v", 
 			ctrlName, rejectionDetails)
-		return false, nil // Returns false to indicate the shared controller must stay online
+		return false, nil 
 	}
 
 	// ABSOLUTE EXCLUSIVITY VERIFIED - EXECUTE PROCESS DISCONNECT COMMAND
@@ -5438,7 +5448,7 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) FinalWwidPurge(ctx context.Conte
 				var deletePath string
 				if strings.HasPrefix(name, "nvme") {
 					// Broken
-					if errWrite := r.SafeEvictNvmeController(ctx, name, "", ""); errWrite != nil {
+					if _, errWrite := r.SafeEvictNvmeController(ctx, name, "", ""); errWrite != nil {
 						return struct{}{}, errWrite
 					}
 
