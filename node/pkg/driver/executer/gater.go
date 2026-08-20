@@ -252,13 +252,13 @@ func baseExecute[T any](
 	var once sync.Once
 
 	workerCtx, cancelWorker := context.WithCancel(ctx)
-	defer cancelWorker()
 
 	parentAdditionalID, _ := goid_info.GetAdditionalIDInfo()
 
 	// 3. WORKER LAUNCH
 	go func() {
 		defer pool.activeOps.Add(-1)
+		defer cancelWorker()
 
 		if parentAdditionalID != "" && parentAdditionalID != "-" {
 			goid_info.SetAdditionalIDInfo(parentAdditionalID)
@@ -289,6 +289,28 @@ func baseExecute[T any](
 	select {
 	case res := <-done:
 		return res.Data, res.Err
+		
+   case <-ctx.Done():
+	   // Context was cancelled by caller before worker finished or timed out
+	   select {
+	   case pool.spare <- struct{}{}:
+			   once.Do(func() {
+					   close(switched)
+					   <-pool.running
+			   })
+			   g.globalLeaked.Add(1) // Worker is now executing in background as a tracked leak
+			   var zero T
+			   return zero, ctx.Err()
+	   default:
+			   once.Do(func() {
+					   close(monitorDone)
+					   <-pool.running
+			   })
+			   g.globalLeaked.Add(1) // Worker is abandoned due to complete saturation
+			   var zero T
+			   return zero, fmt.Errorf("resource %s: context cancelled and spare pool full", resourceName)
+	   }
+		
 	case <-hTimer.C:
 		select {
 		case pool.spare <- struct{}{}:
@@ -320,6 +342,7 @@ func baseExecute[T any](
 				close(monitorDone)
 				<-pool.running
 			})
+			g.globalLeaked.Add(1)
 			var zero T
 			return zero, fmt.Errorf("resource %s: critical saturation (spare pool full)", resourceName)
 		}
@@ -333,6 +356,7 @@ type BatchResult[T any] struct {
 	Err   error
 }
 
+// ExecuteUninterruptibleBatch handles parallel batch operations safely insulated from kernel D-state stalls.
 func ExecuteUninterruptibleBatch[Param any, T any](
 	ctx context.Context,
 	g *KeyedGater,
@@ -362,6 +386,8 @@ func ExecuteUninterruptibleBatch[Param any, T any](
 
 	parentAdditionalID, _ := goid_info.GetAdditionalIDInfo()
 
+	// FIXED: Buffered channel allocated to handle absolute allocation counts safely 
+	// to prevent inner background zombie threads from blocking on delivery writes.
 	resultsChan := make(chan BatchResult[T], len(parameters))
 	var wg sync.WaitGroup
 
@@ -369,6 +395,14 @@ func ExecuteUninterruptibleBatch[Param any, T any](
 		wg.Add(1)
 		go func(index int, p Param) {
 			defer wg.Done()
+
+			// Check cancellation before pulling a pool token
+			select {
+			case <-batchCtx.Done():
+				resultsChan <- BatchResult[T]{Index: index, Err: batchCtx.Err()}
+				return
+			default:
+			}
 
 			select {
 			case pool.running <- struct{}{}:
@@ -378,18 +412,20 @@ func ExecuteUninterruptibleBatch[Param any, T any](
 			}
 
 			pool.activeOps.Add(1)
+			
+			// FIXED: Allocated buffer capacity of 1 to ensure that if the monitor thread 
+			// exits early, the background worker goroutine can drop its data and exit cleanly.
 			done := make(chan Result[T], 1) 
 			switched := make(chan struct{})
-			monitorDone := make(chan struct{}) // FIXED: Symmetrical handshake channel
+			monitorDone := make(chan struct{}) 
 			var once sync.Once
 
 			workerCtx, cancelWorker := context.WithCancel(batchCtx)
-			defer cancelWorker()
 
-			// 3. INNER WORKER LAUNCH
+			// INNER WORKER LAUNCH
 			go func() {
-				// Guarantees activeOps is ALWAYS decremented under any exit trajectory
 				defer pool.activeOps.Add(-1)
+				defer cancelWorker()
 
 				if parentAdditionalID != "" && parentAdditionalID != "-" {
 					goid_info.SetAdditionalIDInfo(parentAdditionalID)
@@ -398,14 +434,12 @@ func ExecuteUninterruptibleBatch[Param any, T any](
 				data, err := worker(workerCtx, index, p, cancelBatch)
 				done <- Result[T]{Data: data, Err: err}
 
-				// FIXED: Safe execution state machine checks if the monitor exited due to saturation
 				once.Do(func() {
 					select {
 					case <-switched:
 						<-pool.spare
 						g.globalLeaked.Add(-1)
 					case <-monitorDone:
-						// Monitor thread already handled pool.running token release during a saturation miss
 						return
 					default:
 						<-pool.running
@@ -413,13 +447,32 @@ func ExecuteUninterruptibleBatch[Param any, T any](
 				})
 			}()
 
-			// 4. MONITOR HANDOFF & HARD TIMEOUT FOR THIS ELEMENT
+			// MONITOR HANDOFF & HARD TIMEOUT FOR THIS ELEMENT
 			hTimer := time.NewTimer(handoffTimeout)
 			defer hTimer.Stop()
 
 			select {
 			case res := <-done:
 				resultsChan <- BatchResult[T]{Index: index, Data: res.Data, Err: res.Err}
+
+			case <-batchCtx.Done():
+				select {
+				case pool.spare <- struct{}{}:
+					once.Do(func() {
+						close(switched)
+						<-pool.running
+					})
+					g.globalLeaked.Add(1) 
+					resultsChan <- BatchResult[T]{Index: index, Err: batchCtx.Err()}
+				default:
+					once.Do(func() {
+						close(monitorDone)
+						<-pool.running
+					})
+					g.globalLeaked.Add(1) 
+					resultsChan <- BatchResult[T]{Index: index, Err: fmt.Errorf("batch item %d: cancelled and spare pool full", index)}
+				}
+				
 			case <-hTimer.C:
 				select {
 				case pool.spare <- struct{}{}:
@@ -431,7 +484,7 @@ func ExecuteUninterruptibleBatch[Param any, T any](
 					if hardTimeout <= 0 {
 						res := <-done
 						resultsChan <- BatchResult[T]{Index: index, Data: res.Data, Err: res.Err}
-						return
+						return // Safely exits since done has a buffer of 1
 					}
 
 					hdTimer := time.NewTimer(hardTimeout)
@@ -448,11 +501,11 @@ func ExecuteUninterruptibleBatch[Param any, T any](
 						}
 					}
 				default:
-					// FIXED: Microsecond-safe saturation release using the close-channel handshake
 					once.Do(func() {
 						close(monitorDone)
 						<-pool.running
 					})
+					g.globalLeaked.Add(1)
 					resultsChan <- BatchResult[T]{Index: index, Err: fmt.Errorf("batch item %d: critical saturation", index)}
 				}
 			}

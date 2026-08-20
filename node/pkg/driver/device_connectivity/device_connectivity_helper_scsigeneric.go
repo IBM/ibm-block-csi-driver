@@ -3505,11 +3505,17 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) evictOrCleanNvmeNamespaces(ctx c
 
 			nsDeletePath := filepath.Join(baseBlockSysDir, "device", "delete")
 			
+			 if _, errStat := os.Stat(nsDeletePath); os.IsNotExist(errStat) {
+				logger.Infof("[Namespace-Evict] [%s] found via main delete path %s", baseName, nsDeletePath)
+				nsDeletePath = filepath.Join("/sys/block", baseName, "delete")
+			 }
+
 			// Verification Bypass: Check if the write endpoint is present under this layout branch
 			if _, errStat := os.Stat(nsDeletePath); errStat == nil {
+				logger.Infof("[Namespace-Evict] [%s] delete path exists %s", baseName, nsDeletePath)
 				_ = r.flushDeviceBuffers(wCtx, baseName)
 
-				logger.Infof("[Namespace-Evict] [%s] Unconditionally writing eviction token '1' to: %s", baseName, nsDeletePath)
+				logger.Infof("[Namespace-Evict] [%s] Unconditionally writing eviction token '1' to universal path: %s", baseName, nsDeletePath)
 				if errWrite := os.WriteFile(nsDeletePath, []byte("1\n"), 0200); errWrite != nil {
 					if !os.IsNotExist(errWrite) {
 						logger.Errorf("[Namespace-Evict] [%s] Failed to write namespace deletion token: %v", baseName, errWrite)
@@ -3523,6 +3529,7 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) evictOrCleanNvmeNamespaces(ctx c
 				// Fallback track: If /sys/block lacks the delete endpoint, target the controller class path
 				ctrlName := ExtractNvmeControllerBase(baseName)
 				if ctrlName != "" {
+					logger.Infof("[Namespace-Evict] [%s] Found controller: %s", baseName, ctrlName)
 					classCtrlDelete := filepath.Join("/sys/class/nvme", ctrlName, baseName, "device", "delete")
 					if _, errCtrl := os.Stat(classCtrlDelete); errCtrl == nil {
 						logger.Infof("[Namespace-Evict] [%s] Writing deletion token to fallback controller path: %s", baseName, classCtrlDelete)
