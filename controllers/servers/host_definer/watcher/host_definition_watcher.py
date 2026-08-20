@@ -3,7 +3,7 @@ from time import sleep
 
 import controllers.servers.host_definer.messages as messages
 from controllers.common.csi_logger import get_stdout_logger
-from controllers.servers.host_definer.watcher.watcher_helper import Watcher
+from controllers.servers.host_definer.watcher.watcher_helper import Watcher, NODES
 from controllers.servers.host_definer.hd_types import DefineHostResponse
 from controllers.servers.host_definer import settings
 import controllers.common.settings as common_settings
@@ -52,6 +52,7 @@ class HostDefinitionWatcher(Watcher):
         else:
             logger.info(messages.ALLOW_DELETE_FALSE_REMOVING_K8S_OBJECT_ONLY.format(host_definition_info.name))
             self._delete_host_definition(host_definition_info.name)
+            NODES.pop(host_definition_info.node_name, None)
 
     def _define_host_definition_after_pending_state(self, host_definition_info):
         logger.info(messages.FOUND_HOST_DEFINITION_IN_PENDING_STATE.format(host_definition_info.name))
