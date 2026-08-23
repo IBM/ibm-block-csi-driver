@@ -13,7 +13,7 @@
 # limitations under the License.
 
 # Build stage
-FROM golang:1.25.10 AS builder
+FROM golang:1.25.14 AS builder
 
 WORKDIR /go/src/github.com/ibm/ibm-block-csi-driver
 ENV GO111MODULE=on
@@ -27,7 +27,7 @@ COPY . .
 RUN make ibm-block-csi-driver
 
 # Final stage
-FROM registry.access.redhat.com/ubi9-minimal:9.8-1781496742
+FROM registry.access.redhat.com/ubi9-minimal:9.8-1786987521
 
 ARG VERSION=1.14.0
 ARG BUILD_NUMBER=0
