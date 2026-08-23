@@ -103,13 +103,12 @@ def _encode_to_base64(data, max_size=1024):
 def _default_callhome_metadata_aux():
     ch_info = {}
 
-    # Disable wanings for insecure https
+    # Get token and CA cert from service account files
     #
-    urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+    sa_dir = "/var/run/secrets/kubernetes.io/serviceaccount"
+    token_path = os.path.join(sa_dir, "token")
+    ca_cert_path = os.path.join(sa_dir, "ca.crt")
 
-    # Get token from a local file
-    #
-    token_path = "/var/run/secrets/kubernetes.io/serviceaccount/token"
     if not os.path.exists(token_path):
         logger.info("Not running inside a Kubernetes/OpenShift pod")
         return ''
@@ -117,13 +116,13 @@ def _default_callhome_metadata_aux():
     with open(token_path, encoding='utf-8') as token_file:
         token = token_file.read().strip()
 
-    # Collect environment info and create URL and http opject
+    # Collect environment info and create URL and http object
     #
     k8s_service_host = os.environ['KUBERNETES_SERVICE_HOST']
     k8s_service_port = os.environ['KUBERNETES_SERVICE_PORT']
     api_server = f"https://{k8s_service_host}:{k8s_service_port}"
     headers = {"Authorization": f"Bearer {token}"}
-    http_client = urllib3.PoolManager(cert_reqs='NONE')
+    http_client = urllib3.PoolManager(ca_certs=ca_cert_path, cert_reqs='CERT_REQUIRED')
 
     # Get k8s version (works for k8s AND ocp)
     #
