@@ -2,14 +2,22 @@ from collections import defaultdict
 from io import StringIO
 from random import choice, randint
 from datetime import datetime, timedelta, timezone
+import json
 import time
 
 import os
+from munch import Munch
 from packaging.version import Version
 from pysvc import errors as svc_errors
 from pysvc.unified.client import connect
 from pysvc.unified.response import CLIFailureError, SVCResponse
 from retry import retry
+
+from openapi_client.api.storage_virtualize_api import StorageVirtualizeAPI
+from openapi_client.exceptions import ApiException as SdkApiException
+from openapi_client.models.lsvdisk_post_request import LsvdiskPostRequest
+from openapi_client.models.lsvdisk_id_post_request import LsvdiskIdPostRequest
+from openapi_client.models.mkvolume_post_request import MkvolumePostRequest
 
 from controllers.servers.host_definer import settings
 from controllers.common.config import config
@@ -185,7 +193,7 @@ def build_kwargs_from_parameters(space_efficiency, pool_name, io_group,
         'name': volume_name,
         'unit': 'b',
         'size': volume_size,
-        'pool': pool_name
+        'pool': pool_name,
     })
     space_efficiency_kwargs = _get_space_efficiency_kwargs(space_efficiency)
     cli_kwargs.update(space_efficiency_kwargs)
@@ -242,14 +250,20 @@ def build_register_plugin_kwargs(unique_key, metadata, version):
 
 def _get_cli_volume_space_efficiency_aliases(cli_volume):
     logger.info("cli_volume {}".format(str(cli_volume)))
+    se_copy = getattr(cli_volume, 'se_copy', 'yes' if getattr(cli_volume, 'se_copy_count', '0') != '0' else 'no')
+    compressed_copy = getattr(
+        cli_volume,
+        'compressed_copy',
+        'yes' if getattr(cli_volume, 'compressed_copy_count', '0') != '0' else 'no'
+    )
     space_efficiency_aliases = {common_settings.SPACE_EFFICIENCY_THICK, ''}
-    if cli_volume.se_copy == YES:
+    if se_copy == YES:
         space_efficiency_aliases = {common_settings.SPACE_EFFICIENCY_THIN}
-    if cli_volume.compressed_copy == YES:
+    if compressed_copy == YES:
         space_efficiency_aliases = {common_settings.SPACE_EFFICIENCY_COMPRESSED}
     if hasattr(cli_volume, "deduplicated_copy"):
         if cli_volume.deduplicated_copy == YES:
-            if cli_volume.se_copy == YES:
+            if se_copy == YES:
                 space_efficiency_aliases = {common_settings.SPACE_EFFICIENCY_DEDUPLICATED_THIN}
             else:
                 space_efficiency_aliases = {common_settings.SPACE_EFFICIENCY_DEDUPLICATED_COMPRESSED,
@@ -257,13 +271,115 @@ def _get_cli_volume_space_efficiency_aliases(cli_volume):
     return space_efficiency_aliases
 
 
+_CAPACITY_UNIT_MULTIPLIERS = {
+    'KB': 1000,
+    'MB': 1000 * 1000,
+    'GB': 1000 * 1000 * 1000,
+    'TB': 1000 * 1000 * 1000 * 1000,
+}
+
+
+def _parse_cli_capacity_bytes(capacity):
+    if isinstance(capacity, int):
+        return capacity
+    if isinstance(capacity, str):
+        for suffix, multiplier in _CAPACITY_UNIT_MULTIPLIERS.items():
+            if capacity.endswith(suffix):
+                return int(float(capacity[:-len(suffix)]) * multiplier)
+    return int(capacity)
+
+
 def _get_ssh_port_from_environment():
     return int(os.environ.get('SVC_SSH_PORT', '22'))
+
+
+def _extract_sdk_error_message(ex):
+    """Extract the CMMVC error message string from an SdkApiException.
+
+    The REST API returns error bodies of the form ``{"message": "CMMVC5753E ..."}``.
+    We pull that string out so it can be matched against the same CMMVC constants
+    that were previously matched against pysvc CLIFailureError.my_message.
+    Falls back to the raw body string when the JSON is unparseable.
+    """
+    body = ex.body or ''
+    try:
+        doc = json.loads(body)
+        if isinstance(doc, dict):
+            return doc.get('message', body)
+    except (ValueError, TypeError):
+        pass
+    return body
+
+
+class _SdkLsvdiskResponse:
+    """Thin wrapper around the raw SDK lsvdisk response.
+
+    The SDK returns a plain Python object (a ``dict`` for a single-volume
+    detail view, or a ``list[dict]`` for the concise list view).  The rest of
+    the mediator code consumes the result through ``.as_single_element`` and
+    ``.as_list``, where each element is expected to support attribute-style
+    access (historically provided by ``Munch`` / pysvc objects).
+
+    This wrapper converts every dict into a ``Munch`` so that all downstream
+    attribute accesses continue to work without modification.
+
+    Non-dict / non-list raw values (e.g. an unexpected text/html response body
+    from the array) are treated as "no data" to avoid propagating a bare str
+    into callers that expect a Munch.
+    """
+
+    def __init__(self, raw):
+        logger.debug("_SdkLsvdiskResponse raw type=%s repr=%.200r", type(raw).__name__, raw)
+        # The SVC REST API sometimes responds with Content-Type: text/html while still
+        # returning a JSON body.  The SDK's deserializer leaves text/html bodies as raw
+        # strings rather than json.loads()-ing them.  Detect and convert here.
+        if isinstance(raw, str) and raw.strip():
+            try:
+                raw = json.loads(raw)
+            except (ValueError, TypeError):
+                pass
+        self._raw = raw
+
+    @classmethod
+    def _to_munch(cls, item):
+        if isinstance(item, dict):
+            return Munch({key: cls._to_munch(value) for key, value in item.items()})
+        if isinstance(item, list):
+            return [cls._to_munch(value) for value in item]
+        return item  # already a Munch or None
+
+    @property
+    def as_single_element(self):
+        if self._raw is None:
+            return None
+        if isinstance(self._raw, list):
+            return self._to_munch(self._raw[0]) if self._raw else None
+        if isinstance(self._raw, dict):
+            return self._to_munch(self._raw)
+        # Unexpected response shape (e.g. text/html body returned as a string).
+        # Treat as empty so callers raise ObjectNotFoundError rather than AttributeError.
+        logger.warning("_SdkLsvdiskResponse.as_single_element: unexpected raw type %s, treating as empty",
+                       type(self._raw).__name__)
+        return None
+
+    @property
+    def as_list(self):
+        if self._raw is None:
+            return []
+        if isinstance(self._raw, list):
+            return [self._to_munch(item) for item in self._raw]
+        if isinstance(self._raw, dict):
+            return [self._to_munch(self._raw)]
+        # Unexpected response shape — treat as empty list.
+        logger.warning("_SdkLsvdiskResponse.as_list: unexpected raw type %s, treating as empty",
+                       type(self._raw).__name__)
+        return []
 
 
 class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
     ARRAY_ACTIONS = {}
     BLOCK_SIZE_IN_BYTES = 512
+    BYTES_IN_GB = 1_000_000_000  # SVC pool grain — decimal GB
     MAX_LUN_NUMBER = 511
     MAX_LUN_NUMBER_INCREMENT = 512
     MIN_LUN_NUMBER = 0
@@ -312,6 +428,7 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
     def __init__(self, user, password, endpoint):
         super().__init__(user, password, endpoint)
         self.client = None
+        self.sdk = None
         # SVC only accept one IP address
         if len(endpoint) == 0 or len(endpoint) > 1:
             logger.error("SVC only support one cluster IP")
@@ -334,6 +451,7 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
                 raise array_errors.UnsupportedStorageVersionError(
                     self._code_level, self.MIN_SUPPORTED_VERSION
                 )
+            self.sdk = StorageVirtualizeAPI(self.endpoint, self.user, self.password)
         except (svc_errors.IncorrectCredentials,
                 svc_errors.StorageArrayClientException):
             raise array_errors.CredentialsError(self.endpoint)
@@ -384,7 +502,7 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
             source_id = self._get_source_volume_wwn_if_exists(cli_volume)
         space_efficiency = _get_cli_volume_space_efficiency_aliases(cli_volume)
         return Volume(
-            capacity_bytes=int(cli_volume.capacity),
+            capacity_bytes=_parse_cli_capacity_bytes(cli_volume.capacity),
             id=cli_volume.vdisk_UID,
             internal_id=cli_volume.id,
             name=cli_volume.name,
@@ -410,7 +528,7 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
 
     def _generate_snapshot_response(self, capacity, name, source_id, internal_id, vdisk_uid='', partition_name=None):
         return Snapshot(
-            capacity_bytes=int(capacity),
+            capacity_bytes=_parse_cli_capacity_bytes(capacity),
             name=name,
             source_id=source_id,
             internal_id=internal_id,
@@ -453,17 +571,42 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
         return lsvdisk_response.as_list
 
     def _lsvdisk(self, **kwargs):
-        kwargs['bytes'] = True
+        object_id = kwargs.get('object_id')
+        filtervalue = kwargs.get('filtervalue')
+
         try:
-            return self.client.svcinfo.lsvdisk(**kwargs)
-        except (svc_errors.CommandExecutionError, CLIFailureError) as ex:
-            if (OBJ_NOT_FOUND in ex.my_message or
-                    NAME_NOT_EXIST_OR_MEET_RULES in ex.my_message):
+            if object_id is not None:
+                if str(object_id).isdigit():
+                    raw = self.sdk.svc_info_api.lsvdisk_id_post(
+                        id=str(object_id),
+                        x_auth_token=None,
+                        lsvdisk_id_post_request=LsvdiskIdPostRequest(unit='b'),
+                    )
+                else:
+                    raw = self.sdk.svc_info_api.lsvdisk_post(
+                        x_auth_token=None,
+                        lsvdisk_post_request=LsvdiskPostRequest(
+                            filtervalue='name={}'.format(object_id),
+                            unit='b',
+                        ),
+                    )
+            else:
+                raw = self.sdk.svc_info_api.lsvdisk_post(
+                    x_auth_token=None,
+                    lsvdisk_post_request=LsvdiskPostRequest(
+                        filtervalue=filtervalue,
+                        unit='b',
+                    ),
+                )
+            return _SdkLsvdiskResponse(raw)
+        except SdkApiException as ex:
+            message = _extract_sdk_error_message(ex)
+            if any(code in message for code in (OBJ_NOT_FOUND, NAME_NOT_EXIST_OR_MEET_RULES)):
                 logger.info("volume not found")
                 return None
-            if any(msg_id in ex.my_message for msg_id in (NON_ASCII_CHARS, VALUE_TOO_LONG, INVALID_FILTER_VALUE)):
-                raise array_errors.InvalidArgumentError(ex.my_message)
-            raise ex
+            if any(code in message for code in (NON_ASCII_CHARS, VALUE_TOO_LONG, INVALID_FILTER_VALUE)):
+                raise array_errors.InvalidArgumentError(message)
+            raise
 
     def _lsvolumegroup(self, id_or_name, not_exist_err=False):
         try:
@@ -650,10 +793,16 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
         logger.info("Finished validate_supported_space_efficiency")
 
     def _convert_size_bytes(self, size_in_bytes):
-        # SVC volume size must be the multiple of 512 bytes
+        # Ceil to next full decimal GB — SVC pool grain is 1 GB (1,000,000,000 bytes).
+        # Without this, requests like 1Gi (1,073,741,824) get rounded DOWN by the array
+        # to 1 GB (1,000,000,000), which is less than requested and causes provisioning failure.
+        remainder = size_in_bytes % self.BYTES_IN_GB
+        if remainder > 0:
+            size_in_bytes = size_in_bytes - remainder + self.BYTES_IN_GB
+        # SVC also requires size to be a multiple of 512 bytes (already satisfied after GB ceil)
         ret = size_in_bytes % self.BLOCK_SIZE_IN_BYTES
         if ret > 0:
-            return size_in_bytes - ret + 512
+            size_in_bytes = size_in_bytes - ret + self.BLOCK_SIZE_IN_BYTES
         return size_in_bytes
 
     def _get_wwn_by_volume_name_if_exists(self, volume_name):
@@ -706,25 +855,24 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
             size = self._convert_size_bytes(size_in_bytes)
             cli_kwargs = build_kwargs_from_parameters(space_efficiency, pool, io_group,
                                                       volume_group, name, size)
-            self.client.svctask.mkvolume(**cli_kwargs)
-        except (svc_errors.CommandExecutionError, CLIFailureError) as ex:
-            logger.debug("Error running mkvolume {}".format(self._format_cli_args(cli_kwargs)))
-            if is_warning_message(ex.my_message):
-                logger.warning("exception encountered during creation of volume {0}: {1}".format(name,
-                                                                                                 ex.my_message))
-            else:
-                logger.error("Cannot create volume {0}, Reason is: {1}".format(name, ex))
-                if OBJ_ALREADY_EXIST in ex.my_message:
-                    raise array_errors.VolumeAlreadyExists(name, self.endpoint)
-                if NAME_NOT_EXIST_OR_MEET_RULES in ex.my_message:
-                    raise array_errors.InvalidArgumentError(ex.my_message)
-                if POOL_NOT_MATCH_VOL_SPACE_EFFICIENCY in ex.my_message or NOT_REDUCTION_POOL in ex.my_message:
-                    raise array_errors.PoolDoesNotMatchSpaceEfficiency(pool, space_efficiency, ex)
-                if NOT_ENOUGH_EXTENTS_IN_POOL_CREATE in ex.my_message:
-                    raise array_errors.NotEnoughSpaceInPool(id_or_name=pool)
-                if any(msg_id in ex.my_message for msg_id in (NON_ASCII_CHARS, INVALID_NAME, TOO_MANY_CHARS)):
-                    raise array_errors.InvalidArgumentError(ex.my_message)
-                raise ex
+            self.sdk.svc_task_api.mkvolume_post(
+                x_auth_token=None,
+                mkvolume_post_request=MkvolumePostRequest(**cli_kwargs),
+            )
+        except SdkApiException as ex:
+            message = _extract_sdk_error_message(ex)
+            logger.error("Cannot create volume {0}, Reason is: {1}".format(name, message))
+            if OBJ_ALREADY_EXIST in message:
+                raise array_errors.VolumeAlreadyExists(name, self.endpoint)
+            if NAME_NOT_EXIST_OR_MEET_RULES in message:
+                raise array_errors.InvalidArgumentError(message)
+            if POOL_NOT_MATCH_VOL_SPACE_EFFICIENCY in message or NOT_REDUCTION_POOL in message:
+                raise array_errors.PoolDoesNotMatchSpaceEfficiency(pool, space_efficiency, ex)
+            if NOT_ENOUGH_EXTENTS_IN_POOL_CREATE in message:
+                raise array_errors.NotEnoughSpaceInPool(id_or_name=pool)
+            if any(msg_id in message for msg_id in (NON_ASCII_CHARS, INVALID_NAME, TOO_MANY_CHARS)):
+                raise array_errors.InvalidArgumentError(message)
+            raise ex
         logger.info("finished creating cli volume : {}".format(name))
 
     @retry(svc_errors.StorageArrayClientException, tries=5, delay=1)
@@ -942,17 +1090,16 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
     def _rmvolume(self, volume_id_or_name, not_exist_err=True):
         logger.info("deleting volume with name : {0}".format(volume_id_or_name))
         try:
-            self.client.svctask.rmvolume(vdisk_id=volume_id_or_name)
-        except (svc_errors.CommandExecutionError, CLIFailureError) as ex:
-            logger.debug("Error running rmvolume -vdisk_id {}".format(volume_id_or_name))
-            if is_warning_message(ex.my_message):
-                logger.warning("exception encountered during deletion of volume {}: {}".format(volume_id_or_name,
-                                                                                               ex.my_message))
-            else:
-                logger.error("Failed to delete volume {}".format(volume_id_or_name))
-                if (OBJ_NOT_FOUND in ex.my_message or VOL_NOT_FOUND in ex.my_message) and not_exist_err:
-                    raise array_errors.ObjectNotFoundError(volume_id_or_name)
-                raise ex
+            self.sdk.svc_task_api.rmvdisk_id_post(
+                id=str(volume_id_or_name),
+                x_auth_token=None,
+            )
+        except SdkApiException as ex:
+            message = _extract_sdk_error_message(ex)
+            logger.error("Failed to delete volume {}".format(volume_id_or_name))
+            if (OBJ_NOT_FOUND in message or VOL_NOT_FOUND in message) and not_exist_err:
+                raise array_errors.ObjectNotFoundError(volume_id_or_name)
+            raise ex
 
     @register_csi_plugin()
     def delete_volume(self, volume_id, partition_name=None):

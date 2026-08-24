@@ -27,9 +27,11 @@ RUN if [[ "$(uname -m)" == "s390x" ]]; then \
 WORKDIR /tmp
 COPY controllers/servers/csi/requirements.txt .
 COPY controllers/servers/csi/requirements_pyxcli.txt .
+COPY build/wheels/ ./wheels/
 # avoid default boringssl lib, since it does not support z systems
 ENV GRPC_PYTHON_BUILD_SYSTEM_OPENSSL=True
-RUN pip3 install -r ./requirements.txt
+RUN pip3 install -r ./requirements.txt && \
+    pip3 install --no-deps --find-links ./wheels/ ibm_svc_rest_client==1.0.2
 RUN pip3 install --no-deps -r ./requirements_pyxcli.txt
 
 USER root
