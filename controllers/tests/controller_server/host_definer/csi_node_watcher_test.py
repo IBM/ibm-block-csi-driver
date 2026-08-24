@@ -95,21 +95,21 @@ class TestWatchCsiNodesResources(CsiNodeWatcherBase):
         self._prepare_mocks_for_updated_csi_node()
         host_definitions = self.ready_k8s_host_definitions
         host_definitions.items[0].spec.hostDefinition.nodeId = 'other_node_id'
+        host_definitions.items[0].metadata.annotations[common_settings.NODE_INITIATORS_FIELD] = '{"nvmeofc":[],"fc":["old_wwpn"],"iscsi":[]}'
         self.csi_node_watcher.host_definitions_api.get.return_value = self.ready_k8s_host_definitions
         self.csi_node_watcher.core_api.read_namespaced_secret.return_value = test_utils.get_fake_k8s_secret()
         test_utils.run_function_with_timeout(self.csi_node_watcher.watch_csi_nodes_resources, 0.5)
         self.assertEqual(1, len(self.nodes_on_csi_node_watcher))
-        # self.csi_node_watcher.storage_host_servicer.define_host.assert_called()
+        self.csi_node_watcher.storage_host_servicer.define_host.assert_called()
 
     def _prepare_mocks_for_updated_csi_node(self):
         self.nodes_on_watcher_helper[test_settings.FAKE_NODE_NAME] = test_utils.get_fake_managed_node()
         self.nodes_on_csi_node_watcher[test_settings.FAKE_NODE_NAME] = test_utils.get_fake_managed_node()
         self.managed_secrets_on_csi_node_watcher.append(test_utils.get_fake_secret_info())
         self.csi_node_watcher.csi_nodes_api.watch.return_value = iter(
-            [test_utils.get_fake_csi_node_watch_event(test_settings.DELETED_EVENT_TYPE)])
+            [test_utils.get_fake_csi_node_watch_event(test_settings.MODIFIED_EVENT_TYPE)])
         self.csi_node_watcher.core_api.read_node.return_value = self.k8s_node_with_manage_node_label
-        self.csi_node_watcher.apps_api.list_daemon_set_for_all_namespaces.side_effect = [
-            self.not_updated_daemon_set, self.updated_daemon_set, self.updated_daemon_set]
+        self.csi_node_watcher.apps_api.list_daemon_set_for_all_namespaces.return_value = self.updated_daemon_set
         self.csi_node_watcher.core_api.list_pod_for_all_namespaces.return_value = test_utils.get_fake_k8s_pods_items()
 
     def test_delete_host_definition(self):
