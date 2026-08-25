@@ -19,6 +19,7 @@ The following table details orchestration platforms suitable for deployment of t
 |Red Hat OpenShift®    | 4.19    |x86|
 |Red Hat OpenShift®    | 4.20    |x86|
 |Red Hat OpenShift®    | 4.21    |x86|
+|Red Hat OpenShift®    | 4.22    |x86|
 
 IBM Power® architecture is only supported with IBM Storage Virtualize® family storage systems.{: restriction}
 
