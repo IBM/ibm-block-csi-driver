@@ -24,7 +24,7 @@ def get_fake_k8s_daemon_set_manifest(updated_pods, desired_updated_pods):
             test_settings.UPDATED_PODS: updated_pods,
             test_settings.DESIRED_UPDATED_PODS: desired_updated_pods,
         }}
-    return _generate_manifest(test_settings.FAKE_NODE_PODS_NAME, k8s_daemon_set_status)
+    return _generate_manifest(test_settings.FAKE_DAEMON_SET_NAME, k8s_daemon_set_status)
 
 
 def get_fake_k8s_pod_manifest():
