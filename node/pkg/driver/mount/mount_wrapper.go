@@ -14,6 +14,8 @@
  * limitations under the License.
  */
 
+package mount
+
 import (
 	"bufio"
 	"context"
@@ -587,7 +589,7 @@ func (m *Mounter) tryUnmount(ctx context.Context, target string, flags int, time
 // ExecuteHostLevelUnmount switches the current OS thread into Host PID 1's 
 // mount namespace to execute a native VFS unmount with specific system flags,
 // bypassing container upgrade leaks and asynchronous udev/namespace lockups.
-func ((m *Mounter) ExecuteHostLevelUnmount(targetPath string, flags int) error {
+func (m *Mounter) ExecuteHostLevelUnmount(targetPath string, flags int) error {
 	// 1. Lock the current goroutine to a single operating system thread.
 	// This prevents the Go runtime scheduler from moving this execution onto a different thread
 	// mid-operation, which would instantly corrupt namespace tracking.
