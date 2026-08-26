@@ -5378,8 +5378,8 @@ func (r *OsDeviceConnectivityHelperGeneric) GetMpathDeviceName(ctx context.Conte
 	return "", fmt.Errorf("could not resolve a valid multipath device for path %s", volumePath)
 }
 
-// resolveIdToKernelName behaves as a high-speed utility leaf.
-// FIXED: Receiver type aligned cleanly across the package module structure
+// resolveIdToKernelName performs an O(1) symbolic link evaluation to translate a device's
+// major and minor metadata coordinates back into its active canonical kernel block device name.
 func (r *OsDeviceConnectivityHelperGeneric) resolveIdToKernelName(ctx context.Context, gater *executer.KeyedGater, major, minor uint64) (string, error) {
 	if err := ctx.Err(); err != nil {
 		return "", err
@@ -5389,7 +5389,11 @@ func (r *OsDeviceConnectivityHelperGeneric) resolveIdToKernelName(ctx context.Co
 
 	realPath, err := filepath.EvalSymlinks(sysPath)
 	if err != nil {
-		return "", fmt.Errorf("failed to resolve sysfs link %s: %w", sysPath, err)
+		// FIXED: Catch detached or unmapped storage states clearly for upper orchestration tracking
+		if os.IsNotExist(err) {
+			return "", fmt.Errorf("block device %d:%d has been detached from host layer (stale reference): %w", major, minor, err)
+		}
+		return "", fmt.Errorf("failed to resolve canonical sysfs block link %s: %w", sysPath, err)
 	}
 
 	return filepath.Base(realPath), nil
@@ -5818,117 +5822,66 @@ func (o *OsDeviceConnectivityHelperGeneric) GetOpenCount(ctx context.Context, dm
 	)
 }
 
-// TODO there's also a version in mount_wrapper.go - GetMajorMinorFromSysfs
-// GetMajorMinorFromSysfs safe-resolves unique identifiers from sysfs block storage descriptors across old and new kernels.
-func (r *OsDeviceConnectivityHelperGeneric) GetMajorMinorFromSysfs(ctx context.Context, devicePath string) (major uint32, minor uint32, err error) {
+// GetMajorMinorFromSysfs takes an absolute device path or raw kernel block name 
+// (e.g., "/dev/sda1", "dm-0", "dasda") and extracts its true major and minor numbers.
+// This approach is completely agnostic to driver prefixes (sd, dm, dasd, nvme).
+func (of *GetDmsPathHelperGeneric) GetMajorMinorFromSysfs(ctx context.Context, deviceInput string) (major uint64, minor uint64, err error) {
 	if err := ctx.Err(); err != nil {
-		return 0, 0, err
+		return 0, 0, ctx.Err()
 	}
 
-	var s syscall.Stat_t
-	if errStat := syscall.Stat(devicePath, &s); errStat != nil {
-		return 0, 0, fmt.Errorf("failed to stat device path %s: %w", devicePath, errStat)
+	// 1. Sanitize input to build a valid absolute node pathway under /dev
+	baseName := filepath.Base(deviceInput)
+	if baseName == "" || baseName == "." || baseName == "/" {
+		return 0, 0, fmt.Errorf("invalid or corrupt block device identifier provided: '%s'", deviceInput)
 	}
+	
+	deviceNodePath := filepath.Join("/dev", baseName)
 
-	major = unix.Major(s.Rdev)
-	minor = unix.Minor(s.Rdev)
-	name := filepath.Base(devicePath)
-
-	if (s.Mode&syscall.S_IFMT) == syscall.S_IFCHR && strings.HasPrefix(name, "sg") {
-		sysPath := fmt.Sprintf("/sys/class/scsi_generic/%s/device", name)
-		
-		canonicalTargetDir, errLink := filepath.EvalSymlinks(sysPath)
-		if errLink == nil {
-			// FIXED: Enforce absolute root tracking if sysfs returns relative symlinks
-			if !filepath.IsAbs(canonicalTargetDir) {
-				canonicalTargetDir = filepath.Clean(filepath.Join("/sys/class/scsi_generic", name, canonicalTargetDir))
-			}
-			blockPath := filepath.Join(canonicalTargetDir, "block")
-
-			blockEntries, errDir := func() ([]os.DirEntry, error) {
-				dFile, errOpen := os.Open(blockPath)
-				if errOpen != nil {
-					return nil, errOpen
-				}
-				defer dFile.Close()
-
-				const maxCapCeiling = 10000
-				var allEntries []os.DirEntry
-				
-				for {
-					if err := ctx.Err(); err != nil {
-						return nil, err
-					}
-
-					entries, errEntries := dFile.ReadDir(100)
-					if errEntries != nil && errEntries != io.EOF {
-						return nil, errEntries
-					}
-					
-					for _, entry := range entries {
-						if len(allEntries) >= maxCapCeiling {
-							logger.Warningf("[VFS-Guard] Block entries mapping list reached safe allocation ceiling (%d). Truncating scan pass.", maxCapCeiling)
-							break
-						}
-						allEntries = append(allEntries, entry)
-					}
-					
-					if len(allEntries) >= maxCapCeiling || len(entries) < 100 || errEntries == io.EOF {
-						break
-					}
-				}
-				return allEntries, nil
-			}()
-			
-			if errDir == nil && len(blockEntries) > 0 {
-				sdName := blockEntries[0].Name()
-				
-				siblingNode := filepath.Join("/dev", sdName)
-				if fi, errLstat := os.Lstat(siblingNode); errLstat == nil {
-					if statT, ok := fi.Sys().(*syscall.Stat_t); ok {
-						major = unix.Major(statT.Rdev)
-						minor = unix.Minor(statT.Rdev)
-					}
-				} else {
-					ueventPath := filepath.Join(blockPath, sdName, "uevent")
-					data, errRead := secureReadSysfs(ctx, r.KeyedGater, sdName, ueventPath)
-					if errRead == nil && data != "" {
-						major, minor = r.parseUeventMajorMinor(data)
-					}
-				}
-			}
+	// 2. Perform a low-level Stat call to extract raw kernel device properties directly
+	var stat syscall.Stat_t
+	if errStat := syscall.Stat(deviceNodePath, &stat); errStat != nil {
+		// FALLBACK: If the /dev node is missing due to udev user-space rendering lag,
+		// parse the values directly from the kernel's sysfs block configuration framework.
+		sysfsDevPath := filepath.Join("/sys/block", baseName, "dev")
+		if _, errErr := os.Stat(sysfsDevPath); os.IsNotExist(errErr) {
+			// Handle partitioned systems safely (e.g., sda1 or dasda1 tracking parameters)
+			sysfsDevPath = filepath.Join("/sys/class/block", baseName, "dev")
 		}
+
+		devBytes, errRead := os.ReadFile(sysfsDevPath)
+		if errRead != nil {
+			return 0, 0, fmt.Errorf("device node %s not found and sysfs resolution failed: %w", deviceNodePath, errRead)
+		}
+
+		// Sysfs formats major:minor as "8:16\n"
+		sysfsStr := strings.TrimSpace(string(devBytes))
+		_, errScan := fmt.Sscanf(sysfsStr, "%d:%d", &major, &minor)
+		if errScan != nil {
+			return 0, 0, fmt.Errorf("corrupt device number format detected inside sysfs path %s: %w", sysfsDevPath, errScan)
+		}
+
+		logger.Debugf("[Topology-Util] Resolved major/minor via sysfs fallback for '%s': %d:%d", baseName, major, minor)
+		return major, minor, nil
 	}
+
+	// 3. Verify that the file node is a valid block device (S_IFBLK)
+	if stat.Mode&syscall.S_IFMT != syscall.S_IFBLK {
+		return 0, 0, fmt.Errorf("target node pathway '%s' exists but is not an active block storage device", deviceNodePath)
+	}
+
+	// 4. Bit-shift the raw system rdev (dev_t) values. 
+	// This matches the Linux kernel's internal layout parameters exactly, completely bypassing string checks.
+	// Raw Rdev extraction handles uint64 boundaries natively without data truncation.
+	rawRdev := uint64(stat.Rdev)
+	major = (rawRdev >> 8) & 0xfff
+	major |= (rawRdev >> 32) & ^uint64(0xfff)
+	minor = rawRdev & 0xff
+	minor |= (rawRdev >> 12) & ^uint64(0xff)
+
+	logger.Debugf("[Topology-Util] Extracted native kernel major/minor for '%s': %d:%d", baseName, major, minor)
 	return major, minor, nil
 }
-
-// parseUeventMajorMinor parses the MAJOR and MINOR values from a sysfs uevent file cleanly.
-func (r *OsDeviceConnectivityHelperGeneric) parseUeventMajorMinor(data string) (major uint32, minor uint32) {
-	scanner := bufio.NewScanner(strings.NewReader(data))
-	for scanner.Scan() {
-		line := scanner.Text()
-		parts := strings.SplitN(line, "=", 2)
-		if len(parts) != 2 {
-			continue
-		}
-
-		key := parts[0]
-		val := parts[1]
-
-		switch key {
-		case "MAJOR":
-			if v, err := strconv.ParseUint(val, 10, 32); err == nil {
-				major = uint32(v)
-			}
-		case "MINOR":
-			if v, err := strconv.ParseUint(val, 10, 32); err == nil {
-				minor = uint32(v)
-			}
-		}
-	}
-	return major, minor
-}
-
 
 //In GetDeviceWWID, you call GetWwnByScsiInq.
 //The Rescue Logic: If GetWwnByScsiInq fails because the path is blocked, the GetGaterKey should still return a key based on Major:Minor to ensure the Rescue Operations (like dmsetup error table swap) are properly synchronized.
