@@ -24,7 +24,6 @@ import (
 	"os"
 	"path"
 	"path/filepath"
-	"runtime"	
 	"strconv"
 	"strings"
 	"sync"
@@ -464,7 +463,6 @@ func (m *Mounter) tryUnmount(ctx context.Context, target string, flags int, time
 	}
 
 	go func(wCtx context.Context, path string, initialFlags int, s *mountSession) {
-		podPath := GetPodPath(path)
 		retryDelay := 100 * time.Millisecond
 		var lastErr error
 
@@ -487,7 +485,7 @@ func (m *Mounter) tryUnmount(ctx context.Context, target string, flags int, time
 					if currentFlags == 0 {
 						logger.Errorf("[Mounter-Gate] Context expiring for %s. Escalating to final MNT_DETACH sweep pass...", path)
 						currentFlags = syscall.MNT_DETACH
-						err := ExecuteHostLevelUnmount(path, currentFlags)
+						err := m.ExecuteHostLevelUnmount(path, currentFlags)
 						if err == nil || err == syscall.ENOENT || err == syscall.EINVAL {
 							m.stuckMounts.Delete(path)
 							m.stuckCount.Add(-1)
@@ -605,11 +603,11 @@ func (m *Mounter) ExecuteHostLevelUnmount(targetPath string, flags int) error {
 	}
 
 	// Append the clean, host-perspective destination directory tracking string
-	args = append(args, target)
+	args = append(args, targetPath)
 	
-	output, err := mounter.executer.ExecuteWithTimeout(int(timeout.Seconds()*1000), "umount", args)
+	output, err := m.executer.ExecuteWithTimeout(int(timeout.Seconds()*1000), "umount", args)
 	if err != nil {
-			return fmt.Errorf("Unmount failed: %v\nUnmounting arguments: %s\nOutput: %s\n", err, target, string(output))
+			return fmt.Errorf("Unmount failed: %v\nUnmounting arguments: %s\nOutput: %s\n", err, targetPath, string(output))
 	}
 	return nil
 }
