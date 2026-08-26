@@ -5030,18 +5030,17 @@ func (o *OsDeviceConnectivityHelperGeneric) isSCSIDeviceBlocked(ctx context.Cont
 	}
 
 	statePath := filepath.Join(sysBlockTarget, "device", "state")
-	logger.Warningf("path state %s", statePath)
 	
 	// FIXED: Direct file read replaced with the context-respecting secureReadSysfs utility.
 	// Isolates locking tokens to individual disk-level name keys to prevent global pool serialization blocks.
 	stateBytesStr, err := secureReadSysfs(ctx, o.KeyedGater, cleanName, statePath)
 	if err != nil || stateBytesStr == "" {
-		logger.Warningf("error reading scsi device state node: %v", err)
+		logger.Warningf("error reading scsi device state %s node: %v", statePath, err)
 		return true 
 	}
 
 	s := strings.TrimSpace(stateBytesStr)
-	logger.Warningf("state %s", s)
+	logger.Warningf("path %s state %s", statePath, s)
 	
 	switch s {
 	case "running":
@@ -5371,7 +5370,7 @@ func (r *OsDeviceConnectivityHelperGeneric) GetMpathDeviceName(ctx context.Conte
 	}
 
 	if major > 0 {
-		if kernelName, err := r.resolveIdToKernelName(ctx, gater, uint32(major), uint32(minor)); err == nil {
+		if kernelName, err := r.resolveIdToKernelName(ctx, gater, major, (minor); err == nil {
 			return kernelName, nil
 		}
 	}
@@ -5381,7 +5380,7 @@ func (r *OsDeviceConnectivityHelperGeneric) GetMpathDeviceName(ctx context.Conte
 
 // resolveIdToKernelName behaves as a high-speed utility leaf.
 // FIXED: Receiver type aligned cleanly across the package module structure
-func (r *OsDeviceConnectivityHelperGeneric) resolveIdToKernelName(ctx context.Context, gater *executer.KeyedGater, major, minor uint32) (string, error) {
+func (r *OsDeviceConnectivityHelperGeneric) resolveIdToKernelName(ctx context.Context, gater *executer.KeyedGater, major, minor uint64) (string, error) {
 	if err := ctx.Err(); err != nil {
 		return "", err
 	}
@@ -6679,6 +6678,23 @@ func (of *GetDmsPathHelperGeneric) EvaluateSysfsTopology(ctx context.Context, ga
 	// PHASE 1: DEVICE-MAPPER (DM) EVALUATION
 	// =========================================================================
 	logger.Debugf("[EvalTopology-Trace] [Phase-1-DM] Starting Device Mapper evaluation pass...")
+	hasDevice, isPending, devName := EvaluateSysfsTopologyScanDM(ctx, gater, devNames, rawScsiTarget, rawNvmeTarget)
+	if hasDevice || devName != "" {
+		return hasDevice, isPending, devName
+	}
+
+	logger.Debugf("[EvalTopology-Trace] [Phase-2-NVMe] Starting Native NVMe namespace evaluation pass...")
+	
+	hasDevice, isPending, devName := EvaluateSysfsTopologyScanNvme(ctx, gater, devNames, rawScsiTarget, rawNvmeTarget)
+	if hasDevice || devName != "" {
+		return hasDevice, isPending, devName
+	}
+	
+
+	return false, false, ""
+}
+
+func (of *GetDmsPathHelperGeneric) EvaluateSysfsTopologyScanDM(ctx context.Context, gater *executer.KeyedGater, devNames []string, rawScsiTarget string, rawNvmeTarget string) (hasDevice bool, isPending bool, devName string) {
 	for _, name := range devNames {
 		if err := ctx.Err(); err != nil {
 			return false, false, ""
@@ -6721,14 +6737,14 @@ func (of *GetDmsPathHelperGeneric) EvaluateSysfsTopology(ctx context.Context, ga
 			logger.Infof("[EvalTopology-Trace] [Phase-1-DM] Returning active match with ready state: (hasDevice=true, isPending=false, name='%s')", name)
 			return true, false, name
 		}
+	
 	}
 	logger.Debugf("[EvalTopology-Trace] [Phase-1-DM] No matches validated in Device Mapper channel.")
+	
+	return false, false, ""
+}
 
-	// =========================================================================
-	// PHASE 2: NATIVE NVME NAMESPACE EVALUATION
-	// =========================================================================
-	logger.Debugf("[EvalTopology-Trace] [Phase-2-NVMe] Starting Native NVMe namespace evaluation pass...")
-
+func (of *GetDmsPathHelperGeneric) EvaluateSysfsTopologyScanNvme(ctx context.Context, gater *executer.KeyedGater, devNames []string, rawScsiTarget string, rawNvmeTarget string) (hasDevice bool, isPending bool, devName string) {
 	for _, name := range devNames {
 		if err := ctx.Err(); err != nil {
 			return false, false, ""
@@ -6820,9 +6836,8 @@ func (of *GetDmsPathHelperGeneric) EvaluateSysfsTopology(ctx context.Context, ga
 			return true, false, baseBlockName
 		}
 	}
-
 	logger.Infof("[EvalTopology-Trace] No matching topologies discovered for identifier: '%s'", rawScsiTarget)
-	return false, false, ""
+
 }
 
 // getControllerEntries scans the universal /sys/class/nvme adapter tree safely.
@@ -6964,38 +6979,7 @@ func (of *GetDmsPathHelperGeneric) EvaluateSpecificSysfsTopology(
 	// TARGETED SPECIFIC DM LAYER EVALUATION
 	// =========================================================================
 	if isDM {
-		logger.Debugf("[SpecTopology-Trace] [Phase-1-DM] Target '%s' is Device Mapper. Reading UUID...", dmName)
-		var contentBytesStr string
-		var readErr error
-
-		if contentBytesStr, readErr = secureReadSysfs(ctx, gater, dmName, filepath.Join(dmPath, "dm", "uuid")); readErr != nil {
-			if contentBytesStr, readErr = secureReadSysfs(ctx, gater, dmName, filepath.Join(dmPath, "uuid")); readErr != nil {
-				contentBytesStr, _ = secureReadSysfs(ctx, gater, dmName, filepath.Join(dmPath, "dm", "name"))
-			}
-		}
-
-		if contentBytesStr != "" {
-			foundUUID := normalizeWWID(contentBytesStr)
-			logger.Debugf("[SpecTopology-Trace] [Phase-1-DM] Found UUID string '%s' normalized to '%s'", contentBytesStr, foundUUID)
-			
-			if foundUUID == rawScsiTarget || foundUUID == rawNvmeTarget {
-				logger.Infof("[SpecTopology-Trace] [Phase-1-DM] Identity match validated strictly for target %s", dmName)
-
-				roBytesStr, errRo := secureReadSysfs(ctx, gater, dmName, filepath.Join(dmPath, "ro"))
-				isReadOnly := errRo == nil && strings.TrimSpace(roBytesStr) != "0"
-
-				suspendedBytesStr, errSusp := secureReadSysfs(ctx, gater, dmName, filepath.Join(dmPath, "dm", "suspended"))
-				isSuspended := errSusp == nil && strings.TrimSpace(suspendedBytesStr) == "1"
-
-				logger.Debugf("[SpecTopology-Trace] [Phase-1-DM] Flags for '%s': isReadOnly=%v, isSuspended=%v", dmName, isReadOnly, isSuspended)
-				if isSuspended || isReadOnly {
-					return true, true, nil 
-				}
-				return true, false, nil 
-			}
-		}
-		logger.Infof("[SpecTopology-Trace] [Phase-1-DM] No matching UUID on Device Mapper target: %s", dmName)
-		return false, false, nil 
+		return EvaluateSpecificSysfsTopologyDM(ctx, gater, dmName, rawScsiTarget, rawNvmeTarget)
 	}
 
 	// =========================================================================
@@ -7003,139 +6987,192 @@ func (of *GetDmsPathHelperGeneric) EvaluateSpecificSysfsTopology(
 	// =========================================================================
 	helper := GetDmsPathHelperGeneric{}
 	if helper.IsNativeNvmeNamespace(dmName) || strings.HasPrefix(dmName, "nvme") {
-		logger.Debugf("[SpecTopology-Trace] [Phase-2-NVMe] Target '%s' evaluated as native NVMe footprint.", dmName)
-		baseBlockName := dmName
-		targetSysDir := dmPath
-		
-		if strings.Contains(dmName, "c") {
-			if lastNIdx := strings.LastIndex(dmName, "n"); lastNIdx != -1 && lastNIdx > 0 {
-				if cIdx := strings.Index(dmName, "c"); cIdx != -1 && cIdx < lastNIdx {
-					ctrlPart := dmName[:cIdx]  
-					nsPart := dmName[lastNIdx:] 
-					baseBlockName = ctrlPart + nsPart 
-					targetSysDir = filepath.Join("/sys/block", baseBlockName)
-					
-					if _, errStat := os.Stat(targetSysDir); os.IsNotExist(errStat) {
-						targetSysDir = filepath.Join("/sys/class/block", baseBlockName)
-					}
-					if resolvedBlock, errLink := filepath.EvalSymlinks(targetSysDir); errLink == nil {
-						targetSysDir = resolvedBlock
-						baseBlockName = filepath.Base(resolvedBlock)
-					}
-					logger.Debugf("[SpecTopology-Trace] Normalized virtual block node routing path: %s -> %s", dmName, targetSysDir)
-				}
-			}
-		}
-
-		var availableIDs []string
-		var discoveredID string // FIXED: Declared missing local identifier variable safely
-
-		deviceNode := filepath.Join("/dev", dmName)
-		if df, errOpen := os.OpenFile(deviceNode, os.O_RDONLY|syscall.O_NONBLOCK, 0); errOpen == nil {
-			var nvmeInfo nvmeIdTarget
-			_, _, errno := unix.Syscall(
-				unix.SYS_IOCTL,
-				df.Fd(),
-				uintptr(NVME_IOCTL_ID_TARGET),
-				uintptr(unsafe.Pointer(&nvmeInfo)),
-			)
-			df.Close()
-
-			if errno == 0 {
-				discoveredID = normalizeWWID(fmt.Sprintf("%x", nvmeInfo.Nguid))
-				if discoveredID != "" && discoveredID != "00000000000000000000000000000000" {
-					availableIDs = append(availableIDs, discoveredID)
-					logger.Debugf("[SpecTopology-Trace] Discovered NGUID via ioctl: '%s'", discoveredID)
-				}
-			}
-		}
-
-		if len(availableIDs) == 0 {
-			if data, err := secureReadSysfs(ctx, gater, baseBlockName, filepath.Join(targetSysDir, "device", "wwid")); err == nil && data != "" {
-				availableIDs = append(availableIDs, normalizeWWID(data))
-			}
-			if data, err := secureReadSysfs(ctx, gater, baseBlockName, filepath.Join(targetSysDir, "uuid")); err == nil && data != "" {
-				availableIDs = append(availableIDs, normalizeWWID(data))
-			}
-			if data, err := secureReadSysfs(ctx, gater, baseBlockName, filepath.Join(targetSysDir, "nguid")); err == nil && data != "" {
-				availableIDs = append(availableIDs, normalizeWWID(data))
-			}
-		}
-
-		matchFound := false
-		for _, rawID := range availableIDs {
-			if rawID == rawNvmeTarget {
-				matchFound = true
-				logger.Infof("[SpecTopology-Trace] NVMe Target candidate matched successfully: '%s'", rawID)
-				break
-			}
-		}
-
-		if matchFound {
-			roBytesStr, errRo := secureReadSysfs(ctx, gater, baseBlockName, filepath.Join(targetSysDir, "ro"))
-			isReadOnly := errRo == nil && strings.TrimSpace(roBytesStr) != "0"
-
-			var isControllerTransitioning bool
-			controllerDir := "/sys/class/nvme"
-			dFile, errOpen := os.Open(controllerDir)
-			
-			var controllerEntries []string
-			if errOpen == nil {
-				candidates := make([]string, 0, 32)
-				for {
-					if err := ctx.Err(); err != nil {
-						break
-					}
-					entries, errEntries := dFile.ReadDir(100)
-					if errEntries != nil && errEntries != io.EOF {
-						break
-					}
-					for _, entry := range entries {
-						if len(candidates) >= maxCapCeiling {
-							break
-						}
-						candidates = append(candidates, entry.Name())
-					}
-					if len(candidates) >= maxCapCeiling || len(entries) < 100 || errEntries == io.EOF {
-						break
-					}
-				}
-				dFile.Close()
-				controllerEntries = candidates
-			}
-
-			for _, entryName := range controllerEntries {
-				if err := ctx.Err(); err != nil {
-					return false, false, ctx.Err()
-				}
-
-				if strings.HasPrefix(entryName, "nvme") && !strings.Contains(entryName, "-") && !nvmeNamespaceRegex.MatchString(entryName) {
-					subsysPath := filepath.Join("/sys/class/nvme", entryName, fmt.Sprintf("%s/wwid", baseBlockName))
-					if _, errStat := os.Stat(subsysPath); errStat == nil {
-						statePath := filepath.Join("/sys/class/nvme", entryName, "state")
-						// FIXED: Passed entryName instead of baseBlockName to key secureReadSysfs correctly to the adapter
-						if stateBytesStr, errState := secureReadSysfs(ctx, gater, entryName, statePath); errState == nil {
-							state := strings.ToLower(strings.TrimSpace(stateBytesStr))
-							logger.Debugf("[SpecTopology-Trace] Controller adapter '%s' state is '%s'", entryName, state)
-							if state == "resetting" || state == "connecting" || state == "deleting" {
-								logger.Warningf("[SpecTopology-Trace] Transition state active on controller '%s': '%s'", entryName, state)
-								isControllerTransitioning = true
-								break
-							}
-						}
-					}
-				}
-			}
-
-			if isControllerTransitioning || isReadOnly {
-				return true, true, nil
-			}
-			return true, false, nil
-		}
+		return EvaluateSpecificSysfsTopologyNvme(ctx, gater, dmName, dmPath, rawNvmeTarget)
 	}
 
 	logger.Infof("[SpecTopology-Trace] No specific matching configuration found for '%s'", targetDeviceName)
 	return false, false, nil
+}
+
+func (of *GetDmsPathHelperGeneric) EvaluateSpecificSysfsTopologyDM(
+	ctx context.Context, 
+	gater *executer.KeyedGater, 
+	dmName string, 
+	rawScsiTarget string, 
+	rawNvmeTarget string,
+) (hasDevice bool, isPending bool, err error) {
+	logger.Debugf("[SpecTopology-Trace] [Phase-1-DM] Target '%s' is Device Mapper. Reading UUID...", dmName)
+	var contentBytesStr string
+	var readErr error
+
+	if contentBytesStr, readErr = secureReadSysfs(ctx, gater, dmName, filepath.Join(dmPath, "dm", "uuid")); readErr != nil {
+		if contentBytesStr, readErr = secureReadSysfs(ctx, gater, dmName, filepath.Join(dmPath, "uuid")); readErr != nil {
+			contentBytesStr, _ = secureReadSysfs(ctx, gater, dmName, filepath.Join(dmPath, "dm", "name"))
+		}
+	}
+
+	if contentBytesStr != "" {
+		foundUUID := normalizeWWID(contentBytesStr)
+		logger.Debugf("[SpecTopology-Trace] [Phase-1-DM] Found UUID string '%s' normalized to '%s'", contentBytesStr, foundUUID)
+		
+		if foundUUID == rawScsiTarget || foundUUID == rawNvmeTarget {
+			logger.Infof("[SpecTopology-Trace] [Phase-1-DM] Identity match validated strictly for target %s", dmName)
+
+			roBytesStr, errRo := secureReadSysfs(ctx, gater, dmName, filepath.Join(dmPath, "ro"))
+			isReadOnly := errRo == nil && strings.TrimSpace(roBytesStr) != "0"
+
+			suspendedBytesStr, errSusp := secureReadSysfs(ctx, gater, dmName, filepath.Join(dmPath, "dm", "suspended"))
+			isSuspended := errSusp == nil && strings.TrimSpace(suspendedBytesStr) == "1"
+
+			logger.Debugf("[SpecTopology-Trace] [Phase-1-DM] Flags for '%s': isReadOnly=%v, isSuspended=%v", dmName, isReadOnly, isSuspended)
+			if isSuspended || isReadOnly {
+				return true, true, nil 
+			}
+			return true, false, nil 
+		}
+	}
+	logger.Infof("[SpecTopology-Trace] [Phase-1-DM] No matching UUID on Device Mapper target: %s", dmName)
+	return false, false, nil 
+
+}
+
+func (of *GetDmsPathHelperGeneric) EvaluateSpecificSysfsTopologyNvme(
+	ctx context.Context, 
+	gater *executer.KeyedGater, 
+	dmName string, 
+	dmPath string,
+	rawNvmeTarget string, 
+) (hasDevice bool, isPending bool, err error) {
+	logger.Debugf("[SpecTopology-Trace] [Phase-2-NVMe] Target '%s' evaluated as native NVMe footprint.", dmName)
+	baseBlockName := dmName
+	targetSysDir := dmPath
+	
+	if strings.Contains(dmName, "c") {
+		if lastNIdx := strings.LastIndex(dmName, "n"); lastNIdx != -1 && lastNIdx > 0 {
+			if cIdx := strings.Index(dmName, "c"); cIdx != -1 && cIdx < lastNIdx {
+				ctrlPart := dmName[:cIdx]  
+				nsPart := dmName[lastNIdx:] 
+				baseBlockName = ctrlPart + nsPart 
+				targetSysDir = filepath.Join("/sys/block", baseBlockName)
+				
+				if _, errStat := os.Stat(targetSysDir); os.IsNotExist(errStat) {
+					targetSysDir = filepath.Join("/sys/class/block", baseBlockName)
+				}
+				if resolvedBlock, errLink := filepath.EvalSymlinks(targetSysDir); errLink == nil {
+					targetSysDir = resolvedBlock
+					baseBlockName = filepath.Base(resolvedBlock)
+				}
+				logger.Debugf("[SpecTopology-Trace] Normalized virtual block node routing path: %s -> %s", dmName, targetSysDir)
+			}
+		}
+	}
+
+	var availableIDs []string
+	var discoveredID string // FIXED: Declared missing local identifier variable safely
+
+	deviceNode := filepath.Join("/dev", dmName)
+	if df, errOpen := os.OpenFile(deviceNode, os.O_RDONLY|syscall.O_NONBLOCK, 0); errOpen == nil {
+		var nvmeInfo nvmeIdTarget
+		_, _, errno := unix.Syscall(
+			unix.SYS_IOCTL,
+			df.Fd(),
+			uintptr(NVME_IOCTL_ID_TARGET),
+			uintptr(unsafe.Pointer(&nvmeInfo)),
+		)
+		df.Close()
+
+		if errno == 0 {
+			discoveredID = normalizeWWID(fmt.Sprintf("%x", nvmeInfo.Nguid))
+			if discoveredID != "" && discoveredID != "00000000000000000000000000000000" {
+				availableIDs = append(availableIDs, discoveredID)
+				logger.Debugf("[SpecTopology-Trace] Discovered NGUID via ioctl: '%s'", discoveredID)
+			}
+		}
+	}
+
+	if len(availableIDs) == 0 {
+		if data, err := secureReadSysfs(ctx, gater, baseBlockName, filepath.Join(targetSysDir, "device", "wwid")); err == nil && data != "" {
+			availableIDs = append(availableIDs, normalizeWWID(data))
+		}
+		if data, err := secureReadSysfs(ctx, gater, baseBlockName, filepath.Join(targetSysDir, "uuid")); err == nil && data != "" {
+			availableIDs = append(availableIDs, normalizeWWID(data))
+		}
+		if data, err := secureReadSysfs(ctx, gater, baseBlockName, filepath.Join(targetSysDir, "nguid")); err == nil && data != "" {
+			availableIDs = append(availableIDs, normalizeWWID(data))
+		}
+	}
+
+	matchFound := false
+	for _, rawID := range availableIDs {
+		if rawID == rawNvmeTarget {
+			matchFound = true
+			logger.Infof("[SpecTopology-Trace] NVMe Target candidate matched successfully: '%s'", rawID)
+			break
+		}
+	}
+
+	if matchFound {
+		roBytesStr, errRo := secureReadSysfs(ctx, gater, baseBlockName, filepath.Join(targetSysDir, "ro"))
+		isReadOnly := errRo == nil && strings.TrimSpace(roBytesStr) != "0"
+
+		var isControllerTransitioning bool
+		controllerDir := "/sys/class/nvme"
+		dFile, errOpen := os.Open(controllerDir)
+		
+		var controllerEntries []string
+		if errOpen == nil {
+			candidates := make([]string, 0, 32)
+			for {
+				if err := ctx.Err(); err != nil {
+					break
+				}
+				entries, errEntries := dFile.ReadDir(100)
+				if errEntries != nil && errEntries != io.EOF {
+					break
+				}
+				for _, entry := range entries {
+					if len(candidates) >= maxCapCeiling {
+						break
+					}
+					candidates = append(candidates, entry.Name())
+				}
+				if len(candidates) >= maxCapCeiling || len(entries) < 100 || errEntries == io.EOF {
+					break
+				}
+			}
+			dFile.Close()
+			controllerEntries = candidates
+		}
+
+		for _, entryName := range controllerEntries {
+			if err := ctx.Err(); err != nil {
+				return false, false, ctx.Err()
+			}
+
+			if strings.HasPrefix(entryName, "nvme") && !strings.Contains(entryName, "-") && !nvmeNamespaceRegex.MatchString(entryName) {
+				subsysPath := filepath.Join("/sys/class/nvme", entryName, fmt.Sprintf("%s/wwid", baseBlockName))
+				if _, errStat := os.Stat(subsysPath); errStat == nil {
+					statePath := filepath.Join("/sys/class/nvme", entryName, "state")
+					// FIXED: Passed entryName instead of baseBlockName to key secureReadSysfs correctly to the adapter
+					if stateBytesStr, errState := secureReadSysfs(ctx, gater, entryName, statePath); errState == nil {
+						state := strings.ToLower(strings.TrimSpace(stateBytesStr))
+						logger.Debugf("[SpecTopology-Trace] Controller adapter '%s' state is '%s'", entryName, state)
+						if state == "resetting" || state == "connecting" || state == "deleting" {
+							logger.Warningf("[SpecTopology-Trace] Transition state active on controller '%s': '%s'", entryName, state)
+							isControllerTransitioning = true
+							break
+						}
+					}
+				}
+			}
+		}
+
+		if isControllerTransitioning || isReadOnly {
+			return true, true, nil
+		}
+		return true, false, nil
+	}
+
 }
 
 // getRoStatus reads the read-only file attribute for a targeted block device name securely passing contexts.
