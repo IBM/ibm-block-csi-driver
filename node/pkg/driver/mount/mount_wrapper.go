@@ -14,8 +14,6 @@
  * limitations under the License.
  */
 
-package mount
-
 import (
 	"bufio"
 	"context"
@@ -24,6 +22,7 @@ import (
 	"os"
 	"path"
 	"path/filepath"
+	"runtime"	
 	"strconv"
 	"strings"
 	"sync"
@@ -503,7 +502,7 @@ func (m *Mounter) tryUnmount(ctx context.Context, target string, flags int, time
 			}
 
 			// 3. RUN THE SYSCALL
-			err := syscall.Unmount(podPath, currentFlags)
+			err := m.ExecuteHostLevelUnmount(path, currentFlags)
 			if err == nil {
 				logger.Infof("[Mounter-Gate] Success! Path %s unmounted cleanly after %v total time.", path, totalElapsed)
 				m.stuckMounts.Delete(path) // Clear historical footprint only on definitive victory
@@ -583,6 +582,56 @@ func (m *Mounter) tryUnmount(ctx context.Context, target string, flags int, time
 		return fmt.Errorf("unmount timeout (%v) reached for %s", timeout, target)
 	}
 }
+
+
+// ExecuteHostLevelUnmount switches the current OS thread into Host PID 1's 
+// mount namespace to execute a native VFS unmount with specific system flags,
+// bypassing container upgrade leaks and asynchronous udev/namespace lockups.
+func ((m *Mounter) ExecuteHostLevelUnmount(targetPath string, flags int) error {
+	// 1. Lock the current goroutine to a single operating system thread.
+	// This prevents the Go runtime scheduler from moving this execution onto a different thread
+	// mid-operation, which would instantly corrupt namespace tracking.
+	runtime.LockOSThread()
+	defer runtime.UnlockOSThread()
+
+	// 2. Open handles to your current (container) namespace and the host (PID 1) namespace
+	currentNsFd, errCur := os.Open("/proc/self/ns/mnt")
+	if errCur != nil {
+		return fmt.Errorf("failed to open current container mount namespace tracking handle: %w", errCur)
+	}
+	defer currentNsFd.Close()
+
+	hostNsFd, errHost := os.Open("/proc/1/ns/mnt")
+	if errHost != nil {
+		return fmt.Errorf("failed to open Host PID 1 target mount namespace (verify privileged container rules): %w", errHost)
+	}
+	defer hostNsFd.Close()
+
+	// 3. PIERCE THE NAMESPACE: Switch this specific thread into the Host's mount namespace.
+	// CLONE_NEWNS (0x00020000) tells the kernel to shift our mount tracking table view.
+	if errSetNs := unix.Setns(int(hostNsFd.Fd()), unix.CLONE_NEWNS); errSetNs != nil {
+		return fmt.Errorf("failed to escape container namespace boundary via setns operation: %w", errSetNs)
+	}
+
+	// 4. Defer switching back to the container's original namespace before unlocking the thread
+	defer func() {
+		if errRestore := unix.Setns(int(currentNsFd.Fd()), unix.CLONE_NEWNS); errRestore != nil {
+			logger.Errorf("[Namespace-Bridge] CRITICAL: Failed to restore container thread mount namespace: %v", errRestore)
+		}
+	}()
+
+	// 5. Run the native standard library unmount call directly on the Host's true VFS layer
+	logger.Infof("[Namespace-Bridge] Executing host-level native unmount on path: '%s' with flags: %d", targetPath, flags)
+	
+	// FIXED: Flags are now passed dynamically through the signature parameter block
+	errUnmount := syscall.Unmount(targetPath, flags)
+	if errUnmount != nil && errUnmount != syscall.EINVAL && errUnmount != syscall.ENOENT {
+		return fmt.Errorf("host-level unmount syscall rejected by kernel core: %w", errUnmount)
+	}
+
+	return nil
+}
+
 
 type SyncResult struct {
 	Success bool

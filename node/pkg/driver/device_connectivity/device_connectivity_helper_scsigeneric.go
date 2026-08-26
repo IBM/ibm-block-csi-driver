@@ -743,6 +743,10 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) flushDeviceBuffers(ctx context.C
 	if err := ctx.Err(); err != nil {
 		return err
 	}
+	
+	if err := ctx.Err(); err != nil {
+		return err
+	}
 
 	const BLKFLSBUF = 0x1261
 	sanitizedDevPath := devPath
@@ -777,32 +781,41 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) flushDeviceBuffers(ctx context.C
 		return nil
 	}
 
-	// FIXED: Open with O_WRONLY | syscall.O_NONBLOCK to bypass the kernel's 
-	// page-cache read locks, ensuring the call never stalls under multi-volume I/O load.
-	f, err := os.OpenFile(sanitizedDevPath, os.O_WRONLY|syscall.O_NONBLOCK, 0)
-	if err != nil {
-		logger.Warningf("device %s flushDeviceBuffers failed to open host descriptor: %v", devPath, err)
-		if os.IsNotExist(err) || strings.Contains(err.Error(), "no such device") {
-			logger.Infof("device %s flushDeviceBuffers: file node already cleared or unlinked. Bypassing flush.", devPath)
-			return nil 
-		}
-		return fmt.Errorf("flush: failed to open %s: %w", sanitizedDevPath, err)
+	// CRITICAL FIX: Utilized raw syscall primitives to completely isolate execution 
+	// from Go runtime descriptor manipulation. Opened strictly as O_RDONLY (Read-Only) 
+	// to avoid exclusive write conflicts, and dropped O_NONBLOCK to guarantee a fully 
+	// committed cache flush layer.
+	fd, errOpen := syscall.Open(sanitizedDevPath, syscall.O_RDONLY|syscall.O_CLOEXEC, 0)
+	if errOpen != nil {
+		logger.Errorf("[FlushBuf-Trace] Failed to open device node target %s for flushing: %v", deviceNode, errOpen)
+		return fmt.Errorf("failed to open block target %s for flush operations: %w", deviceNode, errOpen)
 	}
-	defer f.Close()
+	// Guarantee path teardown immediately following command execution bounds
+	defer syscall.Close(fd)
 
-	errIoctl := unix.IoctlSetInt(int(f.Fd()), BLKFLSBUF, 0)
+	logger.Debugf("[FlushBuf-Trace] Initiating synchronous block device cache flush via BLKFLSBUF ioctl on '%s'", dmName)
+
+	// Invoke the synchronous block cache purge macro instruction layer.
+	// This forces the kernel to run fsync_bdev and invalidate_bdev instantly.
+	errIoctl := unix.IoctlSetInt(fd, unix.BLKFLSBUF, 0)
 	if errIoctl != nil {
-		switch errIoctl {
-		case unix.ENOTTY, unix.EINVAL, unix.EIO, unix.ENOSYS, unix.EOPNOTSUPP, unix.ENXIO:
-			logger.Warningf("device %s flushDeviceBuffers absorbed expected transport error boundary: %v", devPath, errIoctl)
+		// Treat a missing or unmapped device as a non-fatal success criteria state
+		if errIoctl == syscall.ENOTTY || errIoctl == syscall.ENXIO {
+			logger.Warningf("[FlushBuf-Trace] Target device '%s' does not accept block flush macros (likely unmapped)", dmName)
 			return nil
-		default:
-			logger.Warningf("device %s flushDeviceBuffers ioctl failed unexpectedly: %v", devPath, errIoctl)
-			return fmt.Errorf("flush: ioctl BLKFLSBUF failed: %w", errIoctl)
 		}
+		
+		// Catch permissions validation failures clearly
+		if errIoctl == syscall.EACCES || errIoctl == syscall.EPERM {
+			logger.Errorf("[FlushBuf-Trace] Insufficient privilege capabilities (missing CAP_SYS_ADMIN) executing BLKFLSBUF on %s", dmName)
+			return fmt.Errorf("privileged permission fault executing buffer invalidations: %w", errIoctl)
+		}
+
+		logger.Errorf("[FlushBuf-Trace] Kernel driver ioctl failure on device %s: %v", deviceNode, errIoctl)
+		return fmt.Errorf("block hardware device cache flush operation rejected by storage sub-layer: %w", errIoctl)
 	}
 
-	logger.Infof("device %s flushDeviceBuffers successfully completed", devPath)
+	logger.Infof("[FlushBuf-Trace] Synchronous disk and buffer cache purge completed successfully for device mapper target: %s", dmName)
 	return nil
 }
 
@@ -7540,18 +7553,30 @@ func secureReadSysfs(ctx context.Context, KeyedGater      *executer.KeyedGater, 
 func ExtractNvmeControllerBase(name string) string {
 	cleanName := filepath.Base(name)
 	
-	// If it contains virtual channel routings (nvme2c0n1), strip the tail starting at the "c"
-	if cIdx := strings.Index(cleanName, "c"); cIdx != -1 && cIdx > 0 {
-		return cleanName[:cIdx] // Returns "nvme2"
+	// Handle subsystem abstractions explicitly first
+	if strings.HasPrefix(cleanName, "nvme-subsys") {
+		return cleanName
 	}
-	
-	// If it's a standard namespace block (nvme2n1), find the last "n" that isn't the first letter
-	if lastNIdx := strings.LastIndex(cleanName, "n"); lastNIdx != -1 && lastNIdx > 0 {
-		return cleanName[:lastNIdx] // Returns "nvme2"
+
+	// Rule: An NVMe controller base always matches the format "nvme" followed by digits.
+	// Find where the digits after "nvme" end, before any namespace ('n') or channel ('c') designators.
+	if !strings.HasPrefix(cleanName, "nvme") {
+		return cleanName
 	}
-	
-	// It's already a base controller node (e.g., "nvme2")
-	return cleanName
+
+	// Start scanning after the initial "nvme" string prefix (index 4)
+	endIdx := len(cleanName)
+	for i := 4; i < len(cleanName); i++ {
+		ch := cleanName[i]
+		// The moment we hit a non-digit character (like 'n' or 'c'), 
+		// we know we have fully captured the parent controller number.
+		if ch < '0' || ch > '9' {
+			endIdx = i
+			break
+		}
+	}
+
+	return cleanName[:endIdx]
 }
 
 type NvmeType string
