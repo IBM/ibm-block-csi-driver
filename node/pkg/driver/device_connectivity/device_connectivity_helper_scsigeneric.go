@@ -1132,7 +1132,7 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) ValidateLun(ctx context.Context,
 
 	for _, res := range results {
 		if res.Err != nil {
-			cumulativeErrors = append(cumulativeErrors, res.Err.Error())
+			cumulativeErrors = append(cumulativeErrors, fmt.Sprintf("[Index %d] %v", res.Index, res.Err))
 		} else if res.Data {
 			validPathsFound++
 		} else {
@@ -1155,7 +1155,7 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) ValidateLun(ctx context.Context,
 }
 
 // validateNvmePathId checks NVMe states, reads NSID/WWID/serial fields, and validates path identities.
-func (r *OsDeviceConnectivityHelperScsiGeneric) validateNvmePathId(wCtx context.Context, deviceName, baseBlockName, targetSysDir, rawScsiTarget, rawNvmeTarget) error {
+func (r *OsDeviceConnectivityHelperScsiGeneric) validateNvmePathId(wCtx context.Context, deviceName, baseBlockName, targetSysDir, rawScsiTarget, rawNvmeTarget string) error {
 	state, errState := secureReadSysfs(wCtx, r.KeyedGater, baseBlockName, filepath.Join(targetSysDir, "device", "state"))
 	if errState != nil || state != "live" {
 		logger.Warningf("NVMe path %s unavailable (state: %s, err: %v); skipping track", baseBlockName, state, errState)
@@ -1686,6 +1686,7 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) resolveTargetIDsRecursive(ctx co
 
 		uniqueIDs := make(map[string]struct{})
 		var lastErr error
+		var partialSuccess bool
 
 		// STAGE 2: SAFE DECOUPLED RECURSION PROCESS
 		for _, slaveName := range slaveNames {
@@ -1696,8 +1697,10 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) resolveTargetIDsRecursive(ctx co
 			ids, errRecursive := r.resolveTargetIDsRecursive(ctx, slaveName, currentDepth+1, maxDepth)
 			if errRecursive != nil {
 				lastErr = errRecursive
+				logger.Warningf("Failed to resolve target ID for slave link %s: %v", slaveName, errRecursive)
 				continue
 			}
+			artialSuccess = true
 			for _, id := range ids {
 				if id != "" {
 					uniqueIDs[id] = struct{}{}
@@ -1705,7 +1708,7 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) resolveTargetIDsRecursive(ctx co
 			}
 		}
 
-		if len(uniqueIDs) > 0 {
+		if partialSuccess && len(uniqueIDs) > 0 {
 			collectedIDs := make([]string, 0, len(uniqueIDs))
 			for id := range uniqueIDs {
 				collectedIDs = append(collectedIDs, id)
