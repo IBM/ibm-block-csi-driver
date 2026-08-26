@@ -17,7 +17,6 @@
 package device_connectivity
 
 import (
-	"bufio"
 	"context"
 	"encoding/binary"
 	"errors"
@@ -29,7 +28,6 @@ import (
 	"strconv"
 	"strings"
 	"sync"
-	"sync/atomic"
 	"syscall"
 	"time"
 	"io"
@@ -787,13 +785,13 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) flushDeviceBuffers(ctx context.C
 	// committed cache flush layer.
 	fd, errOpen := syscall.Open(sanitizedDevPath, syscall.O_RDONLY|syscall.O_CLOEXEC, 0)
 	if errOpen != nil {
-		logger.Errorf("[FlushBuf-Trace] Failed to open device node target %s for flushing: %v", deviceNode, errOpen)
-		return fmt.Errorf("failed to open block target %s for flush operations: %w", deviceNode, errOpen)
+		logger.Errorf("[FlushBuf-Trace] Failed to open device node target %s for flushing: %v", sanitizedDevPath, errOpen)
+		return fmt.Errorf("failed to open block target %s for flush operations: %w", sanitizedDevPath, errOpen)
 	}
 	// Guarantee path teardown immediately following command execution bounds
 	defer syscall.Close(fd)
 
-	logger.Debugf("[FlushBuf-Trace] Initiating synchronous block device cache flush via BLKFLSBUF ioctl on '%s'", dmName)
+	logger.Debugf("[FlushBuf-Trace] Initiating synchronous block device cache flush via BLKFLSBUF ioctl on '%s'", sanitizedDevPath)
 
 	// Invoke the synchronous block cache purge macro instruction layer.
 	// This forces the kernel to run fsync_bdev and invalidate_bdev instantly.
@@ -801,21 +799,21 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) flushDeviceBuffers(ctx context.C
 	if errIoctl != nil {
 		// Treat a missing or unmapped device as a non-fatal success criteria state
 		if errIoctl == syscall.ENOTTY || errIoctl == syscall.ENXIO {
-			logger.Warningf("[FlushBuf-Trace] Target device '%s' does not accept block flush macros (likely unmapped)", dmName)
+			logger.Warningf("[FlushBuf-Trace] Target device '%s' does not accept block flush macros (likely unmapped)", sanitizedDevPath)
 			return nil
 		}
 		
 		// Catch permissions validation failures clearly
 		if errIoctl == syscall.EACCES || errIoctl == syscall.EPERM {
-			logger.Errorf("[FlushBuf-Trace] Insufficient privilege capabilities (missing CAP_SYS_ADMIN) executing BLKFLSBUF on %s", dmName)
+			logger.Errorf("[FlushBuf-Trace] Insufficient privilege capabilities (missing CAP_SYS_ADMIN) executing BLKFLSBUF on %s", sanitizedDevPath)
 			return fmt.Errorf("privileged permission fault executing buffer invalidations: %w", errIoctl)
 		}
 
-		logger.Errorf("[FlushBuf-Trace] Kernel driver ioctl failure on device %s: %v", deviceNode, errIoctl)
+		logger.Errorf("[FlushBuf-Trace] Kernel driver ioctl failure on device %s: %v", sanitizedDevPath, errIoctl)
 		return fmt.Errorf("block hardware device cache flush operation rejected by storage sub-layer: %w", errIoctl)
 	}
 
-	logger.Infof("[FlushBuf-Trace] Synchronous disk and buffer cache purge completed successfully for device mapper target: %s", dmName)
+	logger.Infof("[FlushBuf-Trace] Synchronous disk and buffer cache purge completed successfully for device mapper target: %s", sanitizedDevPath)
 	return nil
 }
 
@@ -1713,7 +1711,7 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) resolveTargetIDsRecursive(ctx co
 				logger.Warningf("Failed to resolve target ID for slave link %s: %v", slaveName, errRecursive)
 				continue
 			}
-			artialSuccess = true
+			partialSuccess = true
 			for _, id := range ids {
 				if id != "" {
 					uniqueIDs[id] = struct{}{}
@@ -2602,8 +2600,9 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) TeardownVolume(ctx context.Conte
 		// ----------------────────────────────────────────────────────────=========
 		if globalOpenCount > 0 {
 			logger.Warningf("[Teardown-Main] [%s] Device remains busy (openCount=%d). Triggering Deferred Removal Rescue Pass.", mpathName, globalOpenCount)
-			r.tearDownBusyRescue(ctx, userSpaceAliasName)
-			return nil
+			//r.tearDownBusyRescue(ctx, userSpaceAliasName)
+			//return nil
+			return fmt.Errorf("[Teardown-Main] [%s] Device remains busy (openCount=%d)", mpathName, globalOpenCount)
 		}
 
 		// ----------------────────────────────────────────=========================
@@ -2761,7 +2760,7 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) waitForNoRefs(ctx context.Contex
 	return globalOpenCount
 }
 
-func (r *OsDeviceConnectivityHelperScsiGeneric) collectInformationForTeardown(ctx context.Context, target string, expectedWWID string) (mpathName string, hardwareResolved bool, isNativeNVMe bool, major uint32, minor uint32, isMounted bool, needFlush bool, needRemovePhysical bool, isDeviceMapperTarget bool) {
+func (r *OsDeviceConnectivityHelperScsiGeneric) collectInformationForTeardown(ctx context.Context, target string, expectedWWID string) (mpathName string, hardwareResolved bool, isNativeNVMe bool, major uint64, minor uint64, isMounted bool, needFlush bool, needRemovePhysical bool, isDeviceMapperTarget bool) {
 
 	harvestDeviceMetadata := func(devNodePath string, hintMpathName string) {
 		logger.Infof("[Teardown-Main] Target %s - harvest device %s hint %s", target, devNodePath, hintMpathName)
@@ -2772,8 +2771,9 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) collectInformationForTeardown(ct
 		
 		if stat, errStat := os.Stat(sanitizedDevPath); errStat == nil {
 			if sysObj, ok := stat.Sys().(*syscall.Stat_t); ok {
-				major = unix.Major(uint64(sysObj.Rdev))
-				minor = unix.Minor(uint64(sysObj.Rdev))
+				major = uint64(unix.Major(uint64(sysObj.Rdev)))
+				minor = uint64(unix.Minor(uint64(sysObj.Rdev)))
+
 				hardwareResolved = true
 				
 				baseName := filepath.Base(sanitizedDevPath)
@@ -3170,7 +3170,8 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) FindSlavesByWWID(ctx context.Con
 }
 
 // GetDMNameFromMinor safe-resolves a Device Mapper's functional name from its minor code.
-func (r *OsDeviceConnectivityHelperScsiGeneric) GetDMNameFromMinor(ctx context.Context, minor uint32) string {
+// UPDATED: Input parameter shifted seamlessly from uint32 to uint64 to achieve universal 64-bit parity.
+func (r *OsDeviceConnectivityHelperScsiGeneric) GetDMNameFromMinor(ctx context.Context, minor uint64) string {
 	logger.Warning("GetDMNameFromMinor Dynamic Matrix Parsing")
 
 	if err := ctx.Err(); err != nil {
@@ -3179,6 +3180,7 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) GetDMNameFromMinor(ctx context.C
 
 	const maxCapCeiling = 10000
 
+	// Formatting a uint64 with %d is safe, standard base-10 string conversion in Go
 	resolvedDmKernelName := fmt.Sprintf("dm-%d", minor)
 	sysBlockPath := filepath.Join("/sys/block", resolvedDmKernelName)
 	
@@ -3259,8 +3261,12 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) GetDMNameFromMinor(ctx context.C
 			continue
 		}
 
-		minorIndex := unix.Minor(uint64(statT.Rdev))
-		if uint32(minorIndex) == minor {
+		// FIXED: Eliminated the compiler break type truncation error.
+		// Since unix.Minor returns a uint32 on Linux target backplanes, we up-scale 
+		// its output to a clean uint64 before executing the evaluation equality checks.
+		minorIndex := uint64(unix.Minor(uint64(statT.Rdev)))
+		
+		if minorIndex == minor {
 			// FIXED: Instantly return 'name' (e.g. "mpatha") on match, bypassing the secondary 
 			// sysfs readDMNameSafe check which can fail if sysfs is partially unpopulated or masked.
 			logger.Infof("[GetDMNameFromMinor] Minor %d successfully mapped to alias name via /dev/mapper loop: %s", minor, name)
@@ -3270,6 +3276,7 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) GetDMNameFromMinor(ctx context.C
 
 	return ""
 }
+
 
 // readDMNameSafe evaluates standard and legacy device-mapper naming layouts with absolute D-state protection.
 func (r *OsDeviceConnectivityHelperScsiGeneric) readDMNameSafe(ctx context.Context, dmDirName string) string {
@@ -3814,7 +3821,7 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) cleanupOrphanedTopology(ctx cont
 				// FIXED: Cast variables via intermediate buffers to guarantee full multi-arch compilation safety
 				sysMaj, sysMin, errSysfs := r.Helper.GetMajorMinorFromSysfs(ctx, baseBlockName)
 				if errSysfs == nil && sysMaj != 0 {
-					mpathName = r.GetDMNameFromMinor(ctx, uint32(sysMin))
+					mpathName = r.GetDMNameFromMinor(ctx, sysMin)
 					if mpathName != "" {
 						isDM = true
 						logger.Infof("[Cleanup-Topology] Resolved parent Device Mapper link dynamically via slave %s -> %s", baseBlockName, mpathName)
@@ -4678,9 +4685,9 @@ type OsDeviceConnectivityHelperInterface interface {
 	GetMpathVolumeId(ctx context.Context, gater *executer.KeyedGater, mpathDeviceName string) (string, error)
 	normalizeWWID(raw string) string
 	findDMByWWID(ctx context.Context, wwid string) string
-	getSlavesForDevice(ctx context.Context, major, minor uint32) ([]string, error)
+	getSlavesForDevice(ctx context.Context, major, minor uint64) ([]string, error)
 	GetOpenCount(ctx context.Context, dmName string) (int32, error)
-	GetMajorMinorFromSysfs(ctx context.Context, devicePath string) (major uint32, minor uint32, err error)
+	GetMajorMinorFromSysfs(ctx context.Context, devicePath string) (major uint64, minor uint64, err error)
 	getWWIDByDev(ctx context.Context, major, minor uint32) (string, error)
 	WaitForDmToExist(ctx context.Context, gater *executer.KeyedGater, volumeId string, maxRetries int, intervalSeconds int) (string, error)
 }
@@ -5386,7 +5393,7 @@ func (r *OsDeviceConnectivityHelperGeneric) GetMpathDeviceName(ctx context.Conte
 	}
 
 	if major > 0 {
-		if kernelName, err := r.resolveIdToKernelName(ctx, gater, major, (minor); err == nil {
+		if kernelName, err := r.resolveIdToKernelName(ctx, gater, major, minor); err == nil {
 			return kernelName, nil
 		}
 	}
@@ -5415,8 +5422,8 @@ func (r *OsDeviceConnectivityHelperGeneric) resolveIdToKernelName(ctx context.Co
 	return filepath.Base(realPath), nil
 }
 
-// ResolveToKernelName standardizes diverse input block names back to core system labels.
-// FIXED: Receiver type aligned cleanly across the package module structure
+// ResolveToKernelName sweeps target paths to map input identifiers to concrete block metadata coordinates,
+// and leverages type-safe uint64 parameters to translate devices back to raw kernel block handles.
 func (r *OsDeviceConnectivityHelperGeneric) ResolveToKernelName(ctx context.Context, gater *executer.KeyedGater, deviceName string) (string, error) {
 	if err := ctx.Err(); err != nil {
 		return "", err
@@ -5448,9 +5455,13 @@ func (r *OsDeviceConnectivityHelperGeneric) ResolveToKernelName(ctx context.Cont
 		err := syscall.Stat(p, &stat)
 
 		if err == nil && stat.Rdev != 0 && (stat.Mode&syscall.S_IFMT) == syscall.S_IFBLK {
-			major := unix.Major(uint64(stat.Rdev))
-			minor := unix.Minor(uint64(stat.Rdev))
-			
+			// FIXED: Cast stat.Rdev cleanly to uint64 to satisfy the linux unix.Major/Minor 
+			// argument definitions, and up-scale the returned uint32 output into a uint64 
+			// matching your leaf signatures exactly.
+			major := uint64(unix.Major(uint64(stat.Rdev)))
+			minor := uint64(unix.Minor(uint64(stat.Rdev)))
+
+			// Correctly passes the upscaled uint64 values down to the leaf module
 			if kernelName, err := r.resolveIdToKernelName(ctx, gater, major, minor); err == nil {
 				return kernelName, nil
 			}
@@ -5459,6 +5470,8 @@ func (r *OsDeviceConnectivityHelperGeneric) ResolveToKernelName(ctx context.Cont
 
 	return cleanName, nil
 }
+
+
 
 // findDMByWWID scans /dev/mapper to locate a device-mapper name matching a target SCSI/NVMe string.
 // Production-hardened with immediate file descriptor release and a strict 10,000 element heap boundary ceiling.
@@ -5564,9 +5577,10 @@ func (r *OsDeviceConnectivityHelperGeneric) findDMByWWID(ctx context.Context, ww
 	return ""
 }
 
+
 // getSlavesForDevice returns raw underlying physical block device names safely shielded from D-state locks.
-// FIXED: Receiver type standardized to OsDeviceConnectivityHelperScsiGeneric to prevent compilation breaks
-func (r *OsDeviceConnectivityHelperGeneric) getSlavesForDevice(ctx context.Context, major, minor uint32) ([]string, error) {
+// UPDATED: Parameters expanded seamlessly from uint32 to uint64 to align with your 64-bit coordinate system.
+func (r *OsDeviceConnectivityHelperGeneric) getSlavesForDevice(ctx context.Context, major, minor uint64) ([]string, error) {
 	logger.Warning("getSlavesForDevice execution tracing initialized")
 
 	if err := ctx.Err(); err != nil {
@@ -5582,6 +5596,7 @@ func (r *OsDeviceConnectivityHelperGeneric) getSlavesForDevice(ctx context.Conte
 
 	slavesPath := fmt.Sprintf("/sys/dev/block/%d:%d/slaves", major, minor)
 
+	// Execute inside the non-blocking execution gate wrapper to insulate against driver D-state hangs
 	entries, err := executer.ExecuteUninterruptible[[]os.DirEntry](
 		ctx,
 		r.KeyedGater,
@@ -5601,8 +5616,6 @@ func (r *OsDeviceConnectivityHelperGeneric) getSlavesForDevice(ctx context.Conte
 			}
 			defer dFile.Close()
 
-			// FIXED: Replaced unsafe unbounded ReadDir(0) with bounded chunk reads 
-			// to protect against memory allocation spikes and directory stream locks.
 			const maxCapCeiling = 10000
 			var allEntries []os.DirEntry
 
@@ -5616,6 +5629,12 @@ func (r *OsDeviceConnectivityHelperGeneric) getSlavesForDevice(ctx context.Conte
 					return nil, readErr
 				}
 
+				// FIXED: Guard against an exact-multiple page boundary causing a tight infinite loop.
+				// If the directory reading layer yields an empty chunk on a subsequent scan pass, break cleanly.
+				if len(chunk) == 0 {
+					break
+				}
+
 				for _, entry := range chunk {
 					if len(allEntries) >= maxCapCeiling {
 						break
@@ -5623,7 +5642,7 @@ func (r *OsDeviceConnectivityHelperGeneric) getSlavesForDevice(ctx context.Conte
 					allEntries = append(allEntries, entry)
 				}
 
-				if len(allEntries) >= maxCapCeiling || len(chunk) < 100 || readErr == io.EOF {
+				if len(allEntries) >= maxCapCeiling || readErr == io.EOF {
 					break
 				}
 			}
@@ -5841,7 +5860,7 @@ func (o *OsDeviceConnectivityHelperGeneric) GetOpenCount(ctx context.Context, dm
 // GetMajorMinorFromSysfs takes an absolute device path or raw kernel block name 
 // (e.g., "/dev/sda1", "dm-0", "dasda") and extracts its true major and minor numbers.
 // This approach is completely agnostic to driver prefixes (sd, dm, dasd, nvme).
-func (of *GetDmsPathHelperGeneric) GetMajorMinorFromSysfs(ctx context.Context, deviceInput string) (major uint64, minor uint64, err error) {
+func (of *OsDeviceConnectivityHelperGeneric) GetMajorMinorFromSysfs(ctx context.Context, deviceInput string) (major uint64, minor uint64, err error) {
 	if err := ctx.Err(); err != nil {
 		return 0, 0, ctx.Err()
 	}
@@ -6647,14 +6666,14 @@ func (of *GetDmsPathHelperGeneric) EvaluateSysfsTopology(ctx context.Context, ga
 	// PHASE 1: DEVICE-MAPPER (DM) EVALUATION
 	// =========================================================================
 	logger.Debugf("[EvalTopology-Trace] [Phase-1-DM] Starting Device Mapper evaluation pass...")
-	hasDevice, isPending, devName := EvaluateSysfsTopologyScanDM(ctx, gater, devNames, rawScsiTarget, rawNvmeTarget)
+	hasDevice, isPending, devName = of.EvaluateSysfsTopologyScanDM(ctx, gater, devNames, rawScsiTarget, rawNvmeTarget)
 	if hasDevice || devName != "" {
 		return hasDevice, isPending, devName
 	}
 
 	logger.Debugf("[EvalTopology-Trace] [Phase-2-NVMe] Starting Native NVMe namespace evaluation pass...")
 	
-	hasDevice, isPending, devName := EvaluateSysfsTopologyScanNvme(ctx, gater, devNames, rawScsiTarget, rawNvmeTarget)
+	hasDevice, isPending, devName = of.EvaluateSysfsTopologyScanNvme(ctx, gater, devNames, rawScsiTarget, rawNvmeTarget)
 	if hasDevice || devName != "" {
 		return hasDevice, isPending, devName
 	}
@@ -6806,6 +6825,7 @@ func (of *GetDmsPathHelperGeneric) EvaluateSysfsTopologyScanNvme(ctx context.Con
 		}
 	}
 	logger.Infof("[EvalTopology-Trace] No matching topologies discovered for identifier: '%s'", rawScsiTarget)
+	return false, false, ""
 
 }
 
@@ -6941,14 +6961,13 @@ func (of *GetDmsPathHelperGeneric) EvaluateSpecificSysfsTopology(
 		return false, false, fmt.Errorf("target device entry %s is missing from sysfs: %w", dmName, errStat)
 	}
 
-	const maxCapCeiling = 10000
 	isDM := of.IsDeviceMapper(dmName)
 
 	// =========================================================================
 	// TARGETED SPECIFIC DM LAYER EVALUATION
 	// =========================================================================
 	if isDM {
-		return EvaluateSpecificSysfsTopologyDM(ctx, gater, dmName, rawScsiTarget, rawNvmeTarget)
+		return of.EvaluateSpecificSysfsTopologyDM(ctx, gater, dmName, dmPath, rawScsiTarget, rawNvmeTarget)
 	}
 
 	// =========================================================================
@@ -6956,7 +6975,7 @@ func (of *GetDmsPathHelperGeneric) EvaluateSpecificSysfsTopology(
 	// =========================================================================
 	helper := GetDmsPathHelperGeneric{}
 	if helper.IsNativeNvmeNamespace(dmName) || strings.HasPrefix(dmName, "nvme") {
-		return EvaluateSpecificSysfsTopologyNvme(ctx, gater, dmName, dmPath, rawNvmeTarget)
+		return of.EvaluateSpecificSysfsTopologyNvme(ctx, gater, dmName, dmPath, rawNvmeTarget)
 	}
 
 	logger.Infof("[SpecTopology-Trace] No specific matching configuration found for '%s'", targetDeviceName)
@@ -6966,7 +6985,8 @@ func (of *GetDmsPathHelperGeneric) EvaluateSpecificSysfsTopology(
 func (of *GetDmsPathHelperGeneric) EvaluateSpecificSysfsTopologyDM(
 	ctx context.Context, 
 	gater *executer.KeyedGater, 
-	dmName string, 
+	dmName string,
+	dmPath string, 
 	rawScsiTarget string, 
 	rawNvmeTarget string,
 ) (hasDevice bool, isPending bool, err error) {
@@ -7087,6 +7107,8 @@ func (of *GetDmsPathHelperGeneric) EvaluateSpecificSysfsTopologyNvme(
 		var isControllerTransitioning bool
 		controllerDir := "/sys/class/nvme"
 		dFile, errOpen := os.Open(controllerDir)
+
+		const maxCapCeiling = 10000
 		
 		var controllerEntries []string
 		if errOpen == nil {
@@ -7141,6 +7163,7 @@ func (of *GetDmsPathHelperGeneric) EvaluateSpecificSysfsTopologyNvme(
 		}
 		return true, false, nil
 	}
+	return false, false, nil
 
 }
 
