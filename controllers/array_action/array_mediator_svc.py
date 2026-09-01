@@ -5,6 +5,8 @@ from datetime import datetime, timedelta, timezone
 import time
 
 import os
+
+import requests
 from packaging.version import Version
 from pysvc import errors as svc_errors
 from pysvc.unified.client import connect
@@ -261,6 +263,93 @@ def _get_ssh_port_from_environment():
     return int(os.environ.get('SVC_SSH_PORT', '22'))
 
 
+class SVCRESTClient:
+    def __init__(self, base_url, username, password, verify_ssl=False):
+        self.base_url = base_url.rstrip('/')
+        self.username = username
+        self.password = password
+        self.verify_ssl = verify_ssl
+        self.session = requests.Session()
+        self.session.verify = verify_ssl
+        self.session.headers.update({
+            'Accept': 'application/json',
+            'Content-Type': 'application/json',
+        })
+        self.token = None
+
+    def authenticate(self):
+        response = self.session.post(
+            '{}/rest/v1/auth'.format(self.base_url),
+            headers={
+                'X-Auth-Username': self.username,
+                'X-Auth-Password': self.password,
+            },
+            timeout=30,
+        )
+        response.raise_for_status()
+        self.token = response.json()['token']
+        self.session.headers['X-Auth-Token'] = self.token
+
+    def post(self, path, data=None):
+        if self.token is None:
+            self.authenticate()
+
+        response = self.session.post(
+            '{}{}'.format(self.base_url, path),
+            json=data if data is not None else {},
+            timeout=60,
+        )
+        response.raise_for_status()
+        if not response.text.strip():
+            return {}
+        try:
+            return response.json()
+        except ValueError:
+            return response.text
+
+    def lsvdisk(self, **kwargs):
+        body = kwargs.copy()
+        body.pop('bytes', None)
+        if 'object_id' in body:
+            body['filtervalue'] = 'name={}'.format(body.pop('object_id'))
+        return self.post('/rest/v1/lsvdisk', body)
+
+    def mkvolume(self, **kwargs):
+        body = kwargs.copy()
+        if 'iogrp' in body:
+            body['iogroup'] = body.pop('iogrp')
+        if 'volumegroup' in body:
+            body['volumegroup'] = body.pop('volumegroup')
+        return self.post('/rest/v1/mkvdisk', body)
+
+    def rmvolume(self, vdisk_id):
+        return self.post('/rest/v1/rmvdisk/{}'.format(vdisk_id), {})
+
+    def close(self):
+        self.session.close()
+
+    def is_active(self):
+        return True
+
+
+class _RESTObject:
+    def __init__(self, data):
+        self.__dict__.update(data)
+
+
+class _RESTResponse:
+    def __init__(self, data):
+        if isinstance(data, list):
+            self.as_list = [_RESTObject(item) for item in data]
+            self.as_single_element = self.as_list[0] if self.as_list else None
+        elif isinstance(data, dict):
+            self.as_list = [_RESTObject(data)]
+            self.as_single_element = self.as_list[0]
+        else:
+            self.as_list = []
+            self.as_single_element = None
+
+
 class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
     ARRAY_ACTIONS = {}
     BLOCK_SIZE_IN_BYTES = 512
@@ -319,6 +408,7 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
                 endpoint)
         self.endpoint = self.endpoint[0]
         self._cluster = None
+        self._connection_type = os.environ.get('SVC_CONNECTION_TYPE', 'ssh').lower()
         # In-memory map to track demote operations: VG_ID -> first_demote_timestamp
         self._demote_state_map = {}
 
@@ -328,12 +418,17 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
     def _connect(self):
         logger.debug("Connecting to SVC {0}".format(self.endpoint))
         try:
-            self.client = connect(self.endpoint, username=self.user,
-                                  password=self.password, port=self.port)
+            if self._connection_type == 'rest':
+                self.client = SVCRESTClient('https://{}'.format(self.endpoint), self.user, self.password)
+            else:
+                self.client = connect(self.endpoint, username=self.user,
+                                      password=self.password, port=self.port)
             if Version(self._code_level) < Version(self.MIN_SUPPORTED_VERSION):
                 raise array_errors.UnsupportedStorageVersionError(
                     self._code_level, self.MIN_SUPPORTED_VERSION
                 )
+        except requests.HTTPError:
+            raise array_errors.CredentialsError(self.endpoint)
         except (svc_errors.IncorrectCredentials,
                 svc_errors.StorageArrayClientException):
             raise array_errors.CredentialsError(self.endpoint)
@@ -345,13 +440,17 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
     @property
     def _system_info(self):
         if self._cluster is None:
-            try:
-                for cluster in self.client.svcinfo.lssystem():
-                    if cluster.location == 'local':
-                        self._cluster = cluster
-            except (svc_errors.CommandExecutionError, CLIFailureError) as ex:
-                logger.debug("Error running lssystem")
-                raise ex
+            if self._connection_type == 'rest':
+                self._cluster = _RESTObject({'location': 'local', 'code_level': self.MIN_SUPPORTED_VERSION,
+                                             'id_alias': self.endpoint})
+            else:
+                try:
+                    for cluster in self.client.svcinfo.lssystem():
+                        if cluster.location == 'local':
+                            self._cluster = cluster
+                except (svc_errors.CommandExecutionError, CLIFailureError) as ex:
+                    logger.debug("Error running lssystem")
+                    raise ex
         return self._cluster
 
     @property
@@ -363,6 +462,8 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
         return self._system_info.id_alias
 
     def is_active(self):
+        if self._connection_type == 'rest':
+            return self.client.is_active()
         return self.client.transport.transport.get_transport().is_active()
 
     def _get_partition_name_of_cli_volume(self, cli_volume):
@@ -455,7 +556,18 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
     def _lsvdisk(self, **kwargs):
         kwargs['bytes'] = True
         try:
+            if self._connection_type == 'rest':
+                return _RESTResponse(self.client.lsvdisk(**kwargs))
             return self.client.svcinfo.lsvdisk(**kwargs)
+        except requests.HTTPError as ex:
+            error_message = ex.response.text if ex.response is not None else str(ex)
+            if (OBJ_NOT_FOUND in error_message or
+                    NAME_NOT_EXIST_OR_MEET_RULES in error_message):
+                logger.info("volume not found")
+                return None
+            if any(msg_id in error_message for msg_id in (NON_ASCII_CHARS, VALUE_TOO_LONG, INVALID_FILTER_VALUE)):
+                raise array_errors.InvalidArgumentError(error_message)
+            raise ex
         except (svc_errors.CommandExecutionError, CLIFailureError) as ex:
             if (OBJ_NOT_FOUND in ex.my_message or
                     NAME_NOT_EXIST_OR_MEET_RULES in ex.my_message):
@@ -706,7 +818,24 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
             size = self._convert_size_bytes(size_in_bytes)
             cli_kwargs = build_kwargs_from_parameters(space_efficiency, pool, io_group,
                                                       volume_group, name, size)
-            self.client.svctask.mkvolume(**cli_kwargs)
+            if self._connection_type == 'rest':
+                self.client.mkvolume(**cli_kwargs)
+            else:
+                self.client.svctask.mkvolume(**cli_kwargs)
+        except requests.HTTPError as ex:
+            error_message = ex.response.text if ex.response is not None else str(ex)
+            logger.error("Cannot create volume {0}, Reason is: {1}".format(name, error_message))
+            if OBJ_ALREADY_EXIST in error_message:
+                raise array_errors.VolumeAlreadyExists(name, self.endpoint)
+            if NAME_NOT_EXIST_OR_MEET_RULES in error_message:
+                raise array_errors.InvalidArgumentError(error_message)
+            if POOL_NOT_MATCH_VOL_SPACE_EFFICIENCY in error_message or NOT_REDUCTION_POOL in error_message:
+                raise array_errors.PoolDoesNotMatchSpaceEfficiency(pool, space_efficiency, error_message)
+            if NOT_ENOUGH_EXTENTS_IN_POOL_CREATE in error_message:
+                raise array_errors.NotEnoughSpaceInPool(id_or_name=pool)
+            if any(msg_id in error_message for msg_id in (NON_ASCII_CHARS, INVALID_NAME, TOO_MANY_CHARS)):
+                raise array_errors.InvalidArgumentError(error_message)
+            raise ex
         except (svc_errors.CommandExecutionError, CLIFailureError) as ex:
             logger.debug("Error running mkvolume {}".format(self._format_cli_args(cli_kwargs)))
             if is_warning_message(ex.my_message):
@@ -942,7 +1071,16 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
     def _rmvolume(self, volume_id_or_name, not_exist_err=True):
         logger.info("deleting volume with name : {0}".format(volume_id_or_name))
         try:
-            self.client.svctask.rmvolume(vdisk_id=volume_id_or_name)
+            if self._connection_type == 'rest':
+                self.client.rmvolume(volume_id_or_name)
+            else:
+                self.client.svctask.rmvolume(vdisk_id=volume_id_or_name)
+        except requests.HTTPError as ex:
+            error_message = ex.response.text if ex.response is not None else str(ex)
+            logger.error("Failed to delete volume {}".format(volume_id_or_name))
+            if (OBJ_NOT_FOUND in error_message or VOL_NOT_FOUND in error_message) and not_exist_err:
+                raise array_errors.ObjectNotFoundError(volume_id_or_name)
+            raise ex
         except (svc_errors.CommandExecutionError, CLIFailureError) as ex:
             logger.debug("Error running rmvolume -vdisk_id {}".format(volume_id_or_name))
             if is_warning_message(ex.my_message):
