@@ -278,6 +278,7 @@ class SVCRESTClient:
         self.token = None
 
     def authenticate(self):
+        logger.debug("SVCRESTClient: authenticating to {}".format(self.base_url))
         response = self.session.post(
             '{}/rest/v1/auth'.format(self.base_url),
             headers={
@@ -289,11 +290,13 @@ class SVCRESTClient:
         response.raise_for_status()
         self.token = response.json()['token']
         self.session.headers['X-Auth-Token'] = self.token
+        logger.debug("SVCRESTClient: authentication successful")
 
     def post(self, path, data=None):
         if self.token is None:
             self.authenticate()
 
+        logger.debug("SVCRESTClient: POST {} body={}".format(path, data))
         response = self.session.post(
             '{}{}'.format(self.base_url, path),
             json=data if data is not None else {},
@@ -312,6 +315,7 @@ class SVCRESTClient:
         body.pop('bytes', None)
         if 'object_id' in body:
             body['filtervalue'] = 'name={}'.format(body.pop('object_id'))
+        logger.debug("SVCRESTClient: lsvdisk kwargs={}".format(body))
         return self.post('/rest/v1/lsvdisk', body)
 
     def mkvolume(self, **kwargs):
@@ -320,12 +324,15 @@ class SVCRESTClient:
             body['iogroup'] = body.pop('iogrp')
         if 'volumegroup' in body:
             body['volumegroup'] = body.pop('volumegroup')
+        logger.info("SVCRESTClient: mkvolume kwargs={}".format(body))
         return self.post('/rest/v1/mkvdisk', body)
 
     def rmvolume(self, vdisk_id):
+        logger.info("SVCRESTClient: rmvolume vdisk_id={}".format(vdisk_id))
         return self.post('/rest/v1/rmvdisk/{}'.format(vdisk_id), {})
 
     def close(self):
+        logger.debug("SVCRESTClient: closing session to {}".format(self.base_url))
         self.session.close()
 
     def is_active(self):
