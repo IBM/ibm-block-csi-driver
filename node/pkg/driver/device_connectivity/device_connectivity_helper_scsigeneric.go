@@ -505,6 +505,7 @@ func (o OsDeviceConnectivityHelperScsiGeneric) isGhostIBMDevice(sgDev string) bo
 
 func (r OsDeviceConnectivityHelperScsiGeneric) ValidateLun(lun int, sysDevices []string) error {
 	logger.Debugf("Validating lun {%v} on devices: {%v}", lun, sysDevices)
+	lunSuffix := ":" + strconv.Itoa(lun)
 	for _, sysDevice := range sysDevices {
 		sysDeviceParts := strings.Split(sysDevice, "/")
 		device := sysDeviceParts[len(sysDeviceParts)-1]
@@ -515,7 +516,7 @@ func (r OsDeviceConnectivityHelperScsiGeneric) ValidateLun(lun int, sysDevices [
 			return err
 		}
 
-		if !strings.HasSuffix(destinationPath, strconv.Itoa(lun)) {
+		if !strings.HasSuffix(destinationPath, lunSuffix) {
 			return fmt.Errorf("lun not valid, storage lun: %v, linkedPath: %v to device: %v", lun, destinationPath, device)
 		}
 	}
