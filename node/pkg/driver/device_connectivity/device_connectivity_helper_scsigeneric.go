@@ -926,9 +926,12 @@ func (GetDmsPathHelperGeneric) getLineParts(scanner *bufio.Scanner) (string, str
 }
 
 func (o GetDmsPathHelperGeneric) IsIndicatorMatchesFilterValues(dmFilterValues []string, indicatorValue string) bool {
+	trimmedIndicator := strings.ToLower(strings.TrimSpace(indicatorValue))
 	for _, filterValue := range dmFilterValues {
-		logger.Debugf("IsIndicatorMatchesFilterValues: comparing indicatorValue=*%q* filterValue=*%q*", indicatorValue, filterValue)
-		if strings.EqualFold(strings.TrimSpace(indicatorValue), strings.TrimSpace(filterValue)) {
+		trimmedFilter := strings.ToLower(strings.TrimSpace(filterValue))
+		logger.Debugf("IsIndicatorMatchesFilterValues: comparing indicatorValue=%s filterValue=%s", trimmedIndicator, trimmedFilter)
+		if trimmedIndicator == trimmedFilter || strings.HasSuffix(trimmedIndicator, trimmedFilter) {
+			logger.Debugf("%s matches", trimmedIndicator)
 			return true
 		}
 	}
