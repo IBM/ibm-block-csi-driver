@@ -95,7 +95,8 @@ class TestWatchCsiNodesResources(CsiNodeWatcherBase):
         self._prepare_mocks_for_updated_csi_node()
         host_definitions = self.ready_k8s_host_definitions
         host_definitions.items[0].spec.hostDefinition.nodeId = 'other_node_id'
-        host_definitions.items[0].metadata.annotations[common_settings.NODE_INITIATORS_FIELD] = '{"nvmeofc":[],"fc":["old_wwpn"],"iscsi":[]}'
+        host_definitions.items[0].metadata.annotations[common_settings.NODE_INITIATORS_FIELD] = \
+            '{"nvmeofc":[],"fc":["old_wwpn"],"iscsi":[]}'
         self.csi_node_watcher.host_definitions_api.get.return_value = self.ready_k8s_host_definitions
         self.csi_node_watcher.core_api.read_namespaced_secret.return_value = test_utils.get_fake_k8s_secret()
         test_utils.run_function_with_timeout(self.csi_node_watcher.watch_csi_nodes_resources, 0.5)
