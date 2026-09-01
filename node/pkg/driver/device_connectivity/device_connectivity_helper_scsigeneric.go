@@ -505,6 +505,7 @@ func (o OsDeviceConnectivityHelperScsiGeneric) isGhostIBMDevice(sgDev string) bo
 
 func (r OsDeviceConnectivityHelperScsiGeneric) ValidateLun(lun int, sysDevices []string) error {
 	logger.Debugf("Validating lun {%v} on devices: {%v}", lun, sysDevices)
+	lunSuffix := ":" + strconv.Itoa(lun)
 	for _, sysDevice := range sysDevices {
 		sysDeviceParts := strings.Split(sysDevice, "/")
 		device := sysDeviceParts[len(sysDeviceParts)-1]
@@ -515,7 +516,7 @@ func (r OsDeviceConnectivityHelperScsiGeneric) ValidateLun(lun int, sysDevices [
 			return err
 		}
 
-		if !strings.HasSuffix(destinationPath, strconv.Itoa(lun)) {
+		if !strings.HasSuffix(destinationPath, lunSuffix) {
 			return fmt.Errorf("lun not valid, storage lun: %v, linkedPath: %v to device: %v", lun, destinationPath, device)
 		}
 	}
@@ -925,8 +926,12 @@ func (GetDmsPathHelperGeneric) getLineParts(scanner *bufio.Scanner) (string, str
 }
 
 func (o GetDmsPathHelperGeneric) IsIndicatorMatchesFilterValues(dmFilterValues []string, indicatorValue string) bool {
+	trimmedIndicator := strings.ToLower(strings.TrimSpace(indicatorValue))
 	for _, filterValue := range dmFilterValues {
-		if strings.Contains(indicatorValue, filterValue) {
+		trimmedFilter := strings.ToLower(strings.TrimSpace(filterValue))
+		logger.Debugf("IsIndicatorMatchesFilterValues: comparing indicatorValue=%s filterValue=%s", trimmedIndicator, trimmedFilter)
+		if trimmedIndicator == trimmedFilter || strings.HasSuffix(trimmedIndicator, trimmedFilter) {
+			logger.Debugf("%s matches", trimmedIndicator)
 			return true
 		}
 	}

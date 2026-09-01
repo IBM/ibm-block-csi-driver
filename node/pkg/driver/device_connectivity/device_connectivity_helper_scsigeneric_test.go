@@ -1174,3 +1174,54 @@ func TestIsDmName(t *testing.T) {
 		})
 	}
 }
+
+func TestIsIndicatorMatchesFilterValues(t *testing.T) {
+	testCases := []struct {
+		name           string
+		dmFilterValues []string
+		indicatorValue string
+		expected       bool
+	}{
+		{
+			name:           "exact match",
+			dmFilterValues: []string{"60050768109781dd90000000000004bf"},
+			indicatorValue: "60050768109781dd90000000000004bf",
+			expected:       true,
+		},
+		{
+			name:           "match with leading/trailing spaces and mixed case",
+			dmFilterValues: []string{" 60050768109781DD90000000000004BF "},
+			indicatorValue: "  60050768109781dd90000000000004bf  ",
+			expected:       true,
+		},
+		{
+			name:           "match when indicator has NAA prefix 3 and spaces",
+			dmFilterValues: []string{"60050768109781dd90000000000004bf"},
+			indicatorValue: " 360050768109781dd90000000000004bf",
+			expected:       true,
+		},
+		{
+			name:           "match when multiple filter values exist and one matches suffix",
+			dmFilterValues: []string{"unrelated", "60050768109781dd90000000000004bf"},
+			indicatorValue: "360050768109781dd90000000000004bf",
+			expected:       true,
+		},
+		{
+			name:           "no match when totally different",
+			dmFilterValues: []string{"60050768109781dd90000000000004bf"},
+			indicatorValue: "360050768109781dd9000000000000000",
+			expected:       false,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			fakeExecuter := mocks.NewMockExecuterInterface(gomock.NewController(t))
+			helper := device_connectivity.NewGetDmsPathHelperGeneric(fakeExecuter)
+			got := helper.IsIndicatorMatchesFilterValues(tc.dmFilterValues, tc.indicatorValue)
+			if got != tc.expected {
+				t.Fatalf("IsIndicatorMatchesFilterValues(%v, %q) = %v, want %v", tc.dmFilterValues, tc.indicatorValue, got, tc.expected)
+			}
+		})
+	}
+}
