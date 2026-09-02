@@ -448,7 +448,7 @@ func (n NodeUtils) ExpandFilesystem(devicePath string, volumePath string, fsType
 	var args []string
 	if fsType == "ext4" {
 		cmd = "resize2fs"
-		args = []string{devicePath}
+		args = []string{volumePath}
 	} else if fsType == "xfs" {
 		cmd = "xfs_growfs"
 		args = []string{"-d", volumePath}
