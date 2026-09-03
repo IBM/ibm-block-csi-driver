@@ -78,6 +78,7 @@ type NodeUtilsInterface interface {
 	GetVolumeUuid(volumeId string) string
 	ReadNvmeNqn() (string, error)
 	IsNativeNVMeMultipathEnabled() (bool, error)
+	DiscoverMpathDevice(volumeUuid string) (string, error)
 	DevicesAreNvme(device string) (NvmeType, error)
 	ParseFCPorts() ([]string, error)
 	ParseIscsiInitiators() (string, error)
@@ -97,6 +98,7 @@ type NodeUtilsInterface interface {
 	ExpandFilesystem(devicePath string, volumePath string, fsType string) error
 	ExpandMpathDevice(mpathDevice string) error
 	RescanPhysicalDevices(sysDevices []string) error
+	RescanNvmeNamespace(namespaceDevice string) error
 	FormatDevice(devicePath string, fsType string)
 	IsNotMountPoint(file string) (bool, error)
 	GetPodPath(filepath string) string
@@ -218,15 +220,9 @@ func (n NodeUtils) StageInfoFileIsExist(filePath string) bool {
 }
 
 func (n NodeUtils) IsNativeNVMeMultipathEnabled() (bool, error) {
-	data, err := os.ReadFile("/sys/module/nvme_core/parameters/multipath")
-	if err != nil {
-		if os.IsNotExist(err) {
-			return false, nil
-		}
-		return false, fmt.Errorf("failed to read nvme_core multipath param: %w", err)
-	}
-	val := strings.TrimSpace(string(data))
-	return val == "Y", nil
+	// Delegate to the single source of truth in device_connectivity (Executer-backed,
+	// so it is fake-able in tests and reads the shared sysfs param path constant).
+	return device_connectivity.IsNvmeCoreMultipathEnabled(n.Executer)
 }
 
 func (n NodeUtils) DevicesAreNvme(device string) (NvmeType, error) {
@@ -517,6 +513,13 @@ func (n NodeUtils) RescanPhysicalDevices(sysDevices []string) error {
 	return nil
 }
 
+// RescanNvmeNamespace refreshes a native NVMe namespace's size after an array-side
+// expand by rescanning its subsystem controllers (native multipath has no dm device to
+// resize). Best-effort — see device_connectivity.RescanNvmeNamespaceForResize.
+func (n NodeUtils) RescanNvmeNamespace(namespaceDevice string) error {
+	return device_connectivity.RescanNvmeNamespaceForResize(n.Executer, namespaceDevice)
+}
+
 func (n NodeUtils) FormatDevice(devicePath string, fsType string) {
 	var args []string
 	if fsType == "ext4" {
@@ -683,7 +686,7 @@ func (d NodeUtils) GetFileSystemVolumeStats(path string) (VolumeStatistics, erro
 
 func (d NodeUtils) GetBlockVolumeStats(volumeId string) (VolumeStatistics, error) {
 	volumeUuid := d.GetVolumeUuid(volumeId)
-	mpathDevice, err := d.osDeviceConnectivityHelper.GetMpathDevice(volumeUuid)
+	mpathDevice, err := d.DiscoverMpathDevice(volumeUuid)
 	if err != nil {
 		return VolumeStatistics{}, err
 	}
@@ -705,6 +708,27 @@ func (d NodeUtils) GetBlockVolumeStats(volumeId string) (VolumeStatistics, error
 	}
 
 	return volumeStats, nil
+}
+
+// DiscoverMpathDevice resolves the host block device for a volume, native-aware, for the
+// node RPCs that have no connectivity-type dispatch (unstage, publish raw-block, expand,
+// volume stats). In native NVMe mode it resolves the namespace head by NGUID; a miss
+// falls through to dm-multipath discovery so a SCSI/iSCSI volume on a native-NVMe host
+// still resolves (the two device namespaces are disjoint, so there is no false match).
+// The native lookup is single-shot: at these call sites the device is already staged, so
+// no udev settle wait is needed, and a SCSI volume does not stall before the dm fallback.
+func (d NodeUtils) DiscoverMpathDevice(volumeUuid string) (string, error) {
+	native, err := d.IsNativeNVMeMultipathEnabled()
+	if err != nil {
+		logger.Warningf("DiscoverMpathDevice: could not determine multipath mode: %v; using dm discovery", err)
+	}
+	if native {
+		if device, nerr := device_connectivity.DiscoverNativeNamespaceDevice(d.Executer, volumeUuid, 1); nerr == nil {
+			return device, nil
+		}
+		logger.Debugf("DiscoverMpathDevice: no native NVMe namespace for %s, falling back to dm discovery", volumeUuid)
+	}
+	return d.osDeviceConnectivityHelper.GetMpathDevice(volumeUuid)
 }
 
 func (d NodeUtils) GetVolumeUuid(volumeId string) string {
