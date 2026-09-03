@@ -415,3 +415,18 @@ func assertExpectedError(t *testing.T, expectedError error, responseErr error) {
 		t.Fatalf("wrong error: expected %v, got %v", expectedError, responseErr)
 	}
 }
+
+func TestExpandFilesystemExt4UsesMountPoint(t *testing.T) {
+	mockCtrl := gomock.NewController(t)
+	defer mockCtrl.Finish()
+
+	fakeExecuter := mocks.NewMockExecuterInterface(mockCtrl)
+	devicePath := "/dev/dm-2"
+	volumePath := "/var/lib/kubelet/plugins/kubernetes.io/csi/block.csi.ibm.com/volume/mount"
+	fakeExecuter.EXPECT().ExecuteWithTimeout(gomock.Any(), "resize2fs", []string{volumePath}).Return([]byte{}, nil)
+
+	nodeUtils := driver.NewNodeUtils(fakeExecuter, nil, ConfigYaml, nil)
+	if err := nodeUtils.ExpandFilesystem(devicePath, volumePath, "ext4"); err != nil {
+		t.Fatalf("ExpandFilesystem returned an error: %v", err)
+	}
+}
