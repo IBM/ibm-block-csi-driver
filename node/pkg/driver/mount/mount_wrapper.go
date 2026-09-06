@@ -86,11 +86,22 @@ func (mounter *Mounter) MountSensitive(source, target, fstype string, options, s
 	logger.Infof("MountSensitive: mounting %s to %s (fstype=%s options=%v)", source, target, fstype, options)
 	allOptions := append(options, sensitiveOptions...)
 	flags, data := parseMountOptions(allOptions)
-	// Both source and target must be accessed through /host: unix.Mount resolves
+	// The target must be accessed through /host because unix.Mount resolves
 	// paths in the container's rootfs namespace, not the host's, even in a
 	// privileged container.  The host root filesystem is bind-mounted at /host,
-	// so all absolute paths need that prefix to be reachable from the container.
-	return unix.Mount(hostPath(source), hostPath(target), fstype, flags, data)
+	// so kubelet paths (e.g. /var/lib/kubelet/...) need that prefix to be
+	// reachable from the container.
+	//
+	// The source is NOT prefixed for block devices (/dev/...): those device
+	// nodes are always accessible directly in the container's /dev, regardless
+	// of whether the host root is bind-mounted at /host.  For non-device sources
+	// (e.g. bind-mounts from a kubelet staging path) the /host prefix is still
+	// required.
+	srcPath := source
+	if !strings.HasPrefix(source, "/dev/") {
+		srcPath = hostPath(source)
+	}
+	return unix.Mount(srcPath, hostPath(target), fstype, flags, data)
 }
 
 // parseMountOptions translates a slice of mount option strings into the
