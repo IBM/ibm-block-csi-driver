@@ -104,13 +104,24 @@ func (mounter *Mounter) MountSensitive(source, target, fstype string, options, s
 // the OS exposes host paths directly (Ubuntu/RHEL), so both paths are used
 // as-is.  If not, the /host prefix is applied to both (SUSE).
 func resolveMountPaths(source, target string) (string, string) {
-	var stat unix.Stat_t
-	if err := unix.Stat(source, &stat); err == nil {
-		// Source is directly visible — no prefix needed (Ubuntu/RHEL).
+	src := resolveHostPath(source)
+	// Apply the same prefix decision to target as was made for source.
+	if src == source {
 		return source, target
 	}
-	// Source not visible without prefix — use /host-prefixed paths (SUSE).
-	return hostPath(source), hostPath(target)
+	return src, hostPath(target)
+}
+
+// resolveHostPath returns the correct in-container path for a single host
+// filesystem path.  If the path is stat-able as-is the OS exposes host paths
+// directly (Ubuntu/RHEL) and the bare path is returned.  Otherwise the /host
+// prefix is applied (SUSE).
+func resolveHostPath(p string) string {
+	var stat unix.Stat_t
+	if err := unix.Stat(p, &stat); err == nil {
+		return p
+	}
+	return hostPath(p)
 }
 
 // parseMountOptions translates a slice of mount option strings into the
@@ -161,9 +172,11 @@ func parseMountOptions(options []string) (uintptr, string) {
 // Unmount unmounts the target.
 func (mounter *Mounter) Unmount(target string) error {
 	logger.Infof("Unmounting %s", target)
-	output, err := mounter.executer.ExecuteWithTimeout(int(timeout.Seconds()*1000), "umount", []string{target})
+	tgt := resolveHostPath(target)
+	logger.Debugf("Unmount: resolved path: target=%s", tgt)
+	output, err := mounter.executer.ExecuteWithTimeout(int(timeout.Seconds()*1000), "umount", []string{tgt})
 	if err != nil {
-		return fmt.Errorf("Unmount failed: %v\nUnmounting arguments: %s\nOutput: %s\n", err, target, string(output))
+		return fmt.Errorf("Unmount failed: %v\nUnmounting arguments: %s\nOutput: %s\n", err, tgt, string(output))
 	}
 	return nil
 }
