@@ -82,15 +82,35 @@ func (mounter *Mounter) Mount(source, target, fstype string, options []string) e
 
 // MountSensitive is the same as Mount but accepts an additional
 // sensitiveOptions slice (for passwords etc. that must not be logged).
+//
+// Path resolution strategy: on some OS variants (e.g. SUSE) the driver
+// container's rootfs does not directly expose host paths such as /dev/dm-N or
+// /var/lib/kubelet/...; they are only reachable via the /host bind-mount.  On
+// others (e.g. Ubuntu/RHEL) those paths are visible directly.  We probe the
+// source path first: if it is stat-able as-is we use bare paths; otherwise we
+// prepend /host to both source and target.
 func (mounter *Mounter) MountSensitive(source, target, fstype string, options, sensitiveOptions []string) error {
 	logger.Infof("MountSensitive: mounting %s to %s (fstype=%s options=%v)", source, target, fstype, options)
 	allOptions := append(options, sensitiveOptions...)
 	flags, data := parseMountOptions(allOptions)
-	// Both source and target must be accessed through /host: unix.Mount resolves
-	// paths in the container's rootfs namespace, not the host's, even in a
-	// privileged container.  The host root filesystem is bind-mounted at /host,
-	// so all absolute paths need that prefix to be reachable from the container.
-	return unix.Mount(hostPath(source), hostPath(target), fstype, flags, data)
+
+	src, tgt := resolveMountPaths(source, target)
+	logger.Debugf("MountSensitive: resolved paths: source=%s target=%s", src, tgt)
+	return unix.Mount(src, tgt, fstype, flags, data)
+}
+
+// resolveMountPaths determines the correct in-container paths for source and
+// target.  It probes the source path: if unix.Stat succeeds on the bare path
+// the OS exposes host paths directly (Ubuntu/RHEL), so both paths are used
+// as-is.  If not, the /host prefix is applied to both (SUSE).
+func resolveMountPaths(source, target string) (string, string) {
+	var stat unix.Stat_t
+	if err := unix.Stat(source, &stat); err == nil {
+		// Source is directly visible — no prefix needed (Ubuntu/RHEL).
+		return source, target
+	}
+	// Source not visible without prefix — use /host-prefixed paths (SUSE).
+	return hostPath(source), hostPath(target)
 }
 
 // parseMountOptions translates a slice of mount option strings into the
