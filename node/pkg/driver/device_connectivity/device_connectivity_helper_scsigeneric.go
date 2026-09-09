@@ -316,7 +316,8 @@ type dmIoctl struct {
 
 const (
 	// linux/nvme_ioctl.h definition tracking index macro
-	NvmeIoctlIdTarget = 0x4143 
+	//NvmeIoctlIdTarget = 0x4143 
+	NvmeIoctlIdTarget = 0x4e40 
 )
 
 type NvmeIdTarget struct {
@@ -3062,8 +3063,7 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) FindSlavesByWWID(ctx context.Con
 				continue
 			}
 
-			// FIXED: Substituted compile-broken un-declared regex checks with lightweight, allocation-free string prefix matches
-			isNVMe := strings.HasPrefix(name, "nvme") && strings.Contains(name, "n")
+			isNVMe := nvmeNamespaceRegex.MatchString(name)
 			isSCSI := strings.HasPrefix(name, "sd")
 
 			if !isNVMe && !isSCSI {
@@ -3103,7 +3103,7 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) FindSlavesByWWID(ctx context.Con
 					return "", err
 				}
 
-				isNVMe := strings.HasPrefix(name, "nvme") && strings.Contains(name, "n")
+				isNVMe := nvmeNamespaceRegex.MatchString(name)
 				isSCSI := strings.HasPrefix(name, "sd")
 
 				var discoveredID string
@@ -6191,7 +6191,7 @@ func (r *OsDeviceConnectivityHelperGeneric) GetWwnByNvmeSysfs(ctx context.Contex
 		if normSerial == "" {
 			return "", fmt.Errorf("extracted target nvme device serial block evaluated to blank payload spacing")
 		}
-		return normSerial, nil
+		return normalizeWWID(normSerial), nil
 	}
 
 	return "", fmt.Errorf("no unique identity mapping signatures found for nvme device node %s across all sysfs layers", name)
@@ -6629,7 +6629,7 @@ func (o *GetDmsPathHelperGeneric) GetSlaveCountNvmeNamespace(ctx context.Context
 					logger.Warningf("[VFS-Guard] NVMe slave candidates reached safe processing ceiling (%d). Truncating scan.", maxCapCeiling)
 					break
 				}
-				nvmeCandidates = append(nvmeCandidates, name)				
+				nvmeCandidates = append(nvmeCandidates, name)
 			}
 		}
 	}
