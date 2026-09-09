@@ -78,6 +78,9 @@ type NodeMounter interface {
 
 // nodeService represents the node service of CSI driver
 type NodeService struct {
+	csi.UnimplementedIdentityServer
+	csi.UnimplementedNodeServer
+
 	// csi.NodeServer
 	Mounter                     NodeMounter
 	ConfigYaml                  ConfigFile
@@ -232,7 +235,7 @@ func (d *NodeService) NodeStageVolume(ctx context.Context, req *csi.NodeStageVol
 		sysDevices = []string{baseDevice}
 	} else {
 		// Securely handles both traditional SCSI maps and NVMe over DM (NVMeNonNative) layouts via sysfs
-		sysDevices, err = device_connectivity.GetSysDevicesFromMpath(ctx, baseDevice)
+		sysDevices, err = device_connectivity.GetSysDevicesFromMpath(ctx, d.KeyedGater, baseDevice)
 		if err != nil {
 			logger.Errorf("Error while trying to get sys devices : {%v}", err.Error())
 			return nil, status.Error(codes.Internal, err.Error())
@@ -822,7 +825,7 @@ func (d *NodeService) NodeExpandVolume(ctx context.Context, req *csi.NodeExpandV
 	case device_connectivity.NVMeNonNative:
 		// FIXED: Non-native NVMe over DM MUST rescan its NVMe fabric controllers before resizing DM!
 		logger.Infof("Device %s is non-native NVMe: initiating NVMe controller rescan prior to DM resize", baseDevice)
-		sysDevices, err := device_connectivity.GetSysDevicesFromMpath(ctx, baseDevice)
+		sysDevices, err := device_connectivity.GetSysDevicesFromMpath(ctx, d.KeyedGater, baseDevice)
 		if err != nil {
 			logger.Errorf("Error getting underlying paths for NVMe-DM device %s: %v", baseDevice, err)
 			return nil, status.Error(codes.Internal, err.Error())
@@ -841,7 +844,7 @@ func (d *NodeService) NodeExpandVolume(ctx context.Context, req *csi.NodeExpandV
 
 	case device_connectivity.NotNVMe:
 		// Standard SCSI (FC/iSCSI) -> Rescan physical paths via sysfs, then expand the multipath map
-		sysDevices, err := device_connectivity.GetSysDevicesFromMpath(ctx, baseDevice)
+		sysDevices, err := device_connectivity.GetSysDevicesFromMpath(ctx, d.KeyedGater, baseDevice)
 		if err != nil {
 			logger.Errorf("Error getting sys devices for %s: %v", baseDevice, err)
 			return nil, status.Error(codes.Internal, err.Error())
