@@ -124,7 +124,7 @@ func (w *limitWriter) Write(p []byte) (n int, err error) {
 	nActual, err := w.Writer.Write(p[:writeLen])
 	w.curr += nActual
 	if err != nil {
-                logger.Warningf("have error")
+                //logger.Warningf("have error")
 	}
     return nActual, err // Return nActual, NOT len(p)
 }
@@ -145,10 +145,10 @@ func (e *Executer) CommandContext(ctx context.Context, name string, args ...stri
     realExecutor := k8sexec.New()
     baseCmd := realExecutor.CommandContext(ctx, name, args...)
     if standardCmd, ok := baseCmd.(interface{ SetWaitDelay(time.Duration) }); ok {
-        logger.Warning("introduce delay")
+        //logger.Warning("introduce delay")
         standardCmd.SetWaitDelay(e.waitDelay)
     } else {
-        logger.Warning("no delay")
+        //logger.Warning("no delay")
         // Fallback: If your k8s version/provider doesn't have a setter,
         // you may need to use reflection or check for a specific internal struct.
     }
@@ -165,7 +165,7 @@ func (e *Executer) CommandContext(ctx context.Context, name string, args ...stri
 }
 
 func (e *Executer) Command(name string, args ...string) k8sexec.Cmd {
-        logger.Warningf("command %s", name)
+        //logger.Warningf("command %s", name)
         return e.CommandContext(context.Background(), name, args...)
 }
 
@@ -197,7 +197,7 @@ func (s *safeCmd) SetDir(dir string) {
 }
 
 func (s *safeCmd) Start() error {
-        logger.Warning("Start")
+        //logger.Warning("Start")
 
     device := s.extractDevice()
     if device != "" && s.executor.IsDeviceStillStuck(device) {
@@ -215,7 +215,7 @@ func (s *safeCmd) Start() error {
         err := s.Cmd.Start()
 
         if err == nil {
-            logger.Warning("start")
+            //logger.Warning("start")
          } else {
              logger.Warning("failed to start %v", err)
 }
@@ -224,7 +224,7 @@ func (s *safeCmd) Start() error {
 }
 
 func (s *safeCmd) Wait() error {
-        logger.Warning("wait")
+        //logger.Warning("wait")
         err := s.Cmd.Wait()
         device := s.extractDevice()
         //logger.Warning("Wait done")
@@ -239,7 +239,7 @@ func (s *safeCmd) Wait() error {
     } else {
         // Fallback if GetPid isn't available:
         // You might not be able to get the PID from the interface easily
-        logger.Warning("could not retrieve pid from interface")
+        //logger.Warning("could not retrieve pid from interface")
     }
 
         if err != nil {
@@ -266,7 +266,7 @@ func (s *safeCmd) Wait() error {
 				// MUST return a type that satisfies k8sexec.ExitError
 				return &exitError{error: err, code: exitCode}				
         }
-        logger.Warning("success")
+        //logger.Warning("success")
 
         // Success
         if device != "" {
@@ -281,25 +281,25 @@ type exitError struct {
 }
 
 func (e *exitError) ExitStatus() int {
-	logger.Warning("exit status")
+	//logger.Warning("exit status")
     return e.code
 }
 
 func (e *exitError) Exited() bool {
-	logger.Warning("exit error")
+	//logger.Warning("exit error")
     // If we have an exit code from the process, it has exited.
     return true
 }
 
 // Ensure it implements String() to fully satisfy the k8sexec.ExitError interface
 func (e *exitError) String() string {
-	logger.Warning("exitstring")
+	//logger.Warning("exitstring")
     return e.Error()
 }
 
 
 func (s *safeCmd) CombinedOutput() ([]byte, error) {
-        logger.Warning("combined output")
+        //logger.Warning("combined output")
     var b bytes.Buffer
     // Use a single limitWriter for BOTH to track the total output limit correctly
     lw := &limitWriter{Writer: &b, Limit: DefaultMaxOutput}
@@ -316,12 +316,12 @@ func (s *safeCmd) CombinedOutput() ([]byte, error) {
     }
     err := s.Wait()
          if err == nil {
-             logger.Warning("wait")
+             //logger.Warning("wait")
           } else {
-              logger.Warning("failed to wait %v", err)
+              //logger.Warning("failed to wait %v", err)
       }
 
-     logger.Warningf("output %s", string(b.Bytes()))
+     //logger.Warningf("output %s", string(b.Bytes()))
 
 
     return b.Bytes(), err
