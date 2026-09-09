@@ -6887,13 +6887,16 @@ func (of *GetDmsPathHelperGeneric) EvaluateSysfsTopology(ctx context.Context, ga
 }
 
 func (of *GetDmsPathHelperGeneric) EvaluateSysfsTopologyScanDM(ctx context.Context, gater *executer.KeyedGater, devNames []string, rawScsiTarget string, rawNvmeTarget string) (hasDevice bool, isPending bool, devName string) {
-	
 	// FIX: Normalize comparison arguments once outside the hot loop to reduce overhead
 	cleanScsiTarget := normalizeWWID(rawScsiTarget)
 	cleanNvmeTarget := normalizeWWID(rawNvmeTarget)
 
-	for _, name := range devNames {
+	logger.Debugf("[EvalTopology-Trace] [Phase-1-DM] Starting DM Scan Loop. Target SCSI: '%s', Target NVMe: '%s'. Total candidates: %d", 
+		cleanScsiTarget, cleanNvmeTarget, len(devNames))
+
+	for idx, name := range devNames {
 		if err := ctx.Err(); err != nil {
+			logger.Errorf("[EvalTopology-Trace] [Phase-1-DM] Context cancelled at loop index %d", idx)
 			return false, false, ""
 		}
 		
@@ -6902,43 +6905,81 @@ func (of *GetDmsPathHelperGeneric) EvaluateSysfsTopologyScanDM(ctx context.Conte
 		}
 
 		dmPath := filepath.Join("/sys/block", name)
+		logger.Debugf("[EvalTopology-Trace] [Phase-1-DM] ['%s'] Evaluating Device Mapper sysfs structure at: %s", name, dmPath)
 
 		var contentBytesStr string
 		var readErr error
-		if contentBytesStr, readErr = secureReadSysfs(ctx, gater, name, filepath.Join(dmPath, "dm", "uuid")); readErr != nil {
-			if contentBytesStr, readErr = secureReadSysfs(ctx, gater, name, filepath.Join(dmPath, "uuid")); readErr != nil {
-				contentBytesStr, _ = secureReadSysfs(ctx, gater, name, filepath.Join(dmPath, "dm", "name"))
+		var sourceFile string
+
+		// Attempt Step A: Standard dm/uuid file path
+		sourceFile = filepath.Join(dmPath, "dm", "uuid")
+		if contentBytesStr, readErr = secureReadSysfs(ctx, gater, name, sourceFile); readErr != nil {
+			logger.Debugf("[EvalTopology-Trace] [Phase-1-DM] ['%s'] Step A failed (%s): %v. Trying Step B...", name, sourceFile, readErr)
+			
+			// Attempt Step B: Core block layout fallback uuid file path
+			sourceFile = filepath.Join(dmPath, "uuid")
+			if contentBytesStr, readErr = secureReadSysfs(ctx, gater, name, sourceFile); readErr != nil {
+				logger.Debugf("[EvalTopology-Trace] [Phase-1-DM] ['%s'] Step B failed (%s): %v. Trying Step C...", name, sourceFile, readErr)
+				
+				// Attempt Step C: Logical volume clean alias name tracking file path
+				sourceFile = filepath.Join(dmPath, "dm", "name")
+				contentBytesStr, _ = secureReadSysfs(ctx, gater, name, sourceFile)
 			}
 		}
+
 		if contentBytesStr == "" {
+			logger.Warningf("[EvalTopology-Trace] [Phase-1-DM] ['%s'] Unable to retrieve any unique identifying data across all target tracking paths.", name)
 			continue
 		}
 
-		foundUUID := normalizeWWID(contentBytesStr)
-		// FIX: Dropped the 'len(foundUUID) != 32' check. This prevented NVMe UUID/EUI descriptors 
-		// and custom dm-multipath string structures from validating successfully.
+		rawUUID := strings.TrimSpace(contentBytesStr)
+		foundUUID := normalizeWWID(rawUUID)
+		logger.Debugf("[EvalTopology-Trace] [Phase-1-DM] ['%s'] Identity retrieved from %s. Raw: '%s' -> Normalized: '%s'", 
+			name, sourceFile, rawUUID, foundUUID)
 
-		if (cleanScsiTarget != "" && foundUUID == cleanScsiTarget) || (cleanNvmeTarget != "" && foundUUID == cleanNvmeTarget) {
-			logger.Infof("[EvalTopology-Trace] [Phase-1-DM] Match hit on DM device name: '%s'", name)
+		// Verification Matrix Comparison Execution Block
+		scsiMatch := cleanScsiTarget != "" && foundUUID == cleanScsiTarget
+		nvmeMatch := cleanNvmeTarget != "" && foundUUID == cleanNvmeTarget
+
+		logger.Debugf("[EvalTopology-Trace] [Phase-1-DM] ['%s'] Comparison Matrix -> SCSI Match: %t (Target='%s'), NVMe Match: %t (Target='%s')", 
+			name, scsiMatch, cleanScsiTarget, nvmeMatch, cleanNvmeTarget)
+
+		if scsiMatch || nvmeMatch {
+			logger.Infof("[EvalTopology-Trace] [Phase-1-DM] [SUCCESS] Identity confirmation hit on DM node '%s' using key: '%s'", name, foundUUID)
 			
-			// FIX: Reused the pre-calculated dmPath variable to eliminate redundant string allocations
-			roBytesStr, errRo := secureReadSysfs(ctx, gater, name, filepath.Join(dmPath, "ro"))
+			// Query device read-only hardware attribute flag
+			roPath := filepath.Join(dmPath, "ro")
+			roBytesStr, errRo := secureReadSysfs(ctx, gater, name, roPath)
 			isReadOnly := errRo == nil && strings.TrimSpace(roBytesStr) != "0"
+			if errRo != nil {
+				logger.Debugf("[EvalTopology-Trace] [Phase-1-DM] ['%s'] Read-Only flag file check error: %v (defaulting to false)", name, errRo)
+			}
 			
-			suspendedBytesStr, errSusp := secureReadSysfs(ctx, gater, name, filepath.Join(dmPath, "dm", "suspended"))
+			// Query device multi-path suspended replication state mapping frame
+			suspendedPath := filepath.Join(dmPath, "dm", "suspended")
+			suspendedBytesStr, errSusp := secureReadSysfs(ctx, gater, name, suspendedPath)
 			isSuspended := errSusp == nil && strings.TrimSpace(suspendedBytesStr) == "1"
+			if errSusp != nil {
+				logger.Debugf("[EvalTopology-Trace] [Phase-1-DM] ['%s'] Suspended status file check error: %v (defaulting to false)", name, errSusp)
+			}
 
-			logger.Debugf("[EvalTopology-Trace] [Phase-1-DM] Status flags for '%s': isReadOnly=%v, isSuspended=%v", name, isReadOnly, isSuspended)
+			logger.Debugf("[EvalTopology-Trace] [Phase-1-DM] ['%s'] Status evaluation values collected: isReadOnly=%t, isSuspended=%t", 
+				name, isReadOnly, isSuspended)
+
 			if isSuspended || isReadOnly {
-				logger.Infof("[EvalTopology-Trace] [Phase-1-DM] Returning active match with pending/settling state: (hasDevice=true, isPending=true, name='%s')", name)
+				logger.Warningf("[EvalTopology-Trace] [Phase-1-DM] ['%s'] Target device mapper configuration is locked or settling (ReadOnly=%t, Suspended=%t). Marking pending.", 
+					name, isReadOnly, isSuspended)
 				return true, true, name
 			}
-			logger.Infof("[EvalTopology-Trace] [Phase-1-DM] Returning active match with ready state: (hasDevice=true, isPending=false, name='%s')", name)
+
+			logger.Infof("[EvalTopology-Trace] [Phase-1-DM] ['%s'] Target multi-path layout confirmed healthy, idle, and ready for volume attaches.", name)
 			return true, false, name
 		}
+		
+		logger.Debugf("[EvalTopology-Trace] [Phase-1-DM] ['%s'] Identity check complete: device signature does not match expected volume target constraints.", name)
 	}
 	
-	logger.Debugf("[EvalTopology-Trace] [Phase-1-DM] No matches validated in Device Mapper channel.")
+	logger.Debugf("[EvalTopology-Trace] [Phase-1-DM] Complete scan loop exhausted. No matching identities verified across any map options.")
 	return false, false, ""
 }
 
@@ -7826,15 +7867,17 @@ func normalizeWWID(raw string) string {
 	}
 
 	// Baseline universal prefixes found across old and new enterprise kernels
+	// FIXED: Added modern hyphenated multipath and NVMe/EUI architecture variations
 	prefixes := []string{
-		"dm-uuid-mpath-", "uuid-mpath-", "dm-uuid-", "mpath-nvme.", 
+		"dm-uuid-mpath-", "uuid-mpath-", "dm-uuid-", 
+		"mpath-nvme-eui-", "mpath-nvme-nguid-", "mpath-nvme.", 
+		"nvme-eui-", "nvme-nguid-", "nvme-eui.", "nvme-nguid.",
 		"mpath-naa.", "uuid-", "uuid.", "mpath-", "mpath.", 
-		"naa.", "nvme.", "t10.", "eui.", "0x",
+		"naa.", "nvme-", "nvme.", "t10.", "eui-", "eui.", "0x",
 	}
 
 	// MULTI-PASS STRIPPING GATE:
 	// Continually inspect and remove prefixes until the string no longer mutates.
-	// This safely unravels multiple stacked layers (e.g., "mpath-naa.600..." -> "naa.600..." -> "600...").
 	hasChanged := true
 	for hasChanged {
 		hasChanged = false
