@@ -6943,30 +6943,42 @@ func (of *GetDmsPathHelperGeneric) EvaluateSysfsTopologyScanDM(ctx context.Conte
 }
 
 func (of *GetDmsPathHelperGeneric) EvaluateSysfsTopologyScanNvme(ctx context.Context, gater *executer.KeyedGater, devNames []string, rawScsiTarget string, rawNvmeTarget string) (hasDevice bool, isPending bool, devName string) {
-	// FIX: Normalize the comparison target once up front to optimize inner-loop efficiency
 	cleanNvmeTarget := normalizeWWID(rawNvmeTarget)
+	logger.Debugf("[EvalTopology-Trace] Starting NVMe scan. Target identifier: '%s' (Cleaned: '%s'). Checking %d candidate devices.", rawNvmeTarget, cleanNvmeTarget, len(devNames))
 
-	for _, name := range devNames {
+	for idx, name := range devNames {
 		if err := ctx.Err(); err != nil {
+			logger.Errorf("[EvalTopology-Trace] Context cancelled during scan pass at index %d", idx)
 			return false, false, ""
 		}
 		
-		// FIX: Swapped compile-broken external regex with high-performance, allocation-free string prefix scanning
 		if !strings.HasPrefix(name, "nvme") {
+			logger.Debugf("[EvalTopology-Trace] Skipping node '%s': does not match 'nvme' string prefix pattern", name)
 			continue
 		}
 
-		baseBlockName := name
-		m := filepath.Join("/sys/block", name)
-		targetSysDir := m
+		logger.Debugf("[EvalTopology-Trace] Processing candidate node [%d/%d]: '%s'", idx+1, len(devNames), name)
 
+		// 1. Establish the accurate base block name and the correct sysfs node root
+		baseBlockName := name
+		
+		// Map the path cleanly depending on whether it's a standard block or a virtual class node
+		targetSysDir := filepath.Join("/sys/block", name)
+		if _, errStat := os.Stat(targetSysDir); os.IsNotExist(errStat) {
+			logger.Debugf("[EvalTopology-Trace] ['%s'] Path '%s' not found. Falling back to virtual class layout tracking.", name, targetSysDir)
+			targetSysDir = filepath.Join("/sys/class/block", name)
+		} else {
+			logger.Debugf("[EvalTopology-Trace] ['%s'] Confirmed native block tracking framework at: '%s'", name, targetSysDir)
+		}
+
+		// If it's a virtual channel lane (e.g., nvme0c1n1), find its clean master counterpart
 		if strings.Contains(name, "c") {
 			if lastNIdx := strings.LastIndex(name, "n"); lastNIdx != -1 && lastNIdx > 0 {
 				if cIdx := strings.Index(name, "c"); cIdx != -1 && cIdx < lastNIdx {
 					ctrlPart := name[:cIdx]     
 					nsPart := name[lastNIdx:]    
 					baseBlockName = ctrlPart + nsPart 
-					targetSysDir = filepath.Join("/sys/block", baseBlockName)
+					logger.Debugf("[EvalTopology-Trace] ['%s'] Virtual channel detected. Realignment applied: baseBlockName='%s' (targetSysDir remains tracking active lane: '%s')", name, baseBlockName, targetSysDir)
 				}
 			}
 		}
@@ -6974,9 +6986,13 @@ func (of *GetDmsPathHelperGeneric) EvaluateSysfsTopologyScanNvme(ctx context.Con
 		var availableIDs []string
 		var discoveredID string
 
+		// 2. STAGE 1: Attempt Direct Kernel IOCTL Query
 		deviceNode := filepath.Join("/dev", name)
-		if df, errOpen := os.OpenFile(deviceNode, os.O_RDONLY|syscall.O_NONBLOCK, 0); errOpen == nil {
-			// FIX: Replaced compile-broken un-declared macro types with package-compliant structures
+		logger.Debugf("[EvalTopology-Trace] ['%s'] Attempting low-level IOCTL (0x4e40) data trap on node path: '%s'", name, deviceNode)
+		
+		if df, errOpen := os.OpenFile(deviceNode, os.O_RDONLY|syscall.O_NONBLOCK, 0); errOpen != nil {
+			logger.Warningf("[EvalTopology-Trace] ['%s'] Failed to open character/block device node '%s': %v", name, deviceNode, errOpen)
+		} else {
 			var nvmeInfo NvmeIdTarget
 			_, _, errno := syscall.Syscall(
 				syscall.SYS_IOCTL,
@@ -6987,64 +7003,132 @@ func (of *GetDmsPathHelperGeneric) EvaluateSysfsTopologyScanNvme(ctx context.Con
 			df.Close()
 			runtime.KeepAlive(nvmeInfo)
 
-			if errno == 0 {
+			if errno != 0 {
+				logger.Debugf("[EvalTopology-Trace] ['%s'] Kernel IOCTL operation returned error code (errno=%d): %s", name, errno, errno.Error())
+			} else {
 				discoveredID = normalizeWWID(fmt.Sprintf("%x", nvmeInfo.Nguid))
+				logger.Debugf("[EvalTopology-Trace] ['%s'] Raw payload bytes successfully returned from IOCTL. Parsed NGUID hex: '%s'", name, discoveredID)
+				
 				if discoveredID != "" && discoveredID != "00000000000000000000000000000000" {
 					availableIDs = append(availableIDs, discoveredID)
-					logger.Debugf("[EvalTopology-Trace] [Phase-2-NVMe] NGUID recovered via IOCTL on '%s': '%s'", name, discoveredID)
+					logger.Infof("[EvalTopology-Trace] ['%s'] Successfully recovered hardware NGUID via direct IOCTL trap: '%s'", name, discoveredID)
+				} else {
+					logger.Debugf("[EvalTopology-Trace] ['%s'] IOCTL string payload skipped: value is empty or zeroed out", name)
 				}
 			}
 		}
 
+		// 3. STAGE 2: Sysfs fallbacks (Triggered if IOCTL failed or returned zero values)
 		if len(availableIDs) == 0 {
-			logger.Debugf("[EvalTopology-Trace] [Phase-2-NVMe] IOCTL empty for '%s', checking sysfs fallback trees...", name)
-			if data, err := secureReadSysfs(ctx, gater, baseBlockName, filepath.Join(targetSysDir, "device", "wwid")); err == nil && data != "" { availableIDs = append(availableIDs, normalizeWWID(data)) }
-			if data, err := secureReadSysfs(ctx, gater, baseBlockName, filepath.Join(targetSysDir, "uuid")); err == nil && data != "" { availableIDs = append(availableIDs, normalizeWWID(data)) }
-			if data, err := secureReadSysfs(ctx, gater, baseBlockName, filepath.Join(targetSysDir, "nguid")); err == nil && data != "" { availableIDs = append(availableIDs, normalizeWWID(data)) }
-			if data, err := secureReadSysfs(ctx, gater, baseBlockName, filepath.Join(targetSysDir, "device", "serial")); err == nil && data != "" { availableIDs = append(availableIDs, normalizeWWID(data)) }
+			logger.Debugf("[EvalTopology-Trace] ['%s'] Primary IOCTL path returned no identifiers. Initializing sequential sysfs fallback tree scans...", name)
 			
-			subsysSymlink := filepath.Join(m, "device", "subsystem")
+			// Fallback A: Device WWID file descriptor lookup
+			wwidPath := filepath.Join(targetSysDir, "device", "wwid")
+			if data, err := secureReadSysfs(ctx, gater, baseBlockName, wwidPath); err != nil {
+				logger.Debugf("[EvalTopology-Trace] ['%s'] Fallback [A] read failed for '%s': %v", name, wwidPath, err)
+			} else if data != "" {
+				cleaned := normalizeWWID(data)
+				availableIDs = append(availableIDs, cleaned)
+				logger.Infof("[EvalTopology-Trace] ['%s'] Fallback [A] recovered identifier from '%s': '%s'", name, wwidPath, cleaned)
+			}
+
+			// Fallback B: Namespace Unique UUID mapping
+			uuidPath := filepath.Join(targetSysDir, "uuid")
+			if data, err := secureReadSysfs(ctx, gater, baseBlockName, uuidPath); err != nil {
+				logger.Debugf("[EvalTopology-Trace] ['%s'] Fallback [B] read failed for '%s': %v", name, uuidPath, err)
+			} else if data != "" {
+				cleaned := normalizeWWID(data)
+				availableIDs = append(availableIDs, cleaned)
+				logger.Infof("[EvalTopology-Trace] ['%s'] Fallback [B] recovered identifier from '%s': '%s'", name, uuidPath, cleaned)
+			}
+
+			// Fallback C: Namespace Hardware NGUID file lookup
+			nguidPath := filepath.Join(targetSysDir, "nguid")
+			if data, err := secureReadSysfs(ctx, gater, baseBlockName, nguidPath); err != nil {
+				logger.Debugf("[EvalTopology-Trace] ['%s'] Fallback [C] read failed for '%s': %v", name, nguidPath, err)
+			} else if data != "" {
+				cleaned := normalizeWWID(data)
+				availableIDs = append(availableIDs, cleaned)
+				logger.Infof("[EvalTopology-Trace] ['%s'] Fallback [C] recovered identifier from '%s': '%s'", name, nguidPath, cleaned)
+			}
+
+			// Fallback D: Device Controller Serial handle string
+			serialPath := filepath.Join(targetSysDir, "device", "serial")
+			if data, err := secureReadSysfs(ctx, gater, baseBlockName, serialPath); err != nil {
+				logger.Debugf("[EvalTopology-Trace] ['%s'] Fallback [D] read failed for '%s': %v", name, serialPath, err)
+			} else if data != "" {
+				cleaned := normalizeWWID(data)
+				availableIDs = append(availableIDs, cleaned)
+				logger.Infof("[EvalTopology-Trace] ['%s'] Fallback [D] recovered identifier from '%s': '%s'", name, serialPath, cleaned)
+			}
+			
+			// Fallback E: Fabric Subsystem Symlink Tracking
+			subsysSymlink := filepath.Join(targetSysDir, "device", "subsystem")
+			logger.Debugf("[EvalTopology-Trace] ['%s'] Evaluating global subsystem fabric mapping via symlink: '%s'", name, subsysSymlink)
+			
 			realSubsysPath, errLink := filepath.EvalSymlinks(subsysSymlink)
-			if errLink == nil && strings.Contains(realSubsysPath, "virtual/nvme-subsys") {
-				subsysWwidPath := filepath.Join(realSubsysPath, "wwid")
-				if data, err := secureReadSysfs(ctx, gater, baseBlockName, subsysWwidPath); err == nil && data != "" {
-					availableIDs = append(availableIDs, normalizeWWID(data))
+			if errLink != nil {
+				logger.Debugf("[EvalTopology-Trace] ['%s'] Fallback [E] symlink evaluation failed for '%s': %v", name, subsysSymlink, errLink)
+			} else {
+				logger.Debugf("[EvalTopology-Trace] ['%s'] Fallback [E] symlink resolved successfully to real path: '%s'", name, realSubsysPath)
+				if strings.Contains(realSubsysPath, "virtual/nvme-subsys") {
+					subsysWwidPath := filepath.Join(realSubsysPath, "wwid")
+					if data, err := secureReadSysfs(ctx, gater, baseBlockName, subsysWwidPath); err != nil {
+						logger.Debugf("[EvalTopology-Trace] ['%s'] Fallback [E] failed reading subsystem WWID file at '%s': %v", name, subsysWwidPath, err)
+					} else if data != "" {
+						cleaned := normalizeWWID(data)
+						availableIDs = append(availableIDs, cleaned)
+						logger.Infof("[EvalTopology-Trace] ['%s'] Fallback [E] recovered fabric identifier from '%s': '%s'", name, subsysWwidPath, cleaned)
+					}
+				} else {
+					logger.Debugf("[EvalTopology-Trace] ['%s'] Fallback [E] skipped: destination path does not contain 'virtual/nvme-subsys' context token", name)
 				}
 			}
-			logger.Debugf("[EvalTopology-Trace] [Phase-2-NVMe] Sysfs fallback collection yielded IDs count: %d", len(availableIDs))
+			logger.Debugf("[EvalTopology-Trace] ['%s'] Concluded fallback routines. Total tracking IDs collected for verification loop: %d", name, len(availableIDs))
 		}
 
+		// 4. STAGE 3: Identity Verification & Verification Matrix Evaluation
 		matchFound := false
-		for _, rawID := range availableIDs {
-			// FIX: Removed the rigid 'len(rawID) == 32' validation filter. This was dropping valid NVMe-over-Fabrics 
-			// subsystem handles and 36-character standard UUID descriptors.
-			if cleanNvmeTarget != "" && normalizeWWID(rawID) == cleanNvmeTarget {
+		for loopIdx, rawID := range availableIDs {
+			normalizedID := normalizeWWID(rawID)
+			isMatch := cleanNvmeTarget != "" && normalizedID == cleanNvmeTarget
+			logger.Debugf("[EvalTopology-Trace] ['%s'] Comparing structural IDs [Index %d]: Candidate='%s' vs Target='%s' | Match Result: %t", name, loopIdx, normalizedID, cleanNvmeTarget, isMatch)
+			
+			if isMatch {
 				matchFound = true
-				logger.Infof("[EvalTopology-Trace] [Phase-2-NVMe] Namespace match confirmed on node '%s' using ID: '%s'", name, rawID)
+				logger.Infof("[EvalTopology-Trace] [SUCCESS] Namespace match confirmed on node '%s' using identity key: '%s'", name, rawID)
 				break 
 			}
 		}
 
+		// 5. STAGE 4: State Settlement and Readiness Evaluation Tracker
 		if matchFound {
-			roBytesStr, errRo := secureReadSysfs(ctx, gater, baseBlockName, filepath.Join(targetSysDir, "ro"))
+			roPath := filepath.Join(targetSysDir, "ro")
+			roBytesStr, errRo := secureReadSysfs(ctx, gater, baseBlockName, roPath)
 			isReadOnly := errRo == nil && strings.TrimSpace(roBytesStr) != "0"
+			if errRo != nil {
+				logger.Debugf("[EvalTopology-Trace] ['%s'] Read-Only status path '%s' query error: %v (Defaulting state flag to false)", name, roPath, errRo)
+			}
 			
-			controllerEntries := of.getControllerEntries(ctx, baseBlockName)
-			isControllerTransitioning := of.isNvmeControllerTransitioning(ctx, gater, baseBlockName, controllerEntries)
+			controllerBase := ExtractNvmeControllerBase(baseBlockName)
+			controllerEntries := of.getControllerEntries(ctx, controllerBase)
+			isControllerTransitioning := of.isNvmeControllerTransitioning(ctx, gater, controllerBase, controllerEntries)
 
-			logger.Debugf("[EvalTopology-Trace] [Phase-2-NVMe] Status check for '%s': isReadOnly=%v, isControllerTransitioning=%v", baseBlockName, isReadOnly, isControllerTransitioning)
+			logger.Debugf("[EvalTopology-Trace] ['%s'] Operational health check parameters collected: isReadOnly=%t, controllerBase='%s', isControllerTransitioning=%t", name, isReadOnly, controllerBase, isControllerTransitioning)
+			
 			if isControllerTransitioning || isReadOnly {
-				logger.Infof("[EvalTopology-Trace] [Phase-2-NVMe] Returning active NVMe match with pending/settling state: (hasDevice=true, isPending=true, name='%s')", baseBlockName)
+				logger.Warningf("[EvalTopology-Trace] ['%s'] Hardware is verified but signaling a pending or settling state. (isReadOnly=%t, isTransitioning=%t). Retelling as pending configuration.", name, isReadOnly, isControllerTransitioning)
 				return true, true, baseBlockName
 			}
-			logger.Infof("[EvalTopology-Trace] [Phase-2-NVMe] Returning active NVMe match with ready state: (hasDevice=true, isPending=false, name='%s')", baseBlockName)
+			
+			logger.Infof("[EvalTopology-Trace] ['%s'] Target block storage topology is verified, idle, healthy, and flagged ready for mount operations.", name)
 			return true, false, baseBlockName
 		}
+		
+		logger.Debugf("[EvalTopology-Trace] ['%s'] Evaluation complete: Candidate node identity matrix does not align with your target volume attributes.", name)
 	}
 	
-	logger.Infof("[EvalTopology-Trace] No matching topologies discovered for identifier: '%s'", rawScsiTarget)
-	
-	// FIX: Added missing fallback return block to guarantee type safety and compilation compatibility
+	logger.Warningf("[EvalTopology-Trace] [FAILURE] Scan loop terminated. Checked %d device node options but found zero matching NVMe storage topologies for identifier: '%s'", len(devNames), rawScsiTarget)
 	return false, false, ""
 }
 
