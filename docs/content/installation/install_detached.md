@@ -98,8 +98,8 @@ The IBM Block CSI Driver itself uses the following container images:
 * ```registry.k8s.io/sig-storage/csi-snapshotter:v8.3.0```
 * ```registry.k8s.io/sig-storage/csi-resizer:v1.14.0```
 * ```registry.k8s.io/sig-storage/livenessprobe:v2.16.0```
-* ```quay.io/ibmcsiblock/csi-block-volumereplication-operator:v0.9.3```
-* ```quay.io/ibmcsiblock/csi-volume-group-operator:v0.9.3```
+* ```quay.io/ibmcsiblock/csi-block-volumereplication-operator:v0.9.7```
+* ```quay.io/ibmcsiblock/csi-volume-group-operator:v0.9.7```
 * ```quay.io/ibmcsiblock/ibm-block-csi-host-definer-amd64:1.14.0```
 * ```quay.io/ibmcsiblock/ibm-block-csi-operator-amd64:1.14.0 ```
 * ```quay.io/ibmcsiblock/ibm-block-csi-driver-controller-amd64:1.14.0```
