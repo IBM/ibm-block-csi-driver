@@ -2413,7 +2413,7 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) IsSgDeviceGhost(ctx context.Cont
 		return true, nil
 	}
 	
-	logger.Debugf("[IsSgDeviceGhost]  IsSgDeviceGhost, device %s - not hardware ghost", sgName
+	logger.Debugf("[IsSgDeviceGhost]  IsSgDeviceGhost, device %s - not hardware ghost", sgName)
 
 	// TRACK B: Stuck Initialization / Transient Error Management
 	if ioctlErr != nil {
