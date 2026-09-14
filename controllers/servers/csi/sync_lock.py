@@ -1,4 +1,5 @@
 import threading
+import time
 from collections import defaultdict
 
 from controllers.common.csi_logger import get_stdout_logger
@@ -8,17 +9,40 @@ logger = get_stdout_logger()
 
 ids_in_use = defaultdict(set)
 ids_in_use_lock = threading.Lock()
+ids_last_access = {}  # Track last access time for each lock entry
+STALE_LOCK_TIMEOUT = 600  # 10 minutes in seconds
 
 
 def _add_to_ids_in_use(lock_key, object_id):
     ids_in_use[lock_key].add(object_id)
+    ids_last_access[(lock_key, object_id)] = time.monotonic()
 
 
 def _remove_from_ids_in_use(lock_key, object_id):
     if object_id in ids_in_use[lock_key]:
         ids_in_use[lock_key].remove(object_id)
+        ids_last_access.pop((lock_key, object_id), None)
     else:
         logger.error("could not find lock to release for {}: {}".format(lock_key, object_id))
+
+
+def _cleanup_stale_locks():
+    """Remove lock entries that haven't been accessed recently."""
+    current_time = time.monotonic()
+    stale_entries = []
+
+    for (lock_key, object_id), last_access in ids_last_access.items():
+        if current_time - last_access > STALE_LOCK_TIMEOUT:
+            stale_entries.append((lock_key, object_id))
+
+    for lock_key, object_id in stale_entries:
+        logger.warning("Cleaning up stale lock for {}: {} (last accessed {} seconds ago)".format(
+            lock_key, object_id, current_time - ids_last_access.get((lock_key, object_id), current_time)))
+        if object_id in ids_in_use[lock_key]:
+            ids_in_use[lock_key].remove(object_id)
+        ids_last_access.pop((lock_key, object_id), None)
+
+    return len(stale_entries)
 
 
 class SyncLock:
