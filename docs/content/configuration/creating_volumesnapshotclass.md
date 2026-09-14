@@ -17,15 +17,14 @@ For IBM DS8000® family storage systems, the maximum prefix length is five chara
 
 For IBM Storage Virtualize® family storage systems, the `CSI` prefix is added as default if not specified by the user.{: tip}
 
-- The `virt_snap_func` parameter is optional but necessary in IBM Storage Virtualize® storage systems if using the Snapshot function. To enable the Snapshot function, set the value to _"true"_. The default value is _"false"_. If the value is `"false"` the snapshot will use the FlashCopy function.
+- In StorageClass, the `virt_snap_func` parameter is optional but necessary in IBM Storage Virtualize® storage systems if using the Snapshot function. To enable the Snapshot function, set the value to _"true"_. The default value is _"false"_. If the value is `"false"` the snapshot will use the FlashCopy function.
 
-NOTE: In IBM Storage Virtualize® partition environments the flag is ignored - new method is used for taking snapshots
+NOTE: In IBM Storage Virtualize® partition environments, the flag is ignored — a new method is used for taking snapshots.
 
 - To create a stretched snapshot on SAN Volume Controller storage systems, put a colon (:) between the two pools within the `pool` value. For example:
-  
+
   `pool: demo-pool1:demo-pool2`
-  
-The two pools must be from different sites.{: important}
+
 
 For more information about stretched snapshot limitations and requirements, see [Limitations](../release_notes/limitations.md) and [Compatibility and requirements](../installation/install_compatibility_requirements.md).{: tip}
 
