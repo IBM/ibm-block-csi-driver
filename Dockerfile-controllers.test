@@ -23,10 +23,6 @@ RUN if [[ "$(uname -m)" != "x86"* ]]; then yum install -y rust-toolset; fi
 USER default
 ENV PIP_DISABLE_PIP_VERSION_CHECK=1
 
-RUN if [[ "$(uname -m)" == "s390x" ]]; then \
-    export PROTOCOL_BUFFERS_PYTHON_IMPLEMENTATION=python; \
-    fi
-
 WORKDIR /tmp
 COPY controllers/servers/csi/requirements.txt ./csi_requirements.txt
 COPY controllers/servers/csi/requirements_pyxcli.txt ./csi_requirements_pyxcli.txt
@@ -34,6 +30,12 @@ COPY controllers/servers/host_definer/requirements.txt ./host_definer_requiremen
 # avoid default- boringssl lib, since it does not support z systems
 ENV GRPC_PYTHON_BUILD_SYSTEM_OPENSSL=True
 RUN pip3 install -r ./csi_requirements.txt -r ./host_definer_requirements.txt
+# s390x: replace the native UPB wheel with the pure-Python universal wheel to avoid
+# a SIGSEGV in _message.abi3.so at Python interpreter shutdown (issue #870)
+RUN if [ "$(uname -m)" = "s390x" ]; then \
+        pip3 uninstall -y protobuf && \
+        pip3 install "protobuf==6.33.5" --platform py3-none-any --only-binary=:all: ; \
+    fi
 RUN pip3 install --no-deps -r ./csi_requirements_pyxcli.txt
 
 USER root
@@ -47,10 +49,6 @@ COPY controllers/tests/requirements.txt ./requirements-tests.txt
 RUN pip3 install -r ./requirements-tests.txt
 
 FROM registry.access.redhat.com/ubi9/python-312:1-1788919789
-
-RUN if [[ "$(uname -m)" == "s390x" ]]; then \
-    export PROTOCOL_BUFFERS_PYTHON_IMPLEMENTATION=python; \
-    fi
 
 COPY --from=builder /opt/app-root /opt/app-root
 COPY ./common /driver/common
@@ -66,5 +64,8 @@ USER appuser
 WORKDIR /driver
 
 ENV PYTHONPATH=/driver
+# s390x: force pure-Python protobuf backend; belt-and-suspenders alongside wheel swap in builder
+# (replaces the previous no-op "export" inside RUN which had no effect)
+ENV PROTOCOL_BUFFERS_PYTHON_IMPLEMENTATION=python
 
 ENTRYPOINT ["/driver/controllers/scripts/entrypoint-test.sh"]
