@@ -91,10 +91,10 @@ When host definer is being installed, it is preferable to do so before installin
     1. To enable support on your Kubernetes cluster, install the following volume group CRDs once per cluster.
 
         ```
-        curl -O https://raw.githubusercontent.com/csi-addons/volume-replication-operator/v0.3.0/config/crd/bases/replication.storage.openshift.io_volumereplicationclasses.yaml
+        curl -O https://raw.githubusercontent.com/csiblock/volume-replication-operator/v0.9.7/config/crd/bases/replication.storage.openshift.io_volumereplicationclasses.yaml
         kubectl apply -f ./replication.storage.openshift.io_volumereplicationclasses.yaml
 
-        curl -O https://raw.githubusercontent.com/csi-addons/volume-replication-operator/v0.3.0/config/crd/bases/replication.storage.openshift.io_volumereplications.yaml
+        curl -O https://raw.githubusercontent.com/csiblock/volume-replication-operator/v0.9.7/config/crd/bases/replication.storage.openshift.io_volumereplications.yaml
         kubectl apply -f ./replication.storage.openshift.io_volumereplications.yaml
         ```
 

@@ -3,15 +3,16 @@
 
 # Supported operating systems
 
-Kubernetes from 1.32 onwards is not supported on Red Hat Enterprise Linux® (RHEL) 8.x.{: restriction}
-
 The following table lists supported operating systems for deployment of the IBM® block storage CSI driver on Kubernetes orchestration platforms:
 
 | Operating system                                     |Architecture|
 |------------------------------------------------------|------------|
 | Red Hat Enterprise Linux® (RHEL) 9.x                 |x86|
+| Red Hat Enterprise Linux® (RHEL) 10.x                |x86|
 | Ubuntu 22.04.x LTS                                   |x86|
 | Ubuntu 24.04.x LTS                                   |x86|
+| Ubuntu 26.04.x LTS                                   |x86|
+| SUSE Linux Enterprise Server (SLES) 15, 16           |x86|
 
 The following table lists supported operating systems for deployment of the IBM® block storage CSI driver on Red Hat OpenShift® orchestration platforms:
 

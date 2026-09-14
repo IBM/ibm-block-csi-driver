@@ -3,18 +3,15 @@
 
 # Supported orchestration platforms
 
-Kubernetes from 1.32 onwards is not supported on Red Hat Enterprise Linux® (RHEL) 8.x.{: restriction}
-
 As of this document's publication date, IBM Cloud Satellite® only supports RHEL 8 on x86 architecture for Red Hat OpenShift. For the latest support information, see [Satellite host system requirements](https://cloud.ibm.com/docs/satellite?topic=satellite-host-reqs).{: restriction}
 
 The following table details orchestration platforms suitable for deployment of the IBM® block storage CSI driver.
 
 |Orchestration platform| Version |Architecture|
 |----------------------|---------|------------|
-|Kubernetes            | 1.32    |x86|
-|Kubernetes            | 1.33    |x86|
 |Kubernetes            | 1.34    |x86|
 |Kubernetes            | 1.35    |x86|
+|Kubernetes            | 1.36    |x86|
 |Red Hat OpenShift®    | 4.18    |x86|
 |Red Hat OpenShift®    | 4.19    |x86|
 |Red Hat OpenShift®    | 4.20    |x86|
