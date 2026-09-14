@@ -1449,7 +1449,7 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) purgeScsiGhosts(ctx context.Cont
 				pathOwned := r.isPathOwnedByMyArray(wCtx, candidate.sgName, arrayIdentifiers)
 				serialNumber, _ := r.getHardwareSerial(wCtx, candidate.deviceDir)
 				
-				logger.Debugf("[purgeScsiGhosts]  [Vendor: %s, Serial Match: %v, Ghost: %v, Our path: %v]. Executing hot-unplug.", candidate.sgName, vdr, r.IsSerialMatch(serialNumber, expectedSerial), ghostState, pathOwned)
+				logger.Debugf("[purgeScsiGhosts]  device %s [Vendor: %s, Serial Match: %v, Ghost: %v, Our path: %v]. Executing hot-unplug.", candidate.sgName, vdr, r.IsSerialMatch(serialNumber, expectedSerial), ghostState, pathOwned)
 
 				shouldDelete := (ghostState && isIbmDevice) || (pathOwned && (ghostState || !isIbmDevice || (serialNumber != "" && !r.IsSerialMatch(serialNumber, expectedSerial))))
 				if !shouldDelete {
