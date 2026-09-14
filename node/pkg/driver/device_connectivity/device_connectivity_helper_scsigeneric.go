@@ -1313,6 +1313,9 @@ type sgScsiId struct {
 
 // purgeScsiGhosts scans host SCSI adapters in a memory-bounded, decoupled pipeline to clear unmapped logical units safely.
 func (r *OsDeviceConnectivityHelperScsiGeneric) purgeScsiGhosts(ctx context.Context, expectedSerial string, expectedLun int, arrayIdentifiers []string) error {
+
+	logger.Debugf("[purgeScsiGhosts] Starting purgeScsiGhosts, lun %d", expectedLun)
+
 	if err := ctx.Err(); err != nil {
 		return err
 	}
@@ -1348,8 +1351,12 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) purgeScsiGhosts(ctx context.Cont
 		}
 
 		for _, entry := range devEntries {
+		
 
 			sgName := entry.Name()
+			
+			logger.Debugf("[purgeScsiGhosts] Test entry %s", sgName)
+			
 			if !strings.HasPrefix(sgName, "sg") || len(sgName) < 3 {
 				continue
 			}
@@ -1369,10 +1376,14 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) purgeScsiGhosts(ctx context.Cont
 			deviceDirSymlink := filepath.Join("/sys/class/scsi_generic", sgName, "device")
 			absoluteDeviceDir, errLink := filepath.EvalSymlinks(deviceDirSymlink)
 			if errLink != nil {
+				logger.Debugf("[purgeScsiGhosts] entry %s - EvalSymlinks failed", sgName)
 				continue // Skip the single unreadable path element if a pathological link error occurs
 			}
 
 			hctl := filepath.Base(absoluteDeviceDir)
+			
+			logger.Debugf("[purgeScsiGhosts] entry %s - hctl is %s", sgName, hctl)
+			
 			hctlParts := strings.Split(hctl, ":")
 			if len(hctlParts) < 4 {
 				continue 
@@ -1395,6 +1406,8 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) purgeScsiGhosts(ctx context.Cont
 				hctl:      hctl,
 				deviceDir: absoluteDeviceDir,
 			})
+			
+			logger.Debugf("[purgeScsiGhosts] entry %s - candidate", sgName)
 		}
 
 		if len(rawCandidates) >= maxCapCeiling || len(devEntries) < 100 || err == io.EOF {
@@ -1420,8 +1433,12 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) purgeScsiGhosts(ctx context.Cont
 			30*time.Second, // Bounded timeout forces execution to break free if file sync operations freeze
 			batch,
 			func(wCtx context.Context, index int, candidate ghostCandidate, cancelBatch func()) (struct{}, error) {
+			
+				logger.Debugf("[purgeScsiGhosts] ghost check for %s vendor %s hctl %s", candidate.sgName, candidate.deviceDir, candidate.hctl)
+			
 				vendorBytesRaw, err := os.ReadFile(filepath.Join(candidate.deviceDir, "vendor"))
 				if err != nil {
+					logger.Debugf("[purgeScsiGhosts] read vendor failed")
 					return struct{}{}, err
 				}
 				vdr := strings.ToUpper(strings.TrimSpace(string(vendorBytesRaw)))
@@ -1431,6 +1448,8 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) purgeScsiGhosts(ctx context.Cont
 
 				pathOwned := r.isPathOwnedByMyArray(wCtx, candidate.sgName, arrayIdentifiers)
 				serialNumber, _ := r.getHardwareSerial(wCtx, candidate.deviceDir)
+				
+				logger.Debugf("[purgeScsiGhosts]  [Vendor: %s, Serial Match: %v, Ghost: %v, Our path: %v]. Executing hot-unplug.", candidate.sgName, vdr, r.IsSerialMatch(serialNumber, expectedSerial), ghostState, pathOwned)
 
 				shouldDelete := (ghostState && isIbmDevice) || (pathOwned && (ghostState || !isIbmDevice || (serialNumber != "" && !r.IsSerialMatch(serialNumber, expectedSerial))))
 				if !shouldDelete {
@@ -1468,6 +1487,9 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) purgeScsiGhosts(ctx context.Cont
 		currentChunkBatch := rawCandidates[i:end]
 
 		uniqueGaterKey := fmt.Sprintf("batch-purge-scsi-ghosts-%d", time.Now().UnixNano())
+		
+		logger.Debugf("[purgeScsiGhosts] execute batch %d to %d", i, end)
+		
 		if errBatch := executePurgeBatch(currentChunkBatch, uniqueGaterKey); errBatch != nil {
 			return fmt.Errorf("parallel ghost batch engine execution failed: %w", errBatch)
 		}
@@ -2312,14 +2334,18 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) IsSgDeviceGhost(ctx context.Cont
 	sgSysfsPath := fmt.Sprintf("/sys/class/scsi_generic/%s", cleanSgName)
 	deviceLink := filepath.Join(sgSysfsPath, "device")
 
+
 	// --- INLINE AGE TRACKING & SCAVENGER ENGINE (Rule 4/5) ---
 	now := time.Now()
 	actualFirstSeen, _ := r.discoveryCache.LoadOrStore(cleanSgName, now)
 	deviceAge := time.Since(actualFirstSeen.(time.Time))
+	
+	logger.Debugf("[IsSgDeviceGhost] Starting IsSgDeviceGhost, device %s", sgName)
 
 	// Inline Scavenger: Clean up the map on the fly if the underlying directory has disappeared
 	_, statErr := os.Stat(sgSysfsPath)
 	if os.IsNotExist(statErr) {
+		logger.Debugf("[IsSgDeviceGhost]  IsSgDeviceGhost, device %s - no path", sgName)
 		r.discoveryCache.Delete(cleanSgName)
 		return false, nil
 	}
@@ -2328,6 +2354,7 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) IsSgDeviceGhost(ctx context.Cont
 	// to protect against unaligned path construction and udev unbind races under workload density.
 	deviceBase, errLink := filepath.EvalSymlinks(deviceLink)
 	if errLink != nil {
+		logger.Debugf("[IsSgDeviceGhost]  IsSgDeviceGhost, device %s - eval sym link failed", sgName)
 		deviceBase = deviceLink // Fallback securely if the device is already unlinking from the fabric
 	}
 
@@ -2360,6 +2387,8 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) IsSgDeviceGhost(ctx context.Cont
 		}
 		return false, ctx.Err()
 	}
+	
+	logger.Debugf("[IsSgDeviceGhost]  IsSgDeviceGhost, device %s - state %s peripheralType %s ", sgName, state, peripheralType)
 
 	// --- CRITICAL PATH PURGE JUDGMENT ---
 	if state == "offline" || state == "cancelled" || state == "deleting" {
@@ -2383,6 +2412,8 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) IsSgDeviceGhost(ctx context.Cont
 		r.discoveryCache.Delete(cleanSgName)
 		return true, nil
 	}
+	
+	logger.Debugf("[IsSgDeviceGhost]  IsSgDeviceGhost, device %s - not hardware ghost", sgName
 
 	// TRACK B: Stuck Initialization / Transient Error Management
 	if ioctlErr != nil {
