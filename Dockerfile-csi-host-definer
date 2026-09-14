@@ -12,6 +12,12 @@ COPY controllers/servers/host_definer/requirements.txt ./host_definer_requiremen
 # avoid default- boringssl lib, since it does not support z systems
 ENV GRPC_PYTHON_BUILD_SYSTEM_OPENSSL=True
 RUN pip3 install -r ./csi_requirements.txt -r ./host_definer_requirements.txt
+# s390x: replace the native UPB wheel with the pure-Python universal wheel to avoid
+# a SIGSEGV in _message.abi3.so at Python interpreter shutdown (issue #870)
+RUN if [ "$(uname -m)" = "s390x" ]; then \
+        pip3 uninstall -y protobuf && \
+        pip3 install "protobuf==6.33.5" --platform py3-none-any --only-binary=:all: ; \
+    fi
 RUN pip3 install --no-deps -r ./csi_requirements_pyxcli.txt
 
 USER root
@@ -44,6 +50,8 @@ COPY ./LICENSE /licenses/
 
 WORKDIR /driver/controllers/servers/host_definer/
 ENV PYTHONPATH=/driver
+# s390x: force pure-Python protobuf backend; belt-and-suspenders alongside wheel swap above
+ENV PROTOCOL_BUFFERS_PYTHON_IMPLEMENTATION=python
 
 USER default
 CMD ["python3", "/driver/controllers/servers/host_definer/main.py"]
