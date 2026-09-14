@@ -1434,7 +1434,7 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) purgeScsiGhosts(ctx context.Cont
 			batch,
 			func(wCtx context.Context, index int, candidate ghostCandidate, cancelBatch func()) (struct{}, error) {
 			
-				logger.Debugf("[purgeScsiGhosts] ghost check for %s vendor %s hctl %s", candidate.sgName, candidate.deviceDir, candidate.hctl)
+				logger.Debugf("[purgeScsiGhosts] ghost check for %s devicedir %s hctl %s", candidate.sgName, candidate.deviceDir, candidate.hctl)
 			
 				vendorBytesRaw, err := os.ReadFile(filepath.Join(candidate.deviceDir, "vendor"))
 				if err != nil {
@@ -2570,6 +2570,12 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) checkPQviaIoctl(sgName string, d
 					logger.Debugf("[%s] IOCTL Probe: Unit Attention condition flagged by target device. Clearing buffer maps and repeating loop cycle.", sgName)
 					continue 
 				}
+				
+			if senseKey == 0x05 && asc == 0x25 && ascq == 0x00 {
+				logger.Warningf("[%s] IOCTL Probe: Hardware confirmed LUN is detached (Logical Unit Not Supported). Flagging as ghost slot.", sgName)
+				return true, nil
+			}
+				
 
 				// Hard Ghost Indicators: These explicitly prove the logical mapping layout is detached or unbacked
 				isHardGhostCondition := (senseKey == 0x02 && asc == 0x3A) || // Medium Not Present
