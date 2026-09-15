@@ -495,6 +495,8 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) IsVolumePathMatchesVolumeId(ctx 
 
 		return false, fmt.Errorf("hardware signature mapping failed: native NVMe identification mismatch for device %s", dmName)
 	}
+	
+	logger.Infof("[Identity-Check] Slave path: %s", slavesPath)
 
 	// =========================================================================
 	// PROTOCOL BRANCH B: DEVICE MAPPER / MULTIPATH SLAVES SELECTION
@@ -522,6 +524,9 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) IsVolumePathMatchesVolumeId(ctx 
 		
 		for _, entry := range entries {				
 			entryName := entry.Name()
+			
+			logger.Infof("[Identity-Check] evaluate entry %s", entryName)
+			
 			isSCSI := strings.HasPrefix(entryName, "sd")
 			isDM := strings.HasPrefix(entryName, "dm-")
 			isNVMe := helper.IsNativeNvmeNamespace(entryName)
@@ -530,6 +535,7 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) IsVolumePathMatchesVolumeId(ctx 
 				if len(validNvmeTargets) >= maxCapCeiling {
 					break
 				}
+				logger.Infof("[Identity-Check] entry %s is candidate", entryName)
 				validNvmeTargets = append(validNvmeTargets, entryName)
 			}
 		}
@@ -538,58 +544,37 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) IsVolumePathMatchesVolumeId(ctx 
 	if len(validNvmeTargets) == 0 {
 		return false, fmt.Errorf("hardware signature mapping failed: zero valid storage elements discovered in slave paths for %s", dmName)
 	}
+	
+	innerHelper := GetDmsPathHelperGeneric{}
+	hasDevice, isPending, matchedDev := innerHelper.EvaluateSysfsTopology(ctx, r.KeyedGater, expectedSerial, false)
 
-	results, errBatch := executer.ExecuteUninterruptibleBatch[string, bool](
-		ctx,
-		r.KeyedGater,
-		"sysfs-slaves-nvme-scan-"+dmName,
-		10, 50, 5*time.Second, 15*time.Second,
-		validNvmeTargets,
-		func(wCtx context.Context, index int, entryName string, cancelBatch func()) (bool, error) {
-			if err := wCtx.Err(); err != nil {
-				return false, err
-			}
-
-			innerHelper := GetDmsPathHelperGeneric{}
-			hasDevice, isPending, matchedDev := innerHelper.EvaluateSysfsTopology(wCtx, r.KeyedGater, expectedSerial, false)
-
-			if (!hasDevice || matchedDev == "") && !isPending && wCtx.Err() == nil {
-				nvmeTargetSerial := convertScsiIdToNguid(expectedSerial)
-				if nvmeTargetSerial != "" && nvmeTargetSerial != expectedSerial {
-					hasDevice, isPending, matchedDev = innerHelper.EvaluateSysfsTopology(wCtx, r.KeyedGater, nvmeTargetSerial, false)
-				}
-			}
-
-			if hasDevice && !isPending && matchedDev != "" && wCtx.Err() == nil {
-				normalizedSlaveName := entryName
-				if strings.Contains(entryName, "c") {
-					if lastNIdx := strings.LastIndex(entryName, "n"); lastNIdx != -1 && lastNIdx > 0 {
-						if cIdx := strings.Index(entryName, "c"); cIdx != -1 && cIdx < lastNIdx {
-							normalizedSlaveName = entryName[:cIdx] + entryName[lastNIdx:]
-						}
+	if (!hasDevice || matchedDev == "") && !isPending && ctx.Err() == nil {
+		logger.Info("[Identity-Check] topology check 2nd pass")
+		nvmeTargetSerial := convertScsiIdToNguid(expectedSerial)
+		hasDevice, isPending, matchedDev = innerHelper.EvaluateSysfsTopology(ctx, r.KeyedGater, nvmeTargetSerial, false)
+	}
+	
+	if hasDevice && !isPending && matchedDev != "" {
+		logger.Info("[Identity-Check] topology check pass")
+		for _, entryName := range validNvmeTargets {	
+			normalizedSlaveName := entryName
+			if strings.Contains(entryName, "c") {
+				if lastNIdx := strings.LastIndex(entryName, "n"); lastNIdx != -1 && lastNIdx > 0 {
+					if cIdx := strings.Index(entryName, "c"); cIdx != -1 && cIdx < lastNIdx {
+						normalizedSlaveName = entryName[:cIdx] + entryName[lastNIdx:]
 					}
 				}
-
-				if matchedDev == dmName || matchedDev == entryName || matchedDev == normalizedSlaveName {
-					cancelBatch() 
-					return true, nil
-				}
 			}
+			
+			logger.Infof("[Identity-Check] path check for %s - normalized %s", entryName, normalizedSlaveName)
 
-			return false, nil
-		},
-	)
-
-	if errBatch != nil {
-		return false, fmt.Errorf("parallel topology evaluation encountered an unexpected engine failure: %w", errBatch)
-	}
-
-	for _, res := range results {
-		if res.Err == nil && res.Data {
-			logger.Infof("[Identity-Check] [%s] Identity successfully verified via multi-protocol batch fallback architecture.", dmName)
-			return true, nil
+			if matchedDev == dmName || matchedDev == entryName || matchedDev == normalizedSlaveName {
+				logger.Infof("[Identity-Check] [%s] Identity successfully verified via multi-protocol batch fallback architecture.", dmName)
+				return true, nil
+			}
 		}
 	}
+	
 
 	return false, fmt.Errorf("hardware signature mapping failed: no matching identities verified across any available storage slaves for path %s", absoluteDevPath)
 }
@@ -2570,12 +2555,6 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) checkPQviaIoctl(sgName string, d
 					logger.Debugf("[%s] IOCTL Probe: Unit Attention condition flagged by target device. Clearing buffer maps and repeating loop cycle.", sgName)
 					continue 
 				}
-				
-			if senseKey == 0x05 && asc == 0x25 && ascq == 0x00 {
-				logger.Warningf("[%s] IOCTL Probe: Hardware confirmed LUN is detached (Logical Unit Not Supported). Flagging as ghost slot.", sgName)
-				return true, nil
-			}
-				
 
 				// Hard Ghost Indicators: These explicitly prove the logical mapping layout is detached or unbacked
 				isHardGhostCondition := (senseKey == 0x02 && asc == 0x3A) || // Medium Not Present
