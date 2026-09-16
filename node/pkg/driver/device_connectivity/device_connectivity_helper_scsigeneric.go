@@ -55,7 +55,7 @@ type OsDeviceConnectivityHelperScsiGenericInterface interface {
 	GetMpathDevice(ctx context.Context, volumeId string) (string, error)
 	GetExistingMpathDevice(ctx context.Context, volumeUuid string, volumePath string) (string, error)
 	RemovePhysicalDevice(ctx context.Context, sysDevices []string) error
-	RemoveGhostDevice(ctx context.Context, expectedSerial string, expectedLun int, arrayIdentifiers []string) error
+	RemoveGhostDevice(ctx context.Context, expectedSerial string, expectedLun int, arrayIdentifiers []string, postRescan bool) error
 	ValidateLun(ctx context.Context, targetDm string, lun int, sysDevices []string, expectedSerial string) error
 	IsVolumePathMatchesVolumeId(ctx context.Context, volumeId string, volumePath string) (bool, error)
 	TeardownVolume(ctx context.Context, target string, expectedWWID string) error
@@ -1274,12 +1274,12 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) validateScsiPathId(wCtx context.
 }
 
 
-func (r *OsDeviceConnectivityHelperScsiGeneric) RemoveGhostDevice(ctx context.Context, expectedSerial string, expectedLun int, arrayIdentifiers []string) error {
+func (r *OsDeviceConnectivityHelperScsiGeneric) RemoveGhostDevice(ctx context.Context, expectedSerial string, expectedLun int, arrayIdentifiers []string, postRescan bool) error {
 	if !r.CleanScsiDevice {
 		return nil
 	}
 
-	if err := r.purgeScsiGhosts(ctx, expectedSerial, expectedLun, arrayIdentifiers); err != nil {
+	if err := r.purgeScsiGhosts(ctx, expectedSerial, expectedLun, arrayIdentifiers, postRescan); err != nil {
 		logger.Errorf("Ghost Scrubber: SCSI generic pruning cycle hit an error: %v", err)
 	}
 
@@ -1297,7 +1297,7 @@ type sgScsiId struct {
 }
 
 // purgeScsiGhosts scans host SCSI adapters in a memory-bounded, decoupled pipeline to clear unmapped logical units safely.
-func (r *OsDeviceConnectivityHelperScsiGeneric) purgeScsiGhosts(ctx context.Context, expectedSerial string, expectedLun int, arrayIdentifiers []string) error {
+func (r *OsDeviceConnectivityHelperScsiGeneric) purgeScsiGhosts(ctx context.Context, expectedSerial string, expectedLun int, arrayIdentifiers []string, postRescan bool) error {
 
 	logger.Debugf("[purgeScsiGhosts] Starting purgeScsiGhosts, lun %d", expectedLun)
 
@@ -1428,7 +1428,7 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) purgeScsiGhosts(ctx context.Cont
 				}
 				vdr := strings.ToUpper(strings.TrimSpace(string(vendorBytesRaw)))
 
-				ghostState, _ := r.IsSgDeviceGhost(wCtx, candidate.sgName)
+				ghostState, _ := r.IsSgDeviceGhost(wCtx, candidate.sgName, postRescan)
 				isIbmDevice := strings.Contains(vdr, "IBM")
 
 				pathOwned := r.isPathOwnedByMyArray(wCtx, candidate.sgName, arrayIdentifiers)
