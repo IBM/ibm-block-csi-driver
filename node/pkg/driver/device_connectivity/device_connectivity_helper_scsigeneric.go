@@ -2313,7 +2313,7 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) isHardwareBlocked(sgName string)
 
 // IsSgDeviceGhost determines whether a scsi_generic path is a dead zombie target or missing from the host fabric.
 // Natively runs inside inherited worker context lanes to maintain absolute deadlock immunity.
-func (r *OsDeviceConnectivityHelperScsiGeneric) IsSgDeviceGhost(ctx context.Context, sgName string) (bool, error) {
+func (r *OsDeviceConnectivityHelperScsiGeneric) IsSgDeviceGhost(ctx context.Context, sgName string, postRescan bool) (bool, error) {
 	cleanSgName := filepath.Base(sgName)
 	
 	sgSysfsPath := fmt.Sprintf("/sys/class/scsi_generic/%s", cleanSgName)
@@ -2321,9 +2321,20 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) IsSgDeviceGhost(ctx context.Cont
 
 
 	// --- INLINE AGE TRACKING & SCAVENGER ENGINE (Rule 4/5) ---
-	now := time.Now()
-	actualFirstSeen, _ := r.discoveryCache.LoadOrStore(cleanSgName, now)
-	deviceAge := time.Since(actualFirstSeen.(time.Time))
+	var deviceAge time.Duration
+
+	if postRescan {
+		now := time.Now()
+		actualFirstSeen, _ := r.discoveryCache.LoadOrStore(cleanSgName, now)
+		deviceAge = time.Since(actualFirstSeen.(time.Time))
+	} else {
+		actualFirstSeen, loaded := r.discoveryCache.Load(cleanSgName)
+		if loaded {
+			deviceAge = time.Since(actualFirstSeen.(time.Time))
+		} else {
+			deviceAge = 0 // Assume age is 0 if it doesn't exist
+		}
+	}	
 	
 	logger.Debugf("[IsSgDeviceGhost] Starting IsSgDeviceGhost, device %s", sgName)
 
