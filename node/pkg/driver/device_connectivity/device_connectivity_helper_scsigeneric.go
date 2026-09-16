@@ -7617,8 +7617,7 @@ func (of *GetDmsPathHelperGeneric) safeSettle(ctx context.Context, gater *execut
 				
 				if readErr != nil {
 					logger.Warningf("safeSettle open device %s failed with read err %v", targetDeviceNode, readErr)
-				}
-				else {
+				} else {
 					logger.Warningf("safeSettle open device %s success", targetDeviceNode)
 				}
 				
