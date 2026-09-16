@@ -461,8 +461,8 @@ func (r OsDeviceConnectivityNvmeOFc) RemovePhysicalDevice(ctx context.Context, s
 	return r.HelperScsiGeneric.RemovePhysicalDevice(ctx, sysDevices)
 }
 
-func (r OsDeviceConnectivityNvmeOFc) RemoveGhostDevice(ctx context.Context, expectedSerial string, expectedLun int, arrayIdentifiers []string) error {
-	return r.HelperScsiGeneric.RemoveGhostDevice(ctx, expectedSerial, expectedLun, arrayIdentifiers)
+func (r OsDeviceConnectivityNvmeOFc) RemoveGhostDevice(ctx context.Context, expectedSerial string, expectedLun int, arrayIdentifiers []string, postRescan bool) error {
+	return r.HelperScsiGeneric.RemoveGhostDevice(ctx, expectedSerial, expectedLun, arrayIdentifiers, postRescan)
 }
 
 // TODO
