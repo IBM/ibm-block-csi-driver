@@ -184,10 +184,13 @@ func (d *NodeService) NodeStageVolume(ctx context.Context, req *csi.NodeStageVol
 		osDeviceConnectivity.EnsureLogin(ctx, ipsByArrayInitiator)
 		
 		// Consolidated into a single precise pre/post execution cleanup bracket
-		_ = d.OsDeviceConnectivityHelper.RemoveGhostDevice(ctx, volumeUuid, lun, arrayInitiators)
+		logger.Infof("Pre-scan ghost cleanup for %v.", volumeUuid)
+		_ = d.OsDeviceConnectivityHelper.RemoveGhostDevice(ctx, volumeUuid, lun, arrayInitiators, false)
 		if err := osDeviceConnectivity.RescanDevices(ctx, lun, arrayInitiators); err != nil {
 			return nil, status.Error(codes.Internal, err.Error())
 		}
+		logger.Infof("Post-scan ghost cleanup for %v.", volumeUuid)
+		d.OsDeviceConnectivityHelper.RemoveGhostDevice(ctx, volumeUuid, lun, arrayInitiators, true)
 	} else if scanInProgress {
 		logger.Infof("Optimization: Active bus transition or scan in progress detected for %v. Bypassing rescan phase.", volumeUuid)
 	} else {
