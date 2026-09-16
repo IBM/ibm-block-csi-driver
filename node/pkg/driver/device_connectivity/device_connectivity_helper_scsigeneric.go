@@ -1340,8 +1340,6 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) purgeScsiGhosts(ctx context.Cont
 
 			sgName := entry.Name()
 			
-			logger.Debugf("[purgeScsiGhosts] Test entry %s", sgName)
-			
 			if !strings.HasPrefix(sgName, "sg") || len(sgName) < 3 {
 				continue
 			}
@@ -1366,9 +1364,7 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) purgeScsiGhosts(ctx context.Cont
 			}
 
 			hctl := filepath.Base(absoluteDeviceDir)
-			
-			logger.Debugf("[purgeScsiGhosts] entry %s - hctl is %s", sgName, hctl)
-			
+						
 			hctlParts := strings.Split(hctl, ":")
 			if len(hctlParts) < 4 {
 				continue 
@@ -1392,7 +1388,7 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) purgeScsiGhosts(ctx context.Cont
 				deviceDir: absoluteDeviceDir,
 			})
 			
-			logger.Debugf("[purgeScsiGhosts] entry %s - candidate", sgName)
+			logger.Debugf("[purgeScsiGhosts] entry %s with hctl %s - candidate", sgName, hctl)
 		}
 
 		if len(rawCandidates) >= maxCapCeiling || len(devEntries) < 100 || err == io.EOF {
@@ -2327,17 +2323,18 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) IsSgDeviceGhost(ctx context.Cont
 		now := time.Now()
 		actualFirstSeen, _ := r.discoveryCache.LoadOrStore(cleanSgName, now)
 		deviceAge = time.Since(actualFirstSeen.(time.Time))
+		logger.Debugf("[IsSgDeviceGhost]  IsSgDeviceGhost, device %s - post rescan", sgName)
 	} else {
 		actualFirstSeen, loaded := r.discoveryCache.Load(cleanSgName)
 		if loaded {
 			deviceAge = time.Since(actualFirstSeen.(time.Time))
+			logger.Debugf("[IsSgDeviceGhost]  IsSgDeviceGhost, device %s - entry exists", sgName)
 		} else {
-			deviceAge = 0 // Assume age is 0 if it doesn't exist
+			deviceAge = 31*time.Second // Assume old if it doesn't exist
+			logger.Debugf("[IsSgDeviceGhost]  IsSgDeviceGhost, device %s - entry doesn't exist assume old", sgName)
 		}
 	}	
 	
-	logger.Debugf("[IsSgDeviceGhost] Starting IsSgDeviceGhost, device %s", sgName)
-
 	// Inline Scavenger: Clean up the map on the fly if the underlying directory has disappeared
 	_, statErr := os.Stat(sgSysfsPath)
 	if os.IsNotExist(statErr) {
