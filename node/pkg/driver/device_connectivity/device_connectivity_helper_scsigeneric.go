@@ -1430,14 +1430,14 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) purgeScsiGhosts(ctx context.Cont
 				pathOwned := r.isPathOwnedByMyArray(wCtx, candidate.sgName, arrayIdentifiers)
 				serialNumber, _ := r.getHardwareSerial(wCtx, candidate.deviceDir)
 				
-				logger.Debugf("[purgeScsiGhosts]  device %s [Vendor: %s, Serial Match: %v, Ghost: %v, Our path: %v]. Executing hot-unplug.", candidate.sgName, vdr, r.IsSerialMatch(serialNumber, expectedSerial), ghostState, pathOwned)
+				logger.Debugf("[purgeScsiGhosts]  device %s [Vendor: %s, Serial: %s, Serial Match: %v, Ghost: %v, Our path: %v]. Executing hot-unplug.", candidate.sgName, vdr, serialNumber, serialNumber != "" && r.IsSerialMatch(serialNumber, expectedSerial), ghostState, pathOwned)
 
 				shouldDelete := (ghostState && isIbmDevice) || (pathOwned && (ghostState || !isIbmDevice || (serialNumber != "" && !r.IsSerialMatch(serialNumber, expectedSerial))))
 				if !shouldDelete {
 					return struct{}{}, nil
 				}
 
-				logger.Warningf("Pruning stale SCSI device %s [Vendor: %s, Serial Match: %v, Ghost: %v, Our path: %v]. Executing hot-unplug.", candidate.sgName, vdr, r.IsSerialMatch(serialNumber, expectedSerial), ghostState, pathOwned)
+				logger.Warningf("Pruning stale SCSI device %s [Vendor: %s, Serial Match: %v, Ghost: %v, Our path: %v]. Executing hot-unplug.", candidate.sgName, vdr, serialNumber != "" && r.IsSerialMatch(serialNumber, expectedSerial), ghostState, pathOwned)
 
 				deletePath := filepath.Join(candidate.deviceDir, "delete")
 				if _, errStat := os.Stat(deletePath); os.IsNotExist(errStat) {
@@ -4589,16 +4589,7 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) ExecuteDmIoctl(command uintptr, 
 func (r *OsDeviceConnectivityHelperScsiGeneric) IsSerialMatch(hwSerial, expectedSerial string) bool {
 	// Sysfs 'wwid' files often look like: "naa.600507680c80843d3000000000000123"
 	// Expected serial is often just the hex: "600507680c80843d3000000000000123"
-	hw := strings.ToLower(strings.TrimSpace(hwSerial))
-	expected := strings.ToLower(strings.TrimSpace(expectedSerial))
-
-	// Strip common SCSI prefixes
-	prefixes := []string{"naa.", "t10.", "eui.", "uuid."}
-	for _, p := range prefixes {
-		hw = strings.TrimPrefix(hw, p)
-	}
-
-	return strings.Contains(hw, expected) || strings.Contains(expected, hw)
+	return normalizeWWID(hwSerial) == normalizeWWID(expectedSerial)
 }
 
 // getWWIDBySysfs safe-resolves unique identifiers from sysfs block storage descriptors across old and new kernels.
@@ -7611,14 +7602,27 @@ func (of *GetDmsPathHelperGeneric) safeSettle(ctx context.Context, gater *execut
 			200*time.Millisecond, 
 			1300*time.Millisecond, 
 			func(wCtx context.Context) (struct{}, error) {
+				logger.Warningf("safeSettle open device %s", targetDeviceNode)
 				f, err := os.OpenFile(targetDeviceNode, os.O_RDONLY, 0)
 				if err != nil {
+					logger.Warningf("safeSettle open device %s failed with %v", targetDeviceNode, err)
 					return struct{}{}, err
 				}
 				defer f.Close()
 
 				buf := make([]byte, 512)
+				
+				logger.Warningf("safeSettle device %s - read", targetDeviceNode)
+				
 				_, readErr := f.Read(buf)
+				
+				if readErr != nil {
+					logger.Warningf("safeSettle open device %s failed with read err %v", targetDeviceNode, readErr)
+				}
+				else {
+					logger.Warningf("safeSettle open device %s success", targetDeviceNode)
+				}
+				
 				return struct{}{}, readErr
 			},
 		)
