@@ -110,8 +110,8 @@ func (r OsDeviceConnectivityFc) RemovePhysicalDevice(ctx context.Context, sysDev
 	return r.HelperScsiGeneric.RemovePhysicalDevice(ctx, sysDevices)
 }
 
-func (r OsDeviceConnectivityFc) RemoveGhostDevice(ctx context.Context, expectedSerial string, expectedLun int, arrayIdentifiers []string, postRescan bool) error {
-	return r.HelperScsiGeneric.RemoveGhostDevice(ctx, expectedSerial, expectedLun, arrayIdentifiers, postRescan)
+func (r OsDeviceConnectivityFc) RemoveGhostDevice(ctx context.Context, expectedSerial string, expectedLun int, arrayIdentifiers []string) error {
+	return r.HelperScsiGeneric.RemoveGhostDevice(ctx, expectedSerial, expectedLun, arrayIdentifiers)
 }
 
 func (r OsDeviceConnectivityFc) ValidateLun(ctx context.Context, targetDm string, lun int, sysDevices []string, expectedSerial string) error {
