@@ -5026,7 +5026,6 @@ func (o *OsDeviceConnectivityHelperGeneric) GetWwnByScsiInqInternal(dev string) 
 			time.Sleep(50 * time.Millisecond)
 			continue
 		}
-	}
 
 		if header.Status == 0x08 || header.Status == 0x28 { // BUSY or TASK SET FULL
 			time.Sleep(50 * time.Millisecond)
@@ -5066,6 +5065,7 @@ func (o *OsDeviceConnectivityHelperGeneric) GetWwnByScsiInqInternal(dev string) 
 
 	return o.parseVPD83(respBuf[:actualLen])
 }
+
 
 // willIoctl0x83Fail performs a rapid, pre-flight safety scan to determine if a block device is in an unsafe state.
 func (r *OsDeviceConnectivityHelperGeneric) willIoctl0x83Fail(ctx context.Context, gater *executer.KeyedGater, dev string) bool {
