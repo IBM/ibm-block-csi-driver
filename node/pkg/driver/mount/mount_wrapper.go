@@ -23,7 +23,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"path"
 	"os"
 	"path"
 	"path/filepath"
