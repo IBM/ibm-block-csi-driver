@@ -1399,7 +1399,6 @@ func GetMounts(targetPath string) ([]MountInfo, error) {
                 if sepIdx == -1 || sepIdx+3 >= len(fields) {
                         continue
                 }
-
                 infoItem := MountInfo{
                         MountID:        parseInt(fields[0]),
                         ParentID:       parseInt(fields[1]),
@@ -1422,7 +1421,7 @@ func GetMounts(targetPath string) ([]MountInfo, error) {
         }
 
         // =====================================================================
-        // UPGRADE FALLBACK GATEWAY: 
+        // UPGRADE FALLBACK GATEWAY:
         // If the table search returned 0 items but a specific targetPath was requested,
         // we cross-reference the live OS filesystem state to recover from an Ubuntu upgrade.
         // =====================================================================
@@ -1435,17 +1434,20 @@ func GetMounts(targetPath string) ([]MountInfo, error) {
                                 // If device IDs differ, this path is historically an active mount point!
                                 if stat.Dev != parentStat.Dev {
                                         logger.Warningf("[Mountinfo-Trace] [UPGRADE-EMULATION] Target '%s' missing from proc namespace but active on host. Generating synthetic metadata.", targetPath)
-                                        
-                                        // Reconstruct the Major/Minor bits straight from live device kernel specs
+
+                                        // 64-bit Linux kernel/glibc bitwise macros for dev_t extraction (handles huge NVMe arrays)
+                                        majorNum := uint32((stat.Dev >> 8) & 0xfff) | uint32((stat.Dev >> 32) &^ 0xfff)
+                                        minorNum := uint32(stat.Dev & 0xff) | uint32((stat.Dev >> 12) &^ 0xff)
+
                                         emulatedInfo := MountInfo{
                                                 MountID:        9999, // Static identifier signifying synthetic translation
                                                 ParentID:       1,
-                                                Major:          uint32((stat.Dev >> 8) & 0xfff),
-                                                Minor:          uint32(stat.Dev & 0xff),
+                                                Major:          majorNum,
+                                                Minor:          minorNum,
                                                 Root:           "/",
-                                                MountPoint:     strings.TrimPrefix(absTarget, PrefixChrootOfHostRoot), // Strips out the local tracking root if your consumer logic strictly wants a clean host path
+                                                MountPoint:     strings.TrimPrefix(absTarget, PrefixChrootOfHostRoot), 
                                                 MountOptions:   "rw,relatime",
-                                                FilesystemType: "ext4", // Base generic assumption, or substitute with specialized metadata if parsed elsewhere
+                                                FilesystemType: "ext4", 
                                                 MountSource:    "emulated-host-device",
                                         }
                                         mounts = append(mounts, emulatedInfo)
@@ -1457,7 +1459,6 @@ func GetMounts(targetPath string) ([]MountInfo, error) {
         logger.Infof("[Mountinfo-Trace] Scan loop concluded. Total lines processed: %d, Matching mounts captured: %d", lineCounter, len(mounts))
         return mounts, nil
 }
-
 
 
 
