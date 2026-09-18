@@ -112,34 +112,61 @@ func NewWithExecutor(mounterPath string, e executer.ExecuterInterface, g *execut
 
 // NOT REPLACED: UnmountWithForce, MountSensitiveWithoutSystemd, MountSensitiveWithoutSystemdWithMountFlags, CanSafelySkipMountPointCheck
 
-// 1. OVERRIDE: IsLikelyNotMountPoint
-func (m *Mounter) IsLikelyNotMountPoint(file string) (bool, error) {
-	isMounted, err := m.isMountedInProc(file)
-	if err != nil {
-		return true, err
-	}
-	return !isMounted, nil
+// 1. OVERRIDE: IsLikelyNotMountPointa
+func (m *Mounter) IsLikelyNotMountPoint(target string) (bool, error) {
+    isMnt, err := m.IsMounted(target)
+    if err != nil {
+        return true, err // Error reading state, report as likely NOT a mount point
+    }
+    return !isMnt, nil
 }
 
 // 3. OVERRIDE: IsMountPoint
-func (m *Mounter) IsMountPoint(file string) (bool, error) {
-	return m.isMountedInProc(file)
+func (m *Mounter) IsMountPoint(targetPath string) (bool, error) {
+	return m.IsMounted(targetPath)
 }
 
 // 3. OVERRIDE: GetMountRefs
 func (m *Mounter) GetMountRefs(pathname string) ([]string, error) {
-	// Standard implementation is okay, but our inner.GetMountsForPath
-	// is safer against D-state hangs.
-	mounts, err := m.GetMountsForPath(pathname)
-	if err != nil {
-		return nil, err
-	}
+        // 1. Fetch mounts using your original custom parse routine directly.
+        // We drop 'm.' because GetMounts is a package-level function you wrote.
+        mounts, err := GetMounts(pathname)
+        if err != nil {
+                return nil, err
+        }
 
-	var refs []string
-	for _, mnt := range mounts {
-		refs = append(refs, mnt.MountPoint)
-	}
-	return refs, nil
+        // 2. UPGRADE FALLBACK: If your custom /proc/self/mountinfo loop returns nothing 
+        // after an Ubuntu upgrade, look up the active host device layers via stat.
+        if len(mounts) == 0 {
+                containerViewPath := filepath.Clean(GetPodPath(pathname))
+                
+                var stat syscall.Stat_t
+                if err := syscall.Stat(containerViewPath, &stat); err == nil {
+                        // Extract Linux Major/Minor identifiers from live filesystem metadata
+                        major := (stat.Dev >> 8) & 0xfff
+                        minor := stat.Dev & 0xff
+
+                        logger.Warningf("[CSI-Refs-Fallback] Target '%s' empty in mountinfo after upgrade. Scanning host by Maj:Min (%d:%d).", pathname, major, minor)
+                        
+                        // Pass an empty string to GetMounts() to read the full /proc/self/mountinfo table,
+                        // allowing you to cross-reference other paths using the same device ID numbers.
+                        allMounts, scanErr := GetMounts("") 
+                        if scanErr == nil {
+                                for _, mnt := range allMounts {
+                                        if mnt.Major == uint32(major) && mnt.Minor == uint32(minor) {
+                                                mounts = append(mounts, mnt)
+                                        }
+                                }
+                        }
+                }
+        }
+
+        var refs []string
+        for _, mnt := range mounts {
+                // Returns clean tracking paths back to Kubelet
+                refs = append(refs, mnt.MountPoint)
+        }
+        return refs, nil
 }
 
 // 3. OVERRIDE: Mount
@@ -465,6 +492,7 @@ func (m *Mounter) tryUnmount(ctx context.Context, target string, flags int, time
 	}
 
 	go func(wCtx context.Context, path string, initialFlags int, s *mountSession) {
+		podPath := GetPodPath(path)
 		retryDelay := 100 * time.Millisecond
 		var lastErr error
 
@@ -487,7 +515,7 @@ func (m *Mounter) tryUnmount(ctx context.Context, target string, flags int, time
 					if currentFlags == 0 {
 						logger.Errorf("[Mounter-Gate] Context expiring for %s. Escalating to final MNT_DETACH sweep pass...", path)
 						currentFlags = syscall.MNT_DETACH
-						err := m.ExecuteHostLevelUnmount(path, currentFlags)
+						err := syscall.Unmount(podPath, currentFlags)
 						if err == nil || err == syscall.ENOENT || err == syscall.EINVAL {
 							m.stuckMounts.Delete(path)
 							m.stuckCount.Add(-1)
@@ -504,7 +532,8 @@ func (m *Mounter) tryUnmount(ctx context.Context, target string, flags int, time
 			}
 
 			// 3. RUN THE SYSCALL
-			err := m.ExecuteHostLevelUnmount(path, currentFlags)
+			err := syscall.Unmount(podPath, currentFlags)
+			//err := m.ExecuteHostLevelUnmount(path, currentFlags)
 			if err == nil {
 				logger.Infof("[Mounter-Gate] Success! Path %s unmounted cleanly after %v total time.", path, totalElapsed)
 				m.stuckMounts.Delete(path) // Clear historical footprint only on definitive victory
@@ -1310,103 +1339,124 @@ type MountInfo struct {
 	SuperOptions   string
 }
 
-
 func GetMounts(targetPath string) ([]MountInfo, error) {
-	absTarget := ""
-	if targetPath != "" {
-		absTarget = GetPodPath(targetPath)
-		absTarget, _ = filepath.Abs(absTarget)
-		absTarget = filepath.Clean(absTarget)
-	}
-	logger.Infof("[Mountinfo-Trace] Initiating mount scanner matrix. Target lookup constraints: targetPath='%s', absTarget='%s'", targetPath, absTarget)
+        absTarget := ""
+        if targetPath != "" {
+                absTarget = GetPodPath(targetPath)
+                absTarget, _ = filepath.Abs(absTarget)
+                absTarget = filepath.Clean(absTarget)
+        }
+        logger.Infof("[Mountinfo-Trace] Initiating mount scanner matrix. Target lookup constraints: targetPath='%s', absTarget='%s'", targetPath, absTarget)
 
-	f, err := os.Open("/proc/self/mountinfo")
-	if err != nil {
-		logger.Errorf("[Mountinfo-Trace] Fatal: Failed to open kernel mount table /proc/self/mountinfo: %v", err)
-		return nil, err
-	}
-	defer f.Close()
+        f, err := os.Open("/proc/self/mountinfo")
+        if err != nil {
+                logger.Errorf("[Mountinfo-Trace] Fatal: Failed to open kernel mount table /proc/self/mountinfo: %v", err)
+                return nil, err
+        }
+        defer f.Close()
 
-	var mounts []MountInfo
-	scanner := bufio.NewScanner(f)
-	const maxCapacity = 1024 * 1024 
-	buf := make([]byte, maxCapacity)
-	scanner.Buffer(buf, maxCapacity)
+        var mounts []MountInfo
+        scanner := bufio.NewScanner(f)
+        const maxCapacity = 1024 * 1024
+        buf := make([]byte, maxCapacity)
+        scanner.Buffer(buf, maxCapacity)
 
-	lineCounter := 0
-	for scanner.Scan() {
-		lineCounter++
-		rawLine := scanner.Text()
-		
-		fields := strings.Fields(rawLine)
-		if len(fields) < 10 {
-			//logger.Warningf("[Mountinfo-Trace] [REJECTED] Line %d: Row truncated or invalid format (fields=%d). Raw: '%s'", lineCounter, len(fields), rawLine)
-			continue
-		}
+        lineCounter := 0
+        for scanner.Scan() {
+                lineCounter++
+                rawLine := scanner.Text()
 
-		mountPoint := unescapeMountString(fields[4])
-		cleanMountPoint := filepath.Clean(mountPoint)
+                fields := strings.Fields(rawLine)
+                if len(fields) < 10 {
+                        continue
+                }
 
-		// Verification Gateway: Track path evaluation drift precisely
-		if absTarget != "" && cleanMountPoint != absTarget {
-			//logger.Debugf("[Mountinfo-Trace] [REJECTED] Line %d: Target folder mismatch. MountPoint: '%s' (Cleaned: '%s') does not match Target: '%s'. Raw: '%s'", 
-			//	lineCounter, mountPoint, cleanMountPoint, absTarget, rawLine)
-			continue
-		}
+                mountPoint := unescapeMountString(fields[4])
+                cleanMountPoint := filepath.Clean(mountPoint)
 
-		devParts := strings.Split(fields[2], ":")
-		if len(devParts) != 2 {
-			//logger.Warningf("[Mountinfo-Trace] [REJECTED] Line %d: Incompatible major:minor character block layout ('%s'). Raw: '%s'", lineCounter, fields[2], rawLine)
-			continue 
-		}
+                if absTarget != "" && cleanMountPoint != absTarget {
+                        continue
+                }
 
-		major, errMajor := strconv.Atoi(devParts[0])
-		minor, errMinor := strconv.Atoi(devParts[1])
-		if errMajor != nil || errMinor != nil {
-			//logger.Warningf("[Mountinfo-Trace] [REJECTED] Line %d: Integer translation failed for dev tokens (major_err=%v, minor_err=%v). Raw: '%s'", lineCounter, errMajor, errMinor, rawLine)
-			continue
-		}
+                devParts := strings.Split(fields[2], ":")
+                if len(devParts) != 2 {
+                        continue
+                }
 
-		sepIdx := -1
-		for i := 6; i < len(fields); i++ {
-			if fields[i] == "-" {
-				sepIdx = i
-				break
-			}
-		}
-		if sepIdx == -1 || sepIdx+3 >= len(fields) {
-			//logger.Warningf("[Mountinfo-Trace] [REJECTED] Line %d: Missing structural optional fields hyphen separator token. Raw: '%s'", lineCounter, rawLine)
-			continue
-		}
+                major, errMajor := strconv.Atoi(devParts[0])
+                minor, errMinor := strconv.Atoi(devParts[1])
+                if errMajor != nil || errMinor != nil {
+                        continue
+                }
 
-		infoItem := MountInfo{
-			MountID:        parseInt(fields[0]),
-			ParentID:       parseInt(fields[1]),
-			Major:          uint32(major),
-			Minor:          uint32(minor),
-			Root:           unescapeMountString(fields[3]),
-			MountPoint:     mountPoint,
-			MountOptions:   fields[5],
-			FilesystemType: fields[sepIdx+1],
-			MountSource:    unescapeMountString(fields[sepIdx+2]),
-			SuperOptions:   fields[sepIdx+3],
-		}
+                sepIdx := -1
+                for i := 6; i < len(fields); i++ {
+                        if fields[i] == "-" {
+                                sepIdx = i
+                                break
+                        }
+                }
+                if sepIdx == -1 || sepIdx+3 >= len(fields) {
+                        continue
+                }
 
-		//logger.Infof("[Mountinfo-Trace] [ACCEPTED MATCH] Line %d: Successfully validated row map. MountID=%d | Major:Minor=%d:%d | FS=%s | MountPoint='%s' | MountSource='%s'", 
-		//	lineCounter, infoItem.MountID, infoItem.Major, infoItem.Minor, infoItem.FilesystemType, infoItem.MountPoint, infoItem.MountSource)
-		
-		mounts = append(mounts, infoItem)
-	}
+                infoItem := MountInfo{
+                        MountID:        parseInt(fields[0]),
+                        ParentID:       parseInt(fields[1]),
+                        Major:          uint32(major),
+                        Minor:          uint32(minor),
+                        Root:           unescapeMountString(fields[3]),
+                        MountPoint:     mountPoint,
+                        MountOptions:   fields[5],
+                        FilesystemType: fields[sepIdx+1],
+                        MountSource:    unescapeMountString(fields[sepIdx+2]),
+                        SuperOptions:   fields[sepIdx+3],
+                }
 
-	if scanErr := scanner.Err(); scanErr != nil {
-		logger.Errorf("[Mountinfo-Trace] Scanner encountered stream processing errors: %v", scanErr)
-		return nil, scanErr
-	}
+                mounts = append(mounts, infoItem)
+        }
 
-	logger.Infof("[Mountinfo-Trace] Scan loop concluded. Total lines processed: %d, Matching mounts captured: %d", lineCounter, len(mounts))
-	return mounts, nil
+        if scanErr := scanner.Err(); scanErr != nil {
+                logger.Errorf("[Mountinfo-Trace] Scanner encountered stream processing errors: %v", scanErr)
+                return nil, scanErr
+        }
+
+        // =====================================================================
+        // UPGRADE FALLBACK GATEWAY: 
+        // If the table search returned 0 items but a specific targetPath was requested,
+        // we cross-reference the live OS filesystem state to recover from an Ubuntu upgrade.
+        // =====================================================================
+        if len(mounts) == 0 && targetPath != "" {
+                var stat syscall.Stat_t
+                // Check the device state directly using the same path layout
+                if errStat := syscall.Stat(absTarget, &stat); errStat == nil {
+                        var parentStat syscall.Stat_t
+                        if errParent := syscall.Stat(filepath.Dir(absTarget), &parentStat); errParent == nil {
+                                // If device IDs differ, this path is historically an active mount point!
+                                if stat.Dev != parentStat.Dev {
+                                        logger.Warningf("[Mountinfo-Trace] [UPGRADE-EMULATION] Target '%s' missing from proc namespace but active on host. Generating synthetic metadata.", targetPath)
+                                        
+                                        // Reconstruct the Major/Minor bits straight from live device kernel specs
+                                        emulatedInfo := MountInfo{
+                                                MountID:        9999, // Static identifier signifying synthetic translation
+                                                ParentID:       1,
+                                                Major:          uint32((stat.Dev >> 8) & 0xfff),
+                                                Minor:          uint32(stat.Dev & 0xff),
+                                                Root:           "/",
+                                                MountPoint:     strings.TrimPrefix(absTarget, PrefixChrootOfHostRoot), // Strips out the local tracking root if your consumer logic strictly wants a clean host path
+                                                MountOptions:   "rw,relatime",
+                                                FilesystemType: "ext4", // Base generic assumption, or substitute with specialized metadata if parsed elsewhere
+                                                MountSource:    "emulated-host-device",
+                                        }
+                                        mounts = append(mounts, emulatedInfo)
+                                }
+                        }
+                }
+        }
+
+        logger.Infof("[Mountinfo-Trace] Scan loop concluded. Total lines processed: %d, Matching mounts captured: %d", lineCounter, len(mounts))
+        return mounts, nil
 }
-
 
 
 
