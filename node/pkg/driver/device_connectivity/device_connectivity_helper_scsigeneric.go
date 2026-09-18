@@ -3489,18 +3489,11 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) IdentityAwarePreScan(ctx context
 	if len(mounts) > 0 {
 		// FIXED: Resolve major/minor numbers dynamically from the mount source path or target path using unix.Stat
 		var major, minor uint32
-		var statT unix.Stat_t
-		statPath := mounts[0].MountSource
-		if statPath == "" {
-			statPath = targetPath
-		}
 		
-		if errStat := unix.Stat(statPath, &statT); errStat == nil {
-			major = unix.Major(uint64(statT.Rdev))
-			minor = unix.Minor(uint64(statT.Rdev))
-		} else {
-			logger.Warningf("[PreScan-Trace] Failed to stat mount path '%s' for major/minor attributes: %v", statPath, errStat)
-		}
+		major = mounts[0].Major
+		minor = mounts[0].Minor
+		logger.Debugf("[PreScan-Trace] Successfully retrieved device Maj:Min (%d:%d) from mount infrastructure layer.", major, minor)
+
 
 		currentWWIDRaw, _ := r.Helper.getWWIDByDev(ctx, major, minor)
 		currentWWID := normalizeWWID(currentWWIDRaw)
@@ -4442,7 +4435,8 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) multipathdAction(ctx context.Con
 	return nil // Success
 }
 
-// pollLayerDeleted verifies that a specific MountID has vanished from the system
+// pollLayerDeleted verifies that a specific MountID has vanished from the systema
+// Probably broken now because mountID may be emulated in GetMounts
 func (r *OsDeviceConnectivityHelperScsiGeneric) pollLayerDeleted(target string, mountID int, timeout time.Duration) bool {
 	expiry := time.Now().Add(timeout)
 	for time.Now().Before(expiry) {
