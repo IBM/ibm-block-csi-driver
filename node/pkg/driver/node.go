@@ -26,6 +26,7 @@ import (
 	"path/filepath" // FIXED: Replaced brittle path with filepath
 	"reflect"
 	"strings"
+	"syscall"
 
 	"github.com/container-storage-interface/spec/lib/go/csi"
 	"github.com/ibm/ibm-block-csi-driver/node/goid_info"
@@ -678,14 +679,33 @@ func (d *NodeService) NodeUnpublishVolume(ctx context.Context, req *csi.NodeUnpu
 		}
 	}
 	logger.Debugf("Unmount finished. Target : {%s}", target)
-	if err = d.NodeUtils.RemoveFileOrDirectory(targetPathWithHostPrefix); err != nil {
-		logger.Errorf("Failed to remove mount path file/directory. Target %s: %v", targetPathWithHostPrefix, err)
-		return nil, status.Error(codes.Internal, err.Error())
-	}
-	logger.Debugf("Mount point deleted. Target : %s", targetPathWithHostPrefix)
 
-	return &csi.NodeUnpublishVolumeResponse{}, nil
+        if err = d.NodeUtils.RemoveFileOrDirectory(targetPathWithHostPrefix); err != nil {
+                if !os.IsNotExist(err) {
+                        // FIXED: Check for standard Linux EBUSY error or text matching
+                        if !errors.Is(err, syscall.EBUSY) && !strings.Contains(err.Error(), "device or resource busy") {
+				logger.Errorf("Failed to remove mount path file/directory. Target %s: %v", targetPathWithHostPrefix, err)
+                                return nil, status.Error(codes.Internal, err.Error())
+                        }
+                        
+                        logger.Warningf("[Unmount-Engine] Target '%s' is busy on file removal. Escalating to lazy detach.", targetPathWithHostPrefix)
 
+                        // Because the host re-propagated the mount into our container view,
+                        // MNT_DETACH here will successfully find it and tear it down globally.
+                        if lazyErr := syscall.Unmount(targetPathWithHostPrefix, syscall.MNT_DETACH); lazyErr != nil && !errors.Is(lazyErr, syscall.EINVAL) {
+                                logger.Errorf("Failed to run lazy unmount escalation. Target %s: %v", targetPathWithHostPrefix, lazyErr)
+                                return nil, status.Error(codes.Internal, lazyErr.Error())
+                        }
+
+                        // Retry the directory removal one final time now that the lock is shattered
+                        if finalErr := d.NodeUtils.RemoveFileOrDirectory(targetPathWithHostPrefix); finalErr != nil && !os.IsNotExist(finalErr) {
+                                logger.Errorf("Failed to remove mount path file/directory after MNT_DETACH. Target %s: %v", targetPathWithHostPrefix, finalErr)
+                                return nil, status.Error(codes.Internal, finalErr.Error())
+                        }
+                }
+        }
+        logger.Debugf("Mount point deleted. Target : %s", targetPathWithHostPrefix)
+        return &csi.NodeUnpublishVolumeResponse{}, nil
 }
 
 // Structural pattern matching to ensure accurate device name handling across all Linux layers
