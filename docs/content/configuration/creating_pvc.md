@@ -152,10 +152,9 @@ To specify both `accessModes`, use:
      - ReadWriteOnce
      - ReadWriteMany
 
-If `ReadWriteMany` is specified (exclusively or with `ReadWriteOnce`) - Kubernetes allows multiple pod containers to concurrently access the volume. If the application doesn't support multiple access - it is the user's responsibility to make sure that the volume is only accessed by a single pod container.
+If `ReadWriteMany` (RWX) is specified, either exclusively or together with `ReadWriteOnce` (RWO), Kubernetes allows multiple pods to concurrently access the same volume. However, RWX support at the PVC level does not by itself guarantee safe simultaneous access to the same data by multiple writers. If the application is not designed for concurrent access, it is the user's responsibility to ensure that only a single pod accesses the volume at a time. Workloads that require safe shared concurrent access should use an appropriate shared-access or coordination mechanism, such as NFS, CephFS, another clustered/shared filesystem, or an application-level locking mechanism.{: important}
 
 If `ReadWriteOnce` is specified (exclusively or with `ReadWriteMany`) - volume ownership and permissions are modified to match the pod's security policy.
-
 ## Updating Access Modes
 
 To update the `accessModes` of an existing PVC - follow the following steps:
