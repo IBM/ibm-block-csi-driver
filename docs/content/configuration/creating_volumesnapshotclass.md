@@ -21,7 +21,7 @@ For IBM Storage Virtualize® family storage systems, the `CSI` prefix is added a
 
 NOTE: In IBM Storage Virtualize® partition environments, the flag is ignored — a new method is used for taking snapshots.
 
-- To create a stretched snapshot on SAN Volume Controller storage systems, put a colon (:) between the two pools within the `pool` value. For example:
+- To create a stretched snapshot on SAN Volume Controller storage systems, the optional parameter `pool` must be used. Put a colon (:) between the two pools within the `pool` value. For example:
 
   `pool: demo-pool1:demo-pool2`
 
