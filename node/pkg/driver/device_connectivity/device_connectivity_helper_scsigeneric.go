@@ -1432,7 +1432,7 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) purgeScsiGhosts(ctx context.Cont
 				}
 				vdr := strings.ToUpper(strings.TrimSpace(string(vendorBytesRaw)))
 
-				ghostState, _ := r.IsSgDeviceGhost(wCtx, candidate.sgName)
+				ghostState, _ := r.IsSgDeviceGhost(wCtx, candidate.sgName, serialNumber)
 				isIbmDevice := strings.Contains(vdr, "IBM")
 
 				pathOwned := r.isPathOwnedByMyArray(wCtx, candidate.sgName, arrayIdentifiers)
@@ -2438,7 +2438,7 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) checkPQviaIoctl(sgName string, d
 	}()
 
 	// Standard INQUIRY Data (EVPD = 0, Page Code = 0)
-	cdb := byte{0x12, 0x00, 0x00, 0, uint8(allocationLen), 0}
+	cdb := [6]byte{0x12, 0x00, 0x00, 0, uint8(allocationLen), 0}
 
 	header := sgIoHdr{
 			interface_id:    'S',
