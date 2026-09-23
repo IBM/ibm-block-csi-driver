@@ -1414,7 +1414,16 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) purgeScsiGhosts(ctx context.Cont
 			batch,
 			func(wCtx context.Context, index int, candidate ghostCandidate, cancelBatch func()) (struct{}, error) {
 			
+				
+				serialNumber, _ := r.getHardwareSerial(wCtx, candidate.deviceDir)
+				
+				if serialNumber == "" {
+					logger.Debugf("[purgeScsiGhosts] ghost check for %s devicedir %s hctl %s - serial not initialized, skipping", candidate.sgName, candidate.deviceDir, candidate.hctl)
+					return struct{}{}, nil
+				}
+				
 				logger.Debugf("[purgeScsiGhosts] ghost check for %s devicedir %s hctl %s", candidate.sgName, candidate.deviceDir, candidate.hctl)
+
 			
 				vendorBytesRaw, err := os.ReadFile(filepath.Join(candidate.deviceDir, "vendor"))
 				if err != nil {
@@ -1427,11 +1436,10 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) purgeScsiGhosts(ctx context.Cont
 				isIbmDevice := strings.Contains(vdr, "IBM")
 
 				pathOwned := r.isPathOwnedByMyArray(wCtx, candidate.sgName, arrayIdentifiers)
-				serialNumber, _ := r.getHardwareSerial(wCtx, candidate.deviceDir)
 				
-				logger.Debugf("[purgeScsiGhosts]  device %s [Vendor: %s, Serial: %s, Serial Match: %v, Ghost: %v, Our path: %v]. Executing hot-unplug.", candidate.sgName, vdr, serialNumber, serialNumber == "" || r.IsSerialMatch(serialNumber, expectedSerial), ghostState, pathOwned)
+				logger.Debugf("[purgeScsiGhosts]  device %s [Vendor: %s, Serial: %s, Serial Match: %v, Ghost: %v, Our path: %v]. Executing hot-unplug.", candidate.sgName, vdr, serialNumber, !r.IsSerialMatch(serialNumber, expectedSerial), ghostState, pathOwned)
 
-				shouldDelete := (ghostState && isIbmDevice) || (pathOwned && (ghostState || !isIbmDevice || (serialNumber != "" && !r.IsSerialMatch(serialNumber, expectedSerial))))
+				shouldDelete := (ghostState && isIbmDevice) || (pathOwned && (ghostState || !isIbmDevice || !r.IsSerialMatch(serialNumber, expectedSerial)))
 				if !shouldDelete {
 					return struct{}{}, nil
 				}
@@ -2316,17 +2324,14 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) isHardwareBlocked(sgName string)
 }
 
 // IsSgDeviceGhost determines whether a scsi_generic path is a dead zombie target or missing from the host fabric.
-func (r *OsDeviceConnectivityHelperScsiGeneric) IsSgDeviceGhost(ctx context.Context, sgName string) (bool, error) {
+// It accepts the verified hardwareSerial from the upper layer to protect initializing slots.
+func (r *OsDeviceConnectivityHelperScsiGeneric) IsSgDeviceGhost(ctx context.Context, sgName string, hardwareSerial string) (bool, error) {
         cleanSgName := filepath.Base(sgName)
         sgSysfsPath := fmt.Sprintf("/sys/class/scsi_generic/%s", cleanSgName)
         deviceLink := filepath.Join(sgSysfsPath, "device")
 		
-        // 1. PRESENCE SAFEGUARD: Verify the node exists in sysfs before evaluating paths
-        if _, statErr := os.Stat(sgSysfsPath); statErr != nil {
-                if os.IsNotExist(statErr) {
-                        return false, nil // Node doesn't exist yet, not an active ghost mapping
-                }
-                return false, fmt.Errorf("failed to stat sysfs entry: %w", statErr)
+        if _, statErr := os.Stat(sgSysfsPath); os.IsNotExist(statErr) {
+                return false, nil
         }
 
         deviceBase, errLink := filepath.EvalSymlinks(deviceLink)
@@ -2337,15 +2342,13 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) IsSgDeviceGhost(ctx context.Cont
         stateBytes, errState := os.ReadFile(filepath.Join(deviceBase, "state"))
         if errState != nil {
                 if os.IsNotExist(errState) {
-                        return true, nil // Clean removal out of system
+                        return true, nil 
                 }
                 return false, errState
         }
         state := strings.TrimSpace(string(stateBytes))
 
-        // FIX: Replaced "creating" with "created" to match official kernel SCSI specifications.
-        // If the device is in any of these states, it is a transient pre-initialization condition.
-        logger.Debugf("[IsSgDeviceGhost] Device %s is state %s", sgName, state)
+        // FIX A: Changed "creating" to "created" to match official Linux SCSI spec definitions
         if state == "created" || state == "blocked" || state == "quiesce" {
                 logger.Debugf("[IsSgDeviceGhost] Device %s is transiently %s. Retaining path for pending scan.", sgName, state)
                 return false, nil
@@ -2354,12 +2357,9 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) IsSgDeviceGhost(ctx context.Cont
         typeBytes, _ := os.ReadFile(filepath.Join(deviceBase, "type"))
         peripheralType := strings.TrimSpace(string(typeBytes))
 
-        // 2. SAFEGUARD: Triage Type 31 (Unknown / Unconfigured Endpoint Device Types)
         if peripheralType == "31" || peripheralType == "" {
                 if state == "running" {
-                        // FIX: Do NOT blindly skip. If it's "running" but still Type 31, it's highly likely 
-                        // a ghost. Fall through to let checkPQviaIoctl confirm it definitively via the hardware payload.
-                        logger.Debugf("[IsSgDeviceGhost] Device %s reports Type 31 and state is running. Proceeding to hardware IOCTL probe validation.", sgName)
+                        logger.Debugf("[IsSgDeviceGhost] Device %s reports Type 31 and state is running. Proceeding to IOCTL payload check.", sgName)
                 } else {
                         logger.Warningf("[IsSgDeviceGhost] Device %s is dead Type 31 in non-running state (%s). Evicting.", sgName, state)
                         return true, nil
@@ -2375,24 +2375,17 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) IsSgDeviceGhost(ctx context.Cont
         blockMissing := os.IsNotExist(blockErr)
         isNotDiskType := peripheralType != "0"
 
-        // Execute IOCTL probe via internal method handler (Ensure this opens /dev/sgX cleanly)
-        isHwGhost, ioctlErr := r.checkPQviaIoctl(cleanSgName, state)
+        // FIX B: Routed the hardwareSerial down to the child ioctl logic block with a safe retry ceiling (e.g., 5)
+        isHwGhost, ioctlErr := r.checkPQviaIoctl(cleanSgName, state, hardwareSerial, 5)
         if ioctlErr == nil && isHwGhost {
-                // Hard hardware verification (PQ=1 or PQ=3 verified by target controller). Safe to evict immediately.
-                logger.Warningf("[IsSgDeviceGhost] Device %s confirmed as hardware ghost slot via IOCTL payload. Evicting.", sgName)
                 return true, nil
         }
 
-        // 3. SAFEGUARD: Track B De-escalation
         if ioctlErr != nil {
-                // If the path is responding with "running" at the sysfs layer, NEVER kill it 
-                // on a failed IOCTL probe. The path is undergoing an error-recovery step.
                 if state == "running" {
                         logger.Debugf("[%s] Track B: IOCTL failed (%v) but sysfs is 'running'. Masking eviction.", cleanSgName, ioctlErr)
                         return false, nil
                 }
-
-                // Only evict under severe structural errors AND when the device is completely headless
                 if blockMissing || isNotDiskType {
                         logger.Errorf("[%s] Track B: Hard structural failure (%v). Evicting squatter.", cleanSgName, ioctlErr)
                         return true, nil
@@ -2402,12 +2395,12 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) IsSgDeviceGhost(ctx context.Cont
         return false, nil
 }
 
-// checkPQviaIoctl probes a scsi_generic path directly using an SG_IO IOCTL execution loop.
-// Pass deviceState dynamically to eliminate redundant sysfs I/O reads.
-func (r *OsDeviceConnectivityHelperScsiGeneric) checkPQviaIoctl(sgName string, deviceState string) (bool, error) {
+
+
+func (r *OsDeviceConnectivityHelperScsiGeneric) checkPQviaIoctl(sgName string, deviceState string, hardwareSerial string, maxRetries int) (bool, error) {
 	logger.Debugf("[%s] IOCTL Probe: Reading subsystem link type to identify target engine...", sgName)
 
-	// 1. VFS LAYER: Resolve canonical path to identify native NVMe setups safely
+	// 1. RESTORED VFS LAYER: Resolve canonical path to identify native NVMe setups safely
 	subsysPath := fmt.Sprintf("/sys/class/scsi_generic/%s/device/subsystem", sgName)
 	realSubsysPath, errLink := filepath.EvalSymlinks(subsysPath)
 	if errLink == nil && strings.Contains(realSubsysPath, "nvme") {
@@ -2423,6 +2416,7 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) checkPQviaIoctl(sgName string, d
 
 	devPath := filepath.Join("/dev", sgName)
 	
+	// Open using your established production flags
 	fd, err := syscall.Open(devPath, syscall.O_RDONLY|syscall.O_NONBLOCK, 0)
 	if err != nil {
 			if errors.Is(err, syscall.ENXIO) || errors.Is(err, syscall.ENODEV) {
@@ -2437,14 +2431,14 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) checkPQviaIoctl(sgName string, d
 	inqResp := make([]byte, allocationLen)
 	senseBuf := make([]byte, 32)
 
-	// Ensure Go GC doesn't prematurely clean up buffers while the raw kernel holds their uintptr addresses
+	// Guard memory buffers from premature GC unmapping while the raw kernel holds their uintptr addresses
 	defer func() {
 			runtime.KeepAlive(inqResp)
 			runtime.KeepAlive(senseBuf)
 	}()
 
 	// Standard INQUIRY Data (EVPD = 0, Page Code = 0)
-	cdb := [6]byte{0x12, 0x00, 0x00, 0, uint8(allocationLen), 0}
+	cdb := byte{0x12, 0x00, 0x00, 0, uint8(allocationLen), 0}
 
 	header := sgIoHdr{
 			interface_id:    'S',
@@ -2458,95 +2452,149 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) checkPQviaIoctl(sgName string, d
 			timeout:         500, // Explicit fast timeout under load density
 	}
 
-	// SYNTAX FIX: Removed unmapped variables 'attempt' and 'maxRetries'
-	logger.Debugf("[%s] IOCTL Probe: Launching hardware transmission execution...", sgName)
+	// STABILIZATION LOOP: Absorbs transitional timing races on raw /dev/sg* paths
+	for attempt := 0; attempt < maxRetries; attempt++ {
+		logger.Debugf("[%s] IOCTL Probe: Launching hardware transmission execution loop (Attempt %d/%d)...", sgName, attempt+1, maxRetries)
 
-	// Poison variables to detect unpopulated buffers (prevents false PQ=0 mapping traps)
-	for i := range inqResp {
-		inqResp[i] = 0xFF
-	}
-	for i := range senseBuf {
-		senseBuf[i] = 0
-	}
-	header.sb_len_wr = 0
+		// Poison payload fields before execution to capture incomplete memory modifications
+		for i := range inqResp { inqResp[i] = 0xFF }
+		for i := range senseBuf { senseBuf[i] = 0 }
+		header.sb_len_wr = 0
 
-	// INNER TRANSIENT SYSTEM QUEUE PROTECTION LOOP
-	var errno syscall.Errno
-	for i := 0; i < 3; i++ {
-		_, _, errno = syscall.Syscall(syscall.SYS_IOCTL, uintptr(fd), SG_IO, uintptr(unsafe.Pointer(&header)))
-		if errno != syscall.EAGAIN && errno != syscall.EBUSY {
-			break
+		// INNER TRANSIENT SYSTEM QUEUE PROTECTION LOOP
+		var errno syscall.Errno
+		for i := 0; i < 3; i++ {
+			_, _, errno = syscall.Syscall(syscall.SYS_IOCTL, uintptr(fd), SG_IO, uintptr(unsafe.Pointer(&header)))
+			if errno != syscall.EAGAIN && errno != syscall.EBUSY {
+				break
+			}
+			logger.Debugf("[%s] IOCTL Probe: System queue busy (%v). Executing 10ms micro-delay backup...", sgName, errno)
+			time.Sleep(10 * time.Millisecond)
 		}
-		logger.Debugf("[%s] IOCTL Probe: System queue busy (%v). Executing 10ms micro-delay backup...", sgName, errno)
-		time.Sleep(10 * time.Millisecond)
-	}
-	
-	if errno != 0 {
-		// SYNTAX FIX: Exchanged cleanSgName with method-local parameter sgName
-		if errno == syscall.ENXIO || errno == syscall.ENODEV || errno == syscall.ENOTTY {
-			logger.Warningf("[%s] IOCTL Probe: Structural drop caught (%v). Ghost confirmed.", sgName, errno)
-			return true, nil
+		
+		if errno != 0 {
+			if errno == syscall.ENXIO || errno == syscall.ENODEV || errno == syscall.ENOTTY {
+				logger.Warningf("[%s] IOCTL Probe: Structural drop caught (%v). Ghost confirmed.", sgName, errno)
+				return true, nil
+			}
+			return false, fmt.Errorf("ioctl failure: %w", errno)
 		}
-		return false, fmt.Errorf("ioctl failure: %w", errno)
-	}
 
-	// Evaluate HBA Driver Transport Failures
-	if header.host_status != 0 {
-		switch header.host_status {
-		case 0x05, 0x07, 0x0e: // DID_NO_CONNECT, DID_ERROR, DID_TRANSPORT_FAIL_FAST
-			logger.Warningf("[%s] Transport confirms dead link (0x%02x). Ghost confirmed.", sgName, header.host_status)
-			return true, nil
+		// Evaluate HBA Driver Transport Failures
+		if header.host_status != 0 {
+			switch header.host_status {
+			case 0x05, 0x07, 0x0e: // DID_NO_CONNECT, DID_ERROR, DID_TRANSPORT_FAIL_FAST
+				logger.Warningf("[%s] Transport confirms dead link (0x%02x). Ghost confirmed.", sgName, header.host_status)
+				return true, nil
+			default:
+				time.Sleep(100 * time.Millisecond)
+				continue
+			}
+		}
+
+		// Evaluate Protocol Response Payloads
+		switch header.status {
+		case 0x00: // SCSI STATUS: GOOD
+			if inqResp[0] == 0xFF {
+				return false, fmt.Errorf("empty inquiry response payload returned")
+			}
+
+			pq := (inqResp[0] >> 5) & 0x07
+			devType := inqResp[0] & 0x1f
+
+			// IMMEDIATE GHOST: Target explicitly maps, but reports an invalid structural layout address
+			if pq == 3 || devType == 0x1f {
+				logger.Warningf("[%s] Identity mismatch caught [PQ=%d, Type=0x%02x]. Ghost confirmed.", sgName, pq, devType)
+				return true, nil
+			}
+
+			// SUGGESTED FIX INTEGRATION: Handle PQ=1 (PQual=1) intelligently
+			if pq == 1 {
+				// If the upper application layer has already successfully read a valid serial identifier,
+				// or the device has been proven present by the caller, this PQ=1 is transient initialization!
+				if hardwareSerial != "" {
+					logger.Debugf("[%s] Target reported PQ=1 but path has a verified active Serial (%s). Path is pre-init. Retaining safely.", sgName, hardwareSerial)
+					return false, nil // Short circuit out. Do NOT evict a warming-up path.
+				}
+
+				if attempt < maxRetries-1 {
+					logger.Debugf("[%s] Target reported PQ=1 with blank tracking strings. Retrying layout pass...", sgName)
+					time.Sleep(200 * time.Millisecond)
+					continue
+				}
+				return true, nil // Retries exhausted, permanent failure confirmed
+			}
+
+			logger.Debugf("[%s] Target check complete. Healthy active path verified.", sgName)
+			return false, nil
+
+		case 0x02: // STATUS: CHECK CONDITION
+			if header.sb_len_wr < 8 || int(header.sb_len_wr) > len(senseBuf) { 
+				logger.Debugf("[%s] Check condition returned insufficient or anomalous sense data bounds (%d). Retrying...", sgName, header.sb_len_wr)
+				time.Sleep(20 * time.Millisecond)
+				continue
+			}
+			
+			var senseKey, asc, ascq uint8
+			responseCode := senseBuf[0] & 0x7f
+
+			if responseCode == 0x72 || responseCode == 0x73 {
+				// Descriptor Format Sense Data
+				senseKey = senseBuf[1] & 0x0f
+				asc = senseBuf[2]
+				ascq = senseBuf[3]
+			} else {
+				// Fixed Format Sense Data (0x70 or 0x71) - Strictly guarded boundaries
+				if header.sb_len_wr >= 14 && len(senseBuf) >= 14 {
+					senseKey = senseBuf[2] & 0x0f
+					asc = senseBuf[12]
+					ascq = senseBuf[13]
+				} else {
+					logger.Debugf("[%s] Truncated fixed format sense code metadata encountered. Retrying...", sgName)
+					time.Sleep(20 * time.Millisecond)
+					continue
+				}
+			}
+
+			logger.Debugf("[%s] SCSI Check Condition encountered. Sense Key: 0x%02x, ASC: 0x%02x, ASCQ: 0x%02x", sgName, senseKey, asc, ascq)
+
+			if senseKey == 0x06 { // UNIT ATTENTION
+				logger.Debugf("[%s] Unit Attention condition flagged by device. Repeating loop sequence.", sgName)
+				time.Sleep(20 * time.Millisecond)
+				continue
+			}
+			
+			if senseKey == 0x02 && asc == 0x04 { // NOT READY / IN TRANSITION
+				logger.Debugf("[%s] Device actively in transition / ALUA path failover bring-up. Retaining path context.", sgName)
+				time.Sleep(200 * time.Millisecond)
+				continue
+			}
+
+			// DEFINITIVE HARD GHOST CONDITIONS: Validated target rejections
+			isHardGhostCondition := (senseKey == 0x02 && asc == 0x3A) || // Medium Not Present
+									(senseKey == 0x05 && (asc == 0x25 || asc == 0x24)) // LUN Not Supported or Invalid Opcode
+
+			if isHardGhostCondition {
+				logger.Warningf("[%s] Fatal Check Condition (%02x/%02x). Evicting structural slot immediately.", sgName, senseKey, asc)
+				return true, nil
+			}
+			
+			time.Sleep(50 * time.Millisecond)
+			continue
+
+		case 0x08, 0x28: // BUSY or TASK SET FULL
+			logger.Debugf("[%s] Target interface congestion flagged (0x%02x). Executing 50ms backoff...", sgName, header.status)
+			time.Sleep(50 * time.Millisecond)
+			continue
+
 		default:
-			return false, fmt.Errorf("transport failure: 0x%02x", header.host_status)
+			logger.Warningf("[%s] Unexpected SCSI protocol target status code received (0x%02x). Continuing loop tracking.", sgName, header.status)
+			time.Sleep(50 * time.Millisecond)
+			continue
 		}
 	}
 
-	// Evaluate Protocol Response Payloads
-	switch header.status {
-	case 0x00: // SCSI STATUS: GOOD
-		if inqResp[0] == 0xFF {
-			return false, fmt.Errorf("empty inquiry response payload returned")
-		}
-
-		pq := (inqResp[0] >> 5) & 0x07
-		devType := inqResp[0] & 0x1f
-
-		// DEFINITIVE GHOST: Target explicitly registers, but reports missing links/void endpoints
-		if pq == 1 || pq == 3 || devType == 0x1f {
-			logger.Warningf("[%s] Identity mismatch caught [PQ=%d, Type=0x%02x]. Ghost confirmed.", sgName, pq, devType)
-			return true, nil
-		}
-
-		logger.Debugf("[%s] Target check complete. Healthy path verified.", sgName)
-		return false, nil
-
-	case 0x02: // SCSI STATUS: CHECK CONDITION
-		if header.sb_len_wr < 8 { 
-			return false, fmt.Errorf("invalid sense data size returned: %d", header.sb_len_wr)
-		}
-		
-		var senseKey, asc uint8
-		if (senseBuf[0] & 0x7f) == 0x72 {
-			senseKey = senseBuf[1] & 0x0f
-			asc = senseBuf[2]
-		} else if header.sb_len_wr >= 14 {
-			senseKey = senseBuf[2] & 0x0f
-			asc = senseBuf[12]
-		} else {
-			return false, fmt.Errorf("truncated fixed sense data format encountered")
-		}
-
-		// DEFINITIVE GHOST: Hardware explicitly states medium missing or mapping illegal
-		if (senseKey == 0x02 && asc == 0x3A) || (senseKey == 0x05 && (asc == 0x25 || asc == 0x24)) {
-			logger.Warningf("[%s] Fatal Check Condition (%02x/%02x). Ghost confirmed.", sgName, senseKey, asc)
-			return true, nil
-		}
-		
-		return false, fmt.Errorf("target check condition: SK=0x%02x ASC=0x%02x", senseKey, asc)
-
-	default:
-		return false, fmt.Errorf("unexpected scsi protocol status: 0x%02x", header.status)
-	}
+	return false, fmt.Errorf("path analysis retry cycles exhausted without resolution")
 }
 
 
