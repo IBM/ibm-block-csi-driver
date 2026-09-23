@@ -26,7 +26,7 @@ def _dump_memory_snapshot(label='on-exit'):
     if not _tracemalloc_started:
         return
     snapshot = tracemalloc.take_snapshot()
-    stats = snapshot.statistics('lineno')
+    stats = snapshot.statistics('traceback')
 
     lines = [
         '=== HD_DEBUG_MEMORY snapshot ({}) — top {} allocations by size ==='.format(
@@ -36,11 +36,11 @@ def _dump_memory_snapshot(label='on-exit'):
     lines.append('  Total tracked: {:.1f} MiB'.format(total_bytes / 1024 / 1024))
     lines.append('')
     for rank, stat in enumerate(stats[:_SNAPSHOT_TOP_N], start=1):
-        lines.append('  #{:>3}  {:>10.1f} KiB  count={:<6}  {}'.format(
+        lines.append('  #{:>3}  {:>10.1f} KiB  count={:<6}\n    {}'.format(
             rank,
             stat.size / 1024,
             stat.count,
-            stat.traceback.format()[0] if stat.traceback else '(no traceback)',
+            '\n    '.join(stat.traceback.format()) if stat.traceback else '(no traceback)',
         ))
     lines.append('=== end snapshot ===')
     logger.warning('\n'.join(lines))
@@ -55,7 +55,7 @@ def _periodic_memory_monitor(interval_sec=2.0):
             continue
         try:
             snapshot = tracemalloc.take_snapshot()
-            stats = snapshot.statistics('lineno')
+            stats = snapshot.statistics('traceback')
             total_bytes = sum(s.size for s in stats)
 
             lines = [
@@ -65,21 +65,21 @@ def _periodic_memory_monitor(interval_sec=2.0):
             ]
 
             if last_snapshot:
-                diff_stats = snapshot.compare_to(last_snapshot, 'lineno')
+                diff_stats = snapshot.compare_to(last_snapshot, 'traceback')
                 growing_stats = [s for s in diff_stats if s.size_diff > 0]
                 if growing_stats:
                     lines.append('  -- Top Growing Allocations since last tick --')
                     for stat in growing_stats[:10]:
-                        traceback_str = stat.traceback.format()[0] if stat.traceback else '(no traceback)'
-                        lines.append('  +{:>8.1f} KiB (count diff: {:<5})  {}'.format(
+                        traceback_str = '\n    '.join(stat.traceback.format()) if stat.traceback else '(no traceback)'
+                        lines.append('  +{:>8.1f} KiB (count diff: {:<5})\n    {}'.format(
                             stat.size_diff / 1024, stat.count_diff, traceback_str
                         ))
 
             last_snapshot = snapshot
             lines.append('  -- Top Allocations --')
             for rank, stat in enumerate(stats[:_SNAPSHOT_TOP_N], start=1):
-                traceback_str = stat.traceback.format()[0] if stat.traceback else '(no traceback)'
-                lines.append('  #{:>3}  {:>10.1f} KiB  count={:<6}  {}'.format(
+                traceback_str = '\n    '.join(stat.traceback.format()) if stat.traceback else '(no traceback)'
+                lines.append('  #{:>3}  {:>10.1f} KiB  count={:<6}\n    {}'.format(
                     rank, stat.size / 1024, stat.count, traceback_str
                 ))
             lines.append('=== end snapshot ===')
