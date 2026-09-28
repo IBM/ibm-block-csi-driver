@@ -758,6 +758,16 @@ func (d *NodeService) nodeGetVolumeStatsRequestValidation(volumeId string, volum
 }
 
 func (d *NodeService) getVolumeStats(path string, volumeId string) (VolumeStatistics, error) {
+	volumeStats, err := d.getVolumeStatsFromDevice(path, volumeId)
+	if err != nil && status.Code(err) == codes.Internal {
+		// I/O of the pod will hang forever if the storage made the LUN unavailable on all paths
+		// (e.g. after the replication peer was promoted), so the pod could never terminate.
+		d.disableQueueingIfLunUnavailable(d.NodeUtils.GetVolumeUuid(volumeId))
+	}
+	return volumeStats, err
+}
+
+func (d *NodeService) getVolumeStatsFromDevice(path string, volumeId string) (VolumeStatistics, error) {
 	var volumeStats VolumeStatistics
 	isBlock, err := d.NodeUtils.IsBlock(path)
 	if err != nil {
