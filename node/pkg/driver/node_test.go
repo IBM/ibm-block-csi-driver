@@ -505,6 +505,7 @@ func TestNodeUnstageVolume(t *testing.T) {
 				mockNodeUtils.EXPECT().IsNotMountPoint(stagingPathWithHostPrefix).Return(true, nil)
 				mockNodeUtils.EXPECT().GetVolumeUuid(volId).Return(volId)
 				mockOsDeviceConHelper.EXPECT().GetMpathDevice(volId).Return("", dummyError)
+				mockOsDeviceConHelper.EXPECT().DisableQueueingIfLunUnavailable(volId).Return("", nil)
 
 				_, err := node.NodeUnstageVolume(context.TODO(), unstageRequest)
 				assertError(t, err, codes.Internal)
@@ -565,8 +566,9 @@ func TestNodeUnstageVolume(t *testing.T) {
 
 				mockNodeUtils.EXPECT().GetPodPath(stagingPath).Return(stagingPathWithHostPrefix)
 				mockNodeUtils.EXPECT().IsNotMountPoint(stagingPathWithHostPrefix).Return(false, nil)
-				mockMounter.EXPECT().Unmount(stagingPath).Return(nil)
 				mockNodeUtils.EXPECT().GetVolumeUuid(volId).Return(volId)
+				mockOsDeviceConHelper.EXPECT().DisableQueueingIfLunUnavailable(volId).Return("", nil)
+				mockMounter.EXPECT().Unmount(stagingPath).Return(nil)
 				mockOsDeviceConHelper.EXPECT().GetMpathDevice(volId).Return(dmSysFsName, nil)
 				mockNodeUtils.EXPECT().DevicesAreNvme(dmSysFsName).Return(driver.NotNVMe, nil)
 				mockNodeUtils.EXPECT().GetSysDevicesFromMpath(dmSysFsName).Return(sysDevices, nil)
@@ -574,6 +576,34 @@ func TestNodeUnstageVolume(t *testing.T) {
 				mockOsDeviceConHelper.EXPECT().RemovePhysicalDevice(sysDevices).Return(nil)
 				mockNodeUtils.EXPECT().StageInfoFileIsExist(stageInfoPath).Return(true)
 				mockNodeUtils.EXPECT().ClearStageInfoFile(stageInfoPath).Return(nil)
+
+				_, err := node.NodeUnstageVolume(context.TODO(), unstageRequest)
+				if err != nil {
+					t.Fatalf("Expect no error but got: %v", err)
+				}
+			},
+		},
+		{
+			name: "success LUN unavailable on all paths",
+			testFunc: func(t *testing.T) {
+				mockCtl := gomock.NewController(t)
+				defer mockCtl.Finish()
+				mockNodeUtils := mocks.NewMockNodeUtilsInterface(mockCtl)
+				mockOsDeviceConHelper := mocks.NewMockOsDeviceConnectivityHelperScsiGenericInterface(mockCtl)
+				mockMounter := mocks.NewMockNodeMounter(mockCtl)
+				node := newTestNodeServiceStaging(mockNodeUtils, nil, mockOsDeviceConHelper, mockMounter)
+
+				mockNodeUtils.EXPECT().GetPodPath(stagingPath).Return(stagingPathWithHostPrefix)
+				mockNodeUtils.EXPECT().IsNotMountPoint(stagingPathWithHostPrefix).Return(false, nil)
+				mockNodeUtils.EXPECT().GetVolumeUuid(volId).Return(volId)
+				mockOsDeviceConHelper.EXPECT().DisableQueueingIfLunUnavailable(volId).Return(dmSysFsName, nil)
+				mockMounter.EXPECT().Unmount(stagingPath).Return(nil)
+				mockOsDeviceConHelper.EXPECT().GetMpathDevice(gomock.Any()).Times(0)
+				mockNodeUtils.EXPECT().DevicesAreNvme(dmSysFsName).Return(driver.NotNVMe, nil)
+				mockNodeUtils.EXPECT().GetSysDevicesFromMpath(dmSysFsName).Return(sysDevices, nil)
+				mockOsDeviceConHelper.EXPECT().FlushMultipathDevice(dmSysFsName).Return(nil)
+				mockOsDeviceConHelper.EXPECT().RemovePhysicalDevice(sysDevices).Return(nil)
+				mockNodeUtils.EXPECT().StageInfoFileIsExist(stageInfoPath).Return(false)
 
 				_, err := node.NodeUnstageVolume(context.TODO(), unstageRequest)
 				if err != nil {
@@ -991,6 +1021,8 @@ func TestNodeGetVolumeStats(t *testing.T) {
 				mockNodeUtils.EXPECT().IsBlock(volumePathWithHostPrefix).Return(true, nil)
 				mockNodeUtils.EXPECT().GetBlockVolumeStats(volumeId).Return(driver.VolumeStatistics{},
 					errors.New("fail to get stats"))
+				mockNodeUtils.EXPECT().GetVolumeUuid(volumeId).Return(volumeUuid)
+				mockOsDeviceConHelper.EXPECT().DisableQueueingIfLunUnavailable(volumeUuid).Return("", nil)
 
 				_, err := d.NodeGetVolumeStats(context.TODO(), req)
 				assertError(t, err, expErrCode)
@@ -1007,6 +1039,8 @@ func TestNodeGetVolumeStats(t *testing.T) {
 				mockNodeUtils.EXPECT().GetVolumeUuid(volumeId).Return(volumeUuid)
 				mockOsDeviceConHelper.EXPECT().IsVolumePathMatchesVolumeId(volumeUuid, volumePathWithHostPrefix).Return(true, nil)
 				mockNodeUtils.EXPECT().GetFileSystemVolumeStats(volumePathWithHostPrefix).Return(driver.VolumeStatistics{}, errors.New("fail to get stats"))
+				mockNodeUtils.EXPECT().GetVolumeUuid(volumeId).Return(volumeUuid)
+				mockOsDeviceConHelper.EXPECT().DisableQueueingIfLunUnavailable(volumeUuid).Return("", nil)
 
 				_, err := d.NodeGetVolumeStats(context.TODO(), req)
 				assertError(t, err, expErrCode)

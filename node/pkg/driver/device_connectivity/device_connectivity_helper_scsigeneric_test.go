@@ -19,10 +19,12 @@ package device_connectivity_test
 import (
 	"errors"
 	"fmt"
+	"os"
 	"reflect"
 	"strings"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/golang/mock/gomock"
 	"github.com/ibm/ibm-block-csi-driver/node/logger"
@@ -1221,6 +1223,95 @@ func TestIsIndicatorMatchesFilterValues(t *testing.T) {
 			got := helper.IsIndicatorMatchesFilterValues(tc.dmFilterValues, tc.indicatorValue)
 			if got != tc.expected {
 				t.Fatalf("IsIndicatorMatchesFilterValues(%v, %q) = %v, want %v", tc.dmFilterValues, tc.indicatorValue, got, tc.expected)
+			}
+		})
+	}
+}
+
+type fakeSlaveFileInfo struct{ name string }
+
+func (f fakeSlaveFileInfo) Name() string       { return f.name }
+func (f fakeSlaveFileInfo) Size() int64        { return 0 }
+func (f fakeSlaveFileInfo) Mode() os.FileMode  { return os.ModeSymlink }
+func (f fakeSlaveFileInfo) ModTime() time.Time { return time.Time{} }
+func (f fakeSlaveFileInfo) IsDir() bool        { return false }
+func (f fakeSlaveFileInfo) Sys() interface{}   { return nil }
+
+func TestDisableQueueingIfLunUnavailable(t *testing.T) {
+	dmName := "dm-99"
+	dmPath := "/dev/" + dmName
+	slaves := []os.FileInfo{fakeSlaveFileInfo{"sdb"}, fakeSlaveFileInfo{"sdc"}}
+	showMapsArgs := []string{"show", "maps", "raw", "format", "\"", "%w,%d", "\""}
+	showPathsArgs := []string{"show", "paths", "raw", "format", "\"", "%d,%t", "\""}
+	disableQueueingArgs := []string{"disablequeueing", "map", dmName}
+	lunUnavailableOutput := "test unit ready:\nFixed format, current; Sense key: Not Ready\n" +
+		"Additional sense: Logical unit not accessible, target port in unavailable state\ndevice not ready\n"
+	lunNotReadyOutput := "test unit ready:\nFixed format, current; Sense key: Not Ready\n" +
+		"Additional sense: Logical unit not ready, cause not reportable\ndevice not ready\n"
+	notReadyErr := errors.New("exit status 2")
+	allFailedPaths := " sda,undef \n sdb,failed \n sdc,failed \n"
+
+	type tursResult struct {
+		out string
+		err error
+	}
+
+	testCases := []struct {
+		name                  string
+		showMapsOutput        string
+		expectReadSlaves      bool
+		showPathsOutput       string
+		expectShowPaths       bool
+		tursResults           map[string]tursResult
+		expectDisableQueueing bool
+		expDevice             string
+	}{
+		{name: "all paths active", showMapsOutput: " 3" + volumeUuid + "," + dmName + " \n", expectReadSlaves: true,
+			expectShowPaths: true, showPathsOutput: " sda,undef \n sdb,active \n sdc,active \n"},
+		{name: "all paths failed but LUN not unavailable on a path", showMapsOutput: " 3" + volumeUuid + "," + dmName + " \n",
+			expectReadSlaves: true, expectShowPaths: true, showPathsOutput: allFailedPaths,
+			tursResults: map[string]tursResult{"/dev/sdb": {lunUnavailableOutput, notReadyErr}, "/dev/sdc": {lunNotReadyOutput, notReadyErr}}},
+		{name: "all paths failed and LUN unavailable on all paths", showMapsOutput: " 3" + volumeUuid + "," + dmName + " \n",
+			expectReadSlaves: true, expectShowPaths: true, showPathsOutput: allFailedPaths,
+			tursResults:           map[string]tursResult{"/dev/sdb": {lunUnavailableOutput, notReadyErr}, "/dev/sdc": {lunUnavailableOutput, notReadyErr}},
+			expectDisableQueueing: true, expDevice: dmPath},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			mockCtrl := gomock.NewController(t)
+			defer mockCtrl.Finish()
+
+			fakeExecuter := mocks.NewMockExecuterInterface(mockCtrl)
+			fakeExecuter.EXPECT().ExecuteWithTimeout(device_connectivity.TimeOutMultipathCmd, "nvme", []string{"list"}).Return([]byte(""), nil).AnyTimes()
+			fakeHelper := mocks.NewMockOsDeviceConnectivityHelperInterface(mockCtrl)
+			fakeHelper.EXPECT().GetVolumeIdVariations(volumeUuid).Return([]string{volumeUuid, volumeNguid})
+
+			fakeExecuter.EXPECT().ExecuteWithTimeout(device_connectivity.TimeOutMultipathdCmd, "multipathd", showMapsArgs).Return(
+				[]byte(tc.showMapsOutput), nil)
+			if tc.expectReadSlaves {
+				fakeExecuter.EXPECT().IoutilReadDir("/sys/block/"+dmName+"/slaves").Return(slaves, nil)
+			}
+			if tc.expectShowPaths {
+				fakeExecuter.EXPECT().ExecuteWithTimeout(device_connectivity.TimeOutMultipathdCmd, "multipathd", showPathsArgs).Return(
+					[]byte(tc.showPathsOutput), nil)
+			}
+			for pathDevice, result := range tc.tursResults {
+				fakeExecuter.EXPECT().ExecuteWithTimeout(device_connectivity.TimeOutSgInqCmd, "sg_turs", []string{"-v", pathDevice}).Return(
+					[]byte(result.out), result.err)
+			}
+			if tc.expectDisableQueueing {
+				fakeExecuter.EXPECT().ExecuteWithTimeout(device_connectivity.TimeOutMultipathdCmd, "multipathd", disableQueueingArgs).Return(
+					[]byte("ok"), nil)
+			}
+
+			o := NewOsDeviceConnectivityHelperScsiGenericForTest(fakeExecuter, fakeHelper, &sync.Mutex{})
+			device, err := o.DisableQueueingIfLunUnavailable(volumeUuid)
+			if err != nil {
+				t.Fatalf("expected no error, got: %v", err)
+			}
+			if device != tc.expDevice {
+				t.Fatalf("expected device %q, got %q", tc.expDevice, device)
 			}
 		})
 	}
