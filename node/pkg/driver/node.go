@@ -358,7 +358,12 @@ func (d *NodeService) NodeUnstageVolume(ctx context.Context, req *csi.NodeUnstag
 		logger.Warningf("Failed to check if (%s), is mounted", stagingPathWithHostPrefix)
 		return nil, status.Error(codes.Internal, err.Error())
 	}
+
+	volumeUuid := d.NodeUtils.GetVolumeUuid(volumeID)
+	unavailableLunMpathDevice := ""
 	if !isNotMounted {
+		// umount hangs forever if the device queues I/O while the storage made the LUN unavailable
+		unavailableLunMpathDevice = d.disableQueueingIfLunUnavailable(volumeUuid)
 		err = d.Mounter.Unmount(stagingTargetPath)
 		if err != nil {
 			logger.Errorf("Unmount failed. Target : %q, err : %v", stagingTargetPath, err.Error())
@@ -366,8 +371,20 @@ func (d *NodeService) NodeUnstageVolume(ctx context.Context, req *csi.NodeUnstag
 		}
 	}
 
-	volumeUuid := d.NodeUtils.GetVolumeUuid(volumeID)
-	mpathDevice, err := d.OsDeviceConnectivityHelper.GetMpathDevice(volumeUuid)
+	// The device can not be validated by sg_inq when the LUN is unavailable on all paths
+	var mpathDevice string
+	if unavailableLunMpathDevice == "" {
+		mpathDevice, err = d.OsDeviceConnectivityHelper.GetMpathDevice(volumeUuid)
+		if err != nil {
+			if _, isNotFound := err.(*device_connectivity.MultipathDeviceNotFoundForVolumeError); !isNotFound {
+				unavailableLunMpathDevice = d.disableQueueingIfLunUnavailable(volumeUuid)
+			}
+		}
+	}
+	if unavailableLunMpathDevice != "" {
+		logger.Warningf("Using mpath device {%v} of volume {%v} that is unavailable on all paths", unavailableLunMpathDevice, volumeUuid)
+		mpathDevice, err = unavailableLunMpathDevice, nil
+	}
 	if err != nil {
 		switch err.(type) {
 		case *device_connectivity.MultipathDeviceNotFoundForVolumeError:
@@ -429,6 +446,15 @@ func (d *NodeService) NodeUnstageVolume(ctx context.Context, req *csi.NodeUnstag
 	logger.Debugf("NodeUnStageVolume Finished: multipath device removed from host")
 
 	return &csi.NodeUnstageVolumeResponse{}, nil
+}
+
+func (d *NodeService) disableQueueingIfLunUnavailable(volumeUuid string) string {
+	mpathDevice, err := d.OsDeviceConnectivityHelper.DisableQueueingIfLunUnavailable(volumeUuid)
+	if err != nil {
+		logger.Warningf("Failed to check the paths of the mpath device of volume {%v}, err: %v", volumeUuid, err)
+		return ""
+	}
+	return mpathDevice
 }
 
 func (d *NodeService) NodePublishVolume(ctx context.Context, req *csi.NodePublishVolumeRequest) (*csi.NodePublishVolumeResponse, error) {
@@ -701,6 +727,16 @@ func (d *NodeService) nodeGetVolumeStatsRequestValidation(volumeId string, volum
 }
 
 func (d *NodeService) getVolumeStats(path string, volumeId string) (VolumeStatistics, error) {
+	volumeStats, err := d.getVolumeStatsFromDevice(path, volumeId)
+	if err != nil && status.Code(err) == codes.Internal {
+		// I/O of the pod will hang forever if the storage made the LUN unavailable on all paths
+		// (e.g. after the replication peer was promoted), so the pod could never terminate.
+		d.disableQueueingIfLunUnavailable(d.NodeUtils.GetVolumeUuid(volumeId))
+	}
+	return volumeStats, err
+}
+
+func (d *NodeService) getVolumeStatsFromDevice(path string, volumeId string) (VolumeStatistics, error) {
 	var volumeStats VolumeStatistics
 	isBlock, err := d.NodeUtils.IsBlock(path)
 	if err != nil {

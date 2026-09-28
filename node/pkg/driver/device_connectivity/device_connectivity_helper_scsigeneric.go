@@ -44,6 +44,7 @@ type OsDeviceConnectivityHelperScsiGenericInterface interface {
 	RescanDevices(lunId int, arrayIdentifiers []string, hostIDs map[int]bool) error
 	GetMpathDevice(volumeId string) (string, error)
 	FlushMultipathDevice(mpathDevice string) error
+	DisableQueueingIfLunUnavailable(volumeId string) (string, error)
 	RemovePhysicalDevice(sysDevices []string) error
 	RemoveGhostDevice(lun int) error
 	ValidateLun(lun int, sysDevices []string) error
@@ -90,6 +91,10 @@ const (
 	WwnVendorIdentifierEnd      = 16
 	procMountsFilePath          = "/proc/mounts"
 	nvmeCoreMultipathParamPath  = "/sys/module/nvme_core/parameters/multipath"
+	sysBlockSlavesPathFormat    = "/sys/block/%s/slaves"
+	mpathPathStateFailed        = "failed"
+	sgTursCmd                   = "sg_turs"
+	lunUnavailableSense         = "target port in unavailable state"
 )
 
 func NewOsDeviceConnectivityHelperScsiGeneric(executer executer.ExecuterInterface, clean_scsi_device bool) OsDeviceConnectivityHelperScsiGenericInterface {
@@ -382,6 +387,107 @@ func (r OsDeviceConnectivityHelperScsiGeneric) FlushMultipathDevice(mpathDevice 
 
 	logger.Debugf("Finished flushing mpath device : {%v}", mpathDevice)
 	return nil
+}
+
+// DisableQueueingIfLunUnavailable handles a SCSI dm-multipath device of the volume whose paths are ALL failed
+// AND on every path the storage reports the LUN is not accessible because the target port is in unavailable
+// state (e.g. the volume became secondary after the replication peer was promoted).
+// With queue_if_no_path such a device queues I/O forever, so umount / flush / sync on it hang in D state.
+// In that case only, queueing is disabled so pending and new I/O fail instead of hanging.
+// Any other case (e.g. transport outage, any path not failed) is left untouched.
+// Returns the mpath device (e.g. /dev/dm-4) if queueing was disabled, otherwise an empty string.
+// The device is located by its WWID in multipathd only (single query, no retries), without sending I/O to it.
+func (r OsDeviceConnectivityHelperScsiGeneric) DisableQueueingIfLunUnavailable(volumeId string) (string, error) {
+	dmName, err := r.getDmNameByWwid(volumeId)
+	if err != nil || dmName == "" {
+		return "", err
+	}
+	dmPath := filepath.Join(DevPath, dmName)
+	if isNvmeDevice(dmPath, r.Executer) {
+		return "", nil
+	}
+
+	slaves, err := r.Executer.IoutilReadDir(fmt.Sprintf(sysBlockSlavesPathFormat, dmName))
+	if err != nil {
+		return "", err
+	}
+	if len(slaves) == 0 {
+		return "", nil
+	}
+
+	args := []string{"show", "paths", "raw", "format", "\"", "%d" + mpathdSeparator + "%t", "\""}
+	out, err := r.Executer.ExecuteWithTimeout(TimeOutMultipathdCmd, multipathdCmd, args)
+	if err != nil {
+		return "", err
+	}
+	pathStates := make(map[string]string)
+	scanner := bufio.NewScanner(strings.NewReader(string(out)))
+	for scanner.Scan() {
+		lineParts := strings.Split(scanner.Text(), mpathdSeparator)
+		if len(lineParts) == 2 {
+			pathStates[strings.TrimSpace(lineParts[0])] = strings.TrimSpace(lineParts[1])
+		}
+	}
+	for _, slave := range slaves {
+		state, found := pathStates[slave.Name()]
+		if !found || state != mpathPathStateFailed {
+			logger.Debugf("Mpath device {%v} has a path {%v} that is not failed (state: {%v}), keeping queueing", dmName, slave.Name(), state)
+			return "", nil
+		}
+	}
+
+	for _, slave := range slaves {
+		if !r.isLunUnavailableOnPath(slave.Name()) {
+			logger.Debugf("Path {%v} of mpath device {%v} does not report the LUN as unavailable, keeping queueing", slave.Name(), dmName)
+			return "", nil
+		}
+	}
+
+	logger.Warningf("All paths of mpath device {%v} are failed and the LUN is unavailable on all of them, disabling queueing so I/O to it will fail instead of hang", dmName)
+	_, err = r.Executer.ExecuteWithTimeout(TimeOutMultipathdCmd, multipathdCmd, []string{"disablequeueing", "map", dmName})
+	if err != nil {
+		return "", err
+	}
+	return dmPath, nil
+}
+
+// getDmNameByWwid returns the dm name (e.g. dm-4) of the single multipath map matching the volume WWID,
+// or an empty string if there is no such map or more than one.
+func (r OsDeviceConnectivityHelperScsiGeneric) getDmNameByWwid(volumeId string) (string, error) {
+	volumeIdVariations := r.Helper.GetVolumeIdVariations(volumeId)
+	args := []string{"show", "maps", "raw", "format", "\"", strings.Join(MultipathdWildcardsVolumeIdAndMpath, mpathdSeparator), "\""}
+	out, err := r.Executer.ExecuteWithTimeout(TimeOutMultipathdCmd, multipathdCmd, args)
+	if err != nil {
+		return "", err
+	}
+	dmNames := make(map[string]bool)
+	scanner := bufio.NewScanner(strings.NewReader(string(out)))
+	for scanner.Scan() {
+		lineParts := strings.Split(scanner.Text(), mpathdSeparator)
+		if len(lineParts) != 2 {
+			continue
+		}
+		wwid := strings.ToLower(strings.TrimSpace(lineParts[0]))
+		for _, volumeIdVariation := range volumeIdVariations {
+			if wwid != "" && (wwid == volumeIdVariation || strings.HasSuffix(wwid, volumeIdVariation)) {
+				dmNames[strings.TrimSpace(lineParts[1])] = true
+			}
+		}
+	}
+	if len(dmNames) != 1 {
+		return "", nil
+	}
+	for dmName := range dmNames {
+		return dmName, nil
+	}
+	return "", nil
+}
+
+// isLunUnavailableOnPath sends TEST UNIT READY to the path device itself (not the mpath device, so it is not queued)
+// and checks if the storage answers that the LUN is not accessible because the target port is in unavailable state.
+func (r OsDeviceConnectivityHelperScsiGeneric) isLunUnavailableOnPath(pathDevice string) bool {
+	out, err := r.Executer.ExecuteWithTimeout(TimeOutSgInqCmd, sgTursCmd, []string{"-v", filepath.Join(DevPath, pathDevice)})
+	return err != nil && strings.Contains(string(out), lunUnavailableSense)
 }
 
 func (r OsDeviceConnectivityHelperScsiGeneric) RemovePhysicalDevice(sysDevices []string) error {
