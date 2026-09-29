@@ -1434,7 +1434,7 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) purgeScsiGhosts(ctx context.Cont
 				
 				logger.Debugf("[purgeScsiGhosts]  device %s [Vendor: %s, Serial: %s, Serial Match: %v, Ghost: %v, Our path: %v]. Executing hot-unplug.", candidate.sgName, vdr, serialNumber, serialNumber != "" && !r.IsSerialMatch(serialNumber, expectedSerial), ghostState, pathOwned)
 
-				shouldDelete := (ghostState && isIbmDevice) || (pathOwned && (ghostState || !isIbmDevice || (serialNumber != "" && !r.IsSerialMatch(serialNumber, expectedSerial))))
+				shouldDelete := (ghostState && isIbmDevice) || (pathOwned && (ghostState || !isIbmDevice)) || (!pathOwned && serialNumber != "" && !r.IsSerialMatch(serialNumber, expectedSerial))
 				if !shouldDelete {
 					return struct{}{}, nil
 				}
@@ -2324,17 +2324,17 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) IsSgDeviceGhost(ctx context.Cont
         cleanSgName := filepath.Base(sgName)
         sgSysfsPath := fmt.Sprintf("/sys/class/scsi_generic/%s", cleanSgName)
 		deviceLink := filepath.Join(sgSysfsPath, "device")
-        driverDriver := filepath.Join(sgSysfsPath, "device", "driver")
+        //driverDriver := filepath.Join(sgSysfsPath, "device", "driver")
 		
         if _, statErr := os.Stat(sgSysfsPath); os.IsNotExist(statErr) {
 				logger.Debugf("[IsSgDeviceGhost] Device %s - sg path not found", sgName)
                 return false, nil
         }
 		
-        if _, statErr := os.Stat(driverDriver); os.IsNotExist(statErr) {
-				logger.Debugf("[IsSgDeviceGhost] Device %s - driver not ready", sgName)
-                return false, nil
-        }
+        //if _, statErr := os.Stat(driverDriver); os.IsNotExist(statErr) {
+		//		logger.Debugf("[IsSgDeviceGhost] Device %s - driver not ready", sgName)
+        //        return false, nil
+        //}
 
         deviceBase, errLink := filepath.EvalSymlinks(deviceLink)
         if errLink != nil {
@@ -7584,6 +7584,7 @@ func (of *GetDmsPathHelperGeneric) safeSettle(ctx context.Context, gater *execut
 				_, readErr := f.Read(buf)
 				
 				if readErr != nil {
+					// TODO if this is during IdentityAwarePreScan then dm device might be bad - need to force ghost cleanup, not continue to fail
 					logger.Warningf("safeSettle open device %s failed with read err %v", targetDeviceNode, readErr)
 				} else {
 					logger.Warningf("safeSettle open device %s success", targetDeviceNode)
