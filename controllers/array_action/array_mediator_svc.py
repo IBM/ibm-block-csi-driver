@@ -1,5 +1,4 @@
 from collections import defaultdict
-from io import StringIO
 from random import choice, randint
 from datetime import datetime, timedelta, timezone
 import json
@@ -8,16 +7,11 @@ import time
 import os
 from munch import Munch
 from packaging.version import Version
-from pysvc import errors as svc_errors
-from pysvc.unified.client import connect
-from pysvc.unified.response import CLIFailureError, SVCResponse
 from retry import retry
 
 from openapi_client.api.storage_virtualize_api import StorageVirtualizeAPI
 from openapi_client.exceptions import ApiException as SdkApiException
-from openapi_client.models.lsvdisk_post_request import LsvdiskPostRequest
-from openapi_client.models.lsvdisk_id_post_request import LsvdiskIdPostRequest
-from openapi_client.models.mkvolume_post_request import MkvolumePostRequest
+import openapi_client.models as svc_models
 
 from controllers.servers.host_definer import settings
 from controllers.common.config import config
@@ -89,7 +83,6 @@ HOST_NQN = 'nqn'
 HOST_WWPN = 'WWPN'
 HOST_ISCSI_NAME = 'iscsi_name'
 HOST_PORTSET_ID = 'portset_id'
-LIST_HOSTS_CMD_FORMAT = 'lshost {HOST_ID};echo;'
 HOSTS_LIST_ERR_MSG_MAX_LENGTH = 300
 
 LUN_INTERVAL = 128
@@ -311,14 +304,14 @@ def _extract_sdk_error_message(ex):
     return body
 
 
-class _SdkLsvdiskResponse:
-    """Thin wrapper around the raw SDK lsvdisk response.
+class _SdkResponse:
+    """Thin wrapper around a raw SDK response.
 
-    The SDK returns a plain Python object (a ``dict`` for a single-volume
-    detail view, or a ``list[dict]`` for the concise list view).  The rest of
-    the mediator code consumes the result through ``.as_single_element`` and
-    ``.as_list``, where each element is expected to support attribute-style
-    access (historically provided by ``Munch`` / pysvc objects).
+    The SDK returns a plain Python object (a ``dict`` for a detail view,
+    or a ``list[dict]`` for a list view).  Downstream code consumes the
+    result through ``.as_single_element`` and ``.as_list``, where each
+    element supports attribute-style access (historically provided by pysvc
+    Munch objects).
 
     This wrapper converts every dict into a ``Munch`` so that all downstream
     attribute accesses continue to work without modification.
@@ -329,7 +322,7 @@ class _SdkLsvdiskResponse:
     """
 
     def __init__(self, raw):
-        logger.debug("_SdkLsvdiskResponse raw type=%s repr=%.200r", type(raw).__name__, raw)
+        logger.debug("_SdkResponse raw type=%s repr=%.200r", type(raw).__name__, raw)
         # The SVC REST API sometimes responds with Content-Type: text/html while still
         # returning a JSON body.  The SDK's deserializer leaves text/html bodies as raw
         # strings rather than json.loads()-ing them.  Detect and convert here.
@@ -358,7 +351,7 @@ class _SdkLsvdiskResponse:
             return self._to_munch(self._raw)
         # Unexpected response shape (e.g. text/html body returned as a string).
         # Treat as empty so callers raise ObjectNotFoundError rather than AttributeError.
-        logger.warning("_SdkLsvdiskResponse.as_single_element: unexpected raw type %s, treating as empty",
+        logger.warning("_SdkResponse.as_single_element: unexpected raw type %s, treating as empty",
                        type(self._raw).__name__)
         return None
 
@@ -371,9 +364,13 @@ class _SdkLsvdiskResponse:
         if isinstance(self._raw, dict):
             return [self._to_munch(self._raw)]
         # Unexpected response shape — treat as empty list.
-        logger.warning("_SdkLsvdiskResponse.as_list: unexpected raw type %s, treating as empty",
+        logger.warning("_SdkResponse.as_list: unexpected raw type %s, treating as empty",
                        type(self._raw).__name__)
         return []
+
+
+# Keep the old name as an alias so existing lsvdisk call sites need no change.
+_SdkLsvdiskResponse = _SdkResponse
 
 
 class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
@@ -445,31 +442,33 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
     def _connect(self):
         logger.debug("Connecting to SVC {0}".format(self.endpoint))
         try:
-            self.client = connect(self.endpoint, username=self.user,
-                                  password=self.password, port=self.port)
+            self.sdk = StorageVirtualizeAPI(self.endpoint, self.user, self.password)
             if Version(self._code_level) < Version(self.MIN_SUPPORTED_VERSION):
                 raise array_errors.UnsupportedStorageVersionError(
                     self._code_level, self.MIN_SUPPORTED_VERSION
                 )
-            self.sdk = StorageVirtualizeAPI(self.endpoint, self.user, self.password)
-        except (svc_errors.IncorrectCredentials,
-                svc_errors.StorageArrayClientException):
-            raise array_errors.CredentialsError(self.endpoint)
+        except SdkApiException as ex:
+            message = _extract_sdk_error_message(ex)
+            if ex.status == 401 or ex.status == 403:
+                raise array_errors.CredentialsError(self.endpoint)
+            raise
 
     def disconnect(self):
-        if self.client:
-            self.client.close()
+        # REST is stateless — no persistent connection to close.
+        pass
 
     @property
     def _system_info(self):
         if self._cluster is None:
             try:
-                for cluster in self.client.svcinfo.lssystem():
+                raw = self.sdk.svc_info_api.lssystem_post(x_auth_token=None)
+                clusters = _SdkResponse(raw).as_list
+                for cluster in clusters:
                     if cluster.location == 'local':
                         self._cluster = cluster
-            except (svc_errors.CommandExecutionError, CLIFailureError) as ex:
-                logger.debug("Error running lssystem")
-                raise ex
+            except SdkApiException as ex:
+                logger.debug("Error running lssystem: %s", _extract_sdk_error_message(ex))
+                raise
         return self._cluster
 
     @property
@@ -481,7 +480,12 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
         return self._system_info.id_alias
 
     def is_active(self):
-        return self.client.transport.transport.get_transport().is_active()
+        # REST is stateless; use a lightweight lssystem call as the health check.
+        try:
+            self.sdk.svc_info_api.lssystem_post(x_auth_token=None)
+            return True
+        except SdkApiException:
+            return False
 
     def _get_partition_name_of_cli_volume(self, cli_volume):
         if not getattr(cli_volume, 'volume_group_name', None):
@@ -580,12 +584,12 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
                     raw = self.sdk.svc_info_api.lsvdisk_id_post(
                         id=str(object_id),
                         x_auth_token=None,
-                        lsvdisk_id_post_request=LsvdiskIdPostRequest(unit='b'),
+                        lsvdisk_id_post_request=svc_models.LsvdiskIdPostRequest(unit='b'),
                     )
                 else:
                     raw = self.sdk.svc_info_api.lsvdisk_post(
                         x_auth_token=None,
-                        lsvdisk_post_request=LsvdiskPostRequest(
+                        lsvdisk_post_request=svc_models.LsvdiskPostRequest(
                             filtervalue='name={}'.format(object_id),
                             unit='b',
                         ),
@@ -593,7 +597,7 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
             else:
                 raw = self.sdk.svc_info_api.lsvdisk_post(
                     x_auth_token=None,
-                    lsvdisk_post_request=LsvdiskPostRequest(
+                    lsvdisk_post_request=svc_models.LsvdiskPostRequest(
                         filtervalue=filtervalue,
                         unit='b',
                     ),
@@ -610,17 +614,23 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
 
     def _lsvolumegroup(self, id_or_name, not_exist_err=False):
         try:
-            return self.client.svcinfo.lsvolumegroup(object_id=id_or_name).as_single_element
-        except (svc_errors.CommandExecutionError, CLIFailureError) as ex:
-            if (SPECIFIED_OBJ_NOT_EXIST in ex.my_message or
-                    NAME_NOT_EXIST_OR_MEET_RULES in ex.my_message):
+            raw = self.sdk.svc_info_api.lsvolumegroup_id_post(
+                id=str(id_or_name),
+                x_auth_token=None,
+                lsvolumegroup_id_post_request=svc_models.LsvolumegroupIdPostRequest(),
+            )
+            return _SdkResponse(raw).as_single_element
+        except SdkApiException as ex:
+            message = _extract_sdk_error_message(ex)
+            if (SPECIFIED_OBJ_NOT_EXIST in message or
+                    NAME_NOT_EXIST_OR_MEET_RULES in message):
                 logger.info("volume group {} was not found".format(id_or_name))
                 if not_exist_err:
                     raise array_errors.ObjectNotFoundError(id_or_name)
                 return None
-            if any(msg_id in ex.my_message for msg_id in (NON_ASCII_CHARS, VALUE_TOO_LONG)):
-                raise array_errors.InvalidArgumentError(ex.my_message)
-            raise ex
+            if any(msg_id in message for msg_id in (NON_ASCII_CHARS, VALUE_TOO_LONG)):
+                raise array_errors.InvalidArgumentError(message)
+            raise
 
     def _format_cli_args(self, cli_kwargs):
         return ' '.join(f'-{k} {v}' for k, v in cli_kwargs.items())
@@ -641,15 +651,21 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
 
     def _lsvolumegroupreplication(self, id_or_name):
         try:
-            return self.client.svcinfo.lsvolumegroupreplication(object_id=id_or_name).as_single_element
-        except (svc_errors.CommandExecutionError, CLIFailureError) as ex:
-            if (SPECIFIED_OBJ_NOT_EXIST in ex.my_message or
-                    NAME_NOT_EXIST_OR_MEET_RULES in ex.my_message):
+            raw = self.sdk.svc_info_api.lsvolumegroupreplication_id_post(
+                id=str(id_or_name),
+                x_auth_token=None,
+                lsvolumegroupreplication_id_post_request=svc_models.LsvolumegroupreplicationIdPostRequest(),
+            )
+            return _SdkResponse(raw).as_single_element
+        except SdkApiException as ex:
+            message = _extract_sdk_error_message(ex)
+            if (SPECIFIED_OBJ_NOT_EXIST in message or
+                    NAME_NOT_EXIST_OR_MEET_RULES in message):
                 logger.info("volume group replication {} was not found".format(id_or_name))
                 return None
-            if any(msg_id in ex.my_message for msg_id in (NON_ASCII_CHARS, VALUE_TOO_LONG)):
-                raise array_errors.InvalidArgumentError(ex.my_message)
-            raise ex
+            if any(msg_id in message for msg_id in (NON_ASCII_CHARS, VALUE_TOO_LONG)):
+                raise array_errors.InvalidArgumentError(message)
+            raise
 
     def _chvolumegroupreplication(self, id_or_name, **cli_kwargs):
         try:
@@ -771,10 +787,14 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
         """
         filter_value = '{0}_vdisk_name={1}'.format(endpoint_type, volume_name)
         try:
-            return self.client.svcinfo.lsfcmap(filtervalue=filter_value).as_list
-        except (svc_errors.CommandExecutionError, CLIFailureError) as ex:
+            raw = self.sdk.svc_info_api.lsfcmap_post(
+                x_auth_token=None,
+                lsfcmap_post_request=svc_models.LsfcmapPostRequest(filtervalue=filter_value),
+            )
+            return _SdkResponse(raw).as_list
+        except SdkApiException as ex:
             logger.debug("Error running lsfcmap -filtervalue {}".format(filter_value))
-            raise ex
+            raise
 
     def validate_supported_space_efficiency(self, space_efficiency):
         logger.debug("validate_supported_space_efficiency for "
@@ -857,7 +877,7 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
                                                       volume_group, name, size)
             self.sdk.svc_task_api.mkvolume_post(
                 x_auth_token=None,
-                mkvolume_post_request=MkvolumePostRequest(**cli_kwargs),
+                mkvolume_post_request=svc_models.MkvolumePostRequest(**cli_kwargs),
             )
         except SdkApiException as ex:
             message = _extract_sdk_error_message(ex)
@@ -978,10 +998,14 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
         logger.info("get partition {}".format(str(partition_name)))
         filter_value = 'name={}'.format(partition_name)
         try:
-            cli_partition = self.client.svcinfo.lspartition(filtervalue=filter_value).as_single_element
-        except (svc_errors.CommandExecutionError, CLIFailureError) as ex:
+            raw = self.sdk.svc_info_api.lspartition_post(
+                x_auth_token=None,
+                lspartition_post_request=svc_models.LspartitionPostRequest(filtervalue=filter_value),
+            )
+            cli_partition = _SdkResponse(raw).as_single_element
+        except SdkApiException as ex:
             logger.debug("Error running lspartition -filtervalue {}".format(filter_value))
-            raise ex
+            raise
         if not cli_partition:
             raise array_errors.InvalidArgumentError("partition not found")
         replication_policy_name = cli_partition.replication_policy_name
@@ -989,11 +1013,14 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
         if replication_policy_name:
             filter_value = 'name={}'.format(replication_policy_name)
             try:
-                cli_replication_policy = self.client.svcinfo.lsreplicationpolicy(
-                    filtervalue=filter_value).as_single_element
-            except (svc_errors.CommandExecutionError, CLIFailureError) as ex:
+                raw = self.sdk.svc_info_api.lsreplicationpolicy_post(
+                    x_auth_token=None,
+                    lsreplicationpolicy_post_request=svc_models.LsreplicationpolicyPostRequest(filtervalue=filter_value),
+                )
+                cli_replication_policy = _SdkResponse(raw).as_single_element
+            except SdkApiException as ex:
                 logger.debug("Error running lsreplicationpolicy -filtervalue {}".format(filter_value))
-                raise ex
+                raise
             if not cli_replication_policy:
                 raise array_errors.InvalidArgumentError("partition replication policy not found")
             logger.info("replication_topolgy {}".format(str(cli_replication_policy.topology)))
@@ -1297,10 +1324,14 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
     def _get_pool_site(self, pool):
         filter_value = 'name={}'.format(pool)
         try:
-            cli_pool = self.client.svcinfo.lsmdiskgrp(filtervalue=filter_value).as_single_element
-        except (svc_errors.CommandExecutionError, CLIFailureError) as ex:
+            raw = self.sdk.svc_info_api.lsmdiskgrp_post(
+                x_auth_token=None,
+                lsmdiskgrp_post_request=svc_models.LsmdiskgrpPostRequest(filtervalue=filter_value),
+            )
+            cli_pool = _SdkResponse(raw).as_single_element
+        except SdkApiException as ex:
             logger.debug("Error running lsmdiskgrp -filtervalue {}".format(filter_value))
-            raise ex
+            raise
         if cli_pool:
             return cli_pool.site_name
         raise array_errors.PoolDoesNotExist(pool, self.endpoint)
@@ -1429,17 +1460,23 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
 
     def _lsnvmefabric(self, host_nqn):
         try:
-            return self.client.svcinfo.lsnvmefabric(remotenqn=host_nqn).as_list
-        except (svc_errors.CommandExecutionError, CLIFailureError) as ex:
-            if COMMAND_NOT_SUPPORTED in ex.my_message:
+            raw = self.sdk.svc_info_api.lsnvmefabric_post(
+                x_auth_token=None,
+                lsnvmefabric_post_request=svc_models.LsnvmefabricPostRequest(remotenqn=host_nqn),
+            )
+            return _SdkResponse(raw).as_list
+        except SdkApiException as ex:
+            message = _extract_sdk_error_message(ex)
+            if COMMAND_NOT_SUPPORTED in message:
                 logger.warning("Failed to get nvme fabrics - command not supported")
                 return None
             logger.error("Failed to get nvme fabrics. Reason "
-                         "is: {0}".format(ex))
-            raise ex
+                         "is: {0}".format(message))
+            raise
 
     def _is_lsnvmefabric_supported(self):
-        return hasattr(self.client.svcinfo, "lsnvmefabric")
+        # REST SDK always exposes lsnvmefabric; detect support via firmware version instead.
+        return Version(self._code_level) >= Version('8.3')
 
     def _get_host_names_by_nqn(self, nqn):
         if not self._is_lsnvmefabric_supported():
@@ -1453,16 +1490,23 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
 
     def _lshostiplogin(self, iqn):
         try:
-            return self.client.svcinfo.lshostiplogin(object_id=iqn).as_single_element
-        except (svc_errors.CommandExecutionError, CLIFailureError) as ex:
-            if SPECIFIED_OBJ_NOT_EXIST in ex.my_message:
+            raw = self.sdk.svc_info_api.lshostiplogin_id_post(
+                id=str(iqn),
+                x_auth_token=None,
+                lshostiplogin_id_post_request=svc_models.LshostiploginIdPostRequest(),
+            )
+            return _SdkResponse(raw).as_single_element
+        except SdkApiException as ex:
+            message = _extract_sdk_error_message(ex)
+            if SPECIFIED_OBJ_NOT_EXIST in message:
                 return None
             logger.error("Failed to get iscsi host. Reason "
-                         "is: {0}".format(ex))
-            raise ex
+                         "is: {0}".format(message))
+            raise
 
     def _is_lshostiplogin_supported(self):
-        return hasattr(self.client.svcinfo, "lshostiplogin")
+        # REST SDK always exposes lshostiplogin; detect support via firmware version instead.
+        return Version(self._code_level) >= Version('8.1')
 
     def _get_host_name_by_iqn(self, iqn):
         if self._is_lshostiplogin_supported():
@@ -1505,32 +1549,37 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
     def _get_detailed_hosts_list(self):
         logger.debug("Getting detailed hosts list on array {0}".format(self.endpoint))
         try:
-            hosts_list = self.client.svcinfo.lshost()
-        except (svc_errors.CommandExecutionError, CLIFailureError) as ex:
-            logger.debug("Error running lshost")
-            raise ex
+            raw = self.sdk.svc_info_api.lshost_post(
+                x_auth_token=None,
+                lshost_post_request=svc_models.LshostPostRequest(),
+            )
+            hosts_list = _SdkResponse(raw).as_list
+        except SdkApiException as ex:
+            logger.debug("Error running lshost: %s", _extract_sdk_error_message(ex))
+            raise
         if not hosts_list:
             return []
 
-        # get all hosts details by sending a single batch of commands, in which each command is per host
-        detailed_hosts_list_cmd = self._get_detailed_hosts_list_cmd(hosts_list)
-        logger.debug("Sending getting detailed hosts list commands batch")
-        raw_response = self.client.send_raw_command(detailed_hosts_list_cmd)
-        response = SVCResponse(raw_response, {'delim': ' '})
-        return response.as_list
-
-    def _get_detailed_hosts_list_cmd(self, host_list):
-        writer = StringIO()
-        for host in host_list:
-            writer.write(LIST_HOSTS_CMD_FORMAT.format(HOST_ID=host.id))
-        return writer.getvalue()
+        # Replace the SSH batch approach: issue individual REST lshost/{id} calls per host.
+        detailed = []
+        for host in hosts_list:
+            try:
+                detailed_host = self._get_cli_host(host.id)
+                detailed.append(detailed_host)
+            except (SdkApiException, array_errors.HostNotFoundError):
+                pass
+        return detailed
 
     def _get_cli_host(self, id_or_name):
         try:
-            cli_host = self.client.svcinfo.lshost(object_id=id_or_name).as_single_element
-        except (svc_errors.CommandExecutionError, CLIFailureError) as ex:
+            raw = self.sdk.svc_info_api.lshost_id_post(
+                id=str(id_or_name),
+                x_auth_token=None,
+            )
+            cli_host = _SdkResponse(raw).as_single_element
+        except SdkApiException as ex:
             logger.debug("Error running lshost {}".format(id_or_name))
-            raise ex
+            raise
         if not cli_host:
             raise array_errors.HostNotFoundError(id_or_name)
         return cli_host
@@ -1552,9 +1601,13 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
 
     def _lsvdiskhostmap(self, volume_name):
         try:
-            return self.client.svcinfo.lsvdiskhostmap(vdisk_name=volume_name)
-        except (svc_errors.CommandExecutionError, CLIFailureError) as ex:
-            logger.error(ex)
+            raw = self.sdk.svc_info_api.lsvdiskhostmap_id_post(
+                id=str(volume_name),
+                x_auth_token=None,
+            )
+            return _SdkResponse(raw).as_list
+        except SdkApiException as ex:
+            logger.error(_extract_sdk_error_message(ex))
             raise array_errors.ObjectNotFoundError(volume_name)
 
     def get_volume_mappings(self, volume_id):
@@ -1576,13 +1629,17 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
         max_lun_number = 0
 
         try:
-            for mapping in self.client.svcinfo.lshostvdiskmap(host=host_name):
+            raw = self.sdk.svc_info_api.lshostvdiskmap_id_post(
+                id=str(host_name),
+                x_auth_token=None,
+            )
+            for mapping in _SdkResponse(raw).as_list:
                 lun_number = mapping.get('SCSI_id', '')
                 lun_number_int = int(lun_number)
                 max_lun_number = max(max_lun_number, lun_number_int)
                 luns_in_use.add(lun_number)
-        except (svc_errors.CommandExecutionError, CLIFailureError) as ex:
-            logger.error(ex)
+        except SdkApiException as ex:
+            logger.error(_extract_sdk_error_message(ex))
             raise array_errors.HostNotFoundError(host_name)
         logger.debug("The max lun number {0}, used lun ids for host :{1}".format(max_lun_number, luns_in_use))
 
@@ -1691,10 +1748,14 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
     def _get_array_iqns_by_node_id(self):
         logger.debug("Getting array nodes id and iscsi name")
         try:
-            nodes_list = self.client.svcinfo.lsnode()
-        except (svc_errors.CommandExecutionError, CLIFailureError) as ex:
-            logger.debug("Error running lsnode")
-            raise ex
+            raw = self.sdk.svc_info_api.lsnode_post(
+                x_auth_token=None,
+                lsnode_post_request=svc_models.LsnodePostRequest(),
+            )
+            nodes_list = _SdkResponse(raw).as_list
+        except SdkApiException as ex:
+            logger.debug("Error running lsnode: %s", _extract_sdk_error_message(ex))
+            raise
         array_iqns_by_id = {node.id: node.iscsi_name for node in nodes_list
                             if node.status.lower() == "online"}
         logger.debug("Found iqns by node id: {}".format(array_iqns_by_id))
@@ -1704,10 +1765,18 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
         try:
             if portset_id:
                 filter_value = 'portset_id={}'.format(portset_id)
-                return self.client.svcinfo.lsip(filtervalue=filter_value)
-            return self.client.svcinfo.lsportip(filtervalue='state=configured:failover=no')
-        except (svc_errors.CommandExecutionError, CLIFailureError) as ex:
-            logger.error("Get iscsi targets failed. Reason is: {}".format(ex))
+                raw = self.sdk.svc_info_api.lsip_post(
+                    x_auth_token=None,
+                    lsip_post_request=svc_models.LsipPostRequest(filtervalue=filter_value),
+                )
+            else:
+                raw = self.sdk.svc_info_api.lsportip_post(
+                    x_auth_token=None,
+                    lsportip_post_request=svc_models.LsportipPostRequest(filtervalue='state=configured:failover=no'),
+                )
+            return _SdkResponse(raw).as_list
+        except SdkApiException as ex:
+            logger.error("Get iscsi targets failed. Reason is: {}".format(_extract_sdk_error_message(ex)))
             raise array_errors.NoIscsiTargetsFoundError(self.endpoint)
 
     @staticmethod
@@ -1747,19 +1816,27 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
 
     def _lsfabric(self, **kwargs):
         try:
-            return self.client.svcinfo.lsfabric(**kwargs)
-        except (svc_errors.CommandExecutionError, CLIFailureError) as ex:
+            raw = self.sdk.svc_info_api.lsfabric_post(
+                x_auth_token=None,
+                lsfabric_post_request=svc_models.LsfabricPostRequest(**kwargs),
+            )
+            return _SdkResponse(raw)
+        except SdkApiException as ex:
             logger.error("Failed to get fabrics for {0}. Reason "
-                         "is: {1}".format(kwargs, ex))
-            raise ex
+                         "is: {1}".format(kwargs, _extract_sdk_error_message(ex)))
+            raise
 
     def _lstargetportfc(self, **kwargs):
         try:
-            return self.client.svcinfo.lstargetportfc(**kwargs)
-        except (svc_errors.CommandExecutionError, CLIFailureError) as ex:
+            raw = self.sdk.svc_info_api.lstargetportfc_post(
+                x_auth_token=None,
+                lstargetportfc_post_request=svc_models.LstargetportfcPostRequest(**kwargs),
+            )
+            return _SdkResponse(raw).as_list
+        except SdkApiException as ex:
             logger.error("Failed to get target port fc for {0}. Reason "
-                         "is: {1}".format(kwargs, ex))
-            raise ex
+                         "is: {1}".format(kwargs, _extract_sdk_error_message(ex)))
+            raise
 
     def get_nvme_fc_target_ports(self):
         logger.debug("Getting the connected NVMe FC target ports from array.")
@@ -1785,7 +1862,7 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
         logger.debug("Getting the connected fc port wwn value from array "
                      "related to host : {}.".format(host_name))
         fc_port_wwns = []
-        fc_wwns = self._lsfabric(host=host_name)
+        fc_wwns = self._lsfabric(host=host_name).as_list
         for wwn in fc_wwns:
             state = wwn.get('state', '')
             if state in ('active', 'inactive'):
@@ -1866,10 +1943,14 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
 
     def _lsrcrelationship(self, filter_value):
         try:
-            return self.client.svcinfo.lsrcrelationship(filtervalue=filter_value)
-        except (svc_errors.CommandExecutionError, CLIFailureError) as ex:
+            raw = self.sdk.svc_info_api.lsrcrelationship_post(
+                x_auth_token=None,
+                lsrcrelationship_post_request=svc_models.LsrcrelationshipPostRequest(filtervalue=filter_value),
+            )
+            return _SdkResponse(raw)
+        except SdkApiException as ex:
             logger.debug("Error running lsrcrelationship -filtervalue {}".format(filter_value))
-            raise ex
+            raise
 
     def _get_rcrelationship_by_name(self, replication_name, not_exist_error=True):
         filter_value = 'RC_rel_name={0}'.format(replication_name)
@@ -2131,10 +2212,14 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
 
     def _assign_replication_policy_to_partition_vg(self, volume_group_id, requested_policy_name):
         try:
-            policies = self.client.svcinfo.lsreplicationpolicy().as_list
-        except (svc_errors.CommandExecutionError, CLIFailureError) as ex:
-            logger.error("failed to list replication policies: {}".format(ex.my_message))
-            raise ex
+            raw = self.sdk.svc_info_api.lsreplicationpolicy_post(
+                x_auth_token=None,
+                lsreplicationpolicy_post_request=svc_models.LsreplicationpolicyPostRequest(),
+            )
+            policies = _SdkResponse(raw).as_list
+        except SdkApiException as ex:
+            logger.error("failed to list replication policies: {}".format(_extract_sdk_error_message(ex)))
+            raise
 
         if not policies:
             raise array_errors.AsyncDRReplicationPolicyNotFoundError(volume_group_id, requested_policy_name)
@@ -2521,14 +2606,28 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
 
     def _lsvolumesnapshot(self, **kwargs):
         try:
-            return self.client.svcinfo.lsvolumesnapshot(**kwargs).as_single_element
-        except (svc_errors.CommandExecutionError, CLIFailureError) as ex:
-            if OBJ_NOT_FOUND in ex.my_message or NAME_NOT_EXIST_OR_MEET_RULES in ex.my_message:
-                logger.info("snapshot not found for args: {}".format(kwargs))
-            elif any(msg_id in ex.my_message for msg_id in (NON_ASCII_CHARS, VALUE_TOO_LONG)):
-                raise array_errors.InvalidArgumentError(ex.my_message)
+            object_id = kwargs.get('object_id')
+            filtervalue = kwargs.get('filtervalue')
+            if object_id is not None:
+                raw = self.sdk.svc_info_api.lsvolumesnapshot_id_post(
+                    id=str(object_id),
+                    x_auth_token=None,
+                    lsvolumesnapshot_id_post_request=svc_models.LsvolumesnapshotIdPostRequest(),
+                )
             else:
-                raise ex
+                raw = self.sdk.svc_info_api.lsvolumesnapshot_post(
+                    x_auth_token=None,
+                    lsvolumesnapshot_post_request=svc_models.LsvolumesnapshotPostRequest(filtervalue=filtervalue),
+                )
+            return _SdkResponse(raw).as_single_element
+        except SdkApiException as ex:
+            message = _extract_sdk_error_message(ex)
+            if OBJ_NOT_FOUND in message or NAME_NOT_EXIST_OR_MEET_RULES in message:
+                logger.info("snapshot not found for args: {}".format(kwargs))
+            elif any(msg_id in message for msg_id in (NON_ASCII_CHARS, VALUE_TOO_LONG)):
+                raise array_errors.InvalidArgumentError(message)
+            else:
+                raise
         return None
 
     def _get_cli_snapshot_by_id(self, snapshot_id):
@@ -2841,14 +2940,19 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
 
     def _lshostiogrp(self, host_name):
         try:
-            return self.client.svcinfo.lshostiogrp(object_id=host_name).as_single_element
-        except (svc_errors.CommandExecutionError, CLIFailureError) as ex:
-            self._raise_error_when_host_not_exist_or_not_meet_the_rules(host_name, ex.my_message)
-            if is_warning_message(ex.my_message):
+            raw = self.sdk.svc_info_api.lshostiogrp_id_post(
+                id=str(host_name),
+                x_auth_token=None,
+            )
+            return _SdkResponse(raw).as_single_element
+        except SdkApiException as ex:
+            message = _extract_sdk_error_message(ex)
+            self._raise_error_when_host_not_exist_or_not_meet_the_rules(host_name, message)
+            if is_warning_message(message):
                 logger.warning("exception encountered during getting io_group, from host {} : {}".format(
-                    host_name, ex.my_message))
+                    host_name, message))
                 return None
-            raise ex
+            raise
 
     def get_host_io_group(self, host_name):
         logger.info(svc_messages.GET_HOST_IO_GROUP.format(host_name))
@@ -2914,26 +3018,36 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
     def _get_volume_group_from_partition_name(self, partition_name):
         filter_value = 'partition_name={}:partition_default=yes'.format(partition_name)
         try:
-            vol_groups = self.client.svcinfo.lsvolumegroup(filtervalue=filter_value).as_single_element
+            raw = self.sdk.svc_info_api.lsvolumegroup_post(
+                x_auth_token=None,
+                lsvolumegroup_post_request=svc_models.LsvolumegroupPostRequest(filtervalue=filter_value),
+            )
+            vol_groups = _SdkResponse(raw).as_single_element
             if vol_groups is None or not vol_groups.name:
                 return None
             return vol_groups.name
-        except (svc_errors.CommandExecutionError, CLIFailureError) as ex:
-            if any(msg_id in ex.my_message for msg_id in (NON_ASCII_CHARS, VALUE_TOO_LONG)):
-                raise array_errors.InvalidArgumentError(ex.my_message)
-            raise ex
+        except SdkApiException as ex:
+            message = _extract_sdk_error_message(ex)
+            if any(msg_id in message for msg_id in (NON_ASCII_CHARS, VALUE_TOO_LONG)):
+                raise array_errors.InvalidArgumentError(message)
+            raise
 
     def _verify_volume_group_of_partition_name(self, partition_name, volume_group):
         filter_value = 'partition_name={}:name={}'.format(partition_name, volume_group)
         try:
-            vol_groups = self.client.svcinfo.lsvolumegroup(filtervalue=filter_value).as_single_element
+            raw = self.sdk.svc_info_api.lsvolumegroup_post(
+                x_auth_token=None,
+                lsvolumegroup_post_request=svc_models.LsvolumegroupPostRequest(filtervalue=filter_value),
+            )
+            vol_groups = _SdkResponse(raw).as_single_element
             if vol_groups is None or not vol_groups.name:
                 return False
             return vol_groups.partition_name == partition_name
-        except (svc_errors.CommandExecutionError, CLIFailureError) as ex:
-            if any(msg_id in ex.my_message for msg_id in (NON_ASCII_CHARS, VALUE_TOO_LONG)):
-                raise array_errors.InvalidArgumentError(ex.my_message)
-            raise ex
+        except SdkApiException as ex:
+            message = _extract_sdk_error_message(ex)
+            if any(msg_id in message for msg_id in (NON_ASCII_CHARS, VALUE_TOO_LONG)):
+                raise array_errors.InvalidArgumentError(message)
+            raise
 
     def _get_partition_name_of_volume_group(self, cli_volume_group):
         if not hasattr(cli_volume_group, "partition_name") or not cli_volume_group.partition_name:
