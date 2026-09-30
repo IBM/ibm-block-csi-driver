@@ -59,17 +59,16 @@ const (
 const (
 	// In the Dockerfile of the node, specific commands (e.g: multipath, mount...) from the host mounted inside the container in /host directory.
 	// Command lines inside the container will show /host prefix.
-	PrefixChrootOfHostRoot            = "/host"
-	mkfsTimeoutMilliseconds           = 15 * 60 * 1000
-	resizeFsTimeoutMilliseconds       = 30 * 1000
-	TimeOutGeneralCmd                 = 10 * 1000
-	TimeOutMultipathdCmd              = TimeOutGeneralCmd
-	TimeOutNvmeCmd                    = TimeOutGeneralCmd
-	multipathdCmd                     = "multipathd"
-	BlockDevCmd                       = "blockdev"
-	nvmeCmd                           = "nvme"
-	minFilesInNonEmptyDir             = 1
-	noSuchFileOrDirectoryErrorMessage = "No such file or directory"
+	PrefixChrootOfHostRoot      = "/host"
+	mkfsTimeoutMilliseconds     = 15 * 60 * 1000
+	resizeFsTimeoutMilliseconds = 30 * 1000
+	TimeOutGeneralCmd           = 10 * 1000
+	TimeOutMultipathdCmd        = TimeOutGeneralCmd
+	TimeOutNvmeCmd              = TimeOutGeneralCmd
+	multipathdCmd               = "multipathd"
+	BlockDevCmd                 = "blockdev"
+	nvmeCmd                     = "nvme"
+	minFilesInNonEmptyDir       = 1
 )
 
 //go:generate mockgen -destination=../../mocks/mock_node_utils.go -package=mocks github.com/ibm/ibm-block-csi-driver/node/pkg/driver NodeUtilsInterface
@@ -254,12 +253,9 @@ func (n NodeUtils) DevicesAreNvme(device string) (NvmeType, error) {
 	args := []string{"list"}
 	out, err := n.Executer.ExecuteWithTimeout(TimeOutNvmeCmd, nvmeCmd, args)
 	if err != nil {
-		if err.Error() == "exit status 1" {
-			logger.Debugf("'nvme list' failing, nvme/nvme-core modules not loaded. Not NVMe.")
-			return NotNVMe, nil
-		}
-		outMessage := strings.TrimSpace(string(out))
-		if strings.HasSuffix(outMessage, noSuchFileOrDirectoryErrorMessage) {
+		// Preserve status 1 handling; shell/env returns 127 when nvme is missing.
+		if exitCode, isExitError := n.Executer.GetExitCode(err); isExitError && (exitCode == 1 || exitCode == 127) {
+			logger.Debugf("'nvme list' unavailable or modules not loaded (exit code %d). Not NVMe.", exitCode)
 			return NotNVMe, nil
 		}
 		return NotNVMe, err

@@ -17,10 +17,12 @@
 package driver_test
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"io/ioutil"
 	"os"
+	"os/exec"
 	"reflect"
 	"strconv"
 	"strings"
@@ -33,6 +35,66 @@ import (
 	"github.com/ibm/ibm-block-csi-driver/node/pkg/driver/device_connectivity"
 	executer "github.com/ibm/ibm-block-csi-driver/node/pkg/driver/executer"
 )
+
+type nvmeProbeExecuter struct {
+	executer.Executer
+	output []byte
+	err    error
+}
+
+func (e *nvmeProbeExecuter) ExecuteWithTimeout(int, string, []string) ([]byte, error) {
+	return e.output, e.err
+}
+
+func TestDevicesAreNvmeCommandErrors(t *testing.T) {
+	if native, _ := (driver.NodeUtils{}).IsNativeNVMeMultipathEnabled(); native {
+		t.Skip("nvme list is not used when native NVMe multipath is enabled")
+	}
+
+	testCases := []struct {
+		name     string
+		exitCode int
+		output   string
+		err      error
+		wantErr  bool
+	}{
+		{name: "modules not loaded", exitCode: 1},
+		{name: "GNU env missing nvme", exitCode: 127, output: "/usr/bin/env: 'nvme': No such file or directory\n"},
+		{name: "uutils env missing nvme", exitCode: 127, output: "env: 'nvme': No such file or directory\nenv: use -[v]S to pass options in shebang lines\n"},
+		{name: "missing nvme without output", exitCode: 127},
+		{name: "missing nvme with localized output", exitCode: 127, output: "env: nvme: fichier introuvable\n"},
+		{name: "permission denied", exitCode: 126, wantErr: true},
+		{name: "other command failure", exitCode: 2, wantErr: true},
+		{name: "unrelated missing file", exitCode: 2, output: "No such file or directory\n", wantErr: true},
+		{name: "timeout", err: context.DeadlineExceeded, wantErr: true},
+		{name: "non-exit error resembling status 1", err: errors.New("exit status 1"), wantErr: true},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			probeErr := tc.err
+			if probeErr == nil {
+				// Obtain a real exec.ExitError so the production GetExitCode is exercised.
+				probeErr = exec.Command("sh", "-c", fmt.Sprintf("exit %d", tc.exitCode)).Run()
+				if _, ok := probeErr.(*exec.ExitError); !ok {
+					t.Fatalf("expected exec.ExitError, got %v", probeErr)
+				}
+			}
+			nu := driver.NodeUtils{Executer: &nvmeProbeExecuter{output: []byte(tc.output), err: probeErr}}
+			got, err := nu.DevicesAreNvme("dm-test")
+			if got != driver.NotNVMe {
+				t.Fatalf("expected NotNVMe, got %s", got)
+			}
+			if tc.wantErr {
+				if err != probeErr {
+					t.Fatalf("expected original error %v, got %v", probeErr, err)
+				}
+			} else if err != nil {
+				t.Fatalf("expected no error, got %v", err)
+			}
+		})
+	}
+}
 
 var (
 	nodeUtils    = driver.NewNodeUtils(&executer.Executer{}, nil, ConfigYaml, device_connectivity.OsDeviceConnectivityHelperScsiGeneric{})
