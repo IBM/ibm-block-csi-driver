@@ -18,7 +18,9 @@ package device_connectivity
 
 import (
 	"fmt"
+	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/ibm/ibm-block-csi-driver/node/logger"
 	"github.com/ibm/ibm-block-csi-driver/node/pkg/driver/executer"
@@ -31,6 +33,17 @@ const (
 	FCPortPath                          = "/sys/class/fc_host/host*/port_name"
 	nvmeTargetPathCount                 = 3
 	nvmeMinPathsForNonNativeDmMultipath = 2
+	// nvmeByIdEuiPrefix is the stable udev by-id symlink prefix for an NVMe namespace
+	// keyed by its NGUID. Storage Virtualize exposes only an NGUID descriptor (no
+	// EUI-64), which udev labels with the "eui." prefix; the 32-hex value that follows
+	// is exactly what convertScsiIdToNguid derives from the SCSI volume UID.
+	nvmeByIdEuiPrefix    = "/dev/disk/by-id/nvme-eui."
+	sysBlockNvmeWwidGlob = "/sys/block/nvme*/wwid"
+	// sysClassNvmeSubsysNqnGlob enumerates every NVMe controller's subsystem NQN;
+	// sysBlockDeviceSubsysNqnFmt reads a namespace head's subsystem NQN via its
+	// device link. Used to find which controllers carry a given namespace for rescan.
+	sysClassNvmeSubsysNqnGlob  = "/sys/class/nvme/nvme*/subsysnqn"
+	sysBlockDeviceSubsysNqnFmt = "/sys/block/%s/device/subsysnqn"
 )
 
 type OsDeviceConnectivityNvmeOFc struct {
@@ -83,7 +96,7 @@ func (r OsDeviceConnectivityNvmeOFc) EnsureLogin(ipsByArrayInitiator map[string]
 				break
 			}
 
-			pathKey := arrayTargetPort + "|" + hostPort
+			pathKey := normalizeTraddr(arrayTargetPort) + "|" + normalizeTraddr(hostPort)
 			if livePaths[pathKey] {
 				logger.Debugf("NVMe-oFC EnsureLogin: path already live target=%s host=%s, skipping",
 					arrayTargetPort, hostPort)
@@ -128,7 +141,7 @@ func (r OsDeviceConnectivityNvmeOFc) EnsureLogin(ipsByArrayInitiator map[string]
 
 	// Non-native NVMe + find_multipaths=on + < 2 paths: multipathd will not
 	// create a dm device, causing GetMpathDevice to fail.
-	nativeMpath, err := isNvmeCoreMultipathEnabled()
+	nativeMpath, err := IsNvmeCoreMultipathEnabled(r.Executer)
 	if err != nil {
 		logger.Warningf("NVMe-oFC EnsureLogin: could not determine nvme_core multipath mode: %v", err)
 		return
@@ -148,15 +161,21 @@ func (r OsDeviceConnectivityNvmeOFc) EnsureLogin(ipsByArrayInitiator map[string]
 	}
 }
 
-// countLivePathsForSubsystem counts live paths whose traddr matches one of our array target ports.
+// countLivePathsForSubsystem counts live paths whose traddr matches one of our array
+// target ports. Both sides are normalized (strip "0x", lowercase) because the kernel's
+// list-subsys output carries a "0x" prefix the publish-context targets lack.
 func countLivePathsForSubsystem(livePaths map[string]bool, ipsByArrayInitiator map[string][]string) int {
+	arrayTargets := make(map[string]bool, len(ipsByArrayInitiator))
+	for target := range ipsByArrayInitiator {
+		arrayTargets[normalizeTraddr(target)] = true
+	}
 	count := 0
 	for pathKey := range livePaths {
 		parts := strings.SplitN(pathKey, "|", 2)
 		if len(parts) != 2 {
 			continue
 		}
-		if _, ok := ipsByArrayInitiator[parts[0]]; ok {
+		if arrayTargets[normalizeTraddr(parts[0])] {
 			count++
 		}
 	}
@@ -204,7 +223,9 @@ func (r OsDeviceConnectivityNvmeOFc) getLivePathPairs() map[string]bool {
 		traddr := extractNvmeField(trimmed, "traddr=")
 		hostTraddr := extractNvmeField(trimmed, "host_traddr=")
 		if traddr != "" && hostTraddr != "" {
-			livePaths[traddr+"|"+hostTraddr] = true
+			// The kernel emits addresses with a "0x" hex prefix; the publish-context
+			// array targets and sysfs host ports do not. Normalize so the keys compare.
+			livePaths[normalizeTraddr(traddr)+"|"+normalizeTraddr(hostTraddr)] = true
 			logger.Debugf("NVMe-oFC getLivePathPairs: live path traddr=%s host_traddr=%s", traddr, hostTraddr)
 		}
 	}
@@ -282,6 +303,13 @@ func (r OsDeviceConnectivityNvmeOFc) nvmeConnect(arrayTargetPort, hostPort, subN
 	}
 	out, err := r.Executer.ExecuteWithTimeout(nvmeCmdTimeout, "nvme", args)
 	if err != nil {
+		// "already connected" is the steady state when host autoconnect brought the
+		// path up (the norm in native mode) — the path IS live, so count it as success.
+		if strings.Contains(string(out), "already connected") {
+			logger.Debugf("NVMe-oFC nvmeConnect: path already connected NQN=%s target=%s host=%s",
+				subNqn, arrayTargetPort, hostPort)
+			return true
+		}
 		logger.Errorf("NVMe-oFC nvmeConnect: failed NQN=%s target=%s host=%s: %v output=%s",
 			subNqn, arrayTargetPort, hostPort, err, string(out))
 		return false
@@ -334,12 +362,230 @@ func (r OsDeviceConnectivityNvmeOFc) getHostFCPorts() ([]string, error) {
 	return hostPorts, nil
 }
 
-func (r OsDeviceConnectivityNvmeOFc) RescanDevices(_ int, _ []string) error {
+// RescanDevices forces an NVMe namespace rescan on the array's already-connected
+// controllers. nvme connect to an existing controller is a no-op and does not
+// re-enumerate namespaces, so a LUN mapped after the controller was established
+// only appears via a kernel AEN auto-rescan. When that AEN is missed, staging
+// cannot discover the namespace. This mirrors the manual `nvme ns-rescan` recovery:
+// it enumerates the controllers whose traddr matches the array target ports and
+// rescans each, so a missed-AEN namespace becomes visible before GetMpathDevice.
+//
+// Best-effort and non-fatal by design: a rescan that finds nothing (or a transient
+// per-controller failure) must not fail the stage — GetMpathDevice retries after,
+// and the AEN may already have landed. arrayIdentifiers are the array target ports
+// ("nn-WWNN:pn-WWPN"); lunId (NSID) is unused — all namespaces on the array
+// controllers are rescanned, matching the proven manual recovery.
+func (r OsDeviceConnectivityNvmeOFc) RescanDevices(_ int, arrayIdentifiers []string) error {
+	if len(arrayIdentifiers) == 0 {
+		logger.Warningf("NVMe-oFC RescanDevices: no array target ports provided, skipping namespace rescan")
+		return nil
+	}
+
+	controllers := r.getArrayControllers(arrayIdentifiers)
+	if len(controllers) == 0 {
+		logger.Warningf("NVMe-oFC RescanDevices: no connected controllers matched array targets %v, "+
+			"skipping namespace rescan", arrayIdentifiers)
+		return nil
+	}
+
+	for _, controller := range controllers {
+		devicePath := "/dev/" + controller
+		logger.Infof("NVMe-oFC RescanDevices: rescanning namespaces on controller %s", devicePath)
+		if out, err := r.Executer.ExecuteWithTimeout(nvmeCmdTimeout, "nvme", []string{"ns-rescan", devicePath}); err != nil {
+			// Non-fatal: log and continue; GetMpathDevice retries discovery afterwards.
+			logger.Warningf("NVMe-oFC RescanDevices: ns-rescan failed on %s: %v output=%s",
+				devicePath, err, string(out))
+			continue
+		}
+	}
 	return nil
 }
 
+// getArrayControllers parses "nvme list-subsys" and returns the controller device
+// names (e.g. "nvme0") whose traddr matches one of the array target ports. Only the
+// array's controllers are rescanned so the local boot NVMe and unrelated subsystems
+// are left untouched.
+func (r OsDeviceConnectivityNvmeOFc) getArrayControllers(arrayIdentifiers []string) []string {
+	arrayTraddrs := make(map[string]bool, len(arrayIdentifiers))
+	for _, id := range arrayIdentifiers {
+		arrayTraddrs[normalizeTraddr(id)] = true
+	}
+
+	out, err := r.Executer.ExecuteWithTimeout(nvmeCmdTimeout, "nvme", []string{"list-subsys"})
+	if err != nil {
+		logger.Warningf("NVMe-oFC getArrayControllers: nvme list-subsys failed: %v", err)
+		return nil
+	}
+
+	seen := map[string]bool{}
+	var controllers []string
+	for _, line := range strings.Split(string(out), "\n") {
+		trimmed := strings.TrimSpace(line)
+		if !strings.HasPrefix(trimmed, "+-") {
+			continue
+		}
+		fields := strings.Fields(trimmed)
+		// Expected: "+- nvme0 fc traddr=... host_traddr=... live"
+		if len(fields) < 2 {
+			continue
+		}
+		controller := fields[1]
+		traddr := normalizeTraddr(extractNvmeField(trimmed, "traddr="))
+		if traddr == "" || !arrayTraddrs[traddr] {
+			continue
+		}
+		if seen[controller] {
+			continue
+		}
+		seen[controller] = true
+		controllers = append(controllers, controller)
+		logger.Debugf("NVMe-oFC getArrayControllers: matched controller=%s traddr=%s", controller, traddr)
+	}
+	return controllers
+}
+
+// normalizeTraddr lowercases and strips "0x" so target ports from the publish
+// context ("nn-500...:pn-500...") match list-subsys traddrs regardless of whether
+// the kernel emits the hex "0x" prefix.
+func normalizeTraddr(traddr string) string {
+	return strings.ReplaceAll(strings.ToLower(strings.TrimSpace(traddr)), "0x", "")
+}
+
+// GetMpathDevice resolves the host block device for the volume. Under native NVMe
+// multipath (nvme_core.multipath=Y) the kernel presents the volume as a single
+// namespace-head /dev/nvmeXnY with no dm device, so the multipathd-based discovery
+// finds nothing; resolve the head by its NGUID instead. Under dm-multipath (=N)
+// delegate to the shared discovery unchanged. Scoped to NVMe/FC by dispatch, so SCSI
+// and iSCSI volumes on a native-NVMe host are unaffected.
 func (r OsDeviceConnectivityNvmeOFc) GetMpathDevice(volumeId string) (string, error) {
+	native, err := IsNvmeCoreMultipathEnabled(r.Executer)
+	if err != nil {
+		logger.Warningf("NVMe-oFC GetMpathDevice: could not determine multipath mode: %v; using dm discovery", err)
+	}
+	if native {
+		// Stage runs right after the namespace rescan, so wait for udev to settle.
+		return DiscoverNativeNamespaceDevice(r.Executer, volumeId, WaitForMpathRetries)
+	}
 	return r.HelperScsiGeneric.GetMpathDevice(volumeId)
+}
+
+// DiscoverNativeNamespaceDevice finds the ANA namespace-head device for the volume by
+// its NGUID. maxRetries bounds the wait while udev settles (stage passes the full retry
+// budget right after an ns-rescan; post-stage callers, whose device already exists, pass
+// 1). Returns the same MultipathDeviceNotFoundForVolumeError as the dm path when nothing
+// is found, so callers (e.g. idempotent NodeUnstage) behave identically across modes.
+// Exported so node-level callers without a connectivity dispatch can reuse it.
+func DiscoverNativeNamespaceDevice(exec executer.ExecuterInterface, volumeId string, maxRetries int) (string, error) {
+	nguid := convertScsiIdToNguid(strings.ToLower(volumeId))
+	logger.Infof("DiscoverNativeNamespaceDevice: resolving native NVMe head for volume %s (nguid=%s)", volumeId, nguid)
+	for i := 0; i < maxRetries; i++ {
+		if device := resolveNativeNamespaceOnce(exec, nguid); device != "" {
+			logger.Infof("DiscoverNativeNamespaceDevice: resolved volume %s to %s", volumeId, device)
+			return device, nil
+		}
+		// Sleep only between attempts, not after the last — a single-shot lookup
+		// (maxRetries=1, post-stage) returns immediately without a settle wait.
+		if i < maxRetries-1 {
+			time.Sleep(time.Second * time.Duration(WaitForMpathWaitIntervalSec))
+		}
+	}
+	logger.Errorf("DiscoverNativeNamespaceDevice: no native NVMe namespace for volume %s (nguid=%s)", volumeId, nguid)
+	return "", &MultipathDeviceNotFoundForVolumeError{volumeId}
+}
+
+// resolveNativeNamespaceOnce does one lookup: first the stable by-id symlink
+// /dev/disk/by-id/nvme-eui.<nguid>, then a sysfs scan of /sys/block/nvme*/wwid (in case
+// the udev symlink lags the rescan). Returns "" if the namespace is not yet present.
+func resolveNativeNamespaceOnce(exec executer.ExecuterInterface, nguid string) string {
+	byIdPath := nvmeByIdEuiPrefix + nguid
+	if target, err := exec.OsReadlink(byIdPath); err == nil && target != "" {
+		device := filepath.Join(DevPath, filepath.Base(target))
+		logger.Debugf("resolveNativeNamespaceOnce: %s -> %s", byIdPath, device)
+		return device
+	}
+
+	matches, err := exec.FilepathGlob(sysBlockNvmeWwidGlob)
+	if err != nil {
+		logger.Warningf("resolveNativeNamespaceOnce: glob %s failed: %v", sysBlockNvmeWwidGlob, err)
+		return ""
+	}
+	for _, wwidPath := range matches {
+		data, err := exec.IoutilReadFile(wwidPath)
+		if err != nil {
+			continue
+		}
+		if normalizeNguid(string(data)) == nguid {
+			// wwidPath = /sys/block/<dev>/wwid → the device name is the parent dir.
+			device := filepath.Join(DevPath, filepath.Base(filepath.Dir(wwidPath)))
+			logger.Debugf("resolveNativeNamespaceOnce: sysfs %s matched -> %s", wwidPath, device)
+			return device
+		}
+	}
+	return ""
+}
+
+// normalizeNguid strips the "eui."/"nguid." prefix, dashes, and case so a sysfs wwid
+// ("eui.5800…724") or a dashed sysfs nguid ("58000000-0000-…") compares equal to the
+// undashed 32-hex NGUID that convertScsiIdToNguid derives from the SCSI volume UID.
+func normalizeNguid(s string) string {
+	s = strings.ToLower(strings.TrimSpace(s))
+	s = strings.TrimPrefix(s, "eui.")
+	s = strings.TrimPrefix(s, "nguid.")
+	return strings.ReplaceAll(s, "-", "")
+}
+
+// RescanNvmeNamespaceForResize triggers an NVMe controller rescan so the kernel re-reads
+// a namespace's size after an array-side expand. Native multipath emits no dm device to
+// resize, and the size only refreshes via a kernel AEN or an explicit rescan; without one
+// the filesystem grow reads a stale size and under-expands. Rescans the controllers of the
+// namespace head's subsystem (matched by subsysnqn, so unrelated subsystems are left
+// alone). Best-effort: a missing subsysnqn or a per-controller failure is logged, not
+// fatal — the subsequent grow still runs against whatever size the kernel reports.
+func RescanNvmeNamespaceForResize(exec executer.ExecuterInterface, namespaceDevice string) error {
+	subsysNqnPath := fmt.Sprintf(sysBlockDeviceSubsysNqnFmt, namespaceDevice)
+	data, err := exec.IoutilReadFile(subsysNqnPath)
+	if err != nil {
+		logger.Warningf("RescanNvmeNamespaceForResize: cannot read %s: %v; relying on kernel AEN", subsysNqnPath, err)
+		return nil
+	}
+	subsysNqn := strings.TrimSpace(string(data))
+
+	controllers := findControllersBySubsysNqn(exec, subsysNqn)
+	if len(controllers) == 0 {
+		logger.Warningf("RescanNvmeNamespaceForResize: no controllers found for subsysnqn %s; relying on kernel AEN", subsysNqn)
+		return nil
+	}
+
+	for _, controller := range controllers {
+		devicePath := "/dev/" + controller
+		logger.Infof("RescanNvmeNamespaceForResize: rescanning %s to refresh namespace %s size", devicePath, namespaceDevice)
+		if out, err := exec.ExecuteWithTimeout(nvmeCmdTimeout, "nvme", []string{"ns-rescan", devicePath}); err != nil {
+			logger.Warningf("RescanNvmeNamespaceForResize: ns-rescan failed on %s: %v output=%s", devicePath, err, string(out))
+		}
+	}
+	return nil
+}
+
+// findControllersBySubsysNqn returns the NVMe controller names (e.g. "nvme1") whose
+// subsystem NQN equals targetNqn.
+func findControllersBySubsysNqn(exec executer.ExecuterInterface, targetNqn string) []string {
+	matches, err := exec.FilepathGlob(sysClassNvmeSubsysNqnGlob)
+	if err != nil {
+		logger.Warningf("findControllersBySubsysNqn: glob %s failed: %v", sysClassNvmeSubsysNqnGlob, err)
+		return nil
+	}
+	var controllers []string
+	for _, nqnPath := range matches {
+		data, err := exec.IoutilReadFile(nqnPath)
+		if err != nil {
+			continue
+		}
+		if strings.TrimSpace(string(data)) == targetNqn {
+			// nqnPath = /sys/class/nvme/<ctrl>/subsysnqn → controller is the parent dir.
+			controllers = append(controllers, filepath.Base(filepath.Dir(nqnPath)))
+		}
+	}
+	return controllers
 }
 
 func (r OsDeviceConnectivityNvmeOFc) FlushMultipathDevice(mpathDevice string) error {
