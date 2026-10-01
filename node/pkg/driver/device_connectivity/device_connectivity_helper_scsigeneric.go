@@ -1430,11 +1430,13 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) purgeScsiGhosts(ctx context.Cont
 				ghostState, _ := r.IsSgDeviceGhost(wCtx, candidate.sgName, serialNumber)
 				isIbmDevice := strings.Contains(vdr, "IBM")
 
-				pathOwned := r.isPathOwnedByMyArray(wCtx, candidate.sgName, arrayIdentifiers)
+				//pathOwned := r.isPathOwnedByMyArray(wCtx, candidate.sgName, arrayIdentifiers)
 				
-				logger.Debugf("[purgeScsiGhosts]  device %s [Vendor: %s, Serial: %s, Serial Match: %v, Ghost: %v, Our path: %v]. Executing hot-unplug.", candidate.sgName, vdr, serialNumber, serialNumber != "" && !r.IsSerialMatch(serialNumber, expectedSerial), ghostState, pathOwned)
+				logger.Debugf("[purgeScsiGhosts]  device %s [Vendor: %s, Serial: %s, Serial Match: %v, Ghost: %v]. Executing hot-unplug.", candidate.sgName, vdr, serialNumber, serialNumber != "" && r.IsSerialMatch(serialNumber, expectedSerial), ghostState)
 
-				shouldDelete := (ghostState && isIbmDevice) || (pathOwned && (ghostState || !isIbmDevice)) || (!pathOwned && serialNumber != "" && !r.IsSerialMatch(serialNumber, expectedSerial))
+				shouldDelete := (ghostState && isIbmDevice)
+				// || (!pathOwned && serialNumber != "" && r.IsSerialMatch(serialNumber, expectedSerial))
+				// || (pathOwned && (ghostState || !isIbmDevice))
 				if !shouldDelete {
 					return struct{}{}, nil
 				}
