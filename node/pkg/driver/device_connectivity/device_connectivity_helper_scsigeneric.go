@@ -1441,7 +1441,7 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) purgeScsiGhosts(ctx context.Cont
 					return struct{}{}, nil
 				}
 
-				logger.Warningf("Pruning stale SCSI device %s [Vendor: %s, Serial Match: %v, Ghost: %v, Our path: %v]. Executing hot-unplug.", candidate.sgName, vdr, serialNumber != "" && !r.IsSerialMatch(serialNumber, expectedSerial), ghostState, pathOwned)
+				logger.Warningf("Pruning stale SCSI device %s [Vendor: %s, Serial Match: %v, Ghost: %v]. Executing hot-unplug.", candidate.sgName, vdr, serialNumber != "" && !r.IsSerialMatch(serialNumber, expectedSerial), ghostState)
 
 				deletePath := filepath.Join(candidate.deviceDir, "delete")
 				if _, errStat := os.Stat(deletePath); os.IsNotExist(errStat) {
