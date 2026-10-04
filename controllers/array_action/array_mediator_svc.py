@@ -3151,17 +3151,22 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
             raise array_errors.CannotChangeHostProtocolBecauseOfMappedPorts(host_name)
 
     def _chhost(self, host_name, protocol):
-        cli_kwargs = build_change_host_protocol_kwargs(host_name, protocol)
         try:
-            self.client.svctask.chhost(**cli_kwargs)
-        except (svc_errors.CommandExecutionError, CLIFailureError) as ex:
-            logger.debug("Error running chhost {}".format(self._format_cli_args(cli_kwargs)))
-            self._raise_error_when_host_not_found(host_name, ex.my_message)
-            self._raise_unsupported_parameter_error(ex.my_message, 'protocol')
-            self._raise_error_when_cannot_change_host_protocol_because_of_mapped_ports(ex.my_message, host_name)
-            if is_warning_message(ex.my_message):
-                logger.warning("exception encountered during getting io_group, from host {} : {}".format(
-                    host_name, ex.my_message))
+            self.sdk.svc_task_api.chhost_id_post(
+                id=str(host_name),
+                x_auth_token=None,
+                chhost_id_post_request=svc_models.ChhostIdPostRequest(protocol=protocol),
+            )
+        except SdkApiException as ex:
+            message = _extract_sdk_error_message(ex)
+            logger.debug("Error running chhost -object_id {} -protocol {}".format(host_name, protocol))
+            self._raise_error_when_host_not_found(host_name, message)
+            self._raise_unsupported_parameter_error(message, 'protocol')
+            self._raise_error_when_cannot_change_host_protocol_because_of_mapped_ports(message, host_name)
+            code = message.split()[0] if message.split() else ''
+            if code.endswith('W'):
+                logger.warning("exception encountered while changing protocol of host {} : {}".format(
+                    host_name, message))
             raise ex
 
     def change_host_protocol(self, host_name, protocol):
