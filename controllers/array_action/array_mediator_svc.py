@@ -762,7 +762,12 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
                 is_hyperswap = any(self._is_in_remote_copy_relationship(fcmap) for fcmap in fcmaps)
                 if is_hyperswap:
                     command = "expandvolume"
-                    self.client.svctask.expandvolume(object_id=volume_name, unit='b', size=increase_in_bytes)
+                    self.sdk.svc_task_api.expandvolume_id_post(
+                        id=volume_name,
+                        x_auth_token=None,
+                        expandvolume_id_post_request=svc_models.ExpandvolumeIdPostRequest(
+                            size=increase_in_bytes, unit='b'),
+                    )
                 else:
                     command = "expandvdisksize"
                     self.sdk.svc_task_api.expandvdisksize_id_post(
@@ -786,21 +791,6 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
                 if OBJ_NOT_FOUND in message or VOL_NOT_FOUND in message:
                     raise array_errors.ObjectNotFoundError(volume_name)
                 if NOT_ENOUGH_EXTENTS_IN_POOL_EXPAND in message:
-                    raise array_errors.NotEnoughSpaceInPool(id_or_name=cli_volume.mdisk_grp_name)
-                raise ex
-        except (svc_errors.CommandExecutionError, CLIFailureError) as ex:
-            logger.debug("Error running {} -unit b -size {} -{} {}".format(
-                command,
-                final_size if command == "chvolume" else increase_in_bytes,
-                "object_id" if command == "expandvolume" else "vdisk_id", volume_name))
-            if is_warning_message(ex.my_message):
-                logger.warning("exception encountered during volume expansion of {}: {}".format(volume_name,
-                                                                                                ex.my_message))
-            else:
-                logger.error("Failed to expand volume {}".format(volume_name))
-                if OBJ_NOT_FOUND in ex.my_message or VOL_NOT_FOUND in ex.my_message:
-                    raise array_errors.ObjectNotFoundError(volume_name)
-                if NOT_ENOUGH_EXTENTS_IN_POOL_EXPAND in ex.my_message:
                     raise array_errors.NotEnoughSpaceInPool(id_or_name=cli_volume.mdisk_grp_name)
                 raise ex
 
