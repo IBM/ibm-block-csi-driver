@@ -2642,22 +2642,27 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
     def _addsnapshotcommon(self, name, **kwargs):
         kwargs['name'] = name
         try:
-            return self.client.svctask.addsnapshot(**kwargs)
-        except (svc_errors.CommandExecutionError, CLIFailureError) as ex:
+            raw = self.sdk.svc_task_api.addsnapshot_post(
+                x_auth_token=None,
+                addsnapshot_post_request=svc_models.AddsnapshotPostRequest(**kwargs),
+            )
+            return _SdkResponse(raw).as_single_element
+        except SdkApiException as ex:
+            message = _extract_sdk_error_message(ex)
             logger.debug("Error running addsnapshot {}".format(self._format_cli_args(kwargs)))
-            if is_warning_message(ex.my_message):
-                logger.warning("exception encountered while creating snapshot '{}': {}".format(name,
-                                                                                               ex.my_message))
+            code = message.split()[0] if message.split() else ''
+            if code.endswith('W'):
+                logger.warning("exception encountered while creating snapshot '{}': {}".format(name, message))
             else:
                 logger.error("cannot create snapshot {0}, Reason is: {1}".format(name, ex))
-                if OBJ_ALREADY_EXIST in ex.my_message:
+                if OBJ_ALREADY_EXIST in message:
                     raise array_errors.SnapshotAlreadyExists(name, self.endpoint)
-                if NAME_NOT_EXIST_OR_MEET_RULES in ex.my_message or NOT_CHILD_POOL in ex.my_message:
+                if NAME_NOT_EXIST_OR_MEET_RULES in message or NOT_CHILD_POOL in message:
                     raise array_errors.PoolDoesNotExist(kwargs.get('pool'), self.endpoint)
-                if NOT_ENOUGH_EXTENTS_IN_POOL_CREATE in ex.my_message:
+                if NOT_ENOUGH_EXTENTS_IN_POOL_CREATE in message:
                     raise array_errors.NotEnoughSpaceInPool(id_or_name=kwargs.get('pool'))
-                if any(msg_id in ex.my_message for msg_id in (NON_ASCII_CHARS, INVALID_NAME, TOO_MANY_CHARS)):
-                    raise array_errors.InvalidArgumentError(ex.my_message)
+                if any(msg_id in message for msg_id in (NON_ASCII_CHARS, INVALID_NAME, TOO_MANY_CHARS)):
+                    raise array_errors.InvalidArgumentError(message)
                 raise ex
             return None
 
@@ -2716,7 +2721,7 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
 
     def _add_snapshot(self, snapshot_name, source_id, pool):
         svc_response = self._addsnapshot(snapshot_name, source_id, pool)
-        snapshot_id = self._get_id_from_response(svc_response)
+        snapshot_id = int(svc_response.id) if svc_response and hasattr(svc_response, 'id') else None
         cli_snapshot = self._get_cli_snapshot_by_id(snapshot_id)
         if cli_snapshot is None:
             raise array_errors.ObjectNotFoundError(snapshot_id)
