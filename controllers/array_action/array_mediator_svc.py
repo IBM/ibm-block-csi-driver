@@ -2293,17 +2293,29 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
                                                                                               other_system_id,
                                                                                               copy_type))
         kwargs = build_create_replication_kwargs(master_cli_volume_id, aux_cli_volume_id, other_system_id, copy_type)
+        var_global = kwargs.pop('global', None)
         try:
-            svc_response = self.client.svctask.mkrcrelationship(**kwargs)
-            return self._get_id_from_response(svc_response)
-        except (svc_errors.CommandExecutionError, CLIFailureError) as ex:
+            raw = self.sdk.svc_task_api.mkrcrelationship_post(
+                x_auth_token=None,
+                mkrcrelationship_post_request=svc_models.MkrcrelationshipPostRequest(
+                    master=kwargs.get('master'),
+                    aux=kwargs.get('aux'),
+                    cluster=kwargs.get('cluster'),
+                    var_global=str(var_global) if var_global is not None else None,
+                ),
+            )
+            result = _SdkResponse(raw).as_single_element
+            return int(result.id) if result and hasattr(result, 'id') else None
+        except SdkApiException as ex:
+            message = _extract_sdk_error_message(ex)
             logger.debug("Error running mkrcrelationship {}".format(self._format_cli_args(kwargs)))
-            if is_warning_message(ex.my_message):
+            code = message.split()[0] if message.split() else ''
+            if code.endswith('W'):
                 logger.warning("exception encountered during creation of rcrelationship for volume id {0} "
                                "with volume id {1} of system {2}: {3}".format(master_cli_volume_id,
                                                                               aux_cli_volume_id,
                                                                               other_system_id,
-                                                                              ex))
+                                                                              message))
             else:
                 logger.error("failed to create rcrelationship for volume id {0} "
                              "with volume id {1} of system {2}: {3}".format(master_cli_volume_id,
@@ -2318,13 +2330,22 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
                                                                                                  primary_endpoint_type,
                                                                                                  force))
         try:
-            kwargs = build_start_replication_kwargs(rcrelationship_id, primary_endpoint_type, force)
-            self.client.svctask.startrcrelationship(**kwargs)
-        except (svc_errors.CommandExecutionError, CLIFailureError) as ex:
-            logger.debug("Error running startrcrelationship {}".format(self._format_cli_args(kwargs)))
-            if is_warning_message(ex.my_message):
-                logger.warning("exception encountered while starting rcrelationship '{}': {}".format(rcrelationship_id,
-                                                                                                     ex.my_message))
+            self.sdk.svc_task_api.startrcrelationship_id_post(
+                id=str(rcrelationship_id),
+                x_auth_token=None,
+                startrcrelationship_id_post_request=svc_models.StartrcrelationshipIdPostRequest(
+                    primary=primary_endpoint_type,
+                    force=str(force).lower() if force else None,
+                ),
+            )
+        except SdkApiException as ex:
+            message = _extract_sdk_error_message(ex)
+            logger.debug("Error running startrcrelationship -object_id {} -primary {} -force {}".format(
+                rcrelationship_id, primary_endpoint_type, force))
+            code = message.split()[0] if message.split() else ''
+            if code.endswith('W'):
+                logger.warning("exception encountered while starting rcrelationship '{}': {}".format(
+                    rcrelationship_id, message))
             else:
                 logger.warning("failed to start rcrelationship '{}': {}".format(rcrelationship_id, ex))
 
