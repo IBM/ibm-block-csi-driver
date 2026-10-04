@@ -2377,28 +2377,40 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
     def _stop_rcrelationship(self, rcrelationship_id, add_access_to_secondary=False):
         logger.info("stopping remote copy relationship with id: {}. access: {}".format(rcrelationship_id,
                                                                                        add_access_to_secondary))
-        kwargs = build_stop_replication_kwargs(rcrelationship_id, add_access_to_secondary)
         try:
-            self.client.svctask.stoprcrelationship(**kwargs)
-        except (svc_errors.CommandExecutionError, CLIFailureError) as ex:
-            logger.debug("Error running stoprcrelationship {}".format(self._format_cli_args(kwargs)))
-            if is_warning_message(ex.my_message):
+            self.sdk.svc_task_api.stoprcrelationship_id_post(
+                id=str(rcrelationship_id),
+                x_auth_token=None,
+                stoprcrelationship_id_post_request=svc_models.StoprcrelationshipIdPostRequest(
+                    access=str(add_access_to_secondary).lower() if add_access_to_secondary else None,
+                ),
+            )
+        except SdkApiException as ex:
+            message = _extract_sdk_error_message(ex)
+            logger.debug("Error running stoprcrelationship -object_id {} -access {}".format(
+                rcrelationship_id, add_access_to_secondary))
+            code = message.split()[0] if message.split() else ''
+            if code.endswith('W'):
                 logger.warning("exception encountered while stopping"
-                               " rcrelationship '{0}': {1}".format(rcrelationship_id,
-                                                                   ex.my_message))
+                               " rcrelationship '{0}': {1}".format(rcrelationship_id, message))
             else:
                 logger.warning("failed to stop rcrelationship '{0}': {1}".format(rcrelationship_id, ex))
 
     def _delete_rcrelationship(self, rcrelationship_id):
         logger.info("deleting remote copy relationship with id: {0}".format(rcrelationship_id))
         try:
-            self.client.svctask.rmrcrelationship(object_id=rcrelationship_id)
-        except (svc_errors.CommandExecutionError, CLIFailureError) as ex:
+            self.sdk.svc_task_api.rmrcrelationship_id_post(
+                id=str(rcrelationship_id),
+                x_auth_token=None,
+                rmrcrelationship_id_post_request=svc_models.RmrcrelationshipIdPostRequest(),
+            )
+        except SdkApiException as ex:
+            message = _extract_sdk_error_message(ex)
             logger.debug("Error running rmrcrelationship -object_id {}".format(rcrelationship_id))
-            if is_warning_message(ex.my_message):
+            code = message.split()[0] if message.split() else ''
+            if code.endswith('W'):
                 logger.warning("exception encountered during rcrelationship"
-                               " '{0}' deletion: {1}".format(rcrelationship_id,
-                                                             ex.my_message))
+                               " '{0}' deletion: {1}".format(rcrelationship_id, message))
             else:
                 logger.warning("failed to delete rcrelationship '{0}': {1}".format(rcrelationship_id, ex))
 
@@ -2432,19 +2444,25 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
     def _promote_replication_endpoint(self, endpoint_type, replication_name):
         logger.info("making '{}' primary for remote copy relationship {}".format(endpoint_type, replication_name))
         try:
-            self.client.svctask.switchrcrelationship(primary=endpoint_type, object_id=replication_name)
-        except (svc_errors.CommandExecutionError, CLIFailureError) as ex:
+            self.sdk.svc_task_api.switchrcrelationship_id_post(
+                id=str(replication_name),
+                x_auth_token=None,
+                switchrcrelationship_id_post_request=svc_models.SwitchrcrelationshipIdPostRequest(
+                    primary=endpoint_type,
+                ),
+            )
+        except SdkApiException as ex:
+            message = _extract_sdk_error_message(ex)
             logger.debug("Error running switchrcrelationship -primary {} -object_id {}".format(
                 endpoint_type, replication_name))
-            if is_warning_message(ex.my_message):
+            code = message.split()[0] if message.split() else ''
+            if code.endswith('W'):
                 logger.warning("exception encountered while making '{}' primary"
-                               " for rcrelationship {}: {}".format(endpoint_type,
-                                                                   replication_name,
-                                                                   ex.my_message))
+                               " for rcrelationship {}: {}".format(endpoint_type, replication_name, message))
             else:
                 logger.error("failed to make '{}' primary for rcrelationship {}: {}".format(endpoint_type,
                                                                                             replication_name,
-                                                                                            ex.my_message))
+                                                                                            message))
                 raise
         logger.info("succeeded making '{}' primary for remote copy relationship {}".format(endpoint_type,
                                                                                            replication_name))
