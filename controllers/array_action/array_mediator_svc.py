@@ -657,15 +657,22 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
 
     def _chvolumegroupreplication(self, id_or_name, **cli_kwargs):
         try:
-            self.client.svctask.chvolumegroupreplication(object_id=id_or_name, **cli_kwargs)
-        except (svc_errors.CommandExecutionError, CLIFailureError) as ex:
+            self.sdk.svc_task_api.chvolumegroupreplication_id_post(
+                id=str(id_or_name),
+                x_auth_token=None,
+                chvolumegroupreplication_id_post_request=svc_models.ChvolumegroupreplicationIdPostRequest(
+                    **cli_kwargs),
+            )
+        except SdkApiException as ex:
+            message = _extract_sdk_error_message(ex)
             logger.debug("Error running chvolumegroupreplication -object_id {} {}".
                          format(id_or_name, self._format_cli_args(cli_kwargs)))
-            if is_warning_message(ex.my_message):
+            code = message.split()[0] if message.split() else ''
+            if code.endswith('W'):
                 logger.warning(
-                    "exception encountered while changing volume parameters '{}': {}".format(cli_kwargs, ex.my_message))
+                    "exception encountered while changing volume parameters '{}': {}".format(cli_kwargs, message))
             else:
-                if OBJ_ALREADY_EXIST in ex.my_message:
+                if OBJ_ALREADY_EXIST in message:
                     raise array_errors.VolumeAlreadyExists(cli_kwargs, self.endpoint)
                 raise ex
 
