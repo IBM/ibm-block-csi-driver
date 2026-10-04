@@ -929,7 +929,12 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
         pools = pool.split(":")
         for additional_pool in pools[1:]:
             logger.info("adding vdisk copy to pool: {}".format(additional_pool))
-            self.client.svctask.addvdiskcopy(mdiskgrp=additional_pool, vdisk_id=vdisk_id)
+            self.sdk.svc_task_api.addvdiskcopy_id_post(
+                id=str(vdisk_id),
+                addvdiskcopy_id_post_request=svc_models.AddvdiskcopyIdPostRequest(
+                    mdiskgrp=additional_pool,
+                ),
+            )
 
     def _create_cli_volume_from_snapshot(self, name, pool, io_group, volume_group, source_id):
         logger.info("creating volume from snapshot. pool: {}".format(pool))
