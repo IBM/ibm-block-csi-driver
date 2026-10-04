@@ -968,8 +968,11 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
             space_efficiency_kwargs = _get_space_efficiency_kwargs(space_efficiency)
             cli_kwargs.update(space_efficiency_kwargs)
         try:
-            self.client.svctask.mkvolume(name=name, **cli_kwargs)
-        except (svc_errors.CommandExecutionError, CLIFailureError) as ex:
+            self.sdk.svc_task_api.mkvolume_post(
+                x_auth_token=None,
+                mkvolume_post_request=svc_models.MkvolumePostRequest(name=name, **cli_kwargs),
+            )
+        except SdkApiException as ex:
             logger.debug("Error running mkvolume -name {} {}".format(name, self._format_cli_args(cli_kwargs)))
             raise ex
 
