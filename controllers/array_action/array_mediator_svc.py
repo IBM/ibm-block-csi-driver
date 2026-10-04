@@ -1755,33 +1755,33 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
                      "{1}".format(volume_id, host_name))
         volume_name = self._get_volume_name_by_wwn(volume_id)
 
-        cli_kwargs = {
-            'host': host_name,
-            'vdisk_id': volume_name
-        }
-
         try:
-            self.client.svctask.rmvdiskhostmap(**cli_kwargs)
-        except (svc_errors.CommandExecutionError, CLIFailureError) as ex:
-            logger.debug("Error running rmvdiskhostmap {}".format(self._format_cli_args(cli_kwargs)))
-            if is_warning_message(ex.my_message):
+            self.sdk.svc_task_api.rmvdiskhostmap_id_post(
+                id=volume_name,
+                x_auth_token=None,
+                rmvdiskhostmap_id_post_request=svc_models.RmvdiskhostmapIdPostRequest(
+                    host=host_name,
+                ),
+            )
+        except SdkApiException as ex:
+            message = _extract_sdk_error_message(ex)
+            logger.debug("Error running rmvdiskhostmap -host {} -vdisk_id {}".format(host_name, volume_name))
+            code = message.split()[0] if message.split() else ''
+            if code.endswith('W'):
                 logger.warning("exception encountered during volume {0}"
-                               " unmapping from host {1}: {2}".format(volume_name,
-                                                                      host_name,
-                                                                      ex.my_message))
+                               " unmapping from host {1}: {2}".format(volume_name, host_name, message))
             else:
                 logger.error("unmapping volume {0} from host {1} failed. Reason "
                              "is: {2}".format(volume_name, host_name, ex))
-                self._raise_error_when_host_not_exist_or_not_meet_the_rules(host_name, ex.my_message)
-                if OBJ_NOT_FOUND in ex.my_message:
+                self._raise_error_when_host_not_exist_or_not_meet_the_rules(host_name, message)
+                if OBJ_NOT_FOUND in message:
                     raise array_errors.ObjectNotFoundError(volume_name)
-                if VOL_ALREADY_UNMAPPED in ex.my_message:
+                if VOL_ALREADY_UNMAPPED in message:
                     raise array_errors.VolumeAlreadyUnmappedError(volume_name)
-                if SPECIFIED_OBJ_NOT_EXIST in ex.my_message:
+                if SPECIFIED_OBJ_NOT_EXIST in message:
                     # host isn't in the volume's mappings
                     raise array_errors.VolumeNotMappedToHostError(volume_name, host_name)
-                raise array_errors.UnmappingError(volume_name,
-                                                  host_name, ex)
+                raise array_errors.UnmappingError(volume_name, host_name, ex)
 
     def _get_array_iqns_by_node_id(self):
         logger.debug("Getting array nodes id and iscsi name")
