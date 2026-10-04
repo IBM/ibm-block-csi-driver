@@ -2735,25 +2735,30 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
         return cli_snapshot
 
     def _mkvolumegroup(self, name, **cli_kwargs):
-        pool = cli_kwargs['pool'] if 'pool' in cli_kwargs else None
+        pool = cli_kwargs.get('pool')
         try:
-            svc_response = self.client.svctask.mkvolumegroup(name=name, **cli_kwargs)
-            return self._get_id_from_response(svc_response)
-        except (svc_errors.CommandExecutionError, CLIFailureError) as ex:
+            raw = self.sdk.svc_task_api.mkvolumegroup_post(
+                x_auth_token=None,
+                mkvolumegroup_post_request=svc_models.MkvolumegroupPostRequest(name=name, **cli_kwargs),
+            )
+            result = _SdkResponse(raw).as_single_element
+            return int(result.id) if result and hasattr(result, 'id') else None
+        except SdkApiException as ex:
+            message = _extract_sdk_error_message(ex)
             logger.debug("Error running mkvolumegroup -name {} {}".format(name, self._format_cli_args(cli_kwargs)))
-            if is_warning_message(ex.my_message):
+            code = message.split()[0] if message.split() else ''
+            if code.endswith('W'):
                 logger.warning(
-                    "exception encountered during creation of volume group and volume {0}: {1}".format(name,
-                                                                                                       ex.my_message))
+                    "exception encountered during creation of volume group and volume {0}: {1}".format(name, message))
             else:
-                logger.error("Cannot create volume {0}, Reason is: {1}".format(name, ex.my_message))
-                if OBJ_ALREADY_EXIST in ex.my_message:
+                logger.error("Cannot create volume {0}, Reason is: {1}".format(name, message))
+                if OBJ_ALREADY_EXIST in message:
                     raise array_errors.VolumeAlreadyExists(name, self.endpoint)
-                if NOT_ENOUGH_EXTENTS_IN_POOL_CREATE in ex.my_message:
+                if NOT_ENOUGH_EXTENTS_IN_POOL_CREATE in message:
                     raise array_errors.NotEnoughSpaceInPool(id_or_name=pool)
-                if any(msg_id in ex.my_message for msg_id in (NAME_NOT_EXIST_OR_MEET_RULES, NON_ASCII_CHARS,
-                                                              INVALID_NAME, TOO_MANY_CHARS)):
-                    raise array_errors.InvalidArgumentError(ex.my_message)
+                if any(msg_id in message for msg_id in (NAME_NOT_EXIST_OR_MEET_RULES, NON_ASCII_CHARS,
+                                                        INVALID_NAME, TOO_MANY_CHARS)):
+                    raise array_errors.InvalidArgumentError(message)
                 raise ex
         return None
 
