@@ -3269,7 +3269,7 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
             self._register_plugin(unique_key, metadata)
 
     def _is_registerplugin_supported(self):
-        return hasattr(self.client.svctask, "registerplugin")
+        return hasattr(self.sdk.svc_task_api, "registerplugin_post")
 
     def _is_plugin_needs_to_be_registered(self, unique_key):
         current_time = datetime.now()
@@ -3298,8 +3298,14 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
             plugin_name, unique_key, metadata))
         cli_kwargs = build_register_plugin_kwargs(unique_key, metadata, version)
         try:
-            self.client.svctask.registerplugin(name='{}'.format(plugin_name), **cli_kwargs)
-        except Exception as ex:
+            self.sdk.svc_task_api.registerplugin_post(
+                x_auth_token=None,
+                registerplugin_post_request=svc_models.RegisterpluginPostRequest(
+                    name=str(plugin_name),
+                    **cli_kwargs,
+                ),
+            )
+        except SdkApiException as ex:
             logger.debug("Error running registerplugin -name {} {}".format(plugin_name,
                                                                            self._format_cli_args(cli_kwargs)))
             logger.error("exception encountered during"
