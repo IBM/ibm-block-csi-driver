@@ -1449,7 +1449,7 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
         return snapshot
 
     def _is_addsnapshot_supported(self):
-        return hasattr(self.client.svctask, "addsnapshot")
+        return hasattr(self.sdk.svc_task_api, "addsnapshot_post")
 
     def _rmsnapshot(self, internal_snapshot_id):
         try:
@@ -2314,7 +2314,7 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
         self._chvolumegroup(volume_group_id, replicationpolicy=policy_id)
 
     def _is_earreplication_supported(self):
-        return hasattr(self.client.svctask, "chvolumereplicationinternals")
+        return hasattr(self.sdk.svc_task_api, "chvolumereplicationinternals_id_post")
 
     def _create_rcrelationship(self, master_cli_volume_id, aux_cli_volume_id, other_system_id, copy_type):
         logger.info("creating remote copy relationship for master volume id: {0} "
