@@ -3004,14 +3004,21 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
 
     def _rmhostport(self, host_name, connectivity_type, port):
         cli_kwargs = build_host_port_command_kwargs(host_name, connectivity_type, port)
+        body_kwargs = {k: v for k, v in cli_kwargs.items() if k != 'host_name'}
         try:
-            self.client.svctask.rmhostport(**cli_kwargs)
-        except (svc_errors.CommandExecutionError, CLIFailureError) as ex:
+            self.sdk.svc_task_api.rmhostport_id_post(
+                id=str(host_name),
+                x_auth_token=None,
+                rmhostport_id_post_request=svc_models.RmhostportIdPostRequest(**body_kwargs),
+            )
+        except SdkApiException as ex:
+            message = _extract_sdk_error_message(ex)
             logger.debug("Error running rmhostport {}".format(self._format_cli_args(cli_kwargs)))
-            if not self._is_port_invalid(ex.my_message):
-                if is_warning_message(ex.my_message):
+            if not self._is_port_invalid(message):
+                code = message.split()[0] if message.split() else ''
+                if code.endswith('W'):
                     logger.warning("exception encountered during removing port {} from host {} : {}".format(
-                        port, host_name, ex.my_message))
+                        port, host_name, message))
                 raise ex
 
     @register_csi_plugin()
