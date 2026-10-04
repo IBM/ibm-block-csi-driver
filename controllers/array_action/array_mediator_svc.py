@@ -2863,24 +2863,29 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
     def _mkhost(self, host_name, connectivity_type, port, io_group, partition_name, port_set):
         cli_kwargs = build_create_host_kwargs(host_name, connectivity_type, port, io_group, partition_name, port_set)
         try:
-            self.client.svctask.mkhost(**cli_kwargs)
+            self.sdk.svc_task_api.mkhost_post(
+                x_auth_token=None,
+                mkhost_post_request=svc_models.MkhostPostRequest(**cli_kwargs),
+            )
             return 200
-        except (svc_errors.CommandExecutionError, CLIFailureError) as ex:
+        except SdkApiException as ex:
+            message = _extract_sdk_error_message(ex)
             logger.debug("Error running mkhost {}".format(self._format_cli_args(cli_kwargs)))
-            self._raise_invalid_io_group(io_group, ex.my_message)
-            if OBJ_ALREADY_EXIST in ex.my_message:
+            self._raise_invalid_io_group(io_group, message)
+            if OBJ_ALREADY_EXIST in message:
                 raise array_errors.HostAlreadyExists(host_name, self.endpoint)
-            if self._is_port_invalid(ex.my_message):
-                logger.warning("exception {}".format(ex.my_message))
+            if self._is_port_invalid(message):
+                logger.warning("exception {}".format(message))
                 return 400
-            if any(msg_id in ex.my_message for msg_id in (OBJECT_NOT_OF_TYPE_OF_HOST, VALUE_TOO_LONG,
-                                                          ENTITY_DOES_NOT_EXIST)):
+            if any(msg_id in message for msg_id in (OBJECT_NOT_OF_TYPE_OF_HOST, VALUE_TOO_LONG,
+                                                    ENTITY_DOES_NOT_EXIST)):
                 logger.warning("exception encountered during host {} creation : {}, might be related to bad \
-                               portset".format(host_name, ex.my_message))
+                               portset".format(host_name, message))
                 return 400
-            if is_warning_message(ex.my_message):
-                logger.warning("exception encountered during host {} creation : {}".format(host_name, ex.my_message))
-            logger.warning("exception {}".format(ex.my_message))
+            code = message.split()[0] if message.split() else ''
+            if code.endswith('W'):
+                logger.warning("exception encountered during host {} creation : {}".format(host_name, message))
+            logger.warning("exception {}".format(message))
             raise ex
 
     @register_csi_plugin()
@@ -2914,11 +2919,17 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
 
     def _rmhost(self, host_name):
         try:
-            self.client.svctask.rmhost(object_id=host_name)
-        except (svc_errors.CommandExecutionError, CLIFailureError) as ex:
+            self.sdk.svc_task_api.rmhost_id_post(
+                id=str(host_name),
+                x_auth_token=None,
+                rmhost_id_post_request=svc_models.RmhostIdPostRequest(),
+            )
+        except SdkApiException as ex:
+            message = _extract_sdk_error_message(ex)
             logger.debug("Error running rmhost -object_id {}".format(host_name))
-            if is_warning_message(ex.my_message):
-                logger.warning("exception encountered during host {} deletion : {}".format(host_name, ex.my_message))
+            code = message.split()[0] if message.split() else ''
+            if code.endswith('W'):
+                logger.warning("exception encountered during host {} deletion : {}".format(host_name, message))
                 return
             raise ex
 
@@ -2935,14 +2946,22 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
 
     def _addhostport(self, host_name, connectivity_type, port):
         cli_kwargs = build_host_port_command_kwargs(host_name, connectivity_type, port)
+        # host_name is the path id param; remaining kwargs are the request body fields
+        body_kwargs = {k: v for k, v in cli_kwargs.items() if k != 'host_name'}
         try:
-            self.client.svctask.addhostport(**cli_kwargs)
-        except (svc_errors.CommandExecutionError, CLIFailureError) as ex:
+            self.sdk.svc_task_api.addhostport_id_post(
+                id=str(host_name),
+                x_auth_token=None,
+                addhostport_id_post_request=svc_models.AddhostportIdPostRequest(**body_kwargs),
+            )
+        except SdkApiException as ex:
+            message = _extract_sdk_error_message(ex)
             logger.debug("Error running addhostport {}".format(self._format_cli_args(cli_kwargs)))
-            if not self._is_port_invalid(ex.my_message):
-                if is_warning_message(ex.my_message):
+            if not self._is_port_invalid(message):
+                code = message.split()[0] if message.split() else ''
+                if code.endswith('W'):
                     logger.warning("exception encountered during adding port {} to host {} : {}".format(
-                        port, host_name, ex.my_message))
+                        port, host_name, message))
                 raise ex
 
     @register_csi_plugin()
