@@ -3058,16 +3058,20 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
         self._raise_invalid_io_group(io_group, error_message)
 
     def _addhostiogrp(self, host_name, io_group):
-        cli_kwargs = {'iogrp': io_group}
         try:
-            self.client.svctask.addhostiogrp(object_id=host_name, **cli_kwargs)
-        except (svc_errors.CommandExecutionError, CLIFailureError) as ex:
-            logger.debug("Error running addhostiogrp -object_id {} {}".format(host_name,
-                                                                              self._format_cli_args(cli_kwargs)))
-            self._raise_io_group_error(host_name, io_group, ex.my_message)
-            if is_warning_message(ex.my_message):
+            self.sdk.svc_task_api.addhostiogrp_id_post(
+                id=str(host_name),
+                x_auth_token=None,
+                addhostiogrp_id_post_request=svc_models.AddhostiogrpIdPostRequest(iogrp=io_group),
+            )
+        except SdkApiException as ex:
+            message = _extract_sdk_error_message(ex)
+            logger.debug("Error running addhostiogrp -object_id {} -iogrp {}".format(host_name, io_group))
+            self._raise_io_group_error(host_name, io_group, message)
+            code = message.split()[0] if message.split() else ''
+            if code.endswith('W'):
                 logger.warning("exception encountered during adding io_group {}, to host {} : {}".format(
-                    io_group, host_name, ex.my_message))
+                    io_group, host_name, message))
             else:
                 raise ex
 
@@ -3078,16 +3082,20 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
         self._addhostiogrp(host_name, io_group)
 
     def _rmhostiogrp(self, host_name, io_group):
-        cli_kwargs = {'iogrp': io_group}
         try:
-            self.client.svctask.rmhostiogrp(object_id=host_name, **cli_kwargs)
-        except (svc_errors.CommandExecutionError, CLIFailureError) as ex:
-            logger.debug("Error running rmhostiogrp -object_id {} {}".format(host_name,
-                                                                             self._format_cli_args(cli_kwargs)))
-            self._raise_io_group_error(host_name, io_group, ex.my_message)
-            if is_warning_message(ex.my_message):
+            self.sdk.svc_task_api.rmhostiogrp_id_post(
+                id=str(host_name),
+                x_auth_token=None,
+                rmhostiogrp_id_post_request=svc_models.RmhostiogrpIdPostRequest(iogrp=io_group),
+            )
+        except SdkApiException as ex:
+            message = _extract_sdk_error_message(ex)
+            logger.debug("Error running rmhostiogrp -object_id {} -iogrp {}".format(host_name, io_group))
+            self._raise_io_group_error(host_name, io_group, message)
+            code = message.split()[0] if message.split() else ''
+            if code.endswith('W'):
                 logger.warning("exception encountered during removing io_group {}, from host {} : {}".format(
-                    io_group, host_name, ex.my_message))
+                    io_group, host_name, message))
             else:
                 raise ex
 
