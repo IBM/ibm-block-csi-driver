@@ -1219,15 +1219,20 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
     def _start_fcmap(self, fcmap_id):
         logger.info("starting FlashCopy Mapping '{0}'".format(fcmap_id))
         try:
-            self.client.svctask.startfcmap(prep=True, object_id=fcmap_id)
-        except (svc_errors.CommandExecutionError, CLIFailureError) as ex:
+            self.sdk.svc_task_api.startfcmap_id_post(
+                id=str(fcmap_id),
+                x_auth_token=None,
+                startfcmap_id_post_request=svc_models.StartfcmapIdPostRequest(prep=True),
+            )
+        except SdkApiException as ex:
+            message = _extract_sdk_error_message(ex)
             logger.debug("Error running startfcmap -prep True -object_id {}".format(fcmap_id))
-            if is_warning_message(ex.my_message):
+            code = message.split()[0] if message.split() else ''
+            if code.endswith('W'):
                 logger.warning("exception encountered while starting"
-                               " FlashCopy Mapping '{}': {}".format(fcmap_id,
-                                                                    ex.my_message))
+                               " FlashCopy Mapping '{}': {}".format(fcmap_id, message))
             else:
-                if FCMAP_ALREADY_COPYING in ex.my_message:
+                if FCMAP_ALREADY_COPYING in message:
                     logger.info("FlashCopy Mapping '{0}' already copying".format(fcmap_id))
                 else:
                     raise ex
@@ -1241,12 +1246,18 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
     def _delete_fcmap(self, fcmap_id, force):
         logger.info("deleting fcmap with id : {0}".format(fcmap_id))
         try:
-            self.client.svctask.rmfcmap(object_id=fcmap_id, force=force)
-        except (svc_errors.CommandExecutionError, CLIFailureError) as ex:
+            self.sdk.svc_task_api.rmfcmap_id_post(
+                id=str(fcmap_id),
+                x_auth_token=None,
+                rmfcmap_id_post_request=svc_models.RmfcmapIdPostRequest(force=force),
+            )
+        except SdkApiException as ex:
+            message = _extract_sdk_error_message(ex)
             logger.debug("Error running rmfcmap -object_id {} -force {}".format(fcmap_id, force))
-            if is_warning_message(ex.my_message):
+            code = message.split()[0] if message.split() else ''
+            if code.endswith('W'):
                 logger.warning("exception encountered during fcmap '{}' deletion: {}".format(fcmap_id,
-                                                                                             ex.my_message))
+                                                                                             message))
             else:
                 logger.error("Failed to delete fcmap '{0}': {1}".format(fcmap_id, ex))
                 raise ex
@@ -1254,14 +1265,20 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
     def _stop_fcmap(self, fcmap_id):
         logger.info("stopping fcmap with id : {0}".format(fcmap_id))
         try:
-            self.client.svctask.stopfcmap(object_id=fcmap_id)
-        except (svc_errors.CommandExecutionError, CLIFailureError) as ex:
+            self.sdk.svc_task_api.stopfcmap_id_post(
+                id=str(fcmap_id),
+                x_auth_token=None,
+                stopfcmap_id_post_request=svc_models.StopfcmapIdPostRequest(),
+            )
+        except SdkApiException as ex:
+            message = _extract_sdk_error_message(ex)
             logger.debug("Error running stopfcmap -object_id {}".format(fcmap_id))
-            if is_warning_message(ex.my_message):
+            code = message.split()[0] if message.split() else ''
+            if code.endswith('W'):
                 logger.warning("exception encountered while stopping fcmap '{}': {}".format(fcmap_id,
-                                                                                            ex.my_message))
+                                                                                            message))
             else:
-                if FCMAP_ALREADY_IN_THE_STOPPED_STATE in ex.my_message:
+                if FCMAP_ALREADY_IN_THE_STOPPED_STATE in message:
                     logger.info("fcmap '{0}' is already in the stopped state".format(fcmap_id))
                 else:
                     logger.error("Failed to stop fcmap '{0}': {1}".format(fcmap_id, ex))
