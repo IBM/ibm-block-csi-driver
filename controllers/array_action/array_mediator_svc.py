@@ -1033,9 +1033,14 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
         finally:
             try:
                 logger.info("Remove temp snapshot")
-                self.client.svctask.rmsnapshot(
-                             snapshot=cli_snapshot.snapshot_name, volumegroup=cli_volume.volume_group_name)
-            except (svc_errors.CommandExecutionError, CLIFailureError) as ex:
+                self.sdk.svc_task_api.rmsnapshot_post(
+                    x_auth_token=None,
+                    rmsnapshot_post_request=svc_models.RmsnapshotPostRequest(
+                        snapshot=cli_snapshot.snapshot_name,
+                        volumegroup=cli_volume.volume_group_name,
+                    ),
+                )
+            except SdkApiException as ex:
                 logger.debug("Error running rmsnapshot -snapshot {} -volumegroup {}".format(
                              cli_snapshot.snapshot_name, cli_volume.volume_group_name))
                 raise ex
