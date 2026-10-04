@@ -580,28 +580,16 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
 
         try:
             if object_id is not None:
-                if str(object_id).isdigit():
-                    raw = self.sdk.svc_info_api.lsvdisk_id_post(
-                        id=str(object_id),
-                        x_auth_token=None,
-                        lsvdisk_id_post_request=svc_models.LsvdiskIdPostRequest(unit='b'),
-                    )
-                else:
-                    raw = self.sdk.svc_info_api.lsvdisk_post(
-                        x_auth_token=None,
-                        lsvdisk_post_request=svc_models.LsvdiskPostRequest(
-                            filtervalue='name={}'.format(object_id),
-                            unit='b',
-                        ),
-                    )
-            else:
-                raw = self.sdk.svc_info_api.lsvdisk_post(
-                    x_auth_token=None,
-                    lsvdisk_post_request=svc_models.LsvdiskPostRequest(
-                        filtervalue=filtervalue,
-                        unit='b',
-                    ),
-                )
+                field = 'id' if str(object_id).isdigit() else 'name'
+                filtervalue = '{}={}'.format(field, object_id)
+
+            raw = self.sdk.svc_info_api.lsvdisk_post(
+                x_auth_token=None,
+                lsvdisk_post_request=svc_models.LsvdiskPostRequest(
+                    filtervalue=filtervalue,
+                    unit='b',
+                ),
+            )
             return _SdkLsvdiskResponse(raw)
         except SdkApiException as ex:
             message = _extract_sdk_error_message(ex)
