@@ -1190,17 +1190,26 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
         logger.info("creating FlashCopy Mapping from '{0}' to '{1}'".format(source_volume_name, target_volume_name))
         mkfcmap_kwargs = {} if is_copy else {'copyrate': 0}
         try:
-            self.client.svctask.mkfcmap(source=source_volume_name, target=target_volume_name, **mkfcmap_kwargs)
-        except (svc_errors.CommandExecutionError, CLIFailureError) as ex:
+            self.sdk.svc_task_api.mkfcmap_post(
+                x_auth_token=None,
+                mkfcmap_post_request=svc_models.MkfcmapPostRequest(
+                    source=source_volume_name,
+                    target=target_volume_name,
+                    copyrate=mkfcmap_kwargs.get('copyrate'),
+                ),
+            )
+        except SdkApiException as ex:
+            message = _extract_sdk_error_message(ex)
             logger.debug("Error running mkfcmap -source {} -target {} {}".format(
                 source_volume_name, target_volume_name, mkfcmap_kwargs))
-            if is_warning_message(ex.my_message):
+            code = message.split()[0] if message.split() else ''
+            if code.endswith('W'):
                 logger.warning("exception encountered during FlashCopy Mapping creation"
                                " for source '{0}' and target '{1}': {2}".format(source_volume_name,
                                                                                 target_volume_name,
-                                                                                ex.my_message))
+                                                                                message))
             else:
-                if FCMAP_ALREADY_EXIST in ex.my_message:
+                if FCMAP_ALREADY_EXIST in message:
                     logger.info("FlashCopy Mapping already exists"
                                 " for source '{0}' and target '{1}'".format(source_volume_name,
                                                                             target_volume_name))
