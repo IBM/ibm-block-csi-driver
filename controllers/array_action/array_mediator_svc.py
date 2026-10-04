@@ -2795,32 +2795,48 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
         # cli_volume_id is name except when coming _fix_creation_side_effects
         try:
             if partition_name:
-                self.client.svctask.chvolume(vdisk_id=cli_volume_id, **kwargs)
+                self.sdk.svc_task_api.chvolume_id_post(
+                    id=str(cli_volume_id),
+                    x_auth_token=None,
+                    chvolume_id_post_request=svc_models.ChvolumeIdPostRequest(**kwargs),
+                )
             else:
-                self.client.svctask.chvdisk(vdisk_id=cli_volume_id, **kwargs)
-        except (svc_errors.CommandExecutionError, CLIFailureError) as ex:
+                self.sdk.svc_task_api.chvdisk_id_post(
+                    id=str(cli_volume_id),
+                    x_auth_token=None,
+                    chvdisk_id_post_request=svc_models.ChvdiskIdPostRequest(**kwargs),
+                )
+        except SdkApiException as ex:
+            message = _extract_sdk_error_message(ex)
             logger.debug("Error running {} -vdisk_id {} {}".format(
                 "chvolume" if partition_name else "chvdisk", cli_volume_id, self._format_cli_args(kwargs)))
-            if is_warning_message(ex.my_message):
+            code = message.split()[0] if message.split() else ''
+            if code.endswith('W'):
                 logger.warning(
-                    "exception encountered while changing volume parameters '{}': {}".format(kwargs, ex.my_message))
+                    "exception encountered while changing volume parameters '{}': {}".format(kwargs, message))
             else:
-                if OBJ_ALREADY_EXIST in ex.my_message:
+                if OBJ_ALREADY_EXIST in message:
                     raise array_errors.VolumeAlreadyExists(kwargs, self.endpoint)
                 raise ex
 
     def _rmvolumegroup(self, id_or_name, not_exist_error=False):
         logger.info("deleting volume group : {0}".format(id_or_name))
         try:
-            self.client.svctask.rmvolumegroup(object_id=id_or_name)
-        except (svc_errors.CommandExecutionError, CLIFailureError) as ex:
+            self.sdk.svc_task_api.rmvolumegroup_id_post(
+                id=str(id_or_name),
+                x_auth_token=None,
+                rmvolumegroup_id_post_request=svc_models.RmvolumegroupIdPostRequest(),
+            )
+        except SdkApiException as ex:
+            message = _extract_sdk_error_message(ex)
             logger.debug("Error running rmvolumegroup -object_id {}".format(id_or_name))
-            if is_warning_message(ex.my_message):
+            code = message.split()[0] if message.split() else ''
+            if code.endswith('W'):
                 logger.warning("exception encountered during deletion of volume group {}: {}".format(id_or_name,
-                                                                                                     ex.my_message))
+                                                                                                     message))
             else:
                 logger.error("Failed to delete volume group {}".format(id_or_name))
-                if OBJ_NOT_FOUND in ex.my_message or VOL_NOT_FOUND in ex.my_message:
+                if OBJ_NOT_FOUND in message or VOL_NOT_FOUND in message:
                     logger.warning(array_errors.ObjectNotFoundError(id_or_name))
                     if not not_exist_error:
                         return
