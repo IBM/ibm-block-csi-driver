@@ -1423,10 +1423,16 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
 
     def _rmsnapshot(self, internal_snapshot_id):
         try:
-            self.client.svctask.rmsnapshot(snapshotid=internal_snapshot_id)
-        except (svc_errors.CommandExecutionError, CLIFailureError) as ex:
+            self.sdk.svc_task_api.rmsnapshot_post(
+                x_auth_token=None,
+                rmsnapshot_post_request=svc_models.RmsnapshotPostRequest(
+                    snapshotid=str(internal_snapshot_id),
+                ),
+            )
+        except SdkApiException as ex:
+            message = _extract_sdk_error_message(ex)
             logger.debug("Error running rmsnapshot -snapshotid {}".format(internal_snapshot_id))
-            if SNAPSHOT_NOT_EXIST in ex.my_message:
+            if SNAPSHOT_NOT_EXIST in message:
                 raise array_errors.ObjectNotFoundError(internal_snapshot_id)
             raise ex
 
