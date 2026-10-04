@@ -722,7 +722,7 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
         return self._generate_volume_response(cli_volume, is_virt_snap_func)
 
     def _is_chvolume_supported(self):
-        return hasattr(self.client.svctask, "chvolume")
+        return hasattr(self.sdk.svc_task_api, "chvolume_id_post")
 
     def _get_object_fcmaps(self, object_name):
         all_fcmaps = []
@@ -745,7 +745,12 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
         try:
             if self._is_chvolume_supported():
                 command = "chvolume"
-                self.client.svctask.chvolume(size=final_size, unit='b', vdisk_id=volume_name)
+                self.sdk.svc_task_api.chvolume_id_post(
+                    id=volume_name,
+                    x_auth_token=None,
+                    chvolume_id_post_request=svc_models.ChvolumeIdPostRequest(
+                        size=final_size, unit='b'),
+                )
             else:
                 fcmaps = self._get_object_fcmaps(volume_name)
                 is_hyperswap = any(self._is_in_remote_copy_relationship(fcmap) for fcmap in fcmaps)
@@ -754,7 +759,29 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
                     self.client.svctask.expandvolume(object_id=volume_name, unit='b', size=increase_in_bytes)
                 else:
                     command = "expandvdisksize"
-                    self.client.svctask.expandvdisksize(vdisk_id=volume_name, unit='b', size=increase_in_bytes)
+                    self.sdk.svc_task_api.expandvdisksize_id_post(
+                        id=volume_name,
+                        x_auth_token=None,
+                        expandvdisksize_id_post_request=svc_models.ExpandvdisksizeIdPostRequest(
+                            size=increase_in_bytes, unit='b'),
+                    )
+        except SdkApiException as ex:
+            message = _extract_sdk_error_message(ex)
+            logger.debug("Error running {} -unit b -size {} -{} {}".format(
+                command,
+                final_size if command == "chvolume" else increase_in_bytes,
+                "object_id" if command == "expandvolume" else "vdisk_id", volume_name))
+            code = message.split()[0] if message.split() else ''
+            if code.endswith('W'):
+                logger.warning("exception encountered during volume expansion of {}: {}".format(volume_name,
+                                                                                                message))
+            else:
+                logger.error("Failed to expand volume {}".format(volume_name))
+                if OBJ_NOT_FOUND in message or VOL_NOT_FOUND in message:
+                    raise array_errors.ObjectNotFoundError(volume_name)
+                if NOT_ENOUGH_EXTENTS_IN_POOL_EXPAND in message:
+                    raise array_errors.NotEnoughSpaceInPool(id_or_name=cli_volume.mdisk_grp_name)
+                raise ex
         except (svc_errors.CommandExecutionError, CLIFailureError) as ex:
             logger.debug("Error running {} -unit b -size {} -{} {}".format(
                 command,
