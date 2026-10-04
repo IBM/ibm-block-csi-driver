@@ -1712,33 +1712,38 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
         logger.debug("mapping volume : {0} to host : "
                      "{1}".format(volume_id, host_name))
         volume_name = self._get_volume_name_by_wwn(volume_id)
-        cli_kwargs = {
-            'host': host_name,
-            'object_id': volume_name,
-            'force': True
-        }
         lun = ""
         try:
+            scsi = None
             if connectivity_type != array_settings.NVME_OVER_FC_CONNECTIVITY_TYPE:
                 lun = self._get_free_lun(host_name)
-                cli_kwargs.update({'scsi': lun})
-            self.client.svctask.mkvdiskhostmap(**cli_kwargs)
-        except (svc_errors.CommandExecutionError, CLIFailureError) as ex:
-            logger.debug("Error running mkvdiskhostmap {}".format(self._format_cli_args(cli_kwargs)))
-            if is_warning_message(ex.my_message):
-                logger.warning("exception encountered during volume {0} mapping to host {1}: {2}".format(volume_name,
-                                                                                                         host_name,
-                                                                                                         ex.my_message))
+                scsi = int(lun)
+            self.sdk.svc_task_api.mkvdiskhostmap_id_post(
+                id=volume_name,
+                x_auth_token=None,
+                mkvdiskhostmap_id_post_request=svc_models.MkvdiskhostmapIdPostRequest(
+                    host=host_name,
+                    force=True,
+                    scsi=scsi,
+                ),
+            )
+        except SdkApiException as ex:
+            message = _extract_sdk_error_message(ex)
+            logger.debug("Error running mkvdiskhostmap -host {} -object_id {} -scsi {}".format(
+                host_name, volume_name, lun))
+            code = message.split()[0] if message.split() else ''
+            if code.endswith('W'):
+                logger.warning("exception encountered during volume {0} mapping to host {1}: {2}".format(
+                    volume_name, host_name, message))
             else:
                 logger.error("Map volume {0} to host {1} failed. Reason "
                              "is: {2}".format(volume_name, host_name, ex))
-                self._raise_error_when_host_not_exist_or_not_meet_the_rules(host_name, ex.my_message)
-                if SPECIFIED_OBJ_NOT_EXIST in ex.my_message:
+                self._raise_error_when_host_not_exist_or_not_meet_the_rules(host_name, message)
+                if SPECIFIED_OBJ_NOT_EXIST in message:
                     raise array_errors.ObjectNotFoundError(volume_name)
-                if LUN_ALREADY_IN_USE in ex.my_message:
-                    raise array_errors.LunAlreadyInUseError(lun,
-                                                            host_name)
-                if LUN_ID_IS_NOT_VALID in ex.my_message:
+                if LUN_ALREADY_IN_USE in message:
+                    raise array_errors.LunAlreadyInUseError(lun, host_name)
+                if LUN_ID_IS_NOT_VALID in message:
                     raise array_errors.NoAvailableLunError(host_name)
                 raise array_errors.MappingError(volume_name, host_name, ex)
 
