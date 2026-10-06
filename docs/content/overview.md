@@ -18,5 +18,11 @@ For details about volume provisioning with Kubernetes, refer to [Persistent volu
 
 For user convenience, this guide might refer to IBM block storage CSI driver as CSI driver. {: note}
 
+## Cryptography and FIPS compliance
+
+The IBM block storage CSI driver does not include or bundle any cryptographic libraries of its own. All cryptographic operations — including TLS communication, certificate validation, and any FIPS 140-2 compliance requirements — are provided entirely by the underlying OpenShift or Kubernetes installation and its associated system libraries.
+
+To operate in a FIPS-compliant environment, ensure that your OpenShift or Kubernetes cluster is deployed and configured with FIPS mode enabled. The CSI driver inherits the cryptographic posture of the platform on which it runs.
+
 ![This image shows CSI driver integration with IBM block storage.](../book_files/k8s_driver_arch_diagram_1.11.svg "Integration of IBM block storage systems and CSI driver in a Kubernetes environment")
 
