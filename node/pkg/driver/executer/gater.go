@@ -17,21 +17,71 @@ type semaphoreGate struct {
 	refCount int // Track active acquires to determine when to delete the key
 }
 
+type singleflightCall[T any] struct {
+	wg  sync.WaitGroup
+	val T
+	err error
+}
+
+type SingleflightGroup[T any] struct {
+	mu sync.Mutex
+	m  map[string]*singleflightCall[T]
+}
+
+func NewSingleflightGroup[T any]() *SingleflightGroup[T] {
+	return &SingleflightGroup[T]{
+		m: make(map[string]*singleflightCall[T]),
+	}
+}
+
+// Do executes and returns the results of the given function, making
+// sure that only one execution is in-flight for a given key at a time.
+// If a duplicate comes in while an execution is in-flight, it waits for the
+// original to complete and receives the same results with zero introduced delay.
+// As soon as the in-flight execution completes, it is deleted immediately (no retention window).
+func (g *SingleflightGroup[T]) Do(key string, fn func() (T, error)) (T, error) {
+	g.mu.Lock()
+	if g.m == nil {
+		g.m = make(map[string]*singleflightCall[T])
+	}
+	if c, ok := g.m[key]; ok {
+		g.mu.Unlock()
+		c.wg.Wait()
+		return c.val, c.err
+	}
+
+	c := new(singleflightCall[T])
+	c.wg.Add(1)
+	g.m[key] = c
+	g.mu.Unlock()
+
+	c.val, c.err = fn()
+	c.wg.Done()
+
+	g.mu.Lock()
+	delete(g.m, key)
+	g.mu.Unlock()
+
+	return c.val, c.err
+}
+
 type KeyedGater struct {
 	// Keyed semaphore Acquire/Release
 	mu             sync.Mutex
 	semaphoreGates map[string]*semaphoreGate
 
-	resources    sync.Map // map[string]*ResourcePool
-	globalLeaked atomic.Int64
-	maxGlobal    int64
-	lastWarnTime atomic.Int64
+	resources       sync.Map // map[string]*ResourcePool
+	DevSingleflight *SingleflightGroup[[]string]
+	globalLeaked    atomic.Int64
+	maxGlobal       int64
+	lastWarnTime    atomic.Int64
 }
 
 func NewKeyedGater(maxGlobalLeaks int64) *KeyedGater {
 	return &KeyedGater{
-		semaphoreGates: make(map[string]*semaphoreGate),
-		maxGlobal:      maxGlobalLeaks,
+		semaphoreGates:  make(map[string]*semaphoreGate),
+		DevSingleflight: NewSingleflightGroup[[]string](),
+		maxGlobal:       maxGlobalLeaks,
 	}
 }
 
