@@ -61,6 +61,7 @@ NVME_PORT_IS_ALREADY_ASSIGNED = 'CMMVC9328E'
 FCMAP_ALREADY_EXIST = 'CMMVC6466E'
 FCMAP_ALREADY_COPYING = 'CMMVC5907E'
 FCMAP_ALREADY_IN_THE_STOPPED_STATE = 'CMMVC5912E'
+FCMAP_STOPPING = 'CMMVC9015E'
 VOL_NOT_FOUND = 'CMMVC8957E'
 POOL_NOT_MATCH_VOL_SPACE_EFFICIENCY = 'CMMVC9292E'
 NOT_CHILD_POOL = 'CMMVC9760E'
@@ -264,21 +265,37 @@ def _get_cli_volume_space_efficiency_aliases(cli_volume):
     return space_efficiency_aliases
 
 
-_CAPACITY_UNIT_MULTIPLIERS = {
-    'KB': 1000,
-    'MB': 1000 * 1000,
-    'GB': 1000 * 1000 * 1000,
-    'TB': 1000 * 1000 * 1000 * 1000,
-}
+_CAPACITY_UNIT_MULTIPLIERS = [
+    ('PB', 1024 ** 5),
+    ('TB', 1024 ** 4),
+    ('GB', 1024 ** 3),
+    ('MB', 1024 ** 2),
+    ('KB', 1024),
+    ('B', 1),
+]
 
 
 def _parse_cli_capacity_bytes(capacity):
+    if not capacity:
+        return 0
     if isinstance(capacity, int):
         return capacity
     if isinstance(capacity, str):
-        for suffix, multiplier in _CAPACITY_UNIT_MULTIPLIERS.items():
-            if capacity.endswith(suffix):
-                return int(float(capacity[:-len(suffix)]) * multiplier)
+        cap_str = capacity.strip().upper()
+        for suffix, multiplier in _CAPACITY_UNIT_MULTIPLIERS:
+            if cap_str.endswith(suffix):
+                num_part = cap_str[:-len(suffix)].strip()
+                try:
+                    return int(float(num_part) * multiplier)
+                except ValueError:
+                    pass
+        try:
+            return int(cap_str)
+        except ValueError:
+            try:
+                return int(float(cap_str))
+            except ValueError:
+                return 0
     return int(capacity)
 
 
@@ -290,8 +307,7 @@ def _extract_sdk_error_message(ex):
     """Extract the CMMVC error message string from an SdkApiException.
 
     The REST API returns error bodies of the form ``{"message": "CMMVC5753E ..."}``.
-    We pull that string out so it can be matched against the same CMMVC constants
-    that were previously matched against pysvc CLIFailureError.my_message.
+    We pull that string out so it can be matched against the same CMMVC constants.
     Falls back to the raw body string when the JSON is unparseable.
     """
     body = ex.body or ''
@@ -310,8 +326,7 @@ class _SdkResponse:
     The SDK returns a plain Python object (a ``dict`` for a detail view,
     or a ``list[dict]`` for a list view).  Downstream code consumes the
     result through ``.as_single_element`` and ``.as_list``, where each
-    element supports attribute-style access (historically provided by pysvc
-    Munch objects).
+    element supports attribute-style access via Munch objects.
 
     This wrapper converts every dict into a ``Munch`` so that all downstream
     attribute accesses continue to work without modification.
@@ -376,11 +391,11 @@ _SdkLsvdiskResponse = _SdkResponse
 class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
     ARRAY_ACTIONS = {}
     BLOCK_SIZE_IN_BYTES = 512
-    BYTES_IN_GB = 1_000_000_000  # SVC pool grain — decimal GB
     MAX_LUN_NUMBER = 511
     MAX_LUN_NUMBER_INCREMENT = 512
     MIN_LUN_NUMBER = 0
     MIN_SUPPORTED_VERSION = '7.8'
+    # BYTES_IN_GB was defined but is unused; removed.
 
     @ClassProperty
     def array_type(self):
@@ -424,7 +439,6 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
 
     def __init__(self, user, password, endpoint):
         super().__init__(user, password, endpoint)
-        self.client = None
         self.sdk = None
         # SVC only accept one IP address
         if len(endpoint) == 0 or len(endpoint) > 1:
@@ -448,7 +462,6 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
                     self._code_level, self.MIN_SUPPORTED_VERSION
                 )
         except SdkApiException as ex:
-            message = _extract_sdk_error_message(ex)
             if ex.status == 401 or ex.status == 403:
                 raise array_errors.CredentialsError(self.endpoint)
             raise
@@ -553,10 +566,10 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
             cli_object = cli_vol
             source_id = self._get_wwn_by_volume_name_if_exists(cli_object.source_volume_name)
             return self._generate_snapshot_response_from_cli_volume(cli_object, source_id, partition_name)
-        if not cli_object.FC_id:
+        fcmap = self._get_fcmap_as_target_if_exists(cli_object.name)
+        if not getattr(cli_object, 'FC_id', None) and fcmap is None:
             logger.error("FlashCopy Mapping not found for target volume: {}".format(cli_object.name))
             raise array_errors.ExpectedSnapshotButFoundVolumeError(cli_object.name, self.endpoint)
-        fcmap = self._get_fcmap_as_target_if_exists(cli_object.name)
         if fcmap is None or fcmap.copy_rate != '0':
             raise array_errors.ExpectedSnapshotButFoundVolumeError(cli_object.name, self.endpoint)
         source_id = self._get_wwn_by_volume_name_if_exists(fcmap.source_vdisk_name)
@@ -587,7 +600,7 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
                 x_auth_token=None,
                 lsvdisk_post_request=svc_models.LsvdiskPostRequest(
                     filtervalue=filtervalue,
-                    unit='b',
+                    bytes=True,
                 ),
             )
             return _SdkLsvdiskResponse(raw)
@@ -641,7 +654,7 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
             else:
                 if OBJ_ALREADY_EXIST in message:
                     raise array_errors.VolumeAlreadyExists(cli_kwargs, self.endpoint)
-                raise ex
+                raise
 
     def _lsvolumegroupreplication(self, id_or_name):
         try:
@@ -680,7 +693,7 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
             else:
                 if OBJ_ALREADY_EXIST in message:
                     raise array_errors.VolumeAlreadyExists(cli_kwargs, self.endpoint)
-                raise ex
+                raise
 
     def _get_cli_volume(self, volume_name, not_exist_err=True):
         cli_volume = self._lsvdisk_single_element(object_id=volume_name)
@@ -742,7 +755,7 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
         logger.info("Expanding volume with id : {0} to {1} bytes".format(volume_id, required_bytes))
         cli_volume = self._get_cli_volume_by_wwn(volume_id, not_exist_err=True)
         volume_name = cli_volume.name
-        current_size = int(cli_volume.capacity)
+        current_size = _parse_cli_capacity_bytes(cli_volume.capacity)
         final_size = self._convert_size_bytes(required_bytes)
         if final_size < current_size:
             raise array_errors.InvalidArgumentError("New volume size smaller than current")
@@ -792,7 +805,7 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
                     raise array_errors.ObjectNotFoundError(volume_name)
                 if NOT_ENOUGH_EXTENTS_IN_POOL_EXPAND in message:
                     raise array_errors.NotEnoughSpaceInPool(id_or_name=cli_volume.mdisk_grp_name)
-                raise ex
+                raise
 
         logger.info(
             "Finished volume expansion with {0}. id : {1}. volume expanded to {2} bytes".format(
@@ -810,7 +823,7 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
                 lsfcmap_post_request=svc_models.LsfcmapPostRequest(filtervalue=filter_value),
             )
             return _SdkResponse(raw).as_list
-        except SdkApiException as ex:
+        except SdkApiException:
             logger.debug("Error running lsfcmap -filtervalue {}".format(filter_value))
             raise
 
@@ -831,16 +844,10 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
         logger.info("Finished validate_supported_space_efficiency")
 
     def _convert_size_bytes(self, size_in_bytes):
-        # Ceil to next full decimal GB — SVC pool grain is 1 GB (1,000,000,000 bytes).
-        # Without this, requests like 1Gi (1,073,741,824) get rounded DOWN by the array
-        # to 1 GB (1,000,000,000), which is less than requested and causes provisioning failure.
-        remainder = size_in_bytes % self.BYTES_IN_GB
-        if remainder > 0:
-            size_in_bytes = size_in_bytes - remainder + self.BYTES_IN_GB
-        # SVC also requires size to be a multiple of 512 bytes (already satisfied after GB ceil)
+        # SVC volume size must be the multiple of 512 bytes
         ret = size_in_bytes % self.BLOCK_SIZE_IN_BYTES
         if ret > 0:
-            size_in_bytes = size_in_bytes - ret + self.BLOCK_SIZE_IN_BYTES
+            return size_in_bytes - ret + self.BLOCK_SIZE_IN_BYTES
         return size_in_bytes
 
     def _get_wwn_by_volume_name_if_exists(self, volume_name):
@@ -910,10 +917,10 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
                 raise array_errors.NotEnoughSpaceInPool(id_or_name=pool)
             if any(msg_id in message for msg_id in (NON_ASCII_CHARS, INVALID_NAME, TOO_MANY_CHARS)):
                 raise array_errors.InvalidArgumentError(message)
-            raise ex
+            raise
         logger.info("finished creating cli volume : {}".format(name))
 
-    @retry(svc_errors.StorageArrayClientException, tries=5, delay=1)
+    @retry(SdkApiException, tries=5, delay=1)
     def _rollback_copy_to_target_volume(self, target_volume_name):
         self._delete_unstarted_fcmap_if_exists(target_volume_name)
 
@@ -922,11 +929,11 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
                                                                      target_volume_name))
         try:
             return self._create_and_start_fcmap(source_volume_name, target_volume_name, is_copy=True)
-        except (svc_errors.CommandExecutionError, CLIFailureError) as ex:
+        except SdkApiException as ex:
             logger.error("Failed to copy to '{0}': {1}".format(target_volume_name, ex))
             logger.info("rolling back copy to '{0}'".format(target_volume_name))
             self._rollback_copy_to_target_volume(target_volume_name)
-            raise ex
+            raise
 
     def copy_to_existing_volume(self, volume_id, source_id, source_capacity_in_bytes,
                                 minimum_volume_size_in_bytes):
@@ -976,9 +983,9 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
             # remove vg and leave volume, with name <name>
             self._fix_creation_side_effects(name, cli_volume_id, volume_group)
             self._add_vdisk_copies(is_stretch, pool, cli_volume_id)
-        except (svc_errors.CommandExecutionError, CLIFailureError, array_errors.VolumeAlreadyExists) as ex:
+        except (SdkApiException, array_errors.VolumeAlreadyExists) as ex:
             self._rollback_create_volume_from_snapshot(cli_volume_id, name)
-            raise ex
+            raise
 
     def _create_cli_volume_from_vg_snapshot(self, name, pool, io_group, volume_group, vg_snapshot_name,
                                             vol_name, vol_vg, space_efficiency, use_thin_clone):
@@ -1002,9 +1009,9 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
                 x_auth_token=None,
                 mkvolume_post_request=svc_models.MkvolumePostRequest(name=name, **cli_kwargs),
             )
-        except SdkApiException as ex:
+        except SdkApiException:
             logger.debug("Error running mkvolume -name {} {}".format(name, self._format_cli_args(cli_kwargs)))
-            raise ex
+            raise
 
     def _create_cli_volume_from_volume(self, name, pool, io_group, volume_group, source_id):
         logger.info("creating volume from volume")
@@ -1029,7 +1036,7 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
                 lspartition_post_request=svc_models.LspartitionPostRequest(filtervalue=filter_value),
             )
             cli_partition = _SdkResponse(raw).as_single_element
-        except SdkApiException as ex:
+        except SdkApiException:
             logger.debug("Error running lspartition -filtervalue {}".format(filter_value))
             raise
         if not cli_partition:
@@ -1044,7 +1051,7 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
                     lsreplicationpolicy_post_request=svc_models.LsreplicationpolicyPostRequest(filtervalue=filter_value),
                 )
                 cli_replication_policy = _SdkResponse(raw).as_single_element
-            except SdkApiException as ex:
+            except SdkApiException:
                 logger.debug("Error running lsreplicationpolicy -filtervalue {}".format(filter_value))
                 raise
             if not cli_replication_policy:
@@ -1070,10 +1077,10 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
                         volumegroup=cli_volume.volume_group_name,
                     ),
                 )
-            except SdkApiException as ex:
+            except SdkApiException:
                 logger.debug("Error running rmsnapshot -snapshot {} -volumegroup {}".format(
                              cli_snapshot.snapshot_name, cli_volume.volume_group_name))
-                raise ex
+                raise
         logger.info("creating volume from snapshot - success")
 
     def _partition_create_cli_volume_from_volume(self, name, pool, io_group, volume_group, source_id, space_efficiency,
@@ -1087,7 +1094,7 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
         cli_volume = self._get_cli_volume(cli_volume.name)
         if cli_volume is None:
             raise array_errors.ObjectNotFoundError(source_id)
-        if self._convert_size_bytes(size_in_bytes) != int(cli_volume.capacity):
+        if self._convert_size_bytes(size_in_bytes) != _parse_cli_capacity_bytes(cli_volume.capacity):
             raise array_errors.InvalidArgumentError(
                 "clone not created because the source and target volumes are different sizes {} {}".format(
                     size_in_bytes, cli_volume.capacity)
@@ -1157,7 +1164,7 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
             logger.error("Failed to delete volume {}".format(volume_id_or_name))
             if (OBJ_NOT_FOUND in message or VOL_NOT_FOUND in message) and not_exist_err:
                 raise array_errors.ObjectNotFoundError(volume_id_or_name)
-            raise ex
+            raise
 
     @register_csi_plugin()
     def delete_volume(self, volume_id, partition_name=None):
@@ -1212,7 +1219,7 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
         if not space_efficiency:
             space_efficiency_aliases = _get_cli_volume_space_efficiency_aliases(source_cli_volume)
             space_efficiency = space_efficiency_aliases.pop()
-        size_in_bytes = int(source_cli_volume.capacity)
+        size_in_bytes = _parse_cli_capacity_bytes(source_cli_volume.capacity)
         io_group = source_cli_volume.IO_group_name
         self._create_cli_volume(target_volume_name, size_in_bytes, space_efficiency, pool, io_group, None)
 
@@ -1244,7 +1251,7 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
                                 " for source '{0}' and target '{1}'".format(source_volume_name,
                                                                             target_volume_name))
                 else:
-                    raise ex
+                    raise
 
     def _start_fcmap(self, fcmap_id):
         logger.info("starting FlashCopy Mapping '{0}'".format(fcmap_id))
@@ -1265,7 +1272,7 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
                 if FCMAP_ALREADY_COPYING in message:
                     logger.info("FlashCopy Mapping '{0}' already copying".format(fcmap_id))
                 else:
-                    raise ex
+                    raise
 
     def _create_and_start_fcmap(self, source_volume_name, target_volume_name, is_copy):
         self._create_fcmap(source_volume_name, target_volume_name, is_copy)
@@ -1275,22 +1282,29 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
 
     def _delete_fcmap(self, fcmap_id, force):
         logger.info("deleting fcmap with id : {0}".format(fcmap_id))
-        try:
-            self.sdk.svc_task_api.rmfcmap_id_post(
-                id=str(fcmap_id),
-                x_auth_token=None,
-                rmfcmap_id_post_request=svc_models.RmfcmapIdPostRequest(force=force),
-            )
-        except SdkApiException as ex:
-            message = _extract_sdk_error_message(ex)
-            logger.debug("Error running rmfcmap -object_id {} -force {}".format(fcmap_id, force))
-            code = message.split()[0] if message.split() else ''
-            if code.endswith('W'):
-                logger.warning("exception encountered during fcmap '{}' deletion: {}".format(fcmap_id,
-                                                                                             message))
-            else:
+        max_retries = 10
+        for attempt in range(max_retries):
+            try:
+                self.sdk.svc_task_api.rmfcmap_id_post(
+                    id=str(fcmap_id),
+                    x_auth_token=None,
+                    rmfcmap_id_post_request=svc_models.RmfcmapIdPostRequest(force=force),
+                )
+                return
+            except SdkApiException as ex:
+                message = _extract_sdk_error_message(ex)
+                logger.debug("Error running rmfcmap -object_id {} -force {}".format(fcmap_id, force))
+                code = message.split()[0] if message.split() else ''
+                if code.endswith('W'):
+                    logger.warning("exception encountered during fcmap '{}' deletion: {}".format(fcmap_id,
+                                                                                                 message))
+                    return
+                if FCMAP_STOPPING in message and attempt < max_retries - 1:
+                    logger.info("FlashCopy mapping '{}' is in stopping state, waiting before retry...".format(fcmap_id))
+                    time.sleep(1)
+                    continue
                 logger.error("Failed to delete fcmap '{0}': {1}".format(fcmap_id, ex))
-                raise ex
+                raise
 
     def _stop_fcmap(self, fcmap_id):
         logger.info("stopping fcmap with id : {0}".format(fcmap_id))
@@ -1312,7 +1326,7 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
                     logger.info("fcmap '{0}' is already in the stopped state".format(fcmap_id))
                 else:
                     logger.error("Failed to stop fcmap '{0}': {1}".format(fcmap_id, ex))
-                    raise ex
+                    raise
 
     def _safe_stop_and_delete_fcmap(self, fcmap):
         if not self._is_in_remote_copy_relationship(fcmap):
@@ -1355,7 +1369,10 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
 
     def _delete_unstarted_fcmap_if_exists(self, target_volume_name):
         target_cli_volume = self._get_cli_volume_if_exists(target_volume_name)
-        if target_cli_volume and target_cli_volume.FC_id:
+        fcmap = self._get_fcmap_as_target_if_exists(target_volume_name)
+        if fcmap:
+            self._delete_fcmap(fcmap.id, force=False)
+        elif target_cli_volume and getattr(target_cli_volume, 'FC_id', None):
             self._delete_fcmap(target_cli_volume.FC_id, force=False)
         return target_cli_volume
 
@@ -1363,7 +1380,7 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
         if target_cli_volume:
             self._rmvolume(target_cli_volume.name, not_exist_err=False)
 
-    @retry(svc_errors.StorageArrayClientException, tries=5, delay=1)
+    @retry(SdkApiException, tries=5, delay=1)
     def _rollback_create_snapshot(self, target_volume_name):
         target_cli_volume = self._delete_unstarted_fcmap_if_exists(target_volume_name)
         self._delete_target_volume_if_exists(target_cli_volume)
@@ -1372,11 +1389,11 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
         try:
             self._create_similar_volume(source_cli_volume, target_volume_name, space_efficiency, pool)
             return self._create_and_start_fcmap(source_cli_volume.name, target_volume_name, is_copy=False)
-        except (svc_errors.CommandExecutionError, CLIFailureError) as ex:
+        except SdkApiException as ex:
             logger.error("Failed to create snapshot '{0}': {1}".format(target_volume_name, ex))
             logger.info("rolling back create snapshot '{0}'".format(target_volume_name))
             self._rollback_create_snapshot(target_volume_name)
-            raise ex
+            raise
 
     def _get_pool_site(self, pool):
         filter_value = 'name={}'.format(pool)
@@ -1386,7 +1403,7 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
                 lsmdiskgrp_post_request=svc_models.LsmdiskgrpPostRequest(filtervalue=filter_value),
             )
             cli_pool = _SdkResponse(raw).as_single_element
-        except SdkApiException as ex:
+        except SdkApiException:
             logger.debug("Error running lsmdiskgrp -filtervalue {}".format(filter_value))
             raise
         if cli_pool:
@@ -1464,7 +1481,7 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
             logger.debug("Error running rmsnapshot -snapshotid {}".format(internal_snapshot_id))
             if SNAPSHOT_NOT_EXIST in message:
                 raise array_errors.ObjectNotFoundError(internal_snapshot_id)
-            raise ex
+            raise
 
     @register_csi_plugin()
     def delete_snapshot(self, snapshot_id, internal_snapshot_id, partition_name=None):
@@ -1640,7 +1657,7 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
                 x_auth_token=None,
             )
             cli_host = _SdkResponse(raw).as_single_element
-        except SdkApiException as ex:
+        except SdkApiException:
             logger.debug("Error running lshost {}".format(id_or_name))
             raise
         if not cli_host:
@@ -1854,7 +1871,7 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
             if port.get('IP_address'):
                 ips_by_node_id[port.node_id].append(port.IP_address)
             if port.get('IP_address_6'):
-                ipv6 = port.IP_address_6.join('[]')
+                ipv6 = '[{}]'.format(port.IP_address_6)
                 ips_by_node_id[port.node_id].append(ipv6)
         return dict(ips_by_node_id)
 
@@ -2016,7 +2033,7 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
                 lsrcrelationship_post_request=svc_models.LsrcrelationshipPostRequest(filtervalue=filter_value),
             )
             return _SdkResponse(raw)
-        except SdkApiException as ex:
+        except SdkApiException:
             logger.debug("Error running lsrcrelationship -filtervalue {}".format(filter_value))
             raise
 
@@ -2246,7 +2263,7 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
             return None
 
         dest_thin_volume = ThinVolume(
-            capacity_bytes=int(raw_cli_volume.capacity),
+            capacity_bytes=_parse_cli_capacity_bytes(raw_cli_volume.capacity),
             id=remote_uid,
             internal_id=remote_internal_id,
             name=raw_cli_volume.name,
@@ -2352,7 +2369,7 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
                                                                             aux_cli_volume_id,
                                                                             other_system_id,
                                                                             ex))
-                raise ex
+                raise
         return None
 
     def _start_rcrelationship(self, rcrelationship_id, primary_endpoint_type=None, force=False):
@@ -2549,8 +2566,9 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
     def _promote_ear_replication_to_independent(self, volume_group_id):
         try:
             self._chvolumegroupreplication(volume_group_id, mode=array_settings.ENDPOINT_TYPE_INDEPENDENT)
-        except (svc_errors.CommandExecutionError, CLIFailureError) as ex:
-            if EAR_PROMOTE_DIVERGED_COPY_NOT_SYNCED in ex.my_message:
+        except SdkApiException as ex:
+            message = _extract_sdk_error_message(ex)
+            if EAR_PROMOTE_DIVERGED_COPY_NOT_SYNCED in message:
                 logger.warning("volume group '{}' recovery copy is diverged and not yet synced, "
                                "retrying with accessdivergedcopy flag".format(volume_group_id))
                 self._chvolumegroupreplication(volume_group_id, mode=array_settings.ENDPOINT_TYPE_INDEPENDENT,
@@ -2570,9 +2588,10 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
 
         try:
             self._chvolumegroupreplication(volume_group_id, mode=array_settings.ENDPOINT_TYPE_PRODUCTION)
-        except (svc_errors.CommandExecutionError, CLIFailureError) as ex:
+        except SdkApiException as ex:
+            message = _extract_sdk_error_message(ex)
             is_remote_storage_unreachable = any(
-                code in ex.my_message
+                code in message
                 for code in (
                     EAR_PROMOTE_REMOTE_PARTNERSHIP_UNAVAILABLE,
                     EAR_PROMOTE_REMOTE_UNREACHABLE,
@@ -2580,11 +2599,11 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
             )
             if is_remote_storage_unreachable:
                 logger.warning("promote failed because remote storage is unreachable/disconnected, accepting promote "
-                               "with volume group '{}' state as independent: {}".format(volume_group_id, ex.my_message))
+                               "with volume group '{}' state as independent: {}".format(volume_group_id, message))
                 return
 
             is_remote_storage_vg_mode_not_ready = any(
-                code in ex.my_message
+                code in message
                 for code in (
                     EAR_PROMOTE_REMOTE_NOT_READY,
                     EAR_PROMOTE_REMOTE_INTERNAL_ERROR,
@@ -2593,10 +2612,10 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
             )
             if is_remote_storage_vg_mode_not_ready:
                 logger.warning("remote storage's volume group mode not independent yet for volume group '{}', "
-                               "replication operator will retry: {}".format(volume_group_id, ex.my_message))
-                raise array_errors.SecondaryStorageTransitionToProductionNotReadyError(ex.my_message)
+                               "replication operator will retry: {}".format(volume_group_id, message))
+                raise array_errors.SecondaryStorageTransitionToProductionNotReadyError(message)
             logger.error("failed to promote volume group '{}' to production: {}".format(
-                volume_group_id, ex.my_message))
+                volume_group_id, message))
             raise
 
     @register_csi_plugin()
@@ -2639,7 +2658,7 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
             self._demote_state_map[volume_group_name] = time.time()
 
             logger.info("First demote attempt for volume group {}, creating checkpoint".format(volume_group_name))
-            self._chvolumegroupreplication(volume_group_name, checkpoint=array_settings.CHECKPOINT)
+            self._chvolumegroupreplication(volume_group_name, checkpoint=True)
         else:
             # Retry - checkpoint already created, just check status
             first_attempt_time = self._demote_state_map[volume_group_name]
@@ -2693,7 +2712,7 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
                     raise array_errors.NotEnoughSpaceInPool(id_or_name=kwargs.get('pool'))
                 if any(msg_id in message for msg_id in (NON_ASCII_CHARS, INVALID_NAME, TOO_MANY_CHARS)):
                     raise array_errors.InvalidArgumentError(message)
-                raise ex
+                raise
             return None
 
     def _addsnapshot(self, name, source_volume_id, pool):
@@ -2709,12 +2728,6 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
             'retentionminutes': 5
         }
         return self._addsnapshotcommon(name, **kwargs)
-
-    def _get_id_from_response(self, response):
-        message = str(response.response[0])
-        id_start, id_end = message.find('[') + 1, message.find(']')
-        raw_id = message[id_start:id_end]
-        return int(raw_id)
 
     def _lsvolumesnapshot(self, **kwargs):
         try:
@@ -2789,7 +2802,7 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
                 if any(msg_id in message for msg_id in (NAME_NOT_EXIST_OR_MEET_RULES, NON_ASCII_CHARS,
                                                         INVALID_NAME, TOO_MANY_CHARS)):
                     raise array_errors.InvalidArgumentError(message)
-                raise ex
+                raise
         return None
 
     def _get_cli_volume_id_from_volume_group(self, filter, filter_parameter):
@@ -2847,7 +2860,7 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
             else:
                 if OBJ_ALREADY_EXIST in message:
                     raise array_errors.VolumeAlreadyExists(kwargs, self.endpoint)
-                raise ex
+                raise
 
     def _rmvolumegroup(self, id_or_name, not_exist_error=False):
         logger.info("deleting volume group : {0}".format(id_or_name))
@@ -2870,7 +2883,7 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
                     logger.warning(array_errors.ObjectNotFoundError(id_or_name))
                     if not not_exist_error:
                         return
-                raise ex
+                raise
 
     def _is_vdisk_has_fcmaps(self, vdisk_uid):
         if not vdisk_uid:
@@ -2916,7 +2929,7 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
             if code.endswith('W'):
                 logger.warning("exception encountered during host {} creation : {}".format(host_name, message))
             logger.warning("exception {}".format(message))
-            raise ex
+            raise
 
     @register_csi_plugin()
     def create_host(self, host_name, initiators, connectivity_type, io_group, partition_name=None, port_set=None):
@@ -2961,7 +2974,7 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
             if code.endswith('W'):
                 logger.warning("exception encountered during host {} deletion : {}".format(host_name, message))
                 return
-            raise ex
+            raise
 
     @register_csi_plugin()
     def delete_host(self, host_name):
@@ -2992,7 +3005,7 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
                 if code.endswith('W'):
                     logger.warning("exception encountered during adding port {} to host {} : {}".format(
                         port, host_name, message))
-                raise ex
+                raise
 
     @register_csi_plugin()
     def add_ports_to_host(self, host_name, initiators, connectivity_type):
@@ -3019,7 +3032,7 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
                 if code.endswith('W'):
                     logger.warning("exception encountered during removing port {} from host {} : {}".format(
                         port, host_name, message))
-                raise ex
+                raise
 
     @register_csi_plugin()
     def remove_ports_from_host(self, host_name, ports, connectivity_type):
@@ -3073,7 +3086,7 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
                 logger.warning("exception encountered during adding io_group {}, to host {} : {}".format(
                     io_group, host_name, message))
             else:
-                raise ex
+                raise
 
     def add_io_group_to_host(self, host_name, io_group):
         if not io_group:
@@ -3097,7 +3110,7 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
                 logger.warning("exception encountered during removing io_group {}, from host {} : {}".format(
                     io_group, host_name, message))
             else:
-                raise ex
+                raise
 
     def remove_io_group_from_host(self, host_name, io_group):
         if not io_group:
@@ -3115,7 +3128,9 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
         except SdkApiException as ex:
             message = _extract_sdk_error_message(ex)
             self._raise_error_when_host_not_exist_or_not_meet_the_rules(host_name, message)
-            if is_warning_message(message):
+            # SDK error messages are bare strings like "CMMVC5753W ..."; check the tag directly
+            words = message.split()
+            if words and words[0].endswith('W'):
                 logger.warning("exception encountered during getting io_group, from host {} : {}".format(
                     host_name, message))
                 return None
@@ -3167,7 +3182,7 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
             if code.endswith('W'):
                 logger.warning("exception encountered while changing protocol of host {} : {}".format(
                     host_name, message))
-            raise ex
+            raise
 
     def change_host_protocol(self, host_name, protocol):
         self._chhost(host_name, protocol)
@@ -3175,7 +3190,7 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
 
     def _generate_thin_volume_response(self, cli_volume):
         return ThinVolume(
-            capacity_bytes=int(cli_volume.capacity),
+            capacity_bytes=_parse_cli_capacity_bytes(cli_volume.capacity),
             id=cli_volume.vdisk_UID,
             internal_id=cli_volume.id,
             name=cli_volume.name,
@@ -3321,7 +3336,7 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
                     **cli_kwargs,
                 ),
             )
-        except SdkApiException as ex:
+        except Exception as ex:
             logger.debug("Error running registerplugin -name {} {}".format(plugin_name,
                                                                            self._format_cli_args(cli_kwargs)))
             logger.error("exception encountered during"
