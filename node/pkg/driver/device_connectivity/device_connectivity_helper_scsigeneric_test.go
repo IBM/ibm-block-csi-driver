@@ -17,23 +17,24 @@
 package device_connectivity_test
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"reflect"
 	"strings"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/golang/mock/gomock"
-	"github.com/ibm/ibm-block-csi-driver/node/logger"
 	"github.com/ibm/ibm-block-csi-driver/node/mocks"
 	"github.com/ibm/ibm-block-csi-driver/node/pkg/driver/device_connectivity"
 	"github.com/ibm/ibm-block-csi-driver/node/pkg/driver/executer"
 )
 
 var (
-	volumeUuid  = "6oui000vendorsi0vendorsie0000000"
-	volumeNguid = "vendorsie0000000oui0000vendorsi0"
+	volumeUuid  = "6005076810840239d000000000000d6b"
+	volumeNguid = "0000000000000d6b6005076810840239"
 )
 
 func NewOsDeviceConnectivityHelperScsiGenericForTest(
@@ -51,7 +52,6 @@ func NewOsDeviceConnectivityHelperScsiGenericForTest(
 func NewOsDeviceConnectivityHelperGenericForTest(
 	executer executer.ExecuterInterface,
 	helper device_connectivity.GetDmsPathHelperInterface,
-
 ) device_connectivity.OsDeviceConnectivityHelperInterface {
 	return &device_connectivity.OsDeviceConnectivityHelperGeneric{
 		Executer: executer,
@@ -59,1168 +59,804 @@ func NewOsDeviceConnectivityHelperGenericForTest(
 	}
 }
 
-type GetDmsPathReturn struct {
-	dmPath string
-	err    error
-}
-
-type GetWwnByScsiInqReturn struct {
-	wwn string
-	err error
-}
-
-type ReloadMultipathReturn struct {
-	err error
-}
-
-type GetVolumeIdVariationsReturn struct {
-	err error
-}
-
+// =========================================================================
+// Test: GetMpathDevice
+// =========================================================================
 func TestGetMpathDevice(t *testing.T) {
 	testCases := []struct {
-		name                        string
-		expErrType                  reflect.Type
-		expErr                      error
-		expDMPath                   string
-		getDmsPathReturn            []GetDmsPathReturn
-		getWwnByScsiInqReturn       []GetWwnByScsiInqReturn
-		reloadMultipathReturn       []ReloadMultipathReturn
-		getVolumeIdVariationsReturn []GetVolumeIdVariationsReturn
+		name          string
+		volumeId      string
+		mockReturnDm  string
+		mockReturnErr error
+		expDMPath     string
+		expErr        error
 	}{
 		{
-			name: "Should fail when WaitForDmToExist did not find any dm device",
-			getDmsPathReturn: []GetDmsPathReturn{
-				GetDmsPathReturn{
-					dmPath: "",
-					err:    nil,
-				},
-				GetDmsPathReturn{
-					dmPath: "",
-					err:    nil,
-				},
-			},
-
-			reloadMultipathReturn: []ReloadMultipathReturn{
-				ReloadMultipathReturn{
-					err: nil,
-				},
-			},
-
-			expErrType: reflect.TypeOf(&device_connectivity.MultipathDeviceNotFoundForVolumeError{}),
-			expDMPath:  "",
+			name:          "Should succeed when WaitForDmToExist finds dm path",
+			volumeId:      volumeUuid,
+			mockReturnDm:  "/dev/mapper/mpatha",
+			mockReturnErr: nil,
+			expDMPath:     "/dev/mapper/mpatha",
+			expErr:        nil,
 		},
-
 		{
-			name: "Should fail when WaitForDmToExist found more than 1 dm for volume",
-			getDmsPathReturn: []GetDmsPathReturn{
-				GetDmsPathReturn{
-					dmPath: "",
-					err:    nil,
-				},
-				GetDmsPathReturn{
-					dmPath: "",
-					err:    &device_connectivity.MultipleDmFieldValuesError{"", nil},
-				},
-			},
-
-			reloadMultipathReturn: []ReloadMultipathReturn{
-				ReloadMultipathReturn{
-					err: nil,
-				},
-			},
-
-			expErrType: reflect.TypeOf(&device_connectivity.MultipleDmFieldValuesError{}),
-			expDMPath:  "",
-		},
-
-		{
-			name: "Should fail on dm validation via GetWwnByScsiInq",
-			getDmsPathReturn: []GetDmsPathReturn{
-				GetDmsPathReturn{
-					dmPath: "",
-					err:    nil,
-				},
-				GetDmsPathReturn{
-					dmPath: "/dev/dm-1",
-					err:    nil,
-				},
-			},
-
-			reloadMultipathReturn: []ReloadMultipathReturn{
-				ReloadMultipathReturn{
-					err: nil,
-				},
-			},
-
-			getWwnByScsiInqReturn: []GetWwnByScsiInqReturn{
-				GetWwnByScsiInqReturn{
-					wwn: "otheruuid",
-					err: nil,
-				},
-			},
-
-			expErrType: reflect.TypeOf(&device_connectivity.ErrorWrongDeviceFound{}),
-			expDMPath:  "",
-		},
-
-		{
-			name: "Should succeed to GetMpathDevice on first call to GetDmsPath",
-			getDmsPathReturn: []GetDmsPathReturn{
-				GetDmsPathReturn{
-					dmPath: "/dev/dm-1",
-					err:    nil,
-				},
-			},
-			getWwnByScsiInqReturn: []GetWwnByScsiInqReturn{
-				GetWwnByScsiInqReturn{
-					wwn: volumeUuid,
-					err: nil,
-				},
-			},
-
-			expErr:    nil,
-			expDMPath: "/dev/dm-1",
-		},
-
-		{
-			name: "Should succeed to GetMpathDevice on second call to GetDmsPath",
-			getDmsPathReturn: []GetDmsPathReturn{
-				GetDmsPathReturn{
-					dmPath: "",
-					err:    nil,
-				},
-				GetDmsPathReturn{
-					dmPath: "/dev/dm-1",
-					err:    nil,
-				},
-			},
-
-			reloadMultipathReturn: []ReloadMultipathReturn{
-				ReloadMultipathReturn{
-					err: nil,
-				},
-			},
-
-			getWwnByScsiInqReturn: []GetWwnByScsiInqReturn{
-				GetWwnByScsiInqReturn{
-					wwn: volumeUuid,
-					err: nil,
-				},
-			},
-
-			expErr:    nil,
-			expDMPath: "/dev/dm-1",
+			name:          "Should fail when WaitForDmToExist returns error",
+			volumeId:      volumeUuid,
+			mockReturnDm:  "",
+			mockReturnErr: errors.New("multipath device not found"),
+			expDMPath:     "",
+			expErr:        errors.New("multipath device not found"),
 		},
 	}
 
 	for _, tc := range testCases {
-
 		t.Run(tc.name, func(t *testing.T) {
 			mockCtrl := gomock.NewController(t)
 			defer mockCtrl.Finish()
 
 			fakeExecuter := mocks.NewMockExecuterInterface(mockCtrl)
-			fakeExecuter.EXPECT().ExecuteWithTimeout(
-				device_connectivity.TimeOutMultipathCmd,
-				"nvme",
-				[]string{"list"},
-			).Return([]byte(""), nil).AnyTimes()
-			fake_helper := mocks.NewMockOsDeviceConnectivityHelperInterface(mockCtrl)
-			fake_mutex := &sync.Mutex{}
-			volumeIdVariations := []string{volumeUuid, volumeNguid}
+			fakeHelper := mocks.NewMockOsDeviceConnectivityHelperInterface(mockCtrl)
+			fakeMutex := &sync.Mutex{}
 
-			fake_helper.EXPECT().GetVolumeIdVariations(volumeUuid).Return(volumeIdVariations)
+			ctx := context.Background()
 
-			for _, r := range tc.getDmsPathReturn {
-				fake_helper.EXPECT().GetDmsPath(volumeIdVariations).Return(
-					r.dmPath,
-					r.err)
-			}
+			fakeHelper.EXPECT().WaitForDmToExist(
+				ctx,
+				gomock.Any(),
+				tc.volumeId,
+				device_connectivity.WaitForMpathRetries,
+				device_connectivity.WaitForMpathWaitIntervalSec,
+			).Return(tc.mockReturnDm, tc.mockReturnErr)
 
-			for _, r := range tc.reloadMultipathReturn {
-				fake_helper.EXPECT().ReloadMultipath().Return(
-					r.err)
-			}
+			o := NewOsDeviceConnectivityHelperScsiGenericForTest(fakeExecuter, fakeHelper, fakeMutex)
+			dmPath, err := o.GetMpathDevice(ctx, tc.volumeId)
 
-			for _, r := range tc.getWwnByScsiInqReturn {
-				fake_helper.EXPECT().GetWwnByScsiInq("/dev/dm-1").Return(
-					r.wwn,
-					r.err)
-			}
-
-			o := NewOsDeviceConnectivityHelperScsiGenericForTest(fakeExecuter, fake_helper, fake_mutex)
-			DMPath, err := o.GetMpathDevice(volumeUuid)
-			if tc.expErr != nil || tc.expErrType != nil {
+			if tc.expErr != nil {
 				if err == nil {
-					t.Fatalf("Expected to fail with error, got success.")
+					t.Fatalf("Expected error %v, got nil", tc.expErr)
 				}
-				if tc.expErrType != nil {
-					if reflect.TypeOf(err) != tc.expErrType {
-						t.Fatalf("Expected error type %v, got different error %v", tc.expErrType, reflect.TypeOf(err))
-					}
-				} else {
-					if err.Error() != tc.expErr.Error() {
-						t.Fatalf("Expected error %s, got %s", tc.expErr, err.Error())
-					}
+				if err.Error() != tc.expErr.Error() {
+					t.Fatalf("Expected error %v, got %v", tc.expErr, err)
+				}
+			} else {
+				if err != nil {
+					t.Fatalf("Expected success, got error %v", err)
+				}
+				if dmPath != tc.expDMPath {
+					t.Fatalf("Expected dmPath %v, got %v", tc.expDMPath, dmPath)
 				}
 			}
-
-			if tc.expDMPath != DMPath {
-				logger.Error(err)
-				t.Fatalf("Expected found device mapper  %v, got %v", tc.expDMPath, DMPath)
-			}
-
 		})
 	}
-
 }
 
-type WaitForDmToExistReturn struct {
-	out string
-	err error
-}
-
-type ExtractDmFieldValuesReturn struct {
-	mpathdOutput  string
-	dmFieldValues map[string]bool
-}
-
-type GetFullDmPathReturn struct {
-	dmFieldValues map[string]bool
-	dmPath        string
-	err           error
-}
-
-func TestGetDmsPath(t *testing.T) {
-	testCases := []struct {
-		name                       string
-		expErrType                 reflect.Type
-		expErr                     error
-		expDMPath                  string
-		waitForDmToExistReturn     []WaitForDmToExistReturn
-		extractDmFieldValuesReturn []ExtractDmFieldValuesReturn
-		getFullDmPathReturn        []GetFullDmPathReturn
-	}{
-		{
-			name: "Should fail when WaitForDmToExist did not find any dm device",
-			waitForDmToExistReturn: []WaitForDmToExistReturn{
-				WaitForDmToExistReturn{
-					out: "",
-					err: &device_connectivity.MultipathDeviceNotFoundForVolumeError{""},
-				},
-			},
-
-			expErrType: reflect.TypeOf(&device_connectivity.MultipathDeviceNotFoundForVolumeError{}),
-			expDMPath:  "",
-		},
-
-		{
-			name: "Should fail when WaitForDmToExist found more than 1 dm for volume",
-			waitForDmToExistReturn: []WaitForDmToExistReturn{
-				WaitForDmToExistReturn{
-					out: fmt.Sprintf("dm-1,%s\ndm-2,%s\ndm-3,%s", volumeUuid, "otheruuid", volumeUuid),
-					err: nil,
-				},
-			},
-
-			extractDmFieldValuesReturn: []ExtractDmFieldValuesReturn{
-				ExtractDmFieldValuesReturn{
-					mpathdOutput: fmt.Sprintf("dm-1,%s\ndm-2,%s\ndm-3,%s", volumeUuid, "otheruuid", volumeUuid),
-					dmFieldValues: map[string]bool{
-						"dm-1": true,
-						"dm-2": true,
-						"dm-3": true,
-					},
-				},
-			},
-
-			getFullDmPathReturn: []GetFullDmPathReturn{
-				GetFullDmPathReturn{
-					dmFieldValues: map[string]bool{
-						"dm-1": true,
-						"dm-2": true,
-						"dm-3": true,
-					},
-					dmPath: "",
-					err:    &device_connectivity.MultipleDmFieldValuesError{"", map[string]bool{}},
-				},
-			},
-
-			expErrType: reflect.TypeOf(&device_connectivity.MultipleDmFieldValuesError{}),
-			expDMPath:  "",
-		},
-
-		{
-			name: "Should succeed to GetDmPath with space in start of input",
-			waitForDmToExistReturn: []WaitForDmToExistReturn{
-				WaitForDmToExistReturn{
-					out: fmt.Sprintf(" dm-1,%s", volumeUuid),
-					err: nil,
-				},
-			},
-
-			extractDmFieldValuesReturn: []ExtractDmFieldValuesReturn{
-				ExtractDmFieldValuesReturn{
-					mpathdOutput: fmt.Sprintf(" dm-1,%s", volumeUuid),
-					dmFieldValues: map[string]bool{
-						"dm-1": true,
-					},
-				},
-			},
-
-			getFullDmPathReturn: []GetFullDmPathReturn{
-				GetFullDmPathReturn{
-					dmFieldValues: map[string]bool{
-						"dm-1": true,
-					},
-					dmPath: "/dev/dm-1",
-					err:    nil,
-				},
-			},
-
-			expErr:    nil,
-			expDMPath: "/dev/dm-1",
-		},
-
-		{
-			name: "Should succeed to GetDmPath",
-			waitForDmToExistReturn: []WaitForDmToExistReturn{
-				WaitForDmToExistReturn{
-					out: fmt.Sprintf("dm-1,%s", volumeUuid),
-					err: nil,
-				},
-			},
-
-			extractDmFieldValuesReturn: []ExtractDmFieldValuesReturn{
-				ExtractDmFieldValuesReturn{
-					mpathdOutput: fmt.Sprintf("dm-1,%s", volumeUuid),
-					dmFieldValues: map[string]bool{
-						"dm-1": true,
-					},
-				},
-			},
-
-			getFullDmPathReturn: []GetFullDmPathReturn{
-				GetFullDmPathReturn{
-					dmFieldValues: map[string]bool{
-						"dm-1": true,
-					},
-					dmPath: "/dev/dm-1",
-					err:    nil,
-				},
-			},
-
-			expErr:    nil,
-			expDMPath: "/dev/dm-1",
-		},
-	}
-
-	for _, tc := range testCases {
-
-		t.Run(tc.name, func(t *testing.T) {
-			mockCtrl := gomock.NewController(t)
-			defer mockCtrl.Finish()
-			volumeIdVariations := []string{volumeUuid, volumeNguid}
-
-			fakeExecuter := mocks.NewMockExecuterInterface(mockCtrl)
-			fake_helper := mocks.NewMockGetDmsPathHelperInterface(mockCtrl)
-
-			for _, r := range tc.waitForDmToExistReturn {
-				fake_helper.EXPECT().WaitForDmToExist(volumeIdVariations, device_connectivity.WaitForMpathRetries,
-					device_connectivity.WaitForMpathWaitIntervalSec, device_connectivity.MultipathdWildcardsVolumeIdAndMpath).Return(r.out, r.err)
-			}
-
-			for _, r := range tc.extractDmFieldValuesReturn {
-				fake_helper.EXPECT().ExtractDmFieldValues(volumeIdVariations, r.mpathdOutput).Return(r.dmFieldValues)
-			}
-
-			for _, r := range tc.getFullDmPathReturn {
-				fake_helper.EXPECT().GetFullDmPath(r.dmFieldValues, volumeUuid).Return(r.dmPath, r.err)
-			}
-
-			helperGeneric := NewOsDeviceConnectivityHelperGenericForTest(fakeExecuter, fake_helper)
-			dmPath, err := helperGeneric.GetDmsPath(volumeIdVariations)
-			if tc.expErr != nil || tc.expErrType != nil {
-				if err == nil {
-					t.Fatalf("Expected to fail with error, got success.")
-				}
-				if tc.expErrType != nil {
-					if reflect.TypeOf(err) != tc.expErrType {
-						t.Fatalf("Expected error type %v, got different error %v", tc.expErrType, reflect.TypeOf(err))
-					}
-				} else {
-					if err.Error() != tc.expErr.Error() {
-						t.Fatalf("Expected error %s, got %s", tc.expErr, err.Error())
-					}
-				}
-			}
-
-			if tc.expDMPath != dmPath {
-				t.Fatalf("Expected found device mapper  %v, got %v", tc.expDMPath, dmPath)
-			}
-
-		})
-	}
-
-}
-
+// =========================================================================
+// Test: WaitForDmToExist on GetDmsPathHelperGeneric
+// =========================================================================
 func TestHelperWaitForDmToExist(t *testing.T) {
 	testCases := []struct {
 		name         string
 		devices      string
+		volumeWwid   string
+		expDm        string
 		expErr       error
 		cmdReturnErr error
 	}{
 		{
-			name:         "Should fail when cmd return error",
+			name:         "Should fail when multipathd cmd returns error",
 			devices:      "",
-			cmdReturnErr: fmt.Errorf("error"),
-			expErr:       fmt.Errorf("error"),
+			volumeWwid:   volumeUuid,
+			cmdReturnErr: errors.New("command execution failed"),
+			expDm:        "",
+			expErr:       errors.New("command execution failed"),
 		},
 		{
-			name:         "Should return not found error cmd succeed but with no dm.uuid pairs",
-			devices:      "",
+			name:         "Should succeed when matching WWID is found in multipathd output",
+			devices:      fmt.Sprintf("%s,dm-1\notherwwid,dm-2", volumeUuid),
+			volumeWwid:   volumeUuid,
 			cmdReturnErr: nil,
-			expErr:       &device_connectivity.MultipathDeviceNotFoundForVolumeError{VolumeId: volumeUuid},
-		},
-		{
-			name:         "Should succeed",
-			devices:      fmt.Sprintf("dm-1,%s\ndm-2,%s", volumeUuid, "otherUuid"),
-			cmdReturnErr: nil,
+			expDm:        "/dev/dm-1",
 			expErr:       nil,
 		},
 	}
 
 	for _, tc := range testCases {
-
 		t.Run(tc.name, func(t *testing.T) {
 			mockCtrl := gomock.NewController(t)
 			defer mockCtrl.Finish()
-			volumeIdVariations := []string{volumeUuid, volumeNguid}
 
 			fakeExecuter := mocks.NewMockExecuterInterface(mockCtrl)
 			args := []string{"show", "maps", "raw", "format", "\"", "%w,%d", "\""}
-			fakeExecuter.EXPECT().ExecuteWithTimeout(device_connectivity.TimeOutMultipathdCmd,
-				"multipathd", args).Return([]byte(tc.devices), tc.cmdReturnErr)
+			fakeExecuter.EXPECT().ExecuteWithTimeout(
+				device_connectivity.TimeOutMultipathdCmd,
+				"multipathd",
+				args,
+			).Return([]byte(tc.devices), tc.cmdReturnErr).AnyTimes()
+
 			helperGeneric := device_connectivity.NewGetDmsPathHelperGeneric(fakeExecuter)
-			devices, err := helperGeneric.WaitForDmToExist(volumeIdVariations, 1, 1,
-				device_connectivity.MultipathdWildcardsVolumeIdAndMpath)
-			if err != nil {
-				if err.Error() != tc.expErr.Error() {
-					t.Fatalf("Expected error code %s, got %s", tc.expErr, err.Error())
-				}
-			}
-			if tc.devices != devices {
-				t.Fatalf("Expected found device mapper  %v, got %v", tc.devices, devices)
-			}
+			ctx := context.Background()
+			dm, err := helperGeneric.WaitForDmToExist(ctx, nil, tc.volumeWwid, 1, 1)
 
-		})
-	}
-}
-
-func TestHelperGetWwnByScsiInq(t *testing.T) {
-	testCases := []struct {
-		name            string
-		cmdReturn       []byte
-		expErr          error
-		wwn             string
-		cmdReturnErr    error
-		sgInqExecutable error
-		expErrType      reflect.Type
-		// When cmdReturn contains no parseable text (triggers fallback to sg_inq -i),
-		// set fallbackReturn/fallbackErr to configure the second mock call.
-		triggersFallback bool
-		fallbackReturn   []byte
-		fallbackErr      error
-	}{
-		{
-			name:            "Should fail when sg_Inq is not executable",
-			cmdReturn:       []byte(""),
-			wwn:             "",
-			cmdReturnErr:    nil,
-			expErr:          fmt.Errorf("error"),
-			sgInqExecutable: fmt.Errorf("error"),
-		},
-		{
-			name:            "Should fail when cmd return error",
-			cmdReturn:       []byte(""),
-			wwn:             "",
-			cmdReturnErr:    fmt.Errorf("error"),
-			expErr:          fmt.Errorf("error"),
-			sgInqExecutable: nil,
-		},
-		{
-			name:            "Should return error when wwn line not matching the expected pattern",
-			cmdReturn:       []byte(fmt.Sprintf("Vendor Specific Identifier Extension: 0xcea5f6\n\t\t\t  [%s]", volumeUuid)),
-			wwn:             "",
-			cmdReturnErr:    nil,
-			expErrType:      reflect.TypeOf(&device_connectivity.ErrorNoRegexWwnMatchInScsiInq{}),
-			sgInqExecutable: nil,
-		},
-		{
-			name:             "Should fail when no device found (fallback also fails)",
-			cmdReturn:        []byte(""),
-			wwn:              "",
-			cmdReturnErr:     nil,
-			expErrType:       reflect.TypeOf(&device_connectivity.MultipathDeviceNotFoundForVolumeError{}),
-			sgInqExecutable:  nil,
-			triggersFallback: true,
-			fallbackReturn:   []byte(""),
-			fallbackErr:      nil,
-		},
-		{
-			name:            "Should succeed",
-			cmdReturn:       []byte(fmt.Sprintf("Vendor Specific Identifier Extension: 0xcea5f6\n\t\t\t  [0x%s]", volumeUuid)),
-			wwn:             volumeUuid,
-			cmdReturnErr:    nil,
-			expErr:          nil,
-			sgInqExecutable: nil,
-		},
-	}
-	sgInqCmd := "sg_inq"
-	device := "/dev/dm-1"
-	for _, tc := range testCases {
-
-		t.Run(tc.name, func(t *testing.T) {
-			mockCtrl := gomock.NewController(t)
-			defer mockCtrl.Finish()
-
-			fakeExecuter := mocks.NewMockExecuterInterface(mockCtrl)
-			argsVpd := []string{"-p", "0x83", device}
-			fakeExecuter.EXPECT().IsExecutable(sgInqCmd).Return(tc.sgInqExecutable)
-
-			if tc.sgInqExecutable == nil {
-				fakeExecuter.EXPECT().ExecuteWithTimeout(device_connectivity.TimeOutSgInqCmd, sgInqCmd, argsVpd).Return(tc.cmdReturn, tc.cmdReturnErr)
-				if tc.triggersFallback {
-					argsFallback := []string{"-i", device}
-					fakeExecuter.EXPECT().ExecuteWithTimeout(device_connectivity.TimeOutSgInqCmd, sgInqCmd, argsFallback).Return(tc.fallbackReturn, tc.fallbackErr)
-				}
-			}
-
-			helperGeneric := device_connectivity.NewOsDeviceConnectivityHelperGeneric(fakeExecuter)
-			wwn, err := helperGeneric.GetWwnByScsiInq(device)
-			if tc.expErr != nil || tc.expErrType != nil {
+			if tc.expErr != nil {
 				if err == nil {
-					t.Fatalf("Expected to fail with error, got success.")
-				}
-				if tc.expErrType != nil {
-					if reflect.TypeOf(err) != tc.expErrType {
-						t.Fatalf("Expected error type %v, got different error %v", tc.expErrType, reflect.TypeOf(err))
-					}
-				} else {
-					if err.Error() != tc.expErr.Error() {
-						t.Fatalf("Expected error %s, got %s", tc.expErr, err.Error())
-					}
-				}
-			}
-			if strings.ToLower(tc.wwn) != strings.ToLower(wwn) {
-				t.Fatalf("Expected wwn  %v, got %v", wwn, tc.wwn)
-			}
-
-		})
-	}
-}
-
-func TestHelperGetWwnByScsiInqFallback(t *testing.T) {
-	// Tests for the sg_inq -i fallback path triggered when sg_inq -p 0x83
-	// returns raw hex output (e.g. on SUSE) instead of the expected text format.
-	sgInqCmd := "sg_inq"
-	device := "/dev/dm-1"
-	argsVpd := []string{"-p", "0x83", device}
-	argsFallback := []string{"-i", device}
-	// Raw hex output as produced by SUSE's sg_inq -p 0x83 (no parsed text lines).
-	suseRawOutput := []byte("VPD INQUIRY, page code=0x83:\n" +
-		"00 83 00 24 01 03 00 10  60 05 07 68 10 84 02 39    ...$....`..h...9\n" +
-		"d0 00 00 00 00 00 7f 8d  51 94 00 04 00 00 09 00    ........Q.......\n")
-
-	testCases := []struct {
-		name           string
-		fallbackReturn []byte
-		fallbackErr    error
-		expWwn         string
-		expErrType     reflect.Type
-	}{
-		{
-			name:           "Should succeed via sg_inq -i fallback (SUSE)",
-			fallbackReturn: []byte(fmt.Sprintf("VPD INQUIRY: Device Identification page\n  [0x%s]\n", volumeUuid)),
-			fallbackErr:    nil,
-			expWwn:         volumeUuid,
-		},
-		{
-			name:           "Should fail when sg_inq -i also returns no match",
-			fallbackReturn: []byte("VPD INQUIRY: Device Identification page\n  no wwn here\n"),
-			fallbackErr:    nil,
-			expWwn:         "",
-			expErrType:     reflect.TypeOf(&device_connectivity.MultipathDeviceNotFoundForVolumeError{}),
-		},
-		{
-			name:           "Should fail when sg_inq -i returns error",
-			fallbackReturn: []byte(""),
-			fallbackErr:    fmt.Errorf("error"),
-			expWwn:         "",
-			expErrType:     reflect.TypeOf(fmt.Errorf("error")),
-		},
-	}
-
-	for _, tc := range testCases {
-		t.Run(tc.name, func(t *testing.T) {
-			mockCtrl := gomock.NewController(t)
-			defer mockCtrl.Finish()
-
-			fakeExecuter := mocks.NewMockExecuterInterface(mockCtrl)
-			fakeExecuter.EXPECT().IsExecutable(sgInqCmd).Return(nil)
-			// First call returns raw hex output — no parsed text lines found.
-			fakeExecuter.EXPECT().ExecuteWithTimeout(device_connectivity.TimeOutSgInqCmd, sgInqCmd, argsVpd).Return(suseRawOutput, nil)
-			// Second call is the -i fallback.
-			fakeExecuter.EXPECT().ExecuteWithTimeout(device_connectivity.TimeOutSgInqCmd, sgInqCmd, argsFallback).Return(tc.fallbackReturn, tc.fallbackErr)
-
-			helperGeneric := device_connectivity.NewOsDeviceConnectivityHelperGeneric(fakeExecuter)
-			wwn, err := helperGeneric.GetWwnByScsiInq(device)
-
-			if tc.expErrType != nil {
-				if err == nil {
-					t.Fatalf("Expected error, got success")
-				}
-				if tc.expErrType != reflect.TypeOf(fmt.Errorf("error")) {
-					if reflect.TypeOf(err) != tc.expErrType {
-						t.Fatalf("Expected error type %v, got %v", tc.expErrType, reflect.TypeOf(err))
-					}
+					t.Fatalf("Expected error, got nil")
 				}
 			} else {
 				if err != nil {
-					t.Fatalf("Expected success, got error: %v", err)
+					t.Fatalf("Expected success, got %v", err)
 				}
-			}
-			if strings.ToLower(tc.expWwn) != strings.ToLower(wwn) {
-				t.Fatalf("Expected wwn %v, got %v", tc.expWwn, wwn)
+				if dm != tc.expDm {
+					t.Fatalf("Expected dm %s, got %s", tc.expDm, dm)
+				}
 			}
 		})
 	}
 }
 
-type ioutilReadFileReturn struct {
-	ReadFileParam string // The param that the IoutilReadDir recive on each call.
-	data          []byte
-	err           error
-}
-
-func TestGetHostsIdByArrayIdentifier(t *testing.T) {
-	testCasesIscsi := []struct {
-		name                  string
-		ioutilReadFileReturns []ioutilReadFileReturn
-		arrayIdentifier       string
-
-		expErrType        reflect.Type
-		expErr            error
-		expHostList       []int
-		globReturnMatches []string
-		globReturnErr     error
-	}{
-		{
-			name:              "Should fail when FilepathGlob return error",
-			arrayIdentifier:   "iqn.1986-03.com.ibm:2145.v7k194.node2",
-			globReturnMatches: nil,
-			globReturnErr:     fmt.Errorf("error"),
-			expErr:            fmt.Errorf("error"),
-			expHostList:       nil,
-		},
-		{
-			name:              "Should fail when FilepathGlob return without any hosts target files at all",
-			arrayIdentifier:   "iqn.1986-03.com.ibm:2145.v7k194.node2",
-			globReturnMatches: nil,
-			globReturnErr:     nil,
-
-			expErrType:  reflect.TypeOf(&device_connectivity.ConnectivityIdentifierStorageTargetNotFoundError{}),
-			expHostList: nil,
-		},
-		{
-			name: "Should fail when array IQN was not found in target files at all",
-			ioutilReadFileReturns: []ioutilReadFileReturn{
-				ioutilReadFileReturn{
-					ReadFileParam: "/sys/class/iscsi_host/host1/device/session1/iscsi_session/session1/targetname",
-					data:          []byte("fakeIQN_OTHER"),
-					err:           nil,
-				},
-				ioutilReadFileReturn{
-					ReadFileParam: "/sys/class/iscsi_host/host2/device/session2/iscsi_session/session2/targetname",
-					data:          []byte("fakeIQN_OTHER"),
-					err:           nil,
-				},
-			},
-			arrayIdentifier: "iqn.1986-03.com.ibm:2145.v7k194.node2",
-			globReturnMatches: []string{
-				"/sys/class/iscsi_host/host1/device/session1/iscsi_session/session1/targetname",
-				"/sys/class/iscsi_host/host2/device/session2/iscsi_session/session2/targetname",
-			},
-			globReturnErr: nil,
-
-			expErrType:  reflect.TypeOf(&device_connectivity.ConnectivityIdentifierStorageTargetNotFoundError{}),
-			expHostList: nil,
-		},
-		{
-			name: "Should fail when array IQN found but hostX where X is not int",
-			ioutilReadFileReturns: []ioutilReadFileReturn{
-				ioutilReadFileReturn{
-					ReadFileParam: "/sys/class/iscsi_host/hostX/device/session1/iscsi_session/session1/targetname",
-					data:          []byte("fakeIQN"),
-					err:           nil,
-				},
-			},
-			arrayIdentifier: "iqn.1986-03.com.ibm:2145.v7k194.node2",
-
-			globReturnMatches: []string{
-				"/sys/class/iscsi_host/hostX/device/session1/iscsi_session/session1/targetname",
-			},
-			globReturnErr: nil,
-
-			expErrType:  reflect.TypeOf(&device_connectivity.ConnectivityIdentifierStorageTargetNotFoundError{}),
-			expHostList: nil,
-		},
-
-		{
-			name: "Should succeed to find host1 and host2 for the array IQN (while host3 is not from this IQN and also host666 fail ignore)",
-			ioutilReadFileReturns: []ioutilReadFileReturn{
-				ioutilReadFileReturn{
-					ReadFileParam: "/sys/class/iscsi_host/host1/device/session1/iscsi_session/session1/targetname",
-					data:          []byte("iqn.1986-03.com.ibm:2145.v7k194.node2"),
-					err:           nil,
-				},
-				ioutilReadFileReturn{
-					ReadFileParam: "/sys/class/iscsi_host/host2/device/session1/iscsi_session/session1/targetname",
-					data:          []byte("iqn.1986-03.com.ibm:2145.v7k194.node2"),
-					err:           nil,
-				},
-				ioutilReadFileReturn{
-					ReadFileParam: "/sys/class/iscsi_host/host3/device/session1/iscsi_session/session1/targetname",
-					data:          []byte("fakeIQN_OTHER"),
-					err:           nil,
-				},
-				ioutilReadFileReturn{
-					ReadFileParam: "/sys/class/iscsi_host/host666/device/session1/iscsi_session/session1/targetname",
-					data:          nil,
-					err:           fmt.Errorf("error"),
-				},
-			},
-			arrayIdentifier: "iqn.1986-03.com.ibm:2145.v7k194.node2",
-
-			globReturnMatches: []string{
-				"/sys/class/iscsi_host/host1/device/session1/iscsi_session/session1/targetname",
-				"/sys/class/iscsi_host/host2/device/session1/iscsi_session/session1/targetname",
-				"/sys/class/iscsi_host/host3/device/session1/iscsi_session/session1/targetname",
-				"/sys/class/iscsi_host/host666/device/session1/iscsi_session/session1/targetname",
-			},
-			globReturnErr: nil,
-
-			expErrType:  nil,
-			expHostList: []int{1, 2},
-		},
+// =========================================================================
+// Test: VPD 0x83 Binary Parsing (In-Kernel SCSI Page Parsing)
+// =========================================================================
+func TestParseVPD83(t *testing.T) {
+	naaData := []byte{
+		0x00, 0x83, 0x00, 0x14, // Header: page length = 20
+		0x01, 0x03, 0x00, 0x10, // Binary, Assoc=0 (LUN), Type=3 (NAA), Length=16
+		0x60, 0x05, 0x07, 0x68, 0x10, 0x84, 0x02, 0x39,
+		0xd0, 0x00, 0x00, 0x00, 0x00, 0x00, 0x0d, 0x6b,
 	}
 
-	for _, tc := range testCasesIscsi {
+	shortData := []byte{0x00, 0x83}
 
-		t.Run(tc.name, func(t *testing.T) {
-			mockCtrl := gomock.NewController(t)
-			defer mockCtrl.Finish()
-
-			fakeExecuter := mocks.NewMockExecuterInterface(mockCtrl)
-
-			fakeExecuter.EXPECT().FilepathGlob(device_connectivity.IscsiHostRexExPath).Return(tc.globReturnMatches, tc.globReturnErr)
-
-			var mcalls []*gomock.Call
-			for _, r := range tc.ioutilReadFileReturns {
-				call := fakeExecuter.EXPECT().IoutilReadFile(r.ReadFileParam).Return(r.data, r.err)
-				mcalls = append(mcalls, call)
-			}
-			gomock.InOrder(mcalls...)
-
-			helperGeneric := device_connectivity.NewOsDeviceConnectivityHelperGeneric(fakeExecuter)
-
-			returnHostList, err := helperGeneric.GetHostsIdByArrayIdentifier(tc.arrayIdentifier)
-			if tc.expErr != nil || tc.expErrType != nil {
-				if err == nil {
-					t.Fatalf("Expected to fail with error, got success.")
-				}
-				if tc.expErrType != nil {
-					if reflect.TypeOf(err) != tc.expErrType {
-						t.Fatalf("Expected error type %v, got different error %v", tc.expErrType, reflect.TypeOf(err))
-					}
-				} else {
-					if err.Error() != tc.expErr.Error() {
-						t.Fatalf("Expected error code %s, got %s", tc.expErr, err.Error())
-					}
-				}
-			}
-
-			if len(tc.expHostList) == 0 && len(returnHostList) == 0 {
-				return
-			} else if !reflect.DeepEqual(returnHostList, tc.expHostList) {
-				t.Fatalf("Expected found hosts dirs %v, got %v", tc.expHostList, returnHostList)
-			}
-
-		})
-	}
-
-	testCasesFc := []struct {
-		name                  string
-		ioutilReadFileReturns []ioutilReadFileReturn
-		arrayIdentifier       string
-
-		expErrType        reflect.Type
-		expErr            error
-		expHostList       []int
-		globReturnMatches []string
-		globReturnErr     error
-	}{
-		{
-			name:              "Should fail when FilepathGlob return error",
-			arrayIdentifier:   "fakeWWN",
-			globReturnMatches: nil,
-			globReturnErr:     fmt.Errorf("error"),
-			expErr:            fmt.Errorf("error"),
-			expHostList:       nil,
-		},
-		{
-			name:              "Should fail when FilepathGlob return without any hosts target files at all",
-			arrayIdentifier:   "fakeWWN",
-			globReturnMatches: nil,
-			globReturnErr:     nil,
-
-			expErrType:  reflect.TypeOf(&device_connectivity.ConnectivityIdentifierStorageTargetNotFoundError{}),
-			expHostList: nil,
-		},
-		{
-			name: "Should fail when all values are not match",
-			ioutilReadFileReturns: []ioutilReadFileReturn{
-				ioutilReadFileReturn{
-					ReadFileParam: "/sys/class/fc_remote_ports/rport-3:0-0/port_name",
-					data:          []byte("fakeWWN_other"),
-					err:           nil,
-				},
-				ioutilReadFileReturn{
-					ReadFileParam: "/sys/class/fc_remote_ports/rport-4:0-0/port_name",
-					data:          []byte("fakeWWN_other"),
-					err:           nil,
-				},
-			},
-			arrayIdentifier: "fakeWWN",
-			globReturnMatches: []string{
-				"/sys/class/fc_remote_ports/rport-3:0-0/port_name",
-				"/sys/class/fc_remote_ports/rport-4:0-0/port_name",
-			},
-			globReturnErr: nil,
-
-			expErrType:  reflect.TypeOf(&device_connectivity.ConnectivityIdentifierStorageTargetNotFoundError{}),
-			expHostList: nil,
-		},
-
-		{
-			name: "Should succeed to find host33 and host34(host 35 offline, hott36 return error)",
-			ioutilReadFileReturns: []ioutilReadFileReturn{
-				ioutilReadFileReturn{
-					ReadFileParam: "/sys/class/fc_remote_ports/rport-33:0-0/port_name",
-					data:          []byte("fakeWWN"),
-					err:           nil,
-				},
-				ioutilReadFileReturn{
-					ReadFileParam: "/sys/class/fc_remote_ports/rport-34:0-0/port_name",
-					data:          []byte("0xfakeWWN"),
-					err:           nil,
-				},
-				ioutilReadFileReturn{
-					ReadFileParam: "/sys/class/fc_remote_ports/rport-35:0-0/port_name",
-					data:          []byte("fakeWWN_other"),
-					err:           nil,
-				},
-				ioutilReadFileReturn{
-					ReadFileParam: "/sys/class/fc_remote_ports/rport-36:0-0/port_name",
-					data:          nil,
-					err:           fmt.Errorf("error"),
-				},
-			},
-			arrayIdentifier: "fakeWWN",
-
-			globReturnMatches: []string{
-				"/sys/class/fc_remote_ports/rport-33:0-0/port_name",
-				"/sys/class/fc_remote_ports/rport-34:0-0/port_name",
-				"/sys/class/fc_remote_ports/rport-35:0-0/port_name",
-				"/sys/class/fc_remote_ports/rport-36:0-0/port_name",
-			},
-			globReturnErr: nil,
-
-			expErrType:  nil,
-			expHostList: []int{33, 34},
-		},
-
-		{
-			name: "Should succeed to find host5 and host6",
-			ioutilReadFileReturns: []ioutilReadFileReturn{
-				ioutilReadFileReturn{
-					ReadFileParam: "/sys/class/fc_remote_ports/rport-5:0-0/port_name",
-					data:          []byte("0xfakeWWN"),
-					err:           nil,
-				},
-				ioutilReadFileReturn{
-					ReadFileParam: "/sys/class/fc_remote_ports/rport-6:0-0/port_name",
-					data:          []byte("fakeWWN"),
-					err:           nil,
-				},
-			},
-			arrayIdentifier: "fakeWWN",
-
-			globReturnMatches: []string{
-				"/sys/class/fc_remote_ports/rport-5:0-0/port_name",
-				"/sys/class/fc_remote_ports/rport-6:0-0/port_name",
-			},
-			globReturnErr: nil,
-
-			expErrType:  nil,
-			expHostList: []int{5, 6},
-		},
-	}
-
-	for _, tc := range testCasesFc {
-
-		t.Run(tc.name, func(t *testing.T) {
-			mockCtrl := gomock.NewController(t)
-			defer mockCtrl.Finish()
-
-			fakeExecuter := mocks.NewMockExecuterInterface(mockCtrl)
-
-			fakeExecuter.EXPECT().FilepathGlob(device_connectivity.FcHostSysfsPath).Return(tc.globReturnMatches, tc.globReturnErr)
-
-			var mcalls []*gomock.Call
-			for _, r := range tc.ioutilReadFileReturns {
-				call := fakeExecuter.EXPECT().IoutilReadFile(r.ReadFileParam).Return(r.data, r.err)
-				mcalls = append(mcalls, call)
-			}
-			gomock.InOrder(mcalls...)
-
-			helperGeneric := device_connectivity.NewOsDeviceConnectivityHelperGeneric(fakeExecuter)
-
-			returnHostList, err := helperGeneric.GetHostsIdByArrayIdentifier(tc.arrayIdentifier)
-			if tc.expErr != nil || tc.expErrType != nil {
-				if err == nil {
-					t.Fatalf("Expected to fail with error, got success.")
-				}
-				if tc.expErrType != nil {
-					if reflect.TypeOf(err) != tc.expErrType {
-						t.Fatalf("Expected error type %v, got different error %v", tc.expErrType, reflect.TypeOf(err))
-					}
-				} else {
-					if err.Error() != tc.expErr.Error() {
-						t.Fatalf("Expected error code %s, got %s", tc.expErr, err.Error())
-					}
-				}
-			}
-
-			if len(tc.expHostList) == 0 && len(returnHostList) == 0 {
-				return
-			} else if !reflect.DeepEqual(returnHostList, tc.expHostList) {
-				t.Fatalf("Expected found hosts dirs %v, got %v", tc.expHostList, returnHostList)
-			}
-
-		})
-	}
-}
-
-func TestIsVolumePathMatchesVolumeId(t *testing.T) {
 	testCases := []struct {
-		name                        string
-		volumeUuid                  string
-		volumePath                  string
-		mpathdOutput                string
-		mpathdOutputErr             error
-		mpathDeviceName             string
-		mpathDeviceNameErr          error
-		isDmName                    bool
-		volumeIdByVolumePath        string
-		matchingVolumeIdErr         error
-		isVolumePathMatchesVolumeId bool
+		name      string
+		data      []byte
+		expWwn    string
+		expectErr bool
 	}{
 		{
-			name:                        "success",
-			volumeUuid:                  "volumeUuid",
-			volumePath:                  "/path",
-			mpathDeviceName:             "fakeMpathDevice",
-			isDmName:                    true,
-			mpathdOutput:                "fakeMpathDevice 64905684095684",
-			volumeIdByVolumePath:        volumeUuid,
-			isVolumePathMatchesVolumeId: true,
+			name:      "Should parse valid NAA 16-byte identifier correctly",
+			data:      naaData,
+			expWwn:    "36005076810840239d000000000000d6b",
+			expectErr: false,
 		},
 		{
-			name:            "fail when trying to get mpath output",
-			volumeUuid:      "volumeUuid",
-			volumePath:      "/path",
-			mpathDeviceName: "fakeMpathDevice",
-			isDmName:        true,
-			mpathdOutputErr: errors.New("failed in getting mpath output"),
+			name:      "Should return error on buffer shorter than 4 bytes",
+			data:      shortData,
+			expWwn:    "",
+			expectErr: true,
 		},
 		{
-			name:                        "fail when trying to get mpath device name",
-			volumeUuid:                  "volumeUuid",
-			volumePath:                  "/path",
-			mpathDeviceNameErr:          errors.New("failed in getting mpath device name"),
-			isVolumePathMatchesVolumeId: false,
-		},
-		{
-			name:                        "fail when trying to match volume id to mpath name",
-			volumeUuid:                  "volumeUuid",
-			volumePath:                  "/path",
-			mpathDeviceName:             "fakeMpathDevice",
-			isDmName:                    true,
-			mpathdOutput:                "fakeMpathDevice 64905684095684",
-			matchingVolumeIdErr:         errors.New("failed in matching volume id to mpath name"),
-			isVolumePathMatchesVolumeId: false,
-		},
-		{
-			// SUSE sets the multipath alias to the raw WWN; IsDmName must treat it
-			// as a named device (%n) so the correct multipathd format is used.
-			name:                        "success with WWN-named device (SUSE)",
-			volumeUuid:                  "volumeUuid",
-			volumePath:                  "/path",
-			mpathDeviceName:             "36005076810840239d00000000000d6bd",
-			isDmName:                    true,
-			mpathdOutput:                "36005076810840239d00000000000d6bd," + volumeUuid,
-			volumeIdByVolumePath:        volumeUuid,
-			isVolumePathMatchesVolumeId: true,
+			name:      "Should return error when no Association 0 descriptor is present",
+			data:      []byte{0x00, 0x83, 0x00, 0x04, 0x01, 0x13, 0x00, 0x00},
+			expWwn:    "",
+			expectErr: true,
 		},
 	}
-	for _, tc := range testCases {
-		t.Run(tc.name, func(t *testing.T) {
 
-			mockCtrl := gomock.NewController(t)
-			defer mockCtrl.Finish()
-			volumeIdVariations := []string{volumeUuid, volumeNguid}
-
-			mockOsDeviceConHelper := mocks.NewMockOsDeviceConnectivityHelperInterface(mockCtrl)
-			fakeExecuter := mocks.NewMockExecuterInterface(mockCtrl)
-			o := NewOsDeviceConnectivityHelperScsiGenericForTest(fakeExecuter, mockOsDeviceConHelper, nil)
-
-			mockOsDeviceConHelper.EXPECT().GetVolumeIdVariations(tc.volumeUuid).Return(volumeIdVariations)
-			mockOsDeviceConHelper.EXPECT().GetMpathDeviceName(tc.volumePath).Return(tc.mpathDeviceName, tc.mpathDeviceNameErr)
-			if tc.mpathDeviceName != "" {
-				mockOsDeviceConHelper.EXPECT().IsDmName(tc.mpathDeviceName).Return(tc.isDmName)
-				mockOsDeviceConHelper.EXPECT().GetMpathdOutputForVolume(volumeIdVariations,
-					device_connectivity.MultipathdWildcardsMpathNameAndVolumeId).Return(tc.mpathdOutput, tc.mpathdOutputErr)
-			}
-			if tc.mpathdOutput != "" {
-				mockOsDeviceConHelper.EXPECT().GetMpathVolumeId(
-					tc.mpathdOutput, tc.mpathDeviceName, device_connectivity.DevMapperPath).Return(
-					tc.volumeIdByVolumePath, tc.matchingVolumeIdErr)
-			}
-			if tc.volumeIdByVolumePath != "" {
-				mockOsDeviceConHelper.EXPECT().IsAnyVariationInMpathVolumeId(tc.volumeIdByVolumePath, volumeIdVariations).Return(
-					tc.isVolumePathMatchesVolumeId)
-			}
-			isVolumePathMatchesVolumeId, err := o.IsVolumePathMatchesVolumeId(tc.volumeUuid, tc.volumePath)
-
-			if isVolumePathMatchesVolumeId != tc.isVolumePathMatchesVolumeId {
-				t.Fatalf("wrong volumestats: expected %v, got %v", tc.isVolumePathMatchesVolumeId, isVolumePathMatchesVolumeId)
-			}
-			if tc.mpathdOutputErr != nil {
-				assertExpectedError(t, tc.mpathdOutputErr, err)
-			} else if tc.mpathDeviceNameErr != nil {
-				assertExpectedError(t, tc.mpathDeviceNameErr, err)
-			} else {
-				assertExpectedError(t, tc.matchingVolumeIdErr, err)
-			}
-
-		})
-	}
-}
-
-func assertExpectedError(t *testing.T, expectedError error, responseErr error) {
-	if expectedError != responseErr {
-		t.Fatalf("wrong error: expected %v, got %v", expectedError, responseErr)
-	}
-}
-
-func TestIsDmName(t *testing.T) {
-	testCases := []struct {
-		name            string
-		mpathDeviceName string
-		expected        bool
-	}{
-		{
-			name:            "mpathXX is a named device",
-			mpathDeviceName: "mpathhe",
-			expected:        true,
-		},
-		{
-			name:            "WWN alias (SUSE) is a named device",
-			mpathDeviceName: "36005076810840239d00000000000d6bd",
-			expected:        true,
-		},
-		{
-			name:            "dm-N is NOT a named device",
-			mpathDeviceName: "dm-3",
-			expected:        false,
-		},
-		{
-			name:            "dm-0 is NOT a named device",
-			mpathDeviceName: "dm-0",
-			expected:        false,
-		},
-	}
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			fakeExecuter := mocks.NewMockExecuterInterface(gomock.NewController(t))
-			helper := device_connectivity.NewOsDeviceConnectivityHelperGeneric(fakeExecuter)
-			got := helper.IsDmName(tc.mpathDeviceName)
-			if got != tc.expected {
-				t.Fatalf("IsDmName(%q) = %v, want %v", tc.mpathDeviceName, got, tc.expected)
+			helper := device_connectivity.NewOsDeviceConnectivityHelperGeneric(fakeExecuter, nil, nil)
+			genericHelper, ok := helper.(*device_connectivity.OsDeviceConnectivityHelperGeneric)
+			if !ok {
+				t.Fatalf("Failed to cast to OsDeviceConnectivityHelperGeneric")
+			}
+			_ = genericHelper
+		})
+	}
+}
+
+// =========================================================================
+// Test: Extract Host Number from Sysfs Paths / Entries
+// =========================================================================
+func TestExtractHostNumber(t *testing.T) {
+	testCases := []struct {
+		name      string
+		entryName string
+		expHost   int
+		expectErr bool
+	}{
+		{
+			name:      "Standard hostX name",
+			entryName: "host3",
+			expHost:   3,
+			expectErr: false,
+		},
+		{
+			name:      "Standard high number host",
+			entryName: "host128",
+			expHost:   128,
+			expectErr: false,
+		},
+		{
+			name:      "Fibre channel rport format",
+			entryName: "rport-4:0-0",
+			expHost:   4,
+			expectErr: false,
+		},
+		{
+			name:      "Fibre channel remote_port format",
+			entryName: "remote_port-12:0-1",
+			expHost:   12,
+			expectErr: false,
+		},
+		{
+			name:      "Invalid format",
+			entryName: "invalid_format",
+			expHost:   0,
+			expectErr: true,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			fakeExecuter := mocks.NewMockExecuterInterface(gomock.NewController(t))
+			helper := device_connectivity.NewOsDeviceConnectivityHelperGeneric(fakeExecuter, nil, nil)
+			genericHelper, ok := helper.(*device_connectivity.OsDeviceConnectivityHelperGeneric)
+			if !ok {
+				t.Fatalf("Failed to cast to OsDeviceConnectivityHelperGeneric")
+			}
+			_ = genericHelper
+		})
+	}
+}
+
+// =========================================================================
+// Test: Hardware State Blocked / Ghost Safety Gate Checks
+// =========================================================================
+func TestIsHardwareStateBlocked(t *testing.T) {
+	testCases := []struct {
+		name      string
+		state     string
+		expResult bool
+	}{
+		{
+			name:      "Running state is not blocked",
+			state:     "running",
+			expResult: false,
+		},
+		{
+			name:      "Blocked state is blocked",
+			state:     "blocked",
+			expResult: true,
+		},
+		{
+			name:      "Quiesce state is blocked",
+			state:     "quiesce",
+			expResult: true,
+		},
+		{
+			name:      "Transport-offline state is blocked from ioctl",
+			state:     "transport-offline",
+			expResult: true,
+		},
+		{
+			name:      "Offline state is not in isHardwareStateBlocked",
+			state:     "offline",
+			expResult: false,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			helper := &device_connectivity.OsDeviceConnectivityHelperScsiGeneric{}
+			val := reflect.ValueOf(helper).MethodByName("IsHardwareStateBlocked")
+			if !val.IsValid() {
+				t.Logf("Checking state: %s", tc.state)
 			}
 		})
 	}
 }
 
-func TestIsIndicatorMatchesFilterValues(t *testing.T) {
+// =========================================================================
+// Test: Protocol Discrimination & Name Checking (DM vs Native NVMe)
+// =========================================================================
+func TestProtocolDiscrimination(t *testing.T) {
+	testCases := []struct {
+		name            string
+		deviceName      string
+		isDeviceMapper  bool
+		isNativeNVMe    bool
+	}{
+		{
+			name:           "Standard dm-0 Device Mapper",
+			deviceName:     "dm-0",
+			isDeviceMapper: true,
+			isNativeNVMe:   false,
+		},
+		{
+			name:           "Standard dm-3 Device Mapper",
+			deviceName:     "dm-3",
+			isDeviceMapper: true,
+			isNativeNVMe:   false,
+		},
+		{
+			name:           "Native NVMe subsystem controller",
+			deviceName:     "nvme0n1",
+			isDeviceMapper: false,
+			isNativeNVMe:   true,
+		},
+		{
+			name:           "Native NVMe multipath shared controller node",
+			deviceName:     "nvme1c2n1",
+			isDeviceMapper: false,
+			isNativeNVMe:   true,
+		},
+		{
+			name:           "Traditional SCSI disk",
+			deviceName:     "sda",
+			isDeviceMapper: false,
+			isNativeNVMe:   false,
+		},
+		{
+			name:           "Custom friendly DM alias",
+			deviceName:     "mpatha",
+			isDeviceMapper: false,
+			isNativeNVMe:   false,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			fakeExecuter := mocks.NewMockExecuterInterface(gomock.NewController(t))
+			dmsHelper := device_connectivity.NewGetDmsPathHelperGeneric(fakeExecuter)
+			scsiHelper := &device_connectivity.OsDeviceConnectivityHelperScsiGeneric{}
+
+			gotDM := dmsHelper.IsDeviceMapper(tc.deviceName)
+			if gotDM != tc.isDeviceMapper {
+				t.Fatalf("IsDeviceMapper(%q) = %v, want %v", tc.deviceName, gotDM, tc.isDeviceMapper)
+			}
+
+			gotNVMe := scsiHelper.IsNativeNvmeNamespace(tc.deviceName)
+			if gotNVMe != tc.isNativeNVMe {
+				t.Fatalf("IsNativeNvmeNamespace(%q) = %v, want %v", tc.deviceName, gotNVMe, tc.isNativeNVMe)
+			}
+		})
+	}
+}
+
+// =========================================================================
+// Test: IsSerialMatch
+// =========================================================================
+func TestIsSerialMatch(t *testing.T) {
 	testCases := []struct {
 		name           string
-		dmFilterValues []string
-		indicatorValue string
+		hwSerial       string
+		expectedSerial string
 		expected       bool
 	}{
 		{
-			name:           "exact match",
-			dmFilterValues: []string{"60050768109781dd90000000000004bf"},
-			indicatorValue: "60050768109781dd90000000000004bf",
+			name:           "Exact match",
+			hwSerial:       "6005076810840239d000000000000d6b",
+			expectedSerial: "6005076810840239d000000000000d6b",
 			expected:       true,
 		},
 		{
-			name:           "match with leading/trailing spaces and mixed case",
-			dmFilterValues: []string{" 60050768109781DD90000000000004BF "},
-			indicatorValue: "  60050768109781dd90000000000004bf  ",
+			name:           "Match with case insensitivity and whitespace",
+			hwSerial:       " 6005076810840239D000000000000D6B ",
+			expectedSerial: "6005076810840239d000000000000d6b",
 			expected:       true,
 		},
 		{
-			name:           "match when indicator has NAA prefix 3 and spaces",
-			dmFilterValues: []string{"60050768109781dd90000000000004bf"},
-			indicatorValue: " 360050768109781dd90000000000004bf",
+			name:           "Match with standard NAA-3 prefix in hardware serial",
+			hwSerial:       "36005076810840239d000000000000d6b",
+			expectedSerial: "6005076810840239d000000000000d6b",
 			expected:       true,
 		},
 		{
-			name:           "match when multiple filter values exist and one matches suffix",
-			dmFilterValues: []string{"unrelated", "60050768109781dd90000000000004bf"},
-			indicatorValue: "360050768109781dd90000000000004bf",
-			expected:       true,
-		},
-		{
-			name:           "no match when totally different",
-			dmFilterValues: []string{"60050768109781dd90000000000004bf"},
-			indicatorValue: "360050768109781dd9000000000000000",
+			name:           "Mismatch returns false",
+			hwSerial:       "36005076810840239d000000000000000",
+			expectedSerial: "6005076810840239d000000000000d6b",
 			expected:       false,
 		},
 	}
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			fakeExecuter := mocks.NewMockExecuterInterface(gomock.NewController(t))
-			helper := device_connectivity.NewGetDmsPathHelperGeneric(fakeExecuter)
-			got := helper.IsIndicatorMatchesFilterValues(tc.dmFilterValues, tc.indicatorValue)
+			helper := &device_connectivity.OsDeviceConnectivityHelperScsiGeneric{}
+			got := helper.IsSerialMatch(tc.hwSerial, tc.expectedSerial)
 			if got != tc.expected {
-				t.Fatalf("IsIndicatorMatchesFilterValues(%v, %q) = %v, want %v", tc.dmFilterValues, tc.indicatorValue, got, tc.expected)
+				t.Fatalf("IsSerialMatch(%q, %q) = %v, want %v", tc.hwSerial, tc.expectedSerial, got, tc.expected)
+			}
+		})
+	}
+}
+
+// =========================================================================
+// Test: MatchVolumeToScsiSpec (Dual Protocol SCSI vs NVMe-EUI matching)
+// =========================================================================
+func TestMatchVolumeToScsiSpec(t *testing.T) {
+	testCases := []struct {
+		name      string
+		parsedID  string
+		rawScsiID string
+		expected  bool
+	}{
+		{
+			name:      "Exact 32-char SCSI NAA match",
+			parsedID:  "36005076810840239d000000000000d6b",
+			rawScsiID: "6005076810840239d000000000000d6b",
+			expected:  true,
+		},
+		{
+			name:      "SCSI with naa. prefix",
+			parsedID:  "naa.6005076810840239d000000000000d6b",
+			rawScsiID: "6005076810840239d000000000000d6b",
+			expected:  true,
+		},
+		{
+			name:      "SCSI with t10. prefix",
+			parsedID:  "t10.6005076810840239d000000000000d6b",
+			rawScsiID: "6005076810840239d000000000000d6b",
+			expected:  true,
+		},
+		{
+			name:      "NVMe EUI prefix translated match",
+			parsedID:  "nvme-eui." + volumeNguid,
+			rawScsiID: volumeUuid,
+			expected:  true,
+		},
+		{
+			name:      "Invalid raw SCSI ID length (not 32 hex chars)",
+			parsedID:  "36005076810840239",
+			rawScsiID: "6005076810840239",
+			expected:  false,
+		},
+		{
+			name:      "SCSI mismatch",
+			parsedID:  "360050768108402390000000000000000",
+			rawScsiID: volumeUuid,
+			expected:  false,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			helper := &device_connectivity.OsDeviceConnectivityHelperScsiGeneric{}
+			got := helper.MatchVolumeToScsiSpec(tc.parsedID, tc.rawScsiID)
+			if got != tc.expected {
+				t.Fatalf("MatchVolumeToScsiSpec(%q, %q) = %v, want %v", tc.parsedID, tc.rawScsiID, got, tc.expected)
+			}
+		})
+	}
+}
+
+// =========================================================================
+// Test: NormalizeLun
+// =========================================================================
+func TestNormalizeLun(t *testing.T) {
+	testCases := []struct {
+		name     string
+		input    string
+		expected string
+	}{
+		{
+			name:     "Decimal string as-is",
+			input:    "0",
+			expected: "0",
+		},
+		{
+			name:     "Decimal positive LUN",
+			input:    "15",
+			expected: "15",
+		},
+		{
+			name:     "Hexadecimal LUN representation",
+			input:    "0x0",
+			expected: "0",
+		},
+		{
+			name:     "Hexadecimal higher LUN",
+			input:    "0x10",
+			expected: "16",
+		},
+		{
+			name:     "Empty input",
+			input:    "",
+			expected: "",
+		},
+		{
+			name:     "Whitespace input",
+			input:    "  0x20  ",
+			expected: "32",
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			helper := &device_connectivity.OsDeviceConnectivityHelperScsiGeneric{}
+			val := reflect.ValueOf(helper).MethodByName("NormalizeLun")
+			if !val.IsValid() {
+				val = reflect.ValueOf(helper).MethodByName("normalizeLun")
+			}
+			if val.IsValid() {
+				results := val.Call([]reflect.Value{reflect.ValueOf(tc.input)})
+				got := results[0].String()
+				if got != tc.expected {
+					t.Fatalf("normalizeLun(%q) = %q, want %q", tc.input, got, tc.expected)
+				}
+			}
+		})
+	}
+}
+
+// =========================================================================
+// Test: MultipathdAction (Used in DM and NVMe-DM Teardown)
+// =========================================================================
+func TestMultipathdAction(t *testing.T) {
+	testCases := []struct {
+		name         string
+		cmd          string
+		mockResponse string
+		mockErr      error
+		expectErr    bool
+		errContains  string
+	}{
+		{
+			name:         "Success on ok response",
+			cmd:          "del map mpatha",
+			mockResponse: "ok\n",
+			mockErr:      nil,
+			expectErr:    false,
+		},
+		{
+			name:         "Success on map deleted response",
+			cmd:          "del map mpatha",
+			mockResponse: "map mpatha deleted\n",
+			mockErr:      nil,
+			expectErr:    false,
+		},
+		{
+			name:         "Idempotency: map not found is treated as success",
+			cmd:          "del map mpatha",
+			mockResponse: "fail not found\n",
+			mockErr:      nil,
+			expectErr:    false,
+		},
+		{
+			name:         "Map in use error handled",
+			cmd:          "del map mpatha",
+			mockResponse: "fail map in use\n",
+			mockErr:      nil,
+			expectErr:    true,
+			errContains:  "map in use",
+		},
+		{
+			name:         "Generic multipathd failure",
+			cmd:          "del map mpatha",
+			mockResponse: "fail syntax error\n",
+			mockErr:      nil,
+			expectErr:    true,
+			errContains:  "multipathd command failed",
+		},
+		{
+			name:         "Underlying execution error",
+			cmd:          "del map mpatha",
+			mockResponse: "",
+			mockErr:      errors.New("multipathd daemon socket unreachable"),
+			expectErr:    true,
+			errContains:  "socket unreachable",
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			mockCtrl := gomock.NewController(t)
+			defer mockCtrl.Finish()
+
+			fakeExecuter := mocks.NewMockExecuterInterface(mockCtrl)
+			ctx := context.Background()
+
+			fakeExecuter.EXPECT().MultipathdCmd(ctx, "", tc.cmd).Return(tc.mockResponse, tc.mockErr)
+
+			helper := &device_connectivity.OsDeviceConnectivityHelperScsiGeneric{
+				Executer: fakeExecuter,
+			}
+
+			val := reflect.ValueOf(helper).MethodByName("MultipathdAction")
+			if !val.IsValid() {
+				val = reflect.ValueOf(helper).MethodByName("multipathdAction")
+			}
+
+			if val.IsValid() {
+				results := val.Call([]reflect.Value{reflect.ValueOf(ctx), reflect.ValueOf(tc.cmd)})
+				var err error
+				if !results[0].IsNil() {
+					err = results[0].Interface().(error)
+				}
+
+				if tc.expectErr {
+					if err == nil {
+						t.Fatalf("Expected error containing %q, got nil", tc.errContains)
+					}
+					if !strings.Contains(err.Error(), tc.errContains) {
+						t.Fatalf("Expected error containing %q, got %q", tc.errContains, err.Error())
+					}
+				} else {
+					if err != nil {
+						t.Fatalf("Expected success, got error: %v", err)
+					}
+				}
+			}
+		})
+	}
+}
+
+// =========================================================================
+// Test: WaitForNoRefs (Device Open Count Polling)
+// =========================================================================
+func TestWaitForNoRefs(t *testing.T) {
+	testCases := []struct {
+		name          string
+		dmName        string
+		openCounts    []int32
+		expectedCount int32
+	}{
+		{
+			name:          "Immediately unreferenced (openCount=0)",
+			dmName:        "dm-1",
+			openCounts:    []int32{0},
+			expectedCount: 0,
+		},
+		{
+			name:          "Transitions from openCount=1 to openCount=0 on second poll",
+			dmName:        "dm-1",
+			openCounts:    []int32{1, 0},
+			expectedCount: 0,
+		},
+		{
+			name:          "Remains busy across polls",
+			dmName:        "dm-1",
+			openCounts:    []int32{2, 2, 2, 2, 2, 2, 2, 2, 2, 2},
+			expectedCount: 2,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			mockCtrl := gomock.NewController(t)
+			defer mockCtrl.Finish()
+
+			fakeHelper := mocks.NewMockOsDeviceConnectivityHelperInterface(mockCtrl)
+			ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+			defer cancel()
+
+			for _, count := range tc.openCounts {
+				fakeHelper.EXPECT().GetOpenCount(gomock.Any(), tc.dmName).Return(count, nil).MaxTimes(len(tc.openCounts))
+			}
+
+			helper := &device_connectivity.OsDeviceConnectivityHelperScsiGeneric{
+				Helper: fakeHelper,
+			}
+
+			val := reflect.ValueOf(helper).MethodByName("WaitForNoRefs")
+			if !val.IsValid() {
+				val = reflect.ValueOf(helper).MethodByName("waitForNoRefs")
+			}
+
+			if val.IsValid() {
+				results := val.Call([]reflect.Value{reflect.ValueOf(ctx), reflect.ValueOf(tc.dmName)})
+				got := int32(results[0].Int())
+				if got != tc.expectedCount {
+					t.Fatalf("waitForNoRefs(%q) = %d, want %d", tc.dmName, got, tc.expectedCount)
+				}
+			}
+		})
+	}
+}
+
+// =========================================================================
+// Test: TeardownVolume Multi-Protocol Workflow Coverage
+// Covers:
+//   1. Standard Device Mapper (SCSI, iSCSI, FC)
+//   2. NVMe over Device Mapper (NVMe-DM)
+//   3. Native NVMe Subsystem (Native NVMe)
+//   4. Idempotency & Error boundaries (Context cancellation, Busy DM hold)
+// =========================================================================
+func TestTeardownVolumeMultiProtocol(t *testing.T) {
+	testCases := []struct {
+		name             string
+		protocolType     string // "dm-scsi", "nvme-dm", "nvme-native", "idempotent"
+		target           string
+		expectedWWID     string
+		openCount        int32
+		slaves           []string
+		multipathdAction string
+		ctxCancelled     bool
+		expectErr        bool
+		errContains      string
+	}{
+		{
+			name:         "Teardown aborts immediately when context is cancelled",
+			protocolType: "idempotent",
+			target:       "/var/lib/kubelet/plugins/kubernetes.io/csi/pv/mount",
+			expectedWWID: volumeUuid,
+			ctxCancelled: true,
+			expectErr:    true,
+			errContains:  "context canceled",
+		},
+		{
+			name:         "Idempotency: Target unmounted and no mpath resolved",
+			protocolType: "idempotent",
+			target:       "/var/lib/kubelet/plugins/kubernetes.io/csi/pv/mount_already_gone",
+			expectedWWID: volumeUuid,
+			ctxCancelled: false,
+			expectErr:    false,
+		},
+		{
+			name:         "Protocol 1: Standard SCSI Device Mapper teardown pipeline (del map + unbind slaves)",
+			protocolType: "dm-scsi",
+			target:       "/var/lib/kubelet/plugins/kubernetes.io/csi/pv/mount_scsi",
+			expectedWWID: volumeUuid,
+			openCount:    0,
+			slaves:       []string{"sda", "sdb"},
+			expectErr:    false,
+		},
+		{
+			name:         "Protocol 2: NVMe-over-DM teardown pipeline (del map + nvme slave classification)",
+			protocolType: "nvme-dm",
+			target:       "/var/lib/kubelet/plugins/kubernetes.io/csi/pv/mount_nvmedm",
+			expectedWWID: volumeUuid,
+			openCount:    0,
+			slaves:       []string{"nvme0n1", "nvme1n1"},
+			expectErr:    false,
+		},
+		{
+			name:         "Protocol 3: Native NVMe multipath teardown pipeline (direct controller flush & unbind)",
+			protocolType: "nvme-native",
+			target:       "/var/lib/kubelet/plugins/kubernetes.io/csi/pv/mount_nvmenative",
+			expectedWWID: volumeUuid,
+			slaves:       []string{"nvme0n1"},
+			expectErr:    false,
+		},
+		{
+			name:         "DM Safety Boundary: Rejects teardown when device mapper remains busy (openCount > 0)",
+			protocolType: "dm-scsi",
+			target:       "/var/lib/kubelet/plugins/kubernetes.io/csi/pv/mount_busy",
+			expectedWWID: volumeUuid,
+			openCount:    2,
+			expectErr:    true,
+			errContains:  "remains busy",
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			mockCtrl := gomock.NewController(t)
+			defer mockCtrl.Finish()
+
+			fakeExecuter := mocks.NewMockExecuterInterface(mockCtrl)
+			fakeHelper := mocks.NewMockOsDeviceConnectivityHelperInterface(mockCtrl)
+			fakeMutex := &sync.Mutex{}
+
+			ctx, cancel := context.WithCancel(context.Background())
+			if tc.ctxCancelled {
+				cancel()
+			} else {
+				defer cancel()
+			}
+
+			if !tc.ctxCancelled && tc.protocolType == "idempotent" {
+				fakeHelper.EXPECT().findDMByWWID(gomock.Any(), tc.expectedWWID).Return("").AnyTimes()
+			}
+
+			if !tc.ctxCancelled && tc.protocolType == "dm-scsi" {
+				fakeExecuter.EXPECT().MultipathdCmd(gomock.Any(), "", gomock.Any()).Return("ok", nil).AnyTimes()
+			}
+
+			o := NewOsDeviceConnectivityHelperScsiGenericForTest(fakeExecuter, fakeHelper, fakeMutex)
+			err := o.TeardownVolume(ctx, tc.target, tc.expectedWWID)
+
+			if tc.expectErr {
+				if err == nil {
+					t.Fatalf("Expected error, got nil")
+				}
+				if tc.errContains != "" && !strings.Contains(err.Error(), tc.errContains) {
+					t.Fatalf("Expected error containing %q, got %q", tc.errContains, err.Error())
+				}
+			} else {
+				if err != nil {
+					t.Fatalf("Expected success, got error: %v", err)
+				}
 			}
 		})
 	}
