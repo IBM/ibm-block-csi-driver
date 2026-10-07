@@ -70,7 +70,8 @@ type KeyedGater struct {
 	mu             sync.Mutex
 	semaphoreGates map[string]*semaphoreGate
 
-	resources       sync.Map // map[string]*ResourcePool
+	resMu           sync.Mutex
+	resources       map[string]*ResourcePool
 	DevSingleflight *SingleflightGroup[[]string]
 	globalLeaked    atomic.Int64
 	maxGlobal       int64
@@ -80,6 +81,7 @@ type KeyedGater struct {
 func NewKeyedGater(maxGlobalLeaks int64) *KeyedGater {
 	return &KeyedGater{
 		semaphoreGates:  make(map[string]*semaphoreGate),
+		resources:       make(map[string]*ResourcePool),
 		DevSingleflight: NewSingleflightGroup[[]string](),
 		maxGlobal:       maxGlobalLeaks,
 	}
@@ -207,18 +209,42 @@ type Result[T any] struct {
 
 // ResourcePool manages concurrency tokens for a single resource.
 type ResourcePool struct {
-	running    chan struct{}
-	spare      chan struct{}
-	activeOps  atomic.Int64
-	initOnce   sync.Once
+	running   chan struct{}
+	spare     chan struct{}
+	activeOps atomic.Int64
+	refCount  int // Number of operations currently holding or waiting on this pool
 }
 
-// Init guarantees the pools channels are created exactly once safely.
-func (p *ResourcePool) Init(maxRunning, maxSpare int) {
-	p.initOnce.Do(func() {
-		p.running = make(chan struct{}, maxRunning)
-		p.spare = make(chan struct{}, maxSpare)
-	})
+// getOrCreatePool retrieves or constructs a ResourcePool for resourceName with proper ref counting.
+func (g *KeyedGater) getOrCreatePool(resourceName string, maxRunning, maxSpare int) *ResourcePool {
+	g.resMu.Lock()
+	defer g.resMu.Unlock()
+
+	pool, exists := g.resources[resourceName]
+	if !exists {
+		pool = &ResourcePool{
+			running: make(chan struct{}, maxRunning),
+			spare:   make(chan struct{}, maxSpare),
+		}
+		g.resources[resourceName] = pool
+	}
+	pool.refCount++
+	return pool
+}
+
+// releasePool decrements the pool refCount and deletes the key if no callers are using it.
+func (g *KeyedGater) releasePool(resourceName string) {
+	g.resMu.Lock()
+	defer g.resMu.Unlock()
+
+	pool, exists := g.resources[resourceName]
+	if !exists {
+		return
+	}
+	pool.refCount--
+	if pool.refCount <= 0 {
+		delete(g.resources, resourceName)
+	}
 }
 
 
@@ -268,7 +294,7 @@ func ExecuteUninterruptible[T any](
 }
 
 func baseExecute[T any](
-	ctx context.Context, 
+	ctx context.Context,
 	g *KeyedGater,
 	resourceName string,
 	maxRunning, maxSpare int,
@@ -283,10 +309,9 @@ func baseExecute[T any](
 		return zero, err
 	}
 
-	val, _ := g.resources.LoadOrStore(resourceName, &ResourcePool{})
-	pool := val.(*ResourcePool)
-	pool.Init(maxRunning, maxSpare) 
-	
+	pool := g.getOrCreatePool(resourceName, maxRunning, maxSpare)
+	defer g.releasePool(resourceName)
+
 	select {
 	case pool.running <- struct{}{}:
 	case <-ctx.Done():
@@ -427,9 +452,8 @@ func ExecuteUninterruptibleBatch[Param any, T any](
 		return nil, nil
 	}
 
-	val, _ := g.resources.LoadOrStore(resourceName, &ResourcePool{})
-	pool := val.(*ResourcePool)
-	pool.Init(maxRunning, maxSpare) 
+	pool := g.getOrCreatePool(resourceName, maxRunning, maxSpare)
+	defer g.releasePool(resourceName)
 
 	batchCtx, cancelBatch := context.WithCancel(ctx)
 	defer cancelBatch()

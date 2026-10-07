@@ -7861,9 +7861,8 @@ func normalizeWWID(raw string) string {
 // A tight 200ms retention window ensures callers within the same burst window share the snapshot
 // with zero redundant I/O and zero delay.
 func readDevNamesSingleflight(ctx context.Context, gater *executer.KeyedGater) ([]string, error) {
-	const devSnapshotTTL = 200 * time.Millisecond
 	if gater != nil && gater.DevSingleflight != nil {
-		return gater.DevSingleflight.Do("/dev", devSnapshotTTL, func() ([]string, error) {
+		return gater.DevSingleflight.Do("/dev", func() ([]string, error) {
 			return readDevNamesDirect(ctx)
 		})
 	}
