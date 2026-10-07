@@ -456,7 +456,11 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
     def _connect(self):
         logger.debug("Connecting to SVC {0}".format(self.endpoint))
         try:
-            self.sdk = StorageVirtualizeAPI(self.endpoint, self.user, self.password)
+            # SVC/FlashSystem arrays ship with self-signed certificates, so SSL
+            # certificate verification is disabled here. Pass verify_ssl=True if
+            # the array has a CA-signed certificate installed.
+            self.sdk = StorageVirtualizeAPI(self.endpoint, self.user, self.password,
+                                            verify_ssl=False)
             if Version(self._code_level) < Version(self.MIN_SUPPORTED_VERSION):
                 raise array_errors.UnsupportedStorageVersionError(
                     self._code_level, self.MIN_SUPPORTED_VERSION
