@@ -1304,9 +1304,9 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) purgeScsiGhosts(ctx context.Cont
 		return err
 	}
 
-	dFile, errOpen := os.Open("/dev")
-	if errOpen != nil {
-		return fmt.Errorf("failed to open /dev: %w", errOpen)
+	devNames, errDev := readDevNamesSingleflight(ctx, r.KeyedGater)
+	if errDev != nil {
+		return fmt.Errorf("failed to read /dev: %w", errDev)
 	}
 
 	type ghostCandidate struct {
@@ -1315,86 +1315,65 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) purgeScsiGhosts(ctx context.Cont
 		deviceDir string
 	}
 
-	// MEMORY BOUNDED CEILING POOL: Rigidly caps maximum memory pre-allocations under unstable node states.
 	const maxCapCeiling = 10000
 	rawCandidates := make([]ghostCandidate, 0, 200)
 
 	// =========================================================================
-	// STAGE 1: MICROSECOND SNAPSHOT SWEEP (Decouples VFS Handles Instantly)
+	// STAGE 1: MICROSECOND SNAPSHOT SWEEP (Singleflight Coalesced Pass)
 	// =========================================================================
-	for {
+	for _, sgName := range devNames {
 		if err := ctx.Err(); err != nil {
-			dFile.Close()
 			return err
 		}
 
-		devEntries, err := dFile.ReadDir(100)
-		if err != nil && err != io.EOF {
-			dFile.Close()
-			return fmt.Errorf("failed to read /dev: %w", err)
+		if !strings.HasPrefix(sgName, "sg") || len(sgName) < 3 {
+			continue
 		}
 
-		for _, entry := range devEntries {
-		
-
-			sgName := entry.Name()
-			
-			if !strings.HasPrefix(sgName, "sg") || len(sgName) < 3 {
-				continue
-			}
-
-			isNumeric := true
-			for i := 2; i < len(sgName); i++ {
-				if sgName[i] < '0' || sgName[i] > '9' {
-					isNumeric = false
-					break
-				}
-			}
-			if !isNumeric {
-				continue
-			}
-
-			// Clean, absolute directory reference evaluated via true kernel VFS symlink traversal
-			deviceDirSymlink := filepath.Join("/sys/class/scsi_generic", sgName, "device")
-			absoluteDeviceDir, errLink := filepath.EvalSymlinks(deviceDirSymlink)
-			if errLink != nil {
-				logger.Debugf("[purgeScsiGhosts] entry %s - EvalSymlinks failed", sgName)
-				continue // Skip the single unreadable path element if a pathological link error occurs
-			}
-
-			hctl := filepath.Base(absoluteDeviceDir)
-						
-			hctlParts := strings.Split(hctl, ":")
-			if len(hctlParts) < 4 {
-				continue 
-			}
-
-			lunStr := hctlParts[3]
-			parsedLun, errParse := strconv.Atoi(lunStr)
-			if errParse != nil || parsedLun != expectedLun {
-				continue 
-			}
-			
-			// CIRCUIT BREAKER BOUNDARY: Prevent unbounded array bloat from unstable path leaks
-			if len(rawCandidates) >= maxCapCeiling {
-				logger.Warningf("[VFS-Guard] Ghost tracking candidate list reached safe allocation ceiling (%d). Truncating scan pass.", maxCapCeiling)
+		isNumeric := true
+		for i := 2; i < len(sgName); i++ {
+			if sgName[i] < '0' || sgName[i] > '9' {
+				isNumeric = false
 				break
 			}
-
-			rawCandidates = append(rawCandidates, ghostCandidate{
-				sgName:    sgName,
-				hctl:      hctl,
-				deviceDir: absoluteDeviceDir,
-			})
-			
-			logger.Debugf("[purgeScsiGhosts] entry %s with hctl %s - candidate", sgName, hctl)
+		}
+		if !isNumeric {
+			continue
 		}
 
-		if len(rawCandidates) >= maxCapCeiling || len(devEntries) < 100 || err == io.EOF {
+		// Clean, absolute directory reference evaluated via true kernel VFS symlink traversal
+		deviceDirSymlink := filepath.Join("/sys/class/scsi_generic", sgName, "device")
+		absoluteDeviceDir, errLink := filepath.EvalSymlinks(deviceDirSymlink)
+		if errLink != nil {
+			logger.Debugf("[purgeScsiGhosts] entry %s - EvalSymlinks failed", sgName)
+			continue
+		}
+
+		hctl := filepath.Base(absoluteDeviceDir)
+		hctlParts := strings.Split(hctl, ":")
+		if len(hctlParts) < 4 {
+			continue
+		}
+
+		lunStr := hctlParts[3]
+		parsedLun, errParse := strconv.Atoi(lunStr)
+		if errParse != nil || parsedLun != expectedLun {
+			continue
+		}
+
+		if len(rawCandidates) >= maxCapCeiling {
+			logger.Warningf("[VFS-Guard] Ghost tracking candidate list reached safe allocation ceiling (%d). Truncating scan pass.", maxCapCeiling)
 			break
 		}
+
+		rawCandidates = append(rawCandidates, ghostCandidate{
+			sgName:    sgName,
+			hctl:      hctl,
+			deviceDir: absoluteDeviceDir,
+		})
+
+		logger.Debugf("[purgeScsiGhosts] entry %s with hctl %s - candidate", sgName, hctl)
 	}
-	dFile.Close() // CLOSED IMMEDIATELY: Releases descriptor handles before entering slow, multi-second processing lines.
 
 	// =========================================================================
 	// STAGE 2: DECOUPLED BATCH CHUNKING PROCESSING ENGINE
@@ -3029,57 +3008,39 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) FindSlavesByWWID(ctx context.Con
 	}
 	rawNvmeTarget := convertScsiIdToNguid(rawScsiTarget)
 
-	dFile, errOpen := os.Open("/dev")
-	if errOpen != nil {
-		logger.Warningf("FindSlavesByWWID: failed to open /dev cleanly: %v", errOpen)
+	devNames, errDev := readDevNamesSingleflight(ctx, r.KeyedGater)
+	if errDev != nil {
+		logger.Warningf("FindSlavesByWWID: failed to read /dev cleanly: %v", errDev)
 		return slaves
 	}
-	defer dFile.Close()
 
 	const maxCapCeiling = 10000
 	rawNames := make([]string, 0, 100)
 
 	// =========================================================================
-	// STAGE 1: MICROSECOND SNAPSHOT SWEEP (Decouples VFS State Instantly)
+	// STAGE 1: MICROSECOND SNAPSHOT SWEEP (Singleflight Coalesced Pass)
 	// =========================================================================
-	for {
+	for _, name := range devNames {
 		if err := ctx.Err(); err != nil {
 			return nil
 		}
-
-		entries, readErr := dFile.ReadDir(100)
-		if readErr != nil && readErr != io.EOF {
-			logger.Warningf("FindSlavesByWWID: failed to read streaming entries from /dev: %v", readErr)
-			return slaves
+		if strings.HasPrefix(name, "loop") || strings.HasPrefix(name, "ram") || strings.HasPrefix(name, "dm-") {
+			continue
 		}
-		if len(entries) == 0 || readErr == io.EOF {
+
+		isNVMe := nvmeNamespaceRegex.MatchString(name)
+		isSCSI := strings.HasPrefix(name, "sd")
+
+		if !isNVMe && !isSCSI {
+			continue
+		}
+
+		if len(rawNames) >= maxCapCeiling {
+			logger.Warningf("[VFS-Guard] Slaves lookups candidate list reached safe allocation ceiling (%d). Truncating scan pass.", maxCapCeiling)
 			break
 		}
 
-		for _, entry := range entries {
-			name := entry.Name()
-			if strings.HasPrefix(name, "loop") || strings.HasPrefix(name, "ram") || strings.HasPrefix(name, "dm-") {
-				continue
-			}
-
-			isNVMe := nvmeNamespaceRegex.MatchString(name)
-			isSCSI := strings.HasPrefix(name, "sd")
-
-			if !isNVMe && !isSCSI {
-				continue
-			}
-			
-			if len(rawNames) >= maxCapCeiling {
-				logger.Warningf("[VFS-Guard] Slaves lookups candidate list reached safe allocation ceiling (%d). Truncating scan pass.", maxCapCeiling)
-				break
-			}
-
-			rawNames = append(rawNames, name)
-		}
-
-		if len(rawNames) >= maxCapCeiling || readErr == io.EOF {
-			break
-		}
+		rawNames = append(rawNames, name)
 	}
 
 	// =========================================================================
@@ -4028,20 +3989,19 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) disableNativeNvmeQueueing(ctx co
 
 	normExpected := normalizeWWID(expectedWWID)
 
-	devEntries, errDir := os.ReadDir("/dev")
-	if errDir != nil {
-		return fmt.Errorf("failed to safely query system device nodes list: %w", errDir)
+	devNames, errDev := readDevNamesSingleflight(ctx, r.KeyedGater)
+	if errDev != nil {
+		return fmt.Errorf("failed to safely query system device nodes list: %w", errDev)
 	}
 
 	const maxCapCeiling = 10000
 	rawNames := make([]string, 0, 100)
 
-	for _, entry := range devEntries {
-		devName := entry.Name()
+	for _, devName := range devNames {
 		if !nvmeNamespaceRegex.MatchString(devName) {
 			continue
 		}
-		
+
 		if len(rawNames) >= maxCapCeiling {
 			logger.Warningf("[VFS-Guard] NVMe queue tracking list reached safe allocation ceiling (%d). Truncating scan pass.", maxCapCeiling)
 			break
@@ -4212,52 +4172,34 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) purgeStuckPhysicalPathsDualProto
 	scsiMatchTarget := normalizeWWID(rawScsiTarget)
 	nvmeMatchTarget := normalizeWWID(rawNvmeTarget)
 
-	dFile, errOpen := os.Open("/dev")
-	if errOpen != nil {
-		return fmt.Errorf("failed to scan system device path layer under safety frame: %w", errOpen)
+	devNames, errDev := readDevNamesSingleflight(ctx, r.KeyedGater)
+	if errDev != nil {
+		return fmt.Errorf("failed to scan system device path layer under safety frame: %w", errDev)
 	}
-	defer dFile.Close()
 
 	const maxCapCeiling = 10000
 	rawNames := make([]string, 0, 100)
 
 	// =========================================================================
-	// STAGE 1: MICROSECOND SNAPSHOT SWEEP (Decouples VFS State Instantly)
+	// STAGE 1: MICROSECOND SNAPSHOT SWEEP (Singleflight Coalesced Pass)
 	// =========================================================================
-	for {
+	for _, devName := range devNames {
 		if err := ctx.Err(); err != nil {
 			return ctx.Err()
 		}
+		isSCSI := strings.HasPrefix(devName, "sd")
+		isNVMe := strings.HasPrefix(devName, "nvme") && nvmeNamespaceRegex.MatchString(devName)
 
-		entries, readErr := dFile.ReadDir(100)
-		if readErr != nil && readErr != io.EOF {
-			return fmt.Errorf("failed to stream directory snapshots from /dev: %w", readErr)
+		if !isSCSI && !isNVMe {
+			continue
 		}
-		if len(entries) == 0 || readErr == io.EOF {
+
+		if len(rawNames) >= maxCapCeiling {
+			logger.Warningf("[VFS-Guard] Dual protocol purge list reached safe allocation ceiling (%d). Truncating scan pass.", maxCapCeiling)
 			break
 		}
 
-		for _, f := range entries {
-			devName := f.Name()
-			isSCSI := strings.HasPrefix(devName, "sd")
-			// FIXED: Replaced brittle method dependency with standard prefix-aware validation rules
-			isNVMe := strings.HasPrefix(devName, "nvme") && nvmeNamespaceRegex.MatchString(devName)
-
-			if !isSCSI && !isNVMe {
-				continue
-			}
-			
-			if len(rawNames) >= maxCapCeiling {
-				logger.Warningf("[VFS-Guard] Dual protocol purge list reached safe allocation ceiling (%d). Truncating scan pass.", maxCapCeiling)
-				break
-			}
-
-			rawNames = append(rawNames, devName)
-		}
-
-		if len(rawNames) >= maxCapCeiling || readErr == io.EOF {
-			break
-		}
+		rawNames = append(rawNames, devName)
 	}
 
 	var aggregatedErrors []string
@@ -6804,17 +6746,16 @@ func (of *GetDmsPathHelperGeneric) EvaluateSysfsTopology(ctx context.Context, ga
 
 	// NOTE: While we are snapshotting /dev for initial mapping discovery discovery boundaries,
 	// our sub-engines tightly verify state by looking directly into the /sys subsystem layer tree.
-	devEntries, errDir := os.ReadDir("/dev")
-	if errDir != nil {
-		logger.Errorf("[EvalTopology-Trace] VFS failure reading directory /dev: %v", errDir)
+	rawDevNames, errDev := readDevNamesSingleflight(ctx, gater)
+	if errDev != nil {
+		logger.Errorf("[EvalTopology-Trace] VFS failure reading directory /dev: %v", errDev)
 		return false, false, ""
 	}
 
 	const maxCapCeiling = 10000
 	devNames := make([]string, 0, 128)
 
-	for _, entry := range devEntries {
-		name := entry.Name()
+	for _, name := range rawDevNames {
 		isSCSI := strings.HasPrefix(name, "sd")
 		isDM := strings.HasPrefix(name, "dm-")
 		isNVMe := strings.HasPrefix(name, "nvme")
@@ -6822,7 +6763,7 @@ func (of *GetDmsPathHelperGeneric) EvaluateSysfsTopology(ctx context.Context, ga
 		if !isDM && !isNVMe && !isSCSI {
 			continue
 		}
-	
+
 		if len(devNames) >= maxCapCeiling {
 			logger.Warningf("[EvalTopology-Trace] [VFS-Guard] /dev snapshot lookup exceeded safe processing ceiling (%d). Truncating scan pass.", maxCapCeiling)
 			break
@@ -7915,6 +7856,50 @@ func normalizeWWID(raw string) string {
 	return s
 }
 
+
+// readDevNamesSingleflight coalesces concurrent /dev directory reads into a single physical I/O pass.
+// A tight 200ms retention window ensures callers within the same burst window share the snapshot
+// with zero redundant I/O and zero delay.
+func readDevNamesSingleflight(ctx context.Context, gater *executer.KeyedGater) ([]string, error) {
+	const devSnapshotTTL = 200 * time.Millisecond
+	if gater != nil && gater.DevSingleflight != nil {
+		return gater.DevSingleflight.Do("/dev", devSnapshotTTL, func() ([]string, error) {
+			return readDevNamesDirect(ctx)
+		})
+	}
+	return readDevNamesDirect(ctx)
+}
+
+func readDevNamesDirect(ctx context.Context) ([]string, error) {
+	dFile, errOpen := os.Open("/dev")
+	if errOpen != nil {
+		return nil, errOpen
+	}
+	defer dFile.Close()
+
+	const maxCapCeiling = 10000
+	names := make([]string, 0, 128)
+
+	for {
+		if err := ctx.Err(); err != nil {
+			return nil, err
+		}
+		entries, err := dFile.ReadDir(100)
+		if err != nil && err != io.EOF {
+			return nil, err
+		}
+		for _, e := range entries {
+			if len(names) >= maxCapCeiling {
+				break
+			}
+			names = append(names, e.Name())
+		}
+		if len(names) >= maxCapCeiling || len(entries) < 100 || err == io.EOF {
+			break
+		}
+	}
+	return names, nil
+}
 
 // Helper wrapper to safely execute sysfs lookups with kernel D-state freeze isolation boundaries
 func secureReadSysfs(ctx context.Context, KeyedGater      *executer.KeyedGater, devName, sysfsPath string) (string, error) {
