@@ -386,14 +386,13 @@ func ExecuteUninterruptibleBatch[Param any, T any](
 
 	parentAdditionalID, _ := goid_info.GetAdditionalIDInfo()
 
-	// Buffered channel allocated to handle absolute allocation counts safely
-	// to prevent worker threads from blocking on delivery writes.
+	// FIXED: Buffered channel allocated to handle absolute allocation counts safely 
+	// to prevent inner background zombie threads from blocking on delivery writes.
 	resultsChan := make(chan BatchResult[T], len(parameters))
 	var wg sync.WaitGroup
 
 	for idx, param := range parameters {
 		wg.Add(1)
-		// Single worker goroutine per parameter launched concurrently
 		go func(index int, p Param) {
 			defer wg.Done()
 
@@ -405,7 +404,6 @@ func ExecuteUninterruptibleBatch[Param any, T any](
 			default:
 			}
 
-			// Bounded parallelism: wait for an available slot in pool.running
 			select {
 			case pool.running <- struct{}{}:
 			case <-batchCtx.Done():
@@ -414,19 +412,103 @@ func ExecuteUninterruptibleBatch[Param any, T any](
 			}
 
 			pool.activeOps.Add(1)
-			defer pool.activeOps.Add(-1)
-			defer func() { <-pool.running }()
-
-			if parentAdditionalID != "" && parentAdditionalID != "-" {
-				goid_info.SetAdditionalIDInfo(parentAdditionalID)
-			}
+			
+			// FIXED: Allocated buffer capacity of 1 to ensure that if the monitor thread 
+			// exits early, the background worker goroutine can drop its data and exit cleanly.
+			done := make(chan Result[T], 1) 
+			switched := make(chan struct{})
+			monitorDone := make(chan struct{}) 
+			var once sync.Once
 
 			workerCtx, cancelWorker := context.WithCancel(batchCtx)
-			defer cancelWorker()
 
-			// Fast path: directly execute worker within the worker goroutine
-			data, err := worker(workerCtx, index, p, cancelBatch)
-			resultsChan <- BatchResult[T]{Index: index, Data: data, Err: err}
+			// INNER WORKER LAUNCH
+			go func() {
+				defer pool.activeOps.Add(-1)
+				defer cancelWorker()
+
+				if parentAdditionalID != "" && parentAdditionalID != "-" {
+					goid_info.SetAdditionalIDInfo(parentAdditionalID)
+				}
+
+				data, err := worker(workerCtx, index, p, cancelBatch)
+				done <- Result[T]{Data: data, Err: err}
+
+				once.Do(func() {
+					select {
+					case <-switched:
+						<-pool.spare
+						g.globalLeaked.Add(-1)
+					case <-monitorDone:
+						return
+					default:
+						<-pool.running
+					}
+				})
+			}()
+
+			// MONITOR HANDOFF & HARD TIMEOUT FOR THIS ELEMENT
+			hTimer := time.NewTimer(handoffTimeout)
+			defer hTimer.Stop()
+
+			select {
+			case res := <-done:
+				resultsChan <- BatchResult[T]{Index: index, Data: res.Data, Err: res.Err}
+
+			case <-batchCtx.Done():
+				select {
+				case pool.spare <- struct{}{}:
+					once.Do(func() {
+						close(switched)
+						<-pool.running
+					})
+					g.globalLeaked.Add(1) 
+					resultsChan <- BatchResult[T]{Index: index, Err: batchCtx.Err()}
+				default:
+					once.Do(func() {
+						close(monitorDone)
+						<-pool.running
+					})
+					g.globalLeaked.Add(1) 
+					resultsChan <- BatchResult[T]{Index: index, Err: fmt.Errorf("batch item %d: cancelled and spare pool full", index)}
+				}
+				
+			case <-hTimer.C:
+				select {
+				case pool.spare <- struct{}{}:
+					once.Do(func() {
+						close(switched)
+						<-pool.running
+					})
+
+					if hardTimeout <= 0 {
+						res := <-done
+						resultsChan <- BatchResult[T]{Index: index, Data: res.Data, Err: res.Err}
+						return // Safely exits since done has a buffer of 1
+					}
+
+					hdTimer := time.NewTimer(hardTimeout)
+					defer hdTimer.Stop()
+
+					select {
+					case res := <-done:
+						resultsChan <- BatchResult[T]{Index: index, Data: res.Data, Err: res.Err}
+					case <-hdTimer.C:
+						g.globalLeaked.Add(1)
+						resultsChan <- BatchResult[T]{
+							Index: index,
+							Err:   fmt.Errorf("batch item %d abandoned after hard timeout %v", index, hardTimeout),
+						}
+					}
+				default:
+					once.Do(func() {
+						close(monitorDone)
+						<-pool.running
+					})
+					g.globalLeaked.Add(1)
+					resultsChan <- BatchResult[T]{Index: index, Err: fmt.Errorf("batch item %d: critical saturation", index)}
+				}
+			}
 		}(idx, param)
 	}
 
