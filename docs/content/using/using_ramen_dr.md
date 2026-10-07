@@ -404,4 +404,70 @@ oc get drpc <drpc-name> -n <namespace> -o wide
 Check that the VG is now **primary** on the storage system of `<managed-cluster-1>`
 and **secondary** on the storage system of `<managed-cluster-2>`.
 
----
+## Recovering from a Storage Link Outage
+
+### Volume Group (VG) in independent state after storage connectivity loss
+If connectivity between the two storage systems is lost and later recovers, the
+Volume Group (VG) that contains the DR-protected PVCs can end up in an
+**independent** state on the storage systems. The `VolumeReplicationGroup` (VRG)
+and `VolumeReplication` (VR) objects of those PVCs, however, still show the state
+from before the outage.
+
+**Identify the state:** Check the VG replication state in either of the following
+ways:
+
+1. **From the VR:** The `status.statusMessage` field of a VR shows the replication
+   state of the VG as reported by the storage system.
+
+```bash
+   oc get volumereplication <vr-name> -n <namespace> -o jsonpath='{.status.status}{"\n"}{.status.statusMessage}{"\n"}'
+```
+
+   This field is refreshed once per `schedulingInterval`, which is set in the
+   `parameters` of the VolumeReplicationClass, so it may not show the latest
+   state. It is therefore always recommended to also check the VG state on the
+   storage systems.
+
+2. **On the storage systems:** Check the replication state of the VG directly.
+
+**Recover:** To recover the VG from the independent state and bring the VG, VRG,
+and VRs back in sync, force-promote the VG on the cluster that is currently the
+primary:
+
+1. On that managed cluster, pick **one** VR that is part of the VRG protected by
+   the DRPC. The VR must have the desired state `primary`.
+2. Add the `ramen.io/force-promote=true` label to that VR:
+
+```bash
+   oc label volumereplication <vr-name> -n <namespace> ramen.io/force-promote=true --overwrite
+```
+
+There is no need to label every VR. Since the CSI Driver performs DR operations on
+the **entire VG**, force-promoting through one VR promotes the whole VG and brings
+the VRG, the VRs, and the storage systems back in sync.
+
+**Label behavior:**
+
+- **On success:** The label is automatically set back to `false`. There is no
+  need to remove it, and seeing `false` afterward is expected.
+- **On failure:** The label stays `true`, and the controller keeps retrying the
+  force-promote. The wait between retries grows after each failure, up to a
+  maximum of about 16 minutes. To trigger a retry immediately, set the label to
+  `false` and then back to `true`.
+
+**Verify:** To confirm that the force-promote succeeded and the VG has recovered
+from the independent state, check the following:
+
+1. Check that the `ramen.io/force-promote` label on the VR is now `false`. The
+   label is reset only after the force-promote succeeds.
+
+```bash
+   oc get volumereplication <vr-name> -n <namespace> -o jsonpath='{.metadata.labels.ramen\.io/force-promote}{"\n"}'
+```
+
+2. Check the `status.statusMessage` field of the VR. It is refreshed about 20
+   seconds after a successful force-promote and should no longer show
+   `independent`. If it does, the refresh may not have run yet, so confirm on the
+   storage systems.
+3. On the storage systems, check that the VG is no longer in the independent state,
+   and that it is **primary** on the storage system of the force-promoted cluster.
