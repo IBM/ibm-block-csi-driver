@@ -3143,6 +3143,8 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
     def get_host_io_group(self, host_name):
         logger.info(svc_messages.GET_HOST_IO_GROUP.format(host_name))
         io_group = self._lshostiogrp(host_name)
+        if io_group is None:
+            return None
         io_group.id = split_string(io_group.id)
         io_group.name = split_string(io_group.name)
         logger.info(svc_messages.HOST_IO_GROUP_IDS.format(host_name, io_group.id))

@@ -2823,3 +2823,60 @@ class TestArrayMediatorSVC(unittest.TestCase):
         with self.assertRaises(array_errors.ReplicationDestinationInfoNotSupportedError):
             self.svc.get_replication_destination_info(
                 OBJECT_INTERNAL_ID, common_settings.VOLUME_UID, dr_mediator=None, force_dr_mediator=True)
+
+    # ------------------------------------------------------------------
+    # Tests added during production QA review
+    # ------------------------------------------------------------------
+
+    def test_connect_passes_verify_ssl_false(self):
+        """_connect() must pass verify_ssl=False so self-signed certs are accepted."""
+        sdk_mock = Mock()
+        sdk_mock.svc_info_api.lssystem_post.return_value = [
+            Munch({svc_settings.LSSYSTEM_LOCATION_ATTR_KEY: svc_settings.LOCAL_LOCATION,
+                   svc_settings.LSSYSTEM_CODE_LEVEL_ATTR_KEY: svc_settings.CODE_LEVEL,
+                   svc_settings.LSSYSTEM_ID_ALIAS_ATTR_KEY: svc_settings.DUMMY_ID_ALIAS})]
+        with patch("controllers.array_action.array_mediator_svc.StorageVirtualizeAPI",
+                   return_value=sdk_mock) as mock_api_cls:
+            SVCArrayMediator(common_settings.SECRET_USERNAME_VALUE, common_settings.SECRET_PASSWORD_VALUE,
+                             self.endpoint)
+        _, kwargs = mock_api_cls.call_args
+        self.assertFalse(kwargs.get('verify_ssl', True),
+                         "StorageVirtualizeAPI must be called with verify_ssl=False")
+
+    def test_connect_credentials_error_on_401(self):
+        """_connect() must raise CredentialsError when the array returns HTTP 401."""
+        with patch("controllers.array_action.array_mediator_svc.StorageVirtualizeAPI",
+                   side_effect=_sdk_error("Unauthorized", status=401)):
+            with self.assertRaises(array_errors.CredentialsError):
+                SVCArrayMediator(common_settings.SECRET_USERNAME_VALUE, common_settings.SECRET_PASSWORD_VALUE,
+                                 self.endpoint)
+
+    def test_connect_credentials_error_on_403(self):
+        """_connect() must raise CredentialsError when the array returns HTTP 403."""
+        with patch("controllers.array_action.array_mediator_svc.StorageVirtualizeAPI",
+                   side_effect=_sdk_error("Forbidden", status=403)):
+            with self.assertRaises(array_errors.CredentialsError):
+                SVCArrayMediator(common_settings.SECRET_USERNAME_VALUE, common_settings.SECRET_PASSWORD_VALUE,
+                                 self.endpoint)
+
+    def test_is_active_returns_true_when_lssystem_succeeds(self):
+        """is_active() must return True when lssystem_post succeeds."""
+        self.svc.sdk.svc_info_api.lssystem_post.return_value = [
+            Munch({svc_settings.LSSYSTEM_LOCATION_ATTR_KEY: svc_settings.LOCAL_LOCATION,
+                   svc_settings.LSSYSTEM_CODE_LEVEL_ATTR_KEY: svc_settings.CODE_LEVEL,
+                   svc_settings.LSSYSTEM_ID_ALIAS_ATTR_KEY: svc_settings.DUMMY_ID_ALIAS})]
+        self.assertTrue(self.svc.is_active())
+
+    def test_is_active_returns_false_when_lssystem_raises(self):
+        """is_active() must return False when lssystem_post raises SdkApiException."""
+        self.svc.sdk.svc_info_api.lssystem_post.side_effect = _sdk_error("CMMVC5753E")
+        self.assertFalse(self.svc.is_active())
+
+    def test_lshostiogrp_warning_message_returns_none(self):
+        """_lshostiogrp() must return None (not raise) for CMMVCXXXXW warning codes."""
+        self.svc.sdk.svc_info_api.lshostiogrp_id_post = Mock()
+        self.svc.sdk.svc_info_api.lshostiogrp_id_post.side_effect = [
+            _sdk_error("CMMVC5753W The command completed successfully with warnings.")]
+        result = self.svc.get_host_io_group(common_settings.HOST_NAME)
+        self.assertIsNone(result)
+
