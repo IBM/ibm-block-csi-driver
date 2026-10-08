@@ -2009,6 +2009,19 @@ class TestArrayMediatorSVC(unittest.TestCase):
         self.svc.expand_volume(common_settings.VOLUME_UID, 513)
         self.svc.sdk.svc_task_api.chvolume_id_post.assert_called_once()
 
+    def test_expand_volume_uses_gb_unit_not_bytes(self):
+        # Regression test: the SVC REST API interprets the size field as a 32-bit
+        # integer.  Sizes >= 2 GiB overflow int32 when expressed in bytes, so we
+        # must always pass unit='gb' with an integer GB count.
+        # 3 GiB (3221225472) → ceiled to 4 GB → chvolume -size 4 -unit gb
+        self._prepare_mocks_for_expand_volume()
+        three_gib = 3 * 1024 ** 3  # 3221225472 — exceeds INT32_MAX when in bytes
+        self.svc.expand_volume(common_settings.VOLUME_UID, three_gib)
+        call_kwargs = self.svc.sdk.svc_task_api.chvolume_id_post.call_args
+        req = call_kwargs[1].get('chvolume_id_post_request') or call_kwargs[0][2]
+        self.assertEqual('gb', req.unit)
+        self.assertEqual(4, req.size)  # ceil(3 GiB / 1 GB) = 4 GB
+
     def test_expand_volume_in_hyperswap(self):
         self._prepare_mocks_for_expand_volume()
         del self.svc.sdk.svc_task_api.chvolume_id_post
