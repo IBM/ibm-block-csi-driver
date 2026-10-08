@@ -1344,6 +1344,23 @@ class TestArrayMediatorSVC(unittest.TestCase):
                                                 {SPACE_EFFICIENCY_COMPRESSED: True,
                                                  SPACE_EFFICIENCY_DEDUPLICATED: True})
 
+    def test_convert_size_bytes_512_alignment(self):
+        # Only 512-byte alignment — GB ceil is NOT applied during create
+        self.assertEqual(1_073_741_824, self.svc._convert_size_bytes(1_073_741_824))  # 1Gi, already aligned
+        self.assertEqual(1_024, self.svc._convert_size_bytes(1_024))                  # already aligned
+        self.assertEqual(1_024, self.svc._convert_size_bytes(1_000))                  # rounds up to next 512
+
+    def test_ceil_to_gb_exact_gb(self):
+        # Exact decimal GB boundaries must pass through unchanged
+        self.assertEqual(1_000_000_000, self.svc._ceil_to_gb(1_000_000_000))
+        self.assertEqual(3_000_000_000, self.svc._ceil_to_gb(3_000_000_000))
+
+    def test_ceil_to_gb_ceils_to_next_gb(self):
+        # 1 GiB (1,073,741,824) must be ceiled to 2 GB (2,000,000,000)
+        self.assertEqual(2_000_000_000, self.svc._ceil_to_gb(1_073_741_824))
+        # 3 GiB (3,221,225,472) must be ceiled to 4 GB (4,000,000,000)
+        self.assertEqual(4_000_000_000, self.svc._ceil_to_gb(3_221_225_472))
+
     def test_properties(self):
         self.assertEqual(22, SVCArrayMediator.port)
         self.assertEqual(array_settings.DUMMY_SMALL_CAPACITY_INT,
