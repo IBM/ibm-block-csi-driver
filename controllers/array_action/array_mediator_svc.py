@@ -391,11 +391,11 @@ _SdkLsvdiskResponse = _SdkResponse
 class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
     ARRAY_ACTIONS = {}
     BLOCK_SIZE_IN_BYTES = 512
+    BYTES_IN_GB = 1000 * 1000 * 1000  # SVC pool grain — 1 decimal GB
     MAX_LUN_NUMBER = 511
     MAX_LUN_NUMBER_INCREMENT = 512
     MIN_LUN_NUMBER = 0
     MIN_SUPPORTED_VERSION = '7.8'
-    # BYTES_IN_GB was defined but is unused; removed.
 
     @ClassProperty
     def array_type(self):
@@ -760,7 +760,7 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
         cli_volume = self._get_cli_volume_by_wwn(volume_id, not_exist_err=True)
         volume_name = cli_volume.name
         current_size = _parse_cli_capacity_bytes(cli_volume.capacity)
-        final_size = self._convert_size_bytes(required_bytes)
+        final_size = self._ceil_to_gb(self._convert_size_bytes(required_bytes))
         if final_size < current_size:
             raise array_errors.InvalidArgumentError("New volume size smaller than current")
         increase_in_bytes = final_size - current_size
@@ -848,10 +848,20 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
         logger.info("Finished validate_supported_space_efficiency")
 
     def _convert_size_bytes(self, size_in_bytes):
-        # SVC volume size must be the multiple of 512 bytes
+        # SVC volume size must be a multiple of 512 bytes
         ret = size_in_bytes % self.BLOCK_SIZE_IN_BYTES
         if ret > 0:
             return size_in_bytes - ret + self.BLOCK_SIZE_IN_BYTES
+        return size_in_bytes
+
+    def _ceil_to_gb(self, size_in_bytes):
+        # Ceil to next full decimal GB — SVC pool grain is 1 GB (1,000,000,000 bytes).
+        # chvolume/expandvdisksize silently ignore (or warn and discard) non-GB-aligned
+        # byte counts, leaving the volume unexpanded. Always round up to the next GB
+        # boundary before issuing any expand command.
+        remainder = size_in_bytes % self.BYTES_IN_GB
+        if remainder > 0:
+            size_in_bytes = size_in_bytes - remainder + self.BYTES_IN_GB
         return size_in_bytes
 
     def _get_wwn_by_volume_name_if_exists(self, volume_name):
