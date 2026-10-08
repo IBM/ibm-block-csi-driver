@@ -764,6 +764,13 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
         if final_size < current_size:
             raise array_errors.InvalidArgumentError("New volume size smaller than current")
         increase_in_bytes = final_size - current_size
+        # Convert to integer GB for the REST API.  SVC REST uses 32-bit integers
+        # for the size field, so passing byte counts >= 2 GiB (~2.15e9) causes an
+        # int32 overflow and the resize is silently discarded.  Since _ceil_to_gb
+        # already guarantees both final_size and increase_in_bytes are exact
+        # multiples of 1,000,000,000, the division is lossless.
+        final_size_gb = final_size // self.BYTES_IN_GB
+        increase_in_gb = increase_in_bytes // self.BYTES_IN_GB
         command = ""
         try:
             if self._is_chvolume_supported():
@@ -772,7 +779,7 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
                     id=volume_name,
                     x_auth_token=None,
                     chvolume_id_post_request=svc_models.ChvolumeIdPostRequest(
-                        size=final_size, unit='b'),
+                        size=final_size_gb, unit='gb'),
                 )
             else:
                 fcmaps = self._get_object_fcmaps(volume_name)
@@ -783,7 +790,7 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
                         id=volume_name,
                         x_auth_token=None,
                         expandvolume_id_post_request=svc_models.ExpandvolumeIdPostRequest(
-                            size=increase_in_bytes, unit='b'),
+                            size=increase_in_gb, unit='gb'),
                     )
                 else:
                     command = "expandvdisksize"
@@ -791,13 +798,13 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
                         id=volume_name,
                         x_auth_token=None,
                         expandvdisksize_id_post_request=svc_models.ExpandvdisksizeIdPostRequest(
-                            size=increase_in_bytes, unit='b'),
+                            size=increase_in_gb, unit='gb'),
                     )
         except SdkApiException as ex:
             message = _extract_sdk_error_message(ex)
-            logger.debug("Error running {} -unit b -size {} -{} {}".format(
+            logger.debug("Error running {} -unit gb -size {} -{} {}".format(
                 command,
-                final_size if command == "chvolume" else increase_in_bytes,
+                final_size_gb if command == "chvolume" else increase_in_gb,
                 "object_id" if command == "expandvolume" else "vdisk_id", volume_name))
             code = message.split()[0] if message.split() else ''
             if code.endswith('W'):
@@ -812,8 +819,8 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
                 raise
 
         logger.info(
-            "Finished volume expansion with {0}. id : {1}. volume expanded to {2} bytes".format(
-                command, volume_id, final_size))
+            "Finished volume expansion with {0}. id : {1}. volume expanded to {2} GB ({3} bytes)".format(
+                command, volume_id, final_size_gb, final_size))
 
     def _get_fcmaps(self, volume_name, endpoint_type):
         """
