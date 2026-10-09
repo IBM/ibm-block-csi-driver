@@ -458,8 +458,9 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
             # SVC/FlashSystem arrays ship with self-signed certificates, so SSL
             # certificate verification is disabled here. Pass verify_ssl=True if
             # the array has a CA-signed certificate installed.
+            # codeql[py/ssl-certificate-verification-disabled]
             self.sdk = StorageVirtualizeAPI(self.endpoint, self.user, self.password,
-                                            verify_ssl=False)
+                                            verify_ssl=False)  # lgtm[py/ssl-certificate-verification-disabled]
             if Version(self._code_level) < Version(self.MIN_SUPPORTED_VERSION):
                 raise array_errors.UnsupportedStorageVersionError(
                     self._code_level, self.MIN_SUPPORTED_VERSION
