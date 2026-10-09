@@ -1823,7 +1823,9 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
             replication_local_location = volume_group_replication.local_location
             location_attr_name = f"location{replication_local_location}_replication_mode"
 
-        return getattr(volume_group_replication, location_attr_name, None)
+        if hasattr(volume_group_replication, location_attr_name):
+            return getattr(volume_group_replication, location_attr_name)
+        return None
 
     @staticmethod
     def _getattr_as_str(obj, attr, default=array_settings.UNKNOWN):
@@ -1980,7 +1982,9 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
         volume_group_replication = self._lsvolumegroupreplication(volume_group_id)
         if not volume_group_replication:
             return None
-        return volume_group_replication.replication_policy_name
+        if hasattr(volume_group_replication, 'replication_policy_name'):
+            return volume_group_replication.replication_policy_name
+        return None
 
     def _assign_replication_policy_to_partition_vg(self, volume_group_id, requested_policy_name):
         try:
@@ -2297,14 +2301,14 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
         # Check if this is first demote attempt or retry
         if volume_group_name not in self._demote_state_map:
             # First attempt - create checkpoint and track state
-            self._demote_state_map[volume_group_name] = time.time()
+            self._demote_state_map[volume_group_name] = time.monotonic()
 
             logger.info("First demote attempt for volume group {}, creating checkpoint".format(volume_group_name))
             self._chvolumegroupreplication(volume_group_name, checkpoint=array_settings.CHECKPOINT)
         else:
             # Retry - checkpoint already created, just check status
             first_attempt_time = self._demote_state_map[volume_group_name]
-            elapsed_time = time.time() - first_attempt_time
+            elapsed_time = time.monotonic() - first_attempt_time
             logger.info("Retry demote for volume group {}, checking checkpoint status "
                         "(elapsed time: {:.1f}s)".format(volume_group_name,
                                                          elapsed_time))
