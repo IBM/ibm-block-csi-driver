@@ -506,17 +506,20 @@ class TestArrayMediatorSVC(unittest.TestCase):
                                                             size=array_settings.DUMMY_CAPACITY_INT,
                                                             pool=common_settings.DUMMY_POOL1)
 
-    def _test_create_volume_mkvolumegroup_success(self, source_type):
+    def _test_create_volume_mkvolumegroup_success(self, source_type, space_efficiency=None):
         self._prepare_mocks_for_create_volume_mkvolumegroup()
         if source_type == common_settings.VOLUME_OBJECT_TYPE:
             self._prepare_mocks_for_create_snapshot_addsnapshot(snapshot_id=common_settings.INTERNAL_SNAPSHOT_ID)
         self._test_create_volume_success(source_id=common_settings.INTERNAL_SNAPSHOT_ID, source_type=source_type,
-                                         is_virt_snap_func=True)
+                                         is_virt_snap_func=True, space_efficiency=space_efficiency)
 
-        self.svc.client.svctask.mkvolumegroup.assert_called_with(type=svc_settings.MKVOLUMEGROUP_CLONE_TYPE,
-                                                                 fromsnapshotid=common_settings.INTERNAL_SNAPSHOT_ID,
-                                                                 pool=common_settings.DUMMY_POOL1,
-                                                                 name=common_settings.VOLUME_NAME)
+        expected_kwargs = dict(type=svc_settings.MKVOLUMEGROUP_CLONE_TYPE,
+                               fromsnapshotid=common_settings.INTERNAL_SNAPSHOT_ID,
+                               pool=common_settings.DUMMY_POOL1,
+                               name=common_settings.VOLUME_NAME)
+        if space_efficiency == SPACE_EFFICIENCY_DEDUPLICATED_THIN:
+            expected_kwargs.update(thin=True, deduplicated=True)
+        self.svc.client.svctask.mkvolumegroup.assert_called_with(**expected_kwargs)
         remove_from_volumegroup_call = call(vdisk_id=common_settings.INTERNAL_VOLUME_ID, novolumegroup=True)
         rename_call = call(vdisk_id=common_settings.INTERNAL_VOLUME_ID, name=common_settings.VOLUME_NAME)
         self.svc.client.svctask.chvdisk.assert_has_calls([remove_from_volumegroup_call, rename_call])
@@ -527,6 +530,14 @@ class TestArrayMediatorSVC(unittest.TestCase):
 
     def test_create_volume_mkvolumegroup_from_volume_success(self):
         self._test_create_volume_mkvolumegroup_success(source_type=common_settings.VOLUME_OBJECT_TYPE)
+
+    def test_create_volume_mkvolumegroup_from_snapshot_with_dedup_thin_space_efficiency_success(self):
+        self._test_create_volume_mkvolumegroup_success(source_type=common_settings.SNAPSHOT_OBJECT_TYPE,
+                                                       space_efficiency=SPACE_EFFICIENCY_DEDUPLICATED_THIN)
+
+    def test_create_volume_mkvolumegroup_from_volume_with_dedup_thin_space_efficiency_success(self):
+        self._test_create_volume_mkvolumegroup_success(source_type=common_settings.VOLUME_OBJECT_TYPE,
+                                                       space_efficiency=SPACE_EFFICIENCY_DEDUPLICATED_THIN)
 
     def test_is_stretch_pool_with_stretch_pool_returns_true(self):
         pools_to_return = [Munch({svc_settings.LSMDISKGRP_SITE_NAME_ATTR_KEY: svc_settings.DUMMY_POOL_SITE}),
