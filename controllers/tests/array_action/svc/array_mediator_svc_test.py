@@ -1350,17 +1350,6 @@ class TestArrayMediatorSVC(unittest.TestCase):
         self.assertEqual(1_024, self.svc._convert_size_bytes(1_024))                  # already aligned
         self.assertEqual(1_024, self.svc._convert_size_bytes(1_000))                  # rounds up to next 512
 
-    def test_ceil_to_gb_exact_gb(self):
-        # Exact decimal GB boundaries must pass through unchanged
-        self.assertEqual(1_000_000_000, self.svc._ceil_to_gb(1_000_000_000))
-        self.assertEqual(3_000_000_000, self.svc._ceil_to_gb(3_000_000_000))
-
-    def test_ceil_to_gb_ceils_to_next_gb(self):
-        # 1 GiB (1,073,741,824) must be ceiled to 2 GB (2,000,000,000)
-        self.assertEqual(2_000_000_000, self.svc._ceil_to_gb(1_073_741_824))
-        # 3 GiB (3,221,225,472) must be ceiled to 4 GB (4,000,000,000)
-        self.assertEqual(4_000_000_000, self.svc._ceil_to_gb(3_221_225_472))
-
     def test_properties(self):
         self.assertEqual(22, SVCArrayMediator.port)
         self.assertEqual(array_settings.DUMMY_SMALL_CAPACITY_INT,
@@ -2002,43 +1991,15 @@ class TestArrayMediatorSVC(unittest.TestCase):
     def test_expand_volume_success(self):
         self._prepare_mocks_for_expand_volume()
         self.svc.expand_volume(common_settings.VOLUME_UID, array_settings.DUMMY_CAPACITY_INT)
-        self.svc.sdk.svc_task_api.chvolume_id_post.assert_called_once()
+        self.svc.sdk.svc_task_api.expandvdisksize_id_post.assert_called_once()
 
     def test_expand_volume_success_with_size_rounded_up(self):
         self._prepare_mocks_for_expand_volume()
         self.svc.expand_volume(common_settings.VOLUME_UID, 513)
-        self.svc.sdk.svc_task_api.chvolume_id_post.assert_called_once()
-
-    def test_expand_volume_uses_gb_unit_not_bytes(self):
-        # Regression test: the SVC REST API interprets the size field as a 32-bit
-        # integer.  Sizes >= 2 GiB overflow int32 when expressed in bytes, so we
-        # must always pass unit='gb' with an integer GB count.
-        # 3 GiB (3221225472) → ceiled to 4 GB → chvolume -size 4 -unit gb
-        self._prepare_mocks_for_expand_volume()
-        three_gib = 3 * 1024 ** 3  # 3221225472 — exceeds INT32_MAX when in bytes
-        self.svc.expand_volume(common_settings.VOLUME_UID, three_gib)
-        call_kwargs = self.svc.sdk.svc_task_api.chvolume_id_post.call_args
-        req = call_kwargs[1].get('chvolume_id_post_request') or call_kwargs[0][2]
-        self.assertEqual('gb', req.unit)
-        self.assertEqual(4, req.size)  # ceil(3 GiB / 1 GB) = 4 GB
+        self.svc.sdk.svc_task_api.expandvdisksize_id_post.assert_called_once()
 
     def test_expand_volume_in_hyperswap(self):
         self._prepare_mocks_for_expand_volume()
-        del self.svc.sdk.svc_task_api.chvolume_id_post
-        self._prepare_fcmaps_for_hyperswap()
-        self.svc.expand_volume(common_settings.VOLUME_UID, array_settings.DUMMY_CAPACITY_INT)
-
-        self.svc.sdk.svc_task_api.expandvolume_id_post.assert_called_once()
-
-    def test_expand_volume_with_chvolume_not_supported_uses_expandvdisksize(self):
-        self._prepare_mocks_for_expand_volume()
-        del self.svc.sdk.svc_task_api.chvolume_id_post
-        self.svc.expand_volume(common_settings.VOLUME_UID, array_settings.DUMMY_CAPACITY_INT)
-        self.svc.sdk.svc_task_api.expandvdisksize_id_post.assert_called_once()
-
-    def test_expand_volume_with_chvolume_not_supported_and_hyperswap_uses_expandvolume(self):
-        self._prepare_mocks_for_expand_volume()
-        del self.svc.sdk.svc_task_api.chvolume_id_post
         self._prepare_fcmaps_for_hyperswap()
         self.svc.expand_volume(common_settings.VOLUME_UID, array_settings.DUMMY_CAPACITY_INT)
         self.svc.sdk.svc_task_api.expandvolume_id_post.assert_called_once()
@@ -2048,21 +2009,7 @@ class TestArrayMediatorSVC(unittest.TestCase):
         self.svc.sdk.svc_info_api.lsvdisk_post.return_value = None
         with self.assertRaises(array_errors.ObjectNotFoundError):
             self.svc.expand_volume(common_settings.VOLUME_UID, array_settings.DUMMY_CAPACITY_INT)
-        self.svc.sdk.svc_task_api.chvolume_id_post.assert_not_called()
-
-    def _test_expand_volume_chvolume_errors(self, client_error, expected_error):
-        self._prepare_mocks_for_expand_volume()
-        self._test_mediator_method_client_error(self.svc.expand_volume, (common_settings.VOLUME_UID, 2, None),
-                                                self.svc.sdk.svc_task_api.chvolume_id_post, client_error, expected_error)
-
-    def test_expand_volume_chvolume_errors(self):
-        self._test_expand_volume_chvolume_errors(_sdk_error("CMMVC5753E"), array_errors.ObjectNotFoundError)
-        self._test_expand_volume_chvolume_errors(_sdk_error("CMMVC8957E"), array_errors.ObjectNotFoundError)
-        self._test_expand_volume_chvolume_errors(_sdk_error("CMMVC5860E"),
-                                                 array_errors.NotEnoughSpaceInPool)
-        self._test_expand_volume_chvolume_errors(_sdk_error(array_settings.DUMMY_ERROR_MESSAGE),
-                                                 SdkApiException)
-        self._test_expand_volume_chvolume_errors(Exception(array_settings.DUMMY_ERROR_MESSAGE), Exception)
+        self.svc.sdk.svc_task_api.expandvdisksize_id_post.assert_not_called()
 
     def _test_expand_volume_expandvdisksize_errors(self, client_error, expected_error):
         self._prepare_mocks_for_expand_volume()
@@ -2070,7 +2017,6 @@ class TestArrayMediatorSVC(unittest.TestCase):
                                                 self.svc.sdk.svc_task_api.expandvdisksize_id_post, client_error, expected_error)
 
     def test_expand_volume_expandvdisksize_errors(self):
-        del self.svc.sdk.svc_task_api.chvolume_id_post
         self._test_expand_volume_expandvdisksize_errors(_sdk_error("CMMVC5753E"), array_errors.ObjectNotFoundError)
         self._test_expand_volume_expandvdisksize_errors(_sdk_error("CMMVC8957E"), array_errors.ObjectNotFoundError)
         self._test_expand_volume_expandvdisksize_errors(_sdk_error("CMMVC5860E"),

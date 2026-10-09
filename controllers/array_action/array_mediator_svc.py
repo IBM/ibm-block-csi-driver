@@ -391,7 +391,6 @@ _SdkLsvdiskResponse = _SdkResponse
 class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
     ARRAY_ACTIONS = {}
     BLOCK_SIZE_IN_BYTES = 512
-    BYTES_IN_GB = 1000 * 1000 * 1000  # SVC pool grain — 1 decimal GB
     MAX_LUN_NUMBER = 511
     MAX_LUN_NUMBER_INCREMENT = 512
     MIN_LUN_NUMBER = 0
@@ -744,9 +743,6 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
         cli_volume = self._get_cli_volume(name)
         return self._generate_volume_response(cli_volume, is_virt_snap_func)
 
-    def _is_chvolume_supported(self):
-        return hasattr(self.sdk.svc_task_api, "chvolume_id_post")
-
     def _get_object_fcmaps(self, object_name):
         all_fcmaps = []
         fcmap_as_target = self._get_fcmap_as_target_if_exists(object_name)
@@ -760,51 +756,35 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
         cli_volume = self._get_cli_volume_by_wwn(volume_id, not_exist_err=True)
         volume_name = cli_volume.name
         current_size = _parse_cli_capacity_bytes(cli_volume.capacity)
-        final_size = self._ceil_to_gb(self._convert_size_bytes(required_bytes))
+        final_size = self._convert_size_bytes(required_bytes)
         if final_size < current_size:
             raise array_errors.InvalidArgumentError("New volume size smaller than current")
         increase_in_bytes = final_size - current_size
-        # Convert to integer GB for the REST API.  SVC REST uses 32-bit integers
-        # for the size field, so passing byte counts >= 2 GiB (~2.15e9) causes an
-        # int32 overflow and the resize is silently discarded.  Since _ceil_to_gb
-        # already guarantees both final_size and increase_in_bytes are exact
-        # multiples of 1,000,000,000, the division is lossless.
-        final_size_gb = final_size // self.BYTES_IN_GB
-        increase_in_gb = increase_in_bytes // self.BYTES_IN_GB
         command = ""
         try:
-            if self._is_chvolume_supported():
-                command = "chvolume"
-                self.sdk.svc_task_api.chvolume_id_post(
+            fcmaps = self._get_object_fcmaps(volume_name)
+            is_hyperswap = any(self._is_in_remote_copy_relationship(fcmap) for fcmap in fcmaps)
+            if is_hyperswap:
+                command = "expandvolume"
+                self.sdk.svc_task_api.expandvolume_id_post(
                     id=volume_name,
                     x_auth_token=None,
-                    chvolume_id_post_request=svc_models.ChvolumeIdPostRequest(
-                        size=final_size_gb, unit='gb'),
+                    expandvolume_id_post_request=svc_models.ExpandvolumeIdPostRequest(
+                        size=increase_in_bytes, unit='b'),
                 )
             else:
-                fcmaps = self._get_object_fcmaps(volume_name)
-                is_hyperswap = any(self._is_in_remote_copy_relationship(fcmap) for fcmap in fcmaps)
-                if is_hyperswap:
-                    command = "expandvolume"
-                    self.sdk.svc_task_api.expandvolume_id_post(
-                        id=volume_name,
-                        x_auth_token=None,
-                        expandvolume_id_post_request=svc_models.ExpandvolumeIdPostRequest(
-                            size=increase_in_gb, unit='gb'),
-                    )
-                else:
-                    command = "expandvdisksize"
-                    self.sdk.svc_task_api.expandvdisksize_id_post(
-                        id=volume_name,
-                        x_auth_token=None,
-                        expandvdisksize_id_post_request=svc_models.ExpandvdisksizeIdPostRequest(
-                            size=increase_in_gb, unit='gb'),
-                    )
+                command = "expandvdisksize"
+                self.sdk.svc_task_api.expandvdisksize_id_post(
+                    id=volume_name,
+                    x_auth_token=None,
+                    expandvdisksize_id_post_request=svc_models.ExpandvdisksizeIdPostRequest(
+                        size=increase_in_bytes, unit='b'),
+                )
         except SdkApiException as ex:
             message = _extract_sdk_error_message(ex)
-            logger.debug("Error running {} -unit gb -size {} -{} {}".format(
+            logger.debug("Error running {} -unit b -size {} -{} {}".format(
                 command,
-                final_size_gb if command == "chvolume" else increase_in_gb,
+                increase_in_bytes,
                 "object_id" if command == "expandvolume" else "vdisk_id", volume_name))
             code = message.split()[0] if message.split() else ''
             if code.endswith('W'):
@@ -819,8 +799,8 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
                 raise
 
         logger.info(
-            "Finished volume expansion with {0}. id : {1}. volume expanded to {2} GB ({3} bytes)".format(
-                command, volume_id, final_size_gb, final_size))
+            "Finished volume expansion with {0}. id : {1}. volume expanded to {2} bytes".format(
+                command, volume_id, final_size))
 
     def _get_fcmaps(self, volume_name, endpoint_type):
         """
@@ -859,16 +839,6 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
         ret = size_in_bytes % self.BLOCK_SIZE_IN_BYTES
         if ret > 0:
             return size_in_bytes - ret + self.BLOCK_SIZE_IN_BYTES
-        return size_in_bytes
-
-    def _ceil_to_gb(self, size_in_bytes):
-        # Ceil to next full decimal GB — SVC pool grain is 1 GB (1,000,000,000 bytes).
-        # chvolume/expandvdisksize silently ignore (or warn and discard) non-GB-aligned
-        # byte counts, leaving the volume unexpanded. Always round up to the next GB
-        # boundary before issuing any expand command.
-        remainder = size_in_bytes % self.BYTES_IN_GB
-        if remainder > 0:
-            size_in_bytes = size_in_bytes - remainder + self.BYTES_IN_GB
         return size_in_bytes
 
     def _get_wwn_by_volume_name_if_exists(self, volume_name):
