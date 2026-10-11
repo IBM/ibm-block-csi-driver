@@ -27,6 +27,7 @@ import (
 	"reflect"
 	"strings"
 	"syscall"
+	"time"
 
 	"github.com/container-storage-interface/spec/lib/go/csi"
 	"github.com/ibm/ibm-block-csi-driver/node/goid_info"
@@ -108,10 +109,22 @@ func NewNodeService(configYaml ConfigFile, hostname string, nodeUtils NodeUtilsI
 	osDeviceConnectivityHelper device_connectivity.OsDeviceConnectivityHelperScsiGenericInterface,
 	executer executer.ExecuterInterface, KeyedGater *executer.KeyedGater, mounter NodeMounter, syncLock SyncLockInterface) NodeService {
 	go func() {
-		logger.Error("Launch profiler")
-		if err := http.ListenAndServe("localhost:6060", nil); err != nil {
-			logger.Errorf("pprof server failed: %v", err)
-		}
+
+
+
+
+
+    time.Sleep(2 * time.Second)
+    
+    // Bind to ":6060" (0.0.0.0) so traffic from outside the container can reach it
+    logger.Error("Starting diagnostic pprof server on port :6060")
+    if err := http.ListenAndServe(":6060", nil); err != nil {
+        logger.Errorf("CRITICAL: Profiler server failed to bind: %v", err)
+    }
+
+
+
+
 	}()
 	return NodeService{
 		ConfigYaml:                  configYaml,
