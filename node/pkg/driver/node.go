@@ -36,6 +36,8 @@ import (
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	mount "k8s.io/mount-utils"
+	"net/http"
+	_ "net/http/pprof" // Side-effect import registers pprof handlers automati
 )
 
 var (
@@ -105,6 +107,12 @@ func NewNodeService(configYaml ConfigFile, hostname string, nodeUtils NodeUtilsI
 	OsDeviceConnectivityMapping map[string]device_connectivity.OsDeviceConnectivityInterface,
 	osDeviceConnectivityHelper device_connectivity.OsDeviceConnectivityHelperScsiGenericInterface,
 	executer executer.ExecuterInterface, KeyedGater *executer.KeyedGater, mounter NodeMounter, syncLock SyncLockInterface) NodeService {
+	go func() {
+		logger.Error("Launch profiler")
+		if err := http.ListenAndServe("localhost:6060", nil); err != nil {
+			logger.Errorf("pprof server failed: %v", err)
+		}
+	}()
 	return NodeService{
 		ConfigYaml:                  configYaml,
 		Hostname:                    hostname,
