@@ -137,85 +137,76 @@ func (r *OsDeviceConnectivityIscsi) iscsiGetRawSessions(ctx context.Context) ([]
 			var results []string
 
 			// Bounded chunk pagination scanner pass (Rule 5 compliance)
-			for {
+			if err := wCtx.Err(); err != nil {
+				return nil, err
+			}
+
+			connections, errDirs := dFile.Readdirnames(-1)
+			if errDirs != nil && errDirs != io.EOF {
+				return nil, fmt.Errorf("failed to parse iscsi connections stream: %w", errDirs)
+			}
+
+			for _, cName := range connections {
 				if err := wCtx.Err(); err != nil {
 					return nil, err
 				}
 
-				connections, errDirs := dFile.ReadDir(100)
-				if errDirs != nil && errDirs != io.EOF {
-					return nil, fmt.Errorf("failed to parse iscsi connections stream: %w", errDirs)
-				}
-				if len(connections) == 0 {
-					break
+				// Target names like: connection1:0, connection2:0
+				if !strings.HasPrefix(cName, "connection") {
+					continue
 				}
 
-				for _, c := range connections {
-					if err := wCtx.Err(); err != nil {
-						return nil, err
-					}
+				connPath := filepath.Join(connClassPath, cName)
 
-					// Target names like: connection1:0, connection2:0
-					if !strings.HasPrefix(c.Name(), "connection") {
+				// Read address and port directly from the connection class attributes
+				addrBuf, errA := os.ReadFile(filepath.Join(connPath, "address"))
+				portBuf, errP := os.ReadFile(filepath.Join(connPath, "port"))
+				if errA != nil || errP != nil {
+					logger.Debugf("Skipping incomplete connection configuration %s", cName)
+					continue
+				}
+
+				portal := net.JoinHostPort(
+					strings.TrimSpace(string(addrBuf)),
+					strings.TrimSpace(string(portBuf)),
+				)
+
+				deviceMappingLink := filepath.Join(connPath, "device")
+				evalPath, errLink := os.Readlink(deviceMappingLink)
+				if errLink != nil {
+					evalPath, errLink = os.Readlink(connPath)
+					if errLink != nil {
 						continue
 					}
-
-					connPath := filepath.Join(connClassPath, c.Name())
-
-					// Read address and port directly from the connection class attributes
-					addrBuf, errA := os.ReadFile(filepath.Join(connPath, "address"))
-					portBuf, errP := os.ReadFile(filepath.Join(connPath, "port"))
-					if errA != nil || errP != nil {
-						logger.Debugf("Skipping incomplete connection configuration %s", c.Name())
-						continue 
-					}
-
-					portal := net.JoinHostPort(
-						strings.TrimSpace(string(addrBuf)),
-						strings.TrimSpace(string(portBuf)),
-					)
-
-					deviceMappingLink := filepath.Join(connPath, "device")
-					evalPath, errLink := os.Readlink(deviceMappingLink)
-					if errLink != nil {
-						evalPath, errLink = os.Readlink(connPath)
-						if errLink != nil {
-							continue
-						}
-					}
-
-					// Extract "sessionX" from the path string token signature
-					sessionID := "0"
-					parts := strings.Split(evalPath, "/")
-					for _, part := range parts {
-						if strings.HasPrefix(part, "session") {
-							sessionID = strings.TrimPrefix(part, "session")
-							break
-						}
-					}
-
-					// Read targetname from the sibling session path using the extracted sessionID
-					sessionPath := fmt.Sprintf("/sys/class/iscsi_session/session%s", sessionID)
-					
-					stateBuf, errS := r.readSysfs(filepath.Join(sessionPath, "state"))
-					targetBuf, errT := r.readSysfs(filepath.Join(sessionPath, "targetname"))
-					if errS != nil || errT != nil {
-						continue // Session tearing down or unavailable
-					}
-
-					if strings.TrimSpace(string(stateBuf)) != "LOGGED_IN" {
-						continue // Skip transient or failing links
-					}
-
-					targetName := strings.TrimSpace(string(targetBuf))
-					
-					logger.Debugf("Discovered active sysfs session: [%s] target: %s portal: %s", sessionID, targetName, portal)
-					results = append(results, fmt.Sprintf("tcp: [%s] %s %s", sessionID, portal, targetName))
 				}
 
-				if len(connections) < 100 || errDirs == io.EOF {
-					break
+				// Extract "sessionX" from the path string token signature
+				sessionID := "0"
+				parts := strings.Split(evalPath, "/")
+				for _, part := range parts {
+					if strings.HasPrefix(part, "session") {
+						sessionID = strings.TrimPrefix(part, "session")
+						break
+					}
 				}
+
+				// Read targetname from the sibling session path using the extracted sessionID
+				sessionPath := fmt.Sprintf("/sys/class/iscsi_session/session%s", sessionID)
+				
+				stateBuf, errS := r.readSysfs(filepath.Join(sessionPath, "state"))
+				targetBuf, errT := r.readSysfs(filepath.Join(sessionPath, "targetname"))
+				if errS != nil || errT != nil {
+					continue // Session tearing down or unavailable
+				}
+
+				if strings.TrimSpace(string(stateBuf)) != "LOGGED_IN" {
+					continue // Skip transient or failing links
+				}
+
+				targetName := strings.TrimSpace(string(targetBuf))
+				
+				logger.Debugf("Discovered active sysfs session: [%s] target: %s portal: %s", sessionID, targetName, portal)
+				results = append(results, fmt.Sprintf("tcp: [%s] %s %s", sessionID, portal, targetName))
 			}
 
 			return results, nil
@@ -408,28 +399,17 @@ func (r *OsDeviceConnectivityIscsi) loadRelevantTargets(ctx context.Context, req
 			if errOpen == nil {
 				defer dFile.Close()
 				// Bounded chunk pagination scanner pass (Rule 5 compliance)
-				for {
-					if err := wCtx.Err(); err != nil {
-						return nil, err
-					}
+				if err := wCtx.Err(); err != nil {
+					return nil, err
+				}
 
-					discoveredTargets, errDirs := dFile.ReadDir(100)
-					if errDirs != nil && errDirs != io.EOF {
-						return nil, fmt.Errorf("failed to parse local iscsi database stream: %w", errDirs)
-					}
-					if len(discoveredTargets) == 0 {
-						break
-					}
+				discoveredTargets, errDirs := dFile.Readdirnames(-1)
+				if errDirs != nil && errDirs != io.EOF {
+					return nil, fmt.Errorf("failed to parse local iscsi database stream: %w", errDirs)
+				}
 
-					for _, entry := range discoveredTargets {
-						if entry.IsDir() {
-							targetMapCache[entry.Name()] = true
-						}
-					}
-
-					if len(discoveredTargets) < 100 || errDirs == io.EOF {
-						break
-					}
+				for _, entryName := range discoveredTargets {
+					targetMapCache[entryName] = true
 				}
 			}
 
@@ -459,44 +439,31 @@ func (r *OsDeviceConnectivityIscsi) loadRelevantTargets(ctx context.Context, req
 					continue
 				}
 
-				for {
-					if err := wCtx.Err(); err != nil {
-						pFile.Close()
-						return nil, err
-					}
+				if err := wCtx.Err(); err != nil {
+					pFile.Close()
+					return nil, err
+				}
 
-					portals, errPortalsDirs := pFile.ReadDir(100)
-					if errPortalsDirs != nil && errPortalsDirs != io.EOF {
-						logger.Debugf("Failed to read discovered target path %s: %v", targetPath, errPortalsDirs)
-						break
-					}
-					if len(portals) == 0 {
-						break
-					}
+				portals, errPortalsDirs := pFile.Readdirnames(-1)
+				pFile.Close()
+				if errPortalsDirs != nil && errPortalsDirs != io.EOF {
+					logger.Debugf("Failed to read discovered target path %s: %v", targetPath, errPortalsDirs)
+					continue
+				}
 
-					for _, p := range portals {
-						if !p.IsDir() {
-							continue
-						}
+				for _, pName := range portals {
+					logger.Debugf("Processing discovered portal directory: %s", pName)
 
-						logger.Debugf("Processing discovered portal directory: %s", p.Name())
-
-						// KEEP ORIGINAL: Open-iSCSI directory naming format: "IP_ADDRESS,PORT,TPGT"
-						parts := strings.Split(p.Name(), ",")
-						if len(parts) >= 2 {
-							ipKey := r.ExtractIP(parts[0])
-							
-							logger.Debugf("Successfully mapped normalized IP key: %s for target: %s", ipKey, normalizedTarget)
-							
-							db[normalizedTarget][ipKey] = true
-						}
-					}
-
-					if len(portals) < 100 || errPortalsDirs == io.EOF {
-						break
+					// KEEP ORIGINAL: Open-iSCSI directory naming format: "IP_ADDRESS,PORT,TPGT"
+					parts := strings.Split(pName, ",")
+					if len(parts) >= 2 {
+						ipKey := r.ExtractIP(parts[0])
+						
+						logger.Debugf("Successfully mapped normalized IP key: %s for target: %s", ipKey, normalizedTarget)
+						
+						db[normalizedTarget][ipKey] = true
 					}
 				}
-				pFile.Close()
 			}
 
 			return db, nil
@@ -631,61 +598,52 @@ func (r *OsDeviceConnectivityIscsi) parseActiveSessions(ctx context.Context) ([]
 			var sessions []activeSession
 
 			// Bounded chunk pagination scanner pass (Rule 5 compliance)
-			for {
+			if err := wCtx.Err(); err != nil {
+				return nil, err
+			}
+
+			entries, errDirs := dFile.Readdirnames(-1)
+			if errDirs != nil && errDirs != io.EOF {
+				return nil, fmt.Errorf("failed to parse active iscsi sessions stream: %w", errDirs)
+			}
+
+			for _, entryName := range entries {
 				if err := wCtx.Err(); err != nil {
 					return nil, err
 				}
 
-				entries, errDirs := dFile.ReadDir(100)
-				if errDirs != nil && errDirs != io.EOF {
-					return nil, fmt.Errorf("failed to parse active iscsi sessions stream: %w", errDirs)
-				}
-				if len(entries) == 0 {
-					break
-				}
+				sessionPath := filepath.Join(sessionBaseDir, entryName)
+				logger.Errorf("Session path %s", sessionPath)
 
-				for _, entry := range entries {
-					if err := wCtx.Err(); err != nil {
-						return nil, err
-					}
-
-					sessionPath := filepath.Join(sessionBaseDir, entry.Name())
-					logger.Errorf("Session path %s", sessionPath)
-
-					// 1. STATE CHECK
-					stateBuf, _ := os.ReadFile(filepath.Join(sessionPath, "state"))
-					if cleanSysfsData(stateBuf) != "LOGGED_IN" {
-						logger.Errorf("State %s", cleanSysfsData(stateBuf))
-						continue
-					}
-
-					// 2. ROBUST HOST RESOLUTION (Rule 5 Leaf Utilities)
-					// We pass wCtx down to internal helpers so they can honor the framework timeline ceilings natively.
-					hostNum, err := r.extractHostFromDeviceLink(sessionPath)
-					if err != nil {
-						logger.Debugf("Skipping %s: %v", entry.Name(), err)
-						continue
-					}
-
-					// 3. IQN EXTRACTION
-					hostName := fmt.Sprintf("host%d", hostNum)
-					initiatorIQN, err := r.getInitiatorIQN(sessionPath, hostName)
-					if err != nil {
-						logger.Debugf("Skipping session %s: %v", entry.Name(), err)
-						continue
-					}
-
-					sessions = append(sessions, activeSession{
-						sourceIQN: initiatorIQN,
-						hostNum:   hostNum,
-					})
-					
-					logger.Errorf("Add init %s host %s", initiatorIQN, hostName)
+				// 1. STATE CHECK
+				stateBuf, _ := os.ReadFile(filepath.Join(sessionPath, "state"))
+				if cleanSysfsData(stateBuf) != "LOGGED_IN" {
+					logger.Errorf("State %s", cleanSysfsData(stateBuf))
+					continue
 				}
 
-				if len(entries) < 100 || errDirs == io.EOF {
-					break
+				// 2. ROBUST HOST RESOLUTION (Rule 5 Leaf Utilities)
+				// We pass wCtx down to internal helpers so they can honor the framework timeline ceilings natively.
+				hostNum, err := r.extractHostFromDeviceLink(sessionPath)
+				if err != nil {
+					logger.Debugf("Skipping %s: %v", entryName, err)
+					continue
 				}
+
+				// 3. IQN EXTRACTION
+				hostName := fmt.Sprintf("host%d", hostNum)
+				initiatorIQN, err := r.getInitiatorIQN(sessionPath, hostName)
+				if err != nil {
+					logger.Debugf("Skipping session %s: %v", entryName, err)
+					continue
+				}
+
+				sessions = append(sessions, activeSession{
+					sourceIQN: initiatorIQN,
+					hostNum:   hostNum,
+				})
+				
+				logger.Errorf("Add init %s host %s", initiatorIQN, hostName)
 			}
 
 			return sessions, nil
@@ -810,31 +768,24 @@ func (r OsDeviceConnectivityIscsi) GetBlockDeviceForSession(ctx context.Context,
 	devCandidates := make([]string, 0, 128)
 
 	// STAGE 1: MICROSECOND SNAPSHOT SWEEP FOR /dev (Decouples VFS Handles Instantly)
-	for {
-		if err := ctx.Err(); err != nil {
-			dFile.Close()
-			return "", err
-		}
+	if err := ctx.Err(); err != nil {
+		dFile.Close()
+		return "", err
+	}
 
-		devEntries, errDirs := dFile.ReadDir(100)
-		if errDirs != nil && errDirs != io.EOF {
-			dFile.Close()
-			return "", fmt.Errorf("failed to parse dev stream: %w", errDirs)
-		}
+	devEntries, errDirs := dFile.Readdirnames(-1)
+	dFile.Close() // CLOSED IMMEDIATELY: Protects process table limits before starting slow file queries.
+	if errDirs != nil && errDirs != io.EOF {
+		return "", fmt.Errorf("failed to parse dev stream: %w", errDirs)
+	}
 
-		for _, entry := range devEntries {
-			if len(devCandidates) >= maxCapCeiling {
-				logger.Warningf("[VFS-Guard] /dev candidates reached maximum safe allocation ceiling (%d). Truncating scan.", maxCapCeiling)
-				break
-			}
-			devCandidates = append(devCandidates, entry.Name())
-		}
-
-		if len(devCandidates) >= maxCapCeiling || len(devEntries) < 100 || errDirs == io.EOF {
+	for _, entryName := range devEntries {
+		if len(devCandidates) >= maxCapCeiling {
+			logger.Warningf("[VFS-Guard] /dev candidates reached maximum safe allocation ceiling (%d). Truncating scan.", maxCapCeiling)
 			break
 		}
+		devCandidates = append(devCandidates, entryName)
 	}
-	dFile.Close() // CLOSED IMMEDIATELY: Protects process table limits before starting slow file queries.
 
 	sessionToken := fmt.Sprintf("session%s/", sessionID)
 
@@ -876,25 +827,19 @@ func (r OsDeviceConnectivityIscsi) GetBlockDeviceForSession(ctx context.Context,
 	sessionEntries := make([]string, 0, 16)
 
 	// TIER 1 SNAPSHOT SWEEP: Collect targets
-	for {
-		entries, errDirs := sFile.ReadDir(100)
-		if errDirs != nil && errDirs != io.EOF {
-			sFile.Close()
-			return "", fmt.Errorf("failed to parse fallback session tree: %w", errDirs)
-		}
-		for _, entry := range entries {
-			if len(sessionEntries) >= maxCapCeiling {
-				break
-			}
-			if strings.HasPrefix(entry.Name(), "target") {
-				sessionEntries = append(sessionEntries, entry.Name())
-			}
-		}
-		if len(sessionEntries) >= maxCapCeiling || len(entries) < 100 || errDirs == io.EOF {
+	entries, errDirs := sFile.Readdirnames(-1)
+	sFile.Close() // CLOSED IMMEDIATELY
+	if errDirs != nil && errDirs != io.EOF {
+		return "", fmt.Errorf("failed to parse fallback session tree: %w", errDirs)
+	}
+	for _, entryName := range entries {
+		if len(sessionEntries) >= maxCapCeiling {
 			break
 		}
+		if strings.HasPrefix(entryName, "target") {
+			sessionEntries = append(sessionEntries, entryName)
+		}
 	}
-	sFile.Close() // CLOSED IMMEDIATELY
 
 	// DECOUPLED MULTI-TIER EVALUATION
 	for _, targetName := range sessionEntries {
@@ -911,22 +856,16 @@ func (r OsDeviceConnectivityIscsi) GetBlockDeviceForSession(ctx context.Context,
 		lunEntries := make([]string, 0, 16)
 
 		// TIER 2 SNAPSHOT SWEEP: Collect LUNs
-		for {
-			luns, errLunsDirs := tFile.ReadDir(100)
-			if errLunsDirs != nil && errLunsDirs != io.EOF {
-				break
-			}
-			for _, lun := range luns {
+		luns, errLunsDirs := tFile.Readdirnames(-1)
+		tFile.Close() // CLOSED IMMEDIATELY
+		if errLunsDirs == nil || errLunsDirs == io.EOF {
+			for _, lunName := range luns {
 				if len(lunEntries) >= maxCapCeiling {
 					break
 				}
-				lunEntries = append(lunEntries, lun.Name())
-			}
-			if len(lunEntries) >= maxCapCeiling || len(luns) < 100 || errLunsDirs == io.EOF {
-				break
+				lunEntries = append(lunEntries, lunName)
 			}
 		}
-		tFile.Close() // CLOSED IMMEDIATELY
 
 		// DECOUPLED TIER 3 LUN PROCESSING
 		for _, lunName := range lunEntries {
@@ -936,11 +875,11 @@ func (r OsDeviceConnectivityIscsi) GetBlockDeviceForSession(ctx context.Context,
 				continue
 			}
 
-			disks, errDisks := bFile.ReadDir(100)
+			disks, errDisks := bFile.Readdirnames(-1)
 			bFile.Close() // CLOSED IMMEDIATELY
 			
 			if errDisks == nil && len(disks) > 0 {
-				return "/dev/" + disks[0].Name(), nil 
+				return "/dev/" + disks[0], nil
 			}
 		}
 	}

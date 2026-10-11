@@ -422,9 +422,9 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) IsVolumePathMatchesVolumeId(ctx 
 
 	slavesPath := filepath.Join(sysBlockTarget, "slaves")
 	if dFile, errOpen := os.Open(slavesPath); errOpen == nil {
-		if entries, errRead := dFile.ReadDir(16); errRead == nil {
-			for _, entry := range entries {
-				if strings.HasPrefix(entry.Name(), "nvme") {
+		if entries, errRead := dFile.Readdirnames(-1); errRead == nil {
+			for _, entryName := range entries {
+				if strings.HasPrefix(entryName, "nvme") {
 					isMpathNVMe = true
 					break
 				}
@@ -509,34 +509,31 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) IsVolumePathMatchesVolumeId(ctx 
 	}
 	defer dFile.Close()
 
-	for {
+	if ctx.Err() != nil {
+		return false, ctx.Err()
+	}
+	entries, readErr := dFile.Readdirnames(-1)
+	if readErr != nil && readErr != io.EOF {
+		return false, readErr
+	}
+	
+	for _, entryName := range entries {
 		if ctx.Err() != nil {
 			return false, ctx.Err()
 		}
-		entries, readErr := dFile.ReadDir(100)
-		if readErr != nil && readErr != io.EOF {
-			return false, readErr
-		}
-		if len(entries) == 0 || readErr == io.EOF {
-			break
-		}
 		
-		for _, entry := range entries {				
-			entryName := entry.Name()
-			
-			logger.Infof("[Identity-Check] evaluate entry %s", entryName)
-			
-			isSCSI := strings.HasPrefix(entryName, "sd")
-			isDM := strings.HasPrefix(entryName, "dm-")
-			isNVMe := helper.IsNativeNvmeNamespace(entryName)
+		logger.Infof("[Identity-Check] evaluate entry %s", entryName)
+		
+		isSCSI := strings.HasPrefix(entryName, "sd")
+		isDM := strings.HasPrefix(entryName, "dm-")
+		isNVMe := helper.IsNativeNvmeNamespace(entryName)
 
-			if isSCSI || isDM || isNVMe {
-				if len(validNvmeTargets) >= maxCapCeiling {
-					break
-				}
-				logger.Infof("[Identity-Check] entry %s is candidate", entryName)
-				validNvmeTargets = append(validNvmeTargets, entryName)
+		if isSCSI || isDM || isNVMe {
+			if len(validNvmeTargets) >= maxCapCeiling {
+				break
 			}
+			logger.Infof("[Identity-Check] entry %s is candidate", entryName)
+			validNvmeTargets = append(validNvmeTargets, entryName)
 		}
 	}
 
@@ -1672,35 +1669,24 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) resolveTargetIDsRecursive(
 		slaveNames := make([]string, 0, 32)
 
 		// STAGE 1: MICROSECOND SNAPSHOT SWEEP (Decouples VFS States Instantly)
-		for {
-			if err := ctx.Err(); err != nil {
-				dFile.Close()
-				return nil, err
-			}
-
-			entries, readErr := dFile.ReadDir(100)
-			if readErr != nil && readErr != io.EOF {
-				dFile.Close()
-				return nil, fmt.Errorf("failed to read dm slaves: %w", readErr)
-			}
-			
-			if len(entries) == 0 {
-				break
-			}
-
-			for _, entry := range entries {
-				if len(slaveNames) >= maxCapCeiling {
-					logger.Warningf("[VFS-Guard] DM slave elements reached maximum processing threshold ceiling (%d). Truncating scan.", maxCapCeiling)
-					break
-				}
-				slaveNames = append(slaveNames, entry.Name())
-			}
-
-			if len(slaveNames) >= maxCapCeiling || readErr == io.EOF {
-				break
-			}
+		if err := ctx.Err(); err != nil {
+			dFile.Close()
+			return nil, err
 		}
-		dFile.Close() 
+
+		entries, readErr := dFile.Readdirnames(-1)
+		dFile.Close()
+		if readErr != nil && readErr != io.EOF {
+			return nil, fmt.Errorf("failed to read dm slaves: %w", readErr)
+		}
+
+		for _, entryName := range entries {
+			if len(slaveNames) >= maxCapCeiling {
+				logger.Warningf("[VFS-Guard] DM slave elements reached maximum processing threshold ceiling (%d). Truncating scan.", maxCapCeiling)
+				break
+			}
+			slaveNames = append(slaveNames, entryName)
+		}
 
 		// =========================================================================
 		// STAGE 2: HARDENED BATCHED FAN-OUT RECURSION PROCESS
@@ -1888,9 +1874,8 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) getScsiTargetID(ctx context.Cont
 		// 2. Fail-safe scan for Device Mapper / Multipath slaves (handles names like mpatha, VolGroup01, dm-0)
 		slavesPath := filepath.Join("/sys/block", cleanBlockName, "slaves")
 		if dFile, errOpen := os.Open(slavesPath); errOpen == nil {
-			if entries, errRead := dFile.ReadDir(32); errRead == nil {
-				for _, entry := range entries {
-					slaveName := entry.Name()
+			if entries, errRead := dFile.Readdirnames(-1); errRead == nil {
+				for _, slaveName := range entries {
 					if strings.HasPrefix(slaveName, "nvme") {
 						transportType = "nvme"
 						if nvmeCtrl := ExtractNvmeControllerBase(slaveName); nvmeCtrl != "" {
@@ -2016,24 +2001,18 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) getScsiTargetIDTransportFc(ctx c
 		prefixSearch := fmt.Sprintf("rport-%s:", hostID)
 		candidates := make([]string, 0, 32)
 
-		for {
-			rportEntries, errDirs := dFile.ReadDir(100)
-			if errDirs != nil && errDirs != io.EOF {
-				break
-			}
-			for _, entry := range rportEntries {
-				rportName := entry.Name()
-				if strings.HasPrefix(rportName, prefixSearch) {
-					if len(candidates) >= maxCapCeiling {
-						logger.Warningf("[VFS-Guard] Safe ceiling hit (%d). Truncate scan.", maxCapCeiling)
-						break
-					}
-				
-					candidates = append(candidates, rportName)
+		rportEntries, errDirs := dFile.Readdirnames(-1)
+		if errDirs != nil && errDirs != io.EOF {
+			return candidates
+		}
+		for _, rportName := range rportEntries {
+			if strings.HasPrefix(rportName, prefixSearch) {
+				if len(candidates) >= maxCapCeiling {
+					logger.Warningf("[VFS-Guard] Safe ceiling hit (%d). Truncate scan.", maxCapCeiling)
+					break
 				}
-			}
-			if len(candidates) >= maxCapCeiling || len(rportEntries) < 100 || errDirs == io.EOF {
-				break
+			
+				candidates = append(candidates, rportName)
 			}
 		}
 		return candidates
@@ -2099,22 +2078,17 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) getScsiTargetIDTransportIscsi(ct
 		defer sFile.Close()
 
 		candidates := make([]string, 0, 32)
-		for {
-			sessions, errDirs := sFile.ReadDir(100)
-			if errDirs != nil && errDirs != io.EOF {
-				logger.Warningf("[SCSI-Target-Inspector] [%s] [Track-C-Error] Chunk read error: %v", hctl, errDirs)
+		sessions, errDirs := sFile.Readdirnames(-1)
+		if errDirs != nil && errDirs != io.EOF {
+			logger.Warningf("[SCSI-Target-Inspector] [%s] [Track-C-Error] Readdirnames error: %v", hctl, errDirs)
+			return candidates
+		}
+		for _, s := range sessions {
+			if len(candidates) >= maxCapCeiling {
+				logger.Warningf("[VFS-Guard] Safe ceiling hit (%d). Truncate scan.", maxCapCeiling)
 				break
 			}
-			for _, s := range sessions {
-				if len(candidates) >= maxCapCeiling {
-					logger.Warningf("[VFS-Guard] Safe ceiling hit (%d). Truncate scan.", maxCapCeiling)
-					break
-				}
-				candidates = append(candidates, s.Name())
-			}
-			if len(candidates) >= maxCapCeiling || len(sessions) < 100 || errDirs == io.EOF {
-				break
-			}
+			candidates = append(candidates, s)
 		}
 		return candidates
 	}()
@@ -2198,24 +2172,19 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) getIscsiTargetName(ctx context.C
 	sessionCandidates := make([]string, 0, 32)
 
 	// STAGE 1: MICROSECOND SNAPSHOT SWEEP (Decouples VFS Handles Instantly)
-	for {
-		sessions, errDirs := dFile.ReadDir(100)
-		if errDirs != nil && errDirs != io.EOF {
-			logger.Warningf("      [iSCSI-Subsystem-Scout] [Strategy-B Error] Error reading iSCSI sessions chunk: %v", errDirs)
-			break
-		}
+	sessions, errDirs := dFile.Readdirnames(-1)
+	dFile.Close() // CLOSED IMMEDIATELY: Releases VFS handles before entering slow, multi-second file operations.
+	if errDirs != nil && errDirs != io.EOF {
+		logger.Warningf("      [iSCSI-Subsystem-Scout] [Strategy-B Error] Error reading iSCSI sessions: %v", errDirs)
+	} else {
 		for _, s := range sessions {
 			if len(sessionCandidates) >= maxCapCeiling {
 				logger.Warningf("[VFS-Guard] iSCSI sessions list reached safe allocation ceiling (%d). Truncating scan.", maxCapCeiling)
 				break
 			}
-			sessionCandidates = append(sessionCandidates, s.Name())
-		}
-		if len(sessionCandidates) >= maxCapCeiling || len(sessions) < 100 || errDirs == io.EOF {
-			break
+			sessionCandidates = append(sessionCandidates, s)
 		}
 	}
-	dFile.Close() // CLOSED IMMEDIATELY: Releases VFS handles before entering slow, multi-second file operations.
 
 	matchToken := fmt.Sprintf("host%s", hostID)
 
@@ -2915,9 +2884,9 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) collectInformationForTeardown(ct
 		isMpathNVMe := false
 		slavesPath := filepath.Join("/sys/block", mpathName, "slaves")
 		if dFile, errOpen := os.Open(slavesPath); errOpen == nil {
-			if entries, errRead := dFile.ReadDir(10); errRead == nil {
-				for _, entry := range entries {
-					if strings.HasPrefix(entry.Name(), "nvme") {
+			if entries, errRead := dFile.Readdirnames(-1); errRead == nil {
+				for _, entryName := range entries {
+					if strings.HasPrefix(entryName, "nvme") {
 						isMpathNVMe = true
 						break
 					}
@@ -3243,18 +3212,13 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) GetDMNameFromMinor(ctx context.C
 	// =========================================================================
 	// STAGE 1: MICROSECOND SNAPSHOT SWEEP (Decouples VFS State Instantly)
 	// =========================================================================
-	for {
-		if err := ctx.Err(); err != nil {
-			return ""
-		}
+	if err := ctx.Err(); err != nil {
+		return ""
+	}
 
-		mapperEntries, errDirs := sFile.ReadDir(100)
-		if errDirs != nil && errDirs != io.EOF {
-			break
-		}
-
-		for _, entry := range mapperEntries {
-			name := entry.Name()
+	mapperEntries, errDirs := sFile.Readdirnames(-1)
+	if errDirs == nil || errDirs == io.EOF {
+		for _, name := range mapperEntries {
 			if name == "control" {
 				continue
 			}
@@ -3265,10 +3229,6 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) GetDMNameFromMinor(ctx context.C
 			}
 			
 			mapperNames = append(mapperNames, name)
-		}
-
-		if len(mapperNames) >= maxCapCeiling || len(mapperEntries) < 100 || errDirs == io.EOF {
-			break
 		}
 	}
 
@@ -3696,11 +3656,11 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) SafeResolveNvmeMountState(ctx co
 		
 		if dFile, errOpen := os.Open(slavesPath); errOpen == nil {
 			defer dFile.Close()
-			if entries, errRead := dFile.ReadDir(10); errRead == nil {
-				for _, entry := range entries {
+			if entries, errRead := dFile.Readdirnames(-1); errRead == nil {
+				for _, entryName := range entries {
 					// If ANY underlying physical path lane starts with "nvme", it is structurally an NVMe-DM map
-					if strings.HasPrefix(entry.Name(), "nvme") {
-						logger.Infof("[NvmeResolve-Trace] Confirmed NVMe backing via true device-mapper slave topology: %s -> %s", kernelBlockName, entry.Name())
+					if strings.HasPrefix(entryName, "nvme") {
+						logger.Infof("[NvmeResolve-Trace] Confirmed NVMe backing via true device-mapper slave topology: %s -> %s", kernelBlockName, entryName)
 						return true
 					}
 				}
@@ -3748,9 +3708,9 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) getPathHwid(ctx context.Context,
 				// Prevent descriptor leak footprints via structured defer release
 				defer dFile.Close()
 				
-				if entries, errRead := dFile.ReadDir(5); errRead == nil {
-					for _, entry := range entries {
-						if strings.HasPrefix(entry.Name(), "nvme") {
+				if entries, errRead := dFile.Readdirnames(-1); errRead == nil {
+					for _, entryName := range entries {
+						if strings.HasPrefix(entryName, "nvme") {
 							isMpathNVMe = true
 							logger.Infof("[GetHwid-Trace] Target %s confirmed as NVMe-backed Device Mapper path.", lookupName)
 							break
@@ -4090,13 +4050,9 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) disableNativeNvmeQueueing(ctx co
 				if errLink == nil && strings.Contains(realSubsysPath, "virtual/nvme-subsys") {
 					if subFile, errOpenSub := os.Open(realSubsysPath); errOpenSub == nil {
 						processedSubCount := 0
-						for {
-							entries, errSub := subFile.ReadDir(100)
-							if errSub != nil && errSub != io.EOF {
-								break
-							}
-							for _, e := range entries {
-								name := e.Name()
+						entries, errSub := subFile.Readdirnames(-1)
+						if errSub == nil || errSub == io.EOF {
+							for _, name := range entries {
 								if strings.HasPrefix(name, "nvme") && !nvmeNamespaceRegex.MatchString(name) {
 									if processedSubCount >= maxCapCeiling {
 										break
@@ -4105,9 +4061,6 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) disableNativeNvmeQueueing(ctx co
 								
 									controllersToUpdate = append(controllersToUpdate, name)
 								}
-							}
-							if processedSubCount >= maxCapCeiling || len(entries) < 100 || errSub == io.EOF {
-								break
 							}
 						}
 						subFile.Close()
@@ -5133,32 +5086,25 @@ func (r *OsDeviceConnectivityHelperGeneric) checkDMDevice(ctx context.Context, d
 	const maxCapCeiling = 10000
 	slaveNames := make([]string, 0, 32)
 
-	for {
-		if err := ctx.Err(); err != nil {
-			dFile.Close()
-			return true 
-		}
+	if err := ctx.Err(); err != nil {
+		dFile.Close()
+		return true
+	}
 
-		slaves, errDirs := dFile.ReadDir(100)
-		if errDirs != nil && errDirs != io.EOF {
-			logger.Warningf("error reading dm slaves chunk: %v", errDirs)
-			dFile.Close()
-			return true
-		}
+	slaves, errDirs := dFile.Readdirnames(-1)
+	dFile.Close()
+	if errDirs != nil && errDirs != io.EOF {
+		logger.Warningf("error reading dm slaves: %v", errDirs)
+		return true
+	}
 
-		for _, s := range slaves {
-			if len(slaveNames) >= maxCapCeiling {
-				logger.Warningf("[VFS-Guard] DM slave tracking slice reached maximum safe allocation ceiling (%d). Truncating scan.", maxCapCeiling)
-				break
-			}
-			slaveNames = append(slaveNames, s.Name())
-		}
-
-		if len(slaveNames) >= maxCapCeiling || len(slaves) < 100 || errDirs == io.EOF {
+	for _, s := range slaves {
+		if len(slaveNames) >= maxCapCeiling {
+			logger.Warningf("[VFS-Guard] DM slave tracking slice reached maximum safe allocation ceiling (%d). Truncating scan.", maxCapCeiling)
 			break
 		}
+		slaveNames = append(slaveNames, s)
 	}
-	dFile.Close() 
 
 	for _, name := range slaveNames {
 		if err := ctx.Err(); err != nil {
@@ -5503,18 +5449,13 @@ func (r *OsDeviceConnectivityHelperGeneric) findDMByWWID(ctx context.Context, ww
 	// =========================================================================
 	// STAGE 1: MICROSECOND SNAPSHOT SWEEP (Decouples VFS Handles Instantly)
 	// =========================================================================
-	for {
-		if err := ctx.Err(); err != nil {
-			return ""
-		}
+	if err := ctx.Err(); err != nil {
+		return ""
+	}
 
-		mapperEntries, errDirs := sFile.ReadDir(100)
-		if errDirs != nil && errDirs != io.EOF {
-			break
-		}
-
-		for _, entry := range mapperEntries {
-			name := entry.Name()
+	mapperEntries, errDirs := sFile.Readdirnames(-1)
+	if errDirs == nil || errDirs == io.EOF {
+		for _, name := range mapperEntries {
 			if name == "control" {
 				continue
 			}
@@ -5524,10 +5465,6 @@ func (r *OsDeviceConnectivityHelperGeneric) findDMByWWID(ctx context.Context, ww
 			}
 			
 			mapperNames = append(mapperNames, name)
-		}
-
-		if len(mapperNames) >= maxCapCeiling || len(mapperEntries) < 100 || errDirs == io.EOF {
-			break
 		}
 	}
 
@@ -5622,27 +5559,21 @@ func (r *OsDeviceConnectivityHelperGeneric) getSlavesForDevice(ctx context.Conte
 			const maxCapCeiling = 10000
 			var allNames []string
 
-			for {
-				if err := wCtx.Err(); err != nil {
-					return nil, err
-				}
+			if err := wCtx.Err(); err != nil {
+				return nil, err
+			}
 
-				chunk, readErr := dFile.ReadDir(100)
-				if readErr != nil && readErr != io.EOF {
-					return nil, readErr
-				}
+			chunk, readErr := dFile.Readdirnames(-1)
+			if readErr != nil && readErr != io.EOF {
+				return nil, readErr
+			}
 
-				for _, entry := range chunk {
-					if len(allNames) >= maxCapCeiling {
-						break
-					}
-					// Only extract the plain text name string immediately inside the worker loop
-					allNames = append(allNames, entry.Name())
-				}
-
-				if len(allNames) >= maxCapCeiling || len(chunk) < 100 || readErr == io.EOF {
+			for _, entryName := range chunk {
+				if len(allNames) >= maxCapCeiling {
 					break
 				}
+				// Only extract the plain text name string immediately inside the worker loop
+				allNames = append(allNames, entryName)
 			}
 
 			return allNames, nil
@@ -6246,34 +6177,28 @@ func (o *GetDmsPathHelperGeneric) WaitForDmToExist(ctx context.Context, gater *e
 				processedEntriesCount := 0
 				nvmeLanes := 0
 				
-				for {
-					if err := ctx.Err(); err != nil {
-						return 0, err
-					}
+				if err := ctx.Err(); err != nil {
+					return 0, err
+				}
 
-					entries, errEntries := dFile.ReadDir(100)
-					if errEntries != nil && errEntries != io.EOF {
-						return 0, errEntries
-					}
-					if len(entries) == 0 || errEntries == io.EOF {
+				entries, errEntries := dFile.Readdirnames(-1)
+				if errEntries != nil && errEntries != io.EOF {
+					return 0, errEntries
+				}
+				
+				for _, entryName := range entries {
+					if processedEntriesCount >= maxCapCeiling {
 						break
 					}
-					
-					for _, entry := range entries {
-						if processedEntriesCount >= maxCapCeiling {
-							break
-						}
-						processedEntriesCount++
+					processedEntriesCount++
 
-						// FIXED: Sub-stat checks confirm if the node maps back to a valid NVMe class 
-						// controller bus component rather than relying on an unverified prefix name.
-						entryName := entry.Name()
-						if _, errNvmeClass := os.Stat(filepath.Join("/sys/class/nvme", entryName)); errNvmeClass == nil {
-							nvmeLanes++
-						} else if strings.HasPrefix(entryName, "nvme") && !strings.Contains(entryName, "-") {
-							// Traditional fallback for older kernel tracking trees
-							nvmeLanes++
-						}
+					// FIXED: Sub-stat checks confirm if the node maps back to a valid NVMe class
+					// controller bus component rather than relying on an unverified prefix name.
+					if _, errNvmeClass := os.Stat(filepath.Join("/sys/class/nvme", entryName)); errNvmeClass == nil {
+						nvmeLanes++
+					} else if strings.HasPrefix(entryName, "nvme") && !strings.Contains(entryName, "-") {
+						// Traditional fallback for older kernel tracking trees
+						nvmeLanes++
 					}
 				}
 				return nvmeLanes, nil
@@ -6400,31 +6325,24 @@ func (o *GetDmsPathHelperGeneric) GetSlaveCountDM(ctx context.Context, gater *ex
 
 	slaveNames := make([]string, 0, 32)
 
-	for {
-		if err := ctx.Err(); err != nil {
-			dFile.Close()
-			return 0
-		}
+	if err := ctx.Err(); err != nil {
+		dFile.Close()
+		return 0
+	}
 
-		entries, errDirs := dFile.ReadDir(100)
-		if errDirs != nil && errDirs != io.EOF {
-			logger.Warningf("[DM-Slave-Scan] [%s] Error reading slaves chunk: %v", devName, errDirs)
-			break
-		}
-		
-		for _, entry := range entries {
+	entries, errDirs := dFile.Readdirnames(-1)
+	dFile.Close()
+	if errDirs != nil && errDirs != io.EOF {
+		logger.Warningf("[DM-Slave-Scan] [%s] Error reading slaves: %v", devName, errDirs)
+	} else {
+		for _, entryName := range entries {
 			if len(slaveNames) >= maxCapCeiling {
 				logger.Warningf("[VFS-Guard] DM slave elements reached safe processing ceiling (%d). Truncating scan.", maxCapCeiling)
 				break
 			}
-			slaveNames = append(slaveNames, entry.Name())
+			slaveNames = append(slaveNames, entryName)
 		}
-		
-                                  if len(slaveNames) >= maxCapCeiling || len(entries) < 100 {
-                                                  break
-                                  }
-                  }
-                  dFile.Close()
+	}
 count := 0
 
 // STAGE 2: SAFE DECOUPLED EVALUATION PIPELINE
@@ -6526,27 +6444,20 @@ func (o *GetDmsPathHelperGeneric) GetSlaveCountNvmeNamespace(ctx context.Context
 	
 	nvmeCandidates := make([]string, 0, 32)
 
-	for {
-		if err := ctx.Err(); err != nil {
-			nvmeFile.Close()
-			return 0
-		}
+	if err := ctx.Err(); err != nil {
+		nvmeFile.Close()
+		return 0
+	}
 
-		entries, errDirs := nvmeFile.ReadDir(100)
-		if errDirs != nil && errDirs != io.EOF {
-			logger.Warningf("[NVMe-Slave-Scan] [%s] Error reading NVMe controller paths chunk: %v", devName, errDirs)
-			break
-		}
-		if len(entries) == 0 || errDirs == io.EOF {
-			break
-		}
-		
-		for _, e := range entries {
-			name := e.Name()
-			
-			// FIXED: Built a direct, allocation-free evaluation path. 
-			// A true controller lane entry under the namespace node layout begins with "nvme" 
-			// and describes a base controller tracking element (e.g., nvme0, nvme1), 
+	entries, errDirs := nvmeFile.Readdirnames(-1)
+	nvmeFile.Close()
+	if errDirs != nil && errDirs != io.EOF {
+		logger.Warningf("[NVMe-Slave-Scan] [%s] Error reading NVMe controller paths: %v", devName, errDirs)
+	} else {
+		for _, name := range entries {
+			// FIXED: Built a direct, allocation-free evaluation path.
+			// A true controller lane entry under the namespace node layout begins with "nvme"
+			// and describes a base controller tracking element (e.g., nvme0, nvme1),
 			// explicitly excluding structural subsystem mappings to prevent down-stream path corruption.
 			isNamespaceVolume := strings.Contains(name, "n") && strings.Index(name, "n") > 4
 			isController := strings.HasPrefix(name, "nvme") && !isNamespaceVolume && !strings.Contains(name, "subsys")
@@ -6560,7 +6471,6 @@ func (o *GetDmsPathHelperGeneric) GetSlaveCountNvmeNamespace(ctx context.Context
 			}
 		}
 	}
-	nvmeFile.Close() 
 	
 	count := 0
 	
@@ -7114,47 +7024,35 @@ func (of *GetDmsPathHelperGeneric) getControllerEntries(ctx context.Context, bas
 	defer dFile.Close()
 
 	candidates := make([]string, 0, 32)
-	for {
-		if err := ctx.Err(); err != nil {
-			logger.Warningf("[CtrlEntries-Trace] Context expired during directory read stream: %v", err)
-			break
-		}
-		
-		entries, errEntries := dFile.ReadDir(100)
-		if errEntries != nil && errEntries != io.EOF {
-			logger.Errorf("[CtrlEntries-Trace] Error reading directory batch from %s: %v", controllerDir, errEntries)
-			break
-		}
-		
-		// FIXED: Guard against trailing exact-multiple page boundaries causing tight infinite loop states
-		if len(entries) == 0 {
-			break
-		}
+	if err := ctx.Err(); err != nil {
+		logger.Warningf("[CtrlEntries-Trace] Context expired during directory read stream: %v", err)
+		return nil
+	}
+	
+	entries, errEntries := dFile.Readdirnames(-1)
+	if errEntries != nil && errEntries != io.EOF {
+		logger.Errorf("[CtrlEntries-Trace] Error reading directory from %s: %v", controllerDir, errEntries)
+		return nil
+	}
 
-		for _, entry := range entries {
-			if len(candidates) >= maxCapCeiling {
-				logger.Warningf("[CtrlEntries-Trace] [VFS-Guard] Controller candidate ceiling reached (%d). Truncating scan.", maxCapCeiling)
-				break
-			}
-			entryName := entry.Name()
-			logger.Debugf("[CtrlEntries-Trace] Evaluating directory entry: '%s'", entryName)
-		
-			// FIXED: Replaced un-declared global regex with an allocation-free string scan pattern.
-			// Controller handles are strictly 'nvmeX' blocks, never containing a namespace marker ('nvmeXnY').
-			isCandidate := strings.HasPrefix(entryName, "nvme") && 
-				!strings.Contains(entryName, "-") && 
-				!strings.Contains(entryName[4:], "n")
-				
-			if isCandidate {
-				candidates = append(candidates, entryName)
-				logger.Debugf("[CtrlEntries-Trace] Accepted valid adapter controller candidate: '%s'", entryName)
-			} else {
-				logger.Debugf("[CtrlEntries-Trace] Skipped entry '%s' (not a primary controller base node)", entryName)
-			}
-		}
-		
-		if len(candidates) >= maxCapCeiling || errEntries == io.EOF {
+	for _, entryName := range entries {
+		if len(candidates) >= maxCapCeiling {
+			logger.Warningf("[CtrlEntries-Trace] [VFS-Guard] Controller candidate ceiling reached (%d). Truncating scan.", maxCapCeiling)
 			break
+		}
+		logger.Debugf("[CtrlEntries-Trace] Evaluating directory entry: '%s'", entryName)
+	
+		// FIXED: Replaced un-declared global regex with an allocation-free string scan pattern.
+		// Controller handles are strictly 'nvmeX' blocks, never containing a namespace marker ('nvmeXnY').
+		isCandidate := strings.HasPrefix(entryName, "nvme") &&
+			!strings.Contains(entryName, "-") &&
+			!strings.Contains(entryName[4:], "n")
+			
+		if isCandidate {
+			candidates = append(candidates, entryName)
+			logger.Debugf("[CtrlEntries-Trace] Accepted valid adapter controller candidate: '%s'", entryName)
+		} else {
+			logger.Debugf("[CtrlEntries-Trace] Skipped entry '%s' (not a primary controller base node)", entryName)
 		}
 	}
 	logger.Infof("[CtrlEntries-Trace] Controller enumeration complete for '%s'. Discovered candidates count: %d", baseBlockName, len(candidates))
@@ -7399,22 +7297,15 @@ func (of *GetDmsPathHelperGeneric) EvaluateSpecificSysfsTopologyNvme(
 			// FIXED: Replaced un-declared maxCapCeiling bounds with local constant ceiling constraints
 			const maxCapCeiling = 10000
 			candidates := make([]string, 0, 32)
-			for {
-				if err := ctx.Err(); err != nil {
-					break
-				}
-				entries, errEntries := dFile.ReadDir(100)
-				if errEntries != nil && errEntries != io.EOF {
-					break
-				}
-				for _, entry := range entries {
-					if len(candidates) >= maxCapCeiling {
-						break
+			if ctx.Err() == nil {
+				entries, errEntries := dFile.Readdirnames(-1)
+				if errEntries == nil || errEntries == io.EOF {
+					for _, entryName := range entries {
+						if len(candidates) >= maxCapCeiling {
+							break
+						}
+						candidates = append(candidates, entryName)
 					}
-					candidates = append(candidates, entry.Name())
-				}
-				if len(candidates) >= maxCapCeiling || len(entries) < 100 || errEntries == io.EOF {
-					break
 				}
 			}
 			dFile.Close()
@@ -7660,30 +7551,24 @@ func (o *GetDmsPathHelperGeneric) validateDMIntegrity(ctx context.Context, gater
 	slaveNames := make([]string, 0, 32)
 	totalSlaves := 0
 
-	for {
-		if err := ctx.Err(); err != nil {
-			dFile.Close()
-			return "", ctx.Err()
-		}
+	if err := ctx.Err(); err != nil {
+		dFile.Close()
+		return "", ctx.Err()
+	}
 
-		slaves, errDirs := dFile.ReadDir(100)
-		if errDirs != nil && errDirs != io.EOF {
-			dFile.Close()
-			return "", fmt.Errorf("failed to read dm slaves tree: %w", errDirs)
-		}
-		if len(slaves) == 0 || errDirs == io.EOF {
+	slaves, errDirs := dFile.Readdirnames(-1)
+	dFile.Close()
+	if errDirs != nil && errDirs != io.EOF {
+		return "", fmt.Errorf("failed to read dm slaves tree: %w", errDirs)
+	}
+
+	for _, s := range slaves {
+		if len(slaveNames) >= maxCapCeiling {
 			break
 		}
-
-		for _, s := range slaves {
-			if len(slaveNames) >= maxCapCeiling {
-				break
-			}
-			slaveNames = append(slaveNames, s.Name())
-		}
-		totalSlaves += len(slaves)
+		slaveNames = append(slaveNames, s)
 	}
-	dFile.Close() 
+	totalSlaves += len(slaves)
 
 	var activePaths int
 	var degradedPaths int
@@ -7741,25 +7626,18 @@ func (o *GetDmsPathHelperGeneric) validateDMIntegrity(ctx context.Context, gater
 			if errOpenCtrl == nil {
 				ctrlCandidates := make([]string, 0, 16)
 
-				for {
-					if err := ctx.Err(); err != nil {
-						break
-					}
-					entries, errEntries := ctrlFile.ReadDir(100)
-					if errEntries != nil && errEntries != io.EOF {
-						break
-					}
-					if len(entries) == 0 || errEntries == io.EOF {
-						break
-					}
-					for _, entry := range entries {
-						if len(ctrlCandidates) >= maxCapCeiling {
-							break
+				if ctx.Err() == nil {
+					entries, errEntries := ctrlFile.Readdirnames(-1)
+					if errEntries == nil || errEntries == io.EOF {
+						for _, entryName := range entries {
+							if len(ctrlCandidates) >= maxCapCeiling {
+								break
+							}
+							ctrlCandidates = append(ctrlCandidates, entryName)
 						}
-						ctrlCandidates = append(ctrlCandidates, entry.Name())
 					}
 				}
-				ctrlFile.Close() 
+				ctrlFile.Close()
 
 				for _, entryName := range ctrlCandidates {
 					if err := ctx.Err(); err != nil {
@@ -7879,23 +7757,18 @@ func readDevNamesDirect(ctx context.Context) ([]string, error) {
 	const maxCapCeiling = 10000
 	names := make([]string, 0, 128)
 
-	for {
-		if err := ctx.Err(); err != nil {
-			return nil, err
-		}
-		entries, err := dFile.ReadDir(100)
-		if err != nil && err != io.EOF {
-			return nil, err
-		}
-		for _, e := range entries {
-			if len(names) >= maxCapCeiling {
-				break
-			}
-			names = append(names, e.Name())
-		}
-		if len(names) >= maxCapCeiling || len(entries) < 100 || err == io.EOF {
+	if err := ctx.Err(); err != nil {
+		return nil, err
+	}
+	entries, err := dFile.Readdirnames(-1)
+	if err != nil && err != io.EOF {
+		return nil, err
+	}
+	for _, e := range entries {
+		if len(names) >= maxCapCeiling {
 			break
 		}
+		names = append(names, e)
 	}
 	return names, nil
 }
@@ -8166,27 +8039,21 @@ func scanSlavesForSubsystem(wCtx context.Context, parentDevice, expectedSubsyste
 		const maxCapCeiling = 10000
 		processedCount := 0
 
-		for {
-			if err := wCtx.Err(); err != nil {
-				return false, err
-			}
+		if err := wCtx.Err(); err != nil {
+			return false, err
+		}
 
-			entries, readErr := dFile.ReadDir(100)
-			if readErr != nil && readErr != io.EOF {
-				return false, fmt.Errorf("failed to streaming-read entries from directory %s: %w", slavesPath, readErr)
-			}
-			if len(entries) == 0 || readErr == io.EOF {
-				break
-			}
+		entries, readErr := dFile.Readdirnames(-1)
+		if readErr != nil && readErr != io.EOF {
+			return false, fmt.Errorf("failed to streaming-read entries from directory %s: %w", slavesPath, readErr)
+		}
 
-			for _, entry := range entries {
-				if processedCount >= maxCapCeiling {
-					logger.Warningf("[VFS-Guard] Slaves directory processing bounds hit limits (%d). Truncating scan.", maxCapCeiling)
-					return false, nil
-				}
-				processedCount++
-
-				slaveName := entry.Name()
+		for _, slaveName := range entries {
+			if processedCount >= maxCapCeiling {
+				logger.Warningf("[VFS-Guard] Slaves directory processing bounds hit limits (%d). Truncating scan.", maxCapCeiling)
+				return false, nil
+			}
+			processedCount++
 
 				// FIXED: Adaptive Topology Resolution.
 				// Native NVMe namespaces do not expose a nested 'device/subsystem' link. 
@@ -8267,23 +8134,18 @@ func GetSysDevicesFromMpath(ctx context.Context, gater *executer.KeyedGater, bas
 				defer dFile.Close()
 
 				var names []string
-				for {
-					if err := wCtx.Err(); err != nil {
-						return nil, err
-					}
-					chunk, readErr := dFile.ReadDir(100)
-					if readErr != nil && readErr != io.EOF {
-						return nil, readErr
-					}
-					for _, entry := range chunk {
-						if len(names) >= maxCapCeiling {
-							break
-						}
-						names = append(names, entry.Name())
-					}
-					if len(names) >= maxCapCeiling || len(chunk) < 100 || readErr == io.EOF {
+				if err := wCtx.Err(); err != nil {
+					return nil, err
+				}
+				chunk, readErr := dFile.Readdirnames(-1)
+				if readErr != nil && readErr != io.EOF {
+					return nil, readErr
+				}
+				for _, entryName := range chunk {
+					if len(names) >= maxCapCeiling {
 						break
 					}
+					names = append(names, entryName)
 				}
 				return names, nil
 			},
@@ -8334,33 +8196,26 @@ func GetSysDevicesFromMpath(ctx context.Context, gater *executer.KeyedGater, bas
 				defer dFile.Close()
 
 				var activePaths []string
-				for {
-					if err := wCtx.Err(); err != nil {
-						return nil, err
-					}
-					chunk, readErr := dFile.ReadDir(100)
-					if readErr != nil && readErr != io.EOF {
-						return nil, readErr
-					}
-					
-					for _, entry := range chunk {
-						ctrlName := entry.Name()
-						// Parse path targets securely without mapping un-related subsys metadata tracking lines
-						if strings.HasPrefix(ctrlName, "nvme") && !strings.Contains(ctrlName, "subsys") {
-							// FIXED: Clean configuration translation structure. 
-							// If checking an advanced virtual multipath mapping node channel path, 
-							// locate and match the exact block device representation natively.
-							pathName := ctrlName + nsID
-							if _, errStat := os.Stat(filepath.Join("/sys/block", pathName)); errStat == nil {
-								if len(activePaths) < maxCapCeiling {
-									activePaths = append(activePaths, pathName)
-								}
+				if err := wCtx.Err(); err != nil {
+					return nil, err
+				}
+				chunk, readErr := dFile.Readdirnames(-1)
+				if readErr != nil && readErr != io.EOF {
+					return nil, readErr
+				}
+				
+				for _, ctrlName := range chunk {
+					// Parse path targets securely without mapping un-related subsys metadata tracking lines
+					if strings.HasPrefix(ctrlName, "nvme") && !strings.Contains(ctrlName, "subsys") {
+						// FIXED: Clean configuration translation structure.
+						// If checking an advanced virtual multipath mapping node channel path,
+						// locate and match the exact block device representation natively.
+						pathName := ctrlName + nsID
+						if _, errStat := os.Stat(filepath.Join("/sys/block", pathName)); errStat == nil {
+							if len(activePaths) < maxCapCeiling {
+								activePaths = append(activePaths, pathName)
 							}
 						}
-					}
-					
-					if len(activePaths) >= maxCapCeiling || len(chunk) < 100 || readErr == io.EOF {
-						break
 					}
 				}
 				return activePaths, nil
