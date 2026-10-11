@@ -8071,7 +8071,6 @@ func scanSlavesForSubsystem(wCtx context.Context, parentDevice, expectedSubsyste
 					}
 				}
 			}
-		}
 		return false, nil
 	}()
 
