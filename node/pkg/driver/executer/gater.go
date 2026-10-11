@@ -431,13 +431,6 @@ type BatchResult[T any] struct {
 	Err   error
 }
 
-// taskEnvelope couples the specific item data with its original execution position.
-type taskEnvelope[Param any] struct {
-	index int
-	param Param
-}
-
-// ExecuteUninterruptibleBatch handles parallel batch operations safely insulated from kernel D-state stalls.
 func ExecuteUninterruptibleBatch[Param any, T any](
 	ctx context.Context,
 	g *KeyedGater,
@@ -462,7 +455,6 @@ func ExecuteUninterruptibleBatch[Param any, T any](
 	batchCtx, cancelBatch := context.WithCancel(ctx)
 	defer cancelBatch()
 
-	// 1. Establish concurrency bounds based on the requested execution configurations
 	numWorkers := maxRunning
 	if numWorkers > totalItems {
 		numWorkers = totalItems
@@ -471,64 +463,70 @@ func ExecuteUninterruptibleBatch[Param any, T any](
 		numWorkers = 1
 	}
 
-	// 2. Thread-safe data pipes for dispatching tasks and gathering aggregated responses
-	tasksChan := make(chan taskEnvelope[Param], totalItems)
-	resultsChan := make(chan BatchResult[T], totalItems)
+	aggregatedResults := make([]BatchResult[T], totalItems)
+	
+	// FIX: Use a tracking slice of booleans to safely remember which items executed 
+	// without running into generic type comparison errors.
+	executed := make([]bool, totalItems)
 
-	// Hydrate the tasks pipeline upfront
-	for idx, param := range parameters {
-		tasksChan <- taskEnvelope[Param]{index: idx, param: param}
-	}
-	close(tasksChan)
-
+	var currentIdx int64 = 0
 	var wg sync.WaitGroup
 
-	// 3. Launch a controlled worker pool limited exactly to your execution bounds
+	pool := g.getOrCreatePool(resourceName, maxRunning, maxSpare)
+	defer g.releasePool(resourceName)
+
 	for i := 0; i < numWorkers; i++ {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
 
-			for task := range tasksChan {
-				// Fast path context cancellation check before acquiring tokens
-				if err := batchCtx.Err(); err != nil {
-					resultsChan <- BatchResult[T]{Index: task.index, Err: err}
-					continue
+			select {
+			case pool.running <- struct{}{}:
+				defer func() { <-pool.running }()
+			case <-batchCtx.Done():
+				return
+			}
+
+			for {
+				if batchCtx.Err() != nil {
+					return
 				}
 
-				// Leverage the single-item baseExecute logic underneath to cleanly reuse
-				// token tracking, memory safety, and leak metrics without duplicating blocks.
-				data, err := baseExecute(
-					batchCtx,
-					g,
-					resourceName,
-					maxRunning,
-					maxSpare,
-					handoffTimeout,
-					hardTimeout,
-					func(wCtx context.Context) (T, error) {
-						return worker(wCtx, task.index, task.param, cancelBatch)
-					},
-				)
+				idx := int(atomic.AddInt64(&currentIdx, 1) - 1)
+				if idx >= totalItems {
+					return
+				}
 
-				resultsChan <- BatchResult[T]{
-					Index: task.index,
+				param := parameters[idx]
+				
+				pool.activeOps.Add(1)
+				data, err := worker(batchCtx, idx, param, cancelBatch)
+				pool.activeOps.Add(-1)
+
+				aggregatedResults[idx] = BatchResult[T]{
+					Index: idx,
 					Data:  data,
 					Err:   err,
 				}
+				executed[idx] = true // Mark as finished safely
 			}
 		}()
 	}
 
-	// Wait for processing nodes to yield execution slots completely
 	wg.Wait()
-	close(resultsChan)
 
-	// 4. Drain output queue and prepare payload response
-	aggregatedResults := make([]BatchResult[T], totalItems)
-	for res := range resultsChan {
-		aggregatedResults[res.Index] = res
+	// FIX: Inspect the executed tracking slice instead of checking 'Data == nil'
+	for i := 0; i < totalItems; i++ {
+		if !executed[i] {
+			aggregatedResults[i].Index = i
+			if err := batchCtx.Err(); err != nil {
+				aggregatedResults[i].Err = err
+			} else {
+				aggregatedResults[i].Err = context.Canceled
+			}
+		}
 	}
 
 	return aggregatedResults, nil
 }
+
