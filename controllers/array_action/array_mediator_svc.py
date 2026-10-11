@@ -130,9 +130,9 @@ def _is_space_efficiency_matches_source(parameter_space_efficiency, array_space_
            (parameter_space_efficiency and parameter_space_efficiency == array_space_efficiency)
 
 
-def build_create_volume_in_volume_group_kwargs(pool, io_group, source_id):
+def build_create_volume_in_volume_group_kwargs(pool, io_group, source_id, clone_type=None):
     cli_kwargs = {
-        'type': 'clone',
+        'type': clone_type if clone_type in ('clone', 'thinclone') else 'clone',
         'fromsnapshotid': source_id,
         'pool': pool
     }
@@ -761,8 +761,8 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
         first_pool, second_pool = pool.split(":", 1)
         return not self._is_child_pool(second_pool, first_pool)
 
-    def _create_volume_in_volume_group(self, name, pool, io_group, source_id):
-        cli_kwargs = build_create_volume_in_volume_group_kwargs(pool, io_group, source_id)
+    def _create_volume_in_volume_group(self, name, pool, io_group, source_id, clone_type=None):
+        cli_kwargs = build_create_volume_in_volume_group_kwargs(pool, io_group, source_id, clone_type)
         self._mkvolumegroup(name, **cli_kwargs)
 
     def _fix_creation_side_effects(self, name, cli_volume_id, volume_group):
@@ -778,11 +778,11 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
             logger.info("adding vdisk copy to pool: {}".format(additional_pool))
             self.client.svctask.addvdiskcopy(mdiskgrp=additional_pool, vdisk_id=vdisk_id)
 
-    def _create_cli_volume_from_snapshot(self, name, pool, io_group, volume_group, source_id):
-        logger.info("creating volume from snapshot. pool: {}".format(pool))
+    def _create_cli_volume_from_snapshot(self, name, pool, io_group, volume_group, source_id, clone_type=None):
+        logger.info("creating volume from snapshot. pool: {}, clone_type: {}".format(pool, clone_type))
         is_stretch = self._is_stretch_pool(pool)
         vg_pool = pool.split(":")[0] if is_stretch else pool
-        self._create_volume_in_volume_group(name, vg_pool, io_group, source_id)
+        self._create_volume_in_volume_group(name, vg_pool, io_group, source_id, clone_type)
         cli_volume_id = self._get_cli_volume_id_from_volume_group("volume_group_name", name)
         try:
             # remove vg and leave volume, with name <name>
@@ -815,11 +815,12 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
             logger.debug("Error running mkvolume -name {} {}".format(name, self._format_cli_args(cli_kwargs)))
             raise ex
 
-    def _create_cli_volume_from_volume(self, name, pool, io_group, volume_group, source_id):
+    def _create_cli_volume_from_volume(self, name, pool, io_group, volume_group, source_id, clone_type=None):
         logger.info("creating volume from volume")
         cli_snapshot = self._add_snapshot(name, source_id, pool)
         try:
-            self._create_cli_volume_from_snapshot(name, pool, io_group, volume_group, cli_snapshot.snapshot_id)
+            self._create_cli_volume_from_snapshot(name, pool, io_group, volume_group, cli_snapshot.snapshot_id,
+                                                  clone_type)
         finally:
             self._rmsnapshot(cli_snapshot.snapshot_id)
 
@@ -892,11 +893,14 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
         self._partition_create_cli_volume_from_cli_vol(name, pool, io_group, volume_group, cli_volume,
                                                        space_efficiency, partition_name)
 
-    def _create_cli_volume_from_source(self, name, pool, io_group, volume_group, source_ids, source_type):
+    def _create_cli_volume_from_source(self, name, pool, io_group, volume_group, source_ids, source_type,
+                                       clone_type=None):
         if source_type == controller_settings.SNAPSHOT_TYPE_NAME:
-            self._create_cli_volume_from_snapshot(name, pool, io_group, volume_group, source_ids.internal_id)
+            self._create_cli_volume_from_snapshot(name, pool, io_group, volume_group, source_ids.internal_id,
+                                                  clone_type)
         else:
-            self._create_cli_volume_from_volume(name, pool, io_group, volume_group, source_ids.internal_id)
+            self._create_cli_volume_from_volume(name, pool, io_group, volume_group, source_ids.internal_id,
+                                                clone_type)
 
     def _is_vdisk_support_addsnapshot(self, vdisk_uid):
         return self._is_addsnapshot_supported() and not self._is_vdisk_has_fcmaps(vdisk_uid)
@@ -925,14 +929,14 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
 
     @register_csi_plugin()
     def create_volume(self, name, size_in_bytes, space_efficiency, pool, io_group, volume_group, source_ids,
-                      source_type, is_virt_snap_func, partition_name=None, partition_vg=None):
+                      source_type, is_virt_snap_func, partition_name=None, partition_vg=None, clone_type=None):
         if partition_name:
             return self._partition_create_volume(name, size_in_bytes, space_efficiency, pool, io_group, volume_group,
                                                  source_ids, partition_name, partition_vg)
         if is_virt_snap_func and source_ids:
             if self._is_vdisk_support_addsnapshot(source_ids.uid):
                 self._create_cli_volume_from_source(name, pool, io_group, volume_group, source_ids,
-                                                    source_type)
+                                                    source_type, clone_type)
             else:
                 raise array_errors.VirtSnapshotFunctionNotSupportedMessage(name)
         else:

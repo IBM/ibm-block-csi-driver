@@ -47,6 +47,7 @@ class ObjectParameters:
     io_group: str
     volume_group: str
     virt_snap_func: bool
+    clone_type: str = None
 
 
 @dataclass

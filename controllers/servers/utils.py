@@ -423,13 +423,21 @@ def get_object_parameters(parameters, prefix_param_name, system_id):
     default_virt_snap_func = parameters.get(servers_settings.PARAMETERS_VIRT_SNAP_FUNC)
     virt_snap_func_str = system_parameters.get(servers_settings.PARAMETERS_VIRT_SNAP_FUNC, default_virt_snap_func)
     is_virt_snap_func = _str_to_bool(virt_snap_func_str)
+    default_clone_type = parameters.get(servers_settings.PARAMETERS_CLONE_TYPE)
+    clone_type = system_parameters.get(servers_settings.PARAMETERS_CLONE_TYPE, default_clone_type)
+    if clone_type and clone_type not in (servers_settings.CLONE_TYPE_CLONE,
+                                         servers_settings.CLONE_TYPE_THINCLONE):
+        logger.warning("Unsupported clone_type '{}', defaulting to '{}'".format(
+            clone_type, servers_settings.CLONE_TYPE_CLONE))
+        clone_type = servers_settings.CLONE_TYPE_CLONE
     return ObjectParameters(
         pool=system_parameters.get(servers_settings.PARAMETERS_POOL, default_pool),
         space_efficiency=system_parameters.get(servers_settings.PARAMETERS_SPACE_EFFICIENCY, default_space_efficiency),
         prefix=system_parameters.get(prefix_param_name, default_prefix),
         io_group=system_parameters.get(servers_settings.PARAMETERS_IO_GROUP, default_io_group),
         volume_group=system_parameters.get(servers_settings.PARAMETERS_VOLUME_GROUP, default_volume_group),
-        virt_snap_func=is_virt_snap_func)
+        virt_snap_func=is_virt_snap_func,
+        clone_type=clone_type)
 
 
 def get_virt_snap_func_from_storage_class(source_volume_id):
