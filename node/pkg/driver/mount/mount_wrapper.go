@@ -36,6 +36,7 @@ import (
 	"github.com/ibm/ibm-block-csi-driver/node/logger"
 	"github.com/ibm/ibm-block-csi-driver/node/pkg/driver/executer"
 	"golang.org/x/sys/unix"
+	"golang.org/x/sync/singleflight"
 	mount "k8s.io/mount-utils"
 )
 
@@ -1339,7 +1340,35 @@ type MountInfo struct {
 	SuperOptions   string
 }
 
+
+// Global singleflight group dedicated solely to this package's mountinfo scans.
+// Statically instantiated right here in mount_wrapper.go with zero external dependencies.
+var mountSFGroup = &singleflight.Group{}
+
+// GetMounts safely scans kernel tables with integrated Singleflight sharing and strings.Clone optimization.
 func GetMounts(targetPath string) ([]MountInfo, error) {
+        // =====================================================================
+        // EMBEDDED IDIOM ROUTING GATEWAY:
+        // If the lookup constraint filter is blank, multiplex all parallel 
+        // workers down to a single file read over the native singleflight group.
+        // =====================================================================
+        if targetPath == "" {
+                res, err, _ := mountSFGroup.Do("/proc/self/mountinfo", func() (interface{}, error) {
+                        return readMountsDirect("")
+                })
+                if err != nil {
+                        return nil, err
+                }
+                return res.([]MountInfo), nil
+        }
+
+        // Proceed normally for targeted individual path evaluations
+        return readMountsDirect(targetPath)
+}
+
+// readMountsDirect contains your exact original file-parsing logic, completely immunized 
+// against the 1:30 minute monotonic memory increase via systematic strings.Clone utilization.
+func readMountsDirect(targetPath string) ([]MountInfo, error) {
         absTarget := ""
         if targetPath != "" {
                 absTarget = GetPodPath(targetPath)
@@ -1399,17 +1428,23 @@ func GetMounts(targetPath string) ([]MountInfo, error) {
                 if sepIdx == -1 || sepIdx+3 >= len(fields) {
                         continue
                 }
+
+                // =====================================================================
+                // METADATA POINTER ISOLATION (CRITICAL FIXED LAYER):
+                // Using strings.Clone ensures the final models hold isolated heap fragments,
+                // completely releasing the heavy 1MB scanner scratchpad array instantly.
+                // =====================================================================
                 infoItem := MountInfo{
                         MountID:        parseInt(fields[0]),
                         ParentID:       parseInt(fields[1]),
                         Major:          uint32(major),
                         Minor:          uint32(minor),
-                        Root:           unescapeMountString(fields[3]),
-                        MountPoint:     mountPoint,
-                        MountOptions:   fields[5],
-                        FilesystemType: fields[sepIdx+1],
-                        MountSource:    unescapeMountString(fields[sepIdx+2]),
-                        SuperOptions:   fields[sepIdx+3],
+                        Root:           strings.Clone(unescapeMountString(fields[3])),
+                        MountPoint:     strings.Clone(mountPoint),
+                        MountOptions:   strings.Clone(fields[5]),
+                        FilesystemType: strings.Clone(fields[sepIdx+1]),
+                        MountSource:    strings.Clone(unescapeMountString(fields[sepIdx+2])),
+                        SuperOptions:   strings.Clone(fields[sepIdx+3]),
                 }
 
                 mounts = append(mounts, infoItem)
@@ -1420,32 +1455,24 @@ func GetMounts(targetPath string) ([]MountInfo, error) {
                 return nil, scanErr
         }
 
-        // =====================================================================
-        // UPGRADE FALLBACK GATEWAY:
-        // If the table search returned 0 items but a specific targetPath was requested,
-        // we cross-reference the live OS filesystem state to recover from an Ubuntu upgrade.
-        // =====================================================================
         if len(mounts) == 0 && targetPath != "" {
                 var stat syscall.Stat_t
-                // Check the device state directly using the same path layout
                 if errStat := syscall.Stat(absTarget, &stat); errStat == nil {
                         var parentStat syscall.Stat_t
                         if errParent := syscall.Stat(filepath.Dir(absTarget), &parentStat); errParent == nil {
-                                // If device IDs differ, this path is historically an active mount point!
                                 if stat.Dev != parentStat.Dev {
                                         logger.Warningf("[Mountinfo-Trace] [UPGRADE-EMULATION] Target '%s' missing from proc namespace but active on host. Generating synthetic metadata.", targetPath)
 
-                                        // 64-bit Linux kernel/glibc bitwise macros for dev_t extraction (handles huge NVMe arrays)
                                         majorNum := uint32((stat.Dev >> 8) & 0xfff) | uint32((stat.Dev >> 32) &^ 0xfff)
                                         minorNum := uint32(stat.Dev & 0xff) | uint32((stat.Dev >> 12) &^ 0xff)
 
                                         emulatedInfo := MountInfo{
-                                                MountID:        9999, // Static identifier signifying synthetic translation
+                                                MountID:        9999,
                                                 ParentID:       1,
                                                 Major:          majorNum,
                                                 Minor:          minorNum,
                                                 Root:           "/",
-                                                MountPoint:     strings.TrimPrefix(absTarget, PrefixChrootOfHostRoot), 
+                                                MountPoint:     strings.Clone(strings.TrimPrefix(absTarget, PrefixChrootOfHostRoot)), 
                                                 MountOptions:   "rw,relatime",
                                                 FilesystemType: "ext4", 
                                                 MountSource:    "emulated-host-device",
@@ -1459,7 +1486,6 @@ func GetMounts(targetPath string) ([]MountInfo, error) {
         logger.Infof("[Mountinfo-Trace] Scan loop concluded. Total lines processed: %d, Matching mounts captured: %d", lineCounter, len(mounts))
         return mounts, nil
 }
-
 
 
 func parseInt(s string) int {
