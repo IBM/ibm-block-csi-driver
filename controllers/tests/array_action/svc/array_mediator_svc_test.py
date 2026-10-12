@@ -409,6 +409,7 @@ class TestArrayMediatorSVC(unittest.TestCase):
         self._test_create_volume_mkvolume_cli_failure_error("CMMVC5754E", array_errors.InvalidArgumentError)
         self._test_create_volume_mkvolume_cli_failure_error("CMMVC9292E", array_errors.PoolDoesNotMatchSpaceEfficiency)
         self._test_create_volume_mkvolume_cli_failure_error("CMMVC9301E", array_errors.PoolDoesNotMatchSpaceEfficiency)
+        self._test_create_volume_mkvolume_cli_failure_error("CMMVC8997E", array_errors.IoGroupIsInValid)
 
     def _test_create_volume_success(self, space_efficiency=None, source_id=None, source_type=None, volume_group=None,
                                     is_virt_snap_func=False, pool=None):

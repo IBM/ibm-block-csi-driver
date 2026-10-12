@@ -69,6 +69,7 @@ NOT_REDUCTION_POOL = 'CMMVC9301E'
 NOT_ENOUGH_EXTENTS_IN_POOL_EXPAND = 'CMMVC5860E'
 NOT_ENOUGH_EXTENTS_IN_POOL_CREATE = 'CMMVC8710E'
 NOT_VALID_IO_GROUP = 'CMMVC5729E'
+HOST_NOT_IN_IO_GROUP = 'CMMVC8997E'
 NOT_SUPPORTED_PARAMETER = 'CMMVC5709E'
 CANNOT_CHANGE_HOST_PROTOCOL_BECAUSE_OF_MAPPED_PORTS = 'CMMVC9331E'
 COMMAND_NOT_SUPPORTED = 'CMMVC7205E'
@@ -909,6 +910,8 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
                 raise array_errors.NotEnoughSpaceInPool(id_or_name=pool)
             if any(msg_id in message for msg_id in (NON_ASCII_CHARS, INVALID_NAME, TOO_MANY_CHARS)):
                 raise array_errors.InvalidArgumentError(message)
+            if HOST_NOT_IN_IO_GROUP in message:
+                raise array_errors.IoGroupIsInValid(io_group)
             raise
         logger.info("finished creating cli volume : {}".format(name))
 
