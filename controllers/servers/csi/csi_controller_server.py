@@ -144,7 +144,8 @@ class CSIControllerServicer(csi_pb2_grpc.ControllerServicer):
                 response = utils.generate_csi_create_volume_response(volume, array_connection_info.system_id,
                                                                      source_type)
                 return response
-        except (array_errors.InvalidArgumentError, array_errors.ExpectedSnapshotButFoundVolumeError) as ex:
+        except (array_errors.InvalidArgumentError, array_errors.ExpectedSnapshotButFoundVolumeError,
+                array_errors.IoGroupIsInValid) as ex:
             return handle_exception(ex, context, grpc.StatusCode.INVALID_ARGUMENT, csi_pb2.CreateVolumeResponse)
         except array_errors.VolumeAlreadyExists as ex:
             return handle_exception(ex, context, grpc.StatusCode.ALREADY_EXISTS, csi_pb2.CreateVolumeResponse)
