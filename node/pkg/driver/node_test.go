@@ -47,7 +47,7 @@ var ConfigYaml = driver.ConfigFile{
 	Parameters: driver.Parameters{
 		Object_id_info: driver.Object_id_info{Delimiter: ":", Ids_delimiter: ";"},
 	},
-	Connectivity_type: driver.Connectivity_type{Nvme_over_fc: "nvmeofc", Fc: "fc", Iscsi: "iscsi"},
+	Connectivity_type: driver.Connectivity_type{Nvme_over_fc: "nvmeofc", Nvme_over_tcp: "nvmetcp", Fc: "fc", Iscsi: "iscsi"},
 }
 
 func newTestNodeService(nodeUtils driver.NodeUtilsInterface,
@@ -68,9 +68,10 @@ func newTestNodeServiceStaging(nodeUtils driver.NodeUtilsInterface,
 	osDevConHelper device_connectivity.OsDeviceConnectivityHelperScsiGenericInterface,
 	nodeMounter driver.NodeMounter) driver.NodeService {
 	osDeviceConnectivityMapping := map[string]device_connectivity.OsDeviceConnectivityInterface{
-		ConfigYaml.Connectivity_type.Nvme_over_fc: osDevCon,
-		ConfigYaml.Connectivity_type.Fc:           osDevCon,
-		ConfigYaml.Connectivity_type.Iscsi:        osDevCon,
+		ConfigYaml.Connectivity_type.Nvme_over_fc:  osDevCon,
+		ConfigYaml.Connectivity_type.Nvme_over_tcp: osDevCon,
+		ConfigYaml.Connectivity_type.Fc:            osDevCon,
+		ConfigYaml.Connectivity_type.Iscsi:         osDevCon,
 	}
 
 	return driver.NodeService{
@@ -81,6 +82,35 @@ func newTestNodeServiceStaging(nodeUtils driver.NodeUtilsInterface,
 		NodeUtils:                   nodeUtils,
 		OsDeviceConnectivityMapping: osDeviceConnectivityMapping,
 		OsDeviceConnectivityHelper:  osDevConHelper,
+	}
+}
+
+// DBG: SKG: Verify this test later
+func TestGetInfoFromPublishContextNvmeTcp(t *testing.T) {
+	nodeUtils := driver.NodeUtils{ConfigYaml: ConfigYaml}
+	publishContext := map[string]string{
+		"PUBLISH_CONTEXT_LUN":                   "0",
+		"PUBLISH_CONTEXT_CONNECTIVITY":          ConfigYaml.Connectivity_type.Nvme_over_tcp,
+		"nqn.2014-08.com.example:target1":       "10.0.0.11,10.0.0.12",
+		"nqn.2014-08.com.example:target2":       "10.0.0.21,10.0.0.22",
+		"PUBLISH_CONTEXT_ARRAY_NVME_INITIATORS": "nqn.2014-08.com.example:target1,nqn.2014-08.com.example:target2",
+	}
+
+	connectivityType, lun, ipsByArrayInitiator, err := nodeUtils.GetInfoFromPublishContext(publishContext)
+	if err != nil {
+		t.Fatalf("GetInfoFromPublishContext returned unexpected error: %v", err)
+	}
+	if connectivityType != ConfigYaml.Connectivity_type.Nvme_over_tcp {
+		t.Fatalf("expected connectivity type %q, got %q", ConfigYaml.Connectivity_type.Nvme_over_tcp, connectivityType)
+	}
+	if lun != 0 {
+		t.Fatalf("expected lun 0 for NVMe-TCP, got %d", lun)
+	}
+	if got := ipsByArrayInitiator["nqn.2014-08.com.example:target1"]; !reflect.DeepEqual(got, []string{"10.0.0.11", "10.0.0.12"}) {
+		t.Fatalf("unexpected target1 IPs: %#v", got)
+	}
+	if got := ipsByArrayInitiator["nqn.2014-08.com.example:target2"]; !reflect.DeepEqual(got, []string{"10.0.0.21", "10.0.0.22"}) {
+		t.Fatalf("unexpected target2 IPs: %#v", got)
 	}
 }
 

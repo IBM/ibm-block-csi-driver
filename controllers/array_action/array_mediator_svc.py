@@ -78,6 +78,7 @@ EAR_PROMOTE_REMOTE_PARTNERSHIP_UNAVAILABLE = "CMMVC9901E"
 EAR_PROMOTE_REMOTE_UNREACHABLE = "CMMVC9949E"
 
 HOST_NQN = 'nqn'
+HOST_PROTOCOL = 'protocol'
 HOST_WWPN = 'WWPN'
 HOST_ISCSI_NAME = 'iscsi_name'
 HOST_PORTSET_ID = 'portset_id'
@@ -140,7 +141,8 @@ def build_create_volume_in_volume_group_kwargs(pool, io_group, source_id):
 
 
 def _add_port_to_command_kwargs(connectivity_type, port, cli_kwargs):
-    if connectivity_type == array_settings.NVME_OVER_FC_CONNECTIVITY_TYPE:
+    if connectivity_type == array_settings.NVME_OVER_FC_CONNECTIVITY_TYPE or \
+        connectivity_type == array_settings.NVME_OVER_TCP_CONNECTIVITY_TYPE:
         cli_kwargs['nqn'] = port
     elif connectivity_type == array_settings.FC_CONNECTIVITY_TYPE:
         cli_kwargs['fcwwpn'] = port
@@ -156,6 +158,8 @@ def build_create_host_kwargs(host_name, connectivity_type, port, io_group, parti
     cli_kwargs = _add_port_to_command_kwargs(connectivity_type, port, cli_kwargs)
     if connectivity_type == array_settings.NVME_OVER_FC_CONNECTIVITY_TYPE:
         cli_kwargs['protocol'] = 'fcnvme'
+    elif connectivity_type == array_settings.NVME_OVER_TCP_CONNECTIVITY_TYPE:
+        cli_kwargs['protocol'] = 'tcpnvme'
 
     if io_group:
         cli_kwargs['iogrp'] = io_group
@@ -1251,9 +1255,16 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
         connectivity_types = set()
         for host in detailed_hosts_list:
             host_nqns = self._get_host_ports(host, HOST_NQN)
+            host_protocol = self._get_host_ports(host, HOST_PROTOCOL)
             if initiators.is_array_nvme_nqn_match(host_nqns):
                 nvme_host = host.name
-                connectivity_types.add(array_settings.NVME_OVER_FC_CONNECTIVITY_TYPE)
+                # Further check the host_protocol to know
+                # which type of nvme host (fc, tcp, rdma etc.) it is.
+                if 'tcpnvme' in host_protocol:
+                    connectivity_types.add(array_settings.NVME_OVER_TCP_CONNECTIVITY_TYPE)
+                elif 'fcnvme' in host_protocol:
+                    connectivity_types.add(array_settings.NVME_OVER_FC_CONNECTIVITY_TYPE)
+
                 logger.debug("found nvme nqn in list : {0} for host : "
                              "{1}".format(initiators.nvme_nqns, nvme_host))
             host_wwns = self._get_host_ports(host, HOST_WWPN)
@@ -1328,11 +1339,12 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
         host_names = set()
         connectivity_types = set()
         for connectivity_type, initiator in initiators:
-            if connectivity_type == array_settings.NVME_OVER_FC_CONNECTIVITY_TYPE:
+            if connectivity_type in (array_settings.NVME_OVER_FC_CONNECTIVITY_TYPE, 
+                array_settings.NVME_OVER_TCP_CONNECTIVITY_TYPE):
                 nvme_host_names = self._get_host_names_by_nqn(initiator)
                 if nvme_host_names:
                     host_names.update(nvme_host_names)
-                    connectivity_types.add(array_settings.NVME_OVER_FC_CONNECTIVITY_TYPE)
+                    connectivity_types.add(connectivity_type)
             elif connectivity_type == array_settings.FC_CONNECTIVITY_TYPE:
                 fc_host_names = self._get_host_names_by_wwpn(initiator)
                 if fc_host_names:
@@ -1395,7 +1407,14 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
         iscsi_iqns = self._get_host_ports(cli_host, HOST_ISCSI_NAME)
         connectivity_types = []
         if nvme_nqns:
-            connectivity_types.append(array_settings.NVME_OVER_FC_CONNECTIVITY_TYPE)
+            # Further check the host_protocol to know
+            # which type of nvme host (fc, tcp, rdma etc.) it is.
+            host_protocol = self._get_host_ports(cli_host, HOST_PROTOCOL)
+            # TBD: SKG: Check whether an improvement can be done to avoid repeatedly checking host_protocol
+            if 'tcpnvme' in host_protocol:
+                connectivity_types.append(array_settings.NVME_OVER_TCP_CONNECTIVITY_TYPE)
+            elif 'fcnvme' in host_protocol:
+                connectivity_types.append(array_settings.NVME_OVER_FC_CONNECTIVITY_TYPE)
         if fc_wwns:
             connectivity_types.append(array_settings.FC_CONNECTIVITY_TYPE)
         if iscsi_iqns:
@@ -1482,7 +1501,8 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
         }
         lun = ""
         try:
-            if connectivity_type != array_settings.NVME_OVER_FC_CONNECTIVITY_TYPE:
+            if connectivity_type not in (array_settings.NVME_OVER_FC_CONNECTIVITY_TYPE,
+                                         array_settings.NVME_OVER_TCP_CONNECTIVITY_TYPE):
                 lun = self._get_free_lun(host_name)
                 cli_kwargs.update({'scsi': lun})
             self.client.svctask.mkvdiskhostmap(**cli_kwargs)
@@ -1614,15 +1634,26 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
                          "is: {1}".format(kwargs, ex))
             raise ex
 
+    def _lsportset(self, **kwargs):
+        try:
+            return self.client.svcinfo.lsportset(**kwargs)
+        except (svc_errors.CommandExecutionError, CLIFailureError) as ex:
+            logger.error("Failed to get portsets for {0}. Reason is: {1}".format(kwargs, ex))
+            raise ex
+
+    def _lsip(self, **kwargs):
+        try:
+            return self.client.svcinfo.lsip(**kwargs)
+        except (svc_errors.CommandExecutionError, CLIFailureError) as ex:
+            logger.error("Failed to get IP addresses for {0}. Reason is: {1}".format(kwargs, ex))
+            raise ex
+
     def get_nvme_fc_target_ports(self):
         logger.debug("Getting the connected NVMe FC target ports from array.")
         nvme_ports = []
-        all_target_ports = self._lstargetportfc()
-        for port in all_target_ports:
-            if port.get('protocol', '') != 'nvme':
-                continue
-            if port.get('host_io_permitted', '') != 'yes':
-                continue
+        filter_value = 'protocol=nvme:host_io_permitted=yes'
+        target_ports = self._lstargetportfc(filtervalue=filter_value)
+        for port in target_ports:
             wwpn = port.get('WWPN', '')
             wwnn = port.get('WWNN', '')
             if not wwpn or not wwnn:
@@ -1633,6 +1664,31 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
         if not nvme_ports:
             raise array_errors.NoNvmeFcTargetsFoundError(self.endpoint)
         return nvme_ports
+
+    def get_nvme_tcp_target_ips(self):
+        logger.debug("Getting NVMe-TCP target IPs from array.")
+
+        # Get IPs only from portsets of host type and ethernet port_type
+        # and put those array_initiators array that correspond to below command:
+
+        # Run lsportset -filtervalue "type=host:port_type=ethernet" first
+        filter_value = 'type=host:port_type=ethernet'
+        ethernet_host_portsets = self._lsportset(filtervalue=filter_value)
+        target_ips = []
+        for portset in ethernet_host_portsets:
+            portset_name = portset.get('name', '')
+            if not portset_name:
+                continue
+            # Run, lsip -filtervalue 'portset_name=<portset_name>' and fetch IP_address field
+            ip_ports = self._lsip(filtervalue='portset_name={}'.format(portset_name))
+            for port in ip_ports:
+                ip = port.get('IP_address', '')
+                if ip:
+                    target_ips.append(ip)
+        logger.debug("Found NVMe-TCP target IPs: {}".format(target_ips))
+        if not target_ips:
+            raise array_errors.NoNvmeTcpTargetsFoundError(self.endpoint)
+        return target_ips
 
     def get_array_fc_wwns(self, host_name):
         logger.debug("Getting the connected fc port wwn value from array "
@@ -2625,11 +2681,12 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
     def get_host_connectivity_ports(self, host_name, connectivity_type):
         cli_host = self._get_cli_host(host_name)
         ports = None
-        if connectivity_type == array_settings.NVME_OVER_FC_CONNECTIVITY_TYPE:
+        if connectivity_type in (array_settings.NVME_OVER_FC_CONNECTIVITY_TYPE,
+                                 array_settings.NVME_OVER_TCP_CONNECTIVITY_TYPE):
             ports = self._get_host_ports(cli_host, HOST_NQN)
-        if connectivity_type == array_settings.FC_CONNECTIVITY_TYPE:
+        elif connectivity_type == array_settings.FC_CONNECTIVITY_TYPE:
             ports = self._get_host_ports(cli_host, HOST_WWPN)
-        if connectivity_type == array_settings.ISCSI_CONNECTIVITY_TYPE:
+        elif connectivity_type == array_settings.ISCSI_CONNECTIVITY_TYPE:
             ports = self._get_host_ports(cli_host, HOST_ISCSI_NAME)
         if ports:
             logger.info(svc_messages.HOST_PORT_BY_CONNECTIVITY_TYPE.format(host_name, connectivity_type, ports))
@@ -2639,8 +2696,15 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
     def get_host_connectivity_type(self, host_name):
         connectivity_type = None
         cli_host = self._get_cli_host(host_name)
-        if hasattr(cli_host, HOST_NQN):
-            connectivity_type = array_settings.NVME_OVER_FC_CONNECTIVITY_TYPE
+        nvme_nqns = self._get_host_ports(cli_host, HOST_NQN)
+        fc_wwns = self._get_host_ports(cli_host, HOST_WWPN)
+        iscsi_iqns = self._get_host_ports(cli_host, HOST_ISCSI_NAME)
+        if nvme_nqns:
+            host_protocol = self._get_host_ports(cli_host, HOST_PROTOCOL)
+            if 'tcpnvme' in host_protocol:
+                connectivity_type = array_settings.NVME_OVER_TCP_CONNECTIVITY_TYPE
+            elif 'fcnvme' in host_protocol:
+                connectivity_type = array_settings.NVME_OVER_FC_CONNECTIVITY_TYPE
         elif hasattr(cli_host, HOST_WWPN):
             connectivity_type = array_settings.FC_CONNECTIVITY_TYPE
         elif hasattr(cli_host, HOST_ISCSI_NAME):

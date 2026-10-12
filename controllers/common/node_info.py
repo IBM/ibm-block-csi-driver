@@ -31,17 +31,31 @@ class Initiators:
     Object containing node initiators (e.g. iqn, fc_wwns)
     Usage:
     inits = Initiators([nvme_nqn], fc_wwns, [iscsi_iqn])
+    The nvme_transport_type field selects whether NQNs belong to NVMe-FC or NVMe-TCP.
+    It defaults to NVME_OVER_FC for backward compatibility.
     """
     nvme_nqns: list = field(default_factory=list)
     fc_wwns: list = field(default_factory=list)
     iscsi_iqns: list = field(default_factory=list)
+    nvme_transport_type: str = field(default_factory=lambda: array_config.NVME_OVER_FC_CONNECTIVITY_TYPE)
 
     def __post_init__(self):
         self.nvme_nqns = self._filter_empty_parts(self.nvme_nqns)
         self.fc_wwns = self._filter_empty_parts(self.fc_wwns)
         self.iscsi_iqns = self._filter_empty_parts(self.iscsi_iqns)
+        # _ports_by_type: used by get_by_connectivity_type() for lookup.
+        # NVMe-FC and NVMe-TCP both identify hosts by NQN, so both map to nvme_nqns.
+        # TBD: SKG: Verify whether we need both NVME-FC and NVME-TCP entries in _ports_by_type
         self._ports_by_type = {
             array_config.NVME_OVER_FC_CONNECTIVITY_TYPE: self.nvme_nqns,
+            array_config.NVME_OVER_TCP_CONNECTIVITY_TYPE: self.nvme_nqns,
+            array_config.FC_CONNECTIVITY_TYPE: self.fc_wwns,
+            array_config.ISCSI_CONNECTIVITY_TYPE: self.iscsi_iqns
+        }
+        # _iter_ports_by_type: used by __iter__() only. NVMe NQNs are yielded
+        # once, keyed by the actual transport type (FC or TCP) carried in this object.
+        self._iter_ports_by_type = {
+            self.nvme_transport_type: self.nvme_nqns,
             array_config.FC_CONNECTIVITY_TYPE: self.fc_wwns,
             array_config.ISCSI_CONNECTIVITY_TYPE: self.iscsi_iqns
         }
@@ -52,7 +66,7 @@ class Initiators:
         return list(ports)
 
     def _get_iter(self):
-        for connectivity_type, initiators in self._ports_by_type.items():
+        for connectivity_type, initiators in self._iter_ports_by_type.items():
             for initiator in initiators:
                 yield connectivity_type, initiator
 
