@@ -67,6 +67,7 @@ func NewDriver(endpoint string, configFilePath string, hostname string, max_invo
 	syncLock := NewSyncLock(max_invocations, clean_scsi_device)
 	osDeviceConnectivityMapping := map[string]device_connectivity.OsDeviceConnectivityInterface{
 		configFile.Connectivity_type.Nvme_over_fc: device_connectivity.NewOsDeviceConnectivityNvmeOFc(commandExecuter, gater, mount_wrapper, clean_scsi_device),
+		configFile.Connectivity_type.Nvme_over_tcp: device_connectivity.NewOsDeviceConnectivityNvmeOTcp(commandExecuter, gater, mount_wrapper, clean_scsi_device),
 		configFile.Connectivity_type.Fc:           device_connectivity.NewOsDeviceConnectivityFc(commandExecuter, gater, mount_wrapper, clean_scsi_device),
 		configFile.Connectivity_type.Iscsi:        device_connectivity.NewOsDeviceConnectivityIscsi(commandExecuter, gater, mount_wrapper, clean_scsi_device),
 	}
@@ -142,6 +143,7 @@ type Parameters struct {
 
 type Connectivity_type struct {
 	Nvme_over_fc string
+	Nvme_over_tcp string
 	Fc           string
 	Iscsi        string
 }

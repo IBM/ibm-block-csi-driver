@@ -25,7 +25,9 @@ parameters:
     delimiter: ";"
     fcs_delimiter: ":"
 
-connectivity_type:
+# Driver's connectivity-type identifier (may not be same as of storage)
+connectivity_type: 
   nvme_over_fc: "nvmeofc"
+  nvme_over_tcp: "nvmetcp"
   fc: "fc"
   iscsi: "iscsi"

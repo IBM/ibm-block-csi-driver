@@ -7,6 +7,7 @@ from munch import Munch
 
 import controllers.servers.utils as utils
 from controllers.array_action.settings import (NVME_OVER_FC_CONNECTIVITY_TYPE,
+                                               NVME_OVER_TCP_CONNECTIVITY_TYPE,
                                                FC_CONNECTIVITY_TYPE,
                                                ISCSI_CONNECTIVITY_TYPE)
 from controllers.common.node_info import NodeIdInfo
@@ -413,12 +414,18 @@ class TestUtils(unittest.TestCase):
         self._check_node_id_parameters(node_id_info)
 
     def test_choose_connectivity_types(self):
-        nvme = NVME_OVER_FC_CONNECTIVITY_TYPE
+        nvme_fc = NVME_OVER_FC_CONNECTIVITY_TYPE
+        nvme_tcp = NVME_OVER_TCP_CONNECTIVITY_TYPE
         fc = FC_CONNECTIVITY_TYPE
         iscsi = ISCSI_CONNECTIVITY_TYPE
         expected_chosen_by_connectivities_found = {
-            (nvme, fc, iscsi): nvme, (fc, iscsi): fc,
-            (nvme,): nvme, (fc,): fc, (iscsi,): iscsi
+            (nvme_fc, fc, iscsi): nvme_fc,
+            (nvme_tcp, fc, iscsi): nvme_tcp, # TBD: SKG: Verify from Dnyanesh
+            (fc, iscsi): fc,
+            (nvme_fc,): nvme_fc,
+            (nvme_tcp,): nvme_tcp,
+            (fc,): fc,
+            (iscsi,): iscsi
         }
         for connectivities_found, expected_chosen_connectivity in expected_chosen_by_connectivities_found.items():
             actual_chosen = utils.choose_connectivity_type(list(connectivities_found))
@@ -430,7 +437,7 @@ class TestUtils(unittest.TestCase):
                                                                                  array_initiators)
             self.assertEqual(lun, publish_volume_response.publish_context["lun"])
             self.assertEqual(connectivity_type, publish_volume_response.publish_context["connectivity_type"])
-            if connectivity_type == NVME_OVER_FC_CONNECTIVITY_TYPE:
+            if connectivity_type in (NVME_OVER_FC_CONNECTIVITY_TYPE, NVME_OVER_TCP_CONNECTIVITY_TYPE):
                 self.assertEqual(",".join(array_initiators),
                                  publish_volume_response.publish_context["nvme_target_ports"])
                 self.assertIsNone(publish_volume_response.publish_context.get("fc_wwns"))
@@ -449,6 +456,9 @@ class TestUtils(unittest.TestCase):
         self._check_publish_volume_response_parameters("2", NVME_OVER_FC_CONNECTIVITY_TYPE,
                                                        ["nn-5005076810003f8c:pn-50050768101c3f8c",
                                                         "nn-5005076810003f64:pn-50050768101a3f64"])
+
+        self._check_publish_volume_response_parameters("2", NVME_OVER_TCP_CONNECTIVITY_TYPE,
+                                                       ["10.0.0.1", "10.0.0.2"])
 
         self._check_publish_volume_response_parameters("1", FC_CONNECTIVITY_TYPE, ["wwn1", "wwn2"])
 
@@ -727,7 +737,7 @@ class TestUtils(unittest.TestCase):
         # Should return False because FC WWNs don't match
         self.assertFalse(utils.are_initiators_equal(initiator_str1, initiator_str2, FC_CONNECTIVITY_TYPE))
 
-    def test_are_initiators_equal_with_protocol_nvme_match(self):
+    def test_are_initiators_equal_with_protocol_fcnvme_match(self):
         """Test protocol-specific comparison for NVMe - matching NQNs"""
         initiator_str1 = json.dumps({
             NVME_OVER_FC_CONNECTIVITY_TYPE: ["nqn.2014-08.org.nvmexpress:uuid:12345"],
@@ -742,7 +752,7 @@ class TestUtils(unittest.TestCase):
         # Should return True because NVMe NQNs match
         self.assertTrue(utils.are_initiators_equal(initiator_str1, initiator_str2, NVME_OVER_FC_CONNECTIVITY_TYPE))
 
-    def test_are_initiators_equal_with_protocol_nvme_no_match(self):
+    def test_are_initiators_equal_with_protocol_fcnvme_no_match(self):
         """Test protocol-specific comparison for NVMe - different NQNs"""
         initiator_str1 = json.dumps({
             NVME_OVER_FC_CONNECTIVITY_TYPE: ["nqn.2014-08.org.nvmexpress:uuid:12345"],
@@ -756,6 +766,34 @@ class TestUtils(unittest.TestCase):
         })
         # Should return False because NVMe NQNs don't match
         self.assertFalse(utils.are_initiators_equal(initiator_str1, initiator_str2, NVME_OVER_FC_CONNECTIVITY_TYPE))
+
+    def test_are_initiators_equal_with_protocol_nvme_tcp_match(self):
+        """Test protocol-specific comparison for NVMe-TCP - matching NQNs"""
+        initiator_str1 = json.dumps({
+            NVME_OVER_TCP_CONNECTIVITY_TYPE: ["nqn.2014-08.org.nvmexpress:uuid:12345"],
+            FC_CONNECTIVITY_TYPE: ["wwn1"],
+            ISCSI_CONNECTIVITY_TYPE: ["iqn1"]
+        })
+        initiator_str2 = json.dumps({
+            NVME_OVER_TCP_CONNECTIVITY_TYPE: ["nqn.2014-08.org.nvmexpress:uuid:12345"],
+            FC_CONNECTIVITY_TYPE: ["wwn2"],
+            ISCSI_CONNECTIVITY_TYPE: ["iqn2"]
+        })
+        self.assertTrue(utils.are_initiators_equal(initiator_str1, initiator_str2, NVME_OVER_TCP_CONNECTIVITY_TYPE))
+
+    def test_are_initiators_equal_with_protocol_nvme_tcp_no_match(self):
+        """Test protocol-specific comparison for NVMe-TCP - different NQNs"""
+        initiator_str1 = json.dumps({
+            NVME_OVER_TCP_CONNECTIVITY_TYPE: ["nqn.2014-08.org.nvmexpress:uuid:12345"],
+            FC_CONNECTIVITY_TYPE: ["wwn1"],
+            ISCSI_CONNECTIVITY_TYPE: ["iqn1"]
+        })
+        initiator_str2 = json.dumps({
+            NVME_OVER_TCP_CONNECTIVITY_TYPE: ["nqn.2014-08.org.nvmexpress:uuid:67890"],
+            FC_CONNECTIVITY_TYPE: ["wwn1"],
+            ISCSI_CONNECTIVITY_TYPE: ["iqn1"]
+        })
+        self.assertFalse(utils.are_initiators_equal(initiator_str1, initiator_str2, NVME_OVER_TCP_CONNECTIVITY_TYPE))
 
     def test_are_initiators_equal_with_protocol_none_checks_all(self):
         """Test that None protocol checks all connectivity types"""

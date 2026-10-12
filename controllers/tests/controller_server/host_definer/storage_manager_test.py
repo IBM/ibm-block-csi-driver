@@ -528,3 +528,59 @@ class TestChangeHostProtocolWithChhost(TestDefineHost):
         self.mediator.add_ports_to_host.assert_called_once()
 
         self.assertEqual(response.error_message, '')
+
+    def test_change_host_protocol_to_nvme_tcp(self):
+        """Test changing protocol from SCSI to NVMe-TCP"""
+        self._prepare_define_host(is_host_exist=True)
+        self.mediator.get_host_connectivity_type.return_value = array_settings.FC_CONNECTIVITY_TYPE
+        self.mediator.get_host_io_group.return_value = test_utils.get_fake_host_io_group()
+        self.mediator.verify_host_partition.return_value = True
+        self.mediator.change_host_protocol.side_effect = None
+
+        current_ports = ["wwn1", "wwn2"]
+        self.mediator.get_host_connectivity_ports.return_value = current_ports
+
+        self.request.connectivity_type_from_user = array_settings.NVME_OVER_TCP_CONNECTIVITY_TYPE
+        self.request.node_initiators_from_csi_node = test_utils.initiators_to_json(
+            Initiators(nvme_nqns=["nqn1"], nvme_transport_type=array_settings.NVME_OVER_TCP_CONNECTIVITY_TYPE)
+        )
+
+        response = self.servicer.define_host(self.request)
+
+        self.assertEqual(2, self.mediator.get_host_connectivity_ports.call_count)
+        self.mediator.remove_ports_from_host.assert_called_once_with(
+            HOST_NAME, current_ports, array_settings.FC_CONNECTIVITY_TYPE
+        )
+        self.mediator.change_host_protocol.assert_called_once_with(
+            HOST_NAME, common_settings.TCPNVME_PROTOCOL
+        )
+        self.mediator.add_ports_to_host.assert_called_once()
+        self.assertEqual(response.error_message, '')
+
+    def test_change_host_protocol_from_nvme_fc_to_nvme_tcp(self):
+        """Test changing protocol from NVMe-FC to NVMe-TCP"""
+        self._prepare_define_host(is_host_exist=True)
+        self.mediator.get_host_connectivity_type.return_value = array_settings.NVME_OVER_FC_CONNECTIVITY_TYPE
+        self.mediator.get_host_io_group.return_value = test_utils.get_fake_host_io_group()
+        self.mediator.verify_host_partition.return_value = True
+        self.mediator.change_host_protocol.side_effect = None
+
+        current_ports = ["nqn1"]
+        self.mediator.get_host_connectivity_ports.return_value = current_ports
+
+        self.request.connectivity_type_from_user = array_settings.NVME_OVER_TCP_CONNECTIVITY_TYPE
+        self.request.node_initiators_from_csi_node = test_utils.initiators_to_json(
+            Initiators(nvme_nqns=["nqn1"], nvme_transport_type=array_settings.NVME_OVER_TCP_CONNECTIVITY_TYPE)
+        )
+
+        response = self.servicer.define_host(self.request)
+
+        self.assertEqual(2, self.mediator.get_host_connectivity_ports.call_count)
+        self.mediator.remove_ports_from_host.assert_called_once_with(
+            HOST_NAME, current_ports, array_settings.NVME_OVER_FC_CONNECTIVITY_TYPE
+        )
+        self.mediator.change_host_protocol.assert_called_once_with(
+            HOST_NAME, common_settings.TCPNVME_PROTOCOL
+        )
+        self.mediator.add_ports_to_host.assert_called_once()
+        self.assertEqual(response.error_message, '')

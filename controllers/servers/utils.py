@@ -14,7 +14,7 @@ import controllers.servers.messages as messages
 import controllers.servers.settings as servers_settings
 from controllers.array_action.array_action_types import ReplicationRequest
 from controllers.array_action.settings import NVME_OVER_FC_CONNECTIVITY_TYPE, FC_CONNECTIVITY_TYPE, \
-    ISCSI_CONNECTIVITY_TYPE, REPLICATION_COPY_TYPE_SYNC, REPLICATION_COPY_TYPE_ASYNC, REPLICATION_TYPE_MIRROR, \
+    ISCSI_CONNECTIVITY_TYPE, NVME_OVER_TCP_CONNECTIVITY_TYPE, REPLICATION_COPY_TYPE_SYNC, REPLICATION_COPY_TYPE_ASYNC, REPLICATION_TYPE_MIRROR, \
     REPLICATION_TYPE_EAR, REPLICATION_DEFAULT_COPY_TYPE
 from controllers.common import settings
 from controllers.common.config import config as common_config
@@ -147,10 +147,20 @@ def generate_node_initiators_from_string_data(initiators_data):
         Example: Initiators(nvme_nqns=[], fc_wwns=[], iscsi_iqns=['iqn.2016-04.com.open-iscsi:8bce7b6eab12'])
     """
     initiators_data = json.loads(initiators_data)
-    nvme_nqns = initiators_data.get(array_settings.NVME_OVER_FC_CONNECTIVITY_TYPE, [])
+    if initiators_data.get(array_settings.NVME_OVER_FC_CONNECTIVITY_TYPE):
+        nvme_nqns = initiators_data.get(array_settings.NVME_OVER_FC_CONNECTIVITY_TYPE, [])
+        nvme_transport_type = array_settings.NVME_OVER_FC_CONNECTIVITY_TYPE
+    elif initiators_data.get(array_settings.NVME_OVER_TCP_CONNECTIVITY_TYPE):
+        nvme_nqns = initiators_data.get(array_settings.NVME_OVER_TCP_CONNECTIVITY_TYPE, [])
+        nvme_transport_type = array_settings.NVME_OVER_TCP_CONNECTIVITY_TYPE
+    else:
+        nvme_nqns = []
+        nvme_transport_type = array_settings.NVME_OVER_FC_CONNECTIVITY_TYPE
+
+    nvme_nqns = initiators_data.get(nvme_transport_type, [])
     fc_wwns = initiators_data.get(array_settings.FC_CONNECTIVITY_TYPE, [])
     iscsi_iqns = initiators_data.get(array_settings.ISCSI_CONNECTIVITY_TYPE, [])
-    return Initiators(nvme_nqns, fc_wwns, iscsi_iqns)
+    return Initiators(nvme_nqns, fc_wwns, iscsi_iqns, nvme_transport_type)
 
 
 def convert_initiators_to_json_string(initiators):
@@ -161,11 +171,13 @@ def convert_initiators_to_json_string(initiators):
         initiators: Initiators object
 
     Returns:
-        JSON string with initiators
+        JSON string with initiators.
+        NQNs are stored under the key matching initiators.nvme_transport_type so that
+        the transport type survives a serialise/deserialise round-trip.
         Example: '{"nvmeofc":[],"fc":[],"iscsi":["iqn.2016-04.com.open-iscsi:8bce7b6eab12"]}'
     """
     initiators_dict = {
-        array_settings.NVME_OVER_FC_CONNECTIVITY_TYPE: initiators.nvme_nqns,
+        initiators.nvme_transport_type: initiators.nvme_nqns,
         array_settings.FC_CONNECTIVITY_TYPE: initiators.fc_wwns,
         array_settings.ISCSI_CONNECTIVITY_TYPE: initiators.iscsi_iqns
     }
@@ -214,7 +226,7 @@ def are_initiators_equal(initiator_str1, initiator_str2, protocol=None):
             return iscsi_equal
         elif protocol == FC_CONNECTIVITY_TYPE:
             return fc_equal
-        elif protocol == NVME_OVER_FC_CONNECTIVITY_TYPE:
+        elif protocol in (NVME_OVER_FC_CONNECTIVITY_TYPE, NVME_OVER_TCP_CONNECTIVITY_TYPE):
             return nvme_equal
         else:
             return nvme_equal and fc_equal and iscsi_equal
@@ -913,17 +925,22 @@ def get_object_id_info(full_object_id, object_type):
     return ObjectIdInfo(array_type=array_type, system_id=system_id, internal_id=internal_id, uid=strong_id)
 
 
+# Note: A host can have either nvme-fc or nvme-tcp connectivity, 
+# so their relative ordering does not matter.
+CONNECTIVITY_TYPE_PRIORITY = [
+    NVME_OVER_FC_CONNECTIVITY_TYPE,
+    NVME_OVER_TCP_CONNECTIVITY_TYPE,
+    FC_CONNECTIVITY_TYPE,
+    ISCSI_CONNECTIVITY_TYPE,
+]
+
+
 def choose_connectivity_type(connectivity_types):
     logger.debug("choosing connectivity type for connectivity types : {0}".format(connectivity_types))
-    if NVME_OVER_FC_CONNECTIVITY_TYPE in connectivity_types:
-        logger.debug("connectivity type is : {0}".format(NVME_OVER_FC_CONNECTIVITY_TYPE))
-        return NVME_OVER_FC_CONNECTIVITY_TYPE
-    if FC_CONNECTIVITY_TYPE in connectivity_types:
-        logger.debug("connectivity type is : {0}".format(FC_CONNECTIVITY_TYPE))
-        return FC_CONNECTIVITY_TYPE
-    if ISCSI_CONNECTIVITY_TYPE in connectivity_types:
-        logger.debug("connectivity type is : {0}".format(ISCSI_CONNECTIVITY_TYPE))
-        return ISCSI_CONNECTIVITY_TYPE
+    for connectivity_type in CONNECTIVITY_TYPE_PRIORITY:
+        if connectivity_type in connectivity_types:
+            logger.debug("connectivity type is : {0}".format(connectivity_type))
+            return connectivity_type
     return None
 
 
@@ -949,7 +966,10 @@ def generate_csi_publish_volume_response(lun, connectivity_type, array_initiator
         array_initiators_param = common_config.controller.publish_context_array_iqn
         publish_context[array_initiators_param] = separator.join(array_initiators.keys())
 
-    elif connectivity_type == NVME_OVER_FC_CONNECTIVITY_TYPE:
+    elif connectivity_type in (NVME_OVER_FC_CONNECTIVITY_TYPE, NVME_OVER_TCP_CONNECTIVITY_TYPE):
+        # Both NVMe transports share the same publish context key. The node driver
+        # distinguishes FC (nn-...:pn-... WWN pairs) from TCP (IP addresses) via
+        # the connectivity_type key that is also present in the publish context.
         array_initiators_param = common_config.controller.publish_context_nvme_initiators
         joined_initiators = separator.join(array_initiators)
         publish_context[array_initiators_param] = joined_initiators
@@ -1097,7 +1117,7 @@ def validate_parameters_match_source_volume(space_efficiency, required_bytes, vo
 
 def _get_connectivity_type_by_initiators(initiators):
     if initiators.nvme_nqns:
-        return NVME_OVER_FC_CONNECTIVITY_TYPE
+        return initiators.nvme_transport_type
     if initiators.fc_wwns:
         return FC_CONNECTIVITY_TYPE
     if initiators.iscsi_iqns:
@@ -1120,9 +1140,10 @@ def get_connectivity_type_ports(initiators, connectivity_type):
 
 
 def _validate_connectivity_type(connectivity_type):
-    if connectivity_type != array_settings.NVME_OVER_FC_CONNECTIVITY_TYPE and \
-            connectivity_type != array_settings.FC_CONNECTIVITY_TYPE and \
-            connectivity_type != array_settings.ISCSI_CONNECTIVITY_TYPE and connectivity_type:
+    if connectivity_type not in (array_settings.NVME_OVER_FC_CONNECTIVITY_TYPE,
+                                 array_settings.NVME_OVER_TCP_CONNECTIVITY_TYPE,
+                                 array_settings.FC_CONNECTIVITY_TYPE,
+                                 array_settings.ISCSI_CONNECTIVITY_TYPE) and connectivity_type:
         raise array_errors.UnsupportedConnectivityTypeError(connectivity_type)
 
 

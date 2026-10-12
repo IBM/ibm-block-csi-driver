@@ -228,6 +228,13 @@ class NoNvmeFcTargetsFoundError(BaseArrayActionException):
         self.message = messages.NO_NVME_FC_TARGETS_FOUND_ERROR_MESSAGE.format(endpoint)
 
 
+class NoNvmeTcpTargetsFoundError(BaseArrayActionException):
+
+    def __init__(self, endpoint):
+        super().__init__()
+        self.message = messages.NO_NVME_TCP_TARGETS_FOUND_ERROR_MESSAGE.format(endpoint)
+
+
 class UnsupportedConnectivityTypeError(InvalidArgumentError):
 
     def __init__(self, connectivity_type):

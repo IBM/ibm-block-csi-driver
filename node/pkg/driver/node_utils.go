@@ -95,7 +95,7 @@ type NodeUtilsInterface interface {
 	IsNotMountPoint(file string) (bool, error)
 	GetPodPath(filepath string) string
 	GetTopologyLabels(ctx context.Context, nodeName string) (map[string]string, error)
-	UpdateNodeInitiatorsAnnotation(ctx context.Context, nodeName string, iscsiIQN string, fcWWNs []string, nvmeNQN string) error
+	UpdateNodeInitiatorsAnnotation(ctx context.Context, nodeName string,  
 	IsBlock(ctx context.Context, devicePath string) (bool, error)
 	GetFileSystemVolumeStats(ctx context.Context, path string) (VolumeStatistics, error)
 	GetBlockVolumeStats(ctx context.Context, path string) (VolumeStatistics, error)
@@ -126,12 +126,14 @@ func (n NodeUtils) GetInfoFromPublishContext(publishContext map[string]string) (
 	var lun int
 	var err error
 	connectivityType := publishContext[n.ConfigYaml.Controller.Publish_context_connectivity_parameter]
-	if connectivityType != n.ConfigYaml.Connectivity_type.Nvme_over_fc {
+	if connectivityType != n.ConfigYaml.Connectivity_type.Nvme_over_fc &&
+		connectivityType != n.ConfigYaml.Connectivity_type.Nvme_over_tcp {
 		lun, err = strconv.Atoi(strLun)
 		if err != nil {
 			return "", -1, nil, err
 		}
 	}
+
 	if connectivityType == n.ConfigYaml.Connectivity_type.Fc {
 		wwns := strings.Split(publishContext[n.ConfigYaml.Controller.Publish_context_fc_initiators], publishContextSeparator)
 		for _, wwn := range wwns {
@@ -159,6 +161,33 @@ func (n NodeUtils) GetInfoFromPublishContext(publishContext map[string]string) (
 			port = strings.TrimSpace(port)
 			if port != "" {
 				ipsByArrayInitiator[port] = nil
+			}
+		}
+	}
+
+	if connectivityType == n.ConfigYaml.Connectivity_type.Nvme_over_tcp {
+		// NVMe-TCP publish context carries array target IPs under Publish_context_nvme_initiators
+		// and/or individual target keys (e.g. nqn -> "ip1,ip2").
+		if rawInitiators, exists := publishContext[n.ConfigYaml.Controller.Publish_context_nvme_initiators]; exists {
+			for _, ip := range strings.Split(rawInitiators, publishContextSeparator) {
+				ip = strings.TrimSpace(ip)
+				if ip != "" {
+					ipsByArrayInitiator[ip] = []string{ip}
+				}
+			}
+		}
+		for key, ips := range publishContext {
+			switch key {
+			case n.ConfigYaml.Controller.Publish_context_lun_parameter,
+				n.ConfigYaml.Controller.Publish_context_connectivity_parameter,
+				n.ConfigYaml.Controller.Publish_context_array_iqn,
+				n.ConfigYaml.Controller.Publish_context_fc_initiators,
+				n.ConfigYaml.Controller.Publish_context_nvme_initiators:
+				continue
+			}
+			trimmedIPs := strings.TrimSpace(ips)
+			if trimmedIPs != "" {
+				ipsByArrayInitiator[key] = strings.Split(trimmedIPs, publishContextSeparator)
 			}
 		}
 	}
@@ -662,7 +691,7 @@ func (n NodeUtils) GetTopologyLabels(ctx context.Context, nodeName string) (map[
 }
 
 func (n NodeUtils) UpdateNodeInitiatorsAnnotation(ctx context.Context, nodeName string,
-	nvmeNQN string, fcWWNs []string, iscsiIQN string) error {
+	iscsiIQN string, fcWWNs []string, nvmeNQN string) error {
 
 	const nodeInitiatorsAnnotationKey = "block.csi.ibm.com/node-initiators"
 
@@ -681,13 +710,15 @@ func (n NodeUtils) UpdateNodeInitiatorsAnnotation(ctx context.Context, nodeName 
 	connectivity_type := n.ConfigYaml.Connectivity_type
 
 	portsData := map[string]interface{}{
-		connectivity_type.Nvme_over_fc: []string{},
-		connectivity_type.Fc:           []string{},
-		connectivity_type.Iscsi:        []string{},
+		connectivity_type.Nvme_over_fc:  []string{},
+		connectivity_type.Nvme_over_tcp: []string{},
+		connectivity_type.Fc:            []string{},
+		connectivity_type.Iscsi:         []string{},
 	}
 
 	if nvmeNQN != "" {
 		portsData[connectivity_type.Nvme_over_fc] = []string{nvmeNQN}
+		portsData[connectivity_type.Nvme_over_tcp] = []string{nvmeNQN}
 	}
 
 	if len(fcWWNs) > 0 {
