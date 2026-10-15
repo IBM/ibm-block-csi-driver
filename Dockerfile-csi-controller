@@ -28,7 +28,7 @@ RUN pip3 install -r ./requirements.txt
 # s390x: replace the native UPB wheel with the pure-Python universal wheel to avoid
 # a SIGSEGV in _message.abi3.so at Python interpreter shutdown (issue #870)
 RUN if [ "$(uname -m)" = "s390x" ]; then \
-        pip3 install "protobuf==6.33.5" --no-binary protobuf ; \
+        pip3 install --no-binary protobuf protobuf ; \
     fi
 RUN pip3 install --no-deps -r ./requirements_pyxcli.txt
 
