@@ -14,7 +14,7 @@ import controllers.tests.array_action.test_settings as array_settings
 import controllers.tests.common.test_settings as common_settings
 from controllers.array_action.array_action_types import ReplicationRequest, ReplicationInfo, ReplicationStatus
 from controllers.array_action.array_mediator_svc import SVCArrayMediator, build_kwargs_from_parameters, \
-    FCMAP_STATUS_DONE, YES
+    FCMAP_STATUS_DONE, YES, SSH_ALIVE_CHECK_TIMEOUT
 from controllers.array_action.settings import (REPLICATION_TYPE_MIRROR, REPLICATION_TYPE_EAR,
                                                RCRELATIONSHIP_STATE_READY, ENDPOINT_TYPE_PRODUCTION,
                                                HEALTHY_DR_LINK_STATES, DEGRADED_DR_LINK_STATES, FAILED_DR_LINK_STATES,
@@ -111,6 +111,35 @@ class TestArrayMediatorSVC(unittest.TestCase):
     def test_close(self):
         self.svc.disconnect()
         self.svc.client.close.assert_called_with()
+
+    def test_is_active_success(self):
+        transport = self.svc.client.transport.transport.get_transport.return_value
+        transport.is_active.return_value = True
+
+        self.assertTrue(self.svc.is_active())
+
+        transport.open_session.assert_called_once_with(timeout=SSH_ALIVE_CHECK_TIMEOUT)
+        transport.open_session.return_value.close.assert_called_once_with()
+
+    def test_is_active_false_when_transport_not_active(self):
+        transport = self.svc.client.transport.transport.get_transport.return_value
+        transport.is_active.return_value = False
+
+        self.assertFalse(self.svc.is_active())
+
+        transport.open_session.assert_not_called()
+
+    def test_is_active_false_when_no_transport(self):
+        self.svc.client.transport.transport.get_transport.return_value = None
+
+        self.assertFalse(self.svc.is_active())
+
+    def test_is_active_false_when_open_session_fails(self):
+        transport = self.svc.client.transport.transport.get_transport.return_value
+        transport.is_active.return_value = True
+        transport.open_session.side_effect = Exception("Timeout opening channel.")
+
+        self.assertFalse(self.svc.is_active())
 
     def _prepare_rcrelationship_mock(self):
         return Munch({svc_settings.RCRELATIONSHIP_STATE_ATTR_NAME: RCRELATIONSHIP_STATE_READY,

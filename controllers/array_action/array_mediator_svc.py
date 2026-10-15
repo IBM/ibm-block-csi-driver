@@ -86,6 +86,8 @@ HOSTS_LIST_ERR_MSG_MAX_LENGTH = 300
 
 LUN_INTERVAL = 128
 
+SSH_ALIVE_CHECK_TIMEOUT = 10
+
 FCMAP_STATUS_DONE = 'idle_or_copied'
 
 YES = 'yes'
@@ -363,7 +365,15 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
         return self._system_info.id_alias
 
     def is_active(self):
-        return self.client.transport.transport.get_transport().is_active()
+        transport = self.client.transport.transport.get_transport()
+        if not transport or not transport.is_active():
+            return False
+        try:
+            transport.open_session(timeout=SSH_ALIVE_CHECK_TIMEOUT).close()
+            return True
+        except Exception as ex:  # pylint: disable=broad-except
+            logger.debug("SSH session health check failed: {}".format(ex))
+            return False
 
     def _get_partition_name_of_cli_volume(self, cli_volume):
         if not getattr(cli_volume, 'volume_group_name', None):
