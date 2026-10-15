@@ -1021,8 +1021,6 @@ func TestNodeGetVolumeStats(t *testing.T) {
 				mockNodeUtils.EXPECT().IsBlock(volumePathWithHostPrefix).Return(true, nil)
 				mockNodeUtils.EXPECT().GetBlockVolumeStats(volumeId).Return(driver.VolumeStatistics{},
 					errors.New("fail to get stats"))
-				mockNodeUtils.EXPECT().GetVolumeUuid(volumeId).Return(volumeUuid)
-				mockOsDeviceConHelper.EXPECT().DisableQueueingIfLunUnavailable(volumeUuid).Return("", nil)
 
 				_, err := d.NodeGetVolumeStats(context.TODO(), req)
 				assertError(t, err, expErrCode)
@@ -1039,8 +1037,6 @@ func TestNodeGetVolumeStats(t *testing.T) {
 				mockNodeUtils.EXPECT().GetVolumeUuid(volumeId).Return(volumeUuid)
 				mockOsDeviceConHelper.EXPECT().IsVolumePathMatchesVolumeId(volumeUuid, volumePathWithHostPrefix).Return(true, nil)
 				mockNodeUtils.EXPECT().GetFileSystemVolumeStats(volumePathWithHostPrefix).Return(driver.VolumeStatistics{}, errors.New("fail to get stats"))
-				mockNodeUtils.EXPECT().GetVolumeUuid(volumeId).Return(volumeUuid)
-				mockOsDeviceConHelper.EXPECT().DisableQueueingIfLunUnavailable(volumeUuid).Return("", nil)
 
 				_, err := d.NodeGetVolumeStats(context.TODO(), req)
 				assertError(t, err, expErrCode)
