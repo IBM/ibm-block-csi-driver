@@ -95,7 +95,7 @@ type NodeUtilsInterface interface {
 	IsNotMountPoint(file string) (bool, error)
 	GetPodPath(filepath string) string
 	GetTopologyLabels(ctx context.Context, nodeName string) (map[string]string, error)
-	UpdateNodeInitiatorsAnnotation(ctx context.Context, nodeName string,  
+	UpdateNodeInitiatorsAnnotation(ctx context.Context, nodeName string, nvmeNQN string, fcWWNs []string, iscsiIQN string) error
 	IsBlock(ctx context.Context, devicePath string) (bool, error)
 	GetFileSystemVolumeStats(ctx context.Context, path string) (VolumeStatistics, error)
 	GetBlockVolumeStats(ctx context.Context, path string) (VolumeStatistics, error)
@@ -692,7 +692,7 @@ func (n NodeUtils) GetTopologyLabels(ctx context.Context, nodeName string) (map[
 }
 
 func (n NodeUtils) UpdateNodeInitiatorsAnnotation(ctx context.Context, nodeName string,
-	iscsiIQN string, fcWWNs []string, nvmeNQN string) error {
+	nvmeNQN string, fcWWNs []string, iscsiIQN string) error {
 
 	const nodeInitiatorsAnnotationKey = "block.csi.ibm.com/node-initiators"
 
