@@ -16,14 +16,17 @@
 
 package device_connectivity
 
+import (
+	"context"
+)
+
 //go:generate mockgen -destination=../../../mocks/mock_OsDeviceConnectivityInterface.go -package=mocks github.com/ibm/ibm-block-csi-driver/node/pkg/driver/device_connectivity OsDeviceConnectivityInterface
 
 type OsDeviceConnectivityInterface interface {
-	EnsureLogin(ipsByArrayIdentifier map[string][]string)    // For iSCSI login
-	RescanDevices(lunId int, arrayIdentifier []string) error // For NVME lunID will be namespace ID.
-	GetMpathDevice(volumeId string) (string, error)
-	FlushMultipathDevice(mpathDevice string) error
-	RemovePhysicalDevice(sysDevices []string) error
-	RemoveGhostDevice(lun int) error
-	ValidateLun(lun int, sysDevices []string) error
+	EnsureLogin(ctx context.Context, ipsByArrayIdentifier map[string][]string)    // For iSCSI login
+	RescanDevices(ctx context.Context, lunId int, arrayIdentifier []string) error // For NVME lunID will be namespace ID.
+	GetMpathDevice(ctx context.Context, volumeId string) (string, error)
+	RemovePhysicalDevice(ctx context.Context, sysDevices []string) error
+	RemoveGhostDevice(ctx context.Context, expectedSerial string, expectedLun int, arrayIdentifiers []string) error
+	ValidateLun(ctx context.Context, targetDm string, lun int, sysDevices []string, expectedSerial string) error
 }

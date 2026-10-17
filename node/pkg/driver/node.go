@@ -18,8 +18,12 @@ package driver
 
 import (
 	"context"
+	"errors"
+	"regexp"
 	"fmt"
+	"os"
 	"path"
+	"path/filepath" // FIXED: Replaced brittle path with filepath
 	"reflect"
 	"strings"
 
@@ -80,6 +84,7 @@ type NodeService struct {
 	Hostname                    string
 	NodeUtils                   NodeUtilsInterface
 	executer                    executer.ExecuterInterface
+	KeyedGater      *executer.KeyedGater
 	VolumeIdLocksMap            SyncLockInterface
 	OsDeviceConnectivityMapping map[string]device_connectivity.OsDeviceConnectivityInterface
 	OsDeviceConnectivityHelper  device_connectivity.OsDeviceConnectivityHelperScsiGenericInterface
@@ -95,12 +100,13 @@ type VolumeStatistics struct {
 func NewNodeService(configYaml ConfigFile, hostname string, nodeUtils NodeUtilsInterface,
 	OsDeviceConnectivityMapping map[string]device_connectivity.OsDeviceConnectivityInterface,
 	osDeviceConnectivityHelper device_connectivity.OsDeviceConnectivityHelperScsiGenericInterface,
-	executer executer.ExecuterInterface, mounter NodeMounter, syncLock SyncLockInterface) NodeService {
+	executer executer.ExecuterInterface, KeyedGater *executer.KeyedGater, mounter NodeMounter, syncLock SyncLockInterface) NodeService {
 	return NodeService{
 		ConfigYaml:                  configYaml,
 		Hostname:                    hostname,
 		NodeUtils:                   nodeUtils,
 		executer:                    executer,
+		KeyedGater:			KeyedGater,
 		OsDeviceConnectivityMapping: OsDeviceConnectivityMapping,
 		OsDeviceConnectivityHelper:  osDeviceConnectivityHelper,
 		Mounter:                     mounter,
@@ -108,23 +114,27 @@ func NewNodeService(configYaml ConfigFile, hostname string, nodeUtils NodeUtilsI
 	}
 }
 
+// Structural pattern matching to ensure accurate device name handling across all Linux layers
+var nvmeStageControllerPattern = regexp.MustCompile(`^nvme\d+c\d+n\d+$`)
+
 func (d *NodeService) NodeStageVolume(ctx context.Context, req *csi.NodeStageVolumeRequest) (*csi.NodeStageVolumeResponse, error) {
 	defer logger.Exit(logger.Enter(req))
 
+	// 1. INPUT VALIDATION & TYPE-SAFE UNWRAPPING
 	err := d.nodeStageVolumeRequestValidation(req)
 	if err != nil {
-		switch err.(type) {
-		case *RequestValidationError:
+		var validationErr *RequestValidationError
+		if errors.As(err, &validationErr) {
 			return nil, status.Error(codes.InvalidArgument, err.Error())
-		default:
-			return nil, status.Error(codes.Internal, err.Error())
 		}
+		return nil, status.Error(codes.Internal, err.Error())
 	}
 
 	connectivityType, lun, ipsByArrayInitiator, err := d.NodeUtils.GetInfoFromPublishContext(req.PublishContext)
 	if err != nil {
 		return nil, status.Error(codes.Internal, err.Error())
 	}
+	
 	volumeID := req.VolumeId
 	err = d.VolumeIdLocksMap.AddVolumeAndLunLock(volumeID, lun, "NodeStageVolume")
 	if err != nil {
@@ -140,49 +150,103 @@ func (d *NodeService) NodeStageVolume(ctx context.Context, req *csi.NodeStageVol
 		return nil, status.Error(codes.InvalidArgument, fmt.Sprintf("Wrong connectivity type %s", connectivityType))
 	}
 
-	osDeviceConnectivity.EnsureLogin(ipsByArrayInitiator)
-
-	err = d.OsDeviceConnectivityHelper.RemoveGhostDevice(lun)
-	if err != nil {
-		return nil, status.Error(codes.Aborted, err.Error())
-	}
-
-	err = osDeviceConnectivity.RescanDevices(lun, arrayInitiators)
-	if err != nil {
-		return nil, status.Error(codes.Internal, err.Error())
-	}
-
-	err = d.OsDeviceConnectivityHelper.RemoveGhostDevice(lun)
-	if err != nil {
-		logger.Debugf("Failed to clean ghost device for lun %d", lun)
-		// we can swallow the error here, since it's just for cleanliness
-	}
-
+	stagingPath := req.GetStagingTargetPath() 
+	stagingPathWithHostPrefix := d.NodeUtils.GetPodPath(stagingPath)
 	volumeUuid := d.NodeUtils.GetVolumeUuid(volumeID)
-	mpathDevice, err := osDeviceConnectivity.GetMpathDevice(volumeUuid)
-	logger.Debugf("Discovered device : {%v}", mpathDevice)
+
+	// =========================================================================
+	// STAGE 1: EVALUATE IDENTITY AND KERNEL TOPOLOGY PRE-SCAN
+	// =========================================================================
+	mpathDevice, isStaged, skipRescan, scanInProgress, preScanErr := d.OsDeviceConnectivityHelper.IdentityAwarePreScan(ctx, stagingPathWithHostPrefix, volumeUuid)
+	
+	// Handle the in-flight stabilization check (Interrupted Previous Stage)
+	if preScanErr != nil {
+		if status.Code(preScanErr) == codes.Aborted {
+			logger.Infof("Optimization: Active kernel path transition detected for %v. Bypassing rescan and entering poll loop.", volumeUuid)
+			return nil, preScanErr
+		}
+		return nil, preScanErr
+	}
+
+	if isStaged {
+		logger.Infof("NodeStageVolume Idempotency: Volume already fully staged and verified via hardware inquiry.")
+		return &csi.NodeStageVolumeResponse{}, nil
+	}
+
+	// =========================================================================
+	// STAGE 2: DISCOVERY OR STABILIZATION ROUTING
+	// =========================================================================
+	if !skipRescan && !scanInProgress {
+		logger.Infof("Device missing or recently purged for WWID %v. Initiating fabric discovery.", volumeUuid)
+		osDeviceConnectivity.EnsureLogin(ctx, ipsByArrayInitiator)
+		
+		// Consolidated into a single precise pre/post execution cleanup bracket
+		_ = d.OsDeviceConnectivityHelper.RemoveGhostDevice(ctx, volumeUuid, lun, arrayInitiators)
+		if err := osDeviceConnectivity.RescanDevices(ctx, lun, arrayInitiators); err != nil {
+			return nil, status.Error(codes.Internal, err.Error())
+		}
+	} else if scanInProgress {
+		logger.Infof("Optimization: Active bus transition or scan in progress detected for %v. Bypassing rescan phase.", volumeUuid)
+	} else {
+		logger.Infof("Optimization: Healthy idle block device %s found in sysfs. Bypassing rescan phase.", mpathDevice)
+	}
+
+	// =========================================================================
+	// STAGE 3: CORE POLLING AND MULTI-PATH STABILIZATION
+	// =========================================================================
+	mpathDevice, err = d.OsDeviceConnectivityHelper.GetMpathDevice(ctx, volumeUuid)
 	if err != nil {
 		logger.Errorf("Error while discovering the device : {%v}", err.Error())
-		return nil, status.Error(codes.Internal, err.Error())
+		if errors.Is(ctx.Err(), context.DeadlineExceeded) || status.Code(err) == codes.DeadlineExceeded {
+			return nil, status.Errorf(codes.DeadlineExceeded, "temporary discovery loop timeout: %v", err)
+		}
+		return nil, status.Errorf(codes.Internal, "device fingerprint stabilization failed: %v", err)
 	}
 
+	logger.Infof("Device discovery finalized and settled successfully at path: %s", mpathDevice)
+	
+	// 3. BLOCK VOLUME EXIT
 	volumeCap := req.GetVolumeCapability()
 	switch volumeCap.GetAccessType().(type) {
 	case *csi.VolumeCapability_Block:
 		logger.Debugf("NodeStageVolume Finished: multipath device [%s] is ready to be mounted by NodePublishVolume API", mpathDevice)
 		return &csi.NodeStageVolumeResponse{}, nil
 	}
-	baseDevice := path.Base(mpathDevice)
-	sysDevices, err := d.NodeUtils.GetSysDevicesFromMpath(baseDevice)
+
+	// =========================================================================
+	// 4. TOPOLOGY VALIDATION, FORMATTING, AND MOUNTING
+	// =========================================================================
+	baseDevice := filepath.Base(mpathDevice)
+	
+	// FIXED: Standardized, prefix-free protocol checker handles multi-distro naming variants safely
+	nvmeType, err := device_connectivity.DevicesAreNvme(ctx, d.KeyedGater, baseDevice)
 	if err != nil {
-		logger.Errorf("Error while trying to get sys devices : {%v}", err.Error())
+		return nil, status.Errorf(codes.Internal, "Topology evaluation failed during block scheme lookup for %s: %v", baseDevice, err)
+	}
+
+	var sysDevices []string
+	logger.Debugf("[NodeStage-Topology] Extracting physical slave lanes for settled device node: %s", baseDevice)
+
+	if nvmeType == device_connectivity.NVMeNative {
+		// Native NVMe Multipathing structures track the global virtual subsystem node directly
+		sysDevices = []string{baseDevice}
+	} else {
+		// Securely handles both traditional SCSI maps and NVMe over DM (NVMeNonNative) layouts via sysfs
+		sysDevices, err = device_connectivity.GetSysDevicesFromMpath(ctx, baseDevice)
+		if err != nil {
+			logger.Errorf("Error while trying to get sys devices : {%v}", err.Error())
+			return nil, status.Error(codes.Internal, err.Error())
+		}
+	}
+	
+	// FIXED: Replaced misleading "device missing" tracking logs with proper phase progress logging
+	logger.Debugf("[NodeStage-Topology] Resolved slave devices list: %v. Initiating LUN verification matrix.", sysDevices)
+	if err := osDeviceConnectivity.ValidateLun(ctx, mpathDevice, lun, sysDevices, volumeUuid); err != nil {
+		logger.Errorf("Volume LUN validation failed for %s: %v", mpathDevice, err)
 		return nil, status.Error(codes.Internal, err.Error())
 	}
-	err = osDeviceConnectivity.ValidateLun(lun, sysDevices)
-	if err != nil {
-		logger.Errorf("Error while trying to validate lun : {%v}", err.Error())
-		return nil, status.Error(codes.Internal, err.Error())
-	}
+	
+	logger.Debugf("[NodeStage-Mount] LUN validation successful. Inspecting filesystem format type.")
 
 	existingFormat, err := d.Mounter.GetDiskFormat(mpathDevice)
 	if err != nil {
@@ -190,32 +254,44 @@ func (d *NodeService) NodeStageVolume(ctx context.Context, req *csi.NodeStageVol
 		return nil, status.Error(codes.Internal, err.Error())
 	}
 
-	requestedFsType := volumeCap.GetMount().FsType
-	fsTypeForMount, err := d.resolveFsTypeForMount(requestedFsType, existingFormat)
+	fsTypeForMount, err := d.resolveFsTypeForMount(volumeCap.GetMount().FsType, existingFormat)
 	if err != nil {
 		logger.Errorf("Error while resolving type of filesystem to mount : {%v}", err.Error())
 		return nil, err
 	}
 
-	stagingPath := req.GetStagingTargetPath() // e.g in k8s /var/lib/kubelet/plugins/kubernetes.io/csi/pv/pvc-21967c74-b456-11e9-b93e-005056a45d5f/globalmount
-	stagingPathWithHostPrefix := d.NodeUtils.GetPodPath(stagingPath)
-
-	// check if already mounted
-	isMounted, err := d.isTargetMounted(stagingPathWithHostPrefix, true)
+	// 2. IDEMPOTENCY MOUNT CHECK
+	isMounted, err := d.isTargetMounted(stagingPath, true)
 	if err != nil {
 		logger.Debugf("Existing mount check failed {%v}", err.Error())
 		return nil, err
 	}
-	if isMounted { // idempotent case
+	if isMounted { 
+		logger.Infof("NodeStageVolume Idempotency: Target %s is already mounted. Staging complete.", stagingPathWithHostPrefix)
 		return &csi.NodeStageVolumeResponse{}, nil
 	}
+	
+	// HARDENED SANITIZATION LAYER: Pre-clean stale block files or dangling relics from prior crashes
+	if d.NodeUtils.IsPathExists(stagingPathWithHostPrefix) {
+		isBlockFile, errBlock := d.NodeUtils.IsBlock(ctx, stagingPathWithHostPrefix)
+		// FIXED: Aggressive fallback path eviction. If IsBlock returns true OR if the check fails, 
+		// we treat the file node as a potential directory-creation blocker and purge it safely.
+		if (errBlock == nil && isBlockFile) || errBlock != nil {
+			logger.Warningf("Sanitization Safeguard: Removing left-behind block file or ambiguous path obstacle at staging path: %s", stagingPathWithHostPrefix)
+			_ = os.Remove(stagingPathWithHostPrefix)
+		}
+	}
 
-	err = d.formatAndMount(mpathDevice, stagingPath, fsTypeForMount, existingFormat)
-	if err != nil {
+	if err = os.MkdirAll(stagingPathWithHostPrefix, 0750); err != nil {
+		logger.Errorf("failed to create target directory %s: %v", stagingPathWithHostPrefix, err)
+		return nil, status.Errorf(codes.Internal, "failed to create staging target directory: %v", err)
+	}	
+
+	if err = d.formatAndMount(ctx, mpathDevice, stagingPath, fsTypeForMount, existingFormat); err != nil {
 		return nil, status.Error(codes.Internal, err.Error())
 	}
 
-	logger.Debugf("NodeStageVolume Finished: staging path [%s] is ready to be mounted by NodePublishVolume API", stagingPath)
+	logger.Debugf("NodeStageVolume Finished: staging path [%s] is ready to be mounted by NodePublishVolume API", stagingPathWithHostPrefix)
 	return &csi.NodeStageVolumeResponse{}, nil
 }
 
@@ -315,9 +391,9 @@ func (d *NodeService) resolveFsTypeForMount(requestedFsType string, existingForm
 	return fsTypeForMount, nil
 }
 
-func (d *NodeService) formatAndMount(mpathDevice string, stagingPath string, fsTypeForMount string, existingFormat string) error {
+func (d *NodeService) formatAndMount(ctx context.Context, mpathDevice string, stagingPath string, fsTypeForMount string, existingFormat string) error {
 	if existingFormat == "" {
-		d.NodeUtils.FormatDevice(mpathDevice, fsTypeForMount)
+		d.NodeUtils.FormatDevice(ctx, mpathDevice, fsTypeForMount)
 	}
 
 	var mountOptions []string
@@ -328,6 +404,9 @@ func (d *NodeService) formatAndMount(mpathDevice string, stagingPath string, fsT
 	logger.Debugf("Mount the device with fs_type = {%v} (Create filesystem if needed)", fsTypeForMount)
 	return d.Mounter.FormatAndMount(mpathDevice, stagingPath, fsTypeForMount, mountOptions) // Passing without /host because k8s mounter uses mount\mkfs\fsck
 }
+
+// Structural pattern matching to ensure accurate device name handling across all Linux layers
+var nvmeUnstageControllerPattern = regexp.MustCompile(`^nvme\d+c\d+n\d+$`)
 
 func (d *NodeService) NodeUnstageVolume(ctx context.Context, req *csi.NodeUnstageVolumeRequest) (*csi.NodeUnstageVolumeResponse, error) {
 	defer logger.Exit(logger.Enter(req))
@@ -353,81 +432,33 @@ func (d *NodeService) NodeUnstageVolume(ctx context.Context, req *csi.NodeUnstag
 
 	stagingPathWithHostPrefix := d.NodeUtils.GetPodPath(stagingTargetPath)
 	logger.Debugf("Check if staging path {%s} is mounted", stagingPathWithHostPrefix)
-	isNotMounted, err := d.NodeUtils.IsNotMountPoint(stagingPathWithHostPrefix)
-	if err != nil {
-		logger.Warningf("Failed to check if (%s), is mounted", stagingPathWithHostPrefix)
-		return nil, status.Error(codes.Internal, err.Error())
-	}
-	if !isNotMounted {
-		err = d.Mounter.Unmount(stagingTargetPath)
-		if err != nil {
-			logger.Errorf("Unmount failed. Target : %q, err : %v", stagingTargetPath, err.Error())
-			return nil, status.Error(codes.Internal, err.Error())
-		}
-	}
 
 	volumeUuid := d.NodeUtils.GetVolumeUuid(volumeID)
-	mpathDevice, err := d.OsDeviceConnectivityHelper.GetMpathDevice(volumeUuid)
-	if err != nil {
-		switch err.(type) {
-		case *device_connectivity.MultipathDeviceNotFoundForVolumeError:
-			return &csi.NodeUnstageVolumeResponse{}, nil
-		default:
-			logger.Errorf("Error while discovering the device : {%v}", err.Error())
-			return nil, status.Error(codes.Internal, err.Error())
-		}
-	}
-	logger.Debugf("Discovered device : {%v}", mpathDevice)
-
-	baseDevice := path.Base(mpathDevice)
-
-	nvmeType, err := d.NodeUtils.DevicesAreNvme(baseDevice)
-	if err != nil {
-		return nil, status.Errorf(codes.Internal, "Failed to determine device type for %s: %v", baseDevice, err)
-	}
-
-	switch nvmeType {
-	case NVMeNative:
-		// Native NVMe multipath: kernel manages everything, skip all cleanup
-		logger.Infof("Device %s is native NVMe: skipping multipath -f and SCSI device cleanup", baseDevice)
-
-	case NVMeNonNative:
-		// DM-multipath over NVMe: flush mpath only.
-		err = d.OsDeviceConnectivityHelper.FlushMultipathDevice(baseDevice)
-		if err != nil {
-			return nil, status.Errorf(codes.Internal, "Multipath -f command failed for device %s: %v", baseDevice, err)
-		}
-		logger.Infof("Device %s is non-native NVMe: flushed multipath, skipping physical device removal", baseDevice)
-
-	case NotNVMe:
-		// SCSI (FC or iSCSI): flush mpath + delete sdX devices
-		sysDevices, err := d.NodeUtils.GetSysDevicesFromMpath(baseDevice)
-		if err != nil {
-			logger.Errorf("Error while trying to get sys devices for device %s: {%v}", baseDevice, err)
-			return nil, status.Error(codes.Internal, err.Error())
-		}
-		err = d.OsDeviceConnectivityHelper.FlushMultipathDevice(baseDevice)
-		if err != nil {
-			return nil, status.Errorf(codes.Internal, "Multipath -f command failed for device %s: %v", baseDevice, err)
-		}
-		err = d.OsDeviceConnectivityHelper.RemovePhysicalDevice(sysDevices)
-		if err != nil {
-			return nil, status.Errorf(codes.Internal, "Remove SCSI device failed for device %s: %v", baseDevice, err)
-		}
-
-	default:
-		return nil, status.Errorf(codes.Internal, "Unknown NVMe type for device %s", baseDevice)
-	}
-
-	stageInfoPath := path.Join(stagingTargetPath, StageInfoFilename)
+	
+	// Clear Metadata info FIRST before the teardown unmounts the directory 
+	// out from underneath the container namespace.
+	stageInfoPath := filepath.Join(stagingPathWithHostPrefix, StageInfoFilename)
 	if d.NodeUtils.StageInfoFileIsExist(stageInfoPath) {
 		if err := d.NodeUtils.ClearStageInfoFile(stageInfoPath); err != nil {
-			return nil, status.Errorf(codes.Internal, "Fail to clear the stage info file: error %v", err)
+			logger.Warningf("Failed to clear stage info metadata at %s: %v. Proceeding with block layer teardown.", stageInfoPath, err)
 		}
 	}
 
-	logger.Debugf("NodeUnStageVolume Finished: multipath device removed from host")
+	// OMITTED REDUNDANT PARSING: All device discovery, protocol switching, 
+	// and flag settings (needFlush, needRemovePhysical) are now computed 
+	// internally inside the underlying TeardownVolume function.
+	err = d.OsDeviceConnectivityHelper.TeardownVolume(ctx, stagingTargetPath, volumeUuid)
+	if err != nil {
+		logger.Errorf("Failed to teardown volume %s at staging path %s: %v", volumeUuid, stagingTargetPath, err)
+		return nil, status.Errorf(codes.Internal, "failed to teardown staging target %s: %v", stagingTargetPath, err)
+	}
 
+	// Wipe target path registration now that the underlying unmount is safely complete
+	if err := os.Remove(stagingPathWithHostPrefix); err != nil && !os.IsNotExist(err) {
+		return nil, status.Errorf(codes.Internal, "failed to remove staging host path: %v", err)
+	}
+
+	logger.Infof("NodeUnstageVolume Finished Successfully: volume %s completely removed from host", volumeUuid)
 	return &csi.NodeUnstageVolumeResponse{}, nil
 }
 
@@ -468,8 +499,7 @@ func (d *NodeService) NodePublishVolume(ctx context.Context, req *csi.NodePublis
 	}
 
 	if isFSVolume {
-		stagingPathWithHostPrefix := d.NodeUtils.GetPodPath(stagingPath)
-		isStagingNotMounted, err := d.NodeUtils.IsNotMountPoint(stagingPathWithHostPrefix)
+		isStagingNotMounted, err := d.NodeUtils.IsNotMountPoint(stagingPath)
 		if err != nil {
 			logger.Errorf("Existing mount check failed {%v}", err.Error())
 			return nil, err
@@ -482,7 +512,7 @@ func (d *NodeService) NodePublishVolume(ctx context.Context, req *csi.NodePublis
 	isTargetPathExists := d.NodeUtils.IsPathExists(targetPathWithHostPrefix)
 	if isTargetPathExists {
 		// check if already mounted
-		isTargetMounted, err := d.isTargetMounted(targetPathWithHostPrefix, isFSVolume)
+		isTargetMounted, err := d.isTargetMounted(targetPath, isFSVolume)
 		if err != nil {
 			logger.Debugf("Existing mount check failed {%v}", err.Error())
 			return nil, err
@@ -507,7 +537,7 @@ func (d *NodeService) NodePublishVolume(ctx context.Context, req *csi.NodePublis
 		err = d.publishFileSystemVolume(stagingPath, targetPath, fsType)
 	} else {
 		volumeUuid := d.NodeUtils.GetVolumeUuid(volumeID)
-		mpathDevice, err := d.OsDeviceConnectivityHelper.GetMpathDevice(volumeUuid)
+		mpathDevice, err := d.OsDeviceConnectivityHelper.GetMpathDevice(ctx, volumeUuid)
 		if err != nil {
 			logger.Errorf("Error while discovering the device : {%v}", err.Error())
 			return nil, status.Error(codes.Internal, err.Error())
@@ -540,9 +570,10 @@ func (d *NodeService) publishRawBlockVolume(mpathDevice string, targetPath strin
 // targetPathWithHostPrefix: path of target
 // isFSVolume: if we check volume with file system - true, otherwise for raw block false
 // Returns: is <target mounted, error if occured>
-func (d *NodeService) isTargetMounted(targetPathWithHostPrefix string, isFSVolume bool) (bool, error) {
+func (d *NodeService) isTargetMounted(targetPath string, isFSVolume bool) (bool, error) {
+	targetPathWithHostPrefix := d.NodeUtils.GetPodPath(targetPath)
 	logger.Debugf("Check if target {%s} is mounted", targetPathWithHostPrefix)
-	isNotMounted, err := d.NodeUtils.IsNotMountPoint(targetPathWithHostPrefix)
+	isNotMounted, err := d.NodeUtils.IsNotMountPoint(targetPath)
 	if err != nil {
 		logger.Warningf("Failed to check if (%s), is mounted", targetPathWithHostPrefix)
 		return false, status.Error(codes.Internal, err.Error())
@@ -624,9 +655,11 @@ func (d *NodeService) NodeUnpublishVolume(ctx context.Context, req *csi.NodeUnpu
 		return &csi.NodeUnpublishVolumeResponse{}, nil
 	}
 
+	// TODO replace with newer mount point check + unmountwittimeout
+
 	// Unmount and delete mount point file/folder
 	logger.Debugf("Check if target %s is mounted", targetPathWithHostPrefix)
-	isNotMounted, err := d.NodeUtils.IsNotMountPoint(targetPathWithHostPrefix)
+	isNotMounted, err := d.NodeUtils.IsNotMountPoint(target)
 	if err != nil {
 		logger.Errorf("Check is target mounted failed. Target : %q, err : %v", targetPathWithHostPrefix, err.Error())
 		return nil, status.Error(codes.Internal, err.Error())
@@ -649,7 +682,11 @@ func (d *NodeService) NodeUnpublishVolume(ctx context.Context, req *csi.NodeUnpu
 
 }
 
+// Structural pattern matching to ensure accurate device name handling across all Linux layers
+var nvmeStatsControllerPattern = regexp.MustCompile(`^nvme\d+c\d+n\d+$`)
+
 func (d *NodeService) NodeGetVolumeStats(ctx context.Context, req *csi.NodeGetVolumeStatsRequest) (*csi.NodeGetVolumeStatsResponse, error) {
+	defer logger.Exit(logger.Enter(req))
 	volumeId := req.VolumeId
 	goid_info.SetAdditionalIDInfo(volumeId)
 	defer goid_info.DeleteAdditionalIDInfo()
@@ -666,7 +703,7 @@ func (d *NodeService) NodeGetVolumeStats(ctx context.Context, req *csi.NodeGetVo
 		return nil, status.Errorf(codes.NotFound, "volume path %q does not exist", volumePath)
 	}
 
-	volumeStats, err := d.getVolumeStats(volumePathWithHostPrefix, volumeId)
+	volumeStats, err := d.getVolumeStats(ctx, volumePathWithHostPrefix, volumeId)
 	if err != nil {
 		return nil, err
 	}
@@ -700,40 +737,46 @@ func (d *NodeService) nodeGetVolumeStatsRequestValidation(volumeId string, volum
 	return nil
 }
 
-func (d *NodeService) getVolumeStats(path string, volumeId string) (VolumeStatistics, error) {
-	var volumeStats VolumeStatistics
-	isBlock, err := d.NodeUtils.IsBlock(path)
+func (d *NodeService) getVolumeStats(ctx context.Context, path string, volumeId string) (VolumeStatistics, error) {
+	if err := ctx.Err(); err != nil {
+		return VolumeStatistics{}, err
+	}
+
+	// 1. Determine if the target Kubelet mount path is configured as a Raw Block volume
+	isBlock, err := d.NodeUtils.IsBlock(ctx, path)
 	if err != nil {
 		return VolumeStatistics{}, status.Errorf(codes.Internal, "Failed to determine if %q is block device: %s", path, err)
 	}
 
+	// 2. Handle Block Volume Pipeline (Raw Block Volumes)
 	if isBlock {
-		volumeStats, err = d.NodeUtils.GetBlockVolumeStats(volumeId)
+		volumeStats, err := d.NodeUtils.GetBlockVolumeStats(ctx, path)
 		if err != nil {
-			switch err.(type) {
-			case *device_connectivity.MultipathDeviceNotFoundForVolumeError:
+			if _, ok := err.(*device_connectivity.MultipathDeviceNotFoundForVolumeError); ok {
 				return VolumeStatistics{}, status.Errorf(codes.NotFound, "Multipath device of volume id %q does not exist", volumeId)
-			default:
-				return VolumeStatistics{}, status.Errorf(codes.Internal, "Error while discovering the device : %s", err)
 			}
+			return VolumeStatistics{}, status.Errorf(codes.Internal, "Error while discovering the device: %s", err)
 		}
-	} else {
-		volumeUuid := d.NodeUtils.GetVolumeUuid(volumeId)
-		isVolumePathMatchesVolumeId, err := d.OsDeviceConnectivityHelper.IsVolumePathMatchesVolumeId(volumeUuid, path)
-		if err != nil {
-			return VolumeStatistics{}, status.Errorf(codes.Internal,
-				"Failed to determine if volume id [%q], is accessible on volume path [%q], error: %s",
-				volumeId, path, err)
-		}
-		if !isVolumePathMatchesVolumeId {
-			return VolumeStatistics{}, status.Errorf(codes.NotFound,
-				"Volume id [%q] is not accessible on volume path [%q]", volumeId, path)
-		}
-		volumeStats, err = d.NodeUtils.GetFileSystemVolumeStats(path)
-		if err != nil {
-			return VolumeStatistics{}, status.Errorf(codes.Internal, "Failed to get statistics: %s", err)
-		}
+		return volumeStats, nil
 	}
+
+	// 3. Handle Filesystem Volume Pipeline (Standard Mounts)
+	volumeUuid := d.NodeUtils.GetVolumeUuid(volumeId)
+	
+	isVolumePathMatchesVolumeId, err := d.OsDeviceConnectivityHelper.IsVolumePathMatchesVolumeId(ctx, volumeUuid, path)
+	if err != nil {
+		return VolumeStatistics{}, status.Errorf(codes.Internal,
+			"Failed to determine if volume id [%q] is accessible on volume path [%q], error: %s", volumeId, path, err)
+	}
+	if !isVolumePathMatchesVolumeId {
+		return VolumeStatistics{}, status.Errorf(codes.NotFound, "Volume id [%q] is not accessible on volume path [%q]", volumeId, path)
+	}
+
+	volumeStats, err := d.NodeUtils.GetFileSystemVolumeStats(ctx, path)
+	if err != nil {
+		return VolumeStatistics{}, status.Errorf(codes.Internal, "Failed to get statistics: %s", err)
+	}
+
 	return volumeStats, nil
 }
 
@@ -746,56 +789,72 @@ func (d *NodeService) NodeExpandVolume(ctx context.Context, req *csi.NodeExpandV
 	}
 
 	volumeID := req.GetVolumeId()
-
 	err = d.VolumeIdLocksMap.AddVolumeLock(volumeID, "NodeExpandVolume")
 	if err != nil {
-		logger.Errorf("Another operation is being performed on volume : {%s}", volumeID)
+		logger.Errorf("Another operation is being performed on volume: {%s}", volumeID)
 		return nil, status.Error(codes.Aborted, err.Error())
 	}
 	defer d.VolumeIdLocksMap.RemoveVolumeLock(volumeID, "NodeExpandVolume")
 
 	volumeUuid := d.NodeUtils.GetVolumeUuid(volumeID)
-	device, err := d.OsDeviceConnectivityHelper.GetMpathDevice(volumeUuid)
+	volumePath := req.VolumePath
+	volumePathWithHostPrefix := d.NodeUtils.GetPodPath(volumePath)
+
+	device, err := d.OsDeviceConnectivityHelper.GetExistingMpathDevice(ctx, volumeUuid, volumePathWithHostPrefix)
 	if err != nil {
-		logger.Errorf("Error while discovering the device : {%v}", err.Error())
+		logger.Errorf("Error while discovering the device: {%v}", err.Error())
 		return nil, status.Error(codes.Internal, err.Error())
 	}
-	logger.Debugf("Discovered device : {%v}", device)
+	logger.Debugf("Discovered device: {%v}", device)
 
 	baseDevice := path.Base(device)
-
-	nvmeType, err := d.NodeUtils.DevicesAreNvme(baseDevice)
+	nvmeType, err := device_connectivity.DevicesAreNvme(ctx, d.KeyedGater, baseDevice)
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "Failed to determine device type for %s: %v", baseDevice, err)
 	}
 
 	switch nvmeType {
-	case NVMeNative:
-		// Native NVMe → skip multipath/rescan
+	case device_connectivity.NVMeNative:
+		// Native NVMe → The kernel updates the block sizing directly on namespace updates.
+		// No multipath layer or manual controller rescan is required.
 		logger.Infof("Device %s is native NVMe: skipping multipath expand/rescan", baseDevice)
 
-	case NVMeNonNative:
-		// Non-native NVMe → skip rescan, only expand multipath
-		logger.Infof("Device %s is non-native NVMe: skipping rescan, running ExpandMpathDevice", baseDevice)
-		err = d.NodeUtils.ExpandMpathDevice(baseDevice)
+	case device_connectivity.NVMeNonNative:
+		// FIXED: Non-native NVMe over DM MUST rescan its NVMe fabric controllers before resizing DM!
+		logger.Infof("Device %s is non-native NVMe: initiating NVMe controller rescan prior to DM resize", baseDevice)
+		sysDevices, err := device_connectivity.GetSysDevicesFromMpath(ctx, baseDevice)
+		if err != nil {
+			logger.Errorf("Error getting underlying paths for NVMe-DM device %s: %v", baseDevice, err)
+			return nil, status.Error(codes.Internal, err.Error())
+		}
+		
+		// This must iterate through the nvme session layers and trigger /sys/class/nvme/nvmeX/rescan
+		err = d.NodeUtils.RescanPhysicalDevices(ctx, baseDevice, sysDevices)
+		if err != nil {
+			return nil, status.Errorf(codes.Internal, "Failed to rescan underlying NVMe paths: %v", err)
+		}
+
+		err = d.NodeUtils.ExpandMpathDevice(ctx, baseDevice, sysDevices)
 		if err != nil {
 			return nil, status.Error(codes.Internal, err.Error())
 		}
 
-	case NotNVMe:
-		// Non-NVMe → rescan physical devices + expand multipath
-		sysDevices, err := d.NodeUtils.GetSysDevicesFromMpath(baseDevice)
+	case device_connectivity.NotNVMe:
+		// Standard SCSI (FC/iSCSI) -> Rescan physical paths via sysfs, then expand the multipath map
+		sysDevices, err := device_connectivity.GetSysDevicesFromMpath(ctx, baseDevice)
 		if err != nil {
 			logger.Errorf("Error getting sys devices for %s: %v", baseDevice, err)
 			return nil, status.Error(codes.Internal, err.Error())
 		}
 
-		err = d.NodeUtils.RescanPhysicalDevices(sysDevices)
+		// FIXED: Passed the parent block map identifier variable (baseDevice) down 
+		// to securely prevent multi-core lock key gater collisions during thundering herds.
+		err = d.NodeUtils.RescanPhysicalDevices(ctx, baseDevice, sysDevices)
 		if err != nil {
-			return nil, status.Error(codes.Internal, err.Error())
+			logger.Errorf("Physical hardware rescan pass completed with failures for map %s: %v", baseDevice, err)
 		}
-
-		err = d.NodeUtils.ExpandMpathDevice(baseDevice)
+	
+		err = d.NodeUtils.ExpandMpathDevice(ctx, baseDevice, sysDevices)
 		if err != nil {
 			return nil, status.Error(codes.Internal, err.Error())
 		}
@@ -804,20 +863,31 @@ func (d *NodeService) NodeExpandVolume(ctx context.Context, req *csi.NodeExpandV
 		return nil, status.Errorf(codes.Internal, "Unknown NVMe type for device %s", baseDevice)
 	}
 
+	// FIXED: Isolate raw block volumes to protect against file system parsing crashes and corruption
+	isBlock, err := d.NodeUtils.IsBlock(ctx, volumePathWithHostPrefix)
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "Failed block check validation for path %s: %v", volumePathWithHostPrefix, err)
+	}
+	if isBlock {
+		logger.Infof("Volume %s detected as Raw Block volume mode. Skipping filesystem expansion steps completely.", volumeID)
+		return &csi.NodeExpandVolumeResponse{}, nil
+	}
+
 	existingFormat, err := d.Mounter.GetDiskFormat(device)
 	if err != nil {
 		logger.Errorf("Could not determine if disk {%v} is formatted, error: %v", device, err)
 		return nil, status.Error(codes.Internal, err.Error())
 	}
-
+	logger.Warningf("Detected storage format: %s", existingFormat)
+	
 	mountPointToExpand := req.GetStagingTargetPath()
 	if mountPointToExpand == "" {
 		mountPointToExpand = req.GetVolumePath()
 	}
-
-	err = d.NodeUtils.ExpandFilesystem(device, mountPointToExpand, existingFormat)
+	
+	err = d.NodeUtils.ExpandFilesystem(ctx, device, mountPointToExpand, existingFormat)
 	if err != nil {
-		logger.Errorf("Could not resize {%v} file system of {%v} , error: %v", existingFormat, device, err)
+		logger.Errorf("Could not resize {%v} file system of {%v}, error: %v", existingFormat, device, err)
 		return nil, status.Error(codes.Internal, err.Error())
 	}
 
@@ -940,3 +1010,4 @@ func isValidVolumeCapabilitiesAccessMode(volCaps []*csi.VolumeCapability) bool {
 
 	return foundAll
 }
+

@@ -325,15 +325,33 @@ class ArrayMediator(ABC):
         raise NotImplementedError
 
     @abstractmethod
-    def get_host_by_host_identifiers(self, initiators):
+    def get_nvme_tcp_target_ips(self):
         """
-        This function will find the host name by iscsi iqn or fc wwns.
+        This function will return IP list for the NVMe-TCP specific IPs
+        of the storage array in format "<IP_addr>".
+        Only IPs with type=host and port_type=ethernet are returned.
 
         Args:
-           initiators : initiators (e.g. fc wwns, iqn) of the wanted host.
+            None
 
         Returns:
-           connectivity_types : list of connectivity types ([iscis, fc] or just [iscsi],..)
+            list of strings: ["<IP_addr>",...]
+
+        Raises:
+            NoNvmeTcpTargetsFoundError
+        """
+        raise NotImplementedError
+
+    @abstractmethod
+    def get_host_by_host_identifiers(self, initiators):
+        """
+        This function will find the host name by iscsi iqn, fc wwns or nqn.
+
+        Args:
+           initiators : initiators (e.g. fc wwns, iqn, nqn) of the wanted host.
+
+        Returns:
+           connectivity_types : list of connectivity types ([fcnvme, tcpnvme, iscis, fc] or just [iscsi],..)
            hostname           : the name of the host
 
         Raises:

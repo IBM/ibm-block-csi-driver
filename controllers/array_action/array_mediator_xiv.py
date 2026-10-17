@@ -568,6 +568,9 @@ class XIVArrayMediator(ArrayMediatorAbstract):
     def get_nvme_fc_target_ports(self):
         raise NotImplementedError
 
+    def get_nvme_tcp_target_ips(self):
+        raise NotImplementedError
+
     def register_plugin(self, unique_key,  metadata):
         return None
 

@@ -18,6 +18,14 @@ package device_connectivity
 
 import (
 	"github.com/ibm/ibm-block-csi-driver/node/pkg/driver/executer"
+	"github.com/ibm/ibm-block-csi-driver/node/logger"
+	"github.com/ibm/ibm-block-csi-driver/node/pkg/driver/mount"
+
+	"context"
+	"path/filepath"
+	"strconv"
+	"strings"
+	"os"
 )
 
 type OsDeviceConnectivityFc struct {
@@ -25,44 +33,87 @@ type OsDeviceConnectivityFc struct {
 	HelperScsiGeneric OsDeviceConnectivityHelperScsiGenericInterface
 }
 
-func NewOsDeviceConnectivityFc(executer executer.ExecuterInterface, clean_scsi_device bool) OsDeviceConnectivityInterface {
+func NewOsDeviceConnectivityFc(executer executer.ExecuterInterface, KeyedGater *executer.KeyedGater, Mounter *mount.Mounter, clean_scsi_device bool) OsDeviceConnectivityInterface {
 	return &OsDeviceConnectivityFc{
 		Executer:          executer,
-		HelperScsiGeneric: NewOsDeviceConnectivityHelperScsiGeneric(executer, clean_scsi_device),
+		HelperScsiGeneric: NewOsDeviceConnectivityHelperScsiGeneric(executer, KeyedGater, Mounter, clean_scsi_device),
 	}
 }
 
-func (r OsDeviceConnectivityFc) EnsureLogin(_ map[string][]string) {
+func (r OsDeviceConnectivityFc) EnsureLogin(_ context.Context, _ map[string][]string) {
 	// FC doesn't require login
 }
 
-func (r OsDeviceConnectivityFc) RescanDevices(lunId int, arrayIdentifiers []string) error {
+func (r OsDeviceConnectivityFc) updateFCHostIDs(hostIDs map[int]bool) {
+	// Map host numbers to their physical PCI anchor
+	// host0 -> 0000:04:00.0, host1 -> 0000:04:00.0
+	pciMap := make(map[int]string)
+	baseClassPath := "/sys/class/fc_host"
+    
+	// OPTIMIZED: Replace the dynamic wildcard Glob with a high-speed, direct 
+	// directory listing of the flat in-memory class directory.
+	entries, err := os.ReadDir(baseClassPath)
+	if err != nil {
+		// Fallback smoothly if FC is unmounted, absent, or disabled on the node
+		return
+	}
+
+	for _, entry := range entries {
+		name := entry.Name()
+		// Match precisely against exactly named target host slots
+		if !strings.HasPrefix(name, "host") {
+			continue
+		}
+
+		hostNum, _ := strconv.Atoi(strings.TrimPrefix(name, "host"))
+        
+		// Req 4: Use os.Readlink to follow the 'device' symlink
+		if link, err := os.Readlink(filepath.Join(baseClassPath, name, "device")); err == nil {
+			pciMap[hostNum] = filepath.Base(link)
+		}
+	}
+
+	// KEEP ORIGINAL: Capture the PCI addresses already in our "active" set
+	targetHardware := make(map[string]bool)
+	for id := range hostIDs {
+		if pci, exists := pciMap[id]; exists {
+			targetHardware[pci] = true
+		}
+	}
+
+	// KEEP ORIGINAL: Add siblings: If we're scanning one "slice" of a PCI device, scan them all
+	for id, pci := range pciMap {
+		if targetHardware[pci] && !hostIDs[id] {
+			hostIDs[id] = true
+			logger.Infof("FC Sibling: associated host%d with shared HBA %s", id, pci)
+		}
+	}
+}
+
+
+func (r OsDeviceConnectivityFc) RescanDevices(ctx context.Context, lunId int, arrayIdentifiers []string) error {
 	hostIDs, err := r.HelperScsiGeneric.RescanDevicesGetHostIds(lunId, arrayIdentifiers)
 	if err != nil {
 		return err
 	}
-	return r.HelperScsiGeneric.RescanDevices(lunId, arrayIdentifiers, hostIDs)
+	return r.HelperScsiGeneric.RescanDevices(ctx, lunId, arrayIdentifiers, hostIDs)
 }
 
-func (r OsDeviceConnectivityFc) GetMpathDevice(volumeId string) (string, error) {
+func (r OsDeviceConnectivityFc) GetMpathDevice(ctx context.Context, volumeId string) (string, error) {
 	/*
 	   Return Value: "dm-X" of the volumeID.
 	*/
-	return r.HelperScsiGeneric.GetMpathDevice(volumeId)
+	return r.HelperScsiGeneric.GetMpathDevice(ctx, volumeId)
 }
 
-func (r OsDeviceConnectivityFc) FlushMultipathDevice(mpathDevice string) error {
-	return r.HelperScsiGeneric.FlushMultipathDevice(mpathDevice)
+func (r OsDeviceConnectivityFc) RemovePhysicalDevice(ctx context.Context, sysDevices []string) error {
+	return r.HelperScsiGeneric.RemovePhysicalDevice(ctx, sysDevices)
 }
 
-func (r OsDeviceConnectivityFc) RemovePhysicalDevice(sysDevices []string) error {
-	return r.HelperScsiGeneric.RemovePhysicalDevice(sysDevices)
+func (r OsDeviceConnectivityFc) RemoveGhostDevice(ctx context.Context, expectedSerial string, expectedLun int, arrayIdentifiers []string) error {
+	return r.HelperScsiGeneric.RemoveGhostDevice(ctx, expectedSerial, expectedLun, arrayIdentifiers)
 }
 
-func (r OsDeviceConnectivityFc) RemoveGhostDevice(lun int) error {
-	return r.HelperScsiGeneric.RemoveGhostDevice(lun)
-}
-
-func (r OsDeviceConnectivityFc) ValidateLun(lun int, sysDevices []string) error {
-	return r.HelperScsiGeneric.ValidateLun(lun, sysDevices)
+func (r OsDeviceConnectivityFc) ValidateLun(ctx context.Context, targetDm string, lun int, sysDevices []string, expectedSerial string) error {
+	return r.HelperScsiGeneric.ValidateLun(ctx, targetDm, lun, sysDevices, expectedSerial)
 }
