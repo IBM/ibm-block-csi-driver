@@ -5313,7 +5313,7 @@ func (r *OsDeviceConnectivityHelperGeneric) GetMpathDeviceName(ctx context.Conte
 	statFailed := false
 	var stat syscall.Stat_t	
 	if err := syscall.Stat(realVolumePath, &stat); err != nil {
-		logger.Warningf("failed to stat path %s: %w", realVolumePath, err)
+		//logger.Warningf("failed to stat path %s: %w", realVolumePath, err)
 		// Mark that stat failed, but do NOT return early.
 		// We will let the mountinfo fallback try to resolve it.
 		statFailed = true 
