@@ -460,6 +460,9 @@ func TestNodeUnstageVolume(t *testing.T) {
 	stagingPath := "/test/path"
 	stageInfoPath := path.Join(stagingPath, driver.StageInfoFilename)
 	stagingPathWithHostPrefix := GetPodPath(stagingPath)
+	nativeNvmeName := "nvme0n1"
+	nativeNvmeDevice := "/dev/" + nativeNvmeName
+	umountHangError := fmt.Errorf("unmount of %s failed: %w, output: ", stagingPath, context.DeadlineExceeded)
 
 	unstageRequest := &csi.NodeUnstageVolumeRequest{
 		VolumeId:          volId,
@@ -568,6 +571,7 @@ func TestNodeUnstageVolume(t *testing.T) {
 				mockNodeUtils.EXPECT().IsNotMountPoint(stagingPathWithHostPrefix).Return(false, nil)
 				mockNodeUtils.EXPECT().GetVolumeUuid(volId).Return(volId)
 				mockOsDeviceConHelper.EXPECT().DisableQueueingIfLunUnavailable(volId).Return("", nil)
+				mockOsDeviceConHelper.EXPECT().IsNativeNvmeNamespaceInaccessible(volId).Return(false)
 				mockMounter.EXPECT().Unmount(stagingPath).Return(nil)
 				mockOsDeviceConHelper.EXPECT().GetMpathDevice(volId).Return(dmSysFsName, nil)
 				mockNodeUtils.EXPECT().DevicesAreNvme(dmSysFsName).Return(driver.NotNVMe, nil)
@@ -609,6 +613,112 @@ func TestNodeUnstageVolume(t *testing.T) {
 				if err != nil {
 					t.Fatalf("Expect no error but got: %v", err)
 				}
+			},
+		},
+		{
+			name: "native NVMe inaccessible on all paths: umount completes",
+			testFunc: func(t *testing.T) {
+				mockCtl := gomock.NewController(t)
+				defer mockCtl.Finish()
+				mockNodeUtils := mocks.NewMockNodeUtilsInterface(mockCtl)
+				mockOsDeviceConHelper := mocks.NewMockOsDeviceConnectivityHelperScsiGenericInterface(mockCtl)
+				mockMounter := mocks.NewMockNodeMounter(mockCtl)
+				node := newTestNodeServiceStaging(mockNodeUtils, nil, mockOsDeviceConHelper, mockMounter)
+
+				mockNodeUtils.EXPECT().GetPodPath(stagingPath).Return(stagingPathWithHostPrefix)
+				mockNodeUtils.EXPECT().IsNotMountPoint(stagingPathWithHostPrefix).Return(false, nil)
+				mockNodeUtils.EXPECT().GetVolumeUuid(volId).Return(volId)
+				mockOsDeviceConHelper.EXPECT().DisableQueueingIfLunUnavailable(volId).Return("", nil)
+				mockOsDeviceConHelper.EXPECT().IsNativeNvmeNamespaceInaccessible(volId).Return(true)
+				mockNodeUtils.EXPECT().UnmountNoWaitOnHang(stagingPath).Return(nil)
+				mockMounter.EXPECT().Unmount(gomock.Any()).Times(0)
+				mockOsDeviceConHelper.EXPECT().GetMpathDevice(volId).Return(nativeNvmeDevice, nil)
+				mockNodeUtils.EXPECT().DevicesAreNvme(nativeNvmeName).Return(driver.NVMeNative, nil)
+				mockNodeUtils.EXPECT().StageInfoFileIsExist(stageInfoPath).Return(false)
+
+				_, err := node.NodeUnstageVolume(context.TODO(), unstageRequest)
+				if err != nil {
+					t.Fatalf("Expect no error but got: %v", err)
+				}
+			},
+		},
+		{
+			name: "native NVMe inaccessible on all paths: umount blocked after the staging path is unmounted",
+			testFunc: func(t *testing.T) {
+				mockCtl := gomock.NewController(t)
+				defer mockCtl.Finish()
+				mockNodeUtils := mocks.NewMockNodeUtilsInterface(mockCtl)
+				mockOsDeviceConHelper := mocks.NewMockOsDeviceConnectivityHelperScsiGenericInterface(mockCtl)
+				mockMounter := mocks.NewMockNodeMounter(mockCtl)
+				node := newTestNodeServiceStaging(mockNodeUtils, nil, mockOsDeviceConHelper, mockMounter)
+
+				gomock.InOrder(
+					mockNodeUtils.EXPECT().IsNotMountPoint(stagingPathWithHostPrefix).Return(false, nil),
+					mockNodeUtils.EXPECT().IsNotMountPoint(stagingPathWithHostPrefix).Return(true, nil),
+				)
+				mockOsDeviceConHelper.EXPECT().IsNativeNvmeNamespaceInaccessible(volId).Return(true).Times(2)
+				mockNodeUtils.EXPECT().GetPodPath(stagingPath).Return(stagingPathWithHostPrefix)
+				mockNodeUtils.EXPECT().GetVolumeUuid(volId).Return(volId)
+				mockOsDeviceConHelper.EXPECT().DisableQueueingIfLunUnavailable(volId).Return("", nil)
+				mockNodeUtils.EXPECT().UnmountNoWaitOnHang(stagingPath).Return(umountHangError)
+				mockOsDeviceConHelper.EXPECT().GetMpathDevice(volId).Return(nativeNvmeDevice, nil)
+				mockNodeUtils.EXPECT().DevicesAreNvme(nativeNvmeName).Return(driver.NVMeNative, nil)
+				mockNodeUtils.EXPECT().StageInfoFileIsExist(stageInfoPath).Return(false)
+
+				_, err := node.NodeUnstageVolume(context.TODO(), unstageRequest)
+				if err != nil {
+					t.Fatalf("Expect no error but got: %v", err)
+				}
+			},
+		},
+		{
+			name: "native NVMe inaccessible on all paths: umount blocked and the staging path still mounted",
+			testFunc: func(t *testing.T) {
+				mockCtl := gomock.NewController(t)
+				defer mockCtl.Finish()
+				mockNodeUtils := mocks.NewMockNodeUtilsInterface(mockCtl)
+				mockOsDeviceConHelper := mocks.NewMockOsDeviceConnectivityHelperScsiGenericInterface(mockCtl)
+				mockMounter := mocks.NewMockNodeMounter(mockCtl)
+				node := newTestNodeServiceStaging(mockNodeUtils, nil, mockOsDeviceConHelper, mockMounter)
+
+				mockNodeUtils.EXPECT().GetPodPath(stagingPath).Return(stagingPathWithHostPrefix)
+				mockNodeUtils.EXPECT().IsNotMountPoint(stagingPathWithHostPrefix).Return(false, nil).Times(2)
+				mockNodeUtils.EXPECT().GetVolumeUuid(volId).Return(volId)
+				mockOsDeviceConHelper.EXPECT().DisableQueueingIfLunUnavailable(volId).Return("", nil)
+				mockOsDeviceConHelper.EXPECT().IsNativeNvmeNamespaceInaccessible(volId).Return(true)
+				mockNodeUtils.EXPECT().UnmountNoWaitOnHang(stagingPath).Return(umountHangError)
+				mockOsDeviceConHelper.EXPECT().GetMpathDevice(gomock.Any()).Times(0)
+
+				_, err := node.NodeUnstageVolume(context.TODO(), unstageRequest)
+				assertError(t, err, codes.Internal)
+			},
+		},
+		{
+			name: "native NVMe: umount blocked but the namespace is not inaccessible anymore",
+			testFunc: func(t *testing.T) {
+				mockCtl := gomock.NewController(t)
+				defer mockCtl.Finish()
+				mockNodeUtils := mocks.NewMockNodeUtilsInterface(mockCtl)
+				mockOsDeviceConHelper := mocks.NewMockOsDeviceConnectivityHelperScsiGenericInterface(mockCtl)
+				mockMounter := mocks.NewMockNodeMounter(mockCtl)
+				node := newTestNodeServiceStaging(mockNodeUtils, nil, mockOsDeviceConHelper, mockMounter)
+
+				gomock.InOrder(
+					mockNodeUtils.EXPECT().IsNotMountPoint(stagingPathWithHostPrefix).Return(false, nil),
+					mockNodeUtils.EXPECT().IsNotMountPoint(stagingPathWithHostPrefix).Return(true, nil),
+				)
+				gomock.InOrder(
+					mockOsDeviceConHelper.EXPECT().IsNativeNvmeNamespaceInaccessible(volId).Return(true),
+					mockOsDeviceConHelper.EXPECT().IsNativeNvmeNamespaceInaccessible(volId).Return(false),
+				)
+				mockNodeUtils.EXPECT().GetPodPath(stagingPath).Return(stagingPathWithHostPrefix)
+				mockNodeUtils.EXPECT().GetVolumeUuid(volId).Return(volId)
+				mockOsDeviceConHelper.EXPECT().DisableQueueingIfLunUnavailable(volId).Return("", nil)
+				mockNodeUtils.EXPECT().UnmountNoWaitOnHang(stagingPath).Return(umountHangError)
+				mockOsDeviceConHelper.EXPECT().GetMpathDevice(gomock.Any()).Times(0)
+
+				_, err := node.NodeUnstageVolume(context.TODO(), unstageRequest)
+				assertError(t, err, codes.Internal)
 			},
 		},
 	}

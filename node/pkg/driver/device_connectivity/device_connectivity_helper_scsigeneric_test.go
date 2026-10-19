@@ -1164,6 +1164,16 @@ func TestIsDmName(t *testing.T) {
 			mpathDeviceName: "dm-0",
 			expected:        false,
 		},
+		{
+			name:            "native NVMe namespace nvmeXnY is NOT a named device",
+			mpathDeviceName: "nvme0n1",
+			expected:        false,
+		},
+		{
+			name:            "native NVMe namespace with multi-digit ids is NOT a named device",
+			mpathDeviceName: "nvme12n104",
+			expected:        false,
+		},
 	}
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -1312,6 +1322,62 @@ func TestDisableQueueingIfLunUnavailable(t *testing.T) {
 			}
 			if device != tc.expDevice {
 				t.Fatalf("expected device %q, got %q", tc.expDevice, device)
+			}
+		})
+	}
+}
+
+func TestIsNativeNvmeNamespaceInaccessible(t *testing.T) {
+	headWwid := "eui." + volumeNguid
+	type pathState struct{ ana, ctrl string }
+
+	testCases := []struct {
+		name     string
+		wwid     string      // wwid of the namespace nvme0n1
+		paths    []pathState // nil: the multipath dir is not read
+		expected bool
+	}{
+		{name: "all paths inaccessible on live controllers", wwid: headWwid,
+			paths: []pathState{{"inaccessible", "live"}, {"inaccessible", "live"}, {"persistent-loss", "live"}}, expected: true},
+		{name: "one path optimized", wwid: headWwid,
+			paths: []pathState{{"inaccessible", "live"}, {"optimized", "live"}}, expected: false},
+		{name: "ANA change state", wwid: headWwid,
+			paths: []pathState{{"inaccessible", "live"}, {"change", "live"}}, expected: false},
+		{name: "controller not live", wwid: headWwid,
+			paths: []pathState{{"inaccessible", "live"}, {"inaccessible", "connecting"}}, expected: false},
+		{name: "no namespace of the volume", wwid: "eui.other", expected: false},
+		{name: "no paths (not native multipath)", wwid: headWwid, paths: []pathState{}, expected: false},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			mockCtrl := gomock.NewController(t)
+			defer mockCtrl.Finish()
+			fakeExecuter := mocks.NewMockExecuterInterface(mockCtrl)
+			fakeHelper := mocks.NewMockOsDeviceConnectivityHelperInterface(mockCtrl)
+			fakeHelper.EXPECT().GetVolumeIdVariations(volumeUuid).Return([]string{volumeUuid, volumeNguid})
+
+			// a per-path device (nvmeXcYnZ) also matches the glob and must be skipped without reading its wwid
+			fakeExecuter.EXPECT().FilepathGlob("/sys/block/nvme*n*").Return(
+				[]string{"/sys/block/nvme0c0n1", "/sys/block/nvme0n1"}, nil)
+			fakeExecuter.EXPECT().IoutilReadFile("/sys/block/nvme0n1/wwid").Return([]byte(tc.wwid+"\n"), nil)
+
+			if tc.paths != nil {
+				var entries []os.FileInfo
+				for i := range tc.paths {
+					entries = append(entries, fakeSlaveFileInfo{fmt.Sprintf("nvme0c%dn1", i)})
+				}
+				fakeExecuter.EXPECT().IoutilReadDir("/sys/block/nvme0n1/multipath").Return(entries, nil)
+				for i, p := range tc.paths {
+					pathDir := fmt.Sprintf("/sys/block/nvme0c%dn1", i)
+					fakeExecuter.EXPECT().IoutilReadFile(pathDir+"/ana_state").Return([]byte(p.ana+"\n"), nil).MaxTimes(1)
+					fakeExecuter.EXPECT().IoutilReadFile(pathDir+"/device/state").Return([]byte(p.ctrl+"\n"), nil).MaxTimes(1)
+				}
+			}
+
+			o := NewOsDeviceConnectivityHelperScsiGenericForTest(fakeExecuter, fakeHelper, &sync.Mutex{})
+			if got := o.IsNativeNvmeNamespaceInaccessible(volumeUuid); got != tc.expected {
+				t.Fatalf("expected %v, got %v", tc.expected, got)
 			}
 		})
 	}
