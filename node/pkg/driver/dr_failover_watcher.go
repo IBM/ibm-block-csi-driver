@@ -330,10 +330,15 @@ func (w *drFailoverWatcher) checkNamespace(ctx context.Context, namespace string
 	return recheckAfter
 }
 
+// hasNonTerminatedContainer reports whether any container of the pod (init, including native sidecars,
+// regular or ephemeral) is not terminated, so the pod can still be blocked on I/O to its volumes.
 func hasNonTerminatedContainer(pod *corev1.Pod) bool {
-	for _, containerStatus := range pod.Status.ContainerStatuses {
-		if containerStatus.State.Terminated == nil {
-			return true
+	for _, statuses := range [][]corev1.ContainerStatus{pod.Status.InitContainerStatuses,
+		pod.Status.ContainerStatuses, pod.Status.EphemeralContainerStatuses} {
+		for _, containerStatus := range statuses {
+			if containerStatus.State.Terminated == nil {
+				return true
+			}
 		}
 	}
 	return false
