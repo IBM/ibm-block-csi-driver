@@ -71,6 +71,7 @@ var (
 	MultipathdWildcardsVolumeIdAndMpath     = []string{"%w", "%d"}
 	MultipathdWildcardsMpathNameAndVolumeId = []string{"%n", "%w"}
 	multipathdWildcardsMpathAndVolumeId     = []string{"%d", "%w"}
+	nvmeNamespaceDeviceRegexp               = regexp.MustCompile(`^nvme\d+n\d+$`)
 )
 
 const (
@@ -940,8 +941,10 @@ func (o OsDeviceConnectivityHelperGeneric) IsDmName(mpathDeviceName string) bool
 	// A device is a "named" multipath entry (uses %n in multipathd) when it has
 	// an alias set — either the classic "mpathXX" form or any other name including
 	// raw WWNs (e.g. "36005076810840239d00000000000d6bd") as set by SUSE.
-	// The only case that is NOT a named entry is a bare kernel dm device "dm-N".
-	return !strings.HasPrefix(mpathDeviceName, "dm-")
+	// Entries that are NOT named: a bare kernel dm device "dm-N", and a native NVMe
+	// multipath namespace "nvmeXnY" (not a dm device; multipathd lists it via the
+	// nvme foreign library with %n = "<subsysnqn>:nsid.<N>" and %d = "nvmeXnY").
+	return !strings.HasPrefix(mpathDeviceName, "dm-") && !nvmeNamespaceDeviceRegexp.MatchString(mpathDeviceName)
 }
 
 //go:generate mockgen -destination=../../../mocks/mock_GetDmsPathHelperInterface.go -package=mocks github.com/ibm/ibm-block-csi-driver/node/pkg/driver/device_connectivity GetDmsPathHelperInterface
