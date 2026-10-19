@@ -18,6 +18,7 @@ package device_connectivity
 
 import (
 	"fmt"
+	"path/filepath"
 	"strings"
 
 	"github.com/ibm/ibm-block-csi-driver/node/logger"
@@ -31,6 +32,8 @@ const (
 	FCPortPath                          = "/sys/class/fc_host/host*/port_name"
 	nvmeTargetPathCount                 = 3
 	nvmeMinPathsForNonNativeDmMultipath = 2
+	nvmeCtrlSysfsGlob                   = "/sys/class/nvme/nvme*"
+	nvmeCtrlStateLive                   = "live"
 )
 
 type OsDeviceConnectivityNvmeOFc struct {
@@ -334,8 +337,63 @@ func (r OsDeviceConnectivityNvmeOFc) getHostFCPorts() ([]string, error) {
 	return hostPorts, nil
 }
 
-func (r OsDeviceConnectivityNvmeOFc) RescanDevices(_ int, _ []string) error {
+// RescanDevices rescans the namespaces of every live NVMe-oFC controller connected to one of the
+// array target ports. The storage does not remove unmapped namespaces from the host, so the scan
+// both discovers newly mapped namespaces and removes the stale ones (kernel nvme_scan_work).
+// Works for native NVMe multipath and for DM-multipath over NVMe, since both use the same controllers.
+func (r OsDeviceConnectivityNvmeOFc) RescanDevices(_ int, arrayInitiators []string) error {
+	arrayTargetPorts := make(map[string]bool, len(arrayInitiators))
+	for _, arrayInitiator := range arrayInitiators {
+		arrayTargetPorts[normalizeNvmeFcAddress(arrayInitiator)] = true
+	}
+
+	ctrlPaths, err := r.Executer.FilepathGlob(nvmeCtrlSysfsGlob)
+	if err != nil {
+		logger.Warningf("NVMe-oFC RescanDevices: glob %s failed: %v", nvmeCtrlSysfsGlob, err)
+		return nil
+	}
+
+	rescannedCtrls := []string{}
+	for _, ctrlPath := range ctrlPaths {
+		if !r.isLiveFcCtrlToArray(ctrlPath, arrayTargetPorts) {
+			continue
+		}
+		ctrlDevice := filepath.Join(DevPath, filepath.Base(ctrlPath))
+		out, err := r.Executer.ExecuteWithTimeout(nvmeCmdTimeout, "nvme", []string{"ns-rescan", ctrlDevice})
+		if err != nil {
+			logger.Warningf("NVMe-oFC RescanDevices: nvme ns-rescan %s failed: %v output=%s", ctrlDevice, err, string(out))
+			continue
+		}
+		rescannedCtrls = append(rescannedCtrls, ctrlDevice)
+	}
+	logger.Infof("NVMe-oFC RescanDevices: rescanned controllers %v of array target ports %v", rescannedCtrls, arrayInitiators)
 	return nil
+}
+
+// isLiveFcCtrlToArray checks in sysfs that the controller uses FC transport, is live,
+// and its traddr is one of the array target ports.
+func (r OsDeviceConnectivityNvmeOFc) isLiveFcCtrlToArray(ctrlPath string, arrayTargetPorts map[string]bool) bool {
+	transport, err := r.Executer.IoutilReadFile(filepath.Join(ctrlPath, "transport"))
+	if err != nil || strings.TrimSpace(string(transport)) != nvmeTransportFC {
+		return false
+	}
+	state, err := r.Executer.IoutilReadFile(filepath.Join(ctrlPath, "state"))
+	if err != nil || strings.TrimSpace(string(state)) != nvmeCtrlStateLive {
+		logger.Debugf("NVMe-oFC isLiveFcCtrlToArray: controller %s is not live, skipping", ctrlPath)
+		return false
+	}
+	address, err := r.Executer.IoutilReadFile(filepath.Join(ctrlPath, "address"))
+	if err != nil {
+		return false
+	}
+	traddr := extractNvmeField(strings.TrimSpace(string(address)), "traddr=")
+	return arrayTargetPorts[normalizeNvmeFcAddress(traddr)]
+}
+
+// normalizeNvmeFcAddress makes "nn-0x<WWNN>:pn-0x<WWPN>" (nvme-cli autoconnect) and
+// "nn-<WWNN>:pn-<WWPN>" (publish context) comparable.
+func normalizeNvmeFcAddress(address string) string {
+	return strings.ReplaceAll(strings.ToLower(strings.TrimSpace(address)), "0x", "")
 }
 
 func (r OsDeviceConnectivityNvmeOFc) GetMpathDevice(volumeId string) (string, error) {
