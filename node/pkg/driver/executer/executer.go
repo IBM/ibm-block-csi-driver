@@ -17,6 +17,7 @@
 package executer
 
 import (
+	"bytes"
 	"context"
 	"io/ioutil"
 	"os"
@@ -32,6 +33,7 @@ import (
 type ExecuterInterface interface { // basic host dependent functions
 	ExecuteWithTimeout(mSeconds int, command string, args []string) ([]byte, error)
 	ExecuteWithTimeoutSilently(mSeconds int, command string, args []string) ([]byte, error)
+	ExecuteWithTimeoutNoWaitOnHang(mSeconds int, command string, args []string) ([]byte, error)
 	OsOpenFile(name string, flag int, perm os.FileMode) (*os.File, error)
 	OsReadlink(name string) (string, error)
 	FilepathGlob(pattern string) (matches []string, err error)
@@ -85,6 +87,36 @@ func (e *Executer) ExecuteWithTimeout(mSeconds int, command string, args []strin
 	}
 	logger.Debugf("Finished executing command %s", noOutputMessage)
 	return out, err
+}
+
+// ExecuteWithTimeoutNoWaitOnHang runs the command like ExecuteWithTimeout, but when the command does not exit
+// within the timeout it kills it and returns context.DeadlineExceeded without waiting for it to exit.
+// A process blocked in uninterruptible sleep (D state) on I/O that never completes can not die, and
+// ExecuteWithTimeout would wait for it forever. A goroutine reaps the process once it exits.
+func (e *Executer) ExecuteWithTimeoutNoWaitOnHang(mSeconds int, command string, args []string) ([]byte, error) {
+	logger.Debugf("Executing command : {%v} with args : {%v}. and timeout : {%v} mseconds, not waiting on a hang",
+		command, args, mSeconds)
+	var out bytes.Buffer
+	cmd := exec.Command(command, args...)
+	cmd.Stdout = &out
+	cmd.Stderr = &out
+	if err := cmd.Start(); err != nil {
+		return nil, err
+	}
+	done := make(chan error, 1)
+	go func() { done <- cmd.Wait() }()
+
+	select {
+	case err := <-done:
+		logger.Debugf("Finished executing command, output: %s", out.String())
+		return out.Bytes(), err
+	case <-time.After(time.Duration(mSeconds) * time.Millisecond):
+		if err := cmd.Process.Kill(); err != nil {
+			logger.Warningf("Failed to kill command %s after timeout: %v", command, err)
+		}
+		logger.Warningf("Command %s %v did not exit within %v mseconds, not waiting for it", command, args, mSeconds)
+		return nil, context.DeadlineExceeded
+	}
 }
 
 func (e *Executer) OsOpenFile(name string, flag int, perm os.FileMode) (*os.File, error) {

@@ -45,6 +45,7 @@ type OsDeviceConnectivityHelperScsiGenericInterface interface {
 	GetMpathDevice(volumeId string) (string, error)
 	FlushMultipathDevice(mpathDevice string) error
 	DisableQueueingIfLunUnavailable(volumeId string) (string, error)
+	IsNativeNvmeNamespaceInaccessible(volumeId string) bool
 	RemovePhysicalDevice(sysDevices []string) error
 	RemoveGhostDevice(lun int) error
 	ValidateLun(lun int, sysDevices []string) error
@@ -96,6 +97,8 @@ const (
 	mpathPathStateFailed        = "failed"
 	sgTursCmd                   = "sg_turs"
 	lunUnavailableSense         = "target port in unavailable state"
+	nvmeNamespaceHeadSysfsGlob  = "/sys/block/nvme*n*"
+	sysBlockPath                = "/sys/block"
 )
 
 func NewOsDeviceConnectivityHelperScsiGeneric(executer executer.ExecuterInterface, clean_scsi_device bool) OsDeviceConnectivityHelperScsiGenericInterface {
@@ -450,6 +453,73 @@ func (r OsDeviceConnectivityHelperScsiGeneric) DisableQueueingIfLunUnavailable(v
 		return "", err
 	}
 	return dmPath, nil
+}
+
+// nvmeAnaNoIoStates are the ANA states in which the kernel does not send I/O on a path (only optimized and
+// non-optimized paths are used); "change" is excluded since it is a transition that ends by itself.
+var nvmeAnaNoIoStates = map[string]bool{"inaccessible": true, "persistent-loss": true}
+
+// IsNativeNvmeNamespaceInaccessible reports whether the volume is a native NVMe multipath namespace whose every
+// path is in ANA state inaccessible (or persistent-loss) on a live controller. The kernel then requeues all I/O
+// to the namespace (nvme_available_path() is true while a controller is live) until the namespace is removed,
+// so that I/O, like the superblock write of umount, does not complete. Reads only sysfs, no I/O to the device.
+func (r OsDeviceConnectivityHelperScsiGeneric) IsNativeNvmeNamespaceInaccessible(volumeId string) bool {
+	head := r.getNativeNvmeHeadByWwid(volumeId)
+	if head == "" {
+		return false
+	}
+	paths, err := r.Executer.IoutilReadDir(filepath.Join(sysBlockPath, head, "multipath"))
+	if err != nil || len(paths) == 0 {
+		return false
+	}
+	for _, pathDevice := range paths {
+		anaState := r.readSysfsValue(filepath.Join(sysBlockPath, pathDevice.Name(), "ana_state"))
+		ctrlState := r.readSysfsValue(filepath.Join(sysBlockPath, pathDevice.Name(), "device", "state"))
+		if !nvmeAnaNoIoStates[anaState] || ctrlState != nvmeCtrlStateLive {
+			logger.Debugf("Native NVMe namespace {%v} has path {%v} with ANA state {%v} on controller state {%v}",
+				head, pathDevice.Name(), anaState, ctrlState)
+			return false
+		}
+	}
+	logger.Warningf("Native NVMe namespace {%v} of volume {%v} is ANA inaccessible on all {%d} paths of live controllers",
+		head, volumeId, len(paths))
+	return true
+}
+
+// getNativeNvmeHeadByWwid returns the native NVMe multipath namespace (e.g. nvme0n1) whose wwid matches the volume,
+// or "" if there is not exactly one.
+func (r OsDeviceConnectivityHelperScsiGeneric) getNativeNvmeHeadByWwid(volumeId string) string {
+	headPaths, err := r.Executer.FilepathGlob(nvmeNamespaceHeadSysfsGlob)
+	if err != nil {
+		return ""
+	}
+	volumeIdVariations := r.Helper.GetVolumeIdVariations(volumeId)
+	var heads []string
+	for _, headPath := range headPaths {
+		head := filepath.Base(headPath)
+		if !nvmeNamespaceDeviceRegexp.MatchString(head) {
+			continue
+		}
+		wwid := strings.ToLower(r.readSysfsValue(filepath.Join(headPath, "wwid")))
+		for _, volumeIdVariation := range volumeIdVariations {
+			if wwid != "" && (wwid == volumeIdVariation || strings.HasSuffix(wwid, volumeIdVariation)) {
+				heads = append(heads, head)
+				break
+			}
+		}
+	}
+	if len(heads) != 1 {
+		return ""
+	}
+	return heads[0]
+}
+
+func (r OsDeviceConnectivityHelperScsiGeneric) readSysfsValue(sysfsFile string) string {
+	value, err := r.Executer.IoutilReadFile(sysfsFile)
+	if err != nil {
+		return ""
+	}
+	return strings.TrimSpace(string(value))
 }
 
 // getDmNameByWwid returns the dm name (e.g. dm-4) of the single multipath map matching the volume WWID,

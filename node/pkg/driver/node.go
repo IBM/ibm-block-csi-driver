@@ -18,6 +18,7 @@ package driver
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"path"
 	"reflect"
@@ -364,7 +365,11 @@ func (d *NodeService) NodeUnstageVolume(ctx context.Context, req *csi.NodeUnstag
 	if !isNotMounted {
 		// umount hangs forever if the device queues I/O while the storage made the LUN unavailable
 		unavailableLunMpathDevice = d.disableQueueingIfLunUnavailable(volumeUuid)
-		err = d.Mounter.Unmount(stagingTargetPath)
+		if unavailableLunMpathDevice == "" && d.OsDeviceConnectivityHelper.IsNativeNvmeNamespaceInaccessible(volumeUuid) {
+			err = d.unmountInaccessibleNativeNvme(stagingTargetPath, stagingPathWithHostPrefix, volumeUuid)
+		} else {
+			err = d.Mounter.Unmount(stagingTargetPath)
+		}
 		if err != nil {
 			logger.Errorf("Unmount failed. Target : %q, err : %v", stagingTargetPath, err.Error())
 			return nil, status.Error(codes.Internal, err.Error())
@@ -446,6 +451,32 @@ func (d *NodeService) NodeUnstageVolume(ctx context.Context, req *csi.NodeUnstag
 	logger.Debugf("NodeUnStageVolume Finished: multipath device removed from host")
 
 	return &csi.NodeUnstageVolumeResponse{}, nil
+}
+
+// unmountInaccessibleNativeNvme unmounts the staging path of a native NVMe namespace that is ANA inaccessible on
+// all paths of live controllers. umount removes the mount and then blocks in D state writing the filesystem
+// superblock, since the kernel requeues that I/O until the namespace is removed, and only the unmap that follows
+// a successful NodeUnstageVolume removes it. So umount is not waited for once the staging path is not mounted
+// anymore and the namespace is still inaccessible; the held I/O fails when the unmap removes the namespace.
+func (d *NodeService) unmountInaccessibleNativeNvme(stagingTargetPath string, stagingPathWithHostPrefix string,
+	volumeUuid string) error {
+	err := d.NodeUtils.UnmountNoWaitOnHang(stagingTargetPath)
+	if !errors.Is(err, context.DeadlineExceeded) {
+		return err
+	}
+	isNotMounted, mountErr := d.NodeUtils.IsNotMountPoint(stagingPathWithHostPrefix)
+	if mountErr != nil {
+		return fmt.Errorf("%v; failed to check if %s is still mounted: %v", err, stagingPathWithHostPrefix, mountErr)
+	}
+	if !isNotMounted {
+		return fmt.Errorf("%v; %s is still mounted", err, stagingPathWithHostPrefix)
+	}
+	if !d.OsDeviceConnectivityHelper.IsNativeNvmeNamespaceInaccessible(volumeUuid) {
+		return fmt.Errorf("%v; the NVMe namespace of volume %s is not inaccessible on all paths anymore", err, volumeUuid)
+	}
+	logger.Warningf("Staging path %s is unmounted, not waiting for umount that is blocked on I/O to the "+
+		"inaccessible NVMe namespace of volume %s; the I/O fails when the volume is unmapped", stagingTargetPath, volumeUuid)
+	return nil
 }
 
 func (d *NodeService) disableQueueingIfLunUnavailable(volumeUuid string) string {
