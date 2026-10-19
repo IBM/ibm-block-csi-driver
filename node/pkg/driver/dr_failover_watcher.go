@@ -68,6 +68,7 @@ type drFailoverWatcher struct {
 	// VRG keys (namespace/name) to reconcile, from VRG events or a scheduled re-check
 	queue workqueue.TypedDelayingInterface[string]
 	// per VRG key: volumes whose queueing was already disabled, kept only while they still pass all gates.
+	// Used only to log a stuck pod once; the disable itself is re-applied on every check (see handleVolume).
 	// Only the single worker goroutine accesses it.
 	handled map[string]map[string]bool
 }
@@ -374,9 +375,6 @@ func (w *drFailoverWatcher) handleVolume(ctx context.Context, pod *corev1.Pod, p
 
 	volumeId := pv.Spec.CSI.VolumeHandle
 	seen[volumeId] = true
-	if handled[volumeId] {
-		return
-	}
 
 	if err := w.node.VolumeIdLocksMap.AddVolumeLock(volumeId, drLockMsg); err != nil {
 		logger.Debugf("DR failover watcher skips volume {%v} for now: %v", volumeId, err)
@@ -384,10 +382,15 @@ func (w *drFailoverWatcher) handleVolume(ctx context.Context, pod *corev1.Pod, p
 	}
 	defer w.node.VolumeIdLocksMap.RemoveVolumeLock(volumeId, drLockMsg)
 
-	logger.Infof("Pod {%v/%v} is stuck terminating with volume {%v} of PVC {%v} that Ramen Failover moves to secondary",
-		pod.Namespace, pod.Name, volumeId, pvcName)
+	if !handled[volumeId] {
+		logger.Infof("Pod {%v/%v} is stuck terminating with volume {%v} of PVC {%v} that Ramen Failover moves to secondary",
+			pod.Namespace, pod.Name, volumeId, pvcName)
+	}
+	// Called again on every check while the pod is still stuck, even after a successful disable: a reload of the
+	// map (e.g. "multipath -r") brings back no_path_retry from the config (queue for IBM 2145) and multipathd's
+	// setup_map clears its disable_queueing flag. The call re-verifies all its gates and is idempotent.
 	// SCSI (FC/iSCSI): disables queueing only if all paths failed and the LUN is unavailable on all of them.
-	// It returns early for NVMe devices, so NVMe Native handling is added here once its commit is on the branch.
+	// It returns early for NVMe devices (native and DM-multipath): the watcher takes no action for NVMe.
 	if mpathDevice := w.node.disableQueueingIfLunUnavailable(w.node.NodeUtils.GetVolumeUuid(volumeId)); mpathDevice != "" {
 		handled[volumeId] = true
 	}
