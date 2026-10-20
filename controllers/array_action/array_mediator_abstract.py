@@ -7,6 +7,7 @@ import controllers.servers.utils as utils
 from controllers.array_action.array_mediator_interface import ArrayMediator
 from controllers.array_action.errors import NoConnectionAvailableException, UnsupportedConnectivityTypeError
 from controllers.array_action.settings import (NVME_OVER_FC_CONNECTIVITY_TYPE,
+                                               NVME_OVER_TCP_CONNECTIVITY_TYPE,
                                                FC_CONNECTIVITY_TYPE,
                                                ISCSI_CONNECTIVITY_TYPE)
 from controllers.array_action.utils import convert_scsi_id_to_nguid
@@ -79,8 +80,9 @@ class ArrayMediatorAbstract(ArrayMediator, ABC):
     def unmap_volume_by_initiators(self, vol_id, initiators):
         host_name, connectivity_types = self.get_host_by_host_identifiers(initiators)
         connectivity_type = utils.choose_connectivity_type(connectivity_types)
-        if connectivity_type == NVME_OVER_FC_CONNECTIVITY_TYPE:
+        if connectivity_type in (NVME_OVER_FC_CONNECTIVITY_TYPE, NVME_OVER_TCP_CONNECTIVITY_TYPE):
             vol_id = convert_scsi_id_to_nguid(vol_id)
+            logger.debug("Connectivity type {} : unmapping volume by nguid {}".format(connectivity_type, vol_id))
         self.unmap_volume(vol_id, host_name)
 
     def copy_to_existing_volume_from_source(self, volume, source_id, source_type, minimum_volume_size):
@@ -113,6 +115,9 @@ class ArrayMediatorAbstract(ArrayMediator, ABC):
     def _get_array_initiators(self, host_name, connectivity_type):
         if NVME_OVER_FC_CONNECTIVITY_TYPE == connectivity_type:
             array_initiators = self.get_nvme_fc_target_ports()
+        elif NVME_OVER_TCP_CONNECTIVITY_TYPE == connectivity_type:
+            logger.debug("Getting NVMe TCP target IPs for host {}".format(host_name))
+            array_initiators = self.get_nvme_tcp_target_ips(host_name)
         elif FC_CONNECTIVITY_TYPE == connectivity_type:
             array_initiators = self.get_array_fc_wwns(host_name)
         elif ISCSI_CONNECTIVITY_TYPE == connectivity_type:
