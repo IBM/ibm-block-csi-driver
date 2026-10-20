@@ -170,15 +170,12 @@ func (r OsDeviceConnectivityNvmeOFc) isFindMultipathsOn() (bool, error) {
 		return false, fmt.Errorf("multipathd show config failed: %w", err)
 	}
 	for _, line := range strings.Split(string(out), "\n") {
-		trimmed := strings.TrimSpace(line)
-		if !strings.HasPrefix(trimmed, "find_multipaths") {
+		// e.g. `find_multipaths "on"`, skipping `find_multipaths_timeout -10`
+		fields := strings.Fields(strings.TrimSpace(line))
+		if len(fields) < 2 || fields[0] != "find_multipaths" {
 			continue
 		}
-		fields := strings.Fields(trimmed)
-		if len(fields) < 2 {
-			continue
-		}
-		val := strings.ToLower(fields[1])
+		val := strings.ToLower(strings.Trim(fields[1], "\""))
 		result := val == "yes" || val == "on"
 		logger.Debugf("NVMe-oFC isFindMultipathsOn: find_multipaths=%s result=%v", val, result)
 		return result, nil
