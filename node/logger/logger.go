@@ -117,7 +117,7 @@ func logEntry(callerDepth int) *logrus.Entry {
 	if ok {
 		caller = filepath.Base(file) + ":" + strconv.Itoa(no)
 	}
-	logEntry := getInstance(callerDepth + 1).WithFields(logrus.Fields{goIDField: strconv.FormatUint(goid, 10),
+	logEntry := getInstance(callerDepth + 1).WithFields(logrus.Fields{goIDField: strconv.FormatInt(goid, 10),
 		additionalGoIDInfoField: additionalId,
 		callerField:             caller})
 	return logEntry
