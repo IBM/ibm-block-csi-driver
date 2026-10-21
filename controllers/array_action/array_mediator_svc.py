@@ -1410,7 +1410,6 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
             # Further check the host_protocol to know
             # which type of nvme host (fc, tcp, rdma etc.) it is.
             host_protocol = self._get_host_ports(cli_host, HOST_PROTOCOL)
-            # TBD: SKG: Check whether an improvement can be done to avoid repeatedly checking host_protocol
             if 'tcpnvme' in host_protocol:
                 connectivity_types.append(array_settings.NVME_OVER_TCP_CONNECTIVITY_TYPE)
             elif 'fcnvme' in host_protocol:

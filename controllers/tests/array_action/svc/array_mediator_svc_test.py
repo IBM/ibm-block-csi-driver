@@ -23,9 +23,7 @@ from controllers.array_action.settings import (REPLICATION_TYPE_MIRROR, REPLICAT
 from controllers.common.node_info import Initiators
 from controllers.common.settings import ARRAY_TYPE_SVC, SPACE_EFFICIENCY_THIN, SPACE_EFFICIENCY_COMPRESSED, \
     SPACE_EFFICIENCY_DEDUPLICATED_COMPRESSED, SPACE_EFFICIENCY_DEDUPLICATED_THIN, SPACE_EFFICIENCY_DEDUPLICATED, \
-    SPACE_EFFICIENCY_THICK, EAR_VOLUME_FC_MAP_COUNT, SCSI_PROTOCOL, NVME_PROTOCOL
-# TBD: SKG: Should NVME_PROTOCOL be now removed, given that controllers/common/settings.py already
-# have FCNVME and TCPNVME.
+    SPACE_EFFICIENCY_THICK, EAR_VOLUME_FC_MAP_COUNT, SCSI_PROTOCOL, FCNVME_PROTOCOL, TCPNVME_PROTOCOL
 
 from controllers.tests import utils
 from controllers.tests.common.test_settings import OBJECT_INTERNAL_ID, \
@@ -2304,7 +2302,7 @@ class TestArrayMediatorSVC(unittest.TestCase):
             array_settings.NVME_OVER_FC_CONNECTIVITY_TYPE, array_settings.DUMMY_MULTIPLE_IO_GROUP_STRING)
         self.svc.client.svctask.mkhost.assert_called_once_with(name=common_settings.HOST_NAME,
                                                                nqn=array_settings.DUMMY_NVME_NQN1,
-                                                               protocol=svc_settings.MKHOST_NVME_PROTOCOL_VALUE,
+                                                               protocol=svc_settings.MKHOST_FCNVME_PROTOCOL_VALUE,
                                                                iogrp=array_settings.DUMMY_MULTIPLE_IO_GROUP_STRING)
 
     def test_create_host_nvme_success_force_portset(self):
@@ -2318,7 +2316,7 @@ class TestArrayMediatorSVC(unittest.TestCase):
                 array_settings.NVME_OVER_FC_CONNECTIVITY_TYPE, array_settings.DUMMY_MULTIPLE_IO_GROUP_STRING)
             self.svc.client.svctask.mkhost.assert_called_once_with(name=common_settings.HOST_NAME,
                                                                    nqn=array_settings.DUMMY_NVME_NQN1,
-                                                                   protocol=svc_settings.MKHOST_NVME_PROTOCOL_VALUE,
+                                                                   protocol=svc_settings.MKHOST_FCNVME_PROTOCOL_VALUE,
                                                                    iogrp=array_settings.DUMMY_MULTIPLE_IO_GROUP_STRING,
                                                                    portset='2')
 
@@ -2386,7 +2384,7 @@ class TestArrayMediatorSVC(unittest.TestCase):
         with self.assertRaises(array_errors.UnsupportedConnectivityTypeError):
             self.svc.create_host(common_settings.HOST_NAME,
                                  Initiators([], [], [array_settings.DUMMY_NODE1_IQN]),
-                                 svc_settings.MKHOST_NVME_PROTOCOL_VALUE,
+                                 svc_settings.MKHOST_FCNVME_PROTOCOL_VALUE,
                                  array_settings.DUMMY_MULTIPLE_IO_GROUP_STRING)
         self.svc.client.svctask.mkhost.assert_not_called()
 
@@ -2649,10 +2647,15 @@ class TestArrayMediatorSVC(unittest.TestCase):
         self.svc.client.svctask.chhost.assert_called_once_with(object_id=common_settings.HOST_NAME,
                                                                protocol=SCSI_PROTOCOL)
 
-    def test_change_host_protocol_to_nvme_success(self):
-        self.svc.change_host_protocol(common_settings.HOST_NAME, NVME_PROTOCOL)
+    def test_change_host_protocol_to_fcnvme_success(self):
+        self.svc.change_host_protocol(common_settings.HOST_NAME, FCNVME_PROTOCOL)
         self.svc.client.svctask.chhost.assert_called_once_with(object_id=common_settings.HOST_NAME,
-                                                               protocol=NVME_PROTOCOL)
+                                                               protocol=FCNVME_PROTOCOL)
+
+    def test_change_host_protocol_to_tcpnvme_success(self):
+        self.svc.change_host_protocol(common_settings.HOST_NAME, TCPNVME_PROTOCOL)
+        self.svc.client.svctask.chhost.assert_called_once_with(object_id=common_settings.HOST_NAME,
+                                                               protocol=TCPNVME_PROTOCOL)
 
     def _test_change_host_protocol_chhost_errors(self, client_error, expected_error):
         self._test_mediator_method_client_error(self.svc.change_host_protocol,

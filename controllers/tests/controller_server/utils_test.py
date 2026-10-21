@@ -420,7 +420,7 @@ class TestUtils(unittest.TestCase):
         iscsi = ISCSI_CONNECTIVITY_TYPE
         expected_chosen_by_connectivities_found = {
             (nvme_fc, fc, iscsi): nvme_fc,
-            (nvme_tcp, fc, iscsi): nvme_tcp, # TBD: SKG: Verify from Dnyanesh
+            (nvme_tcp, fc, iscsi): nvme_tcp,
             (fc, iscsi): fc,
             (nvme_fc,): nvme_fc,
             (nvme_tcp,): nvme_tcp,
