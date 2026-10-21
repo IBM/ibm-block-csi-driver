@@ -333,6 +333,7 @@ func baseExecute[T any](
 
 		if parentAdditionalID != "" && parentAdditionalID != "-" {
 			goid_info.SetAdditionalIDInfo(parentAdditionalID)
+			defer goid_info.DeleteAdditionalIDInfo()
 		}
 
 		data, err := worker(workerCtx)
