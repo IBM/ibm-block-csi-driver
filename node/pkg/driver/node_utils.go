@@ -62,6 +62,7 @@ const (
 	PrefixChrootOfHostRoot            = "/host"
 	mkfsTimeoutMilliseconds           = 15 * 60 * 1000
 	resizeFsTimeoutMilliseconds       = 30 * 1000
+	unmountTimeoutMs                  = 30 * 1000 // same as the timeout of the mount wrapper Unmount
 	TimeOutGeneralCmd                 = 10 * 1000
 	TimeOutMultipathdCmd              = TimeOutGeneralCmd
 	TimeOutNvmeCmd                    = TimeOutGeneralCmd
@@ -99,6 +100,7 @@ type NodeUtilsInterface interface {
 	RescanPhysicalDevices(sysDevices []string) error
 	FormatDevice(devicePath string, fsType string)
 	IsNotMountPoint(file string) (bool, error)
+	UnmountNoWaitOnHang(target string) error
 	GetPodPath(filepath string) string
 	GetTopologyLabels(ctx context.Context, nodeName string) (map[string]string, error)
 	UpdateNodeInitiatorsAnnotation(ctx context.Context, nodeName string, iscsiIQN string, fcWWNs []string, nvmeNQN string) error
@@ -200,12 +202,11 @@ func (n NodeUtils) GetSysDevicesFromMpath(baseDevice string) ([]string, error) {
 		return nil, err
 	}
 
-	logger.Debugf("found slaves : {%v}", slaves)
-
 	var slavesNames []string
 	for _, slave := range slaves {
 		slavesNames = append(slavesNames, slave.Name())
 	}
+	logger.Debugf("found slaves : {%v}", slavesNames)
 
 	return slavesNames, nil
 }
@@ -537,6 +538,17 @@ func (n NodeUtils) FormatDevice(devicePath string, fsType string) {
 
 func (n NodeUtils) IsNotMountPoint(file string) (bool, error) {
 	return mount.IsNotMountPoint(n.mounter, file)
+}
+
+// UnmountNoWaitOnHang runs umount with the same timeout as the mounter, but returns an error wrapping
+// context.DeadlineExceeded instead of waiting when umount does not exit (e.g. blocked in D state).
+func (n NodeUtils) UnmountNoWaitOnHang(target string) error {
+	logger.Infof("Unmounting %s, not waiting on a hang", target)
+	out, err := n.Executer.ExecuteWithTimeoutNoWaitOnHang(unmountTimeoutMs, "umount", []string{target})
+	if err != nil {
+		return fmt.Errorf("unmount of %s failed: %w, output: %s", target, err, string(out))
+	}
+	return nil
 }
 
 // To some files/dirs pod cannot access using its real path. It has to use a different path which is <prefix>/<path>.
