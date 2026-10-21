@@ -404,9 +404,11 @@ oc get drpc <drpc-name> -n <namespace> -o wide
 Check that the VG is now **primary** on the storage system of `<managed-cluster-1>`
 and **secondary** on the storage system of `<managed-cluster-2>`.
 
-## Recovering from a Storage Link Outage
+## Troubleshooting
 
-### Volume Group (VG) in independent state after storage connectivity loss
+### A) Recovering from a Storage Link Outage
+
+#### Volume Group (VG) in independent state after storage connectivity loss
 If connectivity between the two storage systems is lost and later recovers, the
 Volume Group (VG) that contains the DR-protected PVCs can end up in an
 **independent** state on the storage systems. The `VolumeReplicationGroup` (VRG)
@@ -471,3 +473,39 @@ from the independent state, check the following:
    storage systems.
 3. On the storage systems, check that the VG is no longer in the independent state,
    and that it is **primary** on the storage system of the force-promoted cluster.
+
+### B) PV restore blocked when returning to a previous primary cluster
+
+#### When it occurs
+You run a Failover or Relocate from cluster A to cluster B, and later move back
+to cluster A.
+
+When the PVCs are removed from A during the Failover or Relocate to B, their PVs
+are not deleted, because the StorageClass uses `reclaimPolicy: Retain`. Instead,
+the PVs stay on A in the `Released` state.
+
+When you later move back to A, the VRG on A becomes Primary and Ramen restores the
+PVs from the backup. The restore fails because PVs with the same names already
+exist on A.
+
+#### Symptoms
+- The Failover or Relocate does not complete.
+- On cluster A, the `ClusterDataReady` condition of the VRG is `False`:
+
+```bash
+oc get vrg <vrg-name> -n <namespace> -o jsonpath='{.status.conditions[?(@.type=="ClusterDataReady")].message}{"\n"}'
+```
+  The message is similar to:
+  `failed to restore all []v1.PersistentVolume. Total/Restored N/0`
+
+#### Resolution
+On cluster A, delete the `Released` PVs of the protected PVCs. Ramen retries the restore automatically and recreates the PVs from the backup.
+Once the PVs are deleted, check that `ClusterDataReady` becomes `True` and the
+Failover or Relocate progresses.
+
+**Note:** Delete only PVs in the `Released` state that belong to the protected PVCs. Deleting a PV removes only the Kubernetes object. Because the reclaim policy is `Retain`, the volume stays on the storage system.
+
+**Prevention:** Before you move back to a cluster, delete the `Released` PVs of the protected
+PVCs on that cluster.
+
+---
