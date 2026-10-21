@@ -36,7 +36,6 @@ NODE_INITIATORS_FIELD = 'block.csi.ibm.com/node-initiators'
 EAR_VOLUME_FC_MAP_COUNT = "2"
 
 SCSI_PROTOCOL = 'scsi'
-NVME_PROTOCOL = 'nvme' # TBD: SKG: Should NVME_PROTOCOL be now removed, given that both FCNVME and TCPNVME are declared
 FCNVME_PROTOCOL = 'fcnvme'
 TCPNVME_PROTOCOL = 'tcpnvme'
 
