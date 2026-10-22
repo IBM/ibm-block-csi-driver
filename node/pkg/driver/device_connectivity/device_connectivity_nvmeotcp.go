@@ -26,10 +26,8 @@ import (
 )
 
 const (
-	nvmeTransportTCP     = "tcp"
-	nvmeTcpPort          = "4420"
-	nvmeTcpCtrlSysfsGlob = "/sys/class/nvme/nvme*"
-	nvmeTcpCtrlStateLive = "live"
+	nvmeTransportTCP = "tcp"
+	nvmeTcpPort      = "4420"
 )
 
 type OsDeviceConnectivityNvmeOTcp struct {
@@ -240,9 +238,9 @@ func (r OsDeviceConnectivityNvmeOTcp) RescanDevices(_ int, arrayInitiators []str
 	}
 	logger.Debugf("NVMe-oTCP RescanDevices: array target IPs %v", arrayInitiators)
 
-	ctrlPaths, err := r.Executer.FilepathGlob(nvmeTcpCtrlSysfsGlob)
+	ctrlPaths, err := r.Executer.FilepathGlob(nvmeCtrlSysfsGlob)
 	if err != nil {
-		logger.Warningf("NVMe-oTCP RescanDevices: glob %s failed: %v", nvmeTcpCtrlSysfsGlob, err)
+		logger.Warningf("NVMe-oTCP RescanDevices: glob %s failed: %v", nvmeCtrlSysfsGlob, err)
 		return nil
 	}
 	logger.Debugf("NVMe-oTCP RescanDevices: found controllers %v", ctrlPaths)
@@ -274,7 +272,7 @@ func (r OsDeviceConnectivityNvmeOTcp) isLiveTcpCtrlToArray(ctrlPath string, arra
 		return false
 	}
 	state, err := r.Executer.IoutilReadFile(filepath.Join(ctrlPath, "state"))
-	if err != nil || strings.TrimSpace(string(state)) != nvmeTcpCtrlStateLive {
+	if err != nil || strings.TrimSpace(string(state)) != nvmeCtrlStateLive {
 		logger.Debugf("NVMe-oTCP isLiveTcpCtrlToArray: controller %s is not live, skipping", ctrlPath)
 		return false
 	}
