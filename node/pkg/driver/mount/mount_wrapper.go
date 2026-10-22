@@ -1375,7 +1375,7 @@ func readMountsDirect(targetPath string) ([]MountInfo, error) {
                 absTarget, _ = filepath.Abs(absTarget)
                 absTarget = filepath.Clean(absTarget)
         }
-        logger.Infof("[Mountinfo-Trace] Initiating mount scanner matrix. Target lookup constraints: targetPath='%s', absTarget='%s'", targetPath, absTarget)
+        //logger.Infof("[Mountinfo-Trace] Initiating mount scanner matrix. Target lookup constraints: targetPath='%s', absTarget='%s'", targetPath, absTarget)
 
         f, err := os.Open("/proc/self/mountinfo")
         if err != nil {
