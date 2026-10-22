@@ -6865,7 +6865,7 @@ func (of *GetDmsPathHelperGeneric) EvaluateSysfsTopologyScanNvme(ctx context.Con
 
 		// 2. STAGE 1: Attempt Direct Kernel IOCTL Query
 		deviceNode := filepath.Join("/dev", name)
-		logger.Debugf("[EvalTopology-Trace] ['%s'] Attempting low-level IOCTL (0x4e40) data trap on node path: '%s'", name, deviceNode)
+		//logger.Debugf("[EvalTopology-Trace] ['%s'] Attempting low-level IOCTL (0x4e40) data trap on node path: '%s'", name, deviceNode)
 		
 		if df, errOpen := os.OpenFile(deviceNode, os.O_RDONLY|syscall.O_NONBLOCK, 0); errOpen != nil {
 			logger.Warningf("[EvalTopology-Trace] ['%s'] Failed to open character/block device node '%s': %v", name, deviceNode, errOpen)
@@ -6881,7 +6881,7 @@ func (of *GetDmsPathHelperGeneric) EvaluateSysfsTopologyScanNvme(ctx context.Con
 			runtime.KeepAlive(nvmeInfo)
 
 			if errno != 0 {
-				logger.Debugf("[EvalTopology-Trace] ['%s'] Kernel IOCTL operation returned error code (errno=%d): %s", name, errno, errno.Error())
+				//logger.Debugf("[EvalTopology-Trace] ['%s'] Kernel IOCTL operation returned error code (errno=%d): %s", name, errno, errno.Error())
 			} else {
 				discoveredID = normalizeWWID(fmt.Sprintf("%x", nvmeInfo.Nguid))
 				logger.Debugf("[EvalTopology-Trace] ['%s'] Raw payload bytes successfully returned from IOCTL. Parsed NGUID hex: '%s'", name, discoveredID)
@@ -6897,12 +6897,12 @@ func (of *GetDmsPathHelperGeneric) EvaluateSysfsTopologyScanNvme(ctx context.Con
 
 		// 3. STAGE 2: Sysfs fallbacks (Triggered if IOCTL failed or returned zero values)
 		if len(availableIDs) == 0 {
-			logger.Debugf("[EvalTopology-Trace] ['%s'] Primary IOCTL path returned no identifiers. Initializing sequential sysfs fallback tree scans...", name)
+			//logger.Debugf("[EvalTopology-Trace] ['%s'] Primary IOCTL path returned no identifiers. Initializing sequential sysfs fallback tree scans...", name)
 			
 			// Fallback A: Device WWID file descriptor lookup
 			wwidPath := filepath.Join(targetSysDir, "device", "wwid")
 			if data, err := secureReadSysfs(ctx, gater, baseBlockName, wwidPath); err != nil {
-				logger.Debugf("[EvalTopology-Trace] ['%s'] Fallback [A] read failed for '%s': %v", name, wwidPath, err)
+				//logger.Debugf("[EvalTopology-Trace] ['%s'] Fallback [A] read failed for '%s': %v", name, wwidPath, err)
 			} else if data != "" {
 				cleaned := normalizeWWID(data)
 				availableIDs = append(availableIDs, cleaned)
@@ -6912,7 +6912,7 @@ func (of *GetDmsPathHelperGeneric) EvaluateSysfsTopologyScanNvme(ctx context.Con
 			// Fallback B: Namespace Unique UUID mapping
 			uuidPath := filepath.Join(targetSysDir, "uuid")
 			if data, err := secureReadSysfs(ctx, gater, baseBlockName, uuidPath); err != nil {
-				logger.Debugf("[EvalTopology-Trace] ['%s'] Fallback [B] read failed for '%s': %v", name, uuidPath, err)
+				//logger.Debugf("[EvalTopology-Trace] ['%s'] Fallback [B] read failed for '%s': %v", name, uuidPath, err)
 			} else if data != "" {
 				cleaned := normalizeWWID(data)
 				availableIDs = append(availableIDs, cleaned)
@@ -6922,7 +6922,7 @@ func (of *GetDmsPathHelperGeneric) EvaluateSysfsTopologyScanNvme(ctx context.Con
 			// Fallback C: Namespace Hardware NGUID file lookup
 			nguidPath := filepath.Join(targetSysDir, "nguid")
 			if data, err := secureReadSysfs(ctx, gater, baseBlockName, nguidPath); err != nil {
-				logger.Debugf("[EvalTopology-Trace] ['%s'] Fallback [C] read failed for '%s': %v", name, nguidPath, err)
+				//logger.Debugf("[EvalTopology-Trace] ['%s'] Fallback [C] read failed for '%s': %v", name, nguidPath, err)
 			} else if data != "" {
 				cleaned := normalizeWWID(data)
 				availableIDs = append(availableIDs, cleaned)
@@ -6932,7 +6932,7 @@ func (of *GetDmsPathHelperGeneric) EvaluateSysfsTopologyScanNvme(ctx context.Con
 			// Fallback D: Device Controller Serial handle string
 			serialPath := filepath.Join(targetSysDir, "device", "serial")
 			if data, err := secureReadSysfs(ctx, gater, baseBlockName, serialPath); err != nil {
-				logger.Debugf("[EvalTopology-Trace] ['%s'] Fallback [D] read failed for '%s': %v", name, serialPath, err)
+				//logger.Debugf("[EvalTopology-Trace] ['%s'] Fallback [D] read failed for '%s': %v", name, serialPath, err)
 			} else if data != "" {
 				cleaned := normalizeWWID(data)
 				availableIDs = append(availableIDs, cleaned)
@@ -6941,11 +6941,11 @@ func (of *GetDmsPathHelperGeneric) EvaluateSysfsTopologyScanNvme(ctx context.Con
 			
 			// Fallback E: Fabric Subsystem Symlink Tracking
 			subsysSymlink := filepath.Join(targetSysDir, "device", "subsystem")
-			logger.Debugf("[EvalTopology-Trace] ['%s'] Evaluating global subsystem fabric mapping via symlink: '%s'", name, subsysSymlink)
+			//logger.Debugf("[EvalTopology-Trace] ['%s'] Evaluating global subsystem fabric mapping via symlink: '%s'", name, subsysSymlink)
 			
 			realSubsysPath, errLink := filepath.EvalSymlinks(subsysSymlink)
 			if errLink != nil {
-				logger.Debugf("[EvalTopology-Trace] ['%s'] Fallback [E] symlink evaluation failed for '%s': %v", name, subsysSymlink, errLink)
+				//logger.Debugf("[EvalTopology-Trace] ['%s'] Fallback [E] symlink evaluation failed for '%s': %v", name, subsysSymlink, errLink)
 			} else {
 				logger.Debugf("[EvalTopology-Trace] ['%s'] Fallback [E] symlink resolved successfully to real path: '%s'", name, realSubsysPath)
 				if strings.Contains(realSubsysPath, "virtual/nvme-subsys") {
@@ -6961,7 +6961,7 @@ func (of *GetDmsPathHelperGeneric) EvaluateSysfsTopologyScanNvme(ctx context.Con
 					logger.Debugf("[EvalTopology-Trace] ['%s'] Fallback [E] skipped: destination path does not contain 'virtual/nvme-subsys' context token", name)
 				}
 			}
-			logger.Debugf("[EvalTopology-Trace] ['%s'] Concluded fallback routines. Total tracking IDs collected for verification loop: %d", name, len(availableIDs))
+			//logger.Debugf("[EvalTopology-Trace] ['%s'] Concluded fallback routines. Total tracking IDs collected for verification loop: %d", name, len(availableIDs))
 		}
 
 		// 4. STAGE 3: Identity Verification & Verification Matrix Evaluation
