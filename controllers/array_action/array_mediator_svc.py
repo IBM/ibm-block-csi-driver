@@ -79,7 +79,7 @@ EAR_PROMOTE_REMOTE_UNREACHABLE = "CMMVC9949E"
 
 HOST_NQN = 'nqn'
 HOST_PROTOCOL = 'protocol'
-HOST_PROTOCOL_TCP_NVME = 'tcpnvme'
+NVME_FABRIC_TRANSPORT_FC = 'fc'
 NVME_FABRIC_TRANSPORT_TCP = 'tcp'
 NVME_FC_TARGET_PORTS_FILTER = 'protocol=nvme:host_io_permitted=yes'
 HOST_WWPN = 'WWPN'
@@ -160,10 +160,10 @@ def build_create_host_kwargs(host_name, connectivity_type, port, io_group, parti
     cli_kwargs = {'name': host_name}
     cli_kwargs = _add_port_to_command_kwargs(connectivity_type, port, cli_kwargs)
     if connectivity_type == array_settings.NVME_OVER_FC_CONNECTIVITY_TYPE:
-        cli_kwargs['protocol'] = 'fcnvme'
+        cli_kwargs['protocol'] = common_settings.NVME_FC_PROTOCOL
     elif connectivity_type == array_settings.NVME_OVER_TCP_CONNECTIVITY_TYPE:
-        cli_kwargs['protocol'] = HOST_PROTOCOL_TCP_NVME
-        logger.debug("Creating NVMe TCP host {} with protocol {}".format(host_name, HOST_PROTOCOL_TCP_NVME))
+        cli_kwargs['protocol'] = common_settings.NVME_TCP_PROTOCOL
+        logger.debug("Creating NVMe TCP host {} with protocol {}".format(host_name, common_settings.NVME_TCP_PROTOCOL))
 
     if io_group:
         cli_kwargs['iogrp'] = io_group
@@ -1310,7 +1310,7 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
     @staticmethod
     def _get_nvme_connectivity_type_by_host(cli_host):
         host_protocol = cli_host.get(HOST_PROTOCOL, '')
-        if host_protocol == HOST_PROTOCOL_TCP_NVME:
+        if host_protocol == common_settings.NVME_TCP_PROTOCOL:
             connectivity_type = array_settings.NVME_OVER_TCP_CONNECTIVITY_TYPE
         else:
             connectivity_type = array_settings.NVME_OVER_FC_CONNECTIVITY_TYPE
@@ -1324,6 +1324,7 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
         if NVME_FABRIC_TRANSPORT_TCP in transports:
             connectivity_type = array_settings.NVME_OVER_TCP_CONNECTIVITY_TYPE
         else:
+            # NVME_FABRIC_TRANSPORT_FC
             connectivity_type = array_settings.NVME_OVER_FC_CONNECTIVITY_TYPE
         logger.debug("NVMe fabrics transports : {}, connectivity type : {}".format(transports, connectivity_type))
         return connectivity_type

@@ -35,8 +35,10 @@ NODE_INITIATORS_FIELD = 'block.csi.ibm.com/node-initiators'
 
 EAR_VOLUME_FC_MAP_COUNT = "2"
 
+# Storage host protocol values (mkhost/chhost -protocol, lshost "protocol" field)
 SCSI_PROTOCOL = 'scsi'
 NVME_PROTOCOL = 'nvme'
+NVME_FC_PROTOCOL = 'fcnvme'
 NVME_TCP_PROTOCOL = 'tcpnvme'
 
 FULL_IO_GROUP = '0:1:2:3'
