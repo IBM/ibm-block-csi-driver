@@ -764,7 +764,8 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
     def _is_stretch_pool(self, pool):
         if ":" not in pool:
             return False
-        return (self._get_pool_site(pool.split(":")[0]) != self._get_pool_site(pool.split(":")[1]))
+        first_pool, second_pool = pool.split(":", 1)
+        return not self._is_child_pool(second_pool, first_pool)
 
     def _create_volume_in_volume_group(self, name, pool, io_group, source_id):
         cli_kwargs = build_create_volume_in_volume_group_kwargs(pool, io_group, source_id)
@@ -1155,7 +1156,7 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
             self._rollback_create_snapshot(target_volume_name)
             raise ex
 
-    def _get_pool_site(self, pool):
+    def _get_cli_pool(self, pool):
         filter_value = 'name={}'.format(pool)
         try:
             cli_pool = self.client.svcinfo.lsmdiskgrp(filtervalue=filter_value).as_single_element
@@ -1163,8 +1164,15 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
             logger.debug("Error running lsmdiskgrp -filtervalue {}".format(filter_value))
             raise ex
         if cli_pool:
-            return cli_pool.site_name
+            return cli_pool
         raise array_errors.PoolDoesNotExist(pool, self.endpoint)
+
+    def _is_child_pool(self, pool, parent_pool):
+        cli_pool = self._get_cli_pool(pool)
+        return getattr(cli_pool, 'parent_mdisk_grp_name', None) == parent_pool
+
+    def _get_pool_site(self, pool):
+        return self._get_cli_pool(pool).site_name
 
     def _is_cli_volume_in_site(self, cli_volume, site_name):
         volume_pools = self._get_volume_pools(cli_volume)
