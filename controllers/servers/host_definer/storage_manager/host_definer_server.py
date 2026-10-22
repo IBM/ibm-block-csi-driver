@@ -15,12 +15,18 @@ from controllers.servers.utils import (join_object_prefix_with_name,
                                        get_initiators_from_csi_node,
                                        are_initiators_equal)
 from controllers.servers.host_definer import messages
+from controllers.servers.host_definer import settings as host_definer_settings
 
 logger = get_stdout_logger()
 
 
 class HostDefinerServicer:
     def define_host(self, request):
+        if self._is_connectivity_type_from_user_unsupported(request.connectivity_type_from_user):
+            error = array_errors.UnsupportedConnectivityTypeError(request.connectivity_type_from_user)
+            logger.error("{}, supported connectivity types: {}".format(
+                error, host_definer_settings.SUPPORTED_CONNECTIVITY_TYPES))
+            return DefineHostResponse(error_message=str(error))
         array_connection_info = request.array_connection_info
         array_addresses = array_connection_info.array_addresses
         node_id_info = NodeIdInfo(request.node_id_from_csi_node)
@@ -66,6 +72,11 @@ class HostDefinerServicer:
         except Exception as ex:
             logger.exception(ex)
             return DefineHostResponse(error_message=str(ex))
+
+    def _is_connectivity_type_from_user_unsupported(self, connectivity_type_from_user):
+        # The node label is filtered by the watcher, the config map value is not
+        return bool(connectivity_type_from_user) and \
+            connectivity_type_from_user not in host_definer_settings.SUPPORTED_CONNECTIVITY_TYPES
 
     def undefine_host(self, request):
         node_id_info = NodeIdInfo(request.node_id_from_csi_node)
