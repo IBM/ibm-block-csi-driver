@@ -13,7 +13,6 @@ from controllers.servers.host_definer import settings
 import controllers.common.settings as common_settings
 from controllers.servers.host_definer.hd_types import (
     CsiNodeInfo, PodInfo, NodeInfo, StorageClassInfo, HostDefinitionInfo)
-from controllers.servers import utils as controllers_utils
 
 logger = get_stdout_logger()
 
@@ -109,6 +108,8 @@ class KubernetesManager():
             return CsiNodeInfo()
 
     def _generate_csi_node_info(self, k8s_csi_node):
+        from controllers.servers import utils as controllers_utils
+
         csi_node_info = CsiNodeInfo()
         csi_node_info.name = k8s_csi_node.metadata.name
         csi_node_info.node_id = self._get_node_id_from_k8s_csi_node(k8s_csi_node)
@@ -227,7 +228,7 @@ class KubernetesManager():
             metadata=client.V1ObjectMeta(generate_name='{}.'.format(host_definition_info.name), ),
             reporting_component=settings.HOST_DEFINER, reporting_instance=settings.HOST_DEFINER, action=action,
             type=self._get_event_type(message_type), reason=message_type + action, message=str(message),
-            event_time=datetime.datetime.now(datetime.UTC).strftime('%Y-%m-%dT%H:%M:%S.%fZ'),
+            event_time=datetime.datetime.now(datetime.timezone.utc).strftime('%Y-%m-%dT%H:%M:%S.%fZ'),
             involved_object=client.V1ObjectReference(
                 api_version=settings.CSI_IBM_API_VERSION, kind=settings.HOST_DEFINITION_KIND,
                 name=host_definition_info.name, resource_version=host_definition_info.resource_version,
