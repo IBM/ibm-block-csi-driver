@@ -122,6 +122,7 @@ MKVOLUMEGROUP_CLONE_TYPE = "clone"
 DUMMY_SPACE_EFFICIENCY = "space_efficiency"
 
 LSMDISKGRP_SITE_NAME_ATTR_KEY = "site_name"
+LSMDISKGRP_PARENT_NAME_ATTR_KEY = "parent_mdisk_grp_name"
 DUMMY_POOL_SITE = "pool_site"
 
 LSRCRELATIONSHIP_AUX_VOLUME_ATTR_KEY = "aux_vdisk_name"

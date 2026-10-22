@@ -529,8 +529,7 @@ class TestArrayMediatorSVC(unittest.TestCase):
         self._test_create_volume_mkvolumegroup_success(source_type=common_settings.VOLUME_OBJECT_TYPE)
 
     def test_is_stretch_pool_with_stretch_pool_returns_true(self):
-        pools_to_return = [Munch({svc_settings.LSMDISKGRP_SITE_NAME_ATTR_KEY: svc_settings.DUMMY_POOL_SITE}),
-                           Munch({svc_settings.LSMDISKGRP_SITE_NAME_ATTR_KEY: svc_settings.DUMMY_VOLUME_SITE1})]
+        pools_to_return = [Munch({svc_settings.LSMDISKGRP_PARENT_NAME_ATTR_KEY: ""})]
         self.svc.client.svcinfo.lsmdiskgrp.side_effect = self._mock_cli_objects(pools_to_return)
 
         result = self.svc._is_stretch_pool(common_settings.STRETCHED_POOL)
@@ -542,12 +541,27 @@ class TestArrayMediatorSVC(unittest.TestCase):
 
         self.assertFalse(result)
 
-    def test_is_stretch_pool_with_same_site_pools_returns_false(self):
-        pools_to_return = [Munch({svc_settings.LSMDISKGRP_SITE_NAME_ATTR_KEY: svc_settings.DUMMY_POOL_SITE}),
-                           Munch({svc_settings.LSMDISKGRP_SITE_NAME_ATTR_KEY: svc_settings.DUMMY_POOL_SITE})]
+    def test_is_stretch_pool_with_child_pool_returns_false(self):
+        pools_to_return = [Munch({svc_settings.LSMDISKGRP_PARENT_NAME_ATTR_KEY: common_settings.DUMMY_POOL1})]
         self.svc.client.svcinfo.lsmdiskgrp.side_effect = self._mock_cli_objects(pools_to_return)
 
         result = self.svc._is_stretch_pool(common_settings.STRETCHED_POOL)
+
+        self.assertFalse(result)
+
+    def test_is_child_pool_returns_true(self):
+        pools_to_return = [Munch({svc_settings.LSMDISKGRP_PARENT_NAME_ATTR_KEY: common_settings.DUMMY_POOL1})]
+        self.svc.client.svcinfo.lsmdiskgrp.side_effect = self._mock_cli_objects(pools_to_return)
+
+        result = self.svc._is_child_pool(common_settings.DUMMY_POOL2, common_settings.DUMMY_POOL1)
+
+        self.assertTrue(result)
+
+    def test_is_child_pool_returns_false(self):
+        pools_to_return = [Munch({svc_settings.LSMDISKGRP_PARENT_NAME_ATTR_KEY: ""})]
+        self.svc.client.svcinfo.lsmdiskgrp.side_effect = self._mock_cli_objects(pools_to_return)
+
+        result = self.svc._is_child_pool(common_settings.DUMMY_POOL2, common_settings.DUMMY_POOL1)
 
         self.assertFalse(result)
 
@@ -571,8 +585,7 @@ class TestArrayMediatorSVC(unittest.TestCase):
     def test_create_volume_mkvolumegroup_from_snapshot_with_stretch_pool_success(self):
         self._prepare_mocks_for_create_volume_mkvolumegroup()
         self.svc.client.svctask.addvdiskcopy = Mock()
-        pools_to_return = [Munch({svc_settings.LSMDISKGRP_SITE_NAME_ATTR_KEY: svc_settings.DUMMY_POOL_SITE}),
-                           Munch({svc_settings.LSMDISKGRP_SITE_NAME_ATTR_KEY: svc_settings.DUMMY_VOLUME_SITE1})]
+        pools_to_return = [Munch({svc_settings.LSMDISKGRP_PARENT_NAME_ATTR_KEY: ""})]
         self.svc.client.svcinfo.lsmdiskgrp.side_effect = self._mock_cli_objects(pools_to_return)
 
         self._test_create_volume_success(source_id=common_settings.INTERNAL_SNAPSHOT_ID,
