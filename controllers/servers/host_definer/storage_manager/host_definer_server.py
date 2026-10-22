@@ -47,6 +47,8 @@ class HostDefinerServicer:
                     if not array_connection_info.partition_name:
                         self._update_host_io_group(request, found_host_name, array_mediator)
                     host_name = found_host_name
+                    connectivity_type_from_user = self._get_host_nvme_transport_if_not_requested(
+                        request, connectivity_type_from_user, host_name, array_mediator)
                 except HostNotFoundError:
                     logger.debug(messages.NODE_WAS_NOT_FOUND_CREATE_NEW_HOST_DEFINITION.format(node_name, initiators))
                     try:
@@ -106,6 +108,8 @@ class HostDefinerServicer:
             request.node_id_from_csi_node)
         requested_connectivity_type = get_initiators_connectivity_type(initiators, request.connectivity_type_from_user)
         existing_connectivity_type = array_mediator.get_host_connectivity_type(host)
+        if self._is_nvme_transport_not_requested(request, requested_connectivity_type, existing_connectivity_type):
+            requested_connectivity_type = existing_connectivity_type
         logger.debug("Host {} requested connectivity type: {}, existing connectivity type: {}".format(
             host, requested_connectivity_type, existing_connectivity_type))
         if self._is_protocol_switched(requested_connectivity_type, existing_connectivity_type):
@@ -134,6 +138,22 @@ class HostDefinerServicer:
                     self._create_host(host, array_mediator, request)
                     return
                 raise ex
+
+    def _is_nvme_transport_not_requested(self, request, requested_connectivity_type, existing_connectivity_type):
+        # The node reports one NQN for both NVMe transports, so without a connectivity type from the user
+        # the NVMe transport cannot be derived from the node: keep the existing NVMe host transport
+        return not request.connectivity_type_from_user and \
+            self._is_protocol_nvme(requested_connectivity_type) and \
+            self._is_protocol_nvme(existing_connectivity_type)
+
+    def _get_host_nvme_transport_if_not_requested(self, request, connectivity_type, host_name, array_mediator):
+        # Report the NVMe transport of the host on the storage when it was not requested by the user
+        if request.connectivity_type_from_user or not self._is_protocol_nvme(connectivity_type):
+            return connectivity_type
+        host_connectivity_type = array_mediator.get_host_connectivity_type(host_name)
+        if self._is_protocol_nvme(host_connectivity_type):
+            return host_connectivity_type
+        return connectivity_type
 
     def _is_protocol_switched(self, connectivity_type_from_user, connectivity_type_from_host):
         is_switched = \
