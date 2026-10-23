@@ -250,10 +250,7 @@ class CSIControllerServicer(csi_pb2_grpc.ControllerServicer):
                                                                   array_initiators)
             return response
 
-        except array_errors.VolumeAlreadyMappedToDifferentHostsError as ex:
-            return handle_exception(ex, context, grpc.StatusCode.FAILED_PRECONDITION,
-                                    csi_pb2.ControllerPublishVolumeResponse)
-        except array_errors.NvmeTcpNotEnabledError as ex:
+        except (array_errors.VolumeAlreadyMappedToDifferentHostsError, array_errors.NvmeTcpNotEnabledError) as ex:
             return handle_exception(ex, context, grpc.StatusCode.FAILED_PRECONDITION,
                                     csi_pb2.ControllerPublishVolumeResponse)
         except (array_errors.LunAlreadyInUseError, array_errors.NoAvailableLunError) as ex:

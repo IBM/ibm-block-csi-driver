@@ -1111,7 +1111,7 @@ class TestPublishVolume(BaseControllerSetUp, CommonControllerTest):
         self.assertEqual(self.context.code, grpc.StatusCode.INTERNAL)
 
     def test_publish_volume_nvme_tcp_not_enabled(self):
-        self.mediator.map_volume_by_initiators.side_effect = [array_errors.NvmeTcpNotEnabledError("host")]
+        self.mediator.map_volume_by_initiators.side_effect = [array_errors.NvmeTcpNotEnabledError()]
 
         self.servicer.ControllerPublishVolume(self.request, self.context)
 
