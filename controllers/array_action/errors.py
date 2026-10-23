@@ -237,9 +237,9 @@ class NoNvmeTcpTargetsFoundError(BaseArrayActionException):
 
 class NvmeTcpNotEnabledError(BaseArrayActionException):
 
-    def __init__(self, host_name):
+    def __init__(self):
         super().__init__()
-        self.message = messages.NVME_TCP_NOT_ENABLED_ERROR_MESSAGE.format(host_name)
+        self.message = messages.NVME_TCP_NOT_ENABLED_ERROR_MESSAGE
 
 
 class UnsupportedConnectivityTypeError(InvalidArgumentError):
