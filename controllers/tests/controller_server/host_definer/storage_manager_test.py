@@ -148,6 +148,49 @@ class TestDefineHost(BaseSetUp):
         self.mediator.remove_ports_from_host.assert_called_once_with(HOST_NAME, [settings.IQN],
                                                                      array_settings.ISCSI_CONNECTIVITY_TYPE)
 
+    def test_define_host_with_unsupported_connectivity_type_from_user_failed(self):
+        self.request.connectivity_type_from_user = 'fcnvme'
+
+        response = self.servicer.define_host(self.request)
+
+        self.assertEqual(response.error_message, 'Unsupported connectivity type: fcnvme')
+        self.mediator.get_host_by_host_identifiers.assert_not_called()
+
+    def _prepare_define_existing_nvme_host(self, connectivity_type_from_user, host_connectivity_type):
+        self._prepare_define_host(is_host_exist=True)
+        self.request.connectivity_type_from_user = connectivity_type_from_user
+        self.request.node_initiators_from_csi_node = test_utils.initiators_to_json(Initiators(nvme_nqns=[settings.NQN]))
+        self.request.node_initiators_from_host_definition = test_utils.initiators_to_json(
+            Initiators(nvme_nqns=[settings.NQN]))
+        self.mediator.get_host_connectivity_type.return_value = host_connectivity_type
+        self.mediator.get_host_connectivity_ports.return_value = [settings.NQN]
+        self.mediator.get_host_io_group.return_value = test_utils.get_fake_host_io_group()
+
+    def test_define_host_keeps_existing_nvme_tcp_host_when_no_connectivity_type_from_user(self):
+        self._prepare_define_existing_nvme_host('', array_settings.NVME_OVER_TCP_CONNECTIVITY_TYPE)
+
+        response = self.servicer.define_host(self.request)
+
+        self.assertEqual(response.error_message, '')
+        self.assertEqual(response.connectivity_type, array_settings.NVME_OVER_TCP_CONNECTIVITY_TYPE)
+        self.mediator.change_host_protocol.assert_not_called()
+        self.mediator.delete_host.assert_not_called()
+        self.mediator.create_host.assert_not_called()
+
+    def test_define_host_switch_nvme_fc_host_to_nvme_tcp_success(self):
+        self._prepare_define_existing_nvme_host(array_settings.NVME_OVER_TCP_CONNECTIVITY_TYPE,
+                                                array_settings.NVME_OVER_FC_CONNECTIVITY_TYPE)
+
+        response = self.servicer.define_host(self.request)
+
+        self.assertEqual(response.error_message, '')
+        self.mediator.remove_ports_from_host.assert_called_once_with(HOST_NAME, [settings.NQN],
+                                                                     array_settings.NVME_OVER_FC_CONNECTIVITY_TYPE)
+        self.mediator.change_host_protocol.assert_called_once_with(HOST_NAME, common_settings.NVME_TCP_PROTOCOL)
+        self.mediator.add_ports_to_host.assert_called_once_with(
+            HOST_NAME, Initiators(nvme_nqns=[settings.NQN]), array_settings.NVME_OVER_TCP_CONNECTIVITY_TYPE)
+        self.mediator.delete_host.assert_not_called()
+
     def test_define_host_return_values(self):
         self._prepare_define_host()
         self.mediator.get_host_io_group.return_value = test_utils.get_fake_host_io_group()
