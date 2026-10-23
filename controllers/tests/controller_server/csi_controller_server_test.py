@@ -1110,6 +1110,13 @@ class TestPublishVolume(BaseControllerSetUp, CommonControllerTest):
         self.servicer.ControllerPublishVolume(self.request, self.context)
         self.assertEqual(self.context.code, grpc.StatusCode.INTERNAL)
 
+    def test_publish_volume_nvme_tcp_not_enabled(self):
+        self.mediator.map_volume_by_initiators.side_effect = [array_errors.NvmeTcpNotEnabledError("host")]
+
+        self.servicer.ControllerPublishVolume(self.request, self.context)
+
+        self.assertEqual(self.context.code, grpc.StatusCode.FAILED_PRECONDITION)
+
     def test_publish_volume_map_volume_lun_already_in_use(self):
         self.mediator.map_volume_by_initiators.side_effect = [array_errors.NoAvailableLunError("")]
 
