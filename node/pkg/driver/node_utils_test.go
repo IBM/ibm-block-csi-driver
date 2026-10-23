@@ -415,3 +415,90 @@ func assertExpectedError(t *testing.T, expectedError error, responseErr error) {
 		t.Fatalf("wrong error: expected %v, got %v", expectedError, responseErr)
 	}
 }
+
+func TestGetInfoFromPublishContext(t *testing.T) {
+	configYaml := driver.ConfigFile{
+		Controller: driver.Controller{
+			Publish_context_lun_parameter:          "PUBLISH_CONTEXT_LUN",
+			Publish_context_connectivity_parameter: "PUBLISH_CONTEXT_CONNECTIVITY",
+			Publish_context_separator:              ",",
+			Publish_context_array_iqn:              "PUBLISH_CONTEXT_ARRAY_IQN",
+			Publish_context_fc_initiators:          "PUBLISH_CONTEXT_ARRAY_FC_INITIATORS",
+			Publish_context_nvme_initiators:        "PUBLISH_CONTEXT_ARRAY_NVME_INITIATORS",
+		},
+		Connectivity_type: driver.Connectivity_type{Nvme_over_fc: "nvmeofc", Nvme_over_tcp: "nvmeotcp", Fc: "fc", Iscsi: "iscsi"},
+	}
+	testCases := []struct {
+		name                   string
+		publishContext         map[string]string
+		expConnectivityType    string
+		expLun                 int
+		expIpsByArrayInitiator map[string][]string
+		expErr                 bool
+	}{
+		{
+			name: "nvmeotcp target IPs without LUN",
+			publishContext: map[string]string{
+				"PUBLISH_CONTEXT_ARRAY_NVME_INITIATORS": "9.71.253.97,9.71.253.96",
+				"PUBLISH_CONTEXT_CONNECTIVITY":          "nvmeotcp",
+				"PUBLISH_CONTEXT_LUN":                   "",
+			},
+			expConnectivityType:    "nvmeotcp",
+			expLun:                 0,
+			expIpsByArrayInitiator: map[string][]string{"9.71.253.97": nil, "9.71.253.96": nil},
+		},
+		{
+			name: "nvmeotcp target IPs with spaces and empty entries",
+			publishContext: map[string]string{
+				"PUBLISH_CONTEXT_ARRAY_NVME_INITIATORS": " 9.71.253.97 ,, 9.71.253.96",
+				"PUBLISH_CONTEXT_CONNECTIVITY":          "nvmeotcp",
+			},
+			expConnectivityType:    "nvmeotcp",
+			expLun:                 0,
+			expIpsByArrayInitiator: map[string][]string{"9.71.253.97": nil, "9.71.253.96": nil},
+		},
+		{
+			name: "nvmeofc target ports without LUN",
+			publishContext: map[string]string{
+				"PUBLISH_CONTEXT_ARRAY_NVME_INITIATORS": "nn-5005076810000006:pn-5005076810190006,nn-5005076810004654:pn-5005076810194654",
+				"PUBLISH_CONTEXT_CONNECTIVITY":          "nvmeofc",
+				"PUBLISH_CONTEXT_LUN":                   "",
+			},
+			expConnectivityType: "nvmeofc",
+			expLun:              0,
+			expIpsByArrayInitiator: map[string][]string{
+				"nn-5005076810000006:pn-5005076810190006": nil,
+				"nn-5005076810004654:pn-5005076810194654": nil,
+			},
+		},
+		{
+			name: "iscsi without LUN fails",
+			publishContext: map[string]string{
+				"PUBLISH_CONTEXT_ARRAY_IQN":    "iqn.1994-05.com.redhat:686358c930fe",
+				"PUBLISH_CONTEXT_CONNECTIVITY": "iscsi",
+				"PUBLISH_CONTEXT_LUN":          "",
+			},
+			expLun: -1,
+			expErr: true,
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			nodeUtils := driver.NewNodeUtils(&executer.Executer{}, nil, configYaml, nil)
+			connectivityType, lun, ipsByArrayInitiator, err := nodeUtils.GetInfoFromPublishContext(tc.publishContext)
+			if (err != nil) != tc.expErr {
+				t.Fatalf("wrong error: expected error %v, got %v", tc.expErr, err)
+			}
+			if connectivityType != tc.expConnectivityType {
+				t.Fatalf("wrong connectivity type: expected %q, got %q", tc.expConnectivityType, connectivityType)
+			}
+			if lun != tc.expLun {
+				t.Fatalf("wrong lun: expected %d, got %d", tc.expLun, lun)
+			}
+			if !reflect.DeepEqual(ipsByArrayInitiator, tc.expIpsByArrayInitiator) {
+				t.Fatalf("wrong array initiators: expected %v, got %v", tc.expIpsByArrayInitiator, ipsByArrayInitiator)
+			}
+		})
+	}
+}
