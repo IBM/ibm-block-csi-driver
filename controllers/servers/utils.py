@@ -13,7 +13,8 @@ import controllers.array_action.settings as array_settings
 import controllers.servers.messages as messages
 import controllers.servers.settings as servers_settings
 from controllers.array_action.array_action_types import ReplicationRequest
-from controllers.array_action.settings import NVME_OVER_FC_CONNECTIVITY_TYPE, FC_CONNECTIVITY_TYPE, \
+from controllers.array_action.settings import NVME_OVER_FC_CONNECTIVITY_TYPE, NVME_OVER_TCP_CONNECTIVITY_TYPE, \
+    FC_CONNECTIVITY_TYPE, \
     ISCSI_CONNECTIVITY_TYPE, REPLICATION_COPY_TYPE_SYNC, REPLICATION_COPY_TYPE_ASYNC, REPLICATION_TYPE_MIRROR, \
     REPLICATION_TYPE_EAR, REPLICATION_DEFAULT_COPY_TYPE
 from controllers.common import settings
@@ -214,7 +215,7 @@ def are_initiators_equal(initiator_str1, initiator_str2, protocol=None):
             return iscsi_equal
         elif protocol == FC_CONNECTIVITY_TYPE:
             return fc_equal
-        elif protocol == NVME_OVER_FC_CONNECTIVITY_TYPE:
+        elif protocol in (NVME_OVER_FC_CONNECTIVITY_TYPE, NVME_OVER_TCP_CONNECTIVITY_TYPE):
             return nvme_equal
         else:
             return nvme_equal and fc_equal and iscsi_equal
@@ -918,6 +919,9 @@ def choose_connectivity_type(connectivity_types):
     if NVME_OVER_FC_CONNECTIVITY_TYPE in connectivity_types:
         logger.debug("connectivity type is : {0}".format(NVME_OVER_FC_CONNECTIVITY_TYPE))
         return NVME_OVER_FC_CONNECTIVITY_TYPE
+    if NVME_OVER_TCP_CONNECTIVITY_TYPE in connectivity_types:
+        logger.debug("connectivity type is : {0}".format(NVME_OVER_TCP_CONNECTIVITY_TYPE))
+        return NVME_OVER_TCP_CONNECTIVITY_TYPE
     if FC_CONNECTIVITY_TYPE in connectivity_types:
         logger.debug("connectivity type is : {0}".format(FC_CONNECTIVITY_TYPE))
         return FC_CONNECTIVITY_TYPE
@@ -949,7 +953,8 @@ def generate_csi_publish_volume_response(lun, connectivity_type, array_initiator
         array_initiators_param = common_config.controller.publish_context_array_iqn
         publish_context[array_initiators_param] = separator.join(array_initiators.keys())
 
-    elif connectivity_type == NVME_OVER_FC_CONNECTIVITY_TYPE:
+    elif connectivity_type in (NVME_OVER_FC_CONNECTIVITY_TYPE, NVME_OVER_TCP_CONNECTIVITY_TYPE):
+        # NVMe-FC: "nn-<wwnn>:pn-<wwpn>" target ports, NVMe-TCP: target IP addresses
         array_initiators_param = common_config.controller.publish_context_nvme_initiators
         joined_initiators = separator.join(array_initiators)
         publish_context[array_initiators_param] = joined_initiators
@@ -1121,6 +1126,7 @@ def get_connectivity_type_ports(initiators, connectivity_type):
 
 def _validate_connectivity_type(connectivity_type):
     if connectivity_type != array_settings.NVME_OVER_FC_CONNECTIVITY_TYPE and \
+            connectivity_type != array_settings.NVME_OVER_TCP_CONNECTIVITY_TYPE and \
             connectivity_type != array_settings.FC_CONNECTIVITY_TYPE and \
             connectivity_type != array_settings.ISCSI_CONNECTIVITY_TYPE and connectivity_type:
         raise array_errors.UnsupportedConnectivityTypeError(connectivity_type)
