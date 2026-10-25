@@ -2397,6 +2397,12 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) checkPQviaIoctl(sgName string, d
 
 	cdb := []byte{0x12, 0x00, 0x00, 0, uint8(allocationLen), 0}
 
+        var pinner runtime.Pinner
+        pinner.Pin(&senseBuf)
+        pinner.Pin(&inqResp)
+        pinner.Pin(&cdb)
+        defer pinner.Unpin() // Unpins everything once when checkPQviaIoctl exits
+
 	header := sgIoHdr{
 		interface_id:    'S',
 		dxfer_direction: SG_DXFER_FROM_DEV,
@@ -2408,6 +2414,8 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) checkPQviaIoctl(sgName string, d
 		cmdp:            uintptr(unsafe.Pointer(&cdb[0])),
 		timeout:         500, 
 	}
+
+	pinner.Pin(&header)
 
 	for attempt := 0; attempt < maxRetries; attempt++ {
 		//logger.Debugf("[%s] IOCTL Probe: Launching hardware transmission execution loop (Attempt %d/%d)...", sgName, attempt+1, maxRetries)
@@ -3358,45 +3366,47 @@ func (r *OsDeviceConnectivityHelperScsiGeneric) dmIoctlCall(ctx context.Context,
 				return struct{}{}, fmt.Errorf("dm-ioctl: target name length (%d) exceeds kernel limit of %d", len(cleanName), dmNameLen-1)
 			}
 
-			type dmIoctlPacked struct {
-				version     [3]uint32
-				dataSize    uint32
-				flags       uint32
-				eventNr     uint32
-				targetCount uint32
-				openCount   int32
-				lastEventNr uint32
-				dev         uint64
-				name        [dmNameLen]byte
-				uuid        [dmNameLen]byte
-				dataStart   uint32
-			}
+                        type dmIoctlPacked struct {
+                                version     [3]uint32
+                                dataSize    uint32
+                                flags       uint32
+                                eventNr     uint32
+                                targetCount uint32
+                                openCount   int32
+                                lastEventNr uint32
+                                dev         uint64
+                                name        [dmNameLen]byte
+                                uuid        [dmNameLen]byte
+                                dataStart   uint32
+                        }
 
-			var payload dmIoctlPacked
-			payload.version = [3]uint32{4, 0, 0}
-			payload.dataSize = uint32(unsafe.Sizeof(payload))
-			payload.flags = flags
+                        var payload dmIoctlPacked
+                        payload.version = [3]uint32{4, 0, 0}
+                        payload.dataSize = uint32(unsafe.Sizeof(payload))
+                        payload.flags = flags
 
-			copy(payload.name[:dmNameLen-1], cleanName)
-			payload.name[len(cleanName)] = 0 // Enforce physical null terminator explicitly
+                        copy(payload.name[:dmNameLen-1], cleanName)
+                        payload.name[len(cleanName)] = 0 // Enforce physical null terminator explicitly
 
-			payloadPtr := unsafe.Pointer(&payload)
+//logger.Infof("[DM-Ioctl] Dispatched tracking operator code %v on device map: %s", op, cleanName)
 
-			//logger.Infof("[DM-Ioctl] Dispatched tracking operator code %v on device map: %s", op, cleanName)
-			_, _, errno := unix.Syscall(
-				unix.SYS_IOCTL, 
-				f.Fd(), 
-				op, 
-				uintptr(payloadPtr),
-			)
+                        // ✅ FIX 1: Completely removed the 'payloadPtr' variable declaration step.
+                        // ✅ FIX 2: Inline the uintptr translation explicitly inside the Syscall parameters.
+                        _, _, errno := unix.Syscall(
+                                unix.SYS_IOCTL,
+                                f.Fd(),
+                                op,
+                                uintptr(unsafe.Pointer(&payload)), // Compiler now guarantees memory is anchored!
+                        )
 
-			runtime.KeepAlive(payload)
+                        // ✅ FIX 3: Removed 'runtime.KeepAlive(payload)' since the compiler rule replaces it perfectly.
 
-			if errno != 0 && errno != unix.ENXIO && errno != unix.ENOENT { 
-				return struct{}{}, fmt.Errorf("dm-ioctl execution returned kernel errno: %v", errno) 
-			}
+                        if errno != 0 && errno != unix.ENXIO && errno != unix.ENOENT {
+                                return struct{}{}, fmt.Errorf("dm-ioctl execution returned kernel errno: %v", errno)
+                        }
 
-			return struct{}{}, nil
+                        return struct{}{}, nil
+
 		},
 	)
 	return err
@@ -4851,22 +4861,33 @@ func (o *OsDeviceConnectivityHelperGeneric) GetWwnByScsiInqInternal(dev string) 
 	}
 	defer syscall.Close(fd)
 
-	// SCSI command descriptor block: INQUIRY with EVPD=1, Page Code=0x83
-	cdb := [6]byte{0x12, 0x01, 0x83, 0x00, 0xFF, 0x00}
-	respBuf := make([]byte, 256)
-	senseBuf := make([]byte, 32)
+        // SCSI command descriptor block: INQUIRY with EVPD=1, Page Code=0x83
+        cdb := [6]byte{0x12, 0x01, 0x83, 0x00, 0xFF, 0x00}
+        respBuf := make([]byte, 256)
+        senseBuf := make([]byte, 32)
 
-	header := SgIoHeader{
-		InterfaceID:    'S',
-		DxferDirection: SG_DXFER_FROM_DEV,
-		CmdLen:         uint8(len(cdb)),
-		MxSbpLen:       uint8(len(senseBuf)),
-		DxferLen:       uint32(len(respBuf)),
-		Dxferp:         uintptr(unsafe.Pointer(&respBuf[0])),
-		Cmdp:           uintptr(unsafe.Pointer(&cdb[0])),
-		Sbp:            uintptr(unsafe.Pointer(&senseBuf[0])),
-		Timeout:        uint32(500), // Hard ceiling optimized down to 500ms for high-load scaling
-	}
+        // ✅ FIX: Pin the array backing structures right after creation
+        var pinner runtime.Pinner
+        pinner.Pin(&respBuf)
+        pinner.Pin(&senseBuf)
+        pinner.Pin(&cdb) // Arrays can be pinned directly just like slices
+        defer pinner.Unpin()
+
+        header := SgIoHeader{
+                InterfaceID:    'S',
+                DxferDirection: SG_DXFER_FROM_DEV,
+                CmdLen:         uint8(len(cdb)),
+                MxSbpLen:       uint8(len(senseBuf)),
+                DxferLen:       uint32(len(respBuf)),
+                Dxferp:         uintptr(unsafe.Pointer(&respBuf[0])),
+                Cmdp:           uintptr(unsafe.Pointer(&cdb[0])),
+                Sbp:            uintptr(unsafe.Pointer(&senseBuf[0])),
+                Timeout:        uint32(500), // Hard ceiling optimized down to 500ms for high-load scaling
+        }
+        
+        // Pin the header itself so its memory address remains stable for the syscall
+        pinner.Pin(&header)
+
 
 	maxRetries := 3
 	for i := 0; i < maxRetries; i++ {
