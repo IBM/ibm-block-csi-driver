@@ -289,15 +289,19 @@ func (r OsDeviceConnectivityHelperScsiGeneric) GetMpathDevice(volumeId string) (
 		// NVMe DM devices (non-native) don't support SG_IO ioctl.
 		// EUI/NGUID match from multipathd already identifies the volume correctly.
 		if isNvmeDevice(dmPath, r.Executer) {
-			logger.Debugf("NVMe device detected %s, skipping sg_inq validation", dmPath)
-			return dmPath, nil
+			if r.nativeNvmeDeviceMatchesVolume(dmPath, volumeIdVariations) {
+				logger.Debugf("NVMe device detected %s, skipping sg_inq validation", dmPath)
+				return dmPath, nil
+			}
+			logger.Warningf("NVMe device %s reported by multipathd does not hold volume {%v}, "+
+				"multipathd view may be stale, reloading", dmPath, volumeId)
+		} else {
+			SgInqWwn, _ := r.Helper.GetWwnByScsiInq(dmPath)
+			if isSameId(SgInqWwn, volumeIdVariations) {
+				return dmPath, nil
+			}
+			logger.Warningf("Expected {%v} but got {%v} from sg_inq", volumeId, SgInqWwn)
 		}
-
-		SgInqWwn, _ := r.Helper.GetWwnByScsiInq(dmPath)
-		if isSameId(SgInqWwn, volumeIdVariations) {
-			return dmPath, nil
-		}
-		logger.Warningf("Expected {%v} but got {%v} from sg_inq", volumeId, SgInqWwn)
 	}
 
 	if err := r.Helper.ReloadMultipath(); err != nil {
@@ -315,6 +319,10 @@ func (r OsDeviceConnectivityHelperScsiGeneric) GetMpathDevice(volumeId string) (
 	}
 
 	if isNvmeDevice(dmPath, r.Executer) {
+		if !r.nativeNvmeDeviceMatchesVolume(dmPath, volumeIdVariations) {
+			return "", &ErrorWrongDeviceFound{dmPath, volumeIdVariations[0],
+				r.readSysfsValue(filepath.Join(sysBlockPath, filepath.Base(dmPath), "wwid"))}
+		}
 		logger.Debugf("NVMe device detected %s after reload, skipping sg_inq", dmPath)
 		return dmPath, nil
 	}
@@ -512,6 +520,30 @@ func (r OsDeviceConnectivityHelperScsiGeneric) getNativeNvmeHeadByWwid(volumeId 
 		return ""
 	}
 	return heads[0]
+}
+
+// nativeNvmeDeviceMatchesVolume checks that a native NVMe namespace (e.g. nvme0n1) holds the volume,
+// using the kernel wwid (eui.<nguid>). multipathd can report stale names after namespaces are re-attached.
+// Non-native devices, and native devices whose wwid can't be read, are not checked here.
+func (r OsDeviceConnectivityHelperScsiGeneric) nativeNvmeDeviceMatchesVolume(dmPath string,
+	volumeIdVariations []string) bool {
+	if !isNativeNvmeDevice(dmPath) {
+		return true
+	}
+	wwidPath := filepath.Join(sysBlockPath, filepath.Base(dmPath), "wwid")
+	wwid := strings.ToLower(r.readSysfsValue(wwidPath))
+	if wwid == "" {
+		logger.Warningf("nativeNvmeDeviceMatchesVolume: could not read %s, skipping identity check", wwidPath)
+		return true
+	}
+	for _, volumeIdVariation := range volumeIdVariations {
+		if wwid == volumeIdVariation || strings.HasSuffix(wwid, volumeIdVariation) {
+			return true
+		}
+	}
+	logger.Warningf("nativeNvmeDeviceMatchesVolume: %s has wwid {%s}, expected one of %v",
+		dmPath, wwid, volumeIdVariations)
+	return false
 }
 
 func (r OsDeviceConnectivityHelperScsiGeneric) readSysfsValue(sysfsFile string) string {
