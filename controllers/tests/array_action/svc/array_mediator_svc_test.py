@@ -2081,6 +2081,36 @@ class TestArrayMediatorSVC(unittest.TestCase):
                                           svc_settings.DUMMY_LOCAL_PORT2,
                                           svc_settings.DUMMY_LOCAL_NPORTID2,
                                           svc_settings.INACTIVE_STATE)
+        port_3 = self._mock_lsfabric_port(svc_settings.DUMMY_REMOTE_WWPN3,
+                                          svc_settings.DUMMY_REMOTE_NPORTID3,
+                                          svc_settings.DUMMY_INTERNAL_ID1,
+                                          array_settings.DUMMY_NODE1_NAME,
+                                          svc_settings.DUMMY_LOCAL_WWPN3,
+                                          svc_settings.DUMMY_LOCAL_PORT3,
+                                          svc_settings.DUMMY_LOCAL_NPORTID3,
+                                          svc_settings.BLOCKED_STATE)
+        self.svc.client.svcinfo.lsfabric.return_value = [port_1, port_2, port_3]
+        wwns = self.svc.get_array_fc_wwns(common_settings.HOST_NAME)
+        self.assertEqual([svc_settings.DUMMY_LOCAL_WWPN1, svc_settings.DUMMY_LOCAL_WWPN2,
+                          svc_settings.DUMMY_LOCAL_WWPN3], wwns)
+
+    def test_get_array_fc_wwns_blocked_only_success(self):
+        port_1 = self._mock_lsfabric_port(svc_settings.DUMMY_REMOTE_WWPN1,
+                                          svc_settings.DUMMY_REMOTE_NPORTID1,
+                                          svc_settings.DUMMY_INTERNAL_ID1,
+                                          array_settings.DUMMY_NODE1_NAME,
+                                          svc_settings.DUMMY_LOCAL_WWPN1,
+                                          svc_settings.DUMMY_LOCAL_PORT1,
+                                          svc_settings.DUMMY_LOCAL_NPORTID1,
+                                          svc_settings.BLOCKED_STATE)
+        port_2 = self._mock_lsfabric_port(svc_settings.DUMMY_REMOTE_WWPN2,
+                                          svc_settings.DUMMY_REMOTE_NPORTID2,
+                                          svc_settings.DUMMY_INTERNAL_ID2,
+                                          array_settings.DUMMY_NODE2_NAME,
+                                          svc_settings.DUMMY_LOCAL_WWPN2,
+                                          svc_settings.DUMMY_LOCAL_PORT2,
+                                          svc_settings.DUMMY_LOCAL_NPORTID2,
+                                          svc_settings.BLOCKED_STATE)
         self.svc.client.svcinfo.lsfabric.return_value = [port_1, port_2]
         wwns = self.svc.get_array_fc_wwns(common_settings.HOST_NAME)
         self.assertEqual([svc_settings.DUMMY_LOCAL_WWPN1, svc_settings.DUMMY_LOCAL_WWPN2], wwns)
