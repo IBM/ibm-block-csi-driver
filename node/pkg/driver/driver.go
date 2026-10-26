@@ -99,6 +99,8 @@ func (d *Driver) Run() error {
 	csi.RegisterIdentityServer(d.srv, d)
 	csi.RegisterNodeServer(d.srv, d)
 
+	d.NodeService.StartDRFailoverWatcher(context.Background())
+
 	logger.Infof("Listening for connections on address: %#v", listener.Addr())
 	return d.srv.Serve(listener)
 }

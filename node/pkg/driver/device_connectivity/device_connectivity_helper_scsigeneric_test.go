@@ -19,10 +19,12 @@ package device_connectivity_test
 import (
 	"errors"
 	"fmt"
+	"os"
 	"reflect"
 	"strings"
 	"sync"
 	"testing"
+	"time"
 
 	"github.com/golang/mock/gomock"
 	"github.com/ibm/ibm-block-csi-driver/node/logger"
@@ -1162,6 +1164,16 @@ func TestIsDmName(t *testing.T) {
 			mpathDeviceName: "dm-0",
 			expected:        false,
 		},
+		{
+			name:            "native NVMe namespace nvmeXnY is NOT a named device",
+			mpathDeviceName: "nvme0n1",
+			expected:        false,
+		},
+		{
+			name:            "native NVMe namespace with multi-digit ids is NOT a named device",
+			mpathDeviceName: "nvme12n104",
+			expected:        false,
+		},
 	}
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -1221,6 +1233,151 @@ func TestIsIndicatorMatchesFilterValues(t *testing.T) {
 			got := helper.IsIndicatorMatchesFilterValues(tc.dmFilterValues, tc.indicatorValue)
 			if got != tc.expected {
 				t.Fatalf("IsIndicatorMatchesFilterValues(%v, %q) = %v, want %v", tc.dmFilterValues, tc.indicatorValue, got, tc.expected)
+			}
+		})
+	}
+}
+
+type fakeSlaveFileInfo struct{ name string }
+
+func (f fakeSlaveFileInfo) Name() string       { return f.name }
+func (f fakeSlaveFileInfo) Size() int64        { return 0 }
+func (f fakeSlaveFileInfo) Mode() os.FileMode  { return os.ModeSymlink }
+func (f fakeSlaveFileInfo) ModTime() time.Time { return time.Time{} }
+func (f fakeSlaveFileInfo) IsDir() bool        { return false }
+func (f fakeSlaveFileInfo) Sys() interface{}   { return nil }
+
+func TestDisableQueueingIfLunUnavailable(t *testing.T) {
+	dmName := "dm-99"
+	dmPath := "/dev/" + dmName
+	slaves := []os.FileInfo{fakeSlaveFileInfo{"sdb"}, fakeSlaveFileInfo{"sdc"}}
+	showMapsArgs := []string{"show", "maps", "raw", "format", "\"", "%w,%d", "\""}
+	showPathsArgs := []string{"show", "paths", "raw", "format", "\"", "%d,%t", "\""}
+	disableQueueingArgs := []string{"disablequeueing", "map", dmName}
+	lunUnavailableOutput := "test unit ready:\nFixed format, current; Sense key: Not Ready\n" +
+		"Additional sense: Logical unit not accessible, target port in unavailable state\ndevice not ready\n"
+	lunNotReadyOutput := "test unit ready:\nFixed format, current; Sense key: Not Ready\n" +
+		"Additional sense: Logical unit not ready, cause not reportable\ndevice not ready\n"
+	notReadyErr := errors.New("exit status 2")
+	allFailedPaths := " sda,undef \n sdb,failed \n sdc,failed \n"
+
+	type tursResult struct {
+		out string
+		err error
+	}
+
+	testCases := []struct {
+		name                  string
+		showMapsOutput        string
+		expectReadSlaves      bool
+		showPathsOutput       string
+		expectShowPaths       bool
+		tursResults           map[string]tursResult
+		expectDisableQueueing bool
+		expDevice             string
+	}{
+		{name: "all paths active", showMapsOutput: " 3" + volumeUuid + "," + dmName + " \n", expectReadSlaves: true,
+			expectShowPaths: true, showPathsOutput: " sda,undef \n sdb,active \n sdc,active \n"},
+		{name: "all paths failed but LUN not unavailable on a path", showMapsOutput: " 3" + volumeUuid + "," + dmName + " \n",
+			expectReadSlaves: true, expectShowPaths: true, showPathsOutput: allFailedPaths,
+			tursResults: map[string]tursResult{"/dev/sdb": {lunUnavailableOutput, notReadyErr}, "/dev/sdc": {lunNotReadyOutput, notReadyErr}}},
+		{name: "all paths failed and LUN unavailable on all paths", showMapsOutput: " 3" + volumeUuid + "," + dmName + " \n",
+			expectReadSlaves: true, expectShowPaths: true, showPathsOutput: allFailedPaths,
+			tursResults:           map[string]tursResult{"/dev/sdb": {lunUnavailableOutput, notReadyErr}, "/dev/sdc": {lunUnavailableOutput, notReadyErr}},
+			expectDisableQueueing: true, expDevice: dmPath},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			mockCtrl := gomock.NewController(t)
+			defer mockCtrl.Finish()
+
+			fakeExecuter := mocks.NewMockExecuterInterface(mockCtrl)
+			fakeExecuter.EXPECT().ExecuteWithTimeout(device_connectivity.TimeOutMultipathCmd, "nvme", []string{"list"}).Return([]byte(""), nil).AnyTimes()
+			fakeHelper := mocks.NewMockOsDeviceConnectivityHelperInterface(mockCtrl)
+			fakeHelper.EXPECT().GetVolumeIdVariations(volumeUuid).Return([]string{volumeUuid, volumeNguid})
+
+			fakeExecuter.EXPECT().ExecuteWithTimeout(device_connectivity.TimeOutMultipathdCmd, "multipathd", showMapsArgs).Return(
+				[]byte(tc.showMapsOutput), nil)
+			if tc.expectReadSlaves {
+				fakeExecuter.EXPECT().IoutilReadDir("/sys/block/"+dmName+"/slaves").Return(slaves, nil)
+			}
+			if tc.expectShowPaths {
+				fakeExecuter.EXPECT().ExecuteWithTimeout(device_connectivity.TimeOutMultipathdCmd, "multipathd", showPathsArgs).Return(
+					[]byte(tc.showPathsOutput), nil)
+			}
+			for pathDevice, result := range tc.tursResults {
+				fakeExecuter.EXPECT().ExecuteWithTimeout(device_connectivity.TimeOutSgInqCmd, "sg_turs", []string{"-v", pathDevice}).Return(
+					[]byte(result.out), result.err)
+			}
+			if tc.expectDisableQueueing {
+				fakeExecuter.EXPECT().ExecuteWithTimeout(device_connectivity.TimeOutMultipathdCmd, "multipathd", disableQueueingArgs).Return(
+					[]byte("ok"), nil)
+			}
+
+			o := NewOsDeviceConnectivityHelperScsiGenericForTest(fakeExecuter, fakeHelper, &sync.Mutex{})
+			device, err := o.DisableQueueingIfLunUnavailable(volumeUuid)
+			if err != nil {
+				t.Fatalf("expected no error, got: %v", err)
+			}
+			if device != tc.expDevice {
+				t.Fatalf("expected device %q, got %q", tc.expDevice, device)
+			}
+		})
+	}
+}
+
+func TestIsNativeNvmeNamespaceInaccessible(t *testing.T) {
+	headWwid := "eui." + volumeNguid
+	type pathState struct{ ana, ctrl string }
+
+	testCases := []struct {
+		name     string
+		wwid     string      // wwid of the namespace nvme0n1
+		paths    []pathState // nil: the multipath dir is not read
+		expected bool
+	}{
+		{name: "all paths inaccessible on live controllers", wwid: headWwid,
+			paths: []pathState{{"inaccessible", "live"}, {"inaccessible", "live"}, {"persistent-loss", "live"}}, expected: true},
+		{name: "one path optimized", wwid: headWwid,
+			paths: []pathState{{"inaccessible", "live"}, {"optimized", "live"}}, expected: false},
+		{name: "ANA change state", wwid: headWwid,
+			paths: []pathState{{"inaccessible", "live"}, {"change", "live"}}, expected: false},
+		{name: "controller not live", wwid: headWwid,
+			paths: []pathState{{"inaccessible", "live"}, {"inaccessible", "connecting"}}, expected: false},
+		{name: "no namespace of the volume", wwid: "eui.other", expected: false},
+		{name: "no paths (not native multipath)", wwid: headWwid, paths: []pathState{}, expected: false},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			mockCtrl := gomock.NewController(t)
+			defer mockCtrl.Finish()
+			fakeExecuter := mocks.NewMockExecuterInterface(mockCtrl)
+			fakeHelper := mocks.NewMockOsDeviceConnectivityHelperInterface(mockCtrl)
+			fakeHelper.EXPECT().GetVolumeIdVariations(volumeUuid).Return([]string{volumeUuid, volumeNguid})
+
+			// a per-path device (nvmeXcYnZ) also matches the glob and must be skipped without reading its wwid
+			fakeExecuter.EXPECT().FilepathGlob("/sys/block/nvme*n*").Return(
+				[]string{"/sys/block/nvme0c0n1", "/sys/block/nvme0n1"}, nil)
+			fakeExecuter.EXPECT().IoutilReadFile("/sys/block/nvme0n1/wwid").Return([]byte(tc.wwid+"\n"), nil)
+
+			if tc.paths != nil {
+				var entries []os.FileInfo
+				for i := range tc.paths {
+					entries = append(entries, fakeSlaveFileInfo{fmt.Sprintf("nvme0c%dn1", i)})
+				}
+				fakeExecuter.EXPECT().IoutilReadDir("/sys/block/nvme0n1/multipath").Return(entries, nil)
+				for i, p := range tc.paths {
+					pathDir := fmt.Sprintf("/sys/block/nvme0c%dn1", i)
+					fakeExecuter.EXPECT().IoutilReadFile(pathDir+"/ana_state").Return([]byte(p.ana+"\n"), nil).MaxTimes(1)
+					fakeExecuter.EXPECT().IoutilReadFile(pathDir+"/device/state").Return([]byte(p.ctrl+"\n"), nil).MaxTimes(1)
+				}
+			}
+
+			o := NewOsDeviceConnectivityHelperScsiGenericForTest(fakeExecuter, fakeHelper, &sync.Mutex{})
+			if got := o.IsNativeNvmeNamespaceInaccessible(volumeUuid); got != tc.expected {
+				t.Fatalf("expected %v, got %v", tc.expected, got)
 			}
 		})
 	}
