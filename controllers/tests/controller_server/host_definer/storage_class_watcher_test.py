@@ -92,3 +92,9 @@ class TestWatchStorageClassResources(StorageClassWatcherBase):
         self.managed_secrets_on_watcher_helper.append(test_utils.get_fake_secret_info())
         self.storage_class_watcher.watch_storage_class_resources()
         self.assertEqual(0, self.managed_secrets_on_storage_class_watcher[0].managed_storage_classes)
+
+    def test_deleted_storage_class_with_unmanaged_secret_does_not_raise(self):
+        self.storage_class_stream.return_value = iter([test_utils.get_fake_secret_storage_event(
+            test_settings.DELETED_EVENT_TYPE, test_settings.CSI_PROVISIONER_NAME)])
+        self.storage_class_watcher.watch_storage_class_resources()
+        self.assertEqual(0, len(self.managed_secrets_on_storage_class_watcher))
