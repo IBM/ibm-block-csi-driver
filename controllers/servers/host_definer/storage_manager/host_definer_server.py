@@ -15,12 +15,18 @@ from controllers.servers.utils import (join_object_prefix_with_name,
                                        get_initiators_from_csi_node,
                                        are_initiators_equal)
 from controllers.servers.host_definer import messages
+from controllers.servers.host_definer import settings as host_definer_settings
 
 logger = get_stdout_logger()
 
 
 class HostDefinerServicer:
     def define_host(self, request):
+        if self._is_connectivity_type_from_user_unsupported(request.connectivity_type_from_user):
+            error = array_errors.UnsupportedConnectivityTypeError(request.connectivity_type_from_user)
+            logger.error("{}, supported connectivity types: {}".format(
+                error, host_definer_settings.SUPPORTED_CONNECTIVITY_TYPES))
+            return DefineHostResponse(error_message=str(error))
         array_connection_info = request.array_connection_info
         array_addresses = array_connection_info.array_addresses
         node_id_info = NodeIdInfo(request.node_id_from_csi_node)
@@ -47,6 +53,8 @@ class HostDefinerServicer:
                     if not array_connection_info.partition_name:
                         self._update_host_io_group(request, found_host_name, array_mediator)
                     host_name = found_host_name
+                    connectivity_type_from_user = self._get_host_nvme_transport_if_not_requested(
+                        request, connectivity_type_from_user, host_name, array_mediator)
                 except HostNotFoundError:
                     logger.debug(messages.NODE_WAS_NOT_FOUND_CREATE_NEW_HOST_DEFINITION.format(node_name, initiators))
                     try:
@@ -64,6 +72,11 @@ class HostDefinerServicer:
         except Exception as ex:
             logger.exception(ex)
             return DefineHostResponse(error_message=str(ex))
+
+    def _is_connectivity_type_from_user_unsupported(self, connectivity_type_from_user):
+        # The node label is filtered by the watcher, the config map value is not
+        return bool(connectivity_type_from_user) and \
+            connectivity_type_from_user not in host_definer_settings.SUPPORTED_CONNECTIVITY_TYPES
 
     def undefine_host(self, request):
         node_id_info = NodeIdInfo(request.node_id_from_csi_node)
@@ -106,6 +119,10 @@ class HostDefinerServicer:
             request.node_id_from_csi_node)
         requested_connectivity_type = get_initiators_connectivity_type(initiators, request.connectivity_type_from_user)
         existing_connectivity_type = array_mediator.get_host_connectivity_type(host)
+        if self._is_nvme_transport_not_requested(request, requested_connectivity_type, existing_connectivity_type):
+            requested_connectivity_type = existing_connectivity_type
+        logger.debug("Host {} requested connectivity type: {}, existing connectivity type: {}".format(
+            host, requested_connectivity_type, existing_connectivity_type))
         if self._is_protocol_switched(requested_connectivity_type, existing_connectivity_type):
             self._change_host_protocol(array_mediator, host, existing_connectivity_type, request)
         elif self._is_port_update_needed_when_same_protocol(request, requested_connectivity_type,
@@ -133,9 +150,36 @@ class HostDefinerServicer:
                     return
                 raise ex
 
+    def _is_nvme_transport_not_requested(self, request, requested_connectivity_type, existing_connectivity_type):
+        # The node reports one NQN for both NVMe transports, so without a connectivity type from the user
+        # the NVMe transport cannot be derived from the node: keep the existing NVMe host transport
+        return not request.connectivity_type_from_user and \
+            self._is_protocol_nvme(requested_connectivity_type) and \
+            self._is_protocol_nvme(existing_connectivity_type)
+
+    def _get_host_nvme_transport_if_not_requested(self, request, connectivity_type, host_name, array_mediator):
+        # Report the NVMe transport of the host on the storage when it was not requested by the user
+        if request.connectivity_type_from_user or not self._is_protocol_nvme(connectivity_type):
+            return connectivity_type
+        host_connectivity_type = array_mediator.get_host_connectivity_type(host_name)
+        if self._is_protocol_nvme(host_connectivity_type):
+            return host_connectivity_type
+        return connectivity_type
+
     def _is_protocol_switched(self, connectivity_type_from_user, connectivity_type_from_host):
-        return self._is_switching_from_nvme_to_scsi(connectivity_type_from_user, connectivity_type_from_host) or \
-            self._is_switching_from_scsi_to_nvme(connectivity_type_from_user, connectivity_type_from_host)
+        is_switched = \
+            self._is_switching_from_nvme_to_scsi(connectivity_type_from_user, connectivity_type_from_host) or \
+            self._is_switching_from_scsi_to_nvme(connectivity_type_from_user, connectivity_type_from_host) or \
+            self._is_switching_between_nvme_transports(connectivity_type_from_user, connectivity_type_from_host)
+        logger.debug("Is protocol switched from {} to {}: {}".format(
+            connectivity_type_from_host, connectivity_type_from_user, is_switched))
+        return is_switched
+
+    def _is_switching_between_nvme_transports(self, connectivity_type_from_user, connectivity_type_from_host):
+        # NVMe-FC (fcnvme) and NVMe-TCP (tcpnvme) are different host protocols on the storage
+        return self._is_protocol_nvme(connectivity_type_from_host) and \
+            self._is_protocol_nvme(connectivity_type_from_user) and \
+            connectivity_type_from_user != connectivity_type_from_host
 
     def _is_switching_from_nvme_to_scsi(self, connectivity_type_from_user, connectivity_type_from_host):
         return self._is_protocol_nvme(connectivity_type_from_host) and \
@@ -167,6 +211,8 @@ class HostDefinerServicer:
             request.node_id_from_csi_node)
         requested_connectivity_type = get_initiators_connectivity_type(initiators, request.connectivity_type_from_user)
         protocol = self._get_host_protocol(requested_connectivity_type)
+        logger.debug("Changing host {} protocol to {} for connectivity type {}".format(
+            host_name, protocol, requested_connectivity_type))
         array_mediator.change_host_protocol(host_name, protocol)
         array_mediator.add_ports_to_host(host_name, initiators, requested_connectivity_type)
 
@@ -240,12 +286,17 @@ class HostDefinerServicer:
             return Initiators(fc_wwns=ports)
         elif connectivity_type == array_config.ISCSI_CONNECTIVITY_TYPE:
             return Initiators(iscsi_iqns=ports)
-        elif connectivity_type == array_config.NVME_OVER_FC_CONNECTIVITY_TYPE:
+        elif connectivity_type in (array_config.NVME_OVER_FC_CONNECTIVITY_TYPE,
+                                   array_config.NVME_OVER_TCP_CONNECTIVITY_TYPE):
+            logger.debug("Creating NVMe initiators for connectivity type {} with ports {}".format(
+                connectivity_type, ports))
             return Initiators(nvme_nqns=ports)
         else:
             return Initiators()
 
     def _get_host_protocol(self, connectivity_type):
+        if connectivity_type == array_config.NVME_OVER_TCP_CONNECTIVITY_TYPE:
+            return common_settings.NVME_TCP_PROTOCOL
         if self._is_protocol_scsi(connectivity_type):
             return common_settings.SCSI_PROTOCOL
         if self._is_protocol_nvme(connectivity_type):
@@ -256,7 +307,8 @@ class HostDefinerServicer:
         return connectivity_type in [array_config.FC_CONNECTIVITY_TYPE, array_config.ISCSI_CONNECTIVITY_TYPE]
 
     def _is_protocol_nvme(self, connectivity_type):
-        return connectivity_type == array_config.NVME_OVER_FC_CONNECTIVITY_TYPE
+        return connectivity_type in (array_config.NVME_OVER_FC_CONNECTIVITY_TYPE,
+                                     array_config.NVME_OVER_TCP_CONNECTIVITY_TYPE)
 
     def _create_host(self, host, array_mediator, request):
         initiators = get_initiators_from_csi_node(

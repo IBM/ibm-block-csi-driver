@@ -2,6 +2,9 @@ from dataclasses import dataclass, field
 
 from controllers.array_action import settings as array_config
 from controllers.common import settings
+from controllers.common.csi_logger import get_stdout_logger
+
+logger = get_stdout_logger()
 
 
 class NodeIdInfo:
@@ -60,6 +63,10 @@ class Initiators:
         return self._get_iter()
 
     def get_by_connectivity_type(self, connectivity_type):
+        # NVMe-TCP hosts are identified by the same host NQN as NVMe-FC hosts
+        if connectivity_type == array_config.NVME_OVER_TCP_CONNECTIVITY_TYPE:
+            logger.debug("Using NVMe NQNs {} for connectivity type {}".format(self.nvme_nqns, connectivity_type))
+            connectivity_type = array_config.NVME_OVER_FC_CONNECTIVITY_TYPE
         return self._ports_by_type.get(connectivity_type)
 
     def _lower(self, ports):

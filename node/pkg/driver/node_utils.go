@@ -132,7 +132,8 @@ func (n NodeUtils) GetInfoFromPublishContext(publishContext map[string]string) (
 	var lun int
 	var err error
 	connectivityType := publishContext[n.ConfigYaml.Controller.Publish_context_connectivity_parameter]
-	if connectivityType != n.ConfigYaml.Connectivity_type.Nvme_over_fc {
+	if connectivityType != n.ConfigYaml.Connectivity_type.Nvme_over_fc &&
+		connectivityType != n.ConfigYaml.Connectivity_type.Nvme_over_tcp {
 		lun, err = strconv.Atoi(strLun)
 		if err != nil {
 			return "", -1, nil, err
@@ -167,6 +168,21 @@ func (n NodeUtils) GetInfoFromPublishContext(publishContext map[string]string) (
 				ipsByArrayInitiator[port] = nil
 			}
 		}
+	}
+
+	if connectivityType == n.ConfigYaml.Connectivity_type.Nvme_over_tcp {
+		// PUBLISH_CONTEXT_ARRAY_NVME_INITIATORS = "IP1,IP2,..."
+		// key = array target IP address, value = nil.
+		nvmeTcpTargetIps := strings.Split(
+			publishContext[n.ConfigYaml.Controller.Publish_context_nvme_initiators],
+			publishContextSeparator)
+		for _, targetIp := range nvmeTcpTargetIps {
+			targetIp = strings.TrimSpace(targetIp)
+			if targetIp != "" {
+				ipsByArrayInitiator[targetIp] = nil
+			}
+		}
+		logger.Debugf("NVMe-oTCP PublishContext target IPs: %v", nvmeTcpTargetIps)
 	}
 
 	logger.Debugf("PublishContext relevant info : connectivityType=%v, lun=%v, arrayInitiators=%v",

@@ -62,6 +62,11 @@ NO_FC_TARGETS_FOUND_ERROR_MESSAGE = "Could not find FC targets for storage endpo
 
 NO_NVME_FC_TARGETS_FOUND_ERROR_MESSAGE = "Could not find NVMe-FC targets for storage endpoint: {0}"
 
+NO_NVME_TCP_TARGETS_FOUND_ERROR_MESSAGE = "Could not find NVMe-TCP targets for storage endpoint: {0}"
+
+NVME_TCP_NOT_ENABLED_ERROR_MESSAGE = "NVMe-TCP connectivity is not enabled for host {0}. To allow it, set " \
+                                     "enableNvmeTcp: \"true\" in the ibm-csi-controller-config ConfigMap"
+
 UNSUPPORTED_CONNECTIVITY_TYPE_ERROR_MESSAGE = "Unsupported connectivity type: {0}"
 
 SNAPSHOT_NOT_FOUND_ERROR_MESSAGE = "Snapshot was not found : {0} "

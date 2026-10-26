@@ -1,5 +1,6 @@
+import os
 import unittest
-from unittest.mock import Mock
+from unittest.mock import Mock, patch
 
 import controllers.array_action.errors as array_errors
 import controllers.tests.array_action.test_settings as array_settings
@@ -264,6 +265,35 @@ class TestMapVolumeByInitiators(BaseMediatorAbstractSetUp):
             array_settings.DUMMY_NODE1_IQN: [array_settings.DUMMY_IP_ADDRESS1, array_settings.DUMMY_IP_ADDRESS2],
             array_settings.DUMMY_NODE2_IQN: [array_settings.DUMMY_IP_ADDRESS3]}))
 
+    def _prepare_map_volume_by_initiators_nvme_tcp(self):
+        self.mediator.get_host_by_host_identifiers.return_value = self.hostname, [
+            array_settings.NVME_OVER_TCP_CONNECTIVITY_TYPE]
+        self.mediator.get_nvme_tcp_target_ips = Mock()
+        self.mediator.get_nvme_tcp_target_ips.return_value = [array_settings.DUMMY_NVME_TCP_TARGET_IP1,
+                                                              array_settings.DUMMY_NVME_TCP_TARGET_IP2]
+        self.mediator.map_volume = Mock()
+        self.mediator.map_volume.return_value = self.lun_id
+
+    def test_map_volume_by_initiators_with_connectivity_type_nvme_tcp_not_enabled(self):
+        self._prepare_map_volume_by_initiators_nvme_tcp()
+        with patch.dict(os.environ, {}):
+            os.environ.pop('ENABLE_NVME_TCP', None)
+            with self.assertRaises(array_errors.NvmeTcpNotEnabledError):
+                self.mediator.map_volume_by_initiators('', self.initiators)
+
+        self.mediator.get_nvme_tcp_target_ips.assert_not_called()
+        self.mediator.map_volume.assert_not_called()
+
+    def test_map_volume_by_initiators_with_connectivity_type_nvme_tcp_enabled(self):
+        self._prepare_map_volume_by_initiators_nvme_tcp()
+        with patch.dict(os.environ, {'ENABLE_NVME_TCP': 'true'}):
+            response = self.mediator.map_volume_by_initiators('', self.initiators)
+
+        self.assertEqual(response, (array_settings.DUMMY_LUN_ID, array_settings.NVME_OVER_TCP_CONNECTIVITY_TYPE,
+                                    [array_settings.DUMMY_NVME_TCP_TARGET_IP1,
+                                     array_settings.DUMMY_NVME_TCP_TARGET_IP2]))
+        self.mediator.get_nvme_tcp_target_ips.assert_called_once_with(self.hostname)
+
 
 class TestUnmapVolumeByInitiators(BaseMediatorAbstractSetUp):
 
@@ -277,6 +307,16 @@ class TestUnmapVolumeByInitiators(BaseMediatorAbstractSetUp):
                                                                    array_settings.NVME_OVER_FC_CONNECTIVITY_TYPE)
 
         self.mediator.unmap_volume_by_initiators('', self.initiators)
+
+    def test_unmap_volume_by_initiators_with_connectivity_type_nvme_tcp_unmaps_by_nguid(self):
+        self.mediator.get_host_by_host_identifiers = Mock()
+        self.mediator.get_host_by_host_identifiers.return_value = (common_settings.HOST_NAME,
+                                                                   [array_settings.NVME_OVER_TCP_CONNECTIVITY_TYPE])
+
+        self.mediator.unmap_volume_by_initiators('6005076810AD800030000000000011D9', self.initiators)
+
+        self.mediator.unmap_volume.assert_called_once_with('30000000000011D90050760810AD8000',
+                                                           common_settings.HOST_NAME)
 
     def test_unmap_volume_by_initiators_get_host_by_host_identifiers_multiple_hosts_found_error(self):
         self.mediator.get_host_by_host_identifiers = Mock()

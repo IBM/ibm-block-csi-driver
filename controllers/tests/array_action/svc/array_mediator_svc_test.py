@@ -1646,6 +1646,15 @@ class TestArrayMediatorSVC(unittest.TestCase):
         self.assertEqual({array_settings.NVME_OVER_FC_CONNECTIVITY_TYPE}, connectivity_types)
         self.svc.client.svcinfo.lsnvmefabric.assert_called_once_with(remotenqn=array_settings.DUMMY_NVME_NQN1)
 
+    def test_get_host_by_identifiers_return_nvme_tcp_host(self):
+        self.svc.client.svcinfo.lsnvmefabric.return_value = Mock(as_list=[
+            Munch(object_name=array_settings.DUMMY_HOST_NAME3, transport='tcp')])
+        hostname, connectivity_types = self.svc.get_host_by_host_identifiers(
+            Initiators([array_settings.DUMMY_NVME_NQN1], [], []))
+        self.assertEqual(array_settings.DUMMY_HOST_NAME3, hostname)
+        self.assertEqual({array_settings.NVME_OVER_TCP_CONNECTIVITY_TYPE}, connectivity_types)
+        self.svc.client.svcinfo.lsnvmefabric.assert_called_once_with(remotenqn=array_settings.DUMMY_NVME_NQN1)
+
     @patch.object(SVCResponse, svc_settings.SVC_RESPONSE_AS_LIST, new_callable=PropertyMock)
     def test_get_host_by_identifiers_slow_no_other_ports_return_nvme_host(self, svc_response):
         host_with_nqn = self._get_host_as_munch(array_settings.DUMMY_HOST_ID1, common_settings.HOST_NAME,
@@ -1950,6 +1959,40 @@ class TestArrayMediatorSVC(unittest.TestCase):
         self.svc.client.svcinfo.lshost = Mock()
         self.svc.client.svcinfo.lshost.return_value = Mock(as_single_element=host)
 
+    def _prepare_mocks_for_get_nvme_tcp_target_ips(self, portset_id, lsip_ports):
+        host = self._get_host_as_munch(array_settings.DUMMY_HOST_ID1, common_settings.HOST_NAME,
+                                       nqn_list=[array_settings.DUMMY_NVME_NQN1], portset_id=portset_id)
+        self.svc.client.svcinfo.lshost = Mock()
+        self.svc.client.svcinfo.lshost.return_value = Mock(as_single_element=host)
+        self.svc.client.svcinfo.lsip.return_value = [
+            Munch({svc_settings.LSIP_NODE_ID_ATTR_KEY: node_id, svc_settings.LSIP_IP_ADDRESS_ATTR_KEY: ip_address,
+                   svc_settings.LSIP_PORTSET_ID_ATTR_KEY: portset_id}) for node_id, ip_address in lsip_ports]
+
+    def test_get_nvme_tcp_target_ips_success(self):
+        self._prepare_mocks_for_get_nvme_tcp_target_ips('3', [
+            ('1', array_settings.DUMMY_NVME_TCP_TARGET_IP1), ('2', array_settings.DUMMY_NVME_TCP_TARGET_IP2),
+            ('1', array_settings.DUMMY_NVME_TCP_TARGET_IP1), ('2', '')])
+
+        target_ips = self.svc.get_nvme_tcp_target_ips(common_settings.HOST_NAME)
+
+        self.assertEqual([array_settings.DUMMY_NVME_TCP_TARGET_IP1, array_settings.DUMMY_NVME_TCP_TARGET_IP2],
+                         target_ips)
+        self.svc.client.svcinfo.lsip.assert_called_once_with(filtervalue='portset_id=3')
+
+    def test_get_nvme_tcp_target_ips_host_without_portset_raise_no_targets_error(self):
+        self._prepare_mocks_for_get_nvme_tcp_target_ips(None, [])
+        self.svc.client.svcinfo.lsip = Mock()
+
+        with self.assertRaises(array_errors.NoNvmeTcpTargetsFoundError):
+            self.svc.get_nvme_tcp_target_ips(common_settings.HOST_NAME)
+        self.svc.client.svcinfo.lsip.assert_not_called()
+
+    def test_get_nvme_tcp_target_ips_no_ips_in_portset_raise_no_targets_error(self):
+        self._prepare_mocks_for_get_nvme_tcp_target_ips('3', [])
+
+        with self.assertRaises(array_errors.NoNvmeTcpTargetsFoundError):
+            self.svc.get_nvme_tcp_target_ips(common_settings.HOST_NAME)
+
     def test_get_iscsi_targets_cmd_error_raise_host_not_found(self):
         self.svc.client.svcinfo.lshost.return_value = Mock(as_single_element=[])
         with self.assertRaises(array_errors.HostNotFoundError):
@@ -2212,6 +2255,16 @@ class TestArrayMediatorSVC(unittest.TestCase):
                                                                protocol=svc_settings.MKHOST_NVME_PROTOCOL_VALUE,
                                                                iogrp=array_settings.DUMMY_MULTIPLE_IO_GROUP_STRING)
 
+    def test_create_host_nvme_tcp_success(self):
+        self.svc.create_host(
+            common_settings.HOST_NAME,
+            Initiators([array_settings.DUMMY_NVME_NQN1], [], []),
+            array_settings.NVME_OVER_TCP_CONNECTIVITY_TYPE, array_settings.DUMMY_MULTIPLE_IO_GROUP_STRING)
+        self.svc.client.svctask.mkhost.assert_called_once_with(name=common_settings.HOST_NAME,
+                                                               nqn=array_settings.DUMMY_NVME_NQN1,
+                                                               protocol='tcpnvme',
+                                                               iogrp=array_settings.DUMMY_MULTIPLE_IO_GROUP_STRING)
+
     def test_create_host_nvme_success_force_portset(self):
         with patch('os.getenv', return_value='2'):
             self.svc.create_host(
@@ -2442,6 +2495,13 @@ class TestArrayMediatorSVC(unittest.TestCase):
         self._prepare_mocks_for_get_host_with_ports(connectivity_attribute_name)
         result = self.svc.get_host_connectivity_type(common_settings.HOST_NAME)
         self.assertEqual(result, connectivity_type)
+
+    def test_get_host_connectivity_type_nvme_tcp_success(self):
+        self.svc.client.svcinfo.lshost = Mock()
+        self.svc.client.svcinfo.lshost.return_value = Mock(as_single_element=Munch({
+            svc_settings.HOST_NQN: [array_settings.DUMMY_NVME_NQN1], 'protocol': 'tcpnvme'}))
+        result = self.svc.get_host_connectivity_type(common_settings.HOST_NAME)
+        self.assertEqual(result, array_settings.NVME_OVER_TCP_CONNECTIVITY_TYPE)
 
     def test_get_host_connectivity_type_success(self):
         self._test_get_host_connectivity_type(svc_settings.HOST_NQN, array_settings.NVME_OVER_FC_CONNECTIVITY_TYPE)
