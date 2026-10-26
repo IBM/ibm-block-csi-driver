@@ -2059,7 +2059,22 @@ class TestArrayMediatorSVC(unittest.TestCase):
                       svc_settings.LSFABRIC_PORT_LOCAL_WWPN_ATTR_KEY: local_wwpn,
                       svc_settings.LSFABRIC_PORT_LOCAL_PORT_ATTR_KEY: local_port,
                       svc_settings.LSFABRIC_PORT_LOCAL_NPORTID_ATTR_KEY: local_nportid,
-                      svc_settings.LSFABRIC_PORT_STATE_ATTR_KEY: state,
+                      svc_settings.LSFABRIC_PORT_STATE_ATTR_KEY: state,  # 9.2+: login_state
+                      svc_settings.LSFABRIC_PORT_NAME_ATTR_KEY: svc_settings.DUMMY_PORT_NAME,
+                      svc_settings.LSFABRIC_PORT_CLUSTER_NAME_ATTR_KEY: "",
+                      svc_settings.LSFABRIC_PORT_TYPE_ATTR_KEY: common_settings.HOST_NAME})
+
+    def _mock_lsfabric_port_legacy(self, remote_wwpn, remote_nportid, port_id, node_name, local_wwpn, local_port,
+                                   local_nportid, state):
+        """Simulates pre-9.2 firmware where the column is 'state', not 'login_state'."""
+        return Munch({svc_settings.LSFABRIC_PORT_REMOTE_WWPN_ATTR_KEY: remote_wwpn,
+                      svc_settings.LSFABRIC_PORT_REMOTE_NPORTID_ATTR_KEY: remote_nportid,
+                      svc_settings.LSFABRIC_PORT_ID_ATTR_KEY: port_id,
+                      svc_settings.LSFABRIC_PORT_NODE_NAME_ATTR_KEY: node_name,
+                      svc_settings.LSFABRIC_PORT_LOCAL_WWPN_ATTR_KEY: local_wwpn,
+                      svc_settings.LSFABRIC_PORT_LOCAL_PORT_ATTR_KEY: local_port,
+                      svc_settings.LSFABRIC_PORT_LOCAL_NPORTID_ATTR_KEY: local_nportid,
+                      'state': state,  # pre-9.2: legacy column name
                       svc_settings.LSFABRIC_PORT_NAME_ATTR_KEY: svc_settings.DUMMY_PORT_NAME,
                       svc_settings.LSFABRIC_PORT_CLUSTER_NAME_ATTR_KEY: "",
                       svc_settings.LSFABRIC_PORT_TYPE_ATTR_KEY: common_settings.HOST_NAME})
@@ -2081,6 +2096,28 @@ class TestArrayMediatorSVC(unittest.TestCase):
                                           svc_settings.DUMMY_LOCAL_PORT2,
                                           svc_settings.DUMMY_LOCAL_NPORTID2,
                                           svc_settings.INACTIVE_STATE)
+        self.svc.client.svcinfo.lsfabric.return_value = [port_1, port_2]
+        wwns = self.svc.get_array_fc_wwns(common_settings.HOST_NAME)
+        self.assertEqual([svc_settings.DUMMY_LOCAL_WWPN1, svc_settings.DUMMY_LOCAL_WWPN2], wwns)
+
+    def test_get_array_fc_wwns_success_legacy_state_column(self):
+        """Pre-9.2 firmware uses 'state' column instead of 'login_state'."""
+        port_1 = self._mock_lsfabric_port_legacy(svc_settings.DUMMY_REMOTE_WWPN1,
+                                                 svc_settings.DUMMY_REMOTE_NPORTID1,
+                                                 svc_settings.DUMMY_INTERNAL_ID1,
+                                                 array_settings.DUMMY_NODE1_NAME,
+                                                 svc_settings.DUMMY_LOCAL_WWPN1,
+                                                 svc_settings.DUMMY_LOCAL_PORT1,
+                                                 svc_settings.DUMMY_LOCAL_NPORTID1,
+                                                 svc_settings.ACTIVE_STATE)
+        port_2 = self._mock_lsfabric_port_legacy(svc_settings.DUMMY_REMOTE_WWPN2,
+                                                 svc_settings.DUMMY_REMOTE_NPORTID2,
+                                                 svc_settings.DUMMY_INTERNAL_ID2,
+                                                 array_settings.DUMMY_NODE2_NAME,
+                                                 svc_settings.DUMMY_LOCAL_WWPN2,
+                                                 svc_settings.DUMMY_LOCAL_PORT2,
+                                                 svc_settings.DUMMY_LOCAL_NPORTID2,
+                                                 svc_settings.INACTIVE_STATE)
         self.svc.client.svcinfo.lsfabric.return_value = [port_1, port_2]
         wwns = self.svc.get_array_fc_wwns(common_settings.HOST_NAME)
         self.assertEqual([svc_settings.DUMMY_LOCAL_WWPN1, svc_settings.DUMMY_LOCAL_WWPN2], wwns)
