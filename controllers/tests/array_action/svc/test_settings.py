@@ -16,7 +16,6 @@ ONLINE_STATUS = "online"
 OFFLINE_STATUS = "offline"
 ACTIVE_STATE = "active"
 INACTIVE_STATE = "inactive"
-BLOCKED_STATE = "blocked"
 
 LSSYSTEM_LOCATION_ATTR_KEY = "location"
 LSSYSTEM_CODE_LEVEL_ATTR_KEY = "code_level"
