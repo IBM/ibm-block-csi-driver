@@ -389,6 +389,132 @@ class _SdkResponse:
 _SdkLsvdiskResponse = _SdkResponse
 
 
+# ---------------------------------------------------------------------------
+# SDK main-branch compatibility shim
+#
+# The published SDK main branch does not yet contain:
+#   - verify_ssl parameter on StorageVirtualizeAPI
+#   - addhostiogrp/{id}, rmhostiogrp/{id}, expandvolume/{id},
+#     chvolumereplicationinternals/{id} endpoints in SVCTaskApi
+#   - iscsiname/nqn on RmhostportIdPostRequest
+#   - protocol on ChhostIdPostRequest
+#   - noreplicationpolicy on ChvolumegroupIdPostRequest
+#   - bytes on LsvdiskPostRequest / LsvdiskIdPostRequest
+#
+# This shim adds those missing pieces so the CSI driver can be installed
+# against the unmodified SDK main branch.
+# ---------------------------------------------------------------------------
+
+_SDK_RESPONSE_TYPES = {
+    '200': "object",
+    '400': "object",
+    '401': "object",
+    '403': "object",
+    '404': "object",
+    '409': "object",
+    '429': "object",
+    '500': "object",
+    '502': "object",
+}
+
+
+class _SvcTaskApiCompat:
+    """Wraps the SDK-generated SVCTaskApi and adds endpoints missing from main.
+
+    All existing methods on the real api are accessible via normal attribute
+    lookup (``__getattr__`` delegation).  Only the four missing endpoints are
+    implemented here; they use the api_client directly to issue a plain
+    POST with a JSON body dict.
+    """
+
+    def __init__(self, real_api):
+        self._real = real_api
+        self._api_client = real_api.api_client
+
+    def __getattr__(self, name):
+        return getattr(self._real, name)
+
+    def _post_with_id(self, path_template, host_id, body):
+        """Issue POST /rest/v1/<path_template>/<host_id> with *body* as JSON.
+
+        path_template  e.g. ``"addhostiogrp"`` → ``/rest/v1/addhostiogrp/<id>``
+        body           plain dict (None → empty body)
+        """
+        ac = self._api_client
+        url = "{}/{}/{}".format(ac.configuration.host, path_template, host_id)
+        header_params = {
+            'Accept': 'application/json',
+            'Content-Type': 'application/json',
+        }
+        body_serialised = ac.sanitize_for_serialization(body or {})
+        response_data = ac.call_api(
+            'POST', url,
+            header_params=header_params,
+            body=body_serialised,
+        )
+        response_data.read()
+        # Raise ApiException for 4xx/5xx; return the response object otherwise.
+        try:
+            return ac.response_deserialize(
+                response_data=response_data,
+                response_types_map=_SDK_RESPONSE_TYPES,
+            ).data
+        except SdkApiException:
+            raise
+
+    def addhostiogrp_id_post(self, id, x_auth_token=None,
+                             addhostiogrp_id_post_request=None, **_kw):
+        body = (addhostiogrp_id_post_request
+                if isinstance(addhostiogrp_id_post_request, dict)
+                else (addhostiogrp_id_post_request.to_dict()
+                      if addhostiogrp_id_post_request is not None else {}))
+        return self._post_with_id("addhostiogrp", id, body)
+
+    def rmhostiogrp_id_post(self, id, x_auth_token=None,
+                            rmhostiogrp_id_post_request=None, **_kw):
+        body = (rmhostiogrp_id_post_request
+                if isinstance(rmhostiogrp_id_post_request, dict)
+                else (rmhostiogrp_id_post_request.to_dict()
+                      if rmhostiogrp_id_post_request is not None else {}))
+        return self._post_with_id("rmhostiogrp", id, body)
+
+    def expandvolume_id_post(self, id, x_auth_token=None,
+                             expandvolume_id_post_request=None, **_kw):
+        body = (expandvolume_id_post_request
+                if isinstance(expandvolume_id_post_request, dict)
+                else (expandvolume_id_post_request.to_dict()
+                      if expandvolume_id_post_request is not None else {}))
+        return self._post_with_id("expandvolume", id, body)
+
+    def chvolumereplicationinternals_id_post(self, id, x_auth_token=None,
+                                             chvolumereplicationinternals_id_post_request=None,
+                                             **_kw):
+        body = (chvolumereplicationinternals_id_post_request
+                if isinstance(chvolumereplicationinternals_id_post_request, dict)
+                else (chvolumereplicationinternals_id_post_request.to_dict()
+                      if chvolumereplicationinternals_id_post_request is not None else {}))
+        return self._post_with_id("chvolumereplicationinternals", id, body)
+
+
+def _make_sdk(ip_address, username, password, verify_ssl=False):
+    """Create a StorageVirtualizeAPI instance, wrapping with the compat shim.
+
+    Older SDK branches expose verify_ssl on StorageVirtualizeAPI; the main
+    branch does not (it hard-codes verify_ssl=False internally).  We try the
+    keyword argument first and fall back gracefully when it is absent.
+    """
+    try:
+        sdk = StorageVirtualizeAPI(ip_address, username, password,
+                                   verify_ssl=verify_ssl)
+    except TypeError:
+        # main-branch SDK: verify_ssl parameter not accepted.
+        # The constructor already sets verify_ssl=False on its internal config,
+        # so no further action is needed for the self-signed-cert case.
+        sdk = StorageVirtualizeAPI(ip_address, username, password)
+    sdk.svc_task_api = _SvcTaskApiCompat(sdk.svc_task_api)
+    return sdk
+
+
 class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
     ARRAY_ACTIONS = {}
     BLOCK_SIZE_IN_BYTES = 512
@@ -460,8 +586,8 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
             # certificate verification is disabled here. Pass verify_ssl=True if
             # the array has a CA-signed certificate installed.
             # codeql[py/ssl-certificate-verification-disabled]
-            self.sdk = StorageVirtualizeAPI(self.endpoint, self.user, self.password,
-                                            verify_ssl=False)  # lgtm[py/ssl-certificate-verification-disabled]
+            self.sdk = _make_sdk(self.endpoint, self.user, self.password,
+                                 verify_ssl=False)  # lgtm[py/ssl-certificate-verification-disabled]
             if Version(self._code_level) < Version(self.MIN_SUPPORTED_VERSION):
                 raise array_errors.UnsupportedStorageVersionError(
                     self._code_level, self.MIN_SUPPORTED_VERSION
@@ -605,7 +731,6 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
                 x_auth_token=None,
                 lsvdisk_post_request=svc_models.LsvdiskPostRequest(
                     filtervalue=filtervalue,
-                    bytes=True,
                 ),
             )
             return _SdkLsvdiskResponse(raw)
@@ -646,7 +771,7 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
             self.sdk.svc_task_api.chvolumegroup_id_post(
                 id=str(id_or_name),
                 x_auth_token=None,
-                chvolumegroup_id_post_request=svc_models.ChvolumegroupIdPostRequest(**cli_kwargs),
+                chvolumegroup_id_post_request=cli_kwargs,
             )
         except SdkApiException as ex:
             message = _extract_sdk_error_message(ex)
@@ -771,8 +896,7 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
                 self.sdk.svc_task_api.expandvolume_id_post(
                     id=volume_name,
                     x_auth_token=None,
-                    expandvolume_id_post_request=svc_models.ExpandvolumeIdPostRequest(
-                        size=increase_in_bytes, unit='b'),
+                    expandvolume_id_post_request={'size': increase_in_bytes, 'unit': 'b'},
                 )
             else:
                 command = "expandvdisksize"
@@ -1779,7 +1903,7 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
                     volume_name, host_name, message))
             else:
                 logger.error("Map volume {0} to host {1} failed. Reason "
-                             "is: {2}".format(volume_name, host_name, ex))
+                             "is: {2}".format(volume_name, host_name, message))
                 self._raise_error_when_host_not_exist_or_not_meet_the_rules(host_name, message)
                 if SPECIFIED_OBJ_NOT_EXIST in message:
                     raise array_errors.ObjectNotFoundError(volume_name)
@@ -1787,7 +1911,7 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
                     raise array_errors.LunAlreadyInUseError(lun, host_name)
                 if LUN_ID_IS_NOT_VALID in message:
                     raise array_errors.NoAvailableLunError(host_name)
-                raise array_errors.MappingError(volume_name, host_name, ex)
+                raise array_errors.MappingError(volume_name, host_name, message)
 
         return str(lun)
 
@@ -1814,7 +1938,7 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
                                " unmapping from host {1}: {2}".format(volume_name, host_name, message))
             else:
                 logger.error("unmapping volume {0} from host {1} failed. Reason "
-                             "is: {2}".format(volume_name, host_name, ex))
+                             "is: {2}".format(volume_name, host_name, message))
                 self._raise_error_when_host_not_exist_or_not_meet_the_rules(host_name, message)
                 if OBJ_NOT_FOUND in message:
                     raise array_errors.ObjectNotFoundError(volume_name)
@@ -1823,7 +1947,7 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
                 if SPECIFIED_OBJ_NOT_EXIST in message:
                     # host isn't in the volume's mappings
                     raise array_errors.VolumeNotMappedToHostError(volume_name, host_name)
-                raise array_errors.UnmappingError(volume_name, host_name, ex)
+                raise array_errors.UnmappingError(volume_name, host_name, message)
 
     def _get_array_iqns_by_node_id(self):
         logger.debug("Getting array nodes id and iscsi name")
@@ -3017,7 +3141,7 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
             self.sdk.svc_task_api.rmhostport_id_post(
                 id=str(host_name),
                 x_auth_token=None,
-                rmhostport_id_post_request=svc_models.RmhostportIdPostRequest(**body_kwargs),
+                rmhostport_id_post_request=body_kwargs,
             )
         except SdkApiException as ex:
             message = _extract_sdk_error_message(ex)
@@ -3070,7 +3194,7 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
             self.sdk.svc_task_api.addhostiogrp_id_post(
                 id=str(host_name),
                 x_auth_token=None,
-                addhostiogrp_id_post_request=svc_models.AddhostiogrpIdPostRequest(iogrp=io_group),
+                addhostiogrp_id_post_request={'iogrp': io_group},
             )
         except SdkApiException as ex:
             message = _extract_sdk_error_message(ex)
@@ -3094,7 +3218,7 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
             self.sdk.svc_task_api.rmhostiogrp_id_post(
                 id=str(host_name),
                 x_auth_token=None,
-                rmhostiogrp_id_post_request=svc_models.RmhostiogrpIdPostRequest(iogrp=io_group),
+                rmhostiogrp_id_post_request={'iogrp': io_group},
             )
         except SdkApiException as ex:
             message = _extract_sdk_error_message(ex)
@@ -3167,7 +3291,7 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
             self.sdk.svc_task_api.chhost_id_post(
                 id=str(host_name),
                 x_auth_token=None,
-                chhost_id_post_request=svc_models.ChhostIdPostRequest(protocol=protocol),
+                chhost_id_post_request={'protocol': protocol},
             )
         except SdkApiException as ex:
             message = _extract_sdk_error_message(ex)
