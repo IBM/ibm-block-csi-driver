@@ -281,6 +281,39 @@ class TestArrayMediatorSVC(unittest.TestCase):
     def test_promote_ear_replication_volume_from_recovery(self):
         pass
 
+    def test_promote_ear_replication_to_production_partition_vg_without_policy_assigns_requested_policy(self):
+        self._mock_lsvolumegroupreplication(Munch(partition_name='TestPartition', replication_policy_name=''))
+
+        self.svc._promote_ear_replication_to_production(OBJECT_INTERNAL_ID, replication_policy=REPLICATION_NAME)
+        self.svc.client.svctask.chvolumegroup.assert_called_once_with(object_id=OBJECT_INTERNAL_ID,
+                                                                      replicationpolicy=REPLICATION_NAME)
+        self.svc.client.svctask.chvolumegroupreplication.assert_called_once_with(object_id=OBJECT_INTERNAL_ID,
+                                                                                 mode='production')
+
+    @patch("controllers.array_action.array_mediator_svc.is_warning_message")
+    def test_promote_ear_replication_to_production_partition_vg_requested_policy_not_usable_raises(self,
+                                                                                                   mock_warning):
+        mock_warning.return_value = False
+        for error_message_id in ('CMMVC5754E', 'CMMVC1263E', 'CMMVC1290E'):
+            with self.subTest(error_message_id=error_message_id):
+                self.svc.client.svctask.reset_mock()
+                self._mock_lsvolumegroupreplication(Munch(partition_name='TestPartition', replication_policy_name=''))
+                self.svc.client.svctask.chvolumegroup.side_effect = CLIFailureError(error_message_id)
+
+                with self.assertRaises(array_errors.ReplicationPolicyNotAssignedError):
+                    self.svc._promote_ear_replication_to_production(OBJECT_INTERNAL_ID,
+                                                                    replication_policy=REPLICATION_NAME)
+                self.svc.client.svctask.chvolumegroupreplication.assert_not_called()
+
+    def test_promote_ear_replication_to_production_partition_vg_with_policy_does_not_assign(self):
+        self._mock_lsvolumegroupreplication(Munch(partition_name='TestPartition',
+                                                  replication_policy_name=REPLICATION_NAME))
+
+        self.svc._promote_ear_replication_to_production(OBJECT_INTERNAL_ID, replication_policy=REPLICATION_NAME)
+        self.svc.client.svctask.chvolumegroup.assert_not_called()
+        self.svc.client.svctask.chvolumegroupreplication.assert_called_once_with(object_id=OBJECT_INTERNAL_ID,
+                                                                                 mode='production')
+
     def test_promote_ear_replication_not_supported(self):
         replication, _ = self._prepare_mocks_for_ear_replication(False)
 
