@@ -74,6 +74,8 @@ EAR_PROMOTE_REMOTE_NOT_READY = 'CMMVC1150E'
 EAR_PROMOTE_REMOTE_INTERNAL_ERROR = 'CMMVC9913E'
 EAR_PROMOTE_REMOTE_NOT_INDEPENDENT = "CMMVC9932E"
 EAR_PROMOTE_DIVERGED_COPY_NOT_SYNCED = "CMMVC1149E"
+REPLICATION_POLICY_NOT_IN_VG_PARTITION = "CMMVC1263E"
+REPLICATION_POLICY_NOT_APPLICABLE_TO_PARTITION_VG = "CMMVC1290E"
 EAR_PROMOTE_REMOTE_PARTNERSHIP_UNAVAILABLE = "CMMVC9901E"
 EAR_PROMOTE_REMOTE_UNREACHABLE = "CMMVC9949E"
 
@@ -2087,37 +2089,6 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
             return None
         return volume_group_replication.replication_policy_name
 
-    def _assign_replication_policy_to_partition_vg(self, volume_group_id, requested_policy_name):
-        try:
-            policies = self.client.svcinfo.lsreplicationpolicy().as_list
-        except (svc_errors.CommandExecutionError, CLIFailureError) as ex:
-            logger.error("failed to list replication policies: {}".format(ex.my_message))
-            raise ex
-
-        if not policies:
-            raise array_errors.AsyncDRReplicationPolicyNotFoundError(volume_group_id, requested_policy_name)
-
-        policy_id = None
-        for policy in policies:
-            if getattr(policy, 'name', '') == requested_policy_name:
-                policy_id = policy.id
-                break
-
-        if policy_id is None:
-            for policy in policies:
-                if getattr(policy, 'topology', '') == 'async-dr':
-                    policy_id = policy.id
-                    logger.info("no exact policy match for '{}', using first async-dr policy '{}' "
-                                "for volume group '{}'".format(
-                                    requested_policy_name, getattr(policy, 'name', ''), volume_group_id))
-                    break
-
-        if policy_id is None:
-            raise array_errors.AsyncDRReplicationPolicyNotFoundError(volume_group_id, requested_policy_name)
-
-        logger.info("assigning replication policy '{}' to volume group '{}'".format(policy_id, volume_group_id))
-        self._chvolumegroup(volume_group_id, replicationpolicy=policy_id)
-
     def _is_earreplication_supported(self):
         return hasattr(self.client.svctask, "chvolumereplicationinternals")
 
@@ -2324,15 +2295,33 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
             else:
                 raise
 
+    def _assign_requested_policy_to_partition_vg(self, volume_group_id, partition_name, replication_policy):
+        # In a partition the replication policy is not assigned to the recovery VG automatically.
+        # Assign only the policy named in the request (VolumeReplicationClass), never any other policy.
+        logger.info("assigning requested replication policy '{}' to volume group '{}' in partition '{}'".format(
+            replication_policy, volume_group_id, partition_name))
+        try:
+            self._change_volume_group_policy(volume_group_id, replication_policy)
+        except (svc_errors.CommandExecutionError, CLIFailureError) as ex:
+            if any(code in ex.my_message for code in (NAME_NOT_EXIST_OR_MEET_RULES,
+                                                      REPLICATION_POLICY_NOT_IN_VG_PARTITION,
+                                                      REPLICATION_POLICY_NOT_APPLICABLE_TO_PARTITION_VG)):
+                raise array_errors.ReplicationPolicyNotAssignedError(volume_group_id, partition_name,
+                                                                     replication_policy, ex.my_message)
+            raise
+        logger.debug("assigned replication policy '{}' to volume group '{}' in partition '{}'".format(
+            replication_policy, volume_group_id, partition_name))
+
     def _promote_ear_replication_to_production(self, volume_group_id, replication_policy=None):
         if replication_policy:
             vg_replication = self._lsvolumegroupreplication(volume_group_id)
-            if vg_replication and getattr(vg_replication, 'partition_name', ''):
-                existing_policy = getattr(vg_replication, 'replication_policy_name', '')
-                if not existing_policy:
-                    logger.info("assigning replication policy '{}' to partition VG '{}'".format(
-                        replication_policy, volume_group_id))
-                    self._assign_replication_policy_to_partition_vg(volume_group_id, replication_policy)
+            partition_name = getattr(vg_replication, 'partition_name', '') if vg_replication else ''
+            current_policy = getattr(vg_replication, 'replication_policy_name', '') if vg_replication else ''
+            logger.debug("volume group '{}': partition '{}', assigned replication policy '{}', "
+                         "requested replication policy '{}'".format(volume_group_id, partition_name,
+                                                                    current_policy, replication_policy))
+            if partition_name and not current_policy:
+                self._assign_requested_policy_to_partition_vg(volume_group_id, partition_name, replication_policy)
 
         try:
             self._chvolumegroupreplication(volume_group_id, mode=array_settings.ENDPOINT_TYPE_PRODUCTION)

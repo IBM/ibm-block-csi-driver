@@ -361,12 +361,12 @@ class SecondaryStorageTransitionToProductionNotReadyError(BaseArrayActionExcepti
         self.message = messages.SECONDARY_STORAGE_TRANSITION_TO_PRODUCTION_NOT_READY_ERROR_MESSAGE.format(message)
 
 
-class AsyncDRReplicationPolicyNotFoundError(BaseArrayActionException):
+class ReplicationPolicyNotAssignedError(BaseArrayActionException):
 
-    def __init__(self, volume_group_id, requested_policy_name):
+    def __init__(self, volume_group_id, partition_name, replication_policy, storage_message):
         super().__init__()
-        self.message = messages.ASYNC_DR_REPLICATION_POLICY_NOT_FOUND_MESSAGE.format(
-            requested_policy_name, volume_group_id)
+        self.message = messages.REPLICATION_POLICY_NOT_ASSIGNED_TO_PARTITION_VG_MESSAGE.format(
+            replication_policy, volume_group_id, partition_name, storage_message)
 
 
 class OperationNotReadyError(BaseArrayActionException):

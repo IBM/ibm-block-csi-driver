@@ -101,8 +101,8 @@ CANNOT_CHANGE_HOST_PROTOCOL_BECAUSE_OF_MAPPED_PORTS = "The host protocol cannot 
 SECONDARY_STORAGE_TRANSITION_TO_PRODUCTION_NOT_READY_ERROR_MESSAGE = "Secondary storage is not yet ready to " \
     "transition to production after becoming independent: {0}"
 
-ASYNC_DR_REPLICATION_POLICY_NOT_FOUND_MESSAGE = "No async-dr replication policy '{0}' found on storage for " \
-    "volume group '{1}'"
+REPLICATION_POLICY_NOT_ASSIGNED_TO_PARTITION_VG_MESSAGE = "Cannot assign replication policy '{0}' to volume " \
+    "group '{1}' in partition '{2}': {3}. Create an async-dr replication policy named '{0}' in partition '{2}'"
 
 OPERATION_NOT_READY_ERROR_MESSAGE = "Operation not ready: {0}"
 
