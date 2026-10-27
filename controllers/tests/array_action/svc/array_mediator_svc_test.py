@@ -212,6 +212,33 @@ class TestArrayMediatorSVC(unittest.TestCase):
 
         self.svc.client.svcinfo.lsvolumegroupreplication.assert_called_with(object_id=OBJECT_INTERNAL_ID)
 
+    def test_get_replication_mode_uses_local_dr_replication_mode(self):
+        self._mock_lsvolumegroupreplication(Munch(local_location='2', local_partition_location='',
+                                                  location2_replication_mode='independent',
+                                                  local_dr_replication_mode='independent'))
+
+        self.assertEqual('independent', self.svc._get_replication_mode(OBJECT_INTERNAL_ID))
+
+    def test_get_replication_mode_without_local_dr_field_non_partition_uses_location_field(self):
+        self._mock_lsvolumegroupreplication(Munch(local_location='2', local_partition_location='',
+                                                  location2_replication_mode='recovery'))
+
+        self.assertEqual('recovery', self.svc._get_replication_mode(OBJECT_INTERNAL_ID))
+
+    def test_get_replication_mode_without_local_dr_field_partition_uses_partition_field(self):
+        self._mock_lsvolumegroupreplication(Munch(local_location='1', local_partition_location='upper',
+                                                  upper_partition_replication_mode='production',
+                                                  lower_partition_replication_mode='recovery'))
+
+        self.assertEqual('production', self.svc._get_replication_mode(OBJECT_INTERNAL_ID))
+
+    def test_get_replication_mode_blank_local_dr_field_uses_location_field(self):
+        self._mock_lsvolumegroupreplication(Munch(local_location='1', local_partition_location='',
+                                                  location1_replication_mode='production',
+                                                  local_dr_replication_mode=''))
+
+        self.assertEqual('production', self.svc._get_replication_mode(OBJECT_INTERNAL_ID))
+
     def test_get_ear_replication_not_supported(self):
         _, replication_request = self._prepare_mocks_for_ear_replication(is_ear_supported=False)
 
