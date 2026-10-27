@@ -1925,12 +1925,42 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
             dr_link_status, remote_name, remote_status, within_rpo
         )
 
+    def _get_last_sync_time(self, vg_replication, recovery_loc_idx):
+        running_recovery_point = self._getattr_as_str(
+            vg_replication, 'location{}_running_recovery_point'.format(recovery_loc_idx), '')
+        if running_recovery_point:
+            try:
+                last_sync_time = datetime.now(timezone.utc) - timedelta(seconds=int(running_recovery_point))
+                logger.debug("DR location {}: last_sync_time '{}' from running_recovery_point '{}' seconds".format(
+                    recovery_loc_idx, last_sync_time, running_recovery_point))
+                return last_sync_time
+            except ValueError:
+                logger.warning("cannot parse location{}_running_recovery_point '{}'".format(
+                    recovery_loc_idx, running_recovery_point))
+                return None
+
+        fixed_recovery_point = self._getattr_as_str(
+            vg_replication, 'location{}_fixed_recovery_point'.format(recovery_loc_idx), '')
+        if fixed_recovery_point:
+            try:
+                last_sync_time = datetime.strptime(fixed_recovery_point,
+                                                   array_settings.FIXED_RECOVERY_POINT_TIME_FORMAT) \
+                    .replace(tzinfo=timezone.utc)
+                logger.debug("DR location {}: last_sync_time '{}' from fixed_recovery_point '{}'".format(
+                    recovery_loc_idx, last_sync_time, fixed_recovery_point))
+                return last_sync_time
+            except ValueError:
+                logger.warning("cannot parse location{}_fixed_recovery_point '{}'".format(
+                    recovery_loc_idx, fixed_recovery_point))
+                return None
+
+        logger.info("No recovery point reported for DR location {}".format(recovery_loc_idx))
+        return None
+
     def _build_replication_info(self, vg_replication):
         recovery_loc_idx = self._get_recovery_location_index(vg_replication)
 
-        # NOTE: For now we have not decided field from storage to be populated into last_sync_time
-        # until then using current time
-        last_sync_time = datetime.now(timezone.utc)
+        last_sync_time = self._get_last_sync_time(vg_replication, recovery_loc_idx)
 
         dr_link_status = self._getattr_as_str(vg_replication, 'dr_link_status', array_settings.UNKNOWN)
         proto_status = self._map_dr_link_status_to_proto_status(dr_link_status)

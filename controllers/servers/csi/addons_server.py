@@ -2,7 +2,6 @@ import grpc
 from csi_general import replication_pb2 as pb2
 from csi_general import replication_pb2_grpc as pb2_grpc
 from google.protobuf.timestamp_pb2 import Timestamp
-from datetime import datetime, timezone
 
 import controllers.servers.settings as servers_settings
 import controllers.array_action.settings as array_settings
@@ -240,9 +239,7 @@ class ReplicationControllerServicer(pb2_grpc.ControllerServicer):
                 except array_errors.ObjectNotFoundError:
                     logger.warning(
                         "GetVolumeReplicationInfo: volume not part of any VolumeGroup, "
-                        "returning current time as last_sync_time")
-                    ts_seconds = int(datetime.now(timezone.utc).timestamp())
-                    response.last_sync_time.CopyFrom(Timestamp(seconds=ts_seconds, nanos=0))
+                        "leaving last_sync_time unset")
                     return response
 
             object_id = object_id_info.ids.internal_id
@@ -252,8 +249,7 @@ class ReplicationControllerServicer(pb2_grpc.ControllerServicer):
             ts_seconds = int(replication_info.last_sync_time.timestamp())
             response.last_sync_time.CopyFrom(Timestamp(seconds=ts_seconds, nanos=0))
         else:
-            response.last_sync_time.CopyFrom(Timestamp(seconds=0, nanos=0))
-            logger.warning("last_sync_time not available at storage, setting to default timestamp (0).")
+            logger.warning("last_sync_time not available at storage (no recovery point yet), leaving it unset.")
 
         response.status = replication_info.replication_status
         response.status_message = replication_info.status_message or ''
@@ -261,7 +257,7 @@ class ReplicationControllerServicer(pb2_grpc.ControllerServicer):
         logger.info(
             "GetVolumeReplicationInfo: returning response last_sync_time.seconds={}, "
             "status={}, status_message='{}'".format(
-                response.last_sync_time.seconds,
+                response.last_sync_time.seconds if response.HasField('last_sync_time') else 'unset',
                 response.status,
                 response.status_message
             )

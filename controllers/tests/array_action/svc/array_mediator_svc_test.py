@@ -1,6 +1,6 @@
 import unittest
 from unittest.mock import MagicMock
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 
 from mock import patch, Mock, call, PropertyMock
 from munch import Munch
@@ -2791,7 +2791,8 @@ class TestArrayMediatorSVC(unittest.TestCase):
 
     def _mock_vg_replication(self, partition_name='', local_location='1', dr_link_status='running',
                              loc2_system_name='', loc3_system_name='', loc2_status='', loc3_status='',
-                             loc2_within_rpo='', loc3_within_rpo='', loc2_running_rp='', loc3_running_rp=''):
+                             loc2_within_rpo='', loc3_within_rpo='', loc2_running_rp='', loc3_running_rp='',
+                             loc3_fixed_rp='', loc3_sync_required='', loc3_sync_remaining=''):
         return Munch({
             'partition_name': partition_name,
             'local_location': local_location,
@@ -2804,6 +2805,9 @@ class TestArrayMediatorSVC(unittest.TestCase):
             'location3_status': loc3_status,
             'location3_within_rpo': loc3_within_rpo,
             'location3_running_recovery_point': loc3_running_rp,
+            'location3_fixed_recovery_point': loc3_fixed_rp,
+            'location3_sync_required': loc3_sync_required,
+            'location3_sync_remaining': loc3_sync_remaining,
             'replication_policy_name': REPLICATION_NAME,
         })
 
@@ -2861,16 +2865,51 @@ class TestArrayMediatorSVC(unittest.TestCase):
             loc2_running_rp='0',
         )
 
+        before = datetime.now(timezone.utc)
         result = self.svc._build_replication_info(vg_replication)
+        after = datetime.now(timezone.utc)
 
         self.assertIsInstance(result, ReplicationInfo)
-        self.assertIsNotNone(result.last_sync_time)
+        self.assertTrue(before <= result.last_sync_time <= after)
         self.assertEqual(ReplicationStatus.HEALTHY, result.replication_status)
         self.assertIsNotNone(result.status_message)
 
+    def test_build_replication_info_partition_uses_location3_recovery_point(self):
+        # storage output: partition VG, local_location 1 (production), DR copy at location3 lagging 351s
+        vg_replication = self._mock_vg_replication(partition_name='TestPartition', local_location='1',
+                                                   dr_link_status='running', loc3_running_rp='351',
+                                                   loc3_within_rpo='no', loc3_status='healthy')
+
+        before = datetime.now(timezone.utc) - timedelta(seconds=351)
+        result = self.svc._build_replication_info(vg_replication)
+        after = datetime.now(timezone.utc) - timedelta(seconds=351)
+
+        self.assertTrue(before <= result.last_sync_time <= after)
+
+    # --- _get_last_sync_time tests ---
+    def test_get_last_sync_time_during_initial_sync_returns_none(self):
+        # storage output during initial sync: dr_link_status running, recovery point fields blank
+        vg_replication = self._mock_vg_replication(partition_name='SKGPTN0', dr_link_status='running',
+                                                   loc3_sync_required='204.00GB', loc3_sync_remaining='191.83GB')
+
+        self.assertIsNone(self.svc._get_last_sync_time(vg_replication, '3'))
+
+    def test_get_last_sync_time_link_stopped_uses_fixed_recovery_point_as_utc(self):
+        # storage output with link stopped: running blank, fixed_recovery_point in YYMMDDHHMMSS UTC
+        vg_replication = self._mock_vg_replication(partition_name='SKGPTN0', loc3_fixed_rp='261026214707')
+
+        result = self.svc._get_last_sync_time(vg_replication, '3')
+
+        self.assertEqual(datetime(2026, 10, 26, 21, 47, 7, tzinfo=timezone.utc), result)
+
+    def test_get_last_sync_time_invalid_fixed_recovery_point_returns_none(self):
+        vg_replication = self._mock_vg_replication(partition_name='SKGPTN0', loc3_fixed_rp='not-a-time')
+
+        self.assertIsNone(self.svc._get_last_sync_time(vg_replication, '3'))
+
     # --- get_last_async_snapshot_info tests ---
     def test_get_last_async_snapshot_info_returns_replication_info(self):
-        vg_replication = self._mock_vg_replication(partition_name='', dr_link_status='running')
+        vg_replication = self._mock_vg_replication(partition_name='', dr_link_status='running', loc2_running_rp='5')
         self.svc.client.svcinfo.lsvolumegroupreplication.return_value = Mock(
             as_single_element=vg_replication)
 
