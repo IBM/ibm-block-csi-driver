@@ -1871,6 +1871,14 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
         volume_group_replication = self._lsvolumegroupreplication(volume_group_id)
         if not volume_group_replication:
             return None
+
+        # local_dr_replication_mode is available from SVC 9.1.3; older levels only have the location fields
+        local_dr_replication_mode = getattr(volume_group_replication, 'local_dr_replication_mode', None)
+        if local_dr_replication_mode:
+            logger.debug("volume group '{}': replication mode '{}' from local_dr_replication_mode".format(
+                volume_group_id, local_dr_replication_mode))
+            return local_dr_replication_mode
+
         if hasattr(volume_group_replication, "local_partition_location") \
                 and volume_group_replication.local_partition_location:
             local_partition_location = volume_group_replication.local_partition_location
@@ -1879,7 +1887,10 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
             replication_local_location = volume_group_replication.local_location
             location_attr_name = f"location{replication_local_location}_replication_mode"
 
-        return getattr(volume_group_replication, location_attr_name, None)
+        replication_mode = getattr(volume_group_replication, location_attr_name, None)
+        logger.debug("volume group '{}': local_dr_replication_mode not available, replication mode '{}' from {}".format(
+            volume_group_id, replication_mode, location_attr_name))
+        return replication_mode
 
     @staticmethod
     def _getattr_as_str(obj, attr, default=array_settings.UNKNOWN):
