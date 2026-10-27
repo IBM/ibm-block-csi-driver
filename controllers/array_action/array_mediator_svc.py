@@ -511,7 +511,9 @@ def _make_sdk(ip_address, username, password, verify_ssl=False):
         # The constructor already sets verify_ssl=False on its internal config,
         # so no further action is needed for the self-signed-cert case.
         sdk = StorageVirtualizeAPI(ip_address, username, password)
-    sdk.svc_task_api = _SvcTaskApiCompat(sdk.svc_task_api)
+    # svc_task_api is a read-only property on the new SDK (no setter), so write
+    # directly to the private backing attribute.
+    sdk._svc_task_api = _SvcTaskApiCompat(sdk.svc_task_api)
     return sdk
 
 
