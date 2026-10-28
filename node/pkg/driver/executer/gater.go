@@ -1,11 +1,11 @@
 package executer
 
 import (
-	"github.com/ibm/ibm-block-csi-driver/node/logger"
-	"github.com/ibm/ibm-block-csi-driver/node/goid_info"
 	"context"
 	"errors"
 	"fmt"
+	"github.com/ibm/ibm-block-csi-driver/node/goid_info"
+	"github.com/ibm/ibm-block-csi-driver/node/logger"
 	"os"
 	"sync"
 	"sync/atomic"
@@ -119,7 +119,6 @@ func (g *KeyedGater) Acquire(ctx context.Context, key string, maxRuns int, timeo
 	}
 }
 
-
 func (g *KeyedGater) cleanupFailedAcquire(key string) {
 	g.mu.Lock()
 	defer g.mu.Unlock()
@@ -144,7 +143,7 @@ func (g *KeyedGater) Release(key string) {
 		return
 	}
 
-	// Attempt to drain a slot, but don't block if Release was 
+	// Attempt to drain a slot, but don't block if Release was
 	// called due to an Acquire timeout before a slot was taken.
 	select {
 	case <-gt.ch:
@@ -157,7 +156,6 @@ func (g *KeyedGater) Release(key string) {
 	}
 }
 
-
 // Execute Binds acquisition, execution, and automatic release into a single method call.
 // The caller provides the business logic via the 'action' callback.
 func (g *KeyedGater) Execute(ctx context.Context, key string, maxRuns int, timeout time.Duration, action func() error) error {
@@ -165,7 +163,7 @@ func (g *KeyedGater) Execute(ctx context.Context, key string, maxRuns int, timeo
 	if err := g.Acquire(ctx, key, maxRuns, timeout); err != nil {
 		return err
 	}
-	
+
 	// 2. Ensure release ALWAYS runs after the action completes, completely hidden from the caller
 	defer g.Release(key)
 
@@ -200,7 +198,6 @@ func (g *KeyedGater) ExecuteMultipathd(ctx context.Context, action func() error)
 func (g *KeyedGater) ExecuteTopologyReads(ctx context.Context, action func() error) error {
 	return g.Execute(ctx, "topology-reads", 4, 5*time.Second, action)
 }
-
 
 type Result[T any] struct {
 	Data T
@@ -247,7 +244,6 @@ func (g *KeyedGater) releasePool(resourceName string) {
 	}
 }
 
-
 // suicideIfLeaked protects the Node from PID exhaustion.
 // Hardened: Fixed the duration scale collision and aligned atomic checks to explicit nanosecond barriers.
 func (g *KeyedGater) suicideIfLeaked() {
@@ -268,7 +264,7 @@ func (g *KeyedGater) suicideIfLeaked() {
 	if leaks > (g.maxGlobal / 2) {
 		nowNano := time.Now().UnixNano()
 		lastNano := g.lastWarnTime.Load()
-		
+
 		// FIXED: Explicitly use standard duration thresholds to eliminate numeric scale drift
 		if nowNano-lastNano > (30 * time.Second).Nanoseconds() {
 			if g.lastWarnTime.CompareAndSwap(lastNano, nowNano) {
@@ -318,10 +314,10 @@ func baseExecute[T any](
 		var zero T
 		return zero, ctx.Err()
 	}
-	
+
 	pool.activeOps.Add(1)
-	
-	done := make(chan Result[T], 1) 
+
+	done := make(chan Result[T], 1)
 	switched := make(chan struct{})
 	monitorDone := make(chan struct{}) // FIXED: Symmetrical escape gateway handshake
 	var once sync.Once
@@ -347,7 +343,7 @@ func baseExecute[T any](
 			select {
 			case <-switched:
 				<-pool.spare
-				g.globalLeaked.Add(-1) 
+				g.globalLeaked.Add(-1)
 			case <-monitorDone:
 				// The monitor thread already freed the pool.running slot; exit immediately
 				return
@@ -364,28 +360,28 @@ func baseExecute[T any](
 	select {
 	case res := <-done:
 		return res.Data, res.Err
-		
-   case <-ctx.Done():
-	   // Context was cancelled by caller before worker finished or timed out
-	   select {
-	   case pool.spare <- struct{}{}:
-			   once.Do(func() {
-					   close(switched)
-					   <-pool.running
-			   })
-			   g.globalLeaked.Add(1) // Worker is now executing in background as a tracked leak
-			   var zero T
-			   return zero, ctx.Err()
-	   default:
-			   once.Do(func() {
-					   close(monitorDone)
-					   <-pool.running
-			   })
-			   g.globalLeaked.Add(1) // Worker is abandoned due to complete saturation
-			   var zero T
-			   return zero, fmt.Errorf("resource %s: context cancelled and spare pool full", resourceName)
-	   }
-		
+
+	case <-ctx.Done():
+		// Context was cancelled by caller before worker finished or timed out
+		select {
+		case pool.spare <- struct{}{}:
+			once.Do(func() {
+				close(switched)
+				<-pool.running
+			})
+			g.globalLeaked.Add(1) // Worker is now executing in background as a tracked leak
+			var zero T
+			return zero, ctx.Err()
+		default:
+			once.Do(func() {
+				close(monitorDone)
+				<-pool.running
+			})
+			g.globalLeaked.Add(1) // Worker is abandoned due to complete saturation
+			var zero T
+			return zero, fmt.Errorf("resource %s: context cancelled and spare pool full", resourceName)
+		}
+
 	case <-hTimer.C:
 		select {
 		case pool.spare <- struct{}{}:
@@ -405,7 +401,7 @@ func baseExecute[T any](
 			select {
 			case res := <-done:
 				return res.Data, res.Err
-			case <-hdTimer.C: 
+			case <-hdTimer.C:
 				g.globalLeaked.Add(1)
 				var zero T
 				return zero, fmt.Errorf("resource %s: abandoned after hard timeout %v", resourceName, hardTimeout)
@@ -464,8 +460,8 @@ func ExecuteUninterruptibleBatch[Param any, T any](
 	}
 
 	aggregatedResults := make([]BatchResult[T], totalItems)
-	
-	// FIX: Use a tracking slice of booleans to safely remember which items executed 
+
+	// FIX: Use a tracking slice of booleans to safely remember which items executed
 	// without running into generic type comparison errors.
 	executed := make([]bool, totalItems)
 
@@ -498,7 +494,7 @@ func ExecuteUninterruptibleBatch[Param any, T any](
 				}
 
 				param := parameters[idx]
-				
+
 				pool.activeOps.Add(1)
 				data, err := worker(batchCtx, idx, param, cancelBatch)
 				pool.activeOps.Add(-1)
@@ -529,4 +525,3 @@ func ExecuteUninterruptibleBatch[Param any, T any](
 
 	return aggregatedResults, nil
 }
-
