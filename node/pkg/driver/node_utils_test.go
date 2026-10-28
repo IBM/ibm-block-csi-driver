@@ -17,12 +17,13 @@
 package driver_test
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"io/ioutil"
 	"os"
+	"path/filepath"
 	"reflect"
-	"strconv"
 	"strings"
 	"syscall"
 	"testing"
@@ -30,12 +31,11 @@ import (
 	gomock "github.com/golang/mock/gomock"
 	mocks "github.com/ibm/ibm-block-csi-driver/node/mocks"
 	driver "github.com/ibm/ibm-block-csi-driver/node/pkg/driver"
-	"github.com/ibm/ibm-block-csi-driver/node/pkg/driver/device_connectivity"
 	executer "github.com/ibm/ibm-block-csi-driver/node/pkg/driver/executer"
 )
 
 var (
-	nodeUtils    = driver.NewNodeUtils(&executer.Executer{}, nil, ConfigYaml, device_connectivity.OsDeviceConnectivityHelperScsiGeneric{})
+	nodeUtils    = driver.NewNodeUtils(&executer.Executer{}, nil, nil, ConfigYaml, nil)
 	hostName     = "test-hostname"
 	longHostName = strings.Repeat(hostName, 25)
 	nvmeNQN      = "nqn.2014-08.org.nvmexpress:uuid:b57708c7-5bb6-46a0-b2af-9d824bf539e1"
@@ -200,7 +200,7 @@ func TestParseFCPortsName(t *testing.T) {
 			fakeExecuter := mocks.NewMockExecuterInterface(mockCtrl)
 			devicePath := "/sys/class/fc_host/host*/port_name"
 			fakeExecuter.EXPECT().FilepathGlob(devicePath).Return(fpaths, tc.err)
-			nodeUtils := driver.NewNodeUtils(fakeExecuter, nil, ConfigYaml, nil)
+			nodeUtils := driver.NewNodeUtils(fakeExecuter, nil, nil, ConfigYaml, nil)
 
 			fcs, err := nodeUtils.ParseFCPorts()
 
@@ -324,7 +324,7 @@ func TestGetVolumeUuid(t *testing.T) {
 			defer mockCtrl.Finish()
 
 			fakeExecuter := mocks.NewMockExecuterInterface(mockCtrl)
-			nodeUtils := driver.NewNodeUtils(fakeExecuter, nil, ConfigYaml, nil)
+			nodeUtils := driver.NewNodeUtils(fakeExecuter, nil, nil, ConfigYaml, nil)
 
 			volumeUuid := nodeUtils.GetVolumeUuid(tc.volumeId)
 
@@ -338,74 +338,60 @@ func TestGetVolumeUuid(t *testing.T) {
 
 }
 
+// GetBlockVolumeStats reads the device size with a BLKGETSIZE64 ioctl, which only succeeds on a real block device.
+// The success path therefore cannot run in a unit test; these cases cover the failure paths reachable without one.
 func TestGetBlockVolumeStats(t *testing.T) {
-	sizeInBytes, _ := strconv.ParseInt("1073741824", 10, 64)
+	regularFile := filepath.Join(t.TempDir(), "not-a-block-device")
+	if err := os.WriteFile(regularFile, []byte("data"), 0600); err != nil {
+		t.Fatalf("Cannot create temporary file : %v", err)
+	}
+	canceledCtx, cancel := context.WithCancel(context.Background())
+	cancel()
+
 	testCases := []struct {
-		name           string
-		volumeUuid     string
-		mpathDeviceErr error
-		mpathDevice    string
-		outInBytes     []byte
-		outInBytesErr  error
-		volumeStats    driver.VolumeStatistics
+		name         string
+		ctx          context.Context
+		devicePath   string
+		expCanceled  bool
+		expErrSubstr string
 	}{
 		{
-			name:           "success",
-			volumeUuid:     "volumeUuid",
-			mpathDeviceErr: nil,
-			mpathDevice:    "fakeMpathDevice",
-			outInBytes:     []byte("1073741824"),
-			outInBytesErr:  nil,
-			volumeStats: driver.VolumeStatistics{
-				TotalBytes: sizeInBytes,
-			},
+			name:        "context already canceled",
+			ctx:         canceledCtx,
+			devicePath:  regularFile,
+			expCanceled: true,
 		},
 		{
-			name:           "failed to get mpath device",
-			volumeUuid:     "volumeUuid",
-			mpathDeviceErr: &device_connectivity.MultipathDeviceNotFoundForVolumeError{VolumeId: ""},
-			mpathDevice:    "",
-			outInBytes:     []byte{},
-			outInBytesErr:  nil,
-			volumeStats:    driver.VolumeStatistics{},
+			name:         "device does not exist",
+			ctx:          context.Background(),
+			devicePath:   "/non/existent/device",
+			expErrSubstr: "failed to open device",
 		},
 		{
-			name:           "failed to get size of mpath device",
-			volumeUuid:     "volumeUuid",
-			mpathDeviceErr: nil,
-			mpathDevice:    "fakeMpathDevice",
-			outInBytes:     []byte{},
-			outInBytesErr:  errors.New("failed to run command"),
-			volumeStats:    driver.VolumeStatistics{},
+			name:         "path is not a block device",
+			ctx:          context.Background(),
+			devicePath:   regularFile,
+			expErrSubstr: "ioctl BLKGETSIZE64 failed",
 		},
 	}
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
+			nodeUtils := driver.NewNodeUtils(&executer.Executer{}, executer.NewKeyedGater(100), nil, ConfigYaml, nil)
 
-			mockCtrl := gomock.NewController(t)
-			defer mockCtrl.Finish()
+			volumeStats, err := nodeUtils.GetBlockVolumeStats(tc.ctx, tc.devicePath)
 
-			fakeExecuter := mocks.NewMockExecuterInterface(mockCtrl)
-			mockOsDeviceConHelper := mocks.NewMockOsDeviceConnectivityHelperScsiGenericInterface(mockCtrl)
-			nodeUtils := driver.NewNodeUtils(fakeExecuter, nil, ConfigYaml, mockOsDeviceConHelper)
-			args := []string{"--getsize64", tc.mpathDevice}
-
-			mockOsDeviceConHelper.EXPECT().GetMpathDevice(tc.volumeUuid).Return(tc.mpathDevice, tc.mpathDeviceErr)
-			if tc.mpathDevice != "" {
-				fakeExecuter.EXPECT().ExecuteWithTimeoutSilently(
-					device_connectivity.TimeOutBlockDevCmd, driver.BlockDevCmd, args).Return(tc.outInBytes, tc.outInBytesErr)
+			if err == nil {
+				t.Fatalf("Expected an error, got success with stats %v", volumeStats)
 			}
-			volumestats, err := nodeUtils.GetBlockVolumeStats(tc.volumeUuid)
-
-			if volumestats != tc.volumeStats {
-				t.Fatalf("wrong volumestats: expected %v, got %v", tc.volumeStats, volumestats)
+			if volumeStats != (driver.VolumeStatistics{}) {
+				t.Fatalf("Expected empty volume statistics on error, got %v", volumeStats)
 			}
-			if tc.mpathDeviceErr != nil {
-				assertExpectedError(t, tc.mpathDeviceErr, err)
-			} else {
-				assertExpectedError(t, tc.outInBytesErr, err)
+			if tc.expCanceled && !errors.Is(err, context.Canceled) {
+				t.Fatalf("Expected context.Canceled, got %v", err)
 			}
-
+			if tc.expErrSubstr != "" && !strings.Contains(err.Error(), tc.expErrSubstr) {
+				t.Fatalf("Expected error containing %q, got %v", tc.expErrSubstr, err)
+			}
 		})
 	}
 }
