@@ -648,7 +648,7 @@ func TestIscsiLoadRelevantTargets(t *testing.T) {
 		nodes := "etc/iscsi/nodes"
 		iscsiMkdir(t, fx.root, nodes+"/"+iscsiTargetA+"/10.0.0.1,3260,1")
 		iscsiMkdir(t, fx.root, nodes+"/"+iscsiTargetA+"/2001:db8::1,3260,2")
-		iscsiMkdir(t, fx.root, nodes+"/"+iscsiTargetA+"/no-commas-here")  // ignored: not "ip,port,tpgt"
+		iscsiMkdir(t, fx.root, nodes+"/"+iscsiTargetA+"/no-commas-here")                     // ignored: not "ip,port,tpgt"
 		iscsiMkdir(t, fx.root, nodes+"/iqn.2000-01.com.example:unrequested/10.9.9.9,3260,1") // not requested
 		iscsiWriteFile(t, fx.root, nodes+"/iqn.file", "target entry is a file")
 		iscsiSymlink(t, "/this/does/not/exist", fx.root, nodes+"/iqn.broken")
@@ -1219,7 +1219,7 @@ func TestIscsiGetBlockDeviceForSession(t *testing.T) {
 		iscsiMkdir(t, fx.root, dev+"/target7:0:0/7:0:0:1/block/sdz")
 		iscsiMkdir(t, fx.root, dev+"/target7:0:0/7:0:0:2")       // lun without block dir
 		iscsiMkdir(t, fx.root, dev+"/target7:0:0/7:0:0:3/block") // lun with empty block dir
-		iscsiWriteFile(t, fx.root, dev+"/target8-file", "x")      // target entry that is a file
+		iscsiWriteFile(t, fx.root, dev+"/target8-file", "x")     // target entry that is a file
 		iscsiSymlink(t, "/this/does/not/exist", fx.root, dev+"/target9-broken")
 		iscsiWriteFile(t, fx.root, dev+"/uevent", "not a target")
 

@@ -17,15 +17,15 @@
 package device_connectivity
 
 import (
-	"github.com/ibm/ibm-block-csi-driver/node/pkg/driver/executer"
 	"github.com/ibm/ibm-block-csi-driver/node/logger"
+	"github.com/ibm/ibm-block-csi-driver/node/pkg/driver/executer"
 	"github.com/ibm/ibm-block-csi-driver/node/pkg/driver/mount"
 
 	"context"
+	"os"
 	"path/filepath"
 	"strconv"
 	"strings"
-	"os"
 )
 
 type OsDeviceConnectivityFc struct {
@@ -49,8 +49,8 @@ func (r OsDeviceConnectivityFc) updateFCHostIDs(hostIDs map[int]bool) {
 	// host0 -> 0000:04:00.0, host1 -> 0000:04:00.0
 	pciMap := make(map[int]string)
 	baseClassPath := "/sys/class/fc_host"
-    
-	// OPTIMIZED: Replace the dynamic wildcard Glob with a high-speed, direct 
+
+	// OPTIMIZED: Replace the dynamic wildcard Glob with a high-speed, direct
 	// directory listing of the flat in-memory class directory.
 	entries, err := os.ReadDir(baseClassPath)
 	if err != nil {
@@ -66,7 +66,7 @@ func (r OsDeviceConnectivityFc) updateFCHostIDs(hostIDs map[int]bool) {
 		}
 
 		hostNum, _ := strconv.Atoi(strings.TrimPrefix(name, "host"))
-        
+
 		// Req 4: Use os.Readlink to follow the 'device' symlink
 		if link, err := os.Readlink(filepath.Join(baseClassPath, name, "device")); err == nil {
 			pciMap[hostNum] = filepath.Base(link)
@@ -89,7 +89,6 @@ func (r OsDeviceConnectivityFc) updateFCHostIDs(hostIDs map[int]bool) {
 		}
 	}
 }
-
 
 func (r OsDeviceConnectivityFc) RescanDevices(ctx context.Context, lunId int, arrayIdentifiers []string) error {
 	hostIDs, err := r.HelperScsiGeneric.RescanDevicesGetHostIds(lunId, arrayIdentifiers)

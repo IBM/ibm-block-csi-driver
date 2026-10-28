@@ -77,7 +77,7 @@ type NodeUtilsInterface interface {
 	ParseIscsiInitiators() (string, error)
 	GetInfoFromPublishContext(publishContext map[string]string) (string, int, map[string][]string, error)
 	GetArrayInitiators(ipsByArrayInitiator map[string][]string) []string
-//	GetSysDevicesFromMpath(ctx context.Context, baseDevice string) ([]string, error)
+	//	GetSysDevicesFromMpath(ctx context.Context, baseDevice string) ([]string, error)
 
 	// TODO refactor and move all staging methods to dedicate interface.
 	ClearStageInfoFile(filePath string) error
@@ -183,7 +183,6 @@ func (n NodeUtils) ClearStageInfoFile(filePath string) error {
 	return os.Remove(filePath)
 }
 
-
 func (n NodeUtils) StageInfoFileIsExist(filePath string) bool {
 	if _, err := os.Stat(filePath); err != nil {
 		return false
@@ -202,7 +201,6 @@ func (n NodeUtils) IsNativeNVMeMultipathEnabled() (bool, error) {
 	val := strings.TrimSpace(string(data))
 	return val == "Y", nil
 }
-
 
 func getRelevantLines(rawContent *os.File) ([]string, error) {
 	scanner := bufio.NewScanner(rawContent)
@@ -405,31 +403,31 @@ func (n NodeUtils) ExpandMpathDevice(ctx context.Context, mpathDevice string, sl
 	}
 
 	logger.Infof("ExpandMpathDevice: Initializing expansion actions for target map %s", mpathDevice)
-	
+
 	if n.Executer.IsDeviceStillStuck(mpathDevice) {
 		return fmt.Errorf("expand-safety: device %s is currently stuck in D-state; aborting resize", mpathDevice)
-	}	
-	
+	}
+
 	// Step 1: Send the targeted resize directive to the multipathd socket handle
 	cmd := fmt.Sprintf("resize map %s", mpathDevice)
 	_, err := n.Executer.MultipathdCmd(ctx, mpathDevice, cmd)
 	if err != nil {
 		logger.Warningf("Socket resize map failed for %s: %v. Initiating structural fallback path rescans.", mpathDevice, err)
-		
+
 		// RESTORED FALLBACK: Retrieve the physical paths and trigger explicit kernel geometric rescans
 		for _, slave := range slaves {
 			if err := n.triggerPhysicalRescan(slave); err != nil {
 				logger.Warningf("Rescan notification skipped for slave path node %s: %v", slave, err)
 			}
 		}
-			
+
 		// Retry socket expansion directive following the manual path updates
 		_, err = n.Executer.MultipathdCmd(ctx, mpathDevice, cmd)
 		if err != nil {
 			return fmt.Errorf("multipathd resize map failed after executing path updates: %w", err)
 		}
 	}
-	
+
 	// Step 2: Target reload of the mutated map to apply boundaries safely without invoking global reconfigures
 	_, err = n.Executer.MultipathdCmd(ctx, mpathDevice, fmt.Sprintf("reload map %s", mpathDevice))
 	if err != nil {
@@ -456,7 +454,7 @@ func (n NodeUtils) triggerPhysicalRescan(slave string) error {
 		if err != nil {
 			return err
 		}
-		
+
 		controllerName := filepath.Base(realControllerPath) // e.g. "nvme0"
 		nvmeRescanPath := fmt.Sprintf("/sys/class/nvme/%s/rescan", controllerName)
 		return os.WriteFile(nvmeRescanPath, []byte("1"), 0644)
@@ -465,21 +463,19 @@ func (n NodeUtils) triggerPhysicalRescan(slave string) error {
 	return fmt.Errorf("unknown block protocol scheme layout for device path: %s", slave)
 }
 
-
-
 func (n NodeUtils) rescanPhysicalDevice(deviceName string) error {
 	if deviceName == "" {
 		return fmt.Errorf("rescanPhysicalDevice: target device name cannot be empty")
 	}
 
-	// FIXED: Structural VFS Hardening Layer. Resolve symlinks upfront to cleanly 
-	// translate user-space alias targets like /dev/mapper/nvme-eui... down to 
+	// FIXED: Structural VFS Hardening Layer. Resolve symlinks upfront to cleanly
+	// translate user-space alias targets like /dev/mapper/nvme-eui... down to
 	// their true underlying block names (dm-X or nvmeXnY) or follow partition steps.
 	resolvedPath, errLink := filepath.EvalSymlinks(deviceName)
 	if errLink != nil {
-		resolvedPath = deviceName 
+		resolvedPath = deviceName
 	}
-	
+
 	cleanName := filepath.Base(resolvedPath)
 	sysBlockTarget := filepath.Join("/sys/block", cleanName)
 
@@ -539,18 +535,18 @@ func (n NodeUtils) rescanPhysicalDevice(deviceName string) error {
 
 	scanCmd := "1"
 	logger.Debugf("Rescan sys device: echo %s > %s", scanCmd, filename)
-	
+
 	written, err := n.Executer.FileWriteString(f, scanCmd)
 	if err != nil {
 		logger.Errorf("Rescan Error: could not write to rescan file: %s, error: %v", filename, err)
 		return err
-	} 
+	}
 	if written == 0 {
 		e := fmt.Errorf("rescan error: nothing was written to rescan file: %s", filename)
 		logger.Errorf("%s", e.Error())
 		return e
 	}
-	
+
 	return nil
 }
 
@@ -563,14 +559,14 @@ func (n NodeUtils) RescanPhysicalDevices(ctx context.Context, mpathName string, 
 
 	cleanMpathName := filepath.Base(mpathName)
 	logger.Debugf("Rescan: Start rescan on sys devices: %v for parent map: %s", sysDevices, cleanMpathName)
-	
+
 	for _, deviceName := range sysDevices {
 		if n.Executer.IsDeviceStillStuck(deviceName) {
 			logger.Warningf("Rescan: Skipping %s as it is already marked stuck in D-state", deviceName)
 			continue
 		}
 
-		// FIXED: Blending the unique parent map name into the gater key template completely 
+		// FIXED: Blending the unique parent map name into the gater key template completely
 		// de-duplicates competing parallel requests across independent volumes sharing the same hardware tracks.
 		uniqueGaterKey := fmt.Sprintf("rescan-%s-%s", cleanMpathName, filepath.Base(deviceName))
 
@@ -586,7 +582,7 @@ func (n NodeUtils) RescanPhysicalDevices(ctx context.Context, mpathName string, 
 				return struct{}{}, n.rescanPhysicalDevice(deviceName)
 			},
 		)
-		
+
 		if err != nil {
 			logger.Errorf("Rescan failed for device path target %s under map %s: %v", deviceName, cleanMpathName, err)
 		}
@@ -594,7 +590,6 @@ func (n NodeUtils) RescanPhysicalDevices(ctx context.Context, mpathName string, 
 	logger.Debugf("Rescan: Finish rescan on sys devices: %v", sysDevices)
 	return nil
 }
-
 
 //Use os.WriteFile for brevity unless your Executer wrapper specifically requires the OsOpenFile flow for tracking. os.WriteFile is inherently safer as it handles the close even on early errors.
 
@@ -623,7 +618,7 @@ func (n NodeUtils) FormatDevice(ctx context.Context, devicePath string, fsType s
 		// time.Sleep(2 * time.Second)
 		return nil
 	})
-	
+
 	return finalErr
 }
 
@@ -744,10 +739,10 @@ func (n NodeUtils) IsBlock(ctx context.Context, devicePath string) (bool, error)
 
 	res, err := executer.ExecuteUninterruptible[bool](
 		// Pass the ctx into the gater/executor
-		ctx, 
+		ctx,
 		n.KeyedGater,
 		"is-block-"+devicePath,
-		10, 50, 
+		10, 50,
 		1*time.Second, 5*time.Second,
 		func(wCtx context.Context) (bool, error) {
 			var stat unix.Stat_t
@@ -789,14 +784,14 @@ func (n NodeUtils) GetFileSystemVolumeStats(ctx context.Context, path string) (V
 		return VolumeStatistics{}, err
 	}
 
-	blkSize     := uint64(stat.Bsize)
+	blkSize := uint64(stat.Bsize)
 	totalBlocks := uint64(stat.Blocks)
 	availBlocks := uint64(stat.Bavail)
-	totalFiles  := uint64(stat.Files)
-	freeFiles   := uint64(stat.Ffree)
+	totalFiles := uint64(stat.Files)
+	freeFiles := uint64(stat.Ffree)
 
 	usedBlocks := totalBlocks - availBlocks
-	if totalBlocks < availBlocks { 
+	if totalBlocks < availBlocks {
 		usedBlocks = 0
 	}
 
@@ -828,7 +823,7 @@ func (n NodeUtils) GetBlockVolumeStats(ctx context.Context, devicePath string) (
 				return 0, err
 			}
 
-			// Correctly uses O_NONBLOCK. If the device path is experiencing an active link transport 
+			// Correctly uses O_NONBLOCK. If the device path is experiencing an active link transport
 			// drop or a D-state hang, this open call breaks out immediately without deadlocking the Go thread.
 			f, err := os.OpenFile(devicePath, os.O_RDONLY|unix.O_NONBLOCK, 0)
 			if err != nil {
@@ -842,7 +837,7 @@ func (n NodeUtils) GetBlockVolumeStats(ctx context.Context, devicePath string) (
 			if errIoctl != nil {
 				return 0, fmt.Errorf("ioctl BLKGETSIZE64 failed on target %s: %w", devicePath, errIoctl)
 			}
-			
+
 			return uint64(sizeInt), nil
 		},
 	)
@@ -857,7 +852,6 @@ func (n NodeUtils) GetBlockVolumeStats(ctx context.Context, devicePath string) (
 		UsedBytes:      0,
 	}, nil
 }
-
 
 func (d NodeUtils) GetVolumeUuid(volumeId string) string {
 	volumeIdParts := strings.Split(volumeId, d.ConfigYaml.Parameters.Object_id_info.Delimiter)

@@ -790,10 +790,10 @@ func TestWaitForNoRefs(t *testing.T) {
 // =========================================================================
 // Test: TeardownVolume Multi-Protocol Workflow Coverage
 // Covers:
-//   1. Standard Device Mapper (SCSI, iSCSI, FC)
-//   2. NVMe over Device Mapper (NVMe-DM)
-//   3. Native NVMe Subsystem (Native NVMe)
-//   4. Idempotency & Error boundaries (Context cancellation, Busy DM hold)
+//  1. Standard Device Mapper (SCSI, iSCSI, FC)
+//  2. NVMe over Device Mapper (NVMe-DM)
+//  3. Native NVMe Subsystem (Native NVMe)
+//  4. Idempotency & Error boundaries (Context cancellation, Busy DM hold)
 //
 // TeardownVolume resolves the backing device by stat()-ing real /dev nodes and reading /proc and
 // /sys (collectInformationForTeardown), which cannot be faked through the mocked interfaces.

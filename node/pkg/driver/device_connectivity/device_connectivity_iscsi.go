@@ -19,13 +19,13 @@ package device_connectivity
 import (
 	"context"
 	"fmt"
+	"io"
 	"net"
 	"os"
 	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
-	"io"
 
 	"github.com/ibm/ibm-block-csi-driver/node/logger"
 	"github.com/ibm/ibm-block-csi-driver/node/pkg/driver/executer"
@@ -41,7 +41,7 @@ const (
 
 type OsDeviceConnectivityIscsi struct {
 	Executer          executer.ExecuterInterface
-	KeyedGater      *executer.KeyedGater
+	KeyedGater        *executer.KeyedGater
 	HelperScsiGeneric OsDeviceConnectivityHelperScsiGenericInterface
 	// RootDir is prepended to every host path this type reads (sysfs, /dev, /etc/iscsi).
 	// It is empty in production; it exists so tests can point the code at a fake filesystem tree.
@@ -51,7 +51,7 @@ type OsDeviceConnectivityIscsi struct {
 func NewOsDeviceConnectivityIscsi(executer executer.ExecuterInterface, KeyedGater *executer.KeyedGater, Mounter *mount.Mounter, clean_scsi_device bool) OsDeviceConnectivityInterface {
 	return &OsDeviceConnectivityIscsi{
 		Executer:          executer,
-		KeyedGater: KeyedGater,
+		KeyedGater:        KeyedGater,
 		HelperScsiGeneric: NewOsDeviceConnectivityHelperScsiGeneric(executer, KeyedGater, Mounter, clean_scsi_device),
 	}
 }
@@ -63,7 +63,6 @@ func (r OsDeviceConnectivityIscsi) iscsiCmd(args ...string) (string, error) {
 	out, err := r.Executer.ExecuteWithTimeout(int(IscsiCmdTimeout.Seconds()*1000), "iscsiadm", args)
 	return string(out), err
 }
-
 
 func (r *OsDeviceConnectivityIscsi) iscsiDiscover(ctx context.Context, portal string) error {
 	finalErr := r.KeyedGater.ExecuteicsiFabric(ctx, func() error {
@@ -78,11 +77,11 @@ func (r *OsDeviceConnectivityIscsi) iscsiDiscover(ctx context.Context, portal st
 }
 
 func (r *OsDeviceConnectivityIscsi) iscsiLogin(ctx context.Context, targetName, portal string) error {
-	
+
 	finalErr := r.KeyedGater.ExecuteicsiFabric(ctx, func() error {
 		cliPortal := r.EnsurePort(portal)
 		logger.Infof("Executing iSCSI login for target %s via portal %s", targetName, cliPortal)
-		
+
 		output, err := r.iscsiCmd("-m", "node", "-p", cliPortal, "-T", targetName, "--login")
 		if err != nil {
 			if exitCode, isExitError := r.Executer.GetExitCode(err); isExitError {
@@ -104,9 +103,8 @@ func (r *OsDeviceConnectivityIscsi) iscsiLogin(ctx context.Context, targetName, 
 		logger.Infof("Successfully logged into target %s via portal %s", targetName, cliPortal)
 		return nil
 	})
-	return finalErr	
+	return finalErr
 }
-
 
 // iscsiGetRawSessions reads from /sys/class/iscsi_session to extract target metrics with zero external forks.
 func (r *OsDeviceConnectivityIscsi) iscsiGetRawSessions(ctx context.Context) ([]string, error) {
@@ -114,19 +112,19 @@ func (r *OsDeviceConnectivityIscsi) iscsiGetRawSessions(ctx context.Context) ([]
 		return nil, err
 	}
 
-	// RULE 1: Enforce infrastructure-protected gating around the connection sweep 
+	// RULE 1: Enforce infrastructure-protected gating around the connection sweep
 	// to prevent networking link timeouts from permanently locking up the driver process.
 	return executer.ExecuteUninterruptible[[]string](
 		ctx,
 		r.KeyedGater,
 		"global-iscsi-raw-sessions-scan", // Static key space limits overlapping checks safely
-		15,  // maxRunning: balances simultaneous iSCSI workspace scans across the node
-		100, // maxSpare
+		15,                               // maxRunning: balances simultaneous iSCSI workspace scans across the node
+		100,                              // maxSpare
 		2*time.Second,
 		15*time.Second, // Bounded hard timeout ceiling for complete directory evaluation sweeps
 		func(wCtx context.Context) ([]string, error) {
 			connClassPath := r.path("/sys/class/iscsi_connection")
-			
+
 			dFile, errOpen := os.Open(connClassPath)
 			if errOpen != nil {
 				if os.IsNotExist(errOpen) {
@@ -195,7 +193,7 @@ func (r *OsDeviceConnectivityIscsi) iscsiGetRawSessions(ctx context.Context) ([]
 
 				// Read targetname from the sibling session path using the extracted sessionID
 				sessionPath := r.path(fmt.Sprintf("/sys/class/iscsi_session/session%s", sessionID))
-				
+
 				stateBuf, errS := r.readSysfs(filepath.Join(sessionPath, "state"))
 				targetBuf, errT := r.readSysfs(filepath.Join(sessionPath, "targetname"))
 				if errS != nil || errT != nil {
@@ -207,7 +205,7 @@ func (r *OsDeviceConnectivityIscsi) iscsiGetRawSessions(ctx context.Context) ([]
 				}
 
 				targetName := strings.TrimSpace(string(targetBuf))
-				
+
 				logger.Debugf("Discovered active sysfs session: [%s] target: %s portal: %s", sessionID, targetName, portal)
 				results = append(results, fmt.Sprintf("tcp: [%s] %s %s", sessionID, portal, targetName))
 			}
@@ -247,7 +245,7 @@ func (r OsDeviceConnectivityIscsi) parseRawSessions(lines []string) (map[string]
 			return nil, fmt.Errorf("failed to safely parse active raw session list: truncation detected")
 		}
 
-		// Fix: Extracted elements using explicit slice indexes 
+		// Fix: Extracted elements using explicit slice indexes
 		targetName := strings.ToLower(parts[3])
 		ipKey := r.ExtractIP(parts[2])
 
@@ -262,7 +260,7 @@ func (r OsDeviceConnectivityIscsi) parseRawSessions(lines []string) (map[string]
 // filterLoggedIn isolates targets and portals that do not have active sessions
 func (r OsDeviceConnectivityIscsi) filterLoggedIn(ctx context.Context, portalsByTarget map[string][]string) (map[string][]string, error) {
 	logger.Debug("Querying kernel sysfs to identify existing active iSCSI links")
-	
+
 	// Fetch active sessions from sysfs (Keys are lowercased IQNs and portless IPs)
 	loggedInPortalsByTarget, err := r.getAllSessions(ctx)
 	if err != nil {
@@ -302,7 +300,7 @@ func (r OsDeviceConnectivityIscsi) discoverAndLogin(ctx context.Context, portals
 		return err
 	}
 	discoveredPortals := make(map[string]bool)
-	
+
 	// Track targets/portals that are confirmed ready for login
 	validTargetsForLogin := make(map[string][]string)
 
@@ -323,7 +321,7 @@ func (r OsDeviceConnectivityIscsi) discoverAndLogin(ctx context.Context, portals
 			// If the target record isn't in the database, execute discovery
 			if !discoveredPortals[ipKey] {
 				logger.Infof("Target %s portal IP %s missing from DB, triggering discovery sequence...", targetName, ipKey)
-				
+
 				// Pass the full unmutated portal string (IP:Port) for iscsiadm execution
 				if err := r.iscsiDiscover(ctx, portal); err == nil {
 					discoveredPortals[ipKey] = true
@@ -333,7 +331,7 @@ func (r OsDeviceConnectivityIscsi) discoverAndLogin(ctx context.Context, portals
 						dbCache[normalizedTarget] = make(map[string]bool)
 					}
 					dbCache[normalizedTarget][ipKey] = true
-					
+
 					validTargetsForLogin[targetName] = append(validTargetsForLogin[targetName], portal)
 				} else {
 					logger.Errorf("Discovery failed for portal %s. Target data will not be available for login.", portal)
@@ -356,7 +354,7 @@ func (r OsDeviceConnectivityIscsi) discoverAndLogin(ctx context.Context, portals
 		for _, portal := range portals {
 			loginAttempts++
 			logger.Infof("Routing attachment request to login subsystem for target %s via %s", targetName, portal)
-			
+
 			// Assume r.iscsiLogin is updated to return an error when login fails
 			if err := r.iscsiLogin(ctx, targetName, portal); err != nil {
 				// Check for exit status 15 (already logged in) inside your iscsiLogin execution block
@@ -383,14 +381,14 @@ func (r *OsDeviceConnectivityIscsi) loadRelevantTargets(ctx context.Context, req
 		return nil, err
 	}
 
-	// RULE 1: Enforce infrastructure-protected gating around the database sweep 
+	// RULE 1: Enforce infrastructure-protected gating around the database sweep
 	// to prevent local disk system stalls from permanently locking up the driver process.
 	return executer.ExecuteUninterruptible[map[string]map[string]bool](
 		ctx,
 		r.KeyedGater,
 		"global-iscsi-local-db-load", // Static key space limits overlapping checks safely
-		15,  // maxRunning: balances simultaneous iSCSI workspace scans across the node
-		100, // maxSpare
+		15,                           // maxRunning: balances simultaneous iSCSI workspace scans across the node
+		100,                          // maxSpare
 		2*time.Second,
 		15*time.Second, // Bounded hard timeout ceiling for full database evaluation sweeps
 		func(wCtx context.Context) (map[string]map[string]bool, error) {
@@ -430,7 +428,7 @@ func (r *OsDeviceConnectivityIscsi) loadRelevantTargets(ctx context.Context, req
 				// KEEP ORIGINAL: Open-iSCSI creates directories in strictly lowercase IQNs.
 				normalizedTarget := strings.ToLower(targetName)
 				targetPath := filepath.Join(basePath, normalizedTarget)
-				
+
 				logger.Debugf("Checking target directory path: %s", targetPath)
 
 				db[normalizedTarget] = make(map[string]bool)
@@ -467,9 +465,9 @@ func (r *OsDeviceConnectivityIscsi) loadRelevantTargets(ctx context.Context, req
 					parts := strings.Split(pName, ",")
 					if len(parts) >= 2 {
 						ipKey := r.ExtractIP(parts[0])
-						
+
 						logger.Debugf("Successfully mapped normalized IP key: %s for target: %s", ipKey, normalizedTarget)
-						
+
 						db[normalizedTarget][ipKey] = true
 					}
 				}
@@ -526,7 +524,7 @@ func (r OsDeviceConnectivityIscsi) EnsureLogin(ctx context.Context, allPortalsBy
 	}
 
 	logger.Infof("%d targets have paths requiring active discovery or login operations", len(portalsToLogin))
-	
+
 	// 3. Trigger discovery and execute the login pipeline
 	if err := r.discoverAndLogin(ctx, portalsToLogin); err != nil {
 		logger.Errorf("iSCSI storage attachment pipeline failed: %v", err)
@@ -535,8 +533,6 @@ func (r OsDeviceConnectivityIscsi) EnsureLogin(ctx context.Context, allPortalsBy
 
 	logger.Info("Successfully completed all required iSCSI target login procedures.")
 }
-
-
 
 type activeSession struct {
 	sourceIQN string
@@ -581,19 +577,19 @@ func (r *OsDeviceConnectivityIscsi) parseActiveSessions(ctx context.Context) ([]
 		return nil, err
 	}
 
-	// RULE 1: Enforce infrastructure-protected gating around the session sweep 
+	// RULE 1: Enforce infrastructure-protected gating around the session sweep
 	// to prevent networking link timeouts from permanently locking up the driver process.
 	return executer.ExecuteUninterruptible[[]activeSession](
 		ctx,
 		r.KeyedGater,
 		"global-iscsi-active-sessions-scan", // Static key space limits overlapping checks safely
-		15,  // maxRunning: balances simultaneous iSCSI workspace scans across the node
-		100, // maxSpare
+		15,                                  // maxRunning: balances simultaneous iSCSI workspace scans across the node
+		100,                                 // maxSpare
 		2*time.Second,
 		15*time.Second, // Bounded hard timeout ceiling for full directory evaluation sweeps
 		func(wCtx context.Context) ([]activeSession, error) {
 			sessionBaseDir := r.path("/sys/class/iscsi_session")
-			
+
 			dFile, errOpen := os.Open(sessionBaseDir)
 			if errOpen != nil {
 				logger.Error("Cannot read active sessions")
@@ -651,7 +647,7 @@ func (r *OsDeviceConnectivityIscsi) parseActiveSessions(ctx context.Context) ([]
 					sourceIQN: initiatorIQN,
 					hostNum:   hostNum,
 				})
-				
+
 				logger.Errorf("Add init %s host %s", initiatorIQN, hostName)
 			}
 
@@ -812,15 +808,15 @@ func (r OsDeviceConnectivityIscsi) GetBlockDeviceForSession(ctx context.Context,
 		}
 
 		deviceLink := filepath.Join(r.path("/sys/block"), name, "device")
-		
+
 		// Natively expands relative directory targets, ensuring absolute path matching accuracy
 		realPath, errLink := filepath.EvalSymlinks(deviceLink)
 		if errLink != nil {
-			continue 
+			continue
 		}
 
 		if strings.Contains(realPath, sessionToken) {
-			return "/dev/" + name, nil 
+			return "/dev/" + name, nil
 		}
 	}
 
@@ -886,7 +882,7 @@ func (r OsDeviceConnectivityIscsi) GetBlockDeviceForSession(ctx context.Context,
 
 			disks, errDisks := bFile.Readdirnames(-1)
 			bFile.Close() // CLOSED IMMEDIATELY
-			
+
 			if errDisks == nil && len(disks) > 0 {
 				return "/dev/" + disks[0], nil
 			}
@@ -901,14 +897,12 @@ func cleanSysfsData(data []byte) string {
 }
 
 func (r *OsDeviceConnectivityIscsi) readSysfs(path string) (string, error) {
-        data, err := os.ReadFile(path)
-        if err != nil {
-                return "", err
-         }
-        return strings.Trim(string(data), " \n\r\t\x00"), nil
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return "", err
+	}
+	return strings.Trim(string(data), " \n\r\t\x00"), nil
 }
-
-
 
 // -------------------------------------------------------------------------
 // Helper Utilities for Format Extraction & Key Isolation
@@ -922,15 +916,14 @@ func (r OsDeviceConnectivityIscsi) path(p string) string {
 	return filepath.Join(r.RootDir, p)
 }
 
-
 func (r OsDeviceConnectivityIscsi) ExtractIP(portal string) string {
 	portal = strings.ToLower(strings.TrimSpace(portal))
-	
+
 	// If the portal string contains a port via colon separator, split it cleanly
 	if host, _, err := net.SplitHostPort(portal); err == nil {
 		return strings.Trim(host, "[]")
 	}
-	
+
 	// Fallback handling for raw strings or already split open-iscsi filesystem inputs
 	return strings.Trim(portal, "[]")
 }
@@ -943,25 +936,24 @@ func (r OsDeviceConnectivityIscsi) EnsurePort(portal string) string {
 	return net.JoinHostPort(portal, "3260")
 }
 
-
 // getDiscoveryScopeKey groups locks by subnet prefix to avoid write collisions on the same storage array
 func (r OsDeviceConnectivityIscsi) getDiscoveryScopeKey(portal string) string {
-        ipStr := r.ExtractIP(portal)
-        ip := net.ParseIP(ipStr)
-        if ip == nil {
-                return ipStr
-        }
-        if ipv4 := ip.To4(); ipv4 != nil {
-                return fmt.Sprintf("%d.%d.%d", ipv4[0], ipv4[1], ipv4[2]) // /24 grouping
-        }
-        if ipv6 := ip.To16(); ipv6 != nil {
-                // FIX: Combine adjacent bytes to construct the first four 16-bit blocks of a standard IPv6 /64 prefix
-                block1 := uint16(ipv6[0])<<8 | uint16(ipv6[1])
-                block2 := uint16(ipv6[2])<<8 | uint16(ipv6[3])
-                block3 := uint16(ipv6[4])<<8 | uint16(ipv6[5])
-                block4 := uint16(ipv6[6])<<8 | uint16(ipv6[7])
+	ipStr := r.ExtractIP(portal)
+	ip := net.ParseIP(ipStr)
+	if ip == nil {
+		return ipStr
+	}
+	if ipv4 := ip.To4(); ipv4 != nil {
+		return fmt.Sprintf("%d.%d.%d", ipv4[0], ipv4[1], ipv4[2]) // /24 grouping
+	}
+	if ipv6 := ip.To16(); ipv6 != nil {
+		// FIX: Combine adjacent bytes to construct the first four 16-bit blocks of a standard IPv6 /64 prefix
+		block1 := uint16(ipv6[0])<<8 | uint16(ipv6[1])
+		block2 := uint16(ipv6[2])<<8 | uint16(ipv6[3])
+		block3 := uint16(ipv6[4])<<8 | uint16(ipv6[5])
+		block4 := uint16(ipv6[6])<<8 | uint16(ipv6[7])
 
-                return fmt.Sprintf("%x:%x:%x:%x", block1, block2, block3, block4) // /64 grouping
-        }
-        return ipStr
+		return fmt.Sprintf("%x:%x:%x:%x", block1, block2, block3, block4) // /64 grouping
+	}
+	return ipStr
 }
