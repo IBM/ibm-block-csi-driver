@@ -43,6 +43,9 @@ type OsDeviceConnectivityIscsi struct {
 	Executer          executer.ExecuterInterface
 	KeyedGater      *executer.KeyedGater
 	HelperScsiGeneric OsDeviceConnectivityHelperScsiGenericInterface
+	// RootDir is prepended to every host path this type reads (sysfs, /dev, /etc/iscsi).
+	// It is empty in production; it exists so tests can point the code at a fake filesystem tree.
+	RootDir string
 }
 
 func NewOsDeviceConnectivityIscsi(executer executer.ExecuterInterface, KeyedGater *executer.KeyedGater, Mounter *mount.Mounter, clean_scsi_device bool) OsDeviceConnectivityInterface {
@@ -122,7 +125,7 @@ func (r *OsDeviceConnectivityIscsi) iscsiGetRawSessions(ctx context.Context) ([]
 		2*time.Second,
 		15*time.Second, // Bounded hard timeout ceiling for complete directory evaluation sweeps
 		func(wCtx context.Context) ([]string, error) {
-			const connClassPath = "/sys/class/iscsi_connection"
+			connClassPath := r.path("/sys/class/iscsi_connection")
 			
 			dFile, errOpen := os.Open(connClassPath)
 			if errOpen != nil {
@@ -191,7 +194,7 @@ func (r *OsDeviceConnectivityIscsi) iscsiGetRawSessions(ctx context.Context) ([]
 				}
 
 				// Read targetname from the sibling session path using the extracted sessionID
-				sessionPath := fmt.Sprintf("/sys/class/iscsi_session/session%s", sessionID)
+				sessionPath := r.path(fmt.Sprintf("/sys/class/iscsi_session/session%s", sessionID))
 				
 				stateBuf, errS := r.readSysfs(filepath.Join(sessionPath, "state"))
 				targetBuf, errT := r.readSysfs(filepath.Join(sessionPath, "targetname"))
@@ -220,7 +223,11 @@ func (r OsDeviceConnectivityIscsi) getAllSessions(ctx context.Context) (map[stri
 	if err != nil {
 		return nil, err
 	}
+	return r.parseRawSessions(lines)
+}
 
+// parseRawSessions turns "tcp: [id] ip:port iqn" session lines into a target -> portal-IP lookup map.
+func (r OsDeviceConnectivityIscsi) parseRawSessions(lines []string) (map[string]map[string]bool, error) {
 	portalsByTarget := make(map[string]map[string]bool)
 	for _, line := range lines {
 		line = strings.TrimSpace(line)
@@ -344,8 +351,10 @@ func (r OsDeviceConnectivityIscsi) discoverAndLogin(ctx context.Context, portals
 
 	// 2. Perform Logins on validated database nodes
 	var loginErrors []error
+	loginAttempts := 0
 	for targetName, portals := range validTargetsForLogin {
 		for _, portal := range portals {
+			loginAttempts++
 			logger.Infof("Routing attachment request to login subsystem for target %s via %s", targetName, portal)
 			
 			// Assume r.iscsiLogin is updated to return an error when login fails
@@ -359,7 +368,7 @@ func (r OsDeviceConnectivityIscsi) discoverAndLogin(ctx context.Context, portals
 
 	// If some logins failed, check if at least one path succeeded (Multipath resiliency fallback)
 	if len(loginErrors) > 0 {
-		if len(loginErrors) == len(portalsByTarget) { // All paths totally failed
+		if len(loginErrors) == loginAttempts { // All paths totally failed
 			return fmt.Errorf("all iSCSI login attempts failed: %v", loginErrors)
 		}
 		logger.Warningf("Some iSCSI paths failed to log in, but proceeding with successful sessions: %v", loginErrors)
@@ -386,7 +395,7 @@ func (r *OsDeviceConnectivityIscsi) loadRelevantTargets(ctx context.Context, req
 		15*time.Second, // Bounded hard timeout ceiling for full database evaluation sweeps
 		func(wCtx context.Context) (map[string]map[string]bool, error) {
 			db := make(map[string]map[string]bool)
-			basePath := "/etc/iscsi/nodes"
+			basePath := r.path("/etc/iscsi/nodes")
 
 			dFile, errOpen := os.Open(basePath)
 			if errOpen != nil {
@@ -583,7 +592,7 @@ func (r *OsDeviceConnectivityIscsi) parseActiveSessions(ctx context.Context) ([]
 		2*time.Second,
 		15*time.Second, // Bounded hard timeout ceiling for full directory evaluation sweeps
 		func(wCtx context.Context) ([]activeSession, error) {
-			sessionBaseDir := "/sys/class/iscsi_session"
+			sessionBaseDir := r.path("/sys/class/iscsi_session")
 			
 			dFile, errOpen := os.Open(sessionBaseDir)
 			if errOpen != nil {
@@ -658,13 +667,13 @@ func (r OsDeviceConnectivityIscsi) getInitiatorIQN(sessionPath, hostName string)
 	}
 
 	// 2. Fallback: Host-specific IQN
-	hostInitPath := fmt.Sprintf("/sys/class/iscsi_host/%s/initiatorname", hostName)
+	hostInitPath := r.path(fmt.Sprintf("/sys/class/iscsi_host/%s/initiatorname", hostName))
 	if data, err := os.ReadFile(hostInitPath); err == nil {
 		return strings.TrimSpace(string(data)), nil
 	}
 
 	// 3. Final Fallback: Global Config with Robust Parsing
-	if data, err := os.ReadFile("/etc/iscsi/initiatorname.iscsi"); err == nil {
+	if data, err := os.ReadFile(r.path("/etc/iscsi/initiatorname.iscsi")); err == nil {
 		for _, line := range strings.Split(string(data), "\n") {
 			line = strings.TrimSpace(line)
 
@@ -760,7 +769,7 @@ func (r OsDeviceConnectivityIscsi) GetBlockDeviceForSession(ctx context.Context,
 	// =========================================================================
 	// PRIMARY STRATEGY: SCAN RAM-BACKED /dev LAYOUT
 	// =========================================================================
-	dFile, errOpen := os.Open("/dev")
+	dFile, errOpen := os.Open(r.path("/dev"))
 	if errOpen != nil {
 		return "", errOpen
 	}
@@ -802,7 +811,7 @@ func (r OsDeviceConnectivityIscsi) GetBlockDeviceForSession(ctx context.Context,
 			continue
 		}
 
-		deviceLink := filepath.Join("/sys/block", name, "device")
+		deviceLink := filepath.Join(r.path("/sys/block"), name, "device")
 		
 		// Natively expands relative directory targets, ensuring absolute path matching accuracy
 		realPath, errLink := filepath.EvalSymlinks(deviceLink)
@@ -818,7 +827,7 @@ func (r OsDeviceConnectivityIscsi) GetBlockDeviceForSession(ctx context.Context,
 	// =========================================================================
 	// LEGACY SEAMLESS FALLBACK TREE (For specialized virtual container setups)
 	// =========================================================================
-	sessionDevicePath := fmt.Sprintf("/sys/class/iscsi_session/session%s/device", sessionID)
+	sessionDevicePath := r.path(fmt.Sprintf("/sys/class/iscsi_session/session%s/device", sessionID))
 	sFile, errOpenFallback := os.Open(sessionDevicePath)
 	if errOpenFallback != nil {
 		return "", errOpenFallback
@@ -904,6 +913,15 @@ func (r *OsDeviceConnectivityIscsi) readSysfs(path string) (string, error) {
 // -------------------------------------------------------------------------
 // Helper Utilities for Format Extraction & Key Isolation
 // -------------------------------------------------------------------------
+
+// path maps an absolute host path into RootDir (a no-op when RootDir is empty).
+func (r OsDeviceConnectivityIscsi) path(p string) string {
+	if r.RootDir == "" {
+		return p
+	}
+	return filepath.Join(r.RootDir, p)
+}
+
 
 func (r OsDeviceConnectivityIscsi) ExtractIP(portal string) string {
 	portal = strings.ToLower(strings.TrimSpace(portal))
