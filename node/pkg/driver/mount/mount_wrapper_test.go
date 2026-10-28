@@ -26,6 +26,9 @@ import (
 	"github.com/ibm/ibm-block-csi-driver/node/pkg/driver/mount"
 )
 
+// Mounter.Unmount goes through UnmountWithTimeout, which consults /proc/self/mountinfo and returns early
+// for a target that is not mounted, so it can't be driven with a fake path. The code that actually runs
+// the "umount" binary through the executer is ExecuteHostLevelUnmount, which is what is tested here.
 func TestMounterUnmount(t *testing.T) {
 	target := "fake/target"
 	output := []byte("fake output")
@@ -61,8 +64,8 @@ func TestMounterUnmount(t *testing.T) {
 				ExecuteWithTimeout(int(timeout.Seconds()*1000), "umount", []string{target}).
 				Return(output, tc.execErr)
 
-			mounter := mount.NewWithExecutor("", fake_executer)
-			err := mounter.Unmount(target)
+			mounter := mount.NewWithExecutor("", fake_executer, nil, 0)
+			err := mounter.ExecuteHostLevelUnmount(target, 0)
 
 			if tc.expReturn == nil {
 				if err != nil {
