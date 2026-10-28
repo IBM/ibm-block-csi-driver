@@ -64,8 +64,7 @@ NO_NVME_FC_TARGETS_FOUND_ERROR_MESSAGE = "Could not find NVMe-FC targets for sto
 
 NO_NVME_TCP_TARGETS_FOUND_ERROR_MESSAGE = "Could not find NVMe-TCP targets for storage endpoint: {0}"
 
-NVME_TCP_NOT_ENABLED_ERROR_MESSAGE = "NVMe-TCP connectivity is not enabled for host {0}. To allow it, set " \
-                                     "enableNvmeTcp: \"true\" in the ibm-csi-controller-config ConfigMap"
+NVME_TCP_NOT_ENABLED_ERROR_MESSAGE = "NVMe-TCP connectivity is disabled in the IBM block storage CSI driver"
 
 UNSUPPORTED_CONNECTIVITY_TYPE_ERROR_MESSAGE = "Unsupported connectivity type: {0}"
 
@@ -102,8 +101,8 @@ CANNOT_CHANGE_HOST_PROTOCOL_BECAUSE_OF_MAPPED_PORTS = "The host protocol cannot 
 SECONDARY_STORAGE_TRANSITION_TO_PRODUCTION_NOT_READY_ERROR_MESSAGE = "Secondary storage is not yet ready to " \
     "transition to production after becoming independent: {0}"
 
-ASYNC_DR_REPLICATION_POLICY_NOT_FOUND_MESSAGE = "No async-dr replication policy '{0}' found on storage for " \
-    "volume group '{1}'"
+REPLICATION_POLICY_NOT_ASSIGNED_TO_PARTITION_VG_MESSAGE = "Cannot assign replication policy '{0}' to volume " \
+    "group '{1}' in partition '{2}': {3}. Create an async-dr replication policy named '{0}' in partition '{2}'"
 
 OPERATION_NOT_READY_ERROR_MESSAGE = "Operation not ready: {0}"
 

@@ -74,6 +74,8 @@ EAR_PROMOTE_REMOTE_NOT_READY = 'CMMVC1150E'
 EAR_PROMOTE_REMOTE_INTERNAL_ERROR = 'CMMVC9913E'
 EAR_PROMOTE_REMOTE_NOT_INDEPENDENT = "CMMVC9932E"
 EAR_PROMOTE_DIVERGED_COPY_NOT_SYNCED = "CMMVC1149E"
+REPLICATION_POLICY_NOT_IN_VG_PARTITION = "CMMVC1263E"
+REPLICATION_POLICY_NOT_APPLICABLE_TO_PARTITION_VG = "CMMVC1290E"
 EAR_PROMOTE_REMOTE_PARTNERSHIP_UNAVAILABLE = "CMMVC9901E"
 EAR_PROMOTE_REMOTE_UNREACHABLE = "CMMVC9949E"
 
@@ -1879,6 +1881,14 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
         volume_group_replication = self._lsvolumegroupreplication(volume_group_id)
         if not volume_group_replication:
             return None
+
+        # local_dr_replication_mode is available from SVC 9.1.3; older levels only have the location fields
+        local_dr_replication_mode = getattr(volume_group_replication, 'local_dr_replication_mode', None)
+        if local_dr_replication_mode:
+            logger.debug("volume group '{}': replication mode '{}' from local_dr_replication_mode".format(
+                volume_group_id, local_dr_replication_mode))
+            return local_dr_replication_mode
+
         if hasattr(volume_group_replication, "local_partition_location") \
                 and volume_group_replication.local_partition_location:
             local_partition_location = volume_group_replication.local_partition_location
@@ -1887,7 +1897,10 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
             replication_local_location = volume_group_replication.local_location
             location_attr_name = f"location{replication_local_location}_replication_mode"
 
-        return getattr(volume_group_replication, location_attr_name, None)
+        replication_mode = getattr(volume_group_replication, location_attr_name, None)
+        logger.debug("volume group '{}': local_dr_replication_mode not available, replication mode '{}' from {}".format(
+            volume_group_id, replication_mode, location_attr_name))
+        return replication_mode
 
     @staticmethod
     def _getattr_as_str(obj, attr, default=array_settings.UNKNOWN):
@@ -1933,12 +1946,42 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
             dr_link_status, remote_name, remote_status, within_rpo
         )
 
+    def _get_last_sync_time(self, vg_replication, recovery_loc_idx):
+        running_recovery_point = self._getattr_as_str(
+            vg_replication, 'location{}_running_recovery_point'.format(recovery_loc_idx), '')
+        if running_recovery_point:
+            try:
+                last_sync_time = datetime.now(timezone.utc) - timedelta(seconds=int(running_recovery_point))
+                logger.debug("DR location {}: last_sync_time '{}' from running_recovery_point '{}' seconds".format(
+                    recovery_loc_idx, last_sync_time, running_recovery_point))
+                return last_sync_time
+            except ValueError:
+                logger.warning("cannot parse location{}_running_recovery_point '{}'".format(
+                    recovery_loc_idx, running_recovery_point))
+                return None
+
+        fixed_recovery_point = self._getattr_as_str(
+            vg_replication, 'location{}_fixed_recovery_point'.format(recovery_loc_idx), '')
+        if fixed_recovery_point:
+            try:
+                last_sync_time = datetime.strptime(fixed_recovery_point,
+                                                   array_settings.FIXED_RECOVERY_POINT_TIME_FORMAT) \
+                    .replace(tzinfo=timezone.utc)
+                logger.debug("DR location {}: last_sync_time '{}' from fixed_recovery_point '{}'".format(
+                    recovery_loc_idx, last_sync_time, fixed_recovery_point))
+                return last_sync_time
+            except ValueError:
+                logger.warning("cannot parse location{}_fixed_recovery_point '{}'".format(
+                    recovery_loc_idx, fixed_recovery_point))
+                return None
+
+        logger.info("No recovery point reported for DR location {}".format(recovery_loc_idx))
+        return None
+
     def _build_replication_info(self, vg_replication):
         recovery_loc_idx = self._get_recovery_location_index(vg_replication)
 
-        # NOTE: For now we have not decided field from storage to be populated into last_sync_time
-        # until then using current time
-        last_sync_time = datetime.now(timezone.utc)
+        last_sync_time = self._get_last_sync_time(vg_replication, recovery_loc_idx)
 
         dr_link_status = self._getattr_as_str(vg_replication, 'dr_link_status', array_settings.UNKNOWN)
         proto_status = self._map_dr_link_status_to_proto_status(dr_link_status)
@@ -2045,37 +2088,6 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
         if not volume_group_replication:
             return None
         return volume_group_replication.replication_policy_name
-
-    def _assign_replication_policy_to_partition_vg(self, volume_group_id, requested_policy_name):
-        try:
-            policies = self.client.svcinfo.lsreplicationpolicy().as_list
-        except (svc_errors.CommandExecutionError, CLIFailureError) as ex:
-            logger.error("failed to list replication policies: {}".format(ex.my_message))
-            raise ex
-
-        if not policies:
-            raise array_errors.AsyncDRReplicationPolicyNotFoundError(volume_group_id, requested_policy_name)
-
-        policy_id = None
-        for policy in policies:
-            if getattr(policy, 'name', '') == requested_policy_name:
-                policy_id = policy.id
-                break
-
-        if policy_id is None:
-            for policy in policies:
-                if getattr(policy, 'topology', '') == 'async-dr':
-                    policy_id = policy.id
-                    logger.info("no exact policy match for '{}', using first async-dr policy '{}' "
-                                "for volume group '{}'".format(
-                                    requested_policy_name, getattr(policy, 'name', ''), volume_group_id))
-                    break
-
-        if policy_id is None:
-            raise array_errors.AsyncDRReplicationPolicyNotFoundError(volume_group_id, requested_policy_name)
-
-        logger.info("assigning replication policy '{}' to volume group '{}'".format(policy_id, volume_group_id))
-        self._chvolumegroup(volume_group_id, replicationpolicy=policy_id)
 
     def _is_earreplication_supported(self):
         return hasattr(self.client.svctask, "chvolumereplicationinternals")
@@ -2283,15 +2295,33 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
             else:
                 raise
 
+    def _assign_requested_policy_to_partition_vg(self, volume_group_id, partition_name, replication_policy):
+        # In a partition the replication policy is not assigned to the recovery VG automatically.
+        # Assign only the policy named in the request (VolumeReplicationClass), never any other policy.
+        logger.info("assigning requested replication policy '{}' to volume group '{}' in partition '{}'".format(
+            replication_policy, volume_group_id, partition_name))
+        try:
+            self._change_volume_group_policy(volume_group_id, replication_policy)
+        except (svc_errors.CommandExecutionError, CLIFailureError) as ex:
+            if any(code in ex.my_message for code in (NAME_NOT_EXIST_OR_MEET_RULES,
+                                                      REPLICATION_POLICY_NOT_IN_VG_PARTITION,
+                                                      REPLICATION_POLICY_NOT_APPLICABLE_TO_PARTITION_VG)):
+                raise array_errors.ReplicationPolicyNotAssignedError(volume_group_id, partition_name,
+                                                                     replication_policy, ex.my_message)
+            raise
+        logger.debug("assigned replication policy '{}' to volume group '{}' in partition '{}'".format(
+            replication_policy, volume_group_id, partition_name))
+
     def _promote_ear_replication_to_production(self, volume_group_id, replication_policy=None):
         if replication_policy:
             vg_replication = self._lsvolumegroupreplication(volume_group_id)
-            if vg_replication and getattr(vg_replication, 'partition_name', ''):
-                existing_policy = getattr(vg_replication, 'replication_policy_name', '')
-                if not existing_policy:
-                    logger.info("assigning replication policy '{}' to partition VG '{}'".format(
-                        replication_policy, volume_group_id))
-                    self._assign_replication_policy_to_partition_vg(volume_group_id, replication_policy)
+            partition_name = getattr(vg_replication, 'partition_name', '') if vg_replication else ''
+            current_policy = getattr(vg_replication, 'replication_policy_name', '') if vg_replication else ''
+            logger.debug("volume group '{}': partition '{}', assigned replication policy '{}', "
+                         "requested replication policy '{}'".format(volume_group_id, partition_name,
+                                                                    current_policy, replication_policy))
+            if partition_name and not current_policy:
+                self._assign_requested_policy_to_partition_vg(volume_group_id, partition_name, replication_policy)
 
         try:
             self._chvolumegroupreplication(volume_group_id, mode=array_settings.ENDPOINT_TYPE_PRODUCTION)

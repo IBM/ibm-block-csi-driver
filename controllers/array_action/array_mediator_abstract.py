@@ -4,6 +4,7 @@ from abc import ABC
 from retry import retry
 
 import controllers.array_action.errors as array_errors
+import controllers.array_action.messages as messages
 import controllers.servers.utils as utils
 from controllers.array_action.array_mediator_interface import ArrayMediator
 from controllers.array_action.errors import NoConnectionAvailableException, UnsupportedConnectivityTypeError
@@ -43,7 +44,7 @@ class ArrayMediatorAbstract(ArrayMediator, ABC):
                     logger.debug(
                         "hostname : {}, connectivity_types  : {}".format(host.name, host.connectivity_types))
                     connectivity_type = utils.choose_connectivity_type(host.connectivity_types)
-                    self._validate_connectivity_type_is_enabled(host.name, connectivity_type)
+                    self._validate_nvme_tcp_is_enabled(host.name, connectivity_type)
                     array_initiators = self._get_array_initiators(host.name, connectivity_type)
                     return lun, connectivity_type, array_initiators
                 logger.debug(
@@ -60,7 +61,7 @@ class ArrayMediatorAbstract(ArrayMediator, ABC):
         logger.debug("hostname : {}, connectivity_types  : {}".format(host_name, connectivity_types))
 
         connectivity_type = utils.choose_connectivity_type(connectivity_types)
-        self._validate_connectivity_type_is_enabled(host_name, connectivity_type)
+        self._validate_nvme_tcp_is_enabled(host_name, connectivity_type)
         array_initiators = self._get_array_initiators(host_name, connectivity_type)
 
         try:
@@ -81,7 +82,7 @@ class ArrayMediatorAbstract(ArrayMediator, ABC):
         return lun, connectivity_type, array_initiators
 
     @staticmethod
-    def _validate_connectivity_type_is_enabled(host_name, connectivity_type):
+    def _validate_nvme_tcp_is_enabled(host_name, connectivity_type):
         # NVMe-TCP is blocked unless explicitly allowed (ENABLE_NVME_TCP, default false).
         # Checked before any mapping is made on the storage. Unpublish is never blocked.
         if connectivity_type != NVME_OVER_TCP_CONNECTIVITY_TYPE:
@@ -90,8 +91,8 @@ class ArrayMediatorAbstract(ArrayMediator, ABC):
         logger.debug("Host {} connectivity type {}, {}={}".format(
             host_name, connectivity_type, ENABLE_NVME_TCP_ENV_VAR, enable_nvme_tcp))
         if enable_nvme_tcp != 'true':
-            logger.error("NVMe-TCP connectivity is not enabled, blocking publish to host {}".format(host_name))
-            raise array_errors.NvmeTcpNotEnabledError(host_name)
+            logger.error(messages.NVME_TCP_NOT_ENABLED_ERROR_MESSAGE)
+            raise array_errors.NvmeTcpNotEnabledError()
 
     @retry(NoConnectionAvailableException, tries=11, delay=1)
     def unmap_volume_by_initiators(self, vol_id, initiators):
