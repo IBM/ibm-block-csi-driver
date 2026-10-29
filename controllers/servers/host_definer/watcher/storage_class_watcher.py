@@ -115,9 +115,4 @@ class StorageClassWatcher(Watcher):
     def _handle_deleted_watch_event(self, secrets_info):
         for secret_info in secrets_info:
             _, index = self._get_matching_managed_secret_info(secret_info)
-            if index == -1:
-                logger.warning(messages.DELETED_STORAGE_CLASS_SECRET_IS_NOT_MANAGED.format(
-                    secret_info.name, secret_info.namespace))
-                continue
-            if MANAGED_SECRETS[index].managed_storage_classes > 0:
-                MANAGED_SECRETS[index].managed_storage_classes -= 1
+            MANAGED_SECRETS[index].managed_storage_classes -= 1

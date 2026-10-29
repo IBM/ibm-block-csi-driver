@@ -69,8 +69,6 @@ DETECTED_UNMANAGED_CSI_NODE_WITH_IBM_BLOCK_CSI_DRIVER = 'Detected unmanaged CSIN
 DETECTED_NEW_MANAGED_CSI_NODE = 'Detected new managed CSINodes [{}], defining it on all the managed secrets'
 SECRET_IS_BEING_USED_BY_STORAGE_CLASS = 'Secret {} in namespace {}, it is used by storageClass {}'
 SECRET_IS_FROM_TOPOLOGY_TYPE = 'Secret {} in namespace {}, is from topology type'
-DELETED_STORAGE_CLASS_SECRET_IS_NOT_MANAGED = 'Secret {} in namespace {}, used by a deleted storageClass, '\
-    'is not a managed secret, skipping'
 NEW_MANAGED_SECRET = 'New managed secret {} in namespace {}, defining nodes on it'
 DEFINE_NODE_ON_ALL_MANAGED_SECRETS = 'Define node {} on all managed secrets'
 DEFINE_NODE_ON_SECRET = 'Defining node {} on secret {} in namespace {}'
