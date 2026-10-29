@@ -1,3 +1,4 @@
+import time
 from os import getenv
 import json
 import re
@@ -111,7 +112,9 @@ def get_node_initiators_data(node_name, node_id=None):
         '{"fc":[],"iscsi":["iqn.2016-04.com.open-iscsi:8bce7b6eab12"],"nvmeofc":[]}'
     """
     initiators_data = ''
+    start_time = time.monotonic()
     kubernetes_manager = KubernetesManager()
+    logger.debug("KubernetesManager() created for node {} in {:.1f}s".format(node_name, time.monotonic() - start_time))
     core_api = kubernetes_manager.core_api
     k8s_node = core_api.read_node(name=node_name)
     if k8s_node:
