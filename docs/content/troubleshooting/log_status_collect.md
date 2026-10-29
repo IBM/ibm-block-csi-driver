@@ -43,12 +43,12 @@ The script can be found here: https://github.com/IBM/ibm-block-csi-driver/tree/r
 ---
 ### Diagnostics collection using the IBM Block CSI log collector script
 The diagnostics script collects the following components:
-* resources – CSI-related Kubernetes/OpenShift objects
-* logs – CSI Node Plugin, controller, operator, and host-definer logs
-* events – Cluster events, Namespace events,CSI/storage events and Warning events
-* node-diagnostics – Node-level system, storage, network, and kubelet data
-* storage – IBM FlashSystem / SVC storage diagnostics
-* workload – Diagnostics for a specific pod and/or PVC
+* resources: CSI-related Kubernetes/OpenShift objects
+* logs: CSI Node Plugin, controller, operator, and host-definer logs
+* events: Cluster events, Namespace events,CSI/storage events and Warning events
+* node-diagnostics: Node-level system, storage, network, and kubelet data
+* storage: IBM FlashSystem / SVC storage diagnostics
+* workload: Diagnostics for a specific pod, PVC, and KubeVirt VirtualMachine
 
 #### List available components:
 ```bash
@@ -133,6 +133,26 @@ The diagnostics script collects the following components:
 - CSI node plugin logs from nodes hosting those pods (time-filtered if time options are provided)
 - Note: If no pods are using the PVC, only PVC and PV metadata are collected
 
+#### VM-based workload (KubeVirt)
+```bash
+./ibm-block-csi-logs-collector.sh \
+  -n <namespace> \
+  --workload-vm <vm-name>
+```
+#### Collects:
+- Related-objects overview (cluster-wide and namespace-scoped) matching VM, VMI, DataVolume, PVC, and Pod names, for quick identification
+- VM and VMI YAML and describe output
+- Attached DataVolume(s) and describe output, and their backing PVC(s)/PV(s), if present
+- All virt-launcher pod(s) for the VM, including source and target pods during a live migration, with current and previous container logs
+- Namespace events (time-filtered if time options are provided)
+- Events related to every node the VM is or was running on during collection, covering source and target nodes during migration (time-filtered if time options are provided)
+- CSI node plugin logs from every node identified above (time-filtered if time options are provided)
+- CSI controller logs (time-filtered if time options are provided)
+
+Notes:
+- If the DataVolume CRD (CDI) is not installed, DataVolume collection is skipped; VM/VMI collection still proceeds
+- If the VMI is not found (e.g. the VM is stopped), node-scoped collection (CSI node logs, node events) is skipped
+
 ---
 ### Collecting component-specific data
 You can control exactly which components are collected using the `--only` and `--skip` flags.
@@ -190,7 +210,7 @@ Use the `--skip` flag with a comma-separated list of components.
 - When any time option is provided (`--since-duration`, `--start-time`, `--end-time`), filtering is applied to the following components:
     - logs: Pod logs from CSI node, CSI controller, CSI operator, and host definer
     - events: Cluster-wide, namespace-scoped, CSI/storage-related, and warning events
-    - workload: Namespace events and CSI node plugin logs related to the workload
+    - workload: Namespace events and CSI node/controller plugin logs, for all workload types (pod, PVC, VM); additionally, for VM workloads only, node events covering every node involved, including migration source and target
     - node-diagnostics: Kubelet journal logs
 
 #### Using `--since-duration`
