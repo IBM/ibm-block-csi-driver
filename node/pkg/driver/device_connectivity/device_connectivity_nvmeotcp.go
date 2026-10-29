@@ -43,8 +43,8 @@ func NewOsDeviceConnectivityNvmeOTcp(executer executer.ExecuterInterface, clean_
 }
 
 // EnsureLogin performs NVMe-oTCP discovery and connect for each array target IP from the publish context.
-// Each target IP is one path. Connects until min(number of target IPs, nvmeTargetPathCount) paths are live.
-// Logs error if 0 paths result, warning if below that count.
+// Each target IP is one path. Connects every target IP that is not live yet.
+// Logs error if 0 paths result, warning if not all target IPs are live.
 // For non-native NVMe with find_multipaths=on, logs error if < 2 paths.
 func (r OsDeviceConnectivityNvmeOTcp) EnsureLogin(ipsByArrayInitiator map[string][]string) {
 	targetIps := getNvmeTcpTargetIps(ipsByArrayInitiator)
@@ -53,10 +53,7 @@ func (r OsDeviceConnectivityNvmeOTcp) EnsureLogin(ipsByArrayInitiator map[string
 		return
 	}
 
-	requiredPaths := nvmeTargetPathCount
-	if len(targetIps) < requiredPaths {
-		requiredPaths = len(targetIps)
-	}
+	requiredPaths := len(targetIps)
 	logger.Debugf("NVMe-oTCP EnsureLogin: array target IPs: %v, required live paths: %d", targetIps, requiredPaths)
 
 	liveTargetIps := r.getLiveTargetIps()
