@@ -38,6 +38,16 @@ const (
  +- nvme4 fc traddr=nn-5005076810000006:pn-5005076810190006,host_traddr=nn-200070b7e42b38b1:pn-100070b7e42b38b1 live
 `
 
+	// Three of seven target IPs live over tcp.
+	nvmeTcpTestListSubsysThreeLive = `nvme-subsys0 - NQN=nqn.1986-03.com.ibm:nvme:2145.000002042B60000C
+               hostnqn=nqn.2014-08.org.nvmexpress:uuid:9ffdf84c-1328-11e5-ac71-0894ef016e40
+               iopolicy=numa
+\
+ +- nvme0 tcp traddr=9.71.253.91,trsvcid=4420,src_addr=9.71.253.105 live
+ +- nvme1 tcp traddr=9.71.253.94,trsvcid=4420,src_addr=9.71.253.105 live
+ +- nvme2 tcp traddr=9.71.253.97,trsvcid=4420,src_addr=9.71.253.105 live
+`
+
 	// Only NVMe-oFC paths, none live.
 	nvmeTcpTestListSubsysNoTcp = `nvme-subsys0 - NQN=nqn.1986-03.com.ibm:nvme:2145.000002042B60000C
                hostnqn=nqn.2014-08.org.nvmexpress:uuid:9ffdf84c-1328-11e5-ac71-0894ef016e40
@@ -119,6 +129,41 @@ func TestNvmeOTcpEnsureLogin(t *testing.T) {
 				{args: discoverArgs("9.71.253.97"), stdOut: nvmeTcpTestDiscoverOutput},
 				{args: connectArgs("9.71.253.97"), stdOut: connectOut, err: connectErr},
 				{args: listSubsysArgs, stdOut: nvmeTcpTestListSubsysNoTcp},
+			},
+		},
+		{
+			name:                "no live tcp path, connect every target IP even when more than 3",
+			ipsByArrayInitiator: map[string][]string{"9.71.253.96": nil, "9.71.253.97": nil, "9.71.253.98": nil, "9.71.253.99": nil},
+			calls: []nvmeTcpTestCall{
+				{args: listSubsysArgs, stdOut: nvmeTcpTestListSubsysNoTcp},
+				{args: discoverArgs("9.71.253.96"), stdOut: nvmeTcpTestDiscoverOutput},
+				{args: connectArgs("9.71.253.96")},
+				{args: discoverArgs("9.71.253.97"), stdOut: nvmeTcpTestDiscoverOutput},
+				{args: connectArgs("9.71.253.97")},
+				{args: discoverArgs("9.71.253.98"), stdOut: nvmeTcpTestDiscoverOutput},
+				{args: connectArgs("9.71.253.98")},
+				{args: discoverArgs("9.71.253.99"), stdOut: nvmeTcpTestDiscoverOutput},
+				{args: connectArgs("9.71.253.99")},
+				{args: listSubsysArgs, stdOut: nvmeTcpTestListSubsysNoTcp},
+			},
+		},
+		{
+			name: "seven target IPs, only three reachable, the three are connected and the rest are skipped",
+			ipsByArrayInitiator: map[string][]string{"9.71.253.91": nil, "9.71.253.92": nil, "9.71.253.93": nil,
+				"9.71.253.94": nil, "9.71.253.95": nil, "9.71.253.96": nil, "9.71.253.97": nil},
+			calls: []nvmeTcpTestCall{
+				{args: listSubsysArgs, stdOut: nvmeTcpTestListSubsysNoTcp},
+				{args: discoverArgs("9.71.253.91"), stdOut: nvmeTcpTestDiscoverOutput},
+				{args: connectArgs("9.71.253.91")},
+				{args: discoverArgs("9.71.253.92"), err: errors.New("exit status 1")},
+				{args: discoverArgs("9.71.253.93"), err: errors.New("exit status 1")},
+				{args: discoverArgs("9.71.253.94"), stdOut: nvmeTcpTestDiscoverOutput},
+				{args: connectArgs("9.71.253.94")},
+				{args: discoverArgs("9.71.253.95"), err: errors.New("exit status 1")},
+				{args: discoverArgs("9.71.253.96"), err: errors.New("exit status 1")},
+				{args: discoverArgs("9.71.253.97"), stdOut: nvmeTcpTestDiscoverOutput},
+				{args: connectArgs("9.71.253.97")},
+				{args: listSubsysArgs, stdOut: nvmeTcpTestListSubsysThreeLive},
 			},
 		},
 		{

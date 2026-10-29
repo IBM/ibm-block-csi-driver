@@ -30,7 +30,6 @@ const (
 	nvmeTransportFC                     = "fc"
 	nvmeDiscoveryNqn                    = "nqn.2014-08.org.nvmexpress.discovery"
 	FCPortPath                          = "/sys/class/fc_host/host*/port_name"
-	nvmeTargetPathCount                 = 3
 	nvmeMinPathsForNonNativeDmMultipath = 2
 	nvmeCtrlSysfsGlob                   = "/sys/class/nvme/nvme*"
 	nvmeCtrlStateLive                   = "live"
@@ -49,8 +48,8 @@ func NewOsDeviceConnectivityNvmeOFc(executer executer.ExecuterInterface, clean_s
 }
 
 // EnsureLogin performs NVMe-oFC discovery and connect for each (arrayTargetPort, hostPort) pair.
-// Connects paths until nvmeTargetPathCount is reached. Logs error if 0 paths result,
-// warning if below target. For non-native NVMe with find_multipaths=on, logs error if < 2 paths.
+// Connects every pair that is not live yet. Logs error if 0 paths result.
+// For non-native NVMe with find_multipaths=on, logs error if < 2 paths.
 func (r OsDeviceConnectivityNvmeOFc) EnsureLogin(ipsByArrayInitiator map[string][]string) {
 	if len(ipsByArrayInitiator) == 0 {
 		logger.Warningf("NVMe-oFC EnsureLogin: no array target ports in publish context, skipping")
@@ -68,24 +67,10 @@ func (r OsDeviceConnectivityNvmeOFc) EnsureLogin(ipsByArrayInitiator map[string]
 	logger.Debugf("NVMe-oFC EnsureLogin: live path pairs: %v", livePaths)
 
 	currentPaths := countLivePathsForSubsystem(livePaths, ipsByArrayInitiator)
-	logger.Infof("NVMe-oFC EnsureLogin: current live paths=%d target=%d", currentPaths, nvmeTargetPathCount)
+	logger.Infof("NVMe-oFC EnsureLogin: current live paths=%d", currentPaths)
 
-	if currentPaths >= nvmeTargetPathCount {
-		logger.Infof("NVMe-oFC EnsureLogin: already at target path count (%d), skipping connect", nvmeTargetPathCount)
-		return
-	}
-
-	connectedPaths := currentPaths
 	for arrayTargetPort := range ipsByArrayInitiator {
-		if connectedPaths >= nvmeTargetPathCount {
-			logger.Infof("NVMe-oFC EnsureLogin: reached target path count (%d), stopping", nvmeTargetPathCount)
-			break
-		}
 		for _, hostPort := range hostPorts {
-			if connectedPaths >= nvmeTargetPathCount {
-				break
-			}
-
 			pathKey := arrayTargetPort + "|" + hostPort
 			if livePaths[pathKey] {
 				logger.Debugf("NVMe-oFC EnsureLogin: path already live target=%s host=%s, skipping",
@@ -107,26 +92,19 @@ func (r OsDeviceConnectivityNvmeOFc) EnsureLogin(ipsByArrayInitiator map[string]
 
 			logger.Infof("NVMe-oFC EnsureLogin: connecting NQN=%s target=%s host=%s",
 				subNqn, arrayTargetPort, hostPort)
-			if r.nvmeConnect(arrayTargetPort, hostPort, subNqn) {
-				connectedPaths++
-			}
+			r.nvmeConnect(arrayTargetPort, hostPort, subNqn)
 		}
 	}
 
 	// Re-read to get kernel-confirmed final count (nvmeConnect may have failed silently).
 	finalLivePaths := r.getLivePathPairs()
 	finalPathCount := countLivePathsForSubsystem(finalLivePaths, ipsByArrayInitiator)
-	logger.Infof("NVMe-oFC EnsureLogin: final live paths=%d target=%d", finalPathCount, nvmeTargetPathCount)
+	logger.Infof("NVMe-oFC EnsureLogin: final live paths=%d", finalPathCount)
 
 	if finalPathCount == 0 {
 		logger.Errorf("NVMe-oFC EnsureLogin: 0 live paths after all connect attempts — " +
 			"check fabric connectivity and array zoning. NodeStageVolume will fail.")
 		return
-	}
-
-	if finalPathCount < nvmeTargetPathCount {
-		logger.Warningf("NVMe-oFC EnsureLogin: below target path count: final=%d target=%d, continuing with reduced redundancy",
-			finalPathCount, nvmeTargetPathCount)
 	}
 
 	// Non-native NVMe + find_multipaths=on + < 2 paths: multipathd will not

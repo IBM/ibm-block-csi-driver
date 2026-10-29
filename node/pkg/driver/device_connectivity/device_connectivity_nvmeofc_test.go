@@ -83,13 +83,20 @@ func TestNvmeOFcEnsureLogin(t *testing.T) {
 			map[string][]string{nvmeFcTestTargetPort1: nil})
 	})
 
-	t.Run("already at target path count, skip discover and connect", func(t *testing.T) {
+	t.Run("three live paths, the pair that is not live is still discovered", func(t *testing.T) {
 		mockCtrl := gomock.NewController(t)
 		defer mockCtrl.Finish()
 		fakeExecuter := mocks.NewMockExecuterInterface(mockCtrl)
 		expectNvmeFcHostPorts(fakeExecuter)
-		fakeExecuter.EXPECT().ExecuteWithTimeout(gomock.Any(), "nvme", listSubsysArgs).Return(
-			[]byte(nvmeFcTestListSubsysLive), nil)
+		gomock.InOrder(
+			fakeExecuter.EXPECT().ExecuteWithTimeout(gomock.Any(), "nvme", listSubsysArgs).Return(
+				[]byte(nvmeFcTestListSubsysLive), nil),
+			fakeExecuter.EXPECT().ExecuteWithTimeout(gomock.Any(), "nvme", []string{"discover", "--transport=fc",
+				"--traddr=" + nvmeFcTestTargetPort2, "--host-traddr=" + nvmeFcTestHostPort2}).Return(
+				[]byte("failed to add controller, error failed to write to nvme-fabrics device\n"), errors.New("exit status 1")),
+			fakeExecuter.EXPECT().ExecuteWithTimeout(gomock.Any(), "nvme", listSubsysArgs).Return(
+				[]byte(nvmeFcTestListSubsysLive), nil),
+		)
 
 		device_connectivity.NewOsDeviceConnectivityNvmeOFc(fakeExecuter, false).EnsureLogin(
 			map[string][]string{nvmeFcTestTargetPort1: nil, nvmeFcTestTargetPort2: nil})
