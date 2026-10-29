@@ -15,17 +15,24 @@ class StorageClassWatcher(Watcher):
     def add_initial_storage_classes(self):
         storage_classes_info = self._get_storage_classes_info()
         logger.info(storage_classes_info)
+        logger.debug("Initial storageClasses listed: {}".format([sc.name for sc in storage_classes_info]))
         for storage_class_info in storage_classes_info:
             secrets_info = self._get_secrets_info_from_storage_class_with_driver_provisioner(storage_class_info)
             self._handle_added_watch_event(secrets_info, storage_class_info.name)
 
     def watch_storage_class_resources(self):
+        is_first_iteration = True
         while self._loop_forever():
             resource_version = self._get_k8s_object_resource_version(self.storage_api.list_storage_class())
+            if is_first_iteration:
+                logger.debug("StorageClass watcher first list: resource_version={}".format(resource_version))
+                is_first_iteration = False
             stream = watch.Watch().stream(self.storage_api.list_storage_class,
                                           resource_version=resource_version, timeout_seconds=5)
             for watch_event in stream:
                 watch_event = self._munch(watch_event)
+                logger.debug("StorageClass watcher received {} event for storageClass {}".format(
+                    watch_event.type, watch_event.object.metadata.name))
                 storage_class_info = self._generate_storage_class_info(watch_event.object)
                 secrets_info = self._get_secrets_info_from_storage_class_with_driver_provisioner(storage_class_info)
                 if watch_event.type == settings.ADDED_EVENT:

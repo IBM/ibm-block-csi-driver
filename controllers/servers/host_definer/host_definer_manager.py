@@ -1,3 +1,4 @@
+import time
 from threading import Thread
 
 from controllers.common.csi_logger import get_stdout_logger
@@ -21,10 +22,17 @@ class HostDefinerManager:
         self.node_watcher = NodeWatcher()
 
     def start_host_definition(self):
-        self.csi_node_watcher.add_initial_csi_nodes()
-        self.storage_class_watcher.add_initial_storage_classes()
-        self.node_watcher.add_initial_nodes()
+        self._run_initial_step(self.csi_node_watcher.add_initial_csi_nodes)
+        self._run_initial_step(self.storage_class_watcher.add_initial_storage_classes)
+        self._run_initial_step(self.node_watcher.add_initial_nodes)
         self._start_watchers()
+
+    def _run_initial_step(self, step_function):
+        logger.debug("Startup step {} started".format(step_function.__name__))
+        start_time = time.monotonic()
+        step_function()
+        logger.debug("Startup step {} finished after {:.1f}s".format(
+            step_function.__name__, time.monotonic() - start_time))
 
     def _start_watchers(self):
         watchers = (
@@ -34,5 +42,6 @@ class HostDefinerManager:
             self.node_watcher.watch_nodes_resources,
             self.storage_class_watcher.watch_storage_class_resources)
         for watch_function in watchers:
+            logger.debug("Starting watcher thread for {}".format(watch_function.__name__))
             thread = Thread(target=watch_function,)
             thread.start()
