@@ -18,12 +18,12 @@ package util
 
 import (
 	"fmt"
+	"github.com/petermattis/goid"
 	"net/url"
 	"os"
 	"path"
 	"path/filepath"
 	"strings"
-	"github.com/petermattis/goid"
 )
 
 func ParseEndpoint(endpoint string) (string, string, error) {
