@@ -6,7 +6,7 @@ pytest-xdist==3.6.1
 pytest-timeout==2.3.1
 coverage==7.10.1
 pycodestyle==2.14.0
-pylint==3.3.7
+pylint==4.0.9
 func-timeout==4.3.5
 setuptools==78.1.1
 wheel==0.46.2
