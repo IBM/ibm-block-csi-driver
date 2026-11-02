@@ -4,7 +4,7 @@
 
 IBM® block storage CSI driver 1.14.1 adds support for:
 
-**General availability date:** TBD 2026
+**General availability date:** November 2026
 
 ## Miscellaneous resolved issues
 
