@@ -3,6 +3,7 @@
 # What's new in 1.14.1
 
 IBM® block storage CSI driver 1.14.1 adds support for:
+-- Extended support to Kubernetes 1.37
 
 **General availability date:** November 2026
 
