@@ -1,5 +1,5 @@
 import unittest
-from datetime import datetime, timezone
+from datetime import datetime
 
 import grpc
 from csi_general import replication_pb2 as pb2
@@ -419,7 +419,7 @@ class TestGetVolumeReplicationInfo(BaseReplicationSetUp, CommonControllerTest):
 
         self.assertEqual(grpc.StatusCode.OK, self.context.code)
         self.mediator.get_last_async_snapshot_info.assert_called_once_with(OBJECT_INTERNAL_ID)
-        self.assertEqual(0, response.last_sync_time.seconds)
+        self.assertFalse(response.HasField('last_sync_time'))
         self.assertEqual(ReplicationStatus.UNKNOWN, response.status)
         self.assertEqual('', response.status_message)
 
@@ -439,17 +439,14 @@ class TestGetVolumeReplicationInfo(BaseReplicationSetUp, CommonControllerTest):
         self.assertNotEqual(0, response.last_sync_time.seconds)
         self.assertEqual(ReplicationStatus.HEALTHY, response.status)
 
-    def test_get_volume_replication_info_volume_not_in_vg_returns_current_time(self):
+    def test_get_volume_replication_info_volume_not_in_vg_leaves_last_sync_time_unset(self):
         self.mediator.get_object_by_id.return_value = utils.get_mock_mediator_response_volume(volume_group_id=None)
 
-        before = int(datetime.now(timezone.utc).timestamp())
         response = self.servicer.GetVolumeReplicationInfo(self._make_volume_source_request(), self.context)
-        after = int(datetime.now(timezone.utc).timestamp())
 
         self.assertEqual(grpc.StatusCode.OK, self.context.code)
         self.mediator.get_last_async_snapshot_info.assert_not_called()
-        self.assertGreaterEqual(response.last_sync_time.seconds, before)
-        self.assertLessEqual(response.last_sync_time.seconds, after)
+        self.assertFalse(response.HasField('last_sync_time'))
 
     def test_get_volume_replication_info_with_wrong_secrets(self):
         self._test_request_with_wrong_secrets()

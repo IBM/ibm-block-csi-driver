@@ -20,6 +20,7 @@ status_codes_by_exception = {
     array_errors.SecondaryStorageTransitionToProductionNotReadyError: grpc.StatusCode.UNAVAILABLE,
     array_errors.OperationNotReadyError: grpc.StatusCode.UNAVAILABLE,
     array_errors.ReplicationDestinationInfoNotSupportedError: grpc.StatusCode.FAILED_PRECONDITION,
+    array_errors.ReplicationPolicyNotAssignedError: grpc.StatusCode.FAILED_PRECONDITION,
 }
 
 
