@@ -459,6 +459,53 @@ def get_virt_snap_func_from_storage_class(source_volume_id):
     return virt_snap_func
 
 
+def is_ramen_protected_volume(volume_handle):
+    """
+    Returns False only when the volume is proven not to be protected by Ramen.
+    In any case that cannot be verified, returns True, so the volume is not deleted.
+    """
+    kubernetes_manager = KubernetesManager()
+    persistent_volume = kubernetes_manager.get_persistent_volume_by_volume_handle(volume_handle,
+                                                                                  raise_on_error=True)
+    if not persistent_volume:
+        logger.warning("PersistentVolume with volume handle '{}' was not found, "
+                       "treating it as protected by Ramen".format(volume_handle))
+        return True
+
+    pv_name = persistent_volume.metadata.name
+    annotations = persistent_volume.metadata.annotations or {}
+    destination_volume_handle = annotations.get(servers_settings.RAMEN_DESTINATION_VOLUME_HANDLE_ANNOTATION)
+    if destination_volume_handle:
+        logger.info("PersistentVolume '{}' has annotation '{}': '{}', it is protected by Ramen".format(
+            pv_name, servers_settings.RAMEN_DESTINATION_VOLUME_HANDLE_ANNOTATION, destination_volume_handle))
+        return True
+
+    storage_class_name = persistent_volume.spec.storage_class_name
+    if not storage_class_name:
+        logger.info("PersistentVolume '{}' has no StorageClass, it is not protected by Ramen".format(pv_name))
+        return False
+
+    storage_class = kubernetes_manager.get_storage_class(storage_class_name)
+    if not storage_class:
+        logger.warning("StorageClass '{}' of PersistentVolume '{}' was not found, "
+                       "treating it as protected by Ramen".format(storage_class_name, pv_name))
+        return True
+
+    labels = storage_class.metadata.labels or {}
+    storage_id = labels.get(servers_settings.RAMEN_STORAGE_ID_LABEL)
+    if storage_id:
+        logger.info("StorageClass '{}' of PersistentVolume '{}' has label '{}': '{}', "
+                    "it is protected by Ramen".format(storage_class_name, pv_name,
+                                                      servers_settings.RAMEN_STORAGE_ID_LABEL, storage_id))
+        return True
+
+    logger.info("PersistentVolume '{}' has no annotation '{}' and its StorageClass '{}' has no label '{}', "
+                "it is not protected by Ramen".format(pv_name,
+                                                      servers_settings.RAMEN_DESTINATION_VOLUME_HANDLE_ANNOTATION,
+                                                      storage_class_name, servers_settings.RAMEN_STORAGE_ID_LABEL))
+    return False
+
+
 def get_volume_id(new_volume, system_id):
     return _get_object_id(new_volume, new_volume.id, system_id)
 

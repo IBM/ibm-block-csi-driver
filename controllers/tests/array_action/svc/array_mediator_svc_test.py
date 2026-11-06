@@ -2976,6 +2976,42 @@ class TestArrayMediatorSVC(unittest.TestCase):
         self.svc.client.svcinfo.lsvolumegroupreplication.return_value = Mock(
             as_single_element=vg_replication)
 
+    def _prepare_mocks_for_is_volume_in_replicated_volume_group(self, in_volume_group=True,
+                                                                replication_policy_name='policy'):
+        self.svc.client.svctask.chvolumereplicationinternals = Mock()
+        cli_volume = self._get_cli_volume(in_volume_group=in_volume_group)
+        self.svc.client.svcinfo.lsvdisk.return_value = self._mock_cli_object(cli_volume)
+        self._mock_lsvolumegroupreplication(Munch(replication_policy_name=replication_policy_name))
+
+    def test_is_volume_in_replicated_volume_group_true(self):
+        self._prepare_mocks_for_is_volume_in_replicated_volume_group()
+
+        self.assertTrue(self.svc.is_volume_in_replicated_volume_group(common_settings.VOLUME_UID))
+        self.svc.client.svcinfo.lsvolumegroupreplication.assert_called_once_with(
+            object_id=svc_settings.DUMMY_VOLUME_GROUP_ID)
+
+    def test_is_volume_in_replicated_volume_group_false_when_no_replication_policy(self):
+        self._prepare_mocks_for_is_volume_in_replicated_volume_group(replication_policy_name='')
+
+        self.assertFalse(self.svc.is_volume_in_replicated_volume_group(common_settings.VOLUME_UID))
+
+    def test_is_volume_in_replicated_volume_group_false_when_not_in_volume_group(self):
+        self._prepare_mocks_for_is_volume_in_replicated_volume_group(in_volume_group=False)
+
+        self.assertFalse(self.svc.is_volume_in_replicated_volume_group(common_settings.VOLUME_UID))
+        self.svc.client.svcinfo.lsvolumegroupreplication.assert_not_called()
+
+    def test_is_volume_in_replicated_volume_group_false_when_volume_not_found(self):
+        self.svc.client.svctask.chvolumereplicationinternals = Mock()
+        self.svc.client.svcinfo.lsvdisk.return_value = self._mock_cli_object(None)
+
+        self.assertFalse(self.svc.is_volume_in_replicated_volume_group(common_settings.VOLUME_UID))
+        self.svc.client.svcinfo.lsvolumegroupreplication.assert_not_called()
+
+    def test_is_volume_in_replicated_volume_group_false_when_ear_not_supported(self):
+        self.assertFalse(self.svc.is_volume_in_replicated_volume_group(common_settings.VOLUME_UID))
+        self.svc.client.svcinfo.lsvdisk.assert_not_called()
+
     def test_get_replication_destination_info_without_internal_id_resolves_from_uid(self):
         cli_volume = self._get_cli_volume(
             in_volume_group=True,

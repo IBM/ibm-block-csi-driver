@@ -1950,6 +1950,25 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
 
         return self._build_replication_info(vg_replication)
 
+    def is_volume_in_replicated_volume_group(self, volume_id):
+        if not self._is_earreplication_supported():
+            return False
+        cli_volume = self._get_cli_volume_by_wwn(volume_id, not_exist_err=False)
+        if not cli_volume:
+            return False
+        cli_volume = self._get_cli_volume(cli_volume.id)
+        volume_group_id = self._getattr_as_str(cli_volume, 'volume_group_id', '')
+        if not volume_group_id:
+            return False
+        replication_policy = self._get_replication_policy(volume_group_id)
+        if not replication_policy:
+            logger.info("volume '{}' is in volume group '{}' without a replication policy".format(
+                cli_volume.name, volume_group_id))
+            return False
+        logger.info("volume '{}' is in volume group '{}' with replication policy '{}'".format(
+            cli_volume.name, volume_group_id, replication_policy))
+        return True
+
     def _is_remote_volume_uid_supported(self, raw_cli_volume):
         return hasattr(raw_cli_volume, 'remote_volume_uid')
 

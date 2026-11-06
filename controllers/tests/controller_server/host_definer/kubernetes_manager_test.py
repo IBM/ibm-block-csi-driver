@@ -110,6 +110,16 @@ class TestKubernetesManagerNewMethods(unittest.TestCase):
 
         self.assertIsNone(result)
 
+    def test_get_persistent_volume_by_volume_handle_api_exception_raise_on_error(self):
+        """Test when API call raises exception and raise_on_error is set"""
+
+        api_exception = ApiException(status=500, reason="Internal Server Error")
+        api_exception.body = "Error listing PVs"
+        self.k8s_manager.core_api.list_persistent_volume.side_effect = api_exception
+
+        with self.assertRaises(ApiException):
+            self.k8s_manager.get_persistent_volume_by_volume_handle("any-handle", raise_on_error=True)
+
     def test_get_storage_class_found(self):
         """Test successful retrieval of StorageClass"""
 

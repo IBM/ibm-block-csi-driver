@@ -209,6 +209,12 @@ class CSIControllerServicer(csi_pb2_grpc.ControllerServicer):
         with get_agent(array_connection_info, array_type).get_mediator() as array_mediator:
             logger.debug(array_mediator)
 
+            if array_mediator.is_volume_in_replicated_volume_group(volume_id) and \
+                    utils.is_ramen_protected_volume(request.volume_id):
+                logger.info("Skipping deletion of volume {0} on storage: its volume group is replicating and it "
+                            "is protected by Ramen".format(volume_id))
+                return csi_pb2.DeleteVolumeResponse()
+
             try:
                 logger.debug("Deleting volume {0}".format(volume_id))
                 array_mediator.delete_volume(volume_id, array_connection_info.partition_name)

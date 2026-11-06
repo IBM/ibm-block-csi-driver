@@ -520,6 +520,9 @@ class XIVArrayMediator(ArrayMediatorAbstract):
     def get_last_async_snapshot_info(self, volume_group_id):
         raise NotImplementedError
 
+    def is_volume_in_replicated_volume_group(self, volume_id):
+        return False
+
     def get_replication_destination_info(self, object_id, object_uid, dr_mediator=None, force_dr_mediator=False):
         raise NotImplementedError
 

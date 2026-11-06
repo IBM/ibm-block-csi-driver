@@ -598,6 +598,23 @@ class ArrayMediator(ABC):
         raise NotImplementedError
 
     @abstractmethod
+    def is_volume_in_replicated_volume_group(self, volume_id):
+        """
+        Check if the volume is a member of a volume group that has a replication policy assigned.
+
+        Args:
+            volume_id : volume uid (WWN) on the storage
+
+        Returns:
+            bool: True if the volume is in a volume group with a replication policy, False otherwise
+                  (also False if the volume does not exist or replication is not supported)
+
+        Raises:
+            None
+        """
+        raise NotImplementedError
+
+    @abstractmethod
     def get_replication_destination_info(self, object_id, object_uid, dr_mediator=None, force_dr_mediator=False):
         """
         Return the destination volume handle string for a volume in the Ramen flow,
