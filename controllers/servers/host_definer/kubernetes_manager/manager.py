@@ -383,7 +383,7 @@ class KubernetesManager():
         pod_info.node_name = k8s_pod.spec.node_name
         return pod_info
 
-    def get_persistent_volume_by_volume_handle(self, volume_handle):
+    def get_persistent_volume_by_volume_handle(self, volume_handle, raise_on_error=False):
         try:
             pv_list = self.core_api.list_persistent_volume()
             for pv in pv_list.items:
@@ -393,6 +393,8 @@ class KubernetesManager():
             return None
         except ApiException as ex:
             logger.error(f"Failed to list PersistentVolumes: {ex.body}")
+            if raise_on_error:
+                raise
             return None
 
     def get_storage_class(self, name):

@@ -930,6 +930,74 @@ class TestUtils(unittest.TestCase):
 
         self.assertFalse(result)
 
+    def _mock_k8s_manager_for_ramen_check(self, mock_k8s_manager_class, pv_annotations=None,
+                                          storage_class_name="test-storage-class", sc_labels=None,
+                                          pv_found=True, sc_found=True):
+        mock_k8s_manager = MagicMock()
+        mock_k8s_manager_class.return_value = mock_k8s_manager
+
+        mock_pv = None
+        if pv_found:
+            mock_pv = MagicMock()
+            mock_pv.metadata.name = "test-pv"
+            mock_pv.metadata.annotations = pv_annotations
+            mock_pv.spec.storage_class_name = storage_class_name
+        mock_k8s_manager.get_persistent_volume_by_volume_handle.return_value = mock_pv
+
+        mock_sc = None
+        if sc_found:
+            mock_sc = MagicMock()
+            mock_sc.metadata.labels = sc_labels
+        mock_k8s_manager.get_storage_class.return_value = mock_sc
+        return mock_k8s_manager
+
+    @patch('controllers.servers.utils.KubernetesManager')
+    def test_is_ramen_protected_volume_true_when_pv_not_found(self, mock_k8s_manager_class):
+        mock_k8s_manager = self._mock_k8s_manager_for_ramen_check(mock_k8s_manager_class, pv_found=False)
+
+        self.assertTrue(utils.is_ramen_protected_volume("test-volume-id"))
+        mock_k8s_manager.get_persistent_volume_by_volume_handle.assert_called_once_with("test-volume-id",
+                                                                                        raise_on_error=True)
+        mock_k8s_manager.get_storage_class.assert_not_called()
+
+    @patch('controllers.servers.utils.KubernetesManager')
+    def test_is_ramen_protected_volume_true_with_destination_volume_handle_annotation(self,
+                                                                                      mock_k8s_manager_class):
+        mock_k8s_manager = self._mock_k8s_manager_for_ramen_check(
+            mock_k8s_manager_class,
+            pv_annotations={"ramendr.openshift.io/destination-volume-handle": "SVC:1;destination-uid"})
+
+        self.assertTrue(utils.is_ramen_protected_volume("test-volume-id"))
+        mock_k8s_manager.get_storage_class.assert_not_called()
+
+    @patch('controllers.servers.utils.KubernetesManager')
+    def test_is_ramen_protected_volume_false_when_pv_has_no_storage_class(self, mock_k8s_manager_class):
+        mock_k8s_manager = self._mock_k8s_manager_for_ramen_check(mock_k8s_manager_class, storage_class_name="")
+
+        self.assertFalse(utils.is_ramen_protected_volume("test-volume-id"))
+        mock_k8s_manager.get_storage_class.assert_not_called()
+
+    @patch('controllers.servers.utils.KubernetesManager')
+    def test_is_ramen_protected_volume_true_when_storage_class_not_found(self, mock_k8s_manager_class):
+        self._mock_k8s_manager_for_ramen_check(mock_k8s_manager_class, sc_found=False)
+
+        self.assertTrue(utils.is_ramen_protected_volume("test-volume-id"))
+
+    @patch('controllers.servers.utils.KubernetesManager')
+    def test_is_ramen_protected_volume_true_with_storage_id_label(self, mock_k8s_manager_class):
+        mock_k8s_manager = self._mock_k8s_manager_for_ramen_check(
+            mock_k8s_manager_class, sc_labels={"ramendr.openshift.io/storageid": "storage-id-1"})
+
+        self.assertTrue(utils.is_ramen_protected_volume("test-volume-id"))
+        mock_k8s_manager.get_storage_class.assert_called_once_with("test-storage-class")
+
+    @patch('controllers.servers.utils.KubernetesManager')
+    def test_is_ramen_protected_volume_false_without_annotation_and_label(self, mock_k8s_manager_class):
+        self._mock_k8s_manager_for_ramen_check(mock_k8s_manager_class, pv_annotations={"other": "annotation"},
+                                               sc_labels={"other": "label"})
+
+        self.assertFalse(utils.is_ramen_protected_volume("test-volume-id"))
+
     @patch('controllers.servers.utils.KubernetesManager')
     def test_get_virt_snap_func_pv_not_found(self, mock_k8s_manager_class):
         """Test ValidationException when PersistentVolume is not found"""

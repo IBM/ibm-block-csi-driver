@@ -911,6 +911,7 @@ class TestDeleteVolume(BaseControllerSetUp, CommonControllerTest):
         self.mediator.delete_volume = Mock()
         self.mediator.is_volume_has_snapshots = Mock()
         self.mediator.is_volume_has_snapshots.return_value = False
+        self.mediator.is_volume_in_replicated_volume_group = Mock(return_value=False)
 
         self.request.volume_id = "xiv:0;volume-id"
 
@@ -976,6 +977,45 @@ class TestDeleteVolume(BaseControllerSetUp, CommonControllerTest):
 
     def test_delete_volume_no_internal_id_succeeds(self):
         self._test_delete_volume_succeeds("xiv:volume-id")
+
+    @patch("{}.is_ramen_protected_volume".format(CONTROLLER_SERVER_UTILS_PATH))
+    def test_delete_volume_skips_ramen_protected_volume_in_replicated_volume_group(self, is_ramen_protected_volume):
+        self.mediator.is_volume_in_replicated_volume_group.return_value = True
+        is_ramen_protected_volume.return_value = True
+
+        self.servicer.DeleteVolume(self.request, self.context)
+
+        self.assertEqual(self.context.code, grpc.StatusCode.OK)
+        is_ramen_protected_volume.assert_called_once_with(self.request.volume_id)
+        self.mediator.delete_volume.assert_not_called()
+
+    @patch("{}.is_ramen_protected_volume".format(CONTROLLER_SERVER_UTILS_PATH))
+    def test_delete_volume_deletes_non_ramen_volume_in_replicated_volume_group(self, is_ramen_protected_volume):
+        self.mediator.is_volume_in_replicated_volume_group.return_value = True
+        is_ramen_protected_volume.return_value = False
+
+        self.servicer.DeleteVolume(self.request, self.context)
+
+        self.assertEqual(self.context.code, grpc.StatusCode.OK)
+        self.mediator.delete_volume.assert_called_once()
+
+    @patch("{}.is_ramen_protected_volume".format(CONTROLLER_SERVER_UTILS_PATH))
+    def test_delete_volume_not_in_replicated_volume_group_does_not_check_ramen(self, is_ramen_protected_volume):
+        self.servicer.DeleteVolume(self.request, self.context)
+
+        self.assertEqual(self.context.code, grpc.StatusCode.OK)
+        is_ramen_protected_volume.assert_not_called()
+        self.mediator.delete_volume.assert_called_once()
+
+    @patch("{}.is_ramen_protected_volume".format(CONTROLLER_SERVER_UTILS_PATH))
+    def test_delete_volume_ramen_check_error_does_not_delete(self, is_ramen_protected_volume):
+        self.mediator.is_volume_in_replicated_volume_group.return_value = True
+        is_ramen_protected_volume.side_effect = [Exception("k8s api error")]
+
+        self.servicer.DeleteVolume(self.request, self.context)
+
+        self.assertEqual(self.context.code, grpc.StatusCode.INTERNAL)
+        self.mediator.delete_volume.assert_not_called()
 
 
 class TestPublishVolume(BaseControllerSetUp, CommonControllerTest):
