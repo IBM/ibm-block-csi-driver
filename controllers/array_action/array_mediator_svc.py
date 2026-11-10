@@ -263,6 +263,38 @@ def _get_ssh_port_from_environment():
     return int(os.environ.get('SVC_SSH_PORT', '22'))
 
 
+# Optional SSH keepalive settings. Maps an environment variable to the matching pysvc connect() argument.
+SSH_KEEPALIVE_ENV_VARS = {
+    'SVC_SSH_KEEPALIVE_INTERVAL': 'keepalive_interval',
+    'SVC_TCP_KEEPIDLE': 'tcp_keepidle',
+    'SVC_TCP_KEEPINTVL': 'tcp_keepintvl',
+    'SVC_TCP_KEEPCNT': 'tcp_keepcnt',
+    'SVC_TCP_USER_TIMEOUT': 'tcp_user_timeout',
+}
+
+
+def _get_ssh_keepalive_options_from_environment():
+    """Return the keepalive options that are set (and valid) in the environment.
+
+    A missing or invalid value is left out, so pysvc uses its default for it.
+    """
+    options = {}
+    for env_var, option_name in SSH_KEEPALIVE_ENV_VARS.items():
+        value = os.environ.get(env_var)
+        if not value:
+            continue
+        try:
+            number = int(value)
+        except ValueError:
+            number = 0
+        if number <= 0:
+            logger.warning("Ignoring invalid value {0!r} of {1}, a positive number is required. "
+                           "The default is used.".format(value, env_var))
+            continue
+        options[option_name] = number
+    return options
+
+
 class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
     ARRAY_ACTIONS = {}
     BLOCK_SIZE_IN_BYTES = 512
@@ -331,7 +363,8 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
         logger.debug("Connecting to SVC {0}".format(self.endpoint))
         try:
             self.client = connect(self.endpoint, username=self.user,
-                                  password=self.password, port=self.port)
+                                  password=self.password, port=self.port,
+                                  **_get_ssh_keepalive_options_from_environment())
             if Version(self._code_level) < Version(self.MIN_SUPPORTED_VERSION):
                 raise array_errors.UnsupportedStorageVersionError(
                     self._code_level, self.MIN_SUPPORTED_VERSION

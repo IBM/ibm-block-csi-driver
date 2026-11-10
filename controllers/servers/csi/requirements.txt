@@ -15,6 +15,6 @@ setuptools==78.1.1
 # A9000 python client
 # pyxcli>=1.2.1
 # SVC python client
-pysvc2==2.0.3
+pysvc2 @ git+https://github.com/IBM/pysvc.git@ea7336b2e3bd2bbd614bcfe2712a3d1868c0e670
 # DS8K python client
 pyds8k==1.6.0
