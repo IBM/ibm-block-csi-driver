@@ -108,6 +108,61 @@ class TestArrayMediatorSVC(unittest.TestCase):
         with self.assertRaises(array_errors.CredentialsError):
             self.svc._connect()
 
+    def _connect_and_get_connect_kwargs(self, connect_mock, environment):
+        svc_mock = Mock()
+        svc_mock.svcinfo.lssystem.return_value = [
+            Munch({svc_settings.LSSYSTEM_LOCATION_ATTR_KEY: svc_settings.LOCAL_LOCATION,
+                   svc_settings.LSSYSTEM_CODE_LEVEL_ATTR_KEY: svc_settings.CODE_LEVEL})]
+        connect_mock.return_value = svc_mock
+        with patch.dict("os.environ", environment, clear=True):
+            self.svc._connect()
+        return connect_mock.call_args[1]
+
+    @patch("controllers.array_action.array_mediator_svc.connect")
+    def test_connect_without_keepalive_environment_uses_defaults(self, connect_mock):
+        kwargs = self._connect_and_get_connect_kwargs(connect_mock, {})
+        self.assertEqual({"username": common_settings.SECRET_USERNAME_VALUE,
+                          "password": common_settings.SECRET_PASSWORD_VALUE,
+                          "port": 22}, kwargs)
+
+    @patch("controllers.array_action.array_mediator_svc.connect")
+    def test_connect_passes_all_keepalive_environment_values(self, connect_mock):
+        kwargs = self._connect_and_get_connect_kwargs(connect_mock, {"SVC_SSH_KEEPALIVE_INTERVAL": "20",
+                                                                     "SVC_TCP_KEEPIDLE": "25",
+                                                                     "SVC_TCP_KEEPINTVL": "6",
+                                                                     "SVC_TCP_KEEPCNT": "4",
+                                                                     "SVC_TCP_USER_TIMEOUT": "45000"})
+        self.assertEqual(20, kwargs["keepalive_interval"])
+        self.assertEqual(25, kwargs["tcp_keepidle"])
+        self.assertEqual(6, kwargs["tcp_keepintvl"])
+        self.assertEqual(4, kwargs["tcp_keepcnt"])
+        self.assertEqual(45000, kwargs["tcp_user_timeout"])
+
+    @patch("controllers.array_action.array_mediator_svc.connect")
+    def test_connect_passes_only_the_keepalive_values_that_are_set(self, connect_mock):
+        kwargs = self._connect_and_get_connect_kwargs(connect_mock, {"SVC_TCP_USER_TIMEOUT": "60000"})
+        self.assertEqual(60000, kwargs["tcp_user_timeout"])
+        for name in ("keepalive_interval", "tcp_keepidle", "tcp_keepintvl", "tcp_keepcnt"):
+            self.assertNotIn(name, kwargs)
+
+    @patch("controllers.array_action.array_mediator_svc.logger")
+    @patch("controllers.array_action.array_mediator_svc.connect")
+    def test_connect_ignores_invalid_keepalive_environment_values(self, connect_mock, logger_mock):
+        kwargs = self._connect_and_get_connect_kwargs(connect_mock, {"SVC_SSH_KEEPALIVE_INTERVAL": "abc",
+                                                                     "SVC_TCP_KEEPIDLE": "0",
+                                                                     "SVC_TCP_KEEPINTVL": "-5",
+                                                                     "SVC_TCP_KEEPCNT": "2.5",
+                                                                     "SVC_TCP_USER_TIMEOUT": "30000"})
+        self.assertEqual(30000, kwargs["tcp_user_timeout"])
+        for name in ("keepalive_interval", "tcp_keepidle", "tcp_keepintvl", "tcp_keepcnt"):
+            self.assertNotIn(name, kwargs)
+        self.assertEqual(4, logger_mock.warning.call_count)
+
+    @patch("controllers.array_action.array_mediator_svc.connect")
+    def test_connect_ignores_empty_keepalive_environment_values(self, connect_mock):
+        kwargs = self._connect_and_get_connect_kwargs(connect_mock, {"SVC_TCP_KEEPIDLE": ""})
+        self.assertNotIn("tcp_keepidle", kwargs)
+
     def test_close(self):
         self.svc.disconnect()
         self.svc.client.close.assert_called_with()
