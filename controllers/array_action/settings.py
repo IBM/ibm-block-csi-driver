@@ -1,6 +1,8 @@
 from controllers.common.config import config
 
 NVME_OVER_FC_CONNECTIVITY_TYPE = config.connectivity_type.nvme_over_fc
+SVC_MAX_CONNECTIONS_ENV_VAR = 'SVC_MAX_CONNECTIONS'
+SVC_DEFAULT_MAX_CONNECTIONS = 2
 FC_CONNECTIVITY_TYPE = config.connectivity_type.fc
 ISCSI_CONNECTIVITY_TYPE = config.connectivity_type.iscsi
 REPLICATION_COPY_TYPE_SYNC = "sync"

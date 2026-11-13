@@ -1241,8 +1241,13 @@ def get_replication_object_type_and_id_info(request, require_replication_source=
     return object_type, object_id_info
 
 
+def is_ramen_ear_request(object_type, replication_type):
+    # Ramen sends one request per volume (PVC) for EAR replication, which is done on the volume group
+    return object_type == servers_settings.VOLUME_TYPE_NAME and replication_type == array_settings.REPLICATION_TYPE_EAR
+
+
 def resolve_ramen_ear_volume_to_volume_group(object_type, object_id_info, replication_type, mediator):
-    if object_type != servers_settings.VOLUME_TYPE_NAME or replication_type != array_settings.REPLICATION_TYPE_EAR:
+    if not is_ramen_ear_request(object_type, replication_type):
         return object_type, object_id_info
 
     volume_uid = object_id_info.ids.uid

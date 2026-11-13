@@ -148,6 +148,9 @@ class StorageAgent:
             array_type = detect_array_type(self.endpoints)
 
         med_class = array_type_to_mediator[array_type]
+        max_connections = min(med_class.max_connections, settings.CSI_CONTROLLER_SERVER_WORKERS)
+        logger.info("creating connection pool for endpoint {} with at most {} connections".format(
+            self.endpoint_key, max_connections))
 
         self.conn_pool = ConnectionPool(
             endpoints=self.endpoints,
@@ -156,7 +159,7 @@ class StorageAgent:
             med_class=med_class,
             # Specifying a non-zero min_size pre-populates the pool with min_size items
             min_size=1,
-            max_size=min(med_class.max_connections, settings.CSI_CONTROLLER_SERVER_WORKERS)
+            max_size=max_connections
         )
 
     def __del__(self):
