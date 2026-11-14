@@ -4,7 +4,7 @@
 # ==============================================================================
 
 set -o pipefail
-VERSION="3.0.0"
+CSI_DRIVER_VERSION="1.14.0"
 SCRIPT_NAME="$(basename "$0")"
 
 # ==============================================================================
@@ -29,6 +29,14 @@ readonly CSI_EVENT_REGEX='csi|ibm|block|volume(s)?|pv(c)?|'\
 'mount(ed|ing)?|unmount(ed|ing)?|'\
 'iscsi|fc|multipath'
 
+readonly SVC_COMMANDS_LIST="lseventlog lssystem lshost lsfabric "\
+"lsportip lsvdisk lshostvdiskmap catauditlog "\
+"lscompatibilitymode lsfabricport lsfcmap lshostports "\
+"lsip lsmdiskgrp lsnvmefabric lspartition lspartnership "\
+"lsportethernet lsportfc lsportset lsrcrelationship "\
+"lstargetportfc lstruststore lsvolumegroup "\
+"lsvolumegroupreplication lsvolumegroupsnapshot lsvolumesnapshot"
+
 # ==============================================================================
 # GLOBAL VARIABLES
 # ==============================================================================
@@ -50,6 +58,7 @@ COLLECT_EVENTS=true
 COLLECT_NODE_DIAGNOSTICS=true
 COLLECT_STORAGE_SYSTEM=true
 COLLECT_WORKLOAD=true
+WORKLOAD_EXPLICITLY_REQUESTED=false
 
 STORAGE_SECRET_NAME=""
 STORAGE_SECRET_NAMESPACE=""
@@ -59,17 +68,21 @@ KUBE_CMD=""
 
 WORKLOAD_POD=""
 WORKLOAD_PVC=""
+WORKLOAD_VM=""
 
 OUTPUT_LOCATION=""
 CREATE_ZIP=false
 CLUSTER_TIMEZONE=""
 CLUSTER_TIMEZONE_OFFSET=""
+CLUSTER_VERSION_INFO=""
+CLUSTER_SERVER_VERSION=""
 
 readonly AVAILABLE_COMPONENTS=("logs" "events" "resources" "node-diagnostics" "storage" "workload")
 
 # Temp files for cleanup
 TEMP_FILES=()
 TEMP_DIRS=()
+DEBUG_PODS=()
 
 # ==============================================================================
 # CLEANUP HANDLER
@@ -85,6 +98,10 @@ cleanup() {
 
     for dir in "${TEMP_DIRS[@]}"; do
         [[ -d "$dir" ]] && rm -rf "$dir"
+    done
+
+    for pod in "${DEBUG_PODS[@]}"; do
+        [[ -n "$pod" ]] && $KUBE_CMD delete pod "$pod" --ignore-not-found=true > /dev/null 2>&1
     done
 
     unset SSH_ASKPASS SSH_ASKPASS_REQUIRE DISPLAY SSH_PASSWORD
@@ -143,23 +160,7 @@ detect_cluster_timezone() {
         TEMP_FILES+=("$tmp_tz_file")
 
         if is_openshift; then
-            $KUBE_CMD debug "node/$sample_node" --quiet 2>/dev/null <<'EOF' > "$tmp_tz_file" 2>&1
-chroot /host bash -c '
-if [ -f /etc/timezone ]; then
-    cat /etc/timezone
-elif [ -L /etc/localtime ]; then
-    readlink /etc/localtime | sed "s|.*/zoneinfo/||"
-else
-    timedatectl 2>/dev/null | grep "Time zone" | awk "{print \$3}"
-fi
-'
-exit
-EOF
-        else
-            $KUBE_CMD debug "node/$sample_node" \
-                --quiet \
-                --profile=sysadmin \
-                --image=registry.access.redhat.com/ubi9/ubi:latest 2>/dev/null \
+            $KUBE_CMD debug "node/$sample_node" --quiet 2>/dev/null \
                 -- chroot /host bash -c '
 if [ -f /etc/timezone ]; then
     cat /etc/timezone
@@ -169,6 +170,45 @@ else
     timedatectl 2>/dev/null | grep "Time zone" | awk "{print \$3}"
 fi
 ' > "$tmp_tz_file" 2>&1
+        else
+            local tz_debug_pod_name tz_debug_out tz_debug_err
+            tz_debug_out="$(mktemp)"
+            tz_debug_err="$(mktemp)"
+            TEMP_FILES+=("$tz_debug_out" "$tz_debug_err")
+
+            if $KUBE_CMD debug "node/$sample_node" \
+                --profile=sysadmin \
+                --image=registry.access.redhat.com/ubi9/ubi:latest \
+                --attach=false \
+                -- sleep infinity > "$tz_debug_out" 2>"$tz_debug_err"; then
+
+                tz_debug_pod_name="$(sed -n 's/.*[Cc]reating debugging pod \([^ ]*\) with container.*/\1/p' "$tz_debug_out" | head -1)"
+
+                if [[ -z "$tz_debug_pod_name" ]]; then
+                    tz_debug_pod_name="$($KUBE_CMD get pods -l app.kubernetes.io/managed-by=kubectl-debug \
+                        --field-selector spec.nodeName="$sample_node" -o json 2>/dev/null | \
+                        jq -r '.items | sort_by(.metadata.creationTimestamp) | last | .metadata.name // empty')"
+                fi
+
+                if [[ -n "$tz_debug_pod_name" ]]; then
+                    DEBUG_PODS+=("$tz_debug_pod_name")
+
+                    if $KUBE_CMD wait --for=condition=Ready "pod/${tz_debug_pod_name}" --timeout=60s > /dev/null 2>&1; then
+                        timeout 60 $KUBE_CMD exec "$tz_debug_pod_name" -- chroot /host bash -c '
+if [ -f /etc/timezone ]; then
+    cat /etc/timezone
+elif [ -L /etc/localtime ]; then
+    readlink /etc/localtime | sed "s|.*/zoneinfo/||"
+else
+    timedatectl 2>/dev/null | grep "Time zone" | awk "{print \$3}"
+fi
+' > "$tmp_tz_file" 2>&1
+                    fi
+
+                    $KUBE_CMD delete pod "$tz_debug_pod_name" --ignore-not-found=true > /dev/null 2>&1
+                    DEBUG_PODS=("${DEBUG_PODS[@]/$tz_debug_pod_name}")
+                fi
+            fi
         fi
 
         tz_info=$(grep -vE '^(Starting pod|Removing debug pod|$)' "$tmp_tz_file" | head -1 | xargs)
@@ -338,9 +378,9 @@ WORKLOAD TARGETING (WORKLOAD COMPONENT)
   NOTE:
     - Workload diagnostics are NOT collected by default
     - The workload component is automatically enabled when
-      --workload-pod or --workload-pvc is specified
+      --workload-pod, --workload-pvc, or --workload-vm is specified
     - --namespace is REQUIRED for workload collection
-    - --workload-pod and --workload-pvc CAN be used together
+    - --workload-pod, --workload-pvc, and --workload-vm CAN be used together
 
   --workload-pod <pod-name>
         Target a specific workload pod
@@ -360,6 +400,29 @@ WORKLOAD TARGETING (WORKLOAD COMPONENT)
           - All pods using the PVC (if any)
           - Namespace events (time filtered)
           - CSI node plugin logs from nodes hosting those pods
+
+    --workload-vm <vm-name>
+        Target a specific KubeVirt VirtualMachine
+        (requires the VirtualMachine CRD to be installed on the cluster)
+
+        Automatically discovers and collects:
+          - VM and VMI YAML and describe output
+          - Attached DataVolume(s), and their backing PVC(s)/PV(s), if present
+          - All virt-launcher pod(s) for the VM, including source and target
+            pods during a live migration, with current and previous logs
+          - Cluster-wide and namespace-scoped related-objects overview
+            (VM, VMI, DataVolume, PVC, Pod matches by name)
+          - Namespace events (time filtered)
+          - Events related to every node the VM is or was running on during
+            this collection, covering migration source & target nodes (time filtered)
+          - CSI node plugin logs from every node identified above
+          - CSI controller logs
+
+        NOTE:
+          - DataVolume collection is skipped if the DataVolume CRD is not
+            installed (VM/VMI collection still proceeds)
+          - If the VMI is not found (e.g. VM is stopped), node-scoped
+            collection (CSI node logs, node events) is skipped
 
 -------------------------------------------------
 LOG COLLECTION BEHAVIOR
@@ -453,6 +516,12 @@ EXAMPLES
      --start-time 2025-12-21T10:30 \\
      --end-time 2025-12-21T11:30
    Note: Times are interpreted in the cluster's timezone
+
+9) Collect workload diagnostics for a KubeVirt VirtualMachine
+   ./$SCRIPT_NAME \\
+     -n my-vm-namespace \\
+     --only workload \\
+     --workload-vm my-virtual-machine
 EOF
 }
 
@@ -492,6 +561,14 @@ check_prerequisites() {
         KUBE_CMD="oc"
     else
         KUBE_CMD="kubectl"
+    fi
+
+    CLUSTER_VERSION_INFO="$($KUBE_CMD version 2>&1)"
+
+    CLUSTER_SERVER_VERSION="$(echo "$CLUSTER_VERSION_INFO" | grep -i 'Server Version' | head -1 | sed -E 's/^[Ss]erver [Vv]ersion:?[[:space:]]*//')"
+
+    if [[ -z "$CLUSTER_SERVER_VERSION" ]]; then
+        CLUSTER_SERVER_VERSION="Unknown (see cluster-version.txt)"
     fi
 
     local required_tools=("jq" "base64")
@@ -793,6 +870,145 @@ get_pods_using_pvc() {
     '
 }
 
+# ==============================================================================
+# VIRTUALIZATION (KubeVirt) HELPER FUNCTIONS
+# ==============================================================================
+get_vm_vmi() {
+    local vm_name="$1"
+
+    # Primary: VMI shares the VM's name by KubeVirt convention, verify it exists
+    if $KUBE_CMD get vmi "$vm_name" -n "$TARGET_NAMESPACE" &>/dev/null; then
+        echo "$vm_name"
+        return 0
+    fi
+
+    # Fallback: search VMIs owned by this VM, covers naming edge cases
+    $KUBE_CMD get vmi -n "$TARGET_NAMESPACE" -o json 2>/dev/null | \
+    jq -r --arg vm "$vm_name" '
+        .items[] |
+        select(
+            .metadata.ownerReferences[]?.kind == "VirtualMachine"
+            and .metadata.ownerReferences[]?.name == $vm
+        ) |
+        .metadata.name
+    ' | head -1
+}
+
+get_vmi_pvcs() {
+    local vmi_name="$1"
+    $KUBE_CMD get vmi "$vmi_name" -n "$TARGET_NAMESPACE" -o json 2>/dev/null | \
+    jq -r '.spec.volumes[]? | select(.persistentVolumeClaim) | .persistentVolumeClaim.claimName'
+}
+
+get_vmi_datavolumes() {
+    local vmi_name="$1"
+    $KUBE_CMD get vmi "$vmi_name" -n "$TARGET_NAMESPACE" -o json 2>/dev/null | \
+    jq -r '.spec.volumes[]? | select(.dataVolume) | .dataVolume.name'
+}
+
+get_dv_pvc() {
+    local dv_name="$1"
+
+    # CDI convention: DataVolume provisions a PVC of the same name, verify existence
+    if $KUBE_CMD get pvc "$dv_name" -n "$TARGET_NAMESPACE" &>/dev/null; then
+        echo "$dv_name"
+        return 0
+    fi
+
+    # Fallback: some CDI versions expose the bound claim name in status
+    $KUBE_CMD get dv "$dv_name" -n "$TARGET_NAMESPACE" \
+        -o jsonpath='{.status.claimName}' 2>/dev/null
+}
+
+get_virt_launcher_pods() {
+    local vm_name="$1"
+
+    $KUBE_CMD get pods -n "$TARGET_NAMESPACE" \
+        -l kubevirt.io=virt-launcher \
+        -o json 2>/dev/null | \
+    jq -r --arg vm "$vm_name" '
+        .items[] |
+        select(.metadata.labels["vm.kubevirt.io/name"] == $vm) |
+        .metadata.name
+    '
+}
+
+get_vmi_node() {
+    local vmi_name="$1"
+    $KUBE_CMD get vmi "$vmi_name" -n "$TARGET_NAMESPACE" \
+        -o jsonpath='{.status.nodeName}' 2>/dev/null
+}
+
+collect_vm_related_objects() {
+    local vm_name="$1"
+    local out_dir="$2"
+
+    mkdir -p "$out_dir"
+
+    _write_related_section() {
+        local resource_type="$1" label="$2" scope_flag="$3" out_file="$4"
+        local result
+        result=$($KUBE_CMD get "$resource_type" $scope_flag 2>/dev/null | grep -i "$vm_name")
+        if [[ -n "$result" ]]; then
+            {
+                echo "=== $label ==="
+                echo "$result"
+                echo ""
+            } >> "$out_file"
+        fi
+    }
+
+    # ------------------------------------------------------------
+    # All-namespaces overview
+    # ------------------------------------------------------------
+    local all_ns_file="$out_dir/all-namespaces-overview.txt"
+    rm -f "$all_ns_file"
+    _write_related_section "vm"  "VIRTUAL MACHINES"       "-A" "$all_ns_file"
+    _write_related_section "vmi" "VIRTUAL MACHINE INSTANCES" "-A" "$all_ns_file"
+    _write_related_section "dv"  "DATAVOLUMES"            "-A" "$all_ns_file"
+    _write_related_section "pvc" "PERSISTENT VOLUME CLAIMS" "-A" "$all_ns_file"
+    _write_related_section "pod" "PODS"                   "-A" "$all_ns_file"
+    [[ -s "$all_ns_file" ]] || rm -f "$all_ns_file"
+
+    # ------------------------------------------------------------
+    # Namespace-scoped overview
+    # ------------------------------------------------------------
+    local ns_file="$out_dir/namespace-scoped-overview.txt"
+    rm -f "$ns_file"
+    _write_related_section "vm"  "VIRTUAL MACHINES"       "-n $TARGET_NAMESPACE" "$ns_file"
+    _write_related_section "vmi" "VIRTUAL MACHINE INSTANCES" "-n $TARGET_NAMESPACE" "$ns_file"
+    _write_related_section "dv"  "DATAVOLUMES"            "-n $TARGET_NAMESPACE" "$ns_file"
+    _write_related_section "pvc" "PERSISTENT VOLUME CLAIMS" "-n $TARGET_NAMESPACE" "$ns_file"
+    _write_related_section "pod" "PODS"                   "-n $TARGET_NAMESPACE" "$ns_file"
+    [[ -s "$ns_file" ]] || rm -f "$ns_file"
+
+    unset -f _write_related_section
+}
+
+collect_node_events() {
+    local node_name="$1"
+    local output_file="$2"
+
+    $KUBE_CMD get events -A --sort-by='.lastTimestamp' -o json 2>/dev/null | \
+    jq --arg node "$node_name" '
+    {
+        apiVersion: "v1",
+        kind: "EventList",
+        items: [
+            .items[] |
+            select(
+                (.involvedObject.name // "" | test($node; "i")) or
+                (.source.host // "" | test($node; "i")) or
+                (.message // "" | test($node; "i")) or
+                (.reason // "" | test($node; "i"))
+            )
+        ]
+    } | select(.items | length > 0)
+    ' > "$output_file" 2>/dev/null
+
+    [[ -s "$output_file" ]] || rm -f "$output_file" 2>/dev/null
+}
+
 validate_since_duration() {
     local d="$1"
 
@@ -827,30 +1043,125 @@ collect_workloads() {
         mkdir -p "$WORKLOAD_DIR"
         collect_workload_context
     fi
+
+    if [[ -n "$WORKLOAD_VM" ]]; then
+        WORKLOAD_DIR="$WORKLOAD_BASE_DIR/by-vm_${WORKLOAD_VM}"
+        mkdir -p "$WORKLOAD_DIR"
+        collect_vm_workload_context
+    fi
 }
 
 run_common_node_diagnostics() {
     local journal_flags="$1"
+    local tag="$2"
 
     cat <<EOF
-echo '=== UNAME ==='; uname -a || true
-echo '=== OS_RELEASE ==='; cat /etc/os-release || true
-echo '=== DMESG ==='; dmesg | tail -n 1000 || true
-echo '=== TIMEDATECTL ==='; timedatectl || true
+echo '=== UNAME_${tag} ==='; uname -a || true
+echo '=== OS_RELEASE_${tag} ==='; cat /etc/os-release || true
+echo '=== DMESG_${tag} ==='; dmesg || true
+echo '=== TIMEDATECTL_${tag} ==='; timedatectl || true
 
-echo '=== ISCSI_SESSIONS ==='; iscsiadm -m session || true
-echo '=== ISCSI_INITIATOR ==='; cat /etc/iscsi/initiatorname.iscsi || true
-echo '=== MULTIPATH_LL ==='; multipath -ll || true
-echo '=== MULTIPATH_CONF ==='; cat /etc/multipath.conf || true
-echo '=== LSBLK ==='; lsblk || true
-echo '=== MOUNTS ==='; grep -E 'csi|pv' /proc/mounts || true
+echo '=== ISCSI_INFO_${tag} ==='
+echo '--- iSCSI Sessions ---'
+iscsiadm -m session 2>&1 || echo "N/A (no active iSCSI sessions, or iscsiadm not installed)"
+echo ''
+echo '--- iSCSI Initiator Name ---'
+if [ -f /etc/iscsi/initiatorname.iscsi ]; then
+    cat /etc/iscsi/initiatorname.iscsi
+else
+    echo "N/A (/etc/iscsi/initiatorname.iscsi not present, iSCSI initiator not configured)"
+fi
+echo '=== FC_INFO_${tag} ==='
+echo '--- Local HBA Ports (WWPN/WWNN Summary) ---'
+if [ -d /sys/class/fc_host ]; then
+    for h in /sys/class/fc_host/*; do
+        [ -d "\$h" ] || continue
+        wwpn_val=""
+        wwnn_val=""
+        [ -f "\$h/port_name" ] && wwpn_val=\$(cat "\$h/port_name" 2>/dev/null)
+        [ -f "\$h/node_name" ] && wwnn_val=\$(cat "\$h/node_name" 2>/dev/null)
+        echo "\$(basename "\$h"): WWPN=\$wwpn_val WWNN=\$wwnn_val"
+    done
+    echo ''
+    echo '--- Local HBA Port Details ---'
+    for h in /sys/class/fc_host/*; do
+        [ -d "\$h" ] || continue
+        echo "--- \$(basename "\$h") ---"
+        for f in port_name node_name port_state port_type speed supported_speeds symbolic_name fabric_name; do
+            [ -f "\$h/\$f" ] && echo "\$f: \$(cat "\$h/\$f" 2>/dev/null)"
+        done
+    done
+else
+    echo "N/A (no FC hosts present, /sys/class/fc_host absent)"
+fi
+echo ''
+echo '--- Remote FC Target Ports ---'
+if [ -d /sys/class/fc_remote_ports ]; then
+    for r in /sys/class/fc_remote_ports/*; do
+        [ -d "\$r" ] || continue
+        echo "--- \$(basename "\$r") ---"
+        for f in port_name node_name port_state roles scsi_target_id; do
+            [ -f "\$r/\$f" ] && echo "\$f: \$(cat "\$r/\$f" 2>/dev/null)"
+        done
+    done
+else
+    echo "N/A (no FC remote ports present, /sys/class/fc_remote_ports absent)"
+fi
+echo '=== MULTIPATH_LL_${tag} ==='
+if command -v multipath >/dev/null 2>&1; then
+    mp_ll_output=\$(multipath -ll 2>&1)
+    if [ -n "\$mp_ll_output" ]; then
+        echo "\$mp_ll_output"
+    else
+        echo "N/A (multipath command present but no multipath devices configured on this node)"
+    fi
+else
+    echo "N/A (multipath-tools not installed on this node)"
+fi
+echo '=== MULTIPATH_CONF_${tag} ==='; cat /etc/multipath.conf || true
+echo '=== NVME_INFO_${tag} ==='
+echo '--- NVMe Native Multipath ---'
+if [ -f /sys/module/nvme_core/parameters/multipath ]; then
+    nvme_mp_val=\$(cat /sys/module/nvme_core/parameters/multipath 2>/dev/null)
+    echo "cat /sys/module/nvme_core/parameters/multipath output is \$nvme_mp_val"
+    if [ "\$nvme_mp_val" = "Y" ]; then
+        echo "Y means Native Multipath configured Node"
+    elif [ "\$nvme_mp_val" = "N" ]; then
+        echo "N means Non-Native Multipath configured Node"
+    fi
+else
+    echo "N/A (nvme_core module not loaded or parameter path not present)"
+fi
+echo ''
+echo '--- NVMe Host NQN ---'
+if [ -f /etc/nvme/hostnqn ]; then
+    cat /etc/nvme/hostnqn
+else
+    echo "N/A (/etc/nvme/hostnqn not present, NVMe-oF host not configured)"
+fi
+echo ''
+echo '--- NVMe Device List ---'
+if command -v nvme >/dev/null 2>&1; then
+    nvme list || echo "N/A (nvme command present but returned no output/error)"
+else
+    echo "N/A (nvme-cli not installed on this node)"
+fi
+echo ''
+echo '--- NVMe Subsystem List ---'
+if command -v nvme >/dev/null 2>&1; then
+    nvme list-subsys || echo "N/A (nvme command present but returned no output/error)"
+else
+    echo "N/A (nvme-cli not installed on this node)"
+fi
+echo '=== LSBLK_${tag} ==='; lsblk || true
+echo '=== MOUNTS_${tag} ==='; cat /proc/mounts || true
 
-echo '=== IP_ADDR ==='; ip addr || true
-echo '=== IP_ROUTE ==='; ip route || true
+echo '=== IP_ADDR_${tag} ==='; ip addr || true
+echo '=== IP_ROUTE_${tag} ==='; ip route || true
 
-echo '=== KUBELET_JOURNAL ==='
+echo '=== KUBELET_JOURNAL_${tag} ==='
 journalctl -u kubelet --no-pager ${journal_flags} || true
-echo '=== END ==='
+echo '=== END_${tag} ==='
 EOF
 }
 
@@ -881,6 +1192,7 @@ parse_arguments() {
                 IFS=',' read -ra components <<< "$2"
                 for component in "${components[@]}"; do
                     enable_component "$component"
+                    [[ "$component" == "workload" ]] && WORKLOAD_EXPLICITLY_REQUESTED=true
                 done
                 shift 2
                 ;;
@@ -927,6 +1239,10 @@ parse_arguments() {
                 WORKLOAD_PVC="$2"
                 shift 2
                 ;;
+            --workload-vm)
+                WORKLOAD_VM="$2"
+                shift 2
+                ;;
             *)
                 log_error "Unknown option: $1"
                 echo "Use --help for usage information"
@@ -962,7 +1278,7 @@ validate_arguments() {
         if ! namespace_exists "$TARGET_NAMESPACE"; then
             log_error "Namespace '$TARGET_NAMESPACE' does not exist"
             log_error "Available namespaces:"
-            $KUBE_CMD get namespaces --no-headers -o custom-columns=":metadata.name" | head -10
+            $KUBE_CMD get namespaces --no-headers -o custom-columns=":metadata.name"
             exit 1
         fi
         log_success "Target namespace '$TARGET_NAMESPACE' validated"
@@ -976,7 +1292,7 @@ validate_arguments() {
             if ! namespace_exists "$STORAGE_SECRET_NAMESPACE"; then
                 log_error "Storage secret namespace '$STORAGE_SECRET_NAMESPACE' does not exist"
                 log_error "Available namespaces:"
-                $KUBE_CMD get namespaces --no-headers -o custom-columns=":metadata.name" | head -10
+                $KUBE_CMD get namespaces --no-headers -o custom-columns=":metadata.name"
                 exit 1
             fi
 
@@ -984,7 +1300,7 @@ validate_arguments() {
             if ! secret_exists "$STORAGE_SECRET_NAME" "$STORAGE_SECRET_NAMESPACE"; then
                 log_error "Secret '$STORAGE_SECRET_NAME' does not exist in namespace '$STORAGE_SECRET_NAMESPACE'"
                 log_error "Available secrets in namespace '$STORAGE_SECRET_NAMESPACE':"
-                $KUBE_CMD get secrets -n "$STORAGE_SECRET_NAMESPACE" --no-headers -o custom-columns=":metadata.name" | head -10
+                $KUBE_CMD get secrets -n "$STORAGE_SECRET_NAMESPACE" --no-headers -o custom-columns=":metadata.name"
                 exit 1
             fi
 
@@ -1034,13 +1350,7 @@ validate_arguments() {
     # Workload targeting validation
     # ------------------------------------------------------------------
 
-    if [[ "$COLLECT_WORKLOAD" == true ]] && \
-    [[ -z "$WORKLOAD_POD" && -z "$WORKLOAD_PVC" ]]; then
-        log_error "Component 'workload' requires --workload-pod or --workload-pvc"
-        exit 1
-    fi
-
-    if [[ -n "$WORKLOAD_POD" || -n "$WORKLOAD_PVC" ]]; then
+    if [[ -n "$WORKLOAD_POD" || -n "$WORKLOAD_PVC" || -n "$WORKLOAD_VM" ]]; then
         if [[ -z "$TARGET_NAMESPACE" ]]; then
             log_error "--namespace is required with workload targeting"
             exit 1
@@ -1065,6 +1375,18 @@ validate_arguments() {
             exit 1
         }
     fi
+
+    if [[ -n "$WORKLOAD_VM" ]]; then
+        if ! resource_exists "virtualmachines.kubevirt.io"; then
+            log_error "VirtualMachine CRD not installed on this cluster, cannot target --workload-vm"
+            exit 1
+        fi
+
+        $KUBE_CMD get vm "$WORKLOAD_VM" -n "$TARGET_NAMESPACE" &>/dev/null || {
+            log_error "VirtualMachine '$WORKLOAD_VM' not found in namespace '$TARGET_NAMESPACE'"
+            exit 1
+        }
+    fi
 }
 
 # ==============================================================================
@@ -1073,11 +1395,12 @@ validate_arguments() {
 setup_environment() {
     local timestamp
     timestamp=$(TZ="$CLUSTER_TIMEZONE" date +%Y%m%d-%H%M%S)
+    local safe_timezone="${CLUSTER_TIMEZONE//\//-}"
 
     local base_collection_dir="$OUTPUT_LOCATION/ibm-block-csi-log-collection"
     mkdir -p "$base_collection_dir"
 
-    BASE_OUTPUT_DIR="$base_collection_dir/${timestamp}_${CLUSTER_TIMEZONE}"
+    BASE_OUTPUT_DIR="$base_collection_dir/${timestamp}_${safe_timezone}"
     mkdir -p "$BASE_OUTPUT_DIR"
 
     if [[ "$COLLECT_RESOURCES" == true ]]; then
@@ -1110,7 +1433,7 @@ setup_environment() {
     fi
 
     if [[ "$COLLECT_STORAGE_SYSTEM" == true ]]; then
-        mkdir -p "$BASE_OUTPUT_DIR/storage-system"
+        mkdir -p "$BASE_OUTPUT_DIR/svc-storage-system"
     fi
 
     log_success "Output directory created: $BASE_OUTPUT_DIR"
@@ -2182,6 +2505,9 @@ collect_node_diagnostics() {
     for node in $nodes; do
         log_info "Processing node: $node"
 
+        local diag_tag
+        diag_tag="$(date +%s%N)_$$"
+
         # ------------------------------------------------------------------
         # Node YAML
         # ------------------------------------------------------------------
@@ -2212,29 +2538,66 @@ collect_node_diagnostics() {
         print_group "Gathering kubelet logs this could take some time. Please wait..."
 
         if is_openshift; then
-            if ! $KUBE_CMD debug "node/$node" --quiet < /dev/null <<EOF > "$tmp_out" 2>&1
-chroot /host
-$(run_common_node_diagnostics "$kubelet_journal_flags")
-exit
-EOF
-            then
+            if ! $KUBE_CMD debug "node/$node" \
+                --quiet -- chroot /host /bin/sh -c "
+        $(run_common_node_diagnostics "$kubelet_journal_flags" "$diag_tag")
+        exit 0
+        " > "$tmp_out" 2>&1; then
                 print_warn "OpenShift debug session failed"
                 echo ""
                 continue
             fi
         else
+            local debug_err debug_out debug_pod_name
+            debug_err="$(mktemp)"
+            debug_out="$(mktemp)"
+            TEMP_FILES+=("$debug_err" "$debug_out")
+
             if ! $KUBE_CMD debug "node/$node" \
-                -it \
                 --profile=sysadmin \
                 --image=registry.access.redhat.com/ubi9/ubi:latest \
-                -- chroot /host /bin/sh -c "
-$(run_common_node_diagnostics "$kubelet_journal_flags")
-exit 0
-" > "$tmp_out" 2>&1; then
-                print_warn "Kubernetes debug session failed"
+                --attach=false \
+                -- sleep infinity > "$debug_out" 2>"$debug_err"; then
+                print_warn "Kubernetes debug pod creation failed: $(cat "$debug_err")"
                 echo ""
                 continue
             fi
+
+            debug_pod_name="$(sed -n 's/.*[Cc]reating debugging pod \([^ ]*\) with container.*/\1/p' "$debug_out" | head -1)"
+
+            if [[ -z "$debug_pod_name" ]]; then
+                debug_pod_name="$($KUBE_CMD get pods -l app.kubernetes.io/managed-by=kubectl-debug \
+                    --field-selector spec.nodeName="$node" -o json 2>/dev/null | \
+                    jq -r '.items | sort_by(.metadata.creationTimestamp) | last | .metadata.name // empty')"
+            fi
+
+            if [[ -z "$debug_pod_name" ]]; then
+                print_warn "Could not determine debug pod name from kubectl output: $(cat "$debug_out")"
+                echo ""
+                continue
+            fi
+
+            DEBUG_PODS+=("$debug_pod_name")
+
+            if ! $KUBE_CMD wait --for=condition=Ready "pod/${debug_pod_name}" --timeout=120s > /dev/null 2>"$debug_err"; then
+                print_warn "Debug pod did not become ready: $(cat "$debug_err")"
+                $KUBE_CMD delete pod "$debug_pod_name" --ignore-not-found=true > /dev/null 2>&1
+                echo ""
+                continue
+            fi
+
+            if ! timeout 300 $KUBE_CMD exec "$debug_pod_name" -- chroot /host /bin/sh -c "
+        $(run_common_node_diagnostics "$kubelet_journal_flags" "$diag_tag")
+        exit 0
+        " > "$tmp_out" 2>"$debug_err"; then
+                print_warn "Kubernetes debug session failed: $(cat "$debug_err")"
+                $KUBE_CMD delete pod "$debug_pod_name" --ignore-not-found=true > /dev/null 2>&1
+                echo ""
+                continue
+            fi
+
+            $KUBE_CMD delete pod "$debug_pod_name" --ignore-not-found=true > /dev/null 2>&1
+            DEBUG_PODS=("${DEBUG_PODS[@]/$debug_pod_name}")
         fi
 
         # ------------------------------------------------------------------
@@ -2242,16 +2605,16 @@ exit 0
         # ------------------------------------------------------------------
         print_group "Collecting system information..."
 
-        awk '/=== UNAME ===/,/=== OS_RELEASE ===/' "$tmp_out" | sed '1d;$d' \
+        awk "/=== UNAME_${diag_tag} ===/,/=== OS_RELEASE_${diag_tag} ===/" "$tmp_out" | sed '1d;$d' \
             > "$BASE_OUTPUT_DIR/node-diagnostics/system/${node}_uname.txt"
 
-        awk '/=== OS_RELEASE ===/,/=== DMESG ===/' "$tmp_out" | sed '1d;$d' \
+        awk "/=== OS_RELEASE_${diag_tag} ===/,/=== DMESG_${diag_tag} ===/" "$tmp_out" | sed '1d;$d' \
             > "$BASE_OUTPUT_DIR/node-diagnostics/system/${node}_os-release.txt"
 
-        awk '/=== DMESG ===/,/=== TIMEDATECTL ===/' "$tmp_out" | sed '1d;$d' \
+        awk "/=== DMESG_${diag_tag} ===/,/=== TIMEDATECTL_${diag_tag} ===/" "$tmp_out" | sed '1d;$d' \
             > "$BASE_OUTPUT_DIR/node-diagnostics/system/${node}_dmesg.txt"
 
-        awk '/=== TIMEDATECTL ===/,/=== ISCSI_SESSIONS ===/' "$tmp_out" | sed '1d;$d' \
+        awk "/=== TIMEDATECTL_${diag_tag} ===/,/=== ISCSI_INFO_${diag_tag} ===/" "$tmp_out" | sed '1d;$d' \
             > "$BASE_OUTPUT_DIR/node-diagnostics/system/${node}_timedatectl.txt"
 
         # ------------------------------------------------------------------
@@ -2259,22 +2622,25 @@ exit 0
         # ------------------------------------------------------------------
         print_group "Collecting storage information..."
 
-        awk '/=== ISCSI_SESSIONS ===/,/=== ISCSI_INITIATOR ===/' "$tmp_out" | sed '1d;$d' \
-            > "$BASE_OUTPUT_DIR/node-diagnostics/storage/${node}_iscsi-sessions.txt"
+        awk "/=== ISCSI_INFO_${diag_tag} ===/,/=== FC_INFO_${diag_tag} ===/" "$tmp_out" | sed '1d;$d' \
+            > "$BASE_OUTPUT_DIR/node-diagnostics/storage/${node}_iscsi-info.txt"
 
-        awk '/=== ISCSI_INITIATOR ===/,/=== MULTIPATH_LL ===/' "$tmp_out" | sed '1d;$d' \
-            > "$BASE_OUTPUT_DIR/node-diagnostics/storage/${node}_iscsi-initiatorname.txt"
+        awk "/=== FC_INFO_${diag_tag} ===/,/=== MULTIPATH_LL_${diag_tag} ===/" "$tmp_out" | sed '1d;$d' \
+            > "$BASE_OUTPUT_DIR/node-diagnostics/storage/${node}_fc-info.txt"
 
-        awk '/=== MULTIPATH_LL ===/,/=== MULTIPATH_CONF ===/' "$tmp_out" | sed '1d;$d' \
+        awk "/=== MULTIPATH_LL_${diag_tag} ===/,/=== MULTIPATH_CONF_${diag_tag} ===/" "$tmp_out" | sed '1d;$d' \
             > "$BASE_OUTPUT_DIR/node-diagnostics/storage/${node}_multipath-ll.txt"
 
-        awk '/=== MULTIPATH_CONF ===/,/=== LSBLK ===/' "$tmp_out" | sed '1d;$d' \
+        awk "/=== MULTIPATH_CONF_${diag_tag} ===/,/=== NVME_INFO_${diag_tag} ===/" "$tmp_out" | sed '1d;$d' \
             > "$BASE_OUTPUT_DIR/node-diagnostics/storage/${node}_multipath.conf"
 
-        awk '/=== LSBLK ===/,/=== MOUNTS ===/' "$tmp_out" | sed '1d;$d' \
+        awk "/=== NVME_INFO_${diag_tag} ===/,/=== LSBLK_${diag_tag} ===/" "$tmp_out" | sed '1d;$d' \
+            > "$BASE_OUTPUT_DIR/node-diagnostics/storage/${node}_nvme-info.txt"
+
+        awk "/=== LSBLK_${diag_tag} ===/,/=== MOUNTS_${diag_tag} ===/" "$tmp_out" | sed '1d;$d' \
             > "$BASE_OUTPUT_DIR/node-diagnostics/storage/${node}_lsblk.txt"
 
-        awk '/=== MOUNTS ===/,/=== IP_ADDR ===/' "$tmp_out" | sed '1d;$d' \
+        awk "/=== MOUNTS_${diag_tag} ===/,/=== IP_ADDR_${diag_tag} ===/" "$tmp_out" | sed '1d;$d' \
             > "$BASE_OUTPUT_DIR/node-diagnostics/storage/${node}_mounts.txt"
 
         # ------------------------------------------------------------------
@@ -2282,10 +2648,10 @@ exit 0
         # ------------------------------------------------------------------
         print_group "Collecting network information..."
 
-        awk '/=== IP_ADDR ===/,/=== IP_ROUTE ===/' "$tmp_out" | sed '1d;$d' \
+        awk "/=== IP_ADDR_${diag_tag} ===/,/=== IP_ROUTE_${diag_tag} ===/" "$tmp_out" | sed '1d;$d' \
             > "$BASE_OUTPUT_DIR/node-diagnostics/network/${node}_ip-addr.txt"
 
-        awk '/=== IP_ROUTE ===/,/=== KUBELET_JOURNAL ===/' "$tmp_out" | sed '1d;$d' \
+        awk "/=== IP_ROUTE_${diag_tag} ===/,/=== KUBELET_JOURNAL_${diag_tag} ===/" "$tmp_out" | sed '1d;$d' \
             > "$BASE_OUTPUT_DIR/node-diagnostics/network/${node}_ip-route.txt"
 
         # ------------------------------------------------------------------
@@ -2293,7 +2659,7 @@ exit 0
         # ------------------------------------------------------------------
         print_group "Collecting Kubelet Journal information..."
 
-        awk '/=== KUBELET_JOURNAL ===/,/=== END ===/' "$tmp_out" | sed '1d;$d' \
+        awk "/=== KUBELET_JOURNAL_${diag_tag} ===/,/=== END_${diag_tag} ===/" "$tmp_out" | sed '1d;$d' \
             > "$BASE_OUTPUT_DIR/node-diagnostics/kubelet/${node}_kubelet-journal.txt"
 
         echo ""
@@ -2373,85 +2739,48 @@ collect_storage_diagnostics() {
 
     print_ok "SSH authentication successful"
 
-    local storage_output
+    local SVC_COMMANDS
+    read -ra SVC_COMMANDS <<< "$SVC_COMMANDS_LIST"
+
+    local storage_output remote_script
     storage_output="$(mktemp)"
     TEMP_FILES+=("$storage_output")
 
-    print_group "Collecting storage diagnostics..."
+    remote_script=$(
+        for cmd in "${SVC_COMMANDS[@]}"; do
+            printf "echo '=== %s ==='\n%s\n" "$cmd" "$cmd"
+        done
+        echo "echo '=== END ==='"
+    )
 
-    if ! setsid ssh "${ssh_opts[@]}" "${username}@${mgmt_address}" < /dev/null \
-        > "$storage_output" 2>&1 << 'REMOTE_SCRIPT'
-echo "=== EVENTLOG ==="
-lseventlog
+    print_group "Collecting SVC Storage Data..."
 
-echo "=== SYSTEM ==="
-lssystem
-
-echo "=== HOSTS ==="
-lshost
-
-echo "=== FABRIC ==="
-lsfabric
-
-echo "=== PORTIP ==="
-lsportip
-
-echo "=== VDISK ==="
-lsvdisk
-
-echo "=== HOST_VDISK_MAP ==="
-lshostvdiskmap
-
-echo "=== AUDITLOG ==="
-catauditlog
-
-echo "=== END ==="
-REMOTE_SCRIPT
+    if ! setsid ssh "${ssh_opts[@]}" "${username}@${mgmt_address}" \
+        > "$storage_output" 2>&1 <<< "$remote_script"
     then
         print_warn "SSH session failed"
         return 1
     fi
 
-    mkdir -p "$BASE_OUTPUT_DIR/storage-system"
+    mkdir -p "$BASE_OUTPUT_DIR/svc-storage-system"
 
-    awk '/=== EVENTLOG ===/,/=== SYSTEM ===/' "$storage_output" | sed '1d;$d' \
-        > "$BASE_OUTPUT_DIR/storage-system/event-log.txt" \
-        && print_ok "Event log" || print_warn "Event log"
+    local total_cmds=${#SVC_COMMANDS[@]}
+    for ((i = 0; i < total_cmds; i++)); do
+        local cmd="${SVC_COMMANDS[$i]}"
+        local next_marker="END"
+        [[ $((i + 1)) -lt $total_cmds ]] && next_marker="${SVC_COMMANDS[$((i + 1))]}"
 
-    awk '/=== SYSTEM ===/,/=== HOSTS ===/' "$storage_output" | sed '1d;$d' \
-        > "$BASE_OUTPUT_DIR/storage-system/system-info.txt" \
-        && print_ok "System information" || print_warn "System information"
-
-    awk '/=== HOSTS ===/,/=== FABRIC ===/' "$storage_output" | sed '1d;$d' \
-        > "$BASE_OUTPUT_DIR/storage-system/hosts.txt" \
-        && print_ok "Host definitions" || print_warn "Host definitions"
-
-    awk '/=== FABRIC ===/,/=== PORTIP ===/' "$storage_output" | sed '1d;$d' \
-        > "$BASE_OUTPUT_DIR/storage-system/fc-fabric.txt" \
-        && print_ok "FC fabric information" || print_warn "FC fabric information"
-
-    awk '/=== PORTIP ===/,/=== VDISK ===/' "$storage_output" | sed '1d;$d' \
-        > "$BASE_OUTPUT_DIR/storage-system/iscsi-ports.txt" \
-        && print_ok "iSCSI port configuration" || print_warn "iSCSI port configuration"
-
-    awk '/=== VDISK ===/,/=== HOST_VDISK_MAP ===/' "$storage_output" | sed '1d;$d' \
-        > "$BASE_OUTPUT_DIR/storage-system/volumes.txt" \
-        && print_ok "Volume list" || print_warn "Volume list"
-
-    awk '/=== HOST_VDISK_MAP ===/,/=== AUDITLOG ===/' "$storage_output" | sed '1d;$d' \
-        > "$BASE_OUTPUT_DIR/storage-system/host-vdisk-map.txt" \
-        && print_ok "Host–VDisk mapping" || print_warn "Host–VDisk mapping"
-
-    awk '/=== AUDITLOG ===/,/=== END ===/' "$storage_output" | sed '1d;$d' \
-        > "$BASE_OUTPUT_DIR/storage-system/audit-log.txt" \
-        && print_ok "Audit log" || print_warn "Audit log"
+        awk "/=== ${cmd} ===/,/=== ${next_marker} ===/" "$storage_output" | sed '1d;$d' \
+            > "$BASE_OUTPUT_DIR/svc-storage-system/${cmd}.txt" \
+            && print_ok "${cmd}" || print_warn "${cmd}"
+    done
 
     echo ""
 }
 
 
 # ==============================================================================
-# PHASE 9: WORKLOAD
+# PHASE 9a: WORKLOAD
 # ==============================================================================
 collect_workload_context() {
     [[ "$COLLECT_WORKLOAD" != true ]] && return
@@ -2464,20 +2793,21 @@ collect_workload_context() {
         "$WORKLOAD_DIR/pvcs" \
         "$WORKLOAD_DIR/pvs" \
         "$WORKLOAD_DIR/events" \
-        "$WORKLOAD_DIR/csi-node-logs"
+        "$WORKLOAD_DIR/csi-node-logs" \
+        "$WORKLOAD_DIR/csi-controller-logs"
 
     local pods=()
     local pvcs=()
     local nodes=()
 
     if [[ -n "$WORKLOAD_POD" ]]; then
-        cat > "$WORKLOAD_DIR/target.txt" << EOF
+        cat > "$WORKLOAD_DIR/workload-summary.txt" << EOF
 workload-type: pod
 workload-name: $WORKLOAD_POD
 namespace: $TARGET_NAMESPACE
 EOF
     elif [[ -n "$WORKLOAD_PVC" ]]; then
-        cat > "$WORKLOAD_DIR/target.txt" << EOF
+        cat > "$WORKLOAD_DIR/workload-summary.txt" << EOF
 workload-type: pvc
 workload-name: $WORKLOAD_PVC
 namespace: $TARGET_NAMESPACE
@@ -2527,6 +2857,7 @@ EOF
     # ------------------------------------------------------------
     # Pods
     # ------------------------------------------------------------
+    log_info "Collecting pod YAML and describe output..."
     for pod in "${pods[@]}"; do
         mkdir -p "$WORKLOAD_DIR/pods/$pod"
 
@@ -2540,6 +2871,7 @@ EOF
     # ------------------------------------------------------------
     # PVCs and PVs
     # ------------------------------------------------------------
+    log_info "Collecting PVC(s) and PV(s)..."
     for pvc in "${pvcs[@]}"; do
         mkdir -p "$WORKLOAD_DIR/pvcs/$pvc"
 
@@ -2567,6 +2899,7 @@ EOF
     # ------------------------------------------------------------
     # Namespace events
     # ------------------------------------------------------------
+    log_info "Collecting namespace events..."
     $KUBE_CMD get events -n "$TARGET_NAMESPACE" -o json \
         > "$WORKLOAD_DIR/events/events.json"
 
@@ -2577,7 +2910,11 @@ EOF
             $KUBE_CMD apply --dry-run=client -f - -o yaml \
             > "$WORKLOAD_DIR/events/namespace-events.yaml"
     else
-        log_warning "No namespace events found for workload time window"
+        if [[ -n "$SINCE_DURATION" || -n "$START_TIME" ]]; then
+            log_warning "No namespace events found for workload within the specified time window"
+        else
+            log_warning "No namespace events found in namespace '$TARGET_NAMESPACE'"
+        fi
     fi
 
     rm -f "$WORKLOAD_DIR/events/events.json"
@@ -2592,29 +2929,323 @@ EOF
     done
 
     nodes=($(printf "%s\n" "${nodes[@]}" | sort -u))
+    for n in "${nodes[@]}"; do
+        echo "hosting-node: $n" >> "$WORKLOAD_DIR/workload-summary.txt"
+    done
 
     if [[ ${#nodes[@]} -eq 0 ]]; then
         log_info "Skipping CSI node logs (no workload nodes found)"
+    else
+        for node in "${nodes[@]}"; do
+            log_info "Collecting CSI node plugin logs for node: $node"
+            mkdir -p "$WORKLOAD_DIR/csi-node-logs/$node"
+
+            $KUBE_CMD get pods --all-namespaces \
+                -l product=ibm-block-csi-driver \
+                -l app.kubernetes.io/component=csi-node \
+                -o json | \
+            jq -r --arg node "$node" '
+                .items[] |
+                select(.spec.nodeName == $node) |
+                [.metadata.name, .metadata.namespace] | @tsv
+            ' | while read -r csi_pod ns; do
+                collect_pod_logs \
+                    "$csi_pod" "$ns" \
+                    "$WORKLOAD_DIR/csi-node-logs/$node" \
+                    "$(build_time_flags)"
+            done
+        done
+    fi
+
+    # ------------------------------------------------------------
+    # CSI controller logs
+    # ------------------------------------------------------------
+    log_info "Collecting CSI controller logs..."
+    mkdir -p "$WORKLOAD_DIR/csi-controller-logs"
+
+    $KUBE_CMD get pods --all-namespaces \
+        -l product=ibm-block-csi-driver \
+        -l app.kubernetes.io/component=csi-controller \
+        -o json | \
+    jq -r '
+        .items[] |
+        [.metadata.name, .metadata.namespace] | @tsv
+    ' | while read -r csi_pod ns; do
+        collect_pod_logs \
+            "$csi_pod" "$ns" \
+            "$WORKLOAD_DIR/csi-controller-logs" \
+            "$(build_time_flags)"
+    done
+}
+
+# ==============================================================================
+# PHASE 9b: VIRTUALIZATION (KubeVirt) WORKLOAD
+# ==============================================================================
+collect_vm_workload_context() {
+    [[ "$COLLECT_WORKLOAD" != true ]] && return
+    [[ -z "$WORKLOAD_VM" ]] && return
+
+    if ! resource_exists "virtualmachines.kubevirt.io"; then
+        log_warning "VirtualMachine CRD not installed, skipping VM workload collection for '$WORKLOAD_VM'"
         return
     fi
 
-    for node in "${nodes[@]}"; do
-        mkdir -p "$WORKLOAD_DIR/csi-node-logs/$node"
+    print_section "Collecting Virtualization (KubeVirt) Workload"
 
-        $KUBE_CMD get pods --all-namespaces \
-            -l product=ibm-block-csi-driver \
-            -l app.kubernetes.io/component=csi-node \
-            -o json | \
-        jq -r --arg node "$node" '
-            .items[] |
-            select(.spec.nodeName == $node) |
-            [.metadata.name, .metadata.namespace] | @tsv
-        ' | while read -r csi_pod ns; do
-            collect_pod_logs \
-                "$csi_pod" "$ns" \
-                "$WORKLOAD_DIR/csi-node-logs/$node" \
-                "$(build_time_flags)"
+    mkdir -p \
+        "$WORKLOAD_DIR/related-objects" \
+        "$WORKLOAD_DIR/vms" \
+        "$WORKLOAD_DIR/vmis" \
+        "$WORKLOAD_DIR/datavolumes" \
+        "$WORKLOAD_DIR/pvcs" \
+        "$WORKLOAD_DIR/pvs" \
+        "$WORKLOAD_DIR/pods" \
+        "$WORKLOAD_DIR/events" \
+        "$WORKLOAD_DIR/csi-node-logs" \
+        "$WORKLOAD_DIR/csi-controller-logs"
+
+    cat > "$WORKLOAD_DIR/workload-summary.txt" << EOF
+workload-type: vm
+workload-vm-name: $WORKLOAD_VM
+namespace: $TARGET_NAMESPACE
+EOF
+
+    # ------------------------------------------------------------
+    # Related objects discovery (identification step)
+    # ------------------------------------------------------------
+    log_info "Collecting VM related-objects overview..."
+    collect_vm_related_objects "$WORKLOAD_VM" "$WORKLOAD_DIR/related-objects"
+
+    # ------------------------------------------------------------
+    # VM
+    # ------------------------------------------------------------
+    if ! $KUBE_CMD get vm "$WORKLOAD_VM" -n "$TARGET_NAMESPACE" &>/dev/null; then
+        log_error "VirtualMachine '$WORKLOAD_VM' not found in namespace '$TARGET_NAMESPACE'"
+        return
+    fi
+
+    log_info "Collecting VM YAML and describe output..."
+    mkdir -p "$WORKLOAD_DIR/vms/$WORKLOAD_VM"
+    $KUBE_CMD get vm "$WORKLOAD_VM" -n "$TARGET_NAMESPACE" -o yaml \
+        > "$WORKLOAD_DIR/vms/$WORKLOAD_VM/vm.yaml"
+    $KUBE_CMD describe vm "$WORKLOAD_VM" -n "$TARGET_NAMESPACE" \
+        > "$WORKLOAD_DIR/vms/$WORKLOAD_VM/vm-describe.txt"
+
+    # ------------------------------------------------------------
+    # VMI
+    # ------------------------------------------------------------
+    local vmi_name="" node_name=""
+    vmi_name="$(get_vm_vmi "$WORKLOAD_VM")"
+
+    if [[ -z "$vmi_name" ]]; then
+        log_warning "No VMI found for VM '$WORKLOAD_VM' (VM may not be running)"
+    else
+        log_info "Collecting VMI YAML and describe output..."
+        mkdir -p "$WORKLOAD_DIR/vmis/$vmi_name"
+        $KUBE_CMD get vmi "$vmi_name" -n "$TARGET_NAMESPACE" -o yaml \
+            > "$WORKLOAD_DIR/vmis/$vmi_name/vmi.yaml"
+        $KUBE_CMD describe vmi "$vmi_name" -n "$TARGET_NAMESPACE" \
+            > "$WORKLOAD_DIR/vmis/$vmi_name/vmi-describe.txt"
+
+        node_name="$(get_vmi_node "$vmi_name")"
+        [[ -n "$node_name" ]] && echo "vmi-node: $node_name" >> "$WORKLOAD_DIR/workload-summary.txt"
+    fi
+
+    # ------------------------------------------------------------
+    # PVCs (direct volumes) + DataVolumes (and their PVCs)
+    # ------------------------------------------------------------
+    local pvcs=()
+
+    if [[ -n "$vmi_name" ]]; then
+        while IFS= read -r pvc; do
+            [[ -n "$pvc" ]] && pvcs+=("$pvc")
+        done < <(get_vmi_pvcs "$vmi_name")
+
+        if resource_exists "datavolumes.cdi.kubevirt.io"; then
+            log_info "Collecting DataVolume(s)..."
+            while IFS= read -r dv; do
+                [[ -z "$dv" ]] && continue
+
+                mkdir -p "$WORKLOAD_DIR/datavolumes/$dv"
+                $KUBE_CMD get dv "$dv" -n "$TARGET_NAMESPACE" -o yaml \
+                    > "$WORKLOAD_DIR/datavolumes/$dv/dv.yaml"
+                $KUBE_CMD describe dv "$dv" -n "$TARGET_NAMESPACE" \
+                    > "$WORKLOAD_DIR/datavolumes/$dv/dv-describe.txt"
+
+                local dv_pvc
+                dv_pvc="$(get_dv_pvc "$dv")"
+                [[ -n "$dv_pvc" ]] && pvcs+=("$dv_pvc")
+            done < <(get_vmi_datavolumes "$vmi_name")
+        else
+            log_warning "DataVolume CRD not installed, skipping DataVolume collection"
+        fi
+    fi
+
+    if [[ ${#pvcs[@]} -gt 0 ]]; then
+        pvcs=($(printf "%s\n" "${pvcs[@]}" | sort -u))
+    fi
+
+    log_info "Collecting PVC(s) and PV(s)..."
+    for pvc in "${pvcs[@]}"; do
+        [[ -z "$pvc" ]] && continue
+        mkdir -p "$WORKLOAD_DIR/pvcs/$pvc"
+
+        $KUBE_CMD get pvc "$pvc" -n "$TARGET_NAMESPACE" -o yaml \
+            > "$WORKLOAD_DIR/pvcs/$pvc/pvc.yaml"
+        $KUBE_CMD describe pvc "$pvc" -n "$TARGET_NAMESPACE" \
+            > "$WORKLOAD_DIR/pvcs/$pvc/pvc-describe.txt"
+
+        local pv
+        pv=$($KUBE_CMD get pvc "$pvc" -n "$TARGET_NAMESPACE" \
+            -o jsonpath='{.spec.volumeName}')
+
+        if [[ -n "$pv" ]]; then
+            mkdir -p "$WORKLOAD_DIR/pvs/$pv"
+            $KUBE_CMD get pv "$pv" -o yaml \
+                > "$WORKLOAD_DIR/pvs/$pv/pv.yaml"
+            $KUBE_CMD describe pv "$pv" \
+                > "$WORKLOAD_DIR/pvs/$pv/pv-describe.txt"
+        fi
+    done
+
+    # ------------------------------------------------------------
+    # Virt-launcher pod(s)
+    # ------------------------------------------------------------
+    local launcher_pods=()
+    while IFS= read -r pod; do
+        [[ -n "$pod" ]] && launcher_pods+=("$pod")
+    done < <(get_virt_launcher_pods "$WORKLOAD_VM")
+
+    if [[ ${#launcher_pods[@]} -eq 0 ]]; then
+        log_warning "No virt-launcher pod found for VM '$WORKLOAD_VM'"
+    fi
+
+    local launcher_pod_nodes=()
+
+    for pod in "${launcher_pods[@]}"; do
+        mkdir -p "$WORKLOAD_DIR/pods/$pod"
+
+        $KUBE_CMD get pod "$pod" -n "$TARGET_NAMESPACE" -o yaml \
+            > "$WORKLOAD_DIR/pods/$pod/pod.yaml"
+        $KUBE_CMD describe pod "$pod" -n "$TARGET_NAMESPACE" \
+            > "$WORKLOAD_DIR/pods/$pod/pod-describe.txt"
+
+        collect_pod_logs "$pod" "$TARGET_NAMESPACE" "$WORKLOAD_DIR/pods/$pod" "$(build_time_flags)"
+
+        local pod_node
+        pod_node="$(get_pod_node "$pod")"
+        echo "virt-launcher-pod: $pod, node: $pod_node" >> "$WORKLOAD_DIR/workload-summary.txt"
+        [[ -n "$pod_node" ]] && launcher_pod_nodes+=("$pod_node")
+    done
+
+    # ------------------------------------------------------------
+    # Every node relevant to this VM: VMI's current node plus every
+    # virt-launcher pod's node. Covers migration, source and target
+    # nodes can differ from vmi.status.nodeName during transition.
+    # ------------------------------------------------------------
+    local target_nodes=()
+    [[ -n "$node_name" ]] && target_nodes+=("$node_name")
+    target_nodes+=("${launcher_pod_nodes[@]}")
+    if [[ ${#target_nodes[@]} -gt 0 ]]; then
+        target_nodes=($(printf "%s\n" "${target_nodes[@]}" | sort -u))
+    fi
+
+    if [[ ${#target_nodes[@]} -gt 0 ]]; then
+        echo "target-nodes: $(IFS=,; echo "${target_nodes[*]}")" >> "$WORKLOAD_DIR/workload-summary.txt"
+    fi
+
+    if [[ ${#target_nodes[@]} -gt 1 ]]; then
+        echo "migration-detected: true (multiple distinct nodes found across VMI status and virt-launcher pods)" >> "$WORKLOAD_DIR/workload-summary.txt"
+    fi
+
+    # ------------------------------------------------------------
+    # Namespace events (time-filtered)
+    # ------------------------------------------------------------
+    log_info "Collecting namespace events..."
+    $KUBE_CMD get events -n "$TARGET_NAMESPACE" -o json \
+        > "$WORKLOAD_DIR/events/events.json"
+
+    filter_events_by_time "$WORKLOAD_DIR/events/events.json"
+
+    if [[ "$(jq '.items | length' "$WORKLOAD_DIR/events/events.json" 2>/dev/null)" -gt 0 ]]; then
+        jq '.' "$WORKLOAD_DIR/events/events.json" | \
+            $KUBE_CMD apply --dry-run=client -f - -o yaml \
+            > "$WORKLOAD_DIR/events/namespace-events.yaml"
+    else
+        if [[ -n "$SINCE_DURATION" || -n "$START_TIME" ]]; then
+            log_warning "No namespace events found for VM workload within the specified time window"
+        else
+            log_warning "No namespace events found in namespace '$TARGET_NAMESPACE'"
+        fi
+    fi
+    rm -f "$WORKLOAD_DIR/events/events.json"
+
+    # ------------------------------------------------------------
+    # Node events (time-filtered, broad text match across fields)
+    # ------------------------------------------------------------
+    if [[ ${#target_nodes[@]} -eq 0 ]]; then
+        log_info "Skipping node events (no node identified for this VM)"
+    else
+        for tnode in "${target_nodes[@]}"; do
+            log_info "Collecting node events for: $tnode"
+            collect_node_events "$tnode" "$WORKLOAD_DIR/events/node-events_${tnode}.json"
+
+            if [[ -s "$WORKLOAD_DIR/events/node-events_${tnode}.json" ]]; then
+                filter_events_by_time "$WORKLOAD_DIR/events/node-events_${tnode}.json"
+
+                jq '.' "$WORKLOAD_DIR/events/node-events_${tnode}.json" | \
+                    $KUBE_CMD apply --dry-run=client -f - -o yaml \
+                    > "$WORKLOAD_DIR/events/node-events_${tnode}.yaml"
+                rm -f "$WORKLOAD_DIR/events/node-events_${tnode}.json"
+            else
+                log_warning "No node-related events found for node '$tnode'"
+            fi
         done
+    fi
+
+    # ------------------------------------------------------------
+    # CSI node-plugin logs (node hosting the VMI)
+    # ------------------------------------------------------------
+    if [[ ${#target_nodes[@]} -eq 0 ]]; then
+        log_info "Skipping CSI node logs (no node identified for this VM)"
+    else
+        for tnode in "${target_nodes[@]}"; do
+            log_info "Collecting CSI node plugin logs for node: $tnode"
+            mkdir -p "$WORKLOAD_DIR/csi-node-logs/$tnode"
+
+            $KUBE_CMD get pods --all-namespaces \
+                -l product=ibm-block-csi-driver \
+                -l app.kubernetes.io/component=csi-node \
+                -o json | \
+            jq -r --arg node "$tnode" '
+                .items[] |
+                select(.spec.nodeName == $node) |
+                [.metadata.name, .metadata.namespace] | @tsv
+            ' | while read -r csi_pod ns; do
+                collect_pod_logs \
+                    "$csi_pod" "$ns" \
+                    "$WORKLOAD_DIR/csi-node-logs/$tnode" \
+                    "$(build_time_flags)"
+            done
+        done
+    fi
+
+    # ------------------------------------------------------------
+    # CSI controller logs
+    # ------------------------------------------------------------
+    log_info "Collecting CSI controller logs..."
+    $KUBE_CMD get pods --all-namespaces \
+        -l product=ibm-block-csi-driver \
+        -l app.kubernetes.io/component=csi-controller \
+        -o json | \
+    jq -r '
+        .items[] |
+        [.metadata.name, .metadata.namespace] | @tsv
+    ' | while read -r csi_pod ns; do
+        collect_pod_logs \
+            "$csi_pod" "$ns" \
+            "$WORKLOAD_DIR/csi-controller-logs" \
+            "$(build_time_flags)"
     done
 }
 
@@ -2647,13 +3278,18 @@ generate_summary() {
 ============================================================
 IBM Block CSI Driver – Diagnostics Collection Summary
 ============================================================
-
 Collected At ($CLUSTER_TIMEZONE) : $(TZ="$CLUSTER_TIMEZONE" date +"%Y-%m-%d %H:%M:%S")
-Script Version     : $VERSION
+Released with CSI Version : $CSI_DRIVER_VERSION
 Cluster Type       : $cluster_type
 Cluster CLI Used   : $KUBE_CMD
+Server Version     : $CLUSTER_SERVER_VERSION
 Cluster Timezone   : $CLUSTER_TIMEZONE ($CLUSTER_TIMEZONE_OFFSET)
 Target Namespace   : ${TARGET_NAMESPACE:-All namespaces}
+
+-----------------------------
+Cluster Client-Server Version
+-----------------------------
+$CLUSTER_VERSION_INFO
 
 -----------------------------
 Time Filtering (Logs & Events)
@@ -2686,42 +3322,25 @@ create_archive() {
 
     print_section "Creating Compressed Archive"
 
-    local archive_dir
-    archive_dir=$(dirname "$BASE_OUTPUT_DIR")
+    ARCHIVE_DIR=$(dirname "$BASE_OUTPUT_DIR")
 
     local collection_dirname
     collection_dirname=$(basename "$BASE_OUTPUT_DIR")
 
-    local archive_name="ibm-block-csi-log-collection_${collection_dirname}.tar.gz"
-    local archive_path="$archive_dir/$archive_name"
+    ARCHIVE_NAME="ibm-block-csi-log-collection_${collection_dirname}.tar.gz"
+    local archive_path="$ARCHIVE_DIR/$ARCHIVE_NAME"
 
     [[ -f "$archive_path" ]] && log_warning "Overwriting existing archive: $archive_path"
 
-    log_info "Creating archive: $archive_name"
+    log_info "Creating archive: $ARCHIVE_NAME"
 
-    if tar -czf "$archive_path" -C "$archive_dir" "$collection_dirname"; then
+    if tar -czf "$archive_path" -C "$ARCHIVE_DIR" "$collection_dirname"; then
         local archive_size
         archive_size=$(du -sh "$archive_path" 2>/dev/null | awk '{print $1}')
 
-        log_success "Archive created successfully: $archive_path"
+        log_success "Archive created successfully at: $archive_path"
         log_success "Archive size: $archive_size"
-
-        if [[ "$INTERACTIVE" == true ]]; then
-            echo ""
-            read -p "Remove uncompressed directory? [y/N]: " -n 1 -r
-            echo ""
-        else
-            REPLY="n"
-        fi
-
-        if [[ $REPLY =~ ^[Yy]$ ]]; then
-            rm -rf "$BASE_OUTPUT_DIR"
-            log_success "Uncompressed directory removed"
-            log_info "Final output: $archive_path"
-        else
-            log_info "Uncompressed directory retained: $BASE_OUTPUT_DIR"
-            log_info "Archive available at: $archive_path"
-        fi
+        log_info "Uncompressed directory retained: $BASE_OUTPUT_DIR"
     else
         log_error "Failed to create archive"
         log_info "Uncompressed data available at: $BASE_OUTPUT_DIR"
@@ -2735,7 +3354,7 @@ main() {
     echo ""
     echo -e "${BLUE}============================================================${NC}"
     echo -e "${BLUE}IBM Block CSI Driver Diagnostics Collection Script${NC}"
-    echo -e "${BLUE}Version: ${VERSION}${NC}"
+    echo -e "${BLUE}Released with IBM Block CSI Driver Version: ${CSI_DRIVER_VERSION}${NC}"
     echo -e "${BLUE}============================================================${NC}"
     echo ""
 
@@ -2783,10 +3402,17 @@ main() {
 
     # Workload configuration check
     if [[ "$COLLECT_WORKLOAD" == true ]]; then
-        if [[ -z "$WORKLOAD_POD" && -z "$WORKLOAD_PVC" ]]; then
-            echo ""
-            log_warning "Workload diagnostics skipped (missing --workload-pod or --workload-pvc)"
-            COLLECT_WORKLOAD=false
+        if [[ -z "$WORKLOAD_POD" && -z "$WORKLOAD_PVC" && -z "$WORKLOAD_VM" ]]; then
+            if [[ "$WORKLOAD_EXPLICITLY_REQUESTED" == true ]]; then
+                echo ""
+                log_error "Component 'workload' was explicitly requested via --only but no target was given"
+                log_error "Provide --workload-pod, --workload-pvc, or --workload-vm"
+                exit 1
+            else
+                echo ""
+                log_warning "Workload diagnostics skipped (missing --workload-pod, --workload-pvc, or --workload-vm)"
+                COLLECT_WORKLOAD=false
+            fi
         fi
     fi
 
@@ -2817,6 +3443,9 @@ main() {
 
         [[ -n "$WORKLOAD_PVC" ]] && \
             echo -e "  ${GREEN}PVC${NC}: $WORKLOAD_PVC"
+
+        [[ -n "$WORKLOAD_VM" ]] && \
+            echo -e "  ${GREEN}VM${NC}: $WORKLOAD_VM"
 
         echo -e "  ${GREEN}Namespace${NC}: $TARGET_NAMESPACE"
     fi
@@ -2851,8 +3480,8 @@ main() {
     create_archive
 
     print_section "Collection Complete"
-    if [[ "$CREATE_ZIP" == true ]] && [[ -f "$archive_dir/$archive_name" ]]; then
-        log_info "Archive: $(realpath "$archive_dir/$archive_name")"
+    if [[ "$CREATE_ZIP" == true ]] && [[ -f "$ARCHIVE_DIR/$ARCHIVE_NAME" ]]; then
+        log_info "Archive: $(realpath "$ARCHIVE_DIR/$ARCHIVE_NAME")"
     else
         log_info "Output directory: $(realpath "$BASE_OUTPUT_DIR")"
     fi
