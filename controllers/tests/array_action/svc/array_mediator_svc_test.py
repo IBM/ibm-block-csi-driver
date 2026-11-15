@@ -2964,14 +2964,6 @@ class TestArrayMediatorSVC(unittest.TestCase):
 
     # --- get_replication_destination_info tests ---
 
-    def _mock_dr_mediator(self, vdisk_uid=common_settings.DESTINATION_VOLUME_UID):
-        dest_cli_volume = self._get_cli_volume(in_volume_group=True, vdisk_uid=vdisk_uid)
-        dr_mediator = Mock()
-        dr_mediator._get_cli_volume.return_value = dest_cli_volume
-        dr_mediator._generate_thin_volume_response.return_value = self.svc._generate_thin_volume_response(
-            dest_cli_volume)
-        return dr_mediator
-
     def _mock_lsvolumegroupreplication(self, vg_replication=None):
         self.svc.client.svcinfo.lsvolumegroupreplication.return_value = Mock(
             as_single_element=vg_replication)
@@ -3074,58 +3066,10 @@ class TestArrayMediatorSVC(unittest.TestCase):
         self.assertIsNone(result)
         self.svc.client.svcinfo.lsvolumegroupreplication.assert_called_once()
 
-    def test_get_replication_destination_info_fallback_returns_destination_handle(self):
-        cli_volume = self._get_cli_volume(in_volume_group=True, remote_volume_uid_supported=False)
-        self.svc.client.svcinfo.lsvdisk.return_value = self._mock_cli_object(cli_volume)
-
-        result = self.svc.get_replication_destination_info(
-            OBJECT_INTERNAL_ID, common_settings.VOLUME_UID, dr_mediator=self._mock_dr_mediator())
-
-        self.assertIsNotNone(result)
-        self.assertIn(common_settings.DESTINATION_VOLUME_UID, result)
-        self.assertNotIn(common_settings.VOLUME_UID, result)
-
-    def test_get_replication_destination_info_fallback_destination_not_available_returns_none(self):
-        cli_volume = self._get_cli_volume(in_volume_group=True, remote_volume_uid_supported=False)
-        self.svc.client.svcinfo.lsvdisk.return_value = self._mock_cli_object(cli_volume)
-        dr_mediator = Mock()
-        dr_mediator._get_cli_volume.return_value = None
-
-        result = self.svc.get_replication_destination_info(
-            OBJECT_INTERNAL_ID, common_settings.VOLUME_UID, dr_mediator=dr_mediator)
-
-        self.assertIsNone(result)
-
-    def test_get_replication_destination_info_no_dr_mediator_and_field_unsupported_raises(self):
+    def test_get_replication_destination_info_field_unsupported_raises(self):
         cli_volume = self._get_cli_volume(in_volume_group=True, remote_volume_uid_supported=False)
         self.svc.client.svcinfo.lsvdisk.return_value = self._mock_cli_object(cli_volume)
 
         with self.assertRaises(array_errors.ReplicationDestinationInfoNotSupportedError):
-            self.svc.get_replication_destination_info(
-                OBJECT_INTERNAL_ID, common_settings.VOLUME_UID, dr_mediator=None)
-
-    def test_get_replication_destination_info_force_dr_mediator_uses_remote_even_if_supported(self):
-        cli_volume = self._get_cli_volume(
-            in_volume_group=True,
-            remote_volume_uid=common_settings.DUMMY_REMOTE_VOLUME_UID,
-            remote_internal_id=common_settings.DUMMY_REMOTE_INTERNAL_ID)
-        self.svc.client.svcinfo.lsvdisk.return_value = self._mock_cli_object(cli_volume)
-
-        result = self.svc.get_replication_destination_info(
-            OBJECT_INTERNAL_ID, common_settings.VOLUME_UID,
-            dr_mediator=self._mock_dr_mediator(), force_dr_mediator=True)
-
-        self.assertIsNotNone(result)
-        self.assertIn(common_settings.DESTINATION_VOLUME_UID, result)
+            self.svc.get_replication_destination_info(OBJECT_INTERNAL_ID, common_settings.VOLUME_UID)
         self.svc.client.svcinfo.lsvolumegroupreplication.assert_not_called()
-
-    def test_get_replication_destination_info_force_dr_mediator_no_dr_mediator_raises(self):
-        cli_volume = self._get_cli_volume(
-            in_volume_group=True,
-            remote_volume_uid=common_settings.DUMMY_REMOTE_VOLUME_UID,
-            remote_internal_id=common_settings.DUMMY_REMOTE_INTERNAL_ID)
-        self.svc.client.svcinfo.lsvdisk.return_value = self._mock_cli_object(cli_volume)
-
-        with self.assertRaises(array_errors.ReplicationDestinationInfoNotSupportedError):
-            self.svc.get_replication_destination_info(
-                OBJECT_INTERNAL_ID, common_settings.VOLUME_UID, dr_mediator=None, force_dr_mediator=True)
