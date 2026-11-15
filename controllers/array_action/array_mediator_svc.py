@@ -1844,6 +1844,63 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
         return self._generate_ear_replication_response(volume_group_id, volume_group_name, replication_mode,
                                                        replication_request.replication_policy)
 
+    def get_ramen_ear_replication(self, replication_request, volume_group_name):
+        """
+        The EAR replication of a volume group for a Ramen (per-volume) request: the same result as get_replication,
+        from one lsvolumegroupreplication (for both the policy and the mode) and with the volume group name the
+        caller already read, instead of two lsvolumegroupreplication and one lsvolumegroup.
+        """
+        if not self._is_earreplication_supported():
+            logger.info("EAR replication is not supported on the existing storage")
+            return None
+
+        volume_group_id = replication_request.volume_internal_id
+        volume_group_replication = self._lsvolumegroupreplication(volume_group_id)
+        replication_policy = volume_group_replication.replication_policy_name if volume_group_replication else None
+
+        if replication_policy and replication_policy != replication_request.replication_policy:
+            logger.info("replication policy mismatch, storage='{}' requested='{}', "
+                        "returning None".format(replication_policy, replication_request.replication_policy))
+            return None
+
+        if not replication_policy:
+            logger.info(
+                "no replication policy assigned to volume group '{}', "
+                "using policy from request '{}'".format(volume_group_id,
+                                                        replication_request.replication_policy))
+
+        replication_mode = self._get_ramen_replication_mode_of(volume_group_replication, volume_group_id) \
+            if volume_group_replication else None
+        if not replication_mode:
+            return None
+
+        logger.info("found ear replication: {} ({}) in mode: {}".format(volume_group_id, volume_group_name,
+                                                                       replication_mode))
+        return self._generate_ear_replication_response(volume_group_id, volume_group_name, replication_mode,
+                                                       replication_request.replication_policy)
+
+    @staticmethod
+    def _get_ramen_replication_mode_of(volume_group_replication, volume_group_id):
+        # the same rules as _get_replication_mode, applied to an lsvolumegroupreplication already read
+        local_dr_replication_mode = getattr(volume_group_replication, 'local_dr_replication_mode', None)
+        if local_dr_replication_mode:
+            logger.debug("volume group '{}': replication mode '{}' from local_dr_replication_mode".format(
+                volume_group_id, local_dr_replication_mode))
+            return local_dr_replication_mode
+
+        if hasattr(volume_group_replication, "local_partition_location") \
+                and volume_group_replication.local_partition_location:
+            local_partition_location = volume_group_replication.local_partition_location
+            location_attr_name = f"{local_partition_location}_partition_replication_mode"
+        else:
+            replication_local_location = volume_group_replication.local_location
+            location_attr_name = f"location{replication_local_location}_replication_mode"
+
+        replication_mode = getattr(volume_group_replication, location_attr_name, None)
+        logger.debug("volume group '{}': local_dr_replication_mode not available, replication mode '{}' from {}".format(
+            volume_group_id, replication_mode, location_attr_name))
+        return replication_mode
+
     def _get_replication_mode(self, volume_group_id):
         volume_group_replication = self._lsvolumegroupreplication(volume_group_id)
         if not volume_group_replication:
@@ -2911,6 +2968,32 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
         if cli_volume_group is None:
             raise array_errors.ObjectNotFoundError(volume_group_id)
         return self._generate_volume_group_response(cli_volume_group)
+
+    def get_volume_group_without_volumes(self, volume_group_id):
+        """
+        Like get_volume_group, without listing the volumes of the volume group (one lsvolumegroup instead of
+        also an lsvdisk of every volume in it), for callers that use only its name, ids and partition.
+        """
+        cli_volume_group = self._lsvolumegroup(volume_group_id)
+        if cli_volume_group is None:
+            raise array_errors.ObjectNotFoundError(volume_group_id)
+        return VolumeGroup(name=cli_volume_group.name,
+                           array_type=self.array_type,
+                           id=cli_volume_group.uid if hasattr(cli_volume_group, "uid") else cli_volume_group.id,
+                           internal_id=cli_volume_group.id,
+                           volumes=[],
+                           partition_name=self._get_partition_name_of_volume_group(cli_volume_group))
+
+    def get_volume_group_id_of_volume(self, volume_id):
+        """
+        Returns the id of the volume group of the volume with this uid, or an empty string when it is in none,
+        from one concise lsvdisk (its volume_group_id column); raises ObjectNotFoundError when there is no such volume.
+        """
+        cli_volume = self._get_cli_volume_by_wwn(volume_id, not_exist_err=True)
+        volume_group_id = getattr(cli_volume, "volume_group_id", "") or ""
+        logger.debug("volume '{}' ('{}') is in volume group id '{}' ('{}')".format(
+            volume_id, cli_volume.name, volume_group_id, getattr(cli_volume, "volume_group_name", "")))
+        return volume_group_id
 
     def verify_volume_group_partition(self, volume_group, partition_name):
         if volume_group.partition_name != partition_name:

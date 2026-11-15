@@ -1,4 +1,6 @@
+import logging
 import socket
+import time
 from collections import OrderedDict
 from contextlib import contextmanager
 from queue import Empty
@@ -174,10 +176,18 @@ class StorageAgent:
         """
         Get an object out of the pool, for use with with-statement.
         """
+        wait_start_time = time.monotonic()
         try:
             med = self.conn_pool.get(timeout=timeout)
         except Empty:
+            logger.info("no connection to storage {} became free within {:.1f}s".format(
+                self.endpoint_key, time.monotonic() - wait_start_time))
             raise array_errors.NoConnectionAvailableException(", ".join(self.endpoint_key))
+        waited_seconds = time.monotonic() - wait_start_time
+        log_level = logging.INFO if waited_seconds >= settings.CONNECTION_WAIT_LOG_THRESHOLD_SECONDS \
+            else logging.DEBUG
+        logger.log(log_level, "got a connection to storage {} after {:.3f}s, connections open: {}, free: {}".format(
+            self.endpoint_key, waited_seconds, self.conn_pool.current_size, self.conn_pool.channel.qsize()))
 
         try:
             yield med

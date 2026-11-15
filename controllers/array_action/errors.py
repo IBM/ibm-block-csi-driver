@@ -361,6 +361,13 @@ class OperationNotReadyError(BaseArrayActionException):
         self.message = messages.OPERATION_NOT_READY_ERROR_MESSAGE.format(operation_details)
 
 
+class StorageConnectionWaitTimeoutError(BaseArrayActionException):
+    def __init__(self, endpoint, waited_seconds):
+        super().__init__()
+        self.message = "no connection to storage {} became free within {:.1f}s, " \
+                       "the request will be retried".format(endpoint, waited_seconds)
+
+
 class ReplicationDestinationInfoNotSupportedError(BaseArrayActionException):
 
     def __init__(self, volume_name):

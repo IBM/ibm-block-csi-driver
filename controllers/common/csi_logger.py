@@ -18,6 +18,9 @@ def get_stdout_logger():
         formatter = logging.Formatter(logger_properties['entry'])
         handler.setFormatter(formatter)
         csi_logger.addHandler(handler)
+        # the handler above already writes every message; without this, once a library logs through the root logger
+        # (which makes Python give the root logger a handler), every message is also written a second time
+        csi_logger.propagate = False
 
         csi_logger.handler_set = True
 

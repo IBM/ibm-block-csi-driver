@@ -1,3 +1,4 @@
+import time
 from queue import Queue, Full, Empty
 from threading import RLock
 from controllers.common.csi_logger import get_stdout_logger
@@ -79,17 +80,23 @@ class ConnectionPool:
                 self.current_size += 1
 
         if not is_full:
+            login_start_time = time.monotonic()
             try:
                 created = self.create()
             except Exception as ex:
-                logger.error("Failed to create array connection")
+                logger.error("Failed to create array connection to storage {} after {:.2f}s".format(
+                    self.endpoint_key, time.monotonic() - login_start_time))
                 logger.exception(ex)
                 with self.lock:
                     self.current_size -= 1
                 raise ex
+            logger.info("opened a new connection to storage {} in {:.2f}s, connections open: {} of at most {}".format(
+                self.endpoint_key, time.monotonic() - login_start_time, self.current_size, self.max_size))
             return created
 
         # If current_size is full, waiting for an available one.
+        logger.debug("all {} connections to storage {} are in use, waiting for a free one".format(
+            self.max_size, self.endpoint_key))
         return self.channel.get(block, timeout)
 
     def put(self, item):

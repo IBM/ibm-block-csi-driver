@@ -1251,11 +1251,15 @@ def resolve_ramen_ear_volume_to_volume_group(object_type, object_id_info, replic
         return object_type, object_id_info
 
     volume_uid = object_id_info.ids.uid
-    cli_volume = mediator.get_object_by_id(volume_uid, servers_settings.VOLUME_TYPE_NAME)
-    if not cli_volume:
-        raise array_errors.ObjectNotFoundError(volume_uid)
-
-    vg_internal_id = cli_volume.volume_group_id
+    get_volume_group_id_of_volume = getattr(mediator, "get_volume_group_id_of_volume", None)
+    if get_volume_group_id_of_volume:
+        # one concise lsvdisk, instead of the full volume view with its partition and FlashCopy lookups
+        vg_internal_id = get_volume_group_id_of_volume(volume_uid)
+    else:
+        cli_volume = mediator.get_object_by_id(volume_uid, servers_settings.VOLUME_TYPE_NAME)
+        if not cli_volume:
+            raise array_errors.ObjectNotFoundError(volume_uid)
+        vg_internal_id = cli_volume.volume_group_id
     if not vg_internal_id:
         raise array_errors.ObjectNotFoundError("volume '{}' is not part of any VolumeGroup".format(volume_uid))
 

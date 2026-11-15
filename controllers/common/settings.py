@@ -39,3 +39,6 @@ SCSI_PROTOCOL = 'scsi'
 NVME_PROTOCOL = 'nvme'
 
 FULL_IO_GROUP = '0:1:2:3'
+
+# a request that waits at least this long for a storage connection logs it at INFO level
+CONNECTION_WAIT_LOG_THRESHOLD_SECONDS = 1
