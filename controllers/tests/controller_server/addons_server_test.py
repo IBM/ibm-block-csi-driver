@@ -472,19 +472,17 @@ class TestGetReplicationDestinationInfo(BaseReplicationSetUp, CommonControllerTe
         replication_source.volume.volume_id = volume_id
         self.request.replication_source = replication_source
 
-    def test_get_destination_info_with_dr_mediator_returns_destination_id(self):
+    def test_get_destination_info_returns_destination_id(self):
         destination_id = "{0}:{1};{1}".format("A9000", OTHER_OBJECT_INTERNAL_ID)
-        self.request.secrets["dr_management_address"] = SECRET_MANAGEMENT_ADDRESS_VALUE
         self.mediator.get_replication_destination_info.return_value = destination_id
 
         response = self.servicer.GetReplicationDestinationInfo(self.request, self.context)
 
         self.assertEqual(grpc.StatusCode.OK, self.context.code)
-        self.mediator.get_replication_destination_info.assert_called_once()
+        self.mediator.get_replication_destination_info.assert_called_once_with(OBJECT_INTERNAL_ID, OBJECT_INTERNAL_ID)
         self.assertEqual(destination_id, response.replication_destination.volume.volume_id)
 
     def test_get_destination_info_destination_not_yet_available_returns_empty(self):
-        self.request.secrets["dr_management_address"] = SECRET_MANAGEMENT_ADDRESS_VALUE
         self.mediator.get_replication_destination_info.return_value = None
 
         response = self.servicer.GetReplicationDestinationInfo(self.request, self.context)

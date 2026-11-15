@@ -103,4 +103,4 @@ REPLICATION_POLICY_NOT_ASSIGNED_TO_PARTITION_VG_MESSAGE = "Cannot assign replica
 OPERATION_NOT_READY_ERROR_MESSAGE = "Operation not ready: {0}"
 
 REPLICATION_DESTINATION_INFO_NOT_SUPPORTED_ERROR_MESSAGE = "Replication destination info not supported for " \
-    "volume '{0}': remote_volume_uid field is not supported by storage and no dr mediator was configured"
+    "volume '{0}': remote_volume_uid field is not supported by storage"
