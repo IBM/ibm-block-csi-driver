@@ -53,6 +53,14 @@ def _get_config_map_info():
     else:
         result['csi_node_config'] = json.loads(cfgmap)
 
+    # Config map for controller
+    #
+    cfgmap = os.environ.get('CSI_CONTROLLER_CONFIG')
+    if not cfgmap or cfgmap == 'null':
+        result['csi_ctrl_config'] = {}
+    else:
+        result['csi_ctrl_config'] = json.loads(cfgmap)
+
     # Config map for hostdefiner
     #
     cfgmap = os.environ.get('CSI_HOSTDEFINER_CONFIG')
