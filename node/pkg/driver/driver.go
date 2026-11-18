@@ -42,7 +42,7 @@ type Driver struct {
 	// csi.UnimplementedNodeServer
 }
 
-func NewDriver(endpoint string, configFilePath string, hostname string, max_invocations int, clean_scsi_device bool) (*Driver, error) {
+func NewDriver(endpoint string, configFilePath string, hostname string, max_invocations int, clean_scsi_device bool, tracker* Tracker) (*Driver, error) {
 	configFile, err := ReadConfigFile(configFilePath)
 	if err != nil {
 		return nil, err
@@ -73,7 +73,7 @@ func NewDriver(endpoint string, configFilePath string, hostname string, max_invo
 	return &Driver{
 		endpoint:    endpoint,
 		config:      configFile,
-		NodeService: NewNodeService(configFile, hostname, nodeUtils, osDeviceConnectivityMapping, osDeviceConnectivityHelper, commandExecuter, gater, mounter, syncLock),
+		NodeService: NewNodeService(configFile, hostname, nodeUtils, osDeviceConnectivityMapping, osDeviceConnectivityHelper, commandExecuter, gater, mounter, syncLock, tracker),
 	}, nil
 }
 
@@ -88,16 +88,17 @@ func (d *Driver) Run() error {
 		return err
 	}
 
-	logErr := func(ctx context.Context, req interface{}, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (interface{}, error) {
-		resp, err := handler(ctx, req)
-		if err != nil {
-			logger.Errorf("GRPC error: %v", err)
-		}
-		return resp, err
-	}
-	opts := []grpc.ServerOption{
-		grpc.UnaryInterceptor(logErr),
-	}
+        logErr := func(ctx context.Context, req interface{}, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (interface{}, error) {
+                resp, err := handler(ctx, req)
+                if err != nil {
+                        logger.Errorf("GRPC error: %v", err)
+                }
+                return resp, err
+        }
+
+        opts := []grpc.ServerOption{
+                grpc.UnaryInterceptor(logErr),
+        }
 	d.srv = grpc.NewServer(opts...)
 
 	csi.RegisterIdentityServer(d.srv, d)
@@ -108,8 +109,9 @@ func (d *Driver) Run() error {
 }
 
 func (d *Driver) Stop() {
-	logger.Infof("Stopping server")
-	d.srv.Stop()
+	if d.srv != nil {
+		d.srv.GracefulStop()
+	}
 }
 
 type Identity struct {

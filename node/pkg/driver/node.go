@@ -96,6 +96,8 @@ type NodeService struct {
 	VolumeIdLocksMap            SyncLockInterface
 	OsDeviceConnectivityMapping map[string]device_connectivity.OsDeviceConnectivityInterface
 	OsDeviceConnectivityHelper  device_connectivity.OsDeviceConnectivityHelperScsiGenericInterface
+
+	ApiTracker *Tracker
 }
 
 type VolumeStatistics struct {
@@ -108,7 +110,7 @@ type VolumeStatistics struct {
 func NewNodeService(configYaml ConfigFile, hostname string, nodeUtils NodeUtilsInterface,
 	OsDeviceConnectivityMapping map[string]device_connectivity.OsDeviceConnectivityInterface,
 	osDeviceConnectivityHelper device_connectivity.OsDeviceConnectivityHelperScsiGenericInterface,
-	executer executer.ExecuterInterface, KeyedGater *executer.KeyedGater, mounter NodeMounter, syncLock SyncLockInterface) NodeService {
+	executer executer.ExecuterInterface, KeyedGater *executer.KeyedGater, mounter NodeMounter, syncLock SyncLockInterface, tracker *Tracker) NodeService {
 	return NodeService{
 		ConfigYaml:                  configYaml,
 		Hostname:                    hostname,
@@ -119,6 +121,7 @@ func NewNodeService(configYaml ConfigFile, hostname string, nodeUtils NodeUtilsI
 		OsDeviceConnectivityHelper:  osDeviceConnectivityHelper,
 		Mounter:                     mounter,
 		VolumeIdLocksMap:            syncLock,
+		ApiTracker:			tracker,
 	}
 }
 
@@ -420,6 +423,13 @@ func (d *NodeService) formatAndMount(ctx context.Context, mpathDevice string, st
 var nvmeUnstageControllerPattern = regexp.MustCompile(`^nvme\d+c\d+n\d+$`)
 
 func (d *NodeService) NodeUnstageVolume(ctx context.Context, req *csi.NodeUnstageVolumeRequest) (*csi.NodeUnstageVolumeResponse, error) {
+
+	done, err := d.ApiTracker.TryBeginUnstage()
+	if err != nil {
+		return nil, err
+	}
+	defer done()
+
 	defer logger.Exit(logger.Enter(req))
 	volumeID := req.GetVolumeId()
 
@@ -428,7 +438,7 @@ func (d *NodeService) NodeUnstageVolume(ctx context.Context, req *csi.NodeUnstag
 		return nil, status.Error(codes.InvalidArgument, "Volume ID not provided")
 	}
 
-	err := d.VolumeIdLocksMap.AddVolumeLock(volumeID, "NodeUnstageVolume")
+	err = d.VolumeIdLocksMap.AddVolumeLock(volumeID, "NodeUnstageVolume")
 	if err != nil {
 		logger.Errorf("Another operation is being performed on volume : {%s}", volumeID)
 		return nil, status.Error(codes.Aborted, err.Error())
