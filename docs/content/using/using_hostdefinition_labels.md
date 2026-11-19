@@ -26,7 +26,7 @@ For example, if `connectivityType` is defined as using `fc` in the config map, b
 
 `block.csi.ibm.com/connectivity-type=<connectivityType>`
 
-The values for the connectivityType label are the same as those for defining the config map: `nvmeofc`, `fc`, `iscsi`. If an invalid label is used, this label is ignored.{: note}
+The values for the connectivityType label are the same as those for defining the config map: `nvmeofc`, `nvmetcp`, `fc`, `iscsi`. If an invalid label is used, this label is ignored.{: note}
 
 For more information about defining the connectivity type within the HostDefiner, see [Configuring the host definer](../configuration/configuring_hostdefiner.md).{: tip}
 

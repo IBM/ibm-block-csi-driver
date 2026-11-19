@@ -23,7 +23,8 @@ from controllers.array_action.settings import (REPLICATION_TYPE_MIRROR, REPLICAT
 from controllers.common.node_info import Initiators
 from controllers.common.settings import ARRAY_TYPE_SVC, SPACE_EFFICIENCY_THIN, SPACE_EFFICIENCY_COMPRESSED, \
     SPACE_EFFICIENCY_DEDUPLICATED_COMPRESSED, SPACE_EFFICIENCY_DEDUPLICATED_THIN, SPACE_EFFICIENCY_DEDUPLICATED, \
-    SPACE_EFFICIENCY_THICK, EAR_VOLUME_FC_MAP_COUNT, SCSI_PROTOCOL, NVME_PROTOCOL
+    SPACE_EFFICIENCY_THICK, EAR_VOLUME_FC_MAP_COUNT, SCSI_PROTOCOL, FCNVME_PROTOCOL, TCPNVME_PROTOCOL
+
 from controllers.tests import utils
 from controllers.tests.common.test_settings import OBJECT_INTERNAL_ID, \
     OTHER_OBJECT_INTERNAL_ID, REPLICATION_NAME, SYSTEM_ID, COPY_TYPE
@@ -76,6 +77,18 @@ class TestArrayMediatorSVC(unittest.TestCase):
                       svc_settings.FCMAP_COPY_RATE_ATTR_KEY: svc_settings.DUMMY_COPY_RATE,
                       svc_settings.FCMAP_RC_CONTROLLED_ATTR_KEY: svc_settings.NO_VALUE_ALIAS})
 
+    @patch("controllers.array_action.array_mediator_svc.connect")
+    def test_get_nvme_fc_target_ports_filters_ports_on_array(self):
+        self.svc.client.svcinfo.lstargetportfc.return_value = [
+            Munch({'WWPN': 'ABCDEF', 'WWNN': '123456'})
+        ]
+
+        ports = self.svc.get_nvme_fc_target_ports()
+
+        self.assertEqual(['nn-123456:pn-abcdef'], ports)
+        self.svc.client.svcinfo.lstargetportfc.assert_called_once_with(
+            filtervalue='protocol=nvme:host_io_permitted=yes')
+    
     @patch("controllers.array_action.array_mediator_svc.connect")
     def test_init_unsupported_system_version(self, connect_mock):
         code_level_below_min_supported = "7.7.77.77 (build 777.77.7777777777777)"
@@ -1979,12 +1992,23 @@ class TestArrayMediatorSVC(unittest.TestCase):
                                                                        force=True,
                                                                        scsi=array_settings.DUMMY_LUN_ID)
 
-    def test_map_volume_nvme_success(self):
+    def test_map_volume_fcnvme_success(self):
         self.svc.client.svctask.mkvdiskhostmap.return_value = None
         self.svc.client.svcinfo.lsvdisk.return_value = Mock(
             as_single_element=self._get_cli_volume(name=common_settings.VOLUME_NAME))
         lun = self.svc.map_volume(common_settings.VOLUME_UID, common_settings.HOST_NAME,
                                   array_settings.NVME_OVER_FC_CONNECTIVITY_TYPE)
+        self.assertEqual("", lun)
+        self.svc.client.svctask.mkvdiskhostmap.assert_called_once_with(host=common_settings.HOST_NAME,
+                                                                       object_id=common_settings.VOLUME_NAME,
+                                                                       force=True)
+
+    def test_map_volume_nvme_tcp_success(self):
+        self.svc.client.svctask.mkvdiskhostmap.return_value = None
+        self.svc.client.svcinfo.lsvdisk.return_value = Mock(
+            as_single_element=self._get_cli_volume(name=common_settings.VOLUME_NAME))
+        lun = self.svc.map_volume(common_settings.VOLUME_UID, common_settings.HOST_NAME,
+                                  array_settings.NVME_OVER_TCP_CONNECTIVITY_TYPE)
         self.assertEqual("", lun)
         self.svc.client.svctask.mkvdiskhostmap.assert_called_once_with(host=common_settings.HOST_NAME,
                                                                        object_id=common_settings.VOLUME_NAME,
@@ -2122,6 +2146,75 @@ class TestArrayMediatorSVC(unittest.TestCase):
             svc_errors.CommandExecutionError(array_settings.DUMMY_ERROR_MESSAGE)]
         with self.assertRaises(svc_errors.CommandExecutionError):
             self.svc.get_array_fc_wwns(common_settings.HOST_NAME)
+
+
+    def _mock_portset(self, portset_id, portset_name):
+        return Munch({svc_settings.LSPORTSET_ID_ATTR_KEY: portset_id,
+                      svc_settings.LSPORTSET_NAME_ATTR_KEY: portset_name,
+                      svc_settings.LSPORTSET_TYPE_ATTR_KEY: 'host',
+                      svc_settings.LSPORTSET_PORT_TYPE_ATTR_KEY: 'ethernet'})
+
+    def _mock_ip_port(self, portset_name, ip_address):
+        return Munch({'portset_name': portset_name,
+                      svc_settings.IP_ADDRESS_KEY: ip_address})
+
+    def test_get_nvme_tcp_target_ips_success_single_portset(self):
+        portset = self._mock_portset(svc_settings.DUMMY_INTERNAL_ID1, svc_settings.DUMMY_PORTSET_NAME1)
+        self.svc.client.svcinfo.lsportset.return_value = [portset]
+        ip_port_1 = self._mock_ip_port(svc_settings.DUMMY_PORTSET_NAME1, array_settings.DUMMY_IP_ADDRESS1)
+        ip_port_2 = self._mock_ip_port(svc_settings.DUMMY_PORTSET_NAME1, array_settings.DUMMY_IP_ADDRESS2)
+        self.svc.client.svcinfo.lsip.return_value = [ip_port_1, ip_port_2]
+
+        target_ips = self.svc.get_nvme_tcp_target_ips()
+
+        self.svc.client.svcinfo.lsportset.assert_called_once_with(filtervalue='type=host:port_type=ethernet')
+        self.svc.client.svcinfo.lsip.assert_called_once_with(
+            filtervalue='portset_name={}'.format(svc_settings.DUMMY_PORTSET_NAME1))
+        self.assertEqual([array_settings.DUMMY_IP_ADDRESS1, array_settings.DUMMY_IP_ADDRESS2], target_ips)
+
+    def test_get_nvme_tcp_target_ips_success_multiple_portsets(self):
+        portset1 = self._mock_portset(svc_settings.DUMMY_INTERNAL_ID1, svc_settings.DUMMY_PORTSET_NAME1)
+        portset2 = self._mock_portset(svc_settings.DUMMY_INTERNAL_ID2, svc_settings.DUMMY_PORTSET_NAME2)
+        self.svc.client.svcinfo.lsportset.return_value = [portset1, portset2]
+        ip_port_1 = self._mock_ip_port(svc_settings.DUMMY_PORTSET_NAME1, array_settings.DUMMY_IP_ADDRESS1)
+        ip_port_2 = self._mock_ip_port(svc_settings.DUMMY_PORTSET_NAME2, array_settings.DUMMY_IP_ADDRESS2)
+        self.svc.client.svcinfo.lsip.side_effect = [[ip_port_1], [ip_port_2]]
+
+        target_ips = self.svc.get_nvme_tcp_target_ips()
+
+        self.assertEqual(2, self.svc.client.svcinfo.lsip.call_count)
+        self.assertEqual([array_settings.DUMMY_IP_ADDRESS1, array_settings.DUMMY_IP_ADDRESS2], target_ips)
+
+    def test_get_nvme_tcp_target_ips_no_portsets_raises_error(self):
+        self.svc.client.svcinfo.lsportset.return_value = []
+
+        with self.assertRaises(array_errors.NoNvmeTcpTargetsFoundError):
+            self.svc.get_nvme_tcp_target_ips()
+
+    def test_get_nvme_tcp_target_ips_portsets_but_no_ips_raises_error(self):
+        portset = self._mock_portset(svc_settings.DUMMY_INTERNAL_ID1, svc_settings.DUMMY_PORTSET_NAME1)
+        self.svc.client.svcinfo.lsportset.return_value = [portset]
+        self.svc.client.svcinfo.lsip.return_value = []
+
+        with self.assertRaises(array_errors.NoNvmeTcpTargetsFoundError):
+            self.svc.get_nvme_tcp_target_ips()
+
+    def test_get_nvme_tcp_target_ips_lsportset_raises_error(self):
+        self.svc.client.svcinfo.lsportset.side_effect = [
+            svc_errors.CommandExecutionError(array_settings.DUMMY_ERROR_MESSAGE)]
+
+        with self.assertRaises(svc_errors.CommandExecutionError):
+            self.svc.get_nvme_tcp_target_ips()
+
+    def test_get_nvme_tcp_target_ips_lsip_raises_error(self):
+        portset = self._mock_portset(svc_settings.DUMMY_INTERNAL_ID1, svc_settings.DUMMY_PORTSET_NAME1)
+        self.svc.client.svcinfo.lsportset.return_value = [portset]
+        self.svc.client.svcinfo.lsip.side_effect = [
+            svc_errors.CommandExecutionError(array_settings.DUMMY_ERROR_MESSAGE)]
+
+        with self.assertRaises(svc_errors.CommandExecutionError):
+            self.svc.get_nvme_tcp_target_ips()
+
 
     def _mock_lsfabric_port(self, remote_wwpn, remote_nportid, port_id, node_name, local_wwpn, local_port,
                             local_nportid, state):
@@ -2282,7 +2375,7 @@ class TestArrayMediatorSVC(unittest.TestCase):
             array_settings.NVME_OVER_FC_CONNECTIVITY_TYPE, array_settings.DUMMY_MULTIPLE_IO_GROUP_STRING)
         self.svc.client.svctask.mkhost.assert_called_once_with(name=common_settings.HOST_NAME,
                                                                nqn=array_settings.DUMMY_NVME_NQN1,
-                                                               protocol=svc_settings.MKHOST_NVME_PROTOCOL_VALUE,
+                                                               protocol=svc_settings.MKHOST_FCNVME_PROTOCOL_VALUE,
                                                                iogrp=array_settings.DUMMY_MULTIPLE_IO_GROUP_STRING)
 
     def test_create_host_nvme_success_force_portset(self):
@@ -2296,7 +2389,7 @@ class TestArrayMediatorSVC(unittest.TestCase):
                 array_settings.NVME_OVER_FC_CONNECTIVITY_TYPE, array_settings.DUMMY_MULTIPLE_IO_GROUP_STRING)
             self.svc.client.svctask.mkhost.assert_called_once_with(name=common_settings.HOST_NAME,
                                                                    nqn=array_settings.DUMMY_NVME_NQN1,
-                                                                   protocol=svc_settings.MKHOST_NVME_PROTOCOL_VALUE,
+                                                                   protocol=svc_settings.MKHOST_FCNVME_PROTOCOL_VALUE,
                                                                    iogrp=array_settings.DUMMY_MULTIPLE_IO_GROUP_STRING,
                                                                    portset='2')
 
@@ -2364,7 +2457,7 @@ class TestArrayMediatorSVC(unittest.TestCase):
         with self.assertRaises(array_errors.UnsupportedConnectivityTypeError):
             self.svc.create_host(common_settings.HOST_NAME,
                                  Initiators([], [], [array_settings.DUMMY_NODE1_IQN]),
-                                 svc_settings.MKHOST_NVME_PROTOCOL_VALUE,
+                                 svc_settings.MKHOST_FCNVME_PROTOCOL_VALUE,
                                  array_settings.DUMMY_MULTIPLE_IO_GROUP_STRING)
         self.svc.client.svctask.mkhost.assert_not_called()
 
@@ -2504,6 +2597,7 @@ class TestArrayMediatorSVC(unittest.TestCase):
 
     def test_get_host_connectivity_port_success(self):
         self._test_get_host_connectivity_port(svc_settings.HOST_NQN, array_settings.NVME_OVER_FC_CONNECTIVITY_TYPE)
+        self._test_get_host_connectivity_port(svc_settings.HOST_NQN, array_settings.NVME_OVER_TCP_CONNECTIVITY_TYPE)
         self._test_get_host_connectivity_port(svc_settings.HOST_WWPN, array_settings.FC_CONNECTIVITY_TYPE)
         self._test_get_host_connectivity_port(svc_settings.HOST_ISCSI_NAME, array_settings.ISCSI_CONNECTIVITY_TYPE)
 
@@ -2521,6 +2615,14 @@ class TestArrayMediatorSVC(unittest.TestCase):
         self._test_get_host_connectivity_type(svc_settings.HOST_WWPN, array_settings.FC_CONNECTIVITY_TYPE)
         self._test_get_host_connectivity_type(svc_settings.HOST_ISCSI_NAME, array_settings.ISCSI_CONNECTIVITY_TYPE)
         self._test_get_host_connectivity_type('some_connectivity_attribute_name', None)
+
+    def test_get_host_connectivity_type_nvme_tcp(self):
+        self.svc.client.svcinfo.lshost = Mock()
+        self.svc.client.svcinfo.lshost.return_value = Mock(as_single_element=Munch({
+            svc_settings.HOST_NQN: ['port1', 'port2'],
+            svc_settings.HOST_PROTOCOL: 'tcpnvme'}))
+        result = self.svc.get_host_connectivity_type(common_settings.HOST_NAME)
+        self.assertEqual(result, array_settings.NVME_OVER_TCP_CONNECTIVITY_TYPE)
 
     def test_add_io_group_to_host_success(self):
         self.svc.add_io_group_to_host(common_settings.HOST_NAME, array_settings.DUMMY_MULTIPLE_IO_GROUP_STRING)
@@ -2618,10 +2720,15 @@ class TestArrayMediatorSVC(unittest.TestCase):
         self.svc.client.svctask.chhost.assert_called_once_with(object_id=common_settings.HOST_NAME,
                                                                protocol=SCSI_PROTOCOL)
 
-    def test_change_host_protocol_to_nvme_success(self):
-        self.svc.change_host_protocol(common_settings.HOST_NAME, NVME_PROTOCOL)
+    def test_change_host_protocol_to_fcnvme_success(self):
+        self.svc.change_host_protocol(common_settings.HOST_NAME, FCNVME_PROTOCOL)
         self.svc.client.svctask.chhost.assert_called_once_with(object_id=common_settings.HOST_NAME,
-                                                               protocol=NVME_PROTOCOL)
+                                                               protocol=FCNVME_PROTOCOL)
+
+    def test_change_host_protocol_to_tcpnvme_success(self):
+        self.svc.change_host_protocol(common_settings.HOST_NAME, TCPNVME_PROTOCOL)
+        self.svc.client.svctask.chhost.assert_called_once_with(object_id=common_settings.HOST_NAME,
+                                                               protocol=TCPNVME_PROTOCOL)
 
     def _test_change_host_protocol_chhost_errors(self, client_error, expected_error):
         self._test_mediator_method_client_error(self.svc.change_host_protocol,
