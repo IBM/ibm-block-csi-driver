@@ -1,5 +1,6 @@
-from threading import Lock
+import os
 import socket
+from threading import Lock
 
 from controllers.common.csi_logger import get_stdout_logger
 from controllers.array_action.errors import NoConnectionAvailableException, FailedToFindStorageSystemType
@@ -13,29 +14,36 @@ array_connections_dict = {}
 logger = get_stdout_logger()
 
 
-def _socket_connect_test(host, port, timeout=1):
+def _socket_connect_test(host, port, timeout=30):
     """
     function to test socket connection to host:port.
 
     :param host: ip address or host name
     :param port: port
-    :param timeout: connection timeout
+    :param timeout: connection timeout (default increased to 30s)
 
     :return:  0 - on successful connection
              -1 - on any exception, or specific connection errors with that error number
              other values - on other connection errors
     """
+    socket_timeout = int(os.environ.get("SOCKET_CONNECT_TIMEOUT", timeout))
+    logger.info("Testing socket connection to {}:{} with timeout={}s".format(host, port, socket_timeout))
     try:
         sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        sock.settimeout(timeout)
+        sock.settimeout(socket_timeout)
         ret = sock.connect_ex((host, port))
         sock.close()
+        if ret == 0:
+            logger.info("Socket connection to {}:{} SUCCESS (code: 0)".format(host, port))
+        else:
+            err_msg = os.strerror(ret) if hasattr(os, 'strerror') and ret > 0 else 'connection error'
+            logger.warning("Socket connection to {}:{} FAILED (errno {}: {})".format(host, port, ret, err_msg))
         return ret
     except socket.gaierror as e:
-        logger.debug('could not resolve hostname "{HOST}": {ERROR}'.format(HOST=host, ERROR=e))
+        logger.warning('Could not resolve hostname "{HOST}": {ERROR}'.format(HOST=host, ERROR=e))
         return -1
     except Exception as e:
-        logger.debug('socket_connect {}'.format(e))
+        logger.warning('Socket connect error for {}:{}: {}'.format(host, port, e))
         return -1
 
 
@@ -113,7 +121,7 @@ class ArrayConnectionManager:
             return self.med_class
 
     def detect_array_type(self):
-        logger.debug("detecting array connection type")
+        logger.info("Detecting array connection type for endpoints: {}".format(self.endpoints))
 
         # Don't change the order here since svc port (22) is also opened in ds8k.
         for storage_type, port in [(XIVArrayMediator.array_type, XIVArrayMediator.port),
@@ -121,9 +129,11 @@ class ArrayConnectionManager:
                                    (SVCArrayMediator.array_type, SVCArrayMediator.port),
                                    ]:
 
+            logger.info("Testing storage array type '{}' on port {} for endpoints: {}".format(storage_type, port, self.endpoints))
             for endpoint in self.endpoints:
                 if _socket_connect_test(endpoint, port) == 0:
-                    logger.debug("storage array type is : {0}".format(storage_type))
+                    logger.info("Detected storage array type: {0} for endpoint: {1}".format(storage_type, endpoint))
                     return storage_type
 
+        logger.error("Failed to find storage system type for endpoints: {}".format(self.endpoints))
         raise FailedToFindStorageSystemType(self.endpoints)
