@@ -1,3 +1,4 @@
+import os
 import socket
 from collections import OrderedDict
 from contextlib import contextmanager
@@ -48,44 +49,55 @@ def _get_array_type_from_cache(endpoints):
 
 
 def detect_array_type(endpoints):
-    logger.debug("detecting array connection type")
+    logger.info("Detecting array connection type for endpoints: {}".format(endpoints))
+
     storage_type = _get_array_type_from_cache(endpoints)
     if storage_type:
+        logger.info("Using cached array type: {} for endpoints: {}".format(storage_type, endpoints))
         return storage_type
 
     for storage_type, port in array_type_to_port.items():
+        logger.info("Testing storage array type '{}' on port {} for endpoints: {}".format(storage_type, port, endpoints))
         for endpoint in endpoints:
             if _socket_connect_test(endpoint, port) == 0:
-                logger.debug("storage array type is : {0}".format(storage_type))
+                logger.info("Detected storage array type: {0} for endpoint: {1}".format(storage_type, endpoint))
                 array_type_cache[endpoint] = storage_type
                 return storage_type
 
+    logger.error("Failed to find storage system type for endpoints: {}".format(endpoints))
     raise FailedToFindStorageSystemType(endpoints)
 
 
-def _socket_connect_test(host, port, timeout=1):
+def _socket_connect_test(host, port, timeout=30):
     """
     function to test socket connection to host:port.
 
     :param host: ip address or host name
     :param port: port
-    :param timeout: connection timeout
+    :param timeout: connection timeout (default increased to 30s)
 
     :return:  0 - on successful connection
              -1 - on any exception, or specific connection errors with that error number
              other values - on other connection errors
     """
+    socket_timeout = int(os.environ.get("SOCKET_CONNECT_TIMEOUT", timeout))
+    logger.info("Testing socket connection to {}:{} with timeout={}s".format(host, port, socket_timeout))
     try:
         sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        sock.settimeout(timeout)
+        sock.settimeout(socket_timeout)
         ret = sock.connect_ex((host, port))
         sock.close()
+        if ret == 0:
+            logger.info("Socket connection to {}:{} SUCCESS (code: 0)".format(host, port))
+        else:
+            err_msg = os.strerror(ret) if hasattr(os, 'strerror') and ret > 0 else 'connection error'
+            logger.warning("Socket connection to {}:{} FAILED (errno {}: {})".format(host, port, ret, err_msg))
         return ret
     except socket.gaierror as e:
-        logger.debug('could not resolve hostname "{HOST}": {ERROR}'.format(HOST=host, ERROR=e))
+        logger.warning('Could not resolve hostname "{HOST}": {ERROR}'.format(HOST=host, ERROR=e))
         return -1
     except Exception as e:
-        logger.debug('socket_connect {}'.format(e))
+        logger.warning('Socket connect error for {}:{}: {}'.format(host, port, e))
         return -1
 
 
