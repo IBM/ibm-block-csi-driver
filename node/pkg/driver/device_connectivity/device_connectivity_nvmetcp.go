@@ -25,8 +25,6 @@ import (
 )
 
 const (
-	// TBD: SKG: Check whether other params which are
-	// present in device_connectivity_nvmeofc.go are also needed here
 	nvmeTransportTCP   = "tcp"
 	defaultNvmeTcpPort = "4420"
 )

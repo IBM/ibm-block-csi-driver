@@ -87,7 +87,6 @@ func newTestNodeServiceStaging(nodeUtils driver.NodeUtilsInterface,
 	}
 }
 
-// DBG: SKG: Verify this test later
 func TestGetInfoFromPublishContextNvmeTcp(t *testing.T) {
 	nodeUtils := driver.NodeUtils{ConfigYaml: ConfigYaml}
 	publishContext := map[string]string{

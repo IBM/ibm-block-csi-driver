@@ -45,7 +45,6 @@ class Initiators:
         self.iscsi_iqns = self._filter_empty_parts(self.iscsi_iqns)
         # _ports_by_type: used by get_by_connectivity_type() for lookup.
         # NVMe-FC and NVMe-TCP both identify hosts by NQN, so both map to nvme_nqns.
-        # TBD: SKG: Verify whether we need both NVME-FC and NVME-TCP entries in _ports_by_type
         self._ports_by_type = {
             array_config.NVME_OVER_FC_CONNECTIVITY_TYPE: self.nvme_nqns,
             array_config.NVME_OVER_TCP_CONNECTIVITY_TYPE: self.nvme_nqns,
