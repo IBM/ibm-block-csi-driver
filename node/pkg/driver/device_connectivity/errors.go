@@ -15,10 +15,16 @@ func (e *MultipleDmFieldValuesError) Error() string {
 
 type MultipathDeviceNotFoundForVolumeError struct {
 	VolumeId string
+	// Diagnostics is optional, best-effort guidance appended to the error message (e.g. zFCP/NPIV host checks).
+	Diagnostics string
 }
 
 func (e *MultipathDeviceNotFoundForVolumeError) Error() string {
-	return fmt.Sprintf("Couldn't find multipath device for volumeID [%s]. Please check the host connectivity to the storage.", e.VolumeId)
+	msg := fmt.Sprintf("Couldn't find multipath device for volumeID [%s]. Please check the host connectivity to the storage.", e.VolumeId)
+	if e.Diagnostics != "" {
+		msg += " " + e.Diagnostics
+	}
+	return msg
 }
 
 type MultipathDeviceNotFoundForVolumePathError struct {

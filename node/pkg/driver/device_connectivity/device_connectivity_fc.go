@@ -22,10 +22,22 @@ import (
 	"github.com/ibm/ibm-block-csi-driver/node/pkg/driver/mount"
 
 	"context"
+	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 	"strconv"
 	"strings"
+)
+
+const (
+	zfcpAllowLunScanPath     = "/sys/module/zfcp/parameters/allow_lun_scan"
+	zfcpAllowLunScanEnabled  = "Y"
+	lszfcpCmd                = "lszfcp"
+	lszfcpCmdTimeoutMsec     = 5 * 1000
+	zfcpPortTypeKey          = "port_type:"
+	zfcpNpivPortType         = "NPIV VPORT"
+	zfcpLunDiscoveryRequired = "Automatic FCP LUN discovery requires both allow_lun_scan=Y in the OS and NPIV enabled on the FCP adapter (port_type: NPIV VPORT)."
 )
 
 type OsDeviceConnectivityFc struct {
@@ -102,7 +114,74 @@ func (r OsDeviceConnectivityFc) GetMpathDevice(ctx context.Context, volumeId str
 	/*
 	   Return Value: "dm-X" of the volumeID.
 	*/
-	return r.HelperScsiGeneric.GetMpathDevice(ctx, volumeId)
+	mpathDevice, err := r.HelperScsiGeneric.GetMpathDevice(ctx, volumeId)
+
+	var notFoundErr *MultipathDeviceNotFoundForVolumeError
+	if errors.As(err, &notFoundErr) {
+		notFoundErr.Diagnostics = r.zfcpDiagnostics(ctx, volumeId)
+	}
+	return mpathDevice, err
+}
+
+// zfcpDiagnostics is a best-effort check run only after multipath discovery failed.
+// It never fails and never alters discovery: any error is logged at Debug level and ignored.
+// It returns an empty string on non-zFCP hosts (no zfcp module parameter) and when the settings look healthy.
+func (r OsDeviceConnectivityFc) zfcpDiagnostics(ctx context.Context, volumeId string) string {
+	if ctx.Err() != nil {
+		return ""
+	}
+
+	var issues []string
+
+	allowLunScan, err := r.Executer.IoutilReadFile(zfcpAllowLunScanPath)
+	if err != nil {
+		if errors.Is(err, os.ErrNotExist) {
+			return ""
+		}
+		logger.Debugf("zFCP diagnostics: could not read %s: %v", zfcpAllowLunScanPath, err)
+	} else if value := strings.TrimSpace(string(allowLunScan)); value != zfcpAllowLunScanEnabled {
+		issues = append(issues, fmt.Sprintf("zfcp allow_lun_scan is \"%s\" (expected \"%s\"): automatic FCP LUN discovery is disabled on this node. Set zfcp.allow_lun_scan=1 as a kernel argument on the node.", value, zfcpAllowLunScanEnabled))
+	}
+
+	lszfcpOut, err := r.Executer.ExecuteWithTimeout(lszfcpCmdTimeoutMsec, lszfcpCmd, []string{"-Ha"})
+	if err != nil {
+		logger.Debugf("zFCP diagnostics: %s -Ha failed: %v", lszfcpCmd, err)
+	} else if portTypes := parseZfcpPortTypes(string(lszfcpOut)); len(portTypes) > 0 && !containsString(portTypes, zfcpNpivPortType) {
+		issues = append(issues, fmt.Sprintf("FCP adapter port_type is \"%s\" (expected \"%s\"): NPIV is not active on the FCP adapter. Enable NPIV for the FCP adapter in the HMC/LPAR configuration.", strings.Join(portTypes, "\", \""), zfcpNpivPortType))
+	}
+
+	if len(issues) == 0 {
+		return ""
+	}
+
+	diagnostics := strings.Join(append(issues, zfcpLunDiscoveryRequired), " ")
+	logger.Warningf("zFCP diagnostics for volumeID [%s]: %s", volumeId, diagnostics)
+	return diagnostics
+}
+
+// parseZfcpPortTypes returns the distinct values of all "port_type:" entries in `lszfcp -Ha` output.
+func parseZfcpPortTypes(output string) []string {
+	var portTypes []string
+	for _, line := range strings.Split(output, "\n") {
+		idx := strings.Index(line, zfcpPortTypeKey)
+		if idx == -1 {
+			continue
+		}
+		portType := strings.TrimSpace(line[idx+len(zfcpPortTypeKey):])
+		if portType != "" && !containsString(portTypes, portType) {
+			portTypes = append(portTypes, portType)
+		}
+	}
+	return portTypes
+}
+
+func containsString(values []string, target string) bool {
+	for _, v := range values {
+		if v == target {
+			return true
+		}
+	}
+	return false
 }
 
 func (r OsDeviceConnectivityFc) RemovePhysicalDevice(ctx context.Context, sysDevices []string) error {
