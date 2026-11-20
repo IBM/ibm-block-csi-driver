@@ -6242,7 +6242,7 @@ func (o *GetDmsPathHelperGeneric) WaitForDmToExist(ctx context.Context, gater *e
 		//logger.Warning("waitInterval2 - after")
 	}
 
-	return "", &MultipathDeviceNotFoundForVolumeError{volumeWWID}
+	return "", &MultipathDeviceNotFoundForVolumeError{VolumeId: volumeWWID}
 }
 
 // Locally bounded context select channels to completely eliminate loop timing distortion vulnerabilities.

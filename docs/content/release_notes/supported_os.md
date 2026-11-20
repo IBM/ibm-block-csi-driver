@@ -24,7 +24,9 @@ IBM Power® architecture is only supported with IBM Storage Virtualize® family 
 
 ## Configuration requirements for zLinux
 
-To enable automatic discovery of new luns, it is required to enable the `zfcp.allow_lun_scan` kernel parameter. This can be done with a new machine config, as shown in the example below, after the worker nodes are installed:
+Fibre Channel (FC) connectivity on zLinux requires both of the following prerequisites:
+
+- **Automatic LUN discovery (`allow_lun_scan`)**: To enable automatic discovery of new luns, it is required to enable the `zfcp.allow_lun_scan` kernel parameter. This can be done with a new machine config, as shown in the example below, after the worker nodes are installed:
 ```
 apiVersion: machineconfiguration.openshift.io/v1
 kind: MachineConfig
@@ -36,6 +38,20 @@ spec:
   kernelArguments:
   - 'zfcp.allow_lun_scan=1'
 ```
+- **NPIV on the FCP adapter**: The FCP adapter assigned to the LPAR must operate as an NPIV virtual port (`port_type: NPIV VPORT`). Automatic LUN discovery does not work if NPIV is not active on the FCP adapter, even when `allow_lun_scan` is set to `Y`. If NPIV is not enabled, enable it for the FCP adapter in the HMC/LPAR configuration.
+
+To verify the prerequisites on a worker node, run the following commands:
+
+1. Verify that automatic LUN scan is enabled. The expected output is `Y`:
+```
+cat /sys/module/zfcp/parameters/allow_lun_scan
+```
+2. Verify that NPIV is active on the FCP adapter. The expected output is `port_type: NPIV VPORT`. If `port_type: NPort (fabric via point-to-point)` is returned, NPIV is not active:
+```
+lszfcp -Ha | grep -e port_type
+```
+
+If a volume cannot be attached because the multipath device is not found, the CSI node plugin checks these settings and appends the detected values and remediation guidance to the error message.
 
 Virtualized worker nodes (for example, VMware vSphere) are supported with iSCSI and Fibre Channel (FC) adapters, when the FC adapter is used in passthrough mode.{: tip}
 
