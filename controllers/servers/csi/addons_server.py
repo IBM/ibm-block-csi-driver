@@ -90,7 +90,7 @@ class ReplicationControllerServicer(pb2_grpc.ControllerServicer):
         return pb2.DisableVolumeReplicationResponse()
 
     @staticmethod
-    def _ensure_volume_role_for_replication(mediator, replication, is_to_promote, force=False):
+    def _ensure_volume_role_for_replication(mediator, replication, is_to_promote, force=False, is_ramen_ear=False):
         if is_to_promote:
             if force:
                 logger.info("Ramen: force-promote requested for replication {}".format(replication.name))
@@ -99,6 +99,11 @@ class ReplicationControllerServicer(pb2_grpc.ControllerServicer):
             else:
                 logger.info("promoting volume for replication {}".format(replication.name))
                 mediator.promote_replication_volume(replication)
+        elif is_ramen_ear:
+            # Ramen EAR: the mediator decides from the volume group mode, as a non-production mode such as
+            # independent is not secondary and must not be reported as demoted
+            logger.info("demoting Ramen EAR volume group for replication {}".format(replication.name))
+            mediator.demote_replication_volume(replication, True)
         else:
             if replication.is_primary or replication.is_primary is None:
                 logger.info("demoting volume for replication {}".format(replication.name))
@@ -113,6 +118,7 @@ class ReplicationControllerServicer(pb2_grpc.ControllerServicer):
         utils.validate_addons_request(request, replication_type)
 
         object_type, object_id_info = utils.get_replication_object_type_and_id_info(request)
+        is_ramen_ear = utils.is_ramen_ear_replication(object_type, replication_type)
 
         connection_info = utils.get_array_connection_info_from_secrets(request.secrets)
         with get_agent(connection_info, object_id_info.array_type).get_mediator() as mediator:
@@ -139,7 +145,8 @@ class ReplicationControllerServicer(pb2_grpc.ControllerServicer):
             logger.info("found replication {} on system {}".format(replication.name, mediator.identifier))
 
             try:
-                self._ensure_volume_role_for_replication(mediator, replication, is_to_promote, force=request.force)
+                self._ensure_volume_role_for_replication(mediator, replication, is_to_promote, force=request.force,
+                                                         is_ramen_ear=is_ramen_ear)
             except array_errors.OperationNotReadyError as e:
                 # Checkpoint not yet achieved - return UNAVAILABLE to trigger retry
                 logger.info("Operation not ready, will be retried: {}".format(str(e)))

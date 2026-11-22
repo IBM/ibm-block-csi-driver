@@ -2286,20 +2286,25 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
             raise
 
     @register_csi_plugin()
-    def demote_replication_volume(self, replication):
+    def demote_replication_volume(self, replication, is_ramen_ear=False):
         if replication.replication_type == array_settings.REPLICATION_TYPE_MIRROR:
             self._demote_replication_volume(replication.name)
         elif replication.replication_type == array_settings.REPLICATION_TYPE_EAR:
-            self._demote_ear_replication_volume(replication.volume_group_name)
+            self._demote_ear_replication_volume(replication.volume_group_name, is_ramen_ear)
 
     def _demote_replication_volume(self, replication_name):
         rcrelationship = self._get_rcrelationship_by_name(replication_name)
         endpoint_type_to_promote = self._get_replication_other_endpoint_type(rcrelationship)
         self._ensure_endpoint_is_primary(rcrelationship, endpoint_type_to_promote)
 
-    def _demote_ear_replication_volume(self, volume_group_name):
+    def _demote_ear_replication_volume(self, volume_group_name, is_ramen_ear=False):
         if not self._is_earreplication_supported():
             logger.info("EAR replication is not supported on the existing storage")
+            return
+
+        if not is_ramen_ear:
+            logger.info("skipping demote for volume group '{}': not required for non-Ramen EAR".format(
+                volume_group_name))
             return
 
         # Validate volume group exists
@@ -2308,16 +2313,22 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
             logger.error("Volume group replication not found for {}".format(volume_group_name))
             raise array_errors.ObjectNotFoundError(volume_group_name)
 
-        if self._get_replication_mode(volume_group_name) == array_settings.ENDPOINT_TYPE_RECOVERY:
+        replication_mode = self._get_replication_mode(volume_group_name)
+        if replication_mode == array_settings.ENDPOINT_TYPE_RECOVERY:
             logger.info("Idempotent case: volume group {} is already in recovery mode, "
                         "skipping demote".format(volume_group_name))
             return
 
+        # Ramen promotes the peer once demote succeeds, so demote must not succeed before the final sync.
+        # The final sync can run only from a production copy over a working DR link, so wait otherwise.
         dr_link_status = getattr(volume_group_replication, 'dr_link_status', '')
-        if dr_link_status in array_settings.FAILED_DR_LINK_STATES:
-            logger.warning("skipping demote for volume group '{}' as remote storage link status is '{}', "
-                           "checkpoint sync cannot complete".format(volume_group_name, dr_link_status))
-            return
+        is_production = replication_mode == array_settings.ENDPOINT_TYPE_PRODUCTION
+        if not is_production or dr_link_status in array_settings.FAILED_DR_LINK_STATES:
+            self._demote_state_map.pop(volume_group_name, None)
+            message = "final sync of volume group {} to DR storage cannot complete, replication mode is '{}' " \
+                      "and DR link status is '{}'".format(volume_group_name, replication_mode, dr_link_status)
+            logger.warning("demote waits: {}".format(message))
+            raise array_errors.OperationNotReadyError(message)
 
         # Check if this is first demote attempt or retry
         if volume_group_name not in self._demote_state_map:

@@ -334,6 +334,25 @@ class TestDemoteVolume(BaseReplicationSetUp, CommonControllerTest):
     def test_demote_ear_replication_fails(self):
         self._test_demote_replication_fails(REPLICATION_TYPE_EAR)
 
+    def test_demote_ramen_ear_replication_not_primary_calls_mediator(self):
+        replication = utils.get_mock_mediator_response_replication(name=REPLICATION_NAME,
+                                                                   replication_type=REPLICATION_TYPE_EAR,
+                                                                   is_primary=False)
+
+        self.servicer._ensure_volume_role_for_replication(self.mediator, replication, is_to_promote=False,
+                                                          is_ramen_ear=True)
+
+        self.mediator.demote_replication_volume.assert_called_once_with(replication, True)
+
+    def test_demote_non_ramen_ear_replication_not_primary_skips_mediator(self):
+        replication = utils.get_mock_mediator_response_replication(name=REPLICATION_NAME,
+                                                                   replication_type=REPLICATION_TYPE_EAR,
+                                                                   is_primary=False)
+
+        self.servicer._ensure_volume_role_for_replication(self.mediator, replication, is_to_promote=False)
+
+        self.mediator.demote_replication_volume.assert_not_called()
+
 
 class TestResyncVolume(BaseReplicationSetUp, CommonControllerTest):
     @property

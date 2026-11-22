@@ -535,7 +535,7 @@ class XIVArrayMediator(ArrayMediatorAbstract):
     def promote_replication_volume(self, replication):
         raise NotImplementedError
 
-    def demote_replication_volume(self, replication):
+    def demote_replication_volume(self, replication, is_ramen_ear=False):
         raise NotImplementedError
 
     def create_host(self, host_name, initiators, connectivity_type, io_group, partition_name=None, port_set=None):

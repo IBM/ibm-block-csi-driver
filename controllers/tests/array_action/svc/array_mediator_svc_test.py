@@ -18,7 +18,7 @@ from controllers.array_action.array_mediator_svc import SVCArrayMediator, build_
 from controllers.array_action.settings import (REPLICATION_TYPE_MIRROR, REPLICATION_TYPE_EAR,
                                                RCRELATIONSHIP_STATE_READY, ENDPOINT_TYPE_PRODUCTION,
                                                HEALTHY_DR_LINK_STATES, DEGRADED_DR_LINK_STATES, FAILED_DR_LINK_STATES,
-                                               DR_LINK_STATUS_DISCONNECTED,
+                                               DR_LINK_STATUS_DISCONNECTED, DR_LINK_STATUS_RUNNING,
                                                DR_LINK_STATUS_SUSPENDED_MISSING_CONNECTIVITY)
 from controllers.common.node_info import Initiators
 from controllers.common.settings import ARRAY_TYPE_SVC, SPACE_EFFICIENCY_THIN, SPACE_EFFICIENCY_COMPRESSED, \
@@ -335,12 +335,19 @@ class TestArrayMediatorSVC(unittest.TestCase):
 
     def test_demote_ear_replication_volume(self):
         replication, _ = self._prepare_mocks_for_ear_replication(is_ear_supported=True)
+        self.svc.demote_replication_volume(replication)
+        self.svc.client.svcinfo.lsvolumegroupreplication.assert_not_called()
+        self.svc.client.svctask.chvolumegroupreplication.assert_not_called()
+
+    def test_demote_ramen_ear_replication_volume(self):
+        replication, _ = self._prepare_mocks_for_ear_replication(is_ear_supported=True)
         # Mock volume group replication with checkpoint achieved
-        mock_vg_replication = Mock(checkpoint_achieved='yes')
+        mock_vg_replication = Mock(checkpoint_achieved='yes', local_dr_replication_mode='production',
+                                   dr_link_status=DR_LINK_STATUS_RUNNING)
         self.svc.client.svcinfo.lsvolumegroupreplication.return_value = Mock(
             as_single_element=mock_vg_replication)
 
-        self.svc.demote_replication_volume(replication)
+        self.svc.demote_replication_volume(replication, True)
 
         # Verify checkpoint was created and status was checked
         self.svc.client.svctask.chvolumegroupreplication.assert_called_once()
@@ -2940,27 +2947,48 @@ class TestArrayMediatorSVC(unittest.TestCase):
         with self.assertRaises(array_errors.ObjectNotFoundError):
             self.svc.get_last_async_snapshot_info(OBJECT_INTERNAL_ID)
 
-    # --- _demote_ear_replication_volume skip-on-disconnect tests ---
-    def test_demote_ear_replication_volume_skips_when_non_partition_remote_disconnected(self):
+    # --- _demote_ear_replication_volume Ramen EAR tests ---
+    def _prepare_ramen_demote(self, local_dr_replication_mode, dr_link_status, partition_name=''):
         self.svc.client.svctask.chvolumereplicationinternals = Mock()
-        vg_replication = self._mock_vg_replication(partition_name='', dr_link_status=DR_LINK_STATUS_DISCONNECTED)
-        self.svc.client.svcinfo.lsvolumegroupreplication.return_value = Mock(
-            as_single_element=vg_replication)
+        vg_replication = self._mock_vg_replication(partition_name=partition_name, dr_link_status=dr_link_status)
+        vg_replication.local_dr_replication_mode = local_dr_replication_mode
+        vg_replication.checkpoint_achieved = 'yes'
+        self.svc.client.svcinfo.lsvolumegroupreplication.return_value = Mock(as_single_element=vg_replication)
+        self.svc._demote_state_map[REPLICATION_NAME] = 0
 
-        self.svc._demote_ear_replication_volume(REPLICATION_NAME)
+    def _assert_ramen_demote_waits(self):
+        with self.assertRaises(array_errors.OperationNotReadyError):
+            self.svc._demote_ear_replication_volume(REPLICATION_NAME, is_ramen_ear=True)
+
+        self.svc.client.svctask.chvolumegroupreplication.assert_not_called()
+        self.assertNotIn(REPLICATION_NAME, self.svc._demote_state_map)
+
+    def test_demote_ramen_ear_replication_volume_waits_when_non_partition_remote_disconnected(self):
+        self._prepare_ramen_demote('production', DR_LINK_STATUS_DISCONNECTED)
+        self._assert_ramen_demote_waits()
+
+    def test_demote_ramen_ear_replication_volume_waits_when_partition_remote_suspended_missing_connectivity(self):
+        self._prepare_ramen_demote('production', DR_LINK_STATUS_SUSPENDED_MISSING_CONNECTIVITY,
+                                   partition_name='SKGPTN0')
+        self._assert_ramen_demote_waits()
+
+    def test_demote_ramen_ear_replication_volume_waits_when_independent(self):
+        self._prepare_ramen_demote('independent', DR_LINK_STATUS_RUNNING)
+        self._assert_ramen_demote_waits()
+
+    def test_demote_ramen_ear_replication_volume_recovery_is_idempotent(self):
+        self._prepare_ramen_demote('recovery', DR_LINK_STATUS_RUNNING)
+
+        self.svc._demote_ear_replication_volume(REPLICATION_NAME, is_ramen_ear=True)
 
         self.svc.client.svctask.chvolumegroupreplication.assert_not_called()
 
-    def test_demote_ear_replication_volume_skips_when_partition_remote_suspended_missing_connectivity(self):
-        self.svc.client.svctask.chvolumereplicationinternals = Mock()
-        vg_replication = self._mock_vg_replication(partition_name='SKGPTN0',
-                                                   dr_link_status=DR_LINK_STATUS_SUSPENDED_MISSING_CONNECTIVITY)
-        self.svc.client.svcinfo.lsvolumegroupreplication.return_value = Mock(
-            as_single_element=vg_replication)
+    def test_demote_ramen_ear_replication_volume_production_running_checkpoint_achieved(self):
+        self._prepare_ramen_demote('production', DR_LINK_STATUS_RUNNING)
 
-        self.svc._demote_ear_replication_volume(REPLICATION_NAME)
+        self.svc._demote_ear_replication_volume(REPLICATION_NAME, is_ramen_ear=True)
 
-        self.svc.client.svctask.chvolumegroupreplication.assert_not_called()
+        self.assertNotIn(REPLICATION_NAME, self.svc._demote_state_map)
 
     # --- get_replication_destination_info tests ---
 

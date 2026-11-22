@@ -564,12 +564,13 @@ class ArrayMediator(ABC):
         raise NotImplementedError
 
     @abstractmethod
-    def demote_replication_volume(self, replication):
+    def demote_replication_volume(self, replication, is_ramen_ear=False):
         """
         This function will demote the role of the volume in the connected system to be secondary
 
         Args:
-            replication : replication to be demoted
+            replication  : replication to be demoted
+            is_ramen_ear : True for a Ramen EAR request (a volume resolved to its volume group)
 
         Returns:
             None
@@ -578,6 +579,7 @@ class ArrayMediator(ABC):
             ObjectNotFound
             InvalidArgument
             PermissionDenied
+            OperationNotReady
         """
         raise NotImplementedError
 
