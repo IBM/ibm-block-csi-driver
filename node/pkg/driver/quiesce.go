@@ -156,4 +156,3 @@ func RunPreStopClient(socketPath string, timeout time.Duration) error {
 	defer resp.Body.Close()
 	return nil
 }
-

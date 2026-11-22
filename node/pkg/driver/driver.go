@@ -42,7 +42,7 @@ type Driver struct {
 	// csi.UnimplementedNodeServer
 }
 
-func NewDriver(endpoint string, configFilePath string, hostname string, max_invocations int, clean_scsi_device bool, tracker* Tracker) (*Driver, error) {
+func NewDriver(endpoint string, configFilePath string, hostname string, max_invocations int, clean_scsi_device bool, tracker *Tracker) (*Driver, error) {
 	configFile, err := ReadConfigFile(configFilePath)
 	if err != nil {
 		return nil, err
@@ -88,17 +88,17 @@ func (d *Driver) Run() error {
 		return err
 	}
 
-        logErr := func(ctx context.Context, req interface{}, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (interface{}, error) {
-                resp, err := handler(ctx, req)
-                if err != nil {
-                        logger.Errorf("GRPC error: %v", err)
-                }
-                return resp, err
-        }
+	logErr := func(ctx context.Context, req interface{}, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (interface{}, error) {
+		resp, err := handler(ctx, req)
+		if err != nil {
+			logger.Errorf("GRPC error: %v", err)
+		}
+		return resp, err
+	}
 
-        opts := []grpc.ServerOption{
-                grpc.UnaryInterceptor(logErr),
-        }
+	opts := []grpc.ServerOption{
+		grpc.UnaryInterceptor(logErr),
+	}
 	d.srv = grpc.NewServer(opts...)
 
 	csi.RegisterIdentityServer(d.srv, d)

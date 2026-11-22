@@ -49,10 +49,10 @@ func main() {
 		max_invocations   = flag.Int("max-invocations", 1000, "Max number of external processes allowed to run concurrently")
 		clean_scsi_device = flag.String("clean-scsi-device", "true", "Should clean ghost scsi device upon nodeStage")
 
-		isPreStop = flag.Bool("prestop", false, "Run as preStop hook client and wait for driver quiescence")
-		quietPeriod = flag.Duration("shutdown-quiet-period", 10*time.Second, "Quiet duration before shutdown")
+		isPreStop     = flag.Bool("prestop", false, "Run as preStop hook client and wait for driver quiescence")
+		quietPeriod   = flag.Duration("shutdown-quiet-period", 10*time.Second, "Quiet duration before shutdown")
 		giveUpTimeout = flag.Duration("shutdown-giveup-timeout", 45*time.Second, "Max wait duration in preStop")
-		quiesceSock = flag.String("quiesce-sock", "/csi/quiesce.sock", "Unix socket path for preStop coordination")
+		quiesceSock   = flag.String("quiesce-sock", "/csi/quiesce.sock", "Unix socket path for preStop coordination")
 	)
 
 	// Set a hard limit on the total OS threads this process can ever create.
@@ -62,14 +62,13 @@ func main() {
 
 	logVersionInfo(configFile)
 
-        if *isPreStop {
-                // Client mode invoked by Kubernetes PreStop Exec
-                if err := driver.RunPreStopClient(*quiesceSock, *giveUpTimeout+5*time.Second); err != nil {
-                        logger.Warningf("PreStop client exited with error (proceeding with shutdown): %v", err)
-                }
-                os.Exit(0)
-        }
-
+	if *isPreStop {
+		// Client mode invoked by Kubernetes PreStop Exec
+		if err := driver.RunPreStopClient(*quiesceSock, *giveUpTimeout+5*time.Second); err != nil {
+			logger.Warningf("PreStop client exited with error (proceeding with shutdown): %v", err)
+		}
+		os.Exit(0)
+	}
 
 	if *max_invocations < 1 {
 		logger.Errorf("Max invocations is invalid: %d", *max_invocations)
@@ -79,7 +78,6 @@ func main() {
 	if *exitAfterLogVersion {
 		os.Exit(0)
 	}
-
 
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
