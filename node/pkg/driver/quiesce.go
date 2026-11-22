@@ -36,6 +36,10 @@ func NewTracker(cfg Config) *Tracker {
 // TryBeginUnstage checks if the driver is shutting down. If not, it increments the in-flight
 // counter and returns a cleanup function to defer.
 func (t *Tracker) TryBeginUnstage() (func(), error) {
+	if t == nil {
+		return func() {}, nil
+	}
+
 	if t.shuttingDown.Load() {
 		return nil, status.Error(codes.Unavailable, "CSI driver is shutting down; rejecting new NodeUnstageVolume")
 	}
