@@ -1884,11 +1884,9 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
     def _build_replication_status_message(self, vg_replication, recovery_loc_idx, dr_link_status):
         remote_name = self._getattr_as_str(vg_replication, 'location{}_system_name'.format(recovery_loc_idx))
         remote_status = self._getattr_as_str(vg_replication, 'location{}_status'.format(recovery_loc_idx))
-        within_rpo = self._getattr_as_str(vg_replication, 'location{}_within_rpo'.format(recovery_loc_idx))
+        local_mode = self._getattr_as_str(vg_replication, 'local_dr_replication_mode')
 
-        return svc_messages.REPLICATION_STATUS_MESSAGE.format(
-            dr_link_status, remote_name, remote_status, within_rpo
-        )
+        return svc_messages.REPLICATION_STATUS_MESSAGE.format(local_mode, dr_link_status, remote_name, remote_status)
 
     def _get_last_sync_time(self, vg_replication, recovery_loc_idx):
         running_recovery_point = self._getattr_as_str(

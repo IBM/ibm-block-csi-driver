@@ -392,9 +392,8 @@ class TestGetVolumeReplicationInfo(BaseReplicationSetUp, CommonControllerTest):
         return volume_request
 
     def _make_status_message(self):
-        return svc_messages.REPLICATION_STATUS_MESSAGE.format(
-            DR_LINK_STATUS_RUNNING, "fab3p-118-c", "healthy", "yes"
-        )
+        return svc_messages.REPLICATION_STATUS_MESSAGE.format("production", DR_LINK_STATUS_RUNNING, "fab3p-118-c",
+                                                              "healthy")
 
     def test_get_volume_replication_info_all_fields_populated_succeeds(self):
         replication_status_message = self._make_status_message()
