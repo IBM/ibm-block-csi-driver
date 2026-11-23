@@ -23,7 +23,7 @@ from controllers.array_action.array_action_types import (Volume, Snapshot, Repli
                                                          VolumeGroup, ThinVolume, ReplicationInfo,
                                                          ReplicationStatus)
 from controllers.array_action.array_mediator_abstract import ArrayMediatorAbstract
-from controllers.array_action.utils import ClassProperty, convert_scsi_id_to_nguid
+from controllers.array_action.utils import ClassProperty, convert_scsi_id_to_nguid, is_connectivity_type_nvme
 from controllers.array_action.volume_group_interface import VolumeGroupInterface
 from controllers.common import settings as common_settings
 from controllers.common.csi_logger import get_stdout_logger
@@ -143,8 +143,7 @@ def build_create_volume_in_volume_group_kwargs(pool, io_group, source_id):
 
 
 def _add_port_to_command_kwargs(connectivity_type, port, cli_kwargs):
-    if connectivity_type == array_settings.NVME_OVER_FC_CONNECTIVITY_TYPE or \
-        connectivity_type == array_settings.NVME_OVER_TCP_CONNECTIVITY_TYPE:
+    if is_connectivity_type_nvme(connectivity_type):
         cli_kwargs['nqn'] = port
     elif connectivity_type == array_settings.FC_CONNECTIVITY_TYPE:
         cli_kwargs['fcwwpn'] = port
@@ -1349,8 +1348,7 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
         host_names = set()
         connectivity_types = set()
         for connectivity_type, initiator in initiators:
-            if connectivity_type in (array_settings.NVME_OVER_FC_CONNECTIVITY_TYPE, 
-                array_settings.NVME_OVER_TCP_CONNECTIVITY_TYPE):
+            if is_connectivity_type_nvme(connectivity_type):
                 nvme_host_names = self._get_host_names_by_nqn(initiator)
                 if nvme_host_names:
                     host_names.update(nvme_host_names)
@@ -1510,8 +1508,7 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
         }
         lun = ""
         try:
-            if connectivity_type not in (array_settings.NVME_OVER_FC_CONNECTIVITY_TYPE,
-                                         array_settings.NVME_OVER_TCP_CONNECTIVITY_TYPE):
+            if not is_connectivity_type_nvme(connectivity_type):
                 lun = self._get_free_lun(host_name)
                 cli_kwargs.update({'scsi': lun})
             self.client.svctask.mkvdiskhostmap(**cli_kwargs)
@@ -2718,8 +2715,7 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
     def get_host_connectivity_ports(self, host_name, connectivity_type):
         cli_host = self._get_cli_host(host_name)
         ports = None
-        if connectivity_type in (array_settings.NVME_OVER_FC_CONNECTIVITY_TYPE,
-                                 array_settings.NVME_OVER_TCP_CONNECTIVITY_TYPE):
+        if is_connectivity_type_nvme(connectivity_type):
             ports = self._get_host_ports(cli_host, HOST_NQN)
         elif connectivity_type == array_settings.FC_CONNECTIVITY_TYPE:
             ports = self._get_host_ports(cli_host, HOST_WWPN)
@@ -2734,8 +2730,6 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
         connectivity_type = None
         cli_host = self._get_cli_host(host_name)
         nvme_nqns = self._get_host_ports(cli_host, HOST_NQN)
-        fc_wwns = self._get_host_ports(cli_host, HOST_WWPN)
-        iscsi_iqns = self._get_host_ports(cli_host, HOST_ISCSI_NAME)
         if nvme_nqns:
             host_protocol = self._get_host_ports(cli_host, HOST_PROTOCOL)
             if 'tcpnvme' in host_protocol:

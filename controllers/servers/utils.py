@@ -13,6 +13,7 @@ import controllers.array_action.settings as array_settings
 import controllers.servers.messages as messages
 import controllers.servers.settings as servers_settings
 from controllers.array_action.array_action_types import ReplicationRequest
+from controllers.array_action.utils import is_connectivity_type_nvme
 from controllers.array_action.settings import NVME_OVER_FC_CONNECTIVITY_TYPE, FC_CONNECTIVITY_TYPE, \
     ISCSI_CONNECTIVITY_TYPE, NVME_OVER_TCP_CONNECTIVITY_TYPE, REPLICATION_COPY_TYPE_SYNC, REPLICATION_COPY_TYPE_ASYNC, REPLICATION_TYPE_MIRROR, \
     REPLICATION_TYPE_EAR, REPLICATION_DEFAULT_COPY_TYPE
@@ -226,7 +227,7 @@ def are_initiators_equal(initiator_str1, initiator_str2, protocol=None):
             return iscsi_equal
         elif protocol == FC_CONNECTIVITY_TYPE:
             return fc_equal
-        elif protocol in (NVME_OVER_FC_CONNECTIVITY_TYPE, NVME_OVER_TCP_CONNECTIVITY_TYPE):
+        elif is_connectivity_type_nvme(protocol):
             return nvme_equal
         else:
             return nvme_equal and fc_equal and iscsi_equal
@@ -966,7 +967,7 @@ def generate_csi_publish_volume_response(lun, connectivity_type, array_initiator
         array_initiators_param = common_config.controller.publish_context_array_iqn
         publish_context[array_initiators_param] = separator.join(array_initiators.keys())
 
-    elif connectivity_type in (NVME_OVER_FC_CONNECTIVITY_TYPE, NVME_OVER_TCP_CONNECTIVITY_TYPE):
+    elif is_connectivity_type_nvme(connectivity_type):
         # Both NVMe transports share the same publish context key. The node driver
         # distinguishes FC (nn-...:pn-... WWN pairs) from TCP (IP addresses) via
         # the connectivity_type key that is also present in the publish context.

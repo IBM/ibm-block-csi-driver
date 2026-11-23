@@ -14,7 +14,7 @@ array_connections_dict = {}
 logger = get_stdout_logger()
 
 
-def _socket_connect_test(host, port, timeout=30):
+def _socket_connect_test(host, port, timeout=1):
     """
     function to test socket connection to host:port.
 
@@ -27,23 +27,22 @@ def _socket_connect_test(host, port, timeout=30):
              other values - on other connection errors
     """
     socket_timeout = int(os.environ.get("SOCKET_CONNECT_TIMEOUT", timeout))
-    logger.info("Testing socket connection to {}:{} with timeout={}s".format(host, port, socket_timeout))
     try:
         sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         sock.settimeout(socket_timeout)
         ret = sock.connect_ex((host, port))
         sock.close()
         if ret == 0:
-            logger.info("Socket connection to {}:{} SUCCESS (code: 0)".format(host, port))
+            logger.info("Socket connection SUCCESS (code: 0)")
         else:
             err_msg = os.strerror(ret) if hasattr(os, 'strerror') and ret > 0 else 'connection error'
-            logger.warning("Socket connection to {}:{} FAILED (errno {}: {})".format(host, port, ret, err_msg))
+            logger.warning("Socket connection to storage array FAILED (errno {}: {})".format(ret, err_msg))
         return ret
     except socket.gaierror as e:
-        logger.warning('Could not resolve hostname "{HOST}": {ERROR}'.format(HOST=host, ERROR=e))
+        logger.debug('could not resolve hostname "{HOST}": {ERROR}'.format(HOST=host, ERROR=e))
         return -1
     except Exception as e:
-        logger.warning('Socket connect error for {}:{}: {}'.format(host, port, e))
+        logger.debug('socket_connect {}'.format(e))
         return -1
 
 
@@ -132,7 +131,7 @@ class ArrayConnectionManager:
             logger.info("Testing storage array type '{}' on port {} for endpoints: {}".format(storage_type, port, self.endpoints))
             for endpoint in self.endpoints:
                 if _socket_connect_test(endpoint, port) == 0:
-                    logger.info("Detected storage array type: {0} for endpoint: {1}".format(storage_type, endpoint))
+                    logger.debug("storage array type is : {0}".format(storage_type))
                     return storage_type
 
         logger.error("Failed to find storage system type for endpoints: {}".format(self.endpoints))

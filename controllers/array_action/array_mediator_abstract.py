@@ -10,7 +10,7 @@ from controllers.array_action.settings import (NVME_OVER_FC_CONNECTIVITY_TYPE,
                                                NVME_OVER_TCP_CONNECTIVITY_TYPE,
                                                FC_CONNECTIVITY_TYPE,
                                                ISCSI_CONNECTIVITY_TYPE)
-from controllers.array_action.utils import convert_scsi_id_to_nguid
+from controllers.array_action.utils import convert_scsi_id_to_nguid, is_connectivity_type_nvme
 from controllers.common.csi_logger import get_stdout_logger
 
 logger = get_stdout_logger()
@@ -80,7 +80,7 @@ class ArrayMediatorAbstract(ArrayMediator, ABC):
     def unmap_volume_by_initiators(self, vol_id, initiators):
         host_name, connectivity_types = self.get_host_by_host_identifiers(initiators)
         connectivity_type = utils.choose_connectivity_type(connectivity_types)
-        if connectivity_type in (NVME_OVER_FC_CONNECTIVITY_TYPE, NVME_OVER_TCP_CONNECTIVITY_TYPE):
+        if is_connectivity_type_nvme(connectivity_type):
             vol_id = convert_scsi_id_to_nguid(vol_id)
         self.unmap_volume(vol_id, host_name)
 

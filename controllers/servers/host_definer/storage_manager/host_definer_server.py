@@ -5,6 +5,7 @@ from controllers.array_action import settings as array_config
 from controllers.array_action import errors as array_errors
 from controllers.array_action.errors import HostNotFoundError, HostAlreadyExists
 from controllers.array_action.storage_agent import detect_array_type, get_agent
+from controllers.array_action.utils import is_connectivity_type_nvme
 from controllers.common.csi_logger import get_stdout_logger
 from controllers.common.node_info import NodeIdInfo
 import controllers.common.settings as common_settings
@@ -233,8 +234,7 @@ class HostDefinerServicer:
             return Initiators(fc_wwns=ports)
         elif connectivity_type == array_config.ISCSI_CONNECTIVITY_TYPE:
             return Initiators(iscsi_iqns=ports)
-        elif connectivity_type in (array_config.NVME_OVER_FC_CONNECTIVITY_TYPE,
-                                    array_config.NVME_OVER_TCP_CONNECTIVITY_TYPE):
+        elif is_connectivity_type_nvme(connectivity_type):
             return Initiators(nvme_nqns=ports, nvme_transport_type=connectivity_type)
         else:
             return Initiators()
@@ -250,12 +250,6 @@ class HostDefinerServicer:
 
     def _is_protocol_scsi(self, connectivity_type):
         return connectivity_type in [array_config.FC_CONNECTIVITY_TYPE, array_config.ISCSI_CONNECTIVITY_TYPE]
-
-    # nvme protocol can be over fc or tcp as of now (or even rdma in future)
-    def _is_protocol_nvme(self, connectivity_type):
-        return connectivity_type in (array_config.NVME_OVER_FC_CONNECTIVITY_TYPE,
-                                     array_config.NVME_OVER_TCP_CONNECTIVITY_TYPE)
-
 
     def _create_host(self, host, array_mediator, request):
         initiators = get_initiators_from_csi_node(

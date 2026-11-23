@@ -1,12 +1,16 @@
 import encodings
 
 from controllers.array_action.settings import WWN_OUI_END, WWN_VENDOR_IDENTIFIER_END, VENDOR_IDENTIFIER_LENGTH, \
-    NGUID_OUI_END
+    NGUID_OUI_END, NVME_OVER_FC_CONNECTIVITY_TYPE, NVME_OVER_TCP_CONNECTIVITY_TYPE
 from controllers.common.csi_logger import get_stdout_logger
 
 UTF_8 = encodings.utf_8.getregentry().name
 
 logger = get_stdout_logger()
+
+
+def is_connectivity_type_nvme(connectivity_type):
+    return connectivity_type in (NVME_OVER_FC_CONNECTIVITY_TYPE, NVME_OVER_TCP_CONNECTIVITY_TYPE)
 
 
 def convert_scsi_id_to_nguid(volume_id):
