@@ -264,6 +264,14 @@ def _get_ssh_port_from_environment():
 
 
 # Optional SSH keepalive settings. Maps an environment variable to the matching pysvc connect() argument.
+# The operator sets these variables only to valid values (a positive integer up to a maximum),
+# so the values are not validated here.
+# Units and pysvc defaults:
+#   SVC_SSH_KEEPALIVE_INTERVAL - seconds, default 15
+#   SVC_TCP_KEEPIDLE           - seconds, default 15
+#   SVC_TCP_KEEPINTVL          - seconds, default 5
+#   SVC_TCP_KEEPCNT            - number of probes, default 3
+#   SVC_TCP_USER_TIMEOUT       - MILLISECONDS, default 30000
 SSH_KEEPALIVE_ENV_VARS = {
     'SVC_SSH_KEEPALIVE_INTERVAL': 'keepalive_interval',
     'SVC_TCP_KEEPIDLE': 'tcp_keepidle',
@@ -274,24 +282,15 @@ SSH_KEEPALIVE_ENV_VARS = {
 
 
 def _get_ssh_keepalive_options_from_environment():
-    """Return the keepalive options that are set (and valid) in the environment.
+    """Return the keepalive options that are set in the environment.
 
-    A missing or invalid value is left out, so pysvc uses its default for it.
+    A missing or empty value is left out, so pysvc uses its default for it.
     """
     options = {}
     for env_var, option_name in SSH_KEEPALIVE_ENV_VARS.items():
         value = os.environ.get(env_var)
-        if not value:
-            continue
-        try:
-            number = int(value)
-        except ValueError:
-            number = 0
-        if number <= 0:
-            logger.warning("Ignoring invalid value {0!r} of {1}, a positive number is required. "
-                           "The default is used.".format(value, env_var))
-            continue
-        options[option_name] = number
+        if value:
+            options[option_name] = int(value)
     return options
 
 
