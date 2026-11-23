@@ -3,6 +3,7 @@ from io import StringIO
 from random import choice, randint
 from datetime import datetime, timedelta, timezone
 import time
+from threading import Lock
 
 import os
 from packaging.version import Version
@@ -38,6 +39,11 @@ from controllers.servers import messages
 
 array_connections_dict = {}
 logger = get_stdout_logger()
+
+# Final sync progress of Ramen EAR demote: (storage endpoint, volume group id) -> state.
+# Module level so that all the pooled connections to a storage share it.
+_ear_demote_states = {}
+_ear_demote_states_lock = Lock()
 
 OBJ_NOT_FOUND = 'CMMVC5753E'
 SNAPSHOT_NOT_EXIST = 'CMMVC9755E'
@@ -321,8 +327,6 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
                 endpoint)
         self.endpoint = self.endpoint[0]
         self._cluster = None
-        # In-memory map to track demote operations: VG_ID -> first_demote_timestamp
-        self._demote_state_map = {}
 
         logger.debug("in init")
         self._connect()
@@ -2087,6 +2091,7 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
         replication_policy = replication_request.replication_policy
         volume_group_id = replication_request.volume_internal_id
 
+        self._clear_ear_demote_state(volume_group_id)
         self._change_volume_group_policy(volume_group_id)
         self._change_volume_group_policy(volume_group_id, replication_policy)
 
@@ -2138,6 +2143,7 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
             logger.info("EAR replication is not supported on the existing storage")
             return
 
+        self._clear_ear_demote_state(volume_group_id)
         if self._get_replication_mode(volume_group_id) == array_settings.ENDPOINT_TYPE_RECOVERY:
             logger.info("volume group '{}' is in recovery mode, skipping policy removal".format(
                 volume_group_id))
@@ -2199,10 +2205,9 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
             logger.info("EAR replication is not supported on the existing storage")
             return
 
-        # Clear demote state if exists (handles case where K8S gave up on demote and decided to promote)
-        if volume_group_id in self._demote_state_map:
-            logger.info("Clearing demote state for volume group %s during promote", volume_group_id)
-            self._demote_state_map.pop(volume_group_id, None)
+        # Writes resume after promote, so a later demote needs a new final sync
+        if self._clear_ear_demote_state(volume_group_id):
+            logger.info("cleared demote state of volume group '{}' during promote".format(volume_group_id))
 
         if self._get_replication_mode(volume_group_id) == array_settings.ENDPOINT_TYPE_RECOVERY:
             logger.info("Changing the local volume group to be an independent copy")
@@ -2290,14 +2295,61 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
         if replication.replication_type == array_settings.REPLICATION_TYPE_MIRROR:
             self._demote_replication_volume(replication.name)
         elif replication.replication_type == array_settings.REPLICATION_TYPE_EAR:
-            self._demote_ear_replication_volume(replication.volume_group_name, is_ramen_ear)
+            self._demote_ear_replication_volume(replication.volume_group_id, replication.volume_group_name,
+                                                is_ramen_ear)
 
     def _demote_replication_volume(self, replication_name):
         rcrelationship = self._get_rcrelationship_by_name(replication_name)
         endpoint_type_to_promote = self._get_replication_other_endpoint_type(rcrelationship)
         self._ensure_endpoint_is_primary(rcrelationship, endpoint_type_to_promote)
 
-    def _demote_ear_replication_volume(self, volume_group_name, is_ramen_ear=False):
+    def _ear_demote_state_key(self, volume_group_id):
+        return self.endpoint, volume_group_id
+
+    def _get_hosts_by_mapped_volume_in_volume_group(self, volume_group_name):
+        filter_value = 'volume_group_name={}'.format(volume_group_name)
+        cli_volumes = self._lsvdisk_list(filtervalue=filter_value)
+        if not cli_volumes:
+            return None
+        volume_names_by_id = {cli_volume.id: cli_volume.name for cli_volume in cli_volumes}
+
+        hosts_by_mapped_volume = {}
+        for mapping in self.client.svcinfo.lshostvdiskmap():
+            volume_name = volume_names_by_id.get(mapping.get('vdisk_id', ''))
+            if volume_name:
+                hosts_by_mapped_volume.setdefault(volume_name, []).append(mapping.get('name', ''))
+        return hosts_by_mapped_volume
+
+    def _clear_ear_demote_state(self, volume_group_id):
+        with _ear_demote_states_lock:
+            return _ear_demote_states.pop(self._ear_demote_state_key(volume_group_id), None)
+
+    def _wait_until_ear_final_sync_can_cover_all_writes(self, volume_group_id, volume_group_name,
+                                                        volume_group_replication, replication_mode):
+        # Ramen promotes the peer once demote succeeds, so demote must not succeed before the final sync.
+        # The final sync can run only from a production copy while replication runs, so wait otherwise.
+        dr_link_status = getattr(volume_group_replication, 'dr_link_status', '')
+        is_production = replication_mode == array_settings.ENDPOINT_TYPE_PRODUCTION
+        if not is_production or dr_link_status not in array_settings.FINAL_SYNC_DR_LINK_STATES:
+            self._clear_ear_demote_state(volume_group_id)
+            message = "final sync of volume group {} to DR storage cannot complete, replication mode is '{}' " \
+                      "and DR link status is '{}'".format(volume_group_name, replication_mode, dr_link_status)
+            logger.warning("demote waits: {}".format(message))
+            raise array_errors.OperationNotReadyError(message)
+
+        # A final sync covers all writes only when no volume of the volume group is mapped to a host
+        hosts_by_mapped_volume = self._get_hosts_by_mapped_volume_in_volume_group(volume_group_name)
+        if hosts_by_mapped_volume is None or hosts_by_mapped_volume:
+            self._clear_ear_demote_state(volume_group_id)
+            if hosts_by_mapped_volume is None:
+                reason = "its volumes cannot be listed"
+            else:
+                reason = "volumes are still mapped to hosts: {}".format(hosts_by_mapped_volume)
+            message = "final sync of volume group {} waits, {}".format(volume_group_name, reason)
+            logger.warning("demote waits: {}".format(message))
+            raise array_errors.OperationNotReadyError(message)
+
+    def _demote_ear_replication_volume(self, volume_group_id, volume_group_name, is_ramen_ear=False):
         if not self._is_earreplication_supported():
             logger.info("EAR replication is not supported on the existing storage")
             return
@@ -2315,44 +2367,57 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
 
         replication_mode = self._get_replication_mode(volume_group_name)
         if replication_mode == array_settings.ENDPOINT_TYPE_RECOVERY:
-            logger.info("Idempotent case: volume group {} is already in recovery mode, "
-                        "skipping demote".format(volume_group_name))
+            self._clear_ear_demote_state(volume_group_id)
+            logger.info("volume group {} is a recovery copy, its DR storage is already the production copy, "
+                        "no final sync needed, demote successful".format(volume_group_name))
             return
 
-        # Ramen promotes the peer once demote succeeds, so demote must not succeed before the final sync.
-        # The final sync can run only from a production copy over a working DR link, so wait otherwise.
-        dr_link_status = getattr(volume_group_replication, 'dr_link_status', '')
-        is_production = replication_mode == array_settings.ENDPOINT_TYPE_PRODUCTION
-        if not is_production or dr_link_status in array_settings.FAILED_DR_LINK_STATES:
-            self._demote_state_map.pop(volume_group_name, None)
-            message = "final sync of volume group {} to DR storage cannot complete, replication mode is '{}' " \
-                      "and DR link status is '{}'".format(volume_group_name, replication_mode, dr_link_status)
-            logger.warning("demote waits: {}".format(message))
-            raise array_errors.OperationNotReadyError(message)
+        self._wait_until_ear_final_sync_can_cover_all_writes(volume_group_id, volume_group_name,
+                                                             volume_group_replication, replication_mode)
 
-        # Check if this is first demote attempt or retry
-        if volume_group_name not in self._demote_state_map:
-            # First attempt - create checkpoint and track state
-            self._demote_state_map[volume_group_name] = time.time()
+        # The final sync stays valid until the next promote, so repeated demotes reuse it
+        state_key = self._ear_demote_state_key(volume_group_id)
+        with _ear_demote_states_lock:
+            demote_state = _ear_demote_states.get(state_key)
+            is_first_attempt = demote_state is None
+            if is_first_attempt:
+                demote_state = {'start_time': time.time(), 'is_checkpoint_created': False, 'is_achieved': False}
+                _ear_demote_states[state_key] = demote_state
+            is_checkpoint_created = demote_state['is_checkpoint_created']
+            is_achieved = demote_state['is_achieved']
 
+        if is_achieved:
+            logger.info("Checkpoint already achieved for volume group {}, demote successful".format(
+                volume_group_name))
+            return
+
+        if is_first_attempt:
             logger.info("First demote attempt for volume group {}, creating checkpoint".format(volume_group_name))
-            self._chvolumegroupreplication(volume_group_name, checkpoint=array_settings.CHECKPOINT)
+            try:
+                self._chvolumegroupreplication(volume_group_name, checkpoint=array_settings.CHECKPOINT)
+            except Exception:
+                self._clear_ear_demote_state(volume_group_id)
+                raise
+            with _ear_demote_states_lock:
+                demote_state['is_checkpoint_created'] = True
+        elif not is_checkpoint_created:
+            # checkpoint_achieved may still refer to an older checkpoint until the new one is created
+            message = "checkpoint of volume group {} is being created".format(volume_group_name)
+            logger.info("demote waits: {}".format(message))
+            raise array_errors.OperationNotReadyError(message)
         else:
-            # Retry - checkpoint already created, just check status
-            first_attempt_time = self._demote_state_map[volume_group_name]
-            elapsed_time = time.time() - first_attempt_time
+            elapsed_time = time.time() - demote_state['start_time']
             logger.info("Retry demote for volume group {}, checking checkpoint status "
-                        "(elapsed time: {:.1f}s)".format(volume_group_name,
-                                                         elapsed_time))
+                        "(elapsed time: {:.1f}s)".format(volume_group_name, elapsed_time))
 
         # Re-fetch after checkpoint creation (or on retry) to get current state
         volume_group_replication = self._lsvolumegroupreplication(volume_group_name)
         checkpoint_achieved = getattr(volume_group_replication, 'checkpoint_achieved', 'no')
 
         if checkpoint_achieved == 'yes':
-            # Success - clear state and return
+            with _ear_demote_states_lock:
+                demote_state['is_achieved'] = True
             logger.info("Checkpoint achieved for volume group {}, demote successful".format(volume_group_name))
-            self._demote_state_map.pop(volume_group_name, None)
             return
         # Checkpoint not ready - raise error to trigger retry with UNAVAILABLE status
         logger.info("Checkpoint not yet achieved for volume group {}, will retry".format(volume_group_name))
