@@ -265,19 +265,20 @@ def _get_ssh_port_from_environment():
 
 # Optional SSH keepalive settings. Maps an environment variable to the matching pysvc connect() argument.
 # The operator sets these variables only to valid values (a positive integer up to a maximum),
-# so the values are not validated here.
-# Units and pysvc defaults:
-#   SVC_SSH_KEEPALIVE_INTERVAL - seconds, default 15
-#   SVC_TCP_KEEPIDLE           - seconds, default 15
-#   SVC_TCP_KEEPINTVL          - seconds, default 5
-#   SVC_TCP_KEEPCNT            - number of probes, default 3
-#   SVC_TCP_USER_TIMEOUT       - MILLISECONDS, default 30000
+# so the values are not validated here. The unit is part of each name (_SECONDS, _MS),
+# except for the probe count.
+# pysvc defaults:
+#   SVC_SSH_KEEPALIVE_INTERVAL_SECONDS - 15
+#   SVC_TCP_KEEPIDLE_SECONDS           - 15
+#   SVC_TCP_KEEPINTVL_SECONDS          - 5
+#   SVC_TCP_KEEPCNT                    - number of probes, 3
+#   SVC_TCP_USER_TIMEOUT_MS            - 30000
 SSH_KEEPALIVE_ENV_VARS = {
-    'SVC_SSH_KEEPALIVE_INTERVAL': 'keepalive_interval',
-    'SVC_TCP_KEEPIDLE': 'tcp_keepidle',
-    'SVC_TCP_KEEPINTVL': 'tcp_keepintvl',
+    'SVC_SSH_KEEPALIVE_INTERVAL_SECONDS': 'keepalive_interval',
+    'SVC_TCP_KEEPIDLE_SECONDS': 'tcp_keepidle',
+    'SVC_TCP_KEEPINTVL_SECONDS': 'tcp_keepintvl',
     'SVC_TCP_KEEPCNT': 'tcp_keepcnt',
-    'SVC_TCP_USER_TIMEOUT': 'tcp_user_timeout',
+    'SVC_TCP_USER_TIMEOUT_MS': 'tcp_user_timeout',
 }
 
 

@@ -127,11 +127,11 @@ class TestArrayMediatorSVC(unittest.TestCase):
 
     @patch("controllers.array_action.array_mediator_svc.connect")
     def test_connect_passes_all_keepalive_environment_values(self, connect_mock):
-        kwargs = self._connect_and_get_connect_kwargs(connect_mock, {"SVC_SSH_KEEPALIVE_INTERVAL": "20",
-                                                                     "SVC_TCP_KEEPIDLE": "25",
-                                                                     "SVC_TCP_KEEPINTVL": "6",
+        kwargs = self._connect_and_get_connect_kwargs(connect_mock, {"SVC_SSH_KEEPALIVE_INTERVAL_SECONDS": "20",
+                                                                     "SVC_TCP_KEEPIDLE_SECONDS": "25",
+                                                                     "SVC_TCP_KEEPINTVL_SECONDS": "6",
                                                                      "SVC_TCP_KEEPCNT": "4",
-                                                                     "SVC_TCP_USER_TIMEOUT": "45000"})
+                                                                     "SVC_TCP_USER_TIMEOUT_MS": "45000"})
         self.assertEqual(20, kwargs["keepalive_interval"])
         self.assertEqual(25, kwargs["tcp_keepidle"])
         self.assertEqual(6, kwargs["tcp_keepintvl"])
@@ -140,14 +140,14 @@ class TestArrayMediatorSVC(unittest.TestCase):
 
     @patch("controllers.array_action.array_mediator_svc.connect")
     def test_connect_passes_only_the_keepalive_values_that_are_set(self, connect_mock):
-        kwargs = self._connect_and_get_connect_kwargs(connect_mock, {"SVC_TCP_USER_TIMEOUT": "60000"})
+        kwargs = self._connect_and_get_connect_kwargs(connect_mock, {"SVC_TCP_USER_TIMEOUT_MS": "60000"})
         self.assertEqual(60000, kwargs["tcp_user_timeout"])
         for name in ("keepalive_interval", "tcp_keepidle", "tcp_keepintvl", "tcp_keepcnt"):
             self.assertNotIn(name, kwargs)
 
     @patch("controllers.array_action.array_mediator_svc.connect")
     def test_connect_ignores_empty_keepalive_environment_values(self, connect_mock):
-        kwargs = self._connect_and_get_connect_kwargs(connect_mock, {"SVC_TCP_KEEPIDLE": ""})
+        kwargs = self._connect_and_get_connect_kwargs(connect_mock, {"SVC_TCP_KEEPIDLE_SECONDS": ""})
         self.assertNotIn("tcp_keepidle", kwargs)
 
     def test_close(self):
