@@ -37,6 +37,7 @@ import (
 	"github.com/ibm/ibm-block-csi-driver/node/logger"
 	"github.com/ibm/ibm-block-csi-driver/node/pkg/driver/executer"
 	"github.com/ibm/ibm-block-csi-driver/node/pkg/driver/mount"
+	"golang.org/x/sync/singleflight"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
@@ -1276,169 +1277,205 @@ type sgScsiId struct {
 	_        int32 // Kernel padding
 }
 
-// purgeScsiGhosts scans host SCSI adapters in a memory-bounded, decoupled pipeline to clear unmapped logical units safely.
-func (r *OsDeviceConnectivityHelperScsiGeneric) purgeScsiGhosts(ctx context.Context, expectedSerial string, expectedLun int, arrayIdentifiers []string) error {
+type sgDeviceInfo struct {
+	sgName    string
+	hctl      string
+	deviceDir string
+}
 
+// Replace or wrap this with your actual singleflight.Group instance (e.g., on OsDeviceConnectivityHelperScsiGeneric)
+var sgTopologyFlight singleflight.Group
+
+// purgeScsiGhosts scans host SCSI adapters in a memory-bounded, decoupled pipeline to clear unmapped logical units safely.
+func (r *OsDeviceConnectivityHelperScsiGeneric) purgeScsiGhosts(
+	ctx context.Context,
+	expectedSerial string,
+	expectedLun int,
+	arrayIdentifiers []string,
+) error {
 	logger.Debugf("[purgeScsiGhosts] Starting purgeScsiGhosts, lun %d", expectedLun)
 
 	if err := ctx.Err(); err != nil {
 		return err
 	}
 
-	devNames, errDev := readDevNamesSingleflight(ctx, r.KeyedGater)
-	if errDev != nil {
-		return fmt.Errorf("failed to read /dev: %w", errDev)
+	// =========================================================================
+	// STAGE 1: SINGLEFLIGHT DEVICE-TO-LUN TOPOLOGY MAP
+	// =========================================================================
+	devicesByLun, err := r.getSgDevicesByLunSingleflight(ctx)
+	if err != nil {
+		return fmt.Errorf("failed to build scsi generic device map: %w", err)
 	}
 
-	type ghostCandidate struct {
-		sgName    string
-		hctl      string
-		deviceDir string
-	}
-
-	const maxCapCeiling = 10000
-	rawCandidates := make([]ghostCandidate, 0, 200)
-
-	// =========================================================================
-	// STAGE 1: MICROSECOND SNAPSHOT SWEEP (Singleflight Coalesced Pass)
-	// =========================================================================
-	for _, sgName := range devNames {
-		if err := ctx.Err(); err != nil {
-			return err
-		}
-
-		if !strings.HasPrefix(sgName, "sg") || len(sgName) < 3 {
-			continue
-		}
-
-		isNumeric := true
-		for i := 2; i < len(sgName); i++ {
-			if sgName[i] < '0' || sgName[i] > '9' {
-				isNumeric = false
-				break
-			}
-		}
-		if !isNumeric {
-			continue
-		}
-
-		// Clean, absolute directory reference evaluated via true kernel VFS symlink traversal
-		deviceDirSymlink := filepath.Join("/sys/class/scsi_generic", sgName, "device")
-		absoluteDeviceDir, errLink := filepath.EvalSymlinks(deviceDirSymlink)
-		if errLink != nil {
-			logger.Debugf("[purgeScsiGhosts] entry %s - EvalSymlinks failed", sgName)
-			continue
-		}
-
-		hctl := filepath.Base(absoluteDeviceDir)
-		hctlParts := strings.Split(hctl, ":")
-		if len(hctlParts) < 4 {
-			continue
-		}
-
-		lunStr := hctlParts[3]
-		parsedLun, errParse := strconv.Atoi(lunStr)
-		if errParse != nil || parsedLun != expectedLun {
-			continue
-		}
-
-		if len(rawCandidates) >= maxCapCeiling {
-			logger.Warningf("[VFS-Guard] Ghost tracking candidate list reached safe allocation ceiling (%d). Truncating scan pass.", maxCapCeiling)
-			break
-		}
-
-		rawCandidates = append(rawCandidates, ghostCandidate{
-			sgName:    sgName,
-			hctl:      hctl,
-			deviceDir: absoluteDeviceDir,
-		})
-
-		//logger.Debugf("[purgeScsiGhosts] entry %s with hctl %s - candidate", sgName, hctl)
+	// Filter for the target LUN in the processing stage
+	candidates := devicesByLun[expectedLun]
+	if len(candidates) == 0 {
+		return nil
 	}
 
 	// =========================================================================
 	// STAGE 2: DECOUPLED BATCH CHUNKING PROCESSING ENGINE
 	// =========================================================================
-	executePurgeBatch := func(batch []ghostCandidate, gaterKey string) error {
-		if len(batch) == 0 {
-			return nil
-		}
-		_, errBatch := executer.ExecuteUninterruptibleBatch[ghostCandidate, struct{}](
-			ctx,
-			r.KeyedGater,
-			gaterKey,
-			10,  // maxRunning limits simultaneous unbind executions to preserve udev stability
-			100, // maxSpare
-			5*time.Second,
-			30*time.Second, // Bounded timeout forces execution to break free if file sync operations freeze
-			batch,
-			func(wCtx context.Context, index int, candidate ghostCandidate, cancelBatch func()) (struct{}, error) {
-
-				serialNumber, _ := r.getHardwareSerial(wCtx, candidate.deviceDir)
-
-				//logger.Debugf("[purgeScsiGhosts] ghost check for %s devicedir %s hctl %s serial %s", candidate.sgName, candidate.deviceDir, candidate.hctl, serialNumber)
-
-				vendorBytesRaw, err := os.ReadFile(filepath.Join(candidate.deviceDir, "vendor"))
-				if err != nil {
-					logger.Debugf("[purgeScsiGhosts] read vendor failed")
-					return struct{}{}, err
-				}
-				vdr := strings.ToUpper(strings.TrimSpace(string(vendorBytesRaw)))
-
-				ghostState, _ := r.IsSgDeviceGhost(wCtx, candidate.sgName, serialNumber)
-				isIbmDevice := strings.Contains(vdr, "IBM")
-
-				//pathOwned := r.isPathOwnedByMyArray(wCtx, candidate.sgName, arrayIdentifiers)
-
-				//logger.Debugf("[purgeScsiGhosts]  device %s [Vendor: %s, Serial: %s, Serial Match: %v, Ghost: %v]. Executing hot-unplug.", candidate.sgName, vdr, serialNumber, serialNumber != "" && r.IsSerialMatch(serialNumber, expectedSerial), ghostState)
-
-				shouldDelete := (ghostState && isIbmDevice)
-				// || (!pathOwned && serialNumber != "" && r.IsSerialMatch(serialNumber, expectedSerial))
-				// || (pathOwned && (ghostState || !isIbmDevice))
-				if !shouldDelete {
-					return struct{}{}, nil
-				}
-
-				logger.Warningf("Pruning stale SCSI device %s [Vendor: %s, Serial Match: %v, Ghost: %v]. Executing hot-unplug.", candidate.sgName, vdr, serialNumber != "" && !r.IsSerialMatch(serialNumber, expectedSerial), ghostState)
-
-				deletePath := filepath.Join(candidate.deviceDir, "delete")
-				if _, errStat := os.Stat(deletePath); os.IsNotExist(errStat) {
-					deletePath = fmt.Sprintf("/sys/bus/scsi/devices/%s/delete", candidate.hctl)
-				}
-
-				if errWrite := os.WriteFile(deletePath, []byte("1"), 0200); errWrite != nil {
-					logger.Errorf("Ghost Scrubber: failed to issue un-plug write configuration for target node %s: %v", candidate.sgName, errWrite)
-					return struct{}{}, errWrite
-				}
-				return struct{}{}, nil
-			},
-		)
-		return errBatch
-	}
-
-	// Slice memory array in chunks of 100 for the parallel batch manager
 	const chunkSize = 100
-	for i := 0; i < len(rawCandidates); i += chunkSize {
+	for i := 0; i < len(candidates); i += chunkSize {
 		if err := ctx.Err(); err != nil {
 			return err
 		}
 
-		end := i + chunkSize
-		if end > len(rawCandidates) {
-			end = len(rawCandidates)
-		}
-		currentChunkBatch := rawCandidates[i:end]
+		end := min(i+chunkSize, len(candidates))
+		currentBatch := candidates[i:end]
+		uniqueGaterKey := fmt.Sprintf("batch-purge-scsi-ghosts-%d-%d", expectedLun, time.Now().UnixNano())
 
-		uniqueGaterKey := fmt.Sprintf("batch-purge-scsi-ghosts-%d", time.Now().UnixNano())
-
-		//logger.Debugf("[purgeScsiGhosts] execute batch %d to %d", i, end)
-
-		if errBatch := executePurgeBatch(currentChunkBatch, uniqueGaterKey); errBatch != nil {
+		_, errBatch := executer.ExecuteUninterruptibleBatch[sgDeviceInfo, struct{}](
+			ctx,
+			r.KeyedGater,
+			uniqueGaterKey,
+			10,  // maxRunning limits simultaneous unbind executions to preserve udev stability
+			100, // maxSpare
+			5*time.Second,
+			30*time.Second, // Bounded timeout forces execution to break free if file sync operations freeze
+			currentBatch,
+			func(wCtx context.Context, index int, candidate sgDeviceInfo, cancelBatch func()) (struct{}, error) {
+				return struct{}{}, r.processGhostCandidate(wCtx, candidate, expectedSerial)
+			},
+		)
+		if errBatch != nil {
 			return fmt.Errorf("parallel ghost batch engine execution failed: %w", errBatch)
 		}
 	}
 
 	return nil
+}
+
+// getSgDevicesByLunSingleflight coalesces concurrent VFS symlink sweeps into a single pass,
+// returning an intermediate map of LUN -> []sgDeviceInfo.
+func (r *OsDeviceConnectivityHelperScsiGeneric) getSgDevicesByLunSingleflight(
+	ctx context.Context,
+) (map[int][]sgDeviceInfo, error) {
+	// Detach from caller cancellation so one canceled caller doesn't abort the shared VFS scan
+	// for other concurrent callers waiting on the same flight.
+	v, err, _ := sgTopologyFlight.Do("sg-lun-topology", func() (any, error) {
+		scanCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 15*time.Second)
+		defer cancel()
+
+		devNames, errDev := readDevNamesSingleflight(scanCtx, r.KeyedGater)
+		if errDev != nil {
+			return nil, fmt.Errorf("failed to read /dev: %w", errDev)
+		}
+
+		const maxCapCeiling = 10000
+		devicesByLun := make(map[int][]sgDeviceInfo)
+		totalMapped := 0
+
+		for _, sgName := range devNames {
+			if err := scanCtx.Err(); err != nil {
+				return nil, err
+			}
+
+			if !isScsiGenericName(sgName) {
+				continue
+			}
+
+			deviceDirSymlink := filepath.Join("/sys/class/scsi_generic", sgName, "device")
+			absoluteDeviceDir, errLink := filepath.EvalSymlinks(deviceDirSymlink)
+			if errLink != nil {
+				logger.Debugf("[purgeScsiGhosts] entry %s - EvalSymlinks failed", sgName)
+				continue
+			}
+
+			hctl := filepath.Base(absoluteDeviceDir)
+			lun, ok := parseLunFromHctl(hctl)
+			if !ok {
+				continue
+			}
+
+			if totalMapped >= maxCapCeiling {
+				logger.Warningf("[VFS-Guard] Ghost tracking candidate map reached safe allocation ceiling (%d). Truncating scan pass.", maxCapCeiling)
+				break
+			}
+
+			devicesByLun[lun] = append(devicesByLun[lun], sgDeviceInfo{
+				sgName:    sgName,
+				hctl:      hctl,
+				deviceDir: absoluteDeviceDir,
+			})
+			totalMapped++
+		}
+
+		return devicesByLun, nil
+	})
+
+	if err != nil {
+		return nil, err
+	}
+	return v.(map[int][]sgDeviceInfo), nil
+}
+
+// processGhostCandidate verifies vendor/ghost state for a single device and triggers sysfs hot-unplug if stale.
+func (r *OsDeviceConnectivityHelperScsiGeneric) processGhostCandidate(
+	ctx context.Context,
+	candidate sgDeviceInfo,
+	expectedSerial string,
+) error {
+	serialNumber, _ := r.getHardwareSerial(ctx, candidate.deviceDir)
+
+	vendorBytesRaw, err := os.ReadFile(filepath.Join(candidate.deviceDir, "vendor"))
+	if err != nil {
+		logger.Debugf("[purgeScsiGhosts] read vendor failed for %s: %v", candidate.sgName, err)
+		return err
+	}
+	vdr := strings.ToUpper(strings.TrimSpace(string(vendorBytesRaw)))
+
+	ghostState, _ := r.IsSgDeviceGhost(ctx, candidate.sgName, serialNumber)
+	isIbmDevice := strings.Contains(vdr, "IBM")
+
+	if !(ghostState && isIbmDevice) {
+		return nil
+	}
+
+	logger.Warningf(
+		"Pruning stale SCSI device %s [Vendor: %s, Serial Match: %v, Ghost: %v]. Executing hot-unplug.",
+		candidate.sgName,
+		vdr,
+		serialNumber != "" && !r.IsSerialMatch(serialNumber, expectedSerial),
+		ghostState,
+	)
+
+	deletePath := filepath.Join(candidate.deviceDir, "delete")
+	if _, errStat := os.Stat(deletePath); os.IsNotExist(errStat) {
+		deletePath = fmt.Sprintf("/sys/bus/scsi/devices/%s/delete", candidate.hctl)
+	}
+
+	if errWrite := os.WriteFile(deletePath, []byte("1"), 0200); errWrite != nil {
+		logger.Errorf("Ghost Scrubber: failed to issue un-plug write configuration for target node %s: %v", candidate.sgName, errWrite)
+		return errWrite
+	}
+
+	return nil
+}
+
+func isScsiGenericName(name string) bool {
+	if !strings.HasPrefix(name, "sg") || len(name) < 3 {
+		return false
+	}
+	for i := 2; i < len(name); i++ {
+		if name[i] < '0' || name[i] > '9' {
+			return false
+		}
+	}
+	return true
+}
+
+func parseLunFromHctl(hctl string) (int, bool) {
+	parts := strings.Split(hctl, ":")
+	if len(parts) < 4 {
+		return 0, false
+	}
+	lun, err := strconv.Atoi(parts[3])
+	if err != nil {
+		return 0, false
+	}
+	return lun, true
 }
 
 // GetHCTLFromSg extracts the absolute Host:Channel:Target:Lun parameter mapping from a scsi_generic handle.
