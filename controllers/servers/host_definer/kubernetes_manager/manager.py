@@ -2,6 +2,10 @@
 import ast
 import datetime
 import base64
+import json
+import os
+import threading
+
 
 from kubernetes import client, config, dynamic
 from kubernetes.client import api_client
@@ -383,17 +387,69 @@ class KubernetesManager():
         pod_info.node_name = k8s_pod.spec.node_name
         return pod_info
 
+    _PV_LIST_SEMAPHORE = threading.Semaphore(int(os.getenv(settings.PV_LIST_MAX_CONCURRENT_ENV_VAR, "5").strip()))
+    _PV_LIST_CONNECT_TIMEOUT = int(os.getenv(settings.PV_LIST_CONNECT_TIMEOUT_ENV_VAR, "5").strip())
+    _PV_LIST_READ_TIMEOUT = int(os.getenv(settings.PV_LIST_READ_TIMEOUT_ENV_VAR, "30").strip())
+    _PV_LIST_TIMEOUT = (_PV_LIST_CONNECT_TIMEOUT, _PV_LIST_READ_TIMEOUT)  # (connect_timeout, read_timeout) in seconds
+
     def get_persistent_volume_by_volume_handle(self, volume_handle):
+        matched_item = None
+        retried_on_410 = False
+
         try:
-            pv_list = self.core_api.list_persistent_volume()
-            for pv in pv_list.items:
-                csi_source = getattr(pv.spec, 'csi', None)
-                if csi_source and hasattr(csi_source, 'volume_handle') and csi_source.volume_handle == volume_handle:
-                    return pv
-            return None
+            with self._PV_LIST_SEMAPHORE:
+                continue_token = None
+                while True:
+                    kwargs = {
+                        "_preload_content": False,
+                        "limit": 500,
+                        "_request_timeout": self._PV_LIST_TIMEOUT,
+                    }
+                    if continue_token:
+                        kwargs["_continue"] = continue_token
+
+                    try:
+                        raw_response = self.core_api.list_persistent_volume(**kwargs)
+                    except ApiException as ex:
+                        if ex.status == 410 and continue_token and not retried_on_410:
+                            logger.warning("PersistentVolume pagination token expired (410 Gone); restarting list.")
+                            continue_token = None
+                            retried_on_410 = True
+                            continue
+                        raise
+
+                    try:
+                        raw_data = raw_response.data
+                        if isinstance(raw_data, bytes):
+                            raw_data = raw_data.decode("utf-8")
+                        data = json.loads(raw_data)
+                    finally:
+                        raw_response.release_conn()
+
+                    for item in data.get("items", []):
+                        csi = (item.get("spec") or {}).get("csi")
+                        if csi and csi.get("volumeHandle") == volume_handle:
+                            matched_item = item
+                            break
+
+                    continue_token = (data.get("metadata") or {}).get("continue")
+                    del data
+
+                    if matched_item or not continue_token:
+                        break
+
         except ApiException as ex:
-            logger.error(f"Failed to list PersistentVolumes: {ex.body}")
+            logger.error(f"Failed to list PersistentVolumes (status={ex.status}): {ex.body}")
             return None
+        except (json.JSONDecodeError, UnicodeDecodeError) as ex:
+            logger.error(f"Failed to parse PersistentVolume list response: {ex}")
+            return None
+
+        if not matched_item:
+            return None
+
+        # Deserialize the single matched dict into a V1PersistentVolume locally
+        return self.core_api.api_client._ApiClient__deserialize(matched_item, "V1PersistentVolume")
 
     def get_storage_class(self, name):
         try:

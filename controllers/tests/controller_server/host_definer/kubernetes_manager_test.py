@@ -1,6 +1,8 @@
+import json
 import unittest
 from mock import Mock, patch
 from munch import Munch
+from kubernetes.client import ApiClient
 from kubernetes.client.rest import ApiException
 
 from controllers.servers.host_definer.kubernetes_manager.manager import KubernetesManager
@@ -17,58 +19,130 @@ class TestKubernetesManagerNewMethods(unittest.TestCase):
 
         # Mock the APIs
         self.k8s_manager.core_api = Mock()
+        self.k8s_manager.core_api.api_client = ApiClient()
         self.k8s_manager.storage_api = Mock()
 
     def tearDown(self):
         """Clean up after tests"""
         patch.stopall()
 
+    @staticmethod
+    def _make_pv_list_response(items, continue_token=None):
+        """Helper to create a raw HTTP response mock for _preload_content=False"""
+        metadata = {"continue": continue_token} if continue_token else {}
+        payload = {
+            "apiVersion": "v1",
+            "kind": "PersistentVolumeList",
+            "metadata": metadata,
+            "items": items,
+        }
+        mock_response = Mock()
+        mock_response.data = json.dumps(payload).encode("utf-8")
+        return mock_response
+
     def test_get_persistent_volume_by_volume_handle_found(self):
         """Test successful retrieval of PV by volume handle"""
 
-        mock_pv1 = Munch()
-        mock_pv1.metadata = Munch(name="pv1")
-        mock_pv1.spec = Munch()
-        mock_pv1.spec.csi = Munch(volume_handle="volume-handle-1")
+        pv1 = {
+            "metadata": {"name": "pv1"},
+            "spec": {"csi": {"driver": "test.csi", "volumeHandle": "volume-handle-1"}},
+        }
+        pv2 = {
+            "metadata": {"name": "pv2"},
+            "spec": {"csi": {"driver": "test.csi", "volumeHandle": "volume-handle-2"}},
+        }
 
-        mock_pv2 = Munch()
-        mock_pv2.metadata = Munch(name="pv2")
-        mock_pv2.spec = Munch()
-        mock_pv2.spec.csi = Munch(volume_handle="volume-handle-2")
-
-        mock_pv_list = Mock(items=[mock_pv1, mock_pv2])
-        self.k8s_manager.core_api.list_persistent_volume.return_value = mock_pv_list
+        mock_response = self._make_pv_list_response([pv1, pv2])
+        self.k8s_manager.core_api.list_persistent_volume.return_value = mock_response
 
         result = self.k8s_manager.get_persistent_volume_by_volume_handle("volume-handle-2")
 
         self.assertIsNotNone(result)
         self.assertEqual(result.metadata.name, "pv2")
+        self.assertEqual(result.spec.csi.volume_handle, "volume-handle-2")
         self.k8s_manager.core_api.list_persistent_volume.assert_called_once()
+        mock_response.release_conn.assert_called_once()
+
+    def test_get_persistent_volume_by_volume_handle_pagination(self):
+        """Test finding a PV across multiple paginated responses"""
+
+        pv1 = {
+            "metadata": {"name": "pv1"},
+            "spec": {"csi": {"driver": "test.csi", "volumeHandle": "volume-handle-1"}},
+        }
+        pv2 = {
+            "metadata": {"name": "pv2"},
+            "spec": {"csi": {"driver": "test.csi", "volumeHandle": "volume-handle-2"}},
+        }
+
+        page1 = self._make_pv_list_response([pv1], continue_token="token-page-2")
+        page2 = self._make_pv_list_response([pv2], continue_token=None)
+        self.k8s_manager.core_api.list_persistent_volume.side_effect = [page1, page2]
+
+        result = self.k8s_manager.get_persistent_volume_by_volume_handle("volume-handle-2")
+
+        self.assertIsNotNone(result)
+        self.assertEqual(result.metadata.name, "pv2")
+        self.assertEqual(self.k8s_manager.core_api.list_persistent_volume.call_count, 2)
+        second_call_kwargs = self.k8s_manager.core_api.list_persistent_volume.call_args_list[1].kwargs
+        self.assertEqual(second_call_kwargs["_continue"], "token-page-2")
+        page1.release_conn.assert_called_once()
+        page2.release_conn.assert_called_once()
+
+    def test_get_persistent_volume_by_volume_handle_410_retry(self):
+        """Test restarting pagination once when a continue token expires with 410 Gone"""
+
+        pv1 = {
+            "metadata": {"name": "pv1"},
+            "spec": {"csi": {"driver": "test.csi", "volumeHandle": "volume-handle-1"}},
+        }
+        pv2 = {
+            "metadata": {"name": "pv2"},
+            "spec": {"csi": {"driver": "test.csi", "volumeHandle": "volume-handle-2"}},
+        }
+
+        page1_initial = self._make_pv_list_response([pv1], continue_token="expired-token")
+        expired_exc = ApiException(status=410, reason="Gone")
+        page1_retry = self._make_pv_list_response([pv1, pv2], continue_token=None)
+
+        self.k8s_manager.core_api.list_persistent_volume.side_effect = [
+            page1_initial,
+            expired_exc,
+            page1_retry,
+        ]
+
+        result = self.k8s_manager.get_persistent_volume_by_volume_handle("volume-handle-2")
+
+        self.assertIsNotNone(result)
+        self.assertEqual(result.metadata.name, "pv2")
+        self.assertEqual(self.k8s_manager.core_api.list_persistent_volume.call_count, 3)
 
     def test_get_persistent_volume_by_volume_handle_not_found(self):
         """Test when PV with given volume handle doesn't exist"""
 
-        mock_pv1 = Munch()
-        mock_pv1.metadata = Munch(name="pv1")
-        mock_pv1.spec = Munch()
-        mock_pv1.spec.csi = Munch(volume_handle="volume-handle-1")
+        pv1 = {
+            "metadata": {"name": "pv1"},
+            "spec": {"csi": {"driver": "test.csi", "volumeHandle": "volume-handle-1"}},
+        }
 
-        mock_pv_list = Mock(items=[mock_pv1])
-        self.k8s_manager.core_api.list_persistent_volume.return_value = mock_pv_list
+        mock_response = self._make_pv_list_response([pv1])
+        self.k8s_manager.core_api.list_persistent_volume.return_value = mock_response
 
         result = self.k8s_manager.get_persistent_volume_by_volume_handle("non-existent-handle")
 
         self.assertIsNone(result)
+        mock_response.release_conn.assert_called_once()
 
     def test_get_persistent_volume_by_volume_handle_no_csi_spec(self):
         """Test when PV doesn't have CSI spec"""
 
-        mock_pv1 = Munch()
-        mock_pv1.metadata = Munch(name="pv1")
-        mock_pv1.spec = Munch()  # No csi attribute
+        pv1 = {
+            "metadata": {"name": "pv1"},
+            "spec": {},  # No csi field
+        }
 
-        mock_pv_list = Mock(items=[mock_pv1])
-        self.k8s_manager.core_api.list_persistent_volume.return_value = mock_pv_list
+        mock_response = self._make_pv_list_response([pv1])
+        self.k8s_manager.core_api.list_persistent_volume.return_value = mock_response
 
         result = self.k8s_manager.get_persistent_volume_by_volume_handle("any-handle")
 
@@ -77,13 +151,13 @@ class TestKubernetesManagerNewMethods(unittest.TestCase):
     def test_get_persistent_volume_by_volume_handle_no_volume_handle_attr(self):
         """Test when CSI spec doesn't have volume_handle attribute"""
 
-        mock_pv1 = Munch()
-        mock_pv1.metadata = Munch(name="pv1")
-        mock_pv1.spec = Munch()
-        mock_pv1.spec.csi = Munch()
+        pv1 = {
+            "metadata": {"name": "pv1"},
+            "spec": {"csi": {}},
+        }
 
-        mock_pv_list = Mock(items=[mock_pv1])
-        self.k8s_manager.core_api.list_persistent_volume.return_value = mock_pv_list
+        mock_response = self._make_pv_list_response([pv1])
+        self.k8s_manager.core_api.list_persistent_volume.return_value = mock_response
 
         result = self.k8s_manager.get_persistent_volume_by_volume_handle("any-handle")
 
@@ -92,12 +166,13 @@ class TestKubernetesManagerNewMethods(unittest.TestCase):
     def test_get_persistent_volume_by_volume_handle_empty_list(self):
         """Test when no PVs exist"""
 
-        mock_pv_list = Mock(items=[])
-        self.k8s_manager.core_api.list_persistent_volume.return_value = mock_pv_list
+        mock_response = self._make_pv_list_response([])
+        self.k8s_manager.core_api.list_persistent_volume.return_value = mock_response
 
         result = self.k8s_manager.get_persistent_volume_by_volume_handle("any-handle")
 
         self.assertIsNone(result)
+        mock_response.release_conn.assert_called_once()
 
     def test_get_persistent_volume_by_volume_handle_api_exception(self):
         """Test when API call raises exception"""
