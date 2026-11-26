@@ -53,6 +53,14 @@ def _get_config_map_info():
     else:
         result['csi_node_config'] = json.loads(cfgmap)
 
+    # Config map for controller
+    #
+    cfgmap = os.environ.get('CSI_CONTROLLER_CONFIG')
+    if not cfgmap or cfgmap == 'null':
+        result['csi_ctrl_config'] = {}
+    else:
+        result['csi_ctrl_config'] = json.loads(cfgmap)
+
     # Config map for hostdefiner
     #
     cfgmap = os.environ.get('CSI_HOSTDEFINER_CONFIG')
@@ -103,6 +111,14 @@ def _encode_to_base64(data, max_size=1024):
 def _default_callhome_metadata_aux():
     ch_info = {}
 
+    # Processor arch: one of 'x86_64', 's390x', 'ppc64'
+    #
+    ch_info["arch"] = platform.machine()
+
+    # Any user changes for config map
+    #
+    ch_info["config_map"] = _get_config_map_info()
+
     # Get token and CA cert from service account files
     #
     sa_dir = "/var/run/secrets/kubernetes.io/serviceaccount"
@@ -149,14 +165,6 @@ def _default_callhome_metadata_aux():
 
     if ocp_version:
         ch_info["ocp"] = ocp_version
-
-    # Processor arch: one of 'x86_64', 's390x', 'ppc64'
-    #
-    ch_info["arch"] = platform.machine()
-
-    # Any user changes for config map
-    #
-    ch_info["config_map"] = _get_config_map_info()
 
     callhome_metadata = _encode_to_base64(ch_info)
     return callhome_metadata
