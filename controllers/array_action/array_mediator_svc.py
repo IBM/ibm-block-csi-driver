@@ -263,6 +263,38 @@ def _get_ssh_port_from_environment():
     return int(os.environ.get('SVC_SSH_PORT', '22'))
 
 
+# Optional SSH keepalive settings. Maps an environment variable to the matching pysvc connect() argument.
+# The operator sets these variables only to valid values (a positive integer up to a maximum),
+# so the values are not validated here. The unit is part of each name (_SECONDS, _MS),
+# except for the probe count.
+# pysvc defaults:
+#   SVC_SSH_KEEPALIVE_INTERVAL_SECONDS - 15
+#   SVC_TCP_KEEPIDLE_SECONDS           - 15
+#   SVC_TCP_KEEPINTVL_SECONDS          - 5
+#   SVC_TCP_KEEPCNT                    - number of probes, 3
+#   SVC_TCP_USER_TIMEOUT_MS            - 30000
+SSH_KEEPALIVE_ENV_VARS = {
+    'SVC_SSH_KEEPALIVE_INTERVAL_SECONDS': 'keepalive_interval',
+    'SVC_TCP_KEEPIDLE_SECONDS': 'tcp_keepidle',
+    'SVC_TCP_KEEPINTVL_SECONDS': 'tcp_keepintvl',
+    'SVC_TCP_KEEPCNT': 'tcp_keepcnt',
+    'SVC_TCP_USER_TIMEOUT_MS': 'tcp_user_timeout',
+}
+
+
+def _get_ssh_keepalive_options_from_environment():
+    """Return the keepalive options that are set in the environment.
+
+    A missing or empty value is left out, so pysvc uses its default for it.
+    """
+    options = {}
+    for env_var, option_name in SSH_KEEPALIVE_ENV_VARS.items():
+        value = os.environ.get(env_var)
+        if value:
+            options[option_name] = int(value)
+    return options
+
+
 class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
     ARRAY_ACTIONS = {}
     BLOCK_SIZE_IN_BYTES = 512
@@ -331,7 +363,8 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
         logger.debug("Connecting to SVC {0}".format(self.endpoint))
         try:
             self.client = connect(self.endpoint, username=self.user,
-                                  password=self.password, port=self.port)
+                                  password=self.password, port=self.port,
+                                  **_get_ssh_keepalive_options_from_environment())
             if Version(self._code_level) < Version(self.MIN_SUPPORTED_VERSION):
                 raise array_errors.UnsupportedStorageVersionError(
                     self._code_level, self.MIN_SUPPORTED_VERSION
