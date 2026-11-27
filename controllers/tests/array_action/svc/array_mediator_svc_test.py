@@ -77,7 +77,6 @@ class TestArrayMediatorSVC(unittest.TestCase):
                       svc_settings.FCMAP_COPY_RATE_ATTR_KEY: svc_settings.DUMMY_COPY_RATE,
                       svc_settings.FCMAP_RC_CONTROLLED_ATTR_KEY: svc_settings.NO_VALUE_ALIAS})
 
-    @patch("controllers.array_action.array_mediator_svc.connect")
     def test_get_nvme_fc_target_ports_filters_ports_on_array(self):
         self.svc.client.svcinfo.lstargetportfc.return_value = [
             Munch({'WWPN': 'ABCDEF', 'WWNN': '123456'})
@@ -1732,6 +1731,18 @@ class TestArrayMediatorSVC(unittest.TestCase):
         self.assertEqual({array_settings.NVME_OVER_FC_CONNECTIVITY_TYPE}, connectivity_types)
         self.svc.client.svcinfo.lsnvmefabric.assert_called_once_with(remotenqn=array_settings.DUMMY_NVME_NQN1)
 
+    def test_get_host_by_identifiers_return_nvme_tcp_host_by_host_protocol(self):
+        self._prepare_mocks_for_get_host_by_identifiers(nvme_host_names=[array_settings.DUMMY_HOST_NAME3],
+                                                        connectivity_types=[
+                                                            array_settings.NVME_OVER_FC_CONNECTIVITY_TYPE])
+        self._prepare_mocks_for_get_host_with_ports(svc_settings.HOST_NQN)
+        self.svc.client.svcinfo.lshost.return_value.as_single_element[
+            svc_settings.HOST_PROTOCOL] = svc_settings.MKHOST_TCPNVME_PROTOCOL_VALUE
+        hostname, connectivity_types = self.svc.get_host_by_host_identifiers(
+            Initiators([array_settings.DUMMY_NVME_NQN1], [], []))
+        self.assertEqual(array_settings.DUMMY_HOST_NAME3, hostname)
+        self.assertEqual({array_settings.NVME_OVER_TCP_CONNECTIVITY_TYPE}, connectivity_types)
+
     @patch.object(SVCResponse, svc_settings.SVC_RESPONSE_AS_LIST, new_callable=PropertyMock)
     def test_get_host_by_identifiers_slow_no_other_ports_return_nvme_host(self, svc_response):
         host_with_nqn = self._get_host_as_munch(array_settings.DUMMY_HOST_ID1, common_settings.HOST_NAME,
@@ -1857,10 +1868,11 @@ class TestArrayMediatorSVC(unittest.TestCase):
             connectivity_types)
 
     def _get_host_as_munch(self, host_id, host_name, nqn_list=None, wwpns_list=None, iscsi_names_list=None,
-                           portset_id=None):
+                           portset_id=None, protocol=svc_settings.MKHOST_FCNVME_PROTOCOL_VALUE):
         host = Munch(id=host_id, name=host_name)
         if nqn_list:
             host.nqn = nqn_list
+            host.protocol = protocol
         if wwpns_list:
             host.WWPN = wwpns_list
         if iscsi_names_list:
@@ -2605,24 +2617,24 @@ class TestArrayMediatorSVC(unittest.TestCase):
         with self.assertRaises(array_errors.UnsupportedConnectivityTypeError):
             self.svc.get_host_connectivity_ports(common_settings.HOST_NAME, 'some_connectivity_type')
 
-    def _test_get_host_connectivity_type(self, connectivity_attribute_name, connectivity_type):
+    def _test_get_host_connectivity_type(self, connectivity_attribute_name, connectivity_type, protocol=None):
         self._prepare_mocks_for_get_host_with_ports(connectivity_attribute_name)
+        if protocol:
+            self.svc.client.svcinfo.lshost.return_value.as_single_element[svc_settings.HOST_PROTOCOL] = protocol
         result = self.svc.get_host_connectivity_type(common_settings.HOST_NAME)
         self.assertEqual(result, connectivity_type)
 
     def test_get_host_connectivity_type_success(self):
-        self._test_get_host_connectivity_type(svc_settings.HOST_NQN, array_settings.NVME_OVER_FC_CONNECTIVITY_TYPE)
+        self._test_get_host_connectivity_type(svc_settings.HOST_NQN, array_settings.NVME_OVER_FC_CONNECTIVITY_TYPE,
+                                              svc_settings.MKHOST_FCNVME_PROTOCOL_VALUE)
+        self._test_get_host_connectivity_type(svc_settings.HOST_NQN, array_settings.NVME_OVER_TCP_CONNECTIVITY_TYPE,
+                                              svc_settings.MKHOST_TCPNVME_PROTOCOL_VALUE)
         self._test_get_host_connectivity_type(svc_settings.HOST_WWPN, array_settings.FC_CONNECTIVITY_TYPE)
         self._test_get_host_connectivity_type(svc_settings.HOST_ISCSI_NAME, array_settings.ISCSI_CONNECTIVITY_TYPE)
         self._test_get_host_connectivity_type('some_connectivity_attribute_name', None)
 
-    def test_get_host_connectivity_type_nvme_tcp(self):
-        self.svc.client.svcinfo.lshost = Mock()
-        self.svc.client.svcinfo.lshost.return_value = Mock(as_single_element=Munch({
-            svc_settings.HOST_NQN: ['port1', 'port2'],
-            svc_settings.HOST_PROTOCOL: 'tcpnvme'}))
-        result = self.svc.get_host_connectivity_type(common_settings.HOST_NAME)
-        self.assertEqual(result, array_settings.NVME_OVER_TCP_CONNECTIVITY_TYPE)
+    def test_get_host_connectivity_type_nvme_without_protocol_returns_none(self):
+        self._test_get_host_connectivity_type(svc_settings.HOST_NQN, None)
 
     def test_add_io_group_to_host_success(self):
         self.svc.add_io_group_to_host(common_settings.HOST_NAME, array_settings.DUMMY_MULTIPLE_IO_GROUP_STRING)

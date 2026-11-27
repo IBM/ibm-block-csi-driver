@@ -1344,6 +1344,14 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
                 return iscsi_login.host_name
         return None
 
+    def _get_nvme_connectivity_type_by_host_protocol(self, host_names, default_connectivity_type):
+        # The node annotation carries the same NQN under both nvmeofc and nvmetcp keys, so the transport
+        # derived from the initiators is only a guess. The host protocol on the array is the source of truth.
+        connectivity_types = set()
+        for host_name in filter(None, host_names):
+            connectivity_types.add(self.get_host_connectivity_type(host_name) or default_connectivity_type)
+        return connectivity_types or {default_connectivity_type}
+
     def _get_host_names_and_connectivity_types(self, initiators):
         host_names = set()
         connectivity_types = set()
@@ -1352,7 +1360,8 @@ class SVCArrayMediator(ArrayMediatorAbstract, VolumeGroupInterface):
                 nvme_host_names = self._get_host_names_by_nqn(initiator)
                 if nvme_host_names:
                     host_names.update(nvme_host_names)
-                    connectivity_types.add(connectivity_type)
+                    connectivity_types.update(
+                        self._get_nvme_connectivity_type_by_host_protocol(nvme_host_names, connectivity_type))
             elif connectivity_type == array_settings.FC_CONNECTIVITY_TYPE:
                 fc_host_names = self._get_host_names_by_wwpn(initiator)
                 if fc_host_names:
